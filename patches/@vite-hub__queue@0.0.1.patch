@@ -1,0 +1,81 @@
+diff --git a/dist/vite.js b/dist/vite.js
+index 78318fa3f32e84d57720b31138868dafaf1b6d83..a96fca39a18c787f9e9fdbb4cc174a06f7225139 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -950,6 +950,7 @@ function discoverQueueDefinitions(options) {
+ const queuePackageName = "@vite-hub/queue";
+ const productName = "queue";
+ const generatedRegistryFileName = "registry.mjs";
++const generatedNitroPlugin = ".vitehub/nitro/queue/plugin.ts";
+ const packageDir = computePackageDir(import.meta.url);
+ const resolveRuntimeModule = (modulePath) => resolveRuntimeModule$1(packageDir, modulePath);
+ const providerEntrySpecs = [{
+@@ -1038,6 +1039,52 @@ function createCloudflareQueueBindings(definitions) {
+ 		}))
+ 	};
+ }
++function cloneNitroConfig(value) {
++	return value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {};
++}
++function mergeNitroConfig(value) {
++	const nitro = cloneNitroConfig(value);
++	const plugins = Array.isArray(nitro.plugins) ? [...nitro.plugins] : [];
++	if (!plugins.includes(generatedNitroPlugin)) plugins.push(generatedNitroPlugin);
++	return {
++		...nitro,
++		plugins
++	};
++}
++function renderNitroPlugin(pluginFile, registryFile, queueConfig) {
++	const cloudflare = queueConfig !== false && queueConfig?.provider === "cloudflare";
++	return [
++		"import { definePlugin } from 'nitro'",
++		...cloudflare ? ["import { createQueueCloudflareWorker } from '@vite-hub/queue/runtime/cloudflare-vite'"] : [],
++		"import { setQueueRuntimeConfig, setQueueRuntimeRegistry } from '@vite-hub/queue/runtime/state'",
++		`import queueRegistry from ${JSON.stringify(createImportPath(pluginFile, registryFile))}`,
++		"",
++		`const queueConfig = ${JSON.stringify(queueConfig, null, 2)}`,
++		...cloudflare ? ["const queueWorker = createQueueCloudflareWorker({ queue: queueConfig, registry: queueRegistry })"] : [],
++		"",
++		"export default definePlugin((nitro) => {",
++		"  setQueueRuntimeConfig(queueConfig)",
++		"  setQueueRuntimeRegistry(queueRegistry)",
++		...cloudflare ? ["  nitro.hooks.hook('cloudflare:queue', ({ batch, context, env }) => queueWorker.queue(batch, env, context))"] : [],
++		"})",
++		""
++	].join("\n");
++}
++async function writeNitroIntegration(rootDir, queue) {
++	const generatedDir = ensureGeneratedDir(rootDir, productName);
++	const registryFile = resolve(generatedDir, generatedRegistryFileName);
++	const pluginFile = resolve(rootDir, generatedNitroPlugin);
++	const definitions = discoverQueueDefinitions({ rootDir });
++	const queueConfig = resolveOutputQueueConfig(queue, queue?.provider === "cloudflare" ? "cloudflare" : "vercel");
++	await Promise.all([
++		mkdir(dirname(pluginFile), { recursive: true }),
++		mkdir(generatedDir, { recursive: true })
++	]);
++	await Promise.all([
++		writeFile(registryFile, createRuntimeRegistryContents(registryFile, definitions), "utf8"),
++		writeFile(pluginFile, renderNitroPlugin(pluginFile, registryFile, queueConfig), "utf8")
++	]);
++}
+ async function createCloudflareQueueConfig(options = {}) {
+ 	const rootDir = resolve(process.cwd(), options.rootDir || ".");
+ 	const queues = createCloudflareQueueBindings((await writeProviderEntries(rootDir, { provider: "cloudflare" })).definitions);
+@@ -1276,10 +1323,14 @@ function hubQueue(options) {
+ 		} },
+ 		config(config) {
+ 			queue = config.queue ?? queue;
++			const nitro = mergeNitroConfig(config.nitro);
++			config.nitro = nitro;
++			return { nitro };
+ 		},
+-		configResolved(config) {
++		async configResolved(config) {
+ 			resolved = config;
+ 			queue = config.queue ?? queue;
++			await writeNitroIntegration(config.root, queue);
+ 		},
+ 		configEnvironment(name, config) {
+ 			if (!isServerEnvironment(name, config)) return;

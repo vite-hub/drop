@@ -1,0 +1,12 @@
+{
+  "skills": [
+    {
+      "name": "upload-image",
+      "description": "Uploads an image through Drop and replaces its temporary URL with GitHub's rendered Camo URL.",
+      "files": [
+        "SKILL.md",
+        "scripts/upload-image.mjs"
+      ]
+    }
+  ]
+}

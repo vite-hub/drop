@@ -1,0 +1,21 @@
+diff --git a/dist/state-BhoRVVFd.js b/dist/state-BhoRVVFd.js
+index 97789458e70238c077a4c185714d50fa57567231..226c1132110df5e87edd3782b83eeff0af75f5c7 100644
+--- a/dist/state-BhoRVVFd.js
++++ b/dist/state-BhoRVVFd.js
+@@ -15,10 +15,12 @@ function getRateLimitLimiterCache() {
+ 	return limiterCache;
+ }
+ function enterRateLimitRuntimeEvent(event, requestKey) {
+-	runtimeEventStorage.enterWith({
+-		event,
+-		requestKey
+-	});
++	try {
++		runtimeEventStorage.enterWith({
++			event,
++			requestKey
++		});
++	} catch {}
+ 	setActiveCloudflareEnv(getCloudflareEnv(event));
+ }
+ function runWithRateLimitRuntimeEvent(event, callback, requestKey) {

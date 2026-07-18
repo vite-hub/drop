@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0d0c">
+  <meta name="application-name" content="Drop">
+  <meta name="description" content="Drop gives agents a temporary image URL they can post on GitHub and replace with GitHub's rendered URL.">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Drop">
+  <meta property="og:title" content="Drop | Agent drops images">
+  <meta property="og:description" content="Drop gives agents a temporary image URL they can post on GitHub and replace with GitHub's rendered URL.">
+  <meta property="og:url" content="https://drop.vitehub.dev/">
+  <meta property="og:image" content="https://drop.vitehub.dev/og.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ViteHub Drop. From temporary upload to GitHub-rendered image.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Drop | Agent drops images">
+  <meta name="twitter:description" content="Drop gives agents a temporary image URL they can post on GitHub and replace with GitHub's rendered URL.">
+  <meta name="twitter:image" content="https://drop.vitehub.dev/og.png">
+  <meta name="twitter:image:alt" content="ViteHub Drop. From temporary upload to GitHub-rendered image.">
+  <title>Drop | Agent drops images</title>
+  <link rel="canonical" href="https://drop.vitehub.dev/">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23b8f56b' d='M16 2S6 14 6 21a10 10 0 0 0 20 0C26 14 16 2 16 2Z'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: oklch(12% 0.008 145);
+      --surface: oklch(15% 0.01 145);
+      --line: oklch(26% 0.014 145);
+      --text: oklch(96% 0.008 105);
+      --muted: oklch(70% 0.012 120);
+      --accent: oklch(87% 0.18 125);
+      font-family: "Helvetica Neue", "Nimbus Sans L", sans-serif;
+      font-synthesis: none;
+      font-kerning: normal;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-width: 20rem;
+      min-height: 100svh;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      width: min(45rem, calc(100% - 3rem));
+      margin: 0 auto;
+      padding: clamp(3rem, 10vh, 6rem) 0 max(2rem, env(safe-area-inset-bottom));
+    }
+
+    .intro {
+      min-height: calc(100svh - clamp(5rem, 14vh, 8rem));
+      display: grid;
+    }
+
+    .hero {
+      align-self: center;
+    }
+
+    h1 {
+      margin: 0 0 1.5rem -0.055em;
+      display: flex;
+      align-items: center;
+      gap: 0.16em;
+      font-size: clamp(3.75rem, 9vw, 5.75rem);
+      font-weight: 600;
+      letter-spacing: -0.06em;
+      line-height: 0.88;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 0.72em;
+      height: 0.72em;
+      flex: none;
+    }
+
+    .brand-name {
+      letter-spacing: 0;
+    }
+
+    .lede {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 4.4vw, 1.45rem);
+      line-height: 1.45;
+      white-space: nowrap;
+    }
+
+    .command {
+      width: 100%;
+      min-height: 4rem;
+      margin: clamp(2.5rem, 7vh, 3.5rem) 0 1.5rem;
+      padding: 1rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 180ms ease-out, background 180ms ease-out;
+    }
+
+    .command code {
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.95rem;
+      font-variant-ligatures: none;
+      line-height: 1.5;
+    }
+
+    .command span {
+      flex: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .command:hover {
+      border-color: var(--accent);
+      background: oklch(17% 0.016 125);
+    }
+
+    .command:focus-visible,
+    a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 2rem;
+    }
+
+    .link-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 1.5rem;
+    }
+
+    .external-links {
+      margin-left: auto;
+    }
+
+    .external-links a {
+      gap: 0.4rem;
+    }
+
+    .link-icon {
+      width: 1em;
+      height: 1em;
+      flex: none;
+    }
+
+    a {
+      min-height: 2.75rem;
+      display: inline-flex;
+      align-items: center;
+      color: var(--accent);
+      font-size: 1.05rem;
+      text-underline-offset: 0.32em;
+      text-decoration-thickness: 1px;
+    }
+
+    .doc-section {
+      padding: clamp(5rem, 11vw, 8rem) 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.25rem;
+      border-top: 1px solid var(--line);
+      scroll-margin-top: 2rem;
+    }
+
+    .section-content {
+      margin-inline-start: -0.25rem;
+    }
+
+    .api {
+      --typeset-size: 1rem;
+      --typeset-leading: 1.75;
+      --typeset-flow: 1.25rem;
+    }
+
+    #why {
+      padding: clamp(4rem, 8vw, 6rem) 0;
+      gap: 0.75rem;
+      border-top: 0;
+    }
+
+    #why .section-content {
+      margin-inline-start: 0;
+    }
+
+    .section-label {
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.875rem;
+      letter-spacing: 0.08em;
+      line-height: 1.6;
+      text-transform: uppercase;
+    }
+
+    .section-content h2 {
+      margin: 0;
+      max-width: 18ch;
+      font-size: clamp(2.5rem, 7vw, 4.5rem);
+      font-weight: 600;
+      letter-spacing: -0.055em;
+      line-height: 0.98;
+      text-wrap: balance;
+    }
+
+    .section-content > p {
+      max-width: 40rem;
+      margin: 1.5rem 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.75;
+      text-wrap: pretty;
+    }
+
+    .section-content > p a {
+      min-height: 0;
+      display: inline;
+      color: inherit;
+      font-size: inherit;
+      text-decoration-color: var(--line);
+    }
+
+    .section-content > p a:hover {
+      color: var(--text);
+      text-decoration-color: var(--accent);
+    }
+
+    .stepper {
+      max-width: 40rem;
+      margin: clamp(2.5rem, 6vw, 3.5rem) 0 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      list-style: none;
+    }
+
+    .stepper-item {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 1.75rem minmax(0, 1fr);
+      column-gap: 0.875rem;
+    }
+
+    .stepper-track {
+      display: flex;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    .stepper-indicator {
+      width: 1.75rem;
+      height: 1.75rem;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .stepper-separator {
+      width: 1px;
+      min-height: 1rem;
+      margin: 0.4rem 0;
+      flex: 1;
+      background: var(--line);
+    }
+
+    .stepper-item:last-child .stepper-separator {
+      display: none;
+    }
+
+    .stepper-copy {
+      padding: 0.125rem 0 1.5rem;
+    }
+
+    .stepper-item:last-child .stepper-copy {
+      padding-bottom: 0;
+    }
+
+    .stepper-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .stepper-description {
+      max-width: 36rem;
+      margin: 0.3rem 0 0;
+      color: var(--muted);
+      font-size: 0.925rem;
+      line-height: 1.6;
+      text-wrap: pretty;
+    }
+
+    .stepper-description a {
+      min-height: 0;
+      display: inline;
+      font-size: inherit;
+    }
+
+    .api .section-content > p {
+      margin-block-start: var(--typeset-flow);
+      font-size: var(--typeset-size);
+      line-height: var(--typeset-leading);
+    }
+
+    .api h2 code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.72em;
+      font-weight: 500;
+      letter-spacing: -0.045em;
+    }
+
+    .api h3 {
+      margin: 4rem 0 1rem;
+      font-size: 1.35rem;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+    }
+
+    pre {
+      margin: 1.5rem 0 0;
+      padding: 1.25rem;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.65;
+      tab-size: 2;
+    }
+
+    .behavior {
+      margin: var(--typeset-flow) 0 0;
+      color: var(--muted);
+      font-size: var(--typeset-size);
+      line-height: var(--typeset-leading);
+      text-wrap: pretty;
+    }
+
+    .limit-list {
+      padding-left: 1.2rem;
+    }
+
+    .limit-list li + li {
+      margin-top: 0.35rem;
+    }
+
+    .section-content p code {
+      padding: 0.15em 0.3em;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.875em;
+      font-weight: 600;
+    }
+
+    .api table {
+      width: 100%;
+      border-collapse: collapse;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .api th,
+    .api td {
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .api th {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .api th:first-child,
+    .api td:first-child {
+      width: 4.5rem;
+      padding-right: 1rem;
+    }
+
+    .hero > * {
+      animation: arrive 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .hero > :nth-child(2) { animation-delay: 60ms; }
+    .hero > :nth-child(3) { animation-delay: 120ms; }
+    .hero > :nth-child(4) { animation-delay: 180ms; }
+    @keyframes arrive {
+      from { opacity: 0; transform: translateY(0.75rem); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 34rem) {
+      main {
+        width: min(100% - 2rem, 45rem);
+        padding-top: 3rem;
+      }
+
+      .intro {
+        min-height: calc(100svh - 5rem);
+      }
+
+      h1 {
+        font-size: clamp(2.625rem, 13.8vw, 3.75rem);
+      }
+
+      .command {
+        align-items: flex-start;
+      }
+
+      .doc-section {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.25rem;
+      }
+
+      #why {
+        padding: 3.5rem 0;
+        gap: 0.6rem;
+      }
+
+      .stepper {
+        margin-top: 2rem;
+      }
+
+      .api thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .api tbody,
+      .api tr,
+      .api td {
+        display: block;
+        width: 100%;
+      }
+
+      .api tr {
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .api td,
+      .api td:first-child {
+        padding: 0;
+        border: 0;
+      }
+
+      .api td:first-child {
+        width: auto;
+        margin-bottom: 0.35rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      .hero > * {
+        animation: none;
+      }
+
+      .command {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="intro">
+      <div class="hero" aria-labelledby="title">
+        <h1 id="title">
+          <svg class="brand-mark" viewBox="0 0 84 84" aria-hidden="true">
+            <path fill="var(--accent)" d="M42 7S18 36 18 52a24 24 0 0 0 48 0C66 36 42 7 42 7Z"/>
+          </svg>
+          <span class="brand-name">ViteHub</span>
+          <span>Drop</span>
+        </h1>
+        <p class="lede">So your agent can post images on GitHub.</p>
+        <button class="command" type="button" data-copy aria-label="Copy skill install command">
+          <code>npx skills add https://drop.vitehub.dev</code>
+          <span aria-live="polite">Copy skill</span>
+        </button>
+        <nav class="links" aria-label="Service links">
+          <span class="link-group">
+            <a href="#why">How and why</a>
+            <a href="#api">Skill</a>
+          </span>
+          <span class="link-group external-links">
+            <a href="https://vitehub.dev">
+              <svg class="link-icon" viewBox="0 0 20 18" aria-hidden="true">
+                <path fill="currentColor" d="M19.734 8.156 15.576.844A1.66 1.66 0 0 0 14.135 0H5.819C5.226 0 4.677.32 4.38.844L.222 8.156a1.71 1.71 0 0 0 0 1.688l4.158 7.312c.297.523.846.844 1.439.844h8.316c.593 0 1.142-.32 1.438-.844l4.158-7.312c.3-.523.3-1.165.003-1.688Z"/>
+              </svg>
+              <span>Built with ViteHub</span>
+            </a>
+            <a href="https://github.com/vite-hub/drop">
+              <svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+              </svg>
+              <span>GitHub</span>
+            </a>
+          </span>
+        </nav>
+      </div>
+    </section>
+
+    <section class="doc-section" id="why" aria-labelledby="why-title">
+      <div class="section-label">How and why</div>
+      <div class="section-content">
+        <h2 id="why-title">Programmatically upload pictures to GitHub</h2>
+        <p>Agents have no easy way to upload images to GitHub because there is no standard MCP tool or ready-made skill. ViteHub Drop provides the missing upload workflow.</p>
+        <ol class="stepper" aria-label="How it works">
+          <li class="stepper-item">
+            <div class="stepper-track" aria-hidden="true">
+              <span class="stepper-indicator">1</span>
+              <span class="stepper-separator"></span>
+            </div>
+            <div class="stepper-copy">
+              <h3 class="stepper-title">Upload</h3>
+              <p class="stepper-description">The agent uploads the image and gets a temporary <code>DROP_URL</code>.</p>
+            </div>
+          </li>
+          <li class="stepper-item">
+            <div class="stepper-track" aria-hidden="true">
+              <span class="stepper-indicator">2</span>
+              <span class="stepper-separator"></span>
+            </div>
+            <div class="stepper-copy">
+              <h3 class="stepper-title">Render</h3>
+              <p class="stepper-description">The agent posts <code>![image](DROP_URL)</code> to a GitHub issue or pull request.</p>
+            </div>
+          </li>
+          <li class="stepper-item">
+            <div class="stepper-track" aria-hidden="true">
+              <span class="stepper-indicator">3</span>
+              <span class="stepper-separator"></span>
+            </div>
+            <div class="stepper-copy">
+              <h3 class="stepper-title">Post</h3>
+              <p class="stepper-description">GitHub returns a <code>camo.githubusercontent.com</code> URL for the agent to use. <a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-anonymized-urls">How Camo works.</a></p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="doc-section api" id="api" aria-labelledby="api-title">
+      <div class="section-label">Skill</div>
+      <div class="section-content">
+        <h2 id="api-title">Upload Image to GitHub</h2>
+        <p>The installed skill includes a script that validates the image, uploads it to Drop, resolves it through GitHub, and prints the Camo URL.</p>
+        <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/image.png"</code></pre>
+
+        <h3>Limits</h3>
+        <ul class="behavior limit-list">
+          <li>One PNG, JPEG, or WebP image per request, up to 4 MiB.</li>
+          <li>Target: 5 upload attempts per source address every 60 seconds.</li>
+          <li>On <code>429</code>, wait for <code>Retry-After</code> before retrying.</li>
+        </ul>
+
+        <h3 id="errors-title">Errors</h3>
+        <table aria-labelledby="errors-title">
+          <thead>
+            <tr><th scope="col">Status</th><th scope="col">Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>400</code></td><td>A missing content type, malformed multipart data, a missing or repeated image, or an unexpected field.</td></tr>
+            <tr><td><code>413</code></td><td>The image exceeds 4 MiB or the request exceeds 4 MiB plus 64 KiB.</td></tr>
+            <tr><td><code>415</code></td><td>The request is not multipart data, the image format is unsupported, or its signature does not match the declared type.</td></tr>
+            <tr><td><code>422</code></td><td>The content type header is malformed.</td></tr>
+            <tr><td><code>429</code></td><td>The upload rate limit was reached; retry after 60 seconds.</td></tr>
+            <tr><td><code>503</code></td><td>Rate limiting, storage, or the expiry queue is unavailable.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+  <script>
+    const button = document.querySelector("[data-copy]")
+    const label = button.querySelector("span")
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText("npx skills add https://drop.vitehub.dev")
+      label.textContent = "Copied"
+      window.setTimeout(() => { label.textContent = "Copy skill" }, 1400)
+    })
+  </script>
+</body>
+</html>
