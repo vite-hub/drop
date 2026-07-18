@@ -588,7 +588,7 @@
           <code>npx skills add https://drop.vitehub.dev</code>
           <span aria-live="polite">Copy skill</span>
         </button>
-        <p class="usage-proof" data-usage-proof data-loading aria-live="polite"><strong data-upload-count>0</strong> <span data-upload-label>images uploaded</span></p>
+        <p class="usage-proof" data-usage-proof data-loading aria-live="polite"><strong data-upload-count>1,000+</strong> <span>images uploaded by agents</span></p>
         <nav class="links" aria-label="Service links">
           <span class="link-group">
             <a href="#why">How and why</a>
@@ -736,9 +736,9 @@
     fetch("/api/stats")
       .then(response => response.ok ? response.json() : Promise.reject())
       .then(({ uploads }) => {
-        if (!Number.isSafeInteger(uploads) || uploads < 1) return
-        usageProof.querySelector("[data-upload-count]").textContent = uploads.toLocaleString()
-        usageProof.querySelector("[data-upload-label]").textContent = uploads === 1 ? "image uploaded" : "images uploaded"
+        if (!Number.isSafeInteger(uploads) || uploads < 1000) return
+        const roundedUploads = Math.floor(uploads / 1000) * 1000
+        usageProof.querySelector("[data-upload-count]").textContent = `${roundedUploads.toLocaleString()}+`
         usageProof.removeAttribute("data-loading")
       })
       .catch(() => {})
