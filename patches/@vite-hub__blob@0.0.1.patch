@@ -1,0 +1,57 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index b54817f2aed76a52707eda076c1f81dd26ba8a27..d58bf979a117b094464978de97c018a238b695d2 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,4 +1,25 @@
+ import { A as ResolvedCloudflareR2BlobStoreConfig, C as GoogleDriveBlobStoreConfig, D as OneDriveBlobStoreConfig, E as NetlifyBlobsStoreConfig, F as StorjBlobStoreConfig, I as SupabaseBlobStoreConfig, L as UploadThingBlobStoreConfig, M as ResolvedMinioBlobStoreConfig, N as ResolvedVercelBlobStoreConfig, O as ResolvedBlobModuleOptions, P as S3BlobStoreConfig, R as VercelBlobStoreConfig, S as GcsBlobStoreConfig, T as MinioBlobStoreConfig, _ as BoxBlobStoreConfig, a as BlobEnsureOptions, b as DropboxBlobStoreConfig, c as BlobModuleOptions, d as BlobSignOptions, f as BlobSignedRequest, g as BlobType, h as BlobStoreConfig, j as ResolvedFsBlobStoreConfig, k as ResolvedBlobStoreConfig, l as BlobObject, m as BlobStorage, n as AzureBlobStoreConfig, o as BlobListOptions, p as BlobSize, r as BlobDriver, s as BlobListResult, t as AkamaiBlobStoreConfig, u as BlobPutOptions, v as CloudflareR2BlobStoreConfig, w as HetznerBlobStoreConfig, x as FsBlobStoreConfig, y as DigitalOceanSpacesBlobStoreConfig } from "./types-CdpMG_4f.js";
+ import { ensureBlob } from "./ensure.js";
+ import { blob } from "./runtime/storage.js";
+-export { type AkamaiBlobStoreConfig, type AzureBlobStoreConfig, type BlobDriver, type BlobEnsureOptions, type BlobListOptions, type BlobListResult, type BlobModuleOptions, type BlobObject, type BlobPutOptions, type BlobSignOptions, type BlobSignedRequest, type BlobSize, type BlobStorage, type BlobStoreConfig, type BlobType, type BoxBlobStoreConfig, type CloudflareR2BlobStoreConfig, type DigitalOceanSpacesBlobStoreConfig, type DropboxBlobStoreConfig, type FsBlobStoreConfig, type GcsBlobStoreConfig, type GoogleDriveBlobStoreConfig, type HetznerBlobStoreConfig, type MinioBlobStoreConfig, type NetlifyBlobsStoreConfig, type OneDriveBlobStoreConfig, type ResolvedBlobModuleOptions, type ResolvedBlobStoreConfig, type ResolvedCloudflareR2BlobStoreConfig, type ResolvedFsBlobStoreConfig, type ResolvedMinioBlobStoreConfig, type ResolvedVercelBlobStoreConfig, type S3BlobStoreConfig, type StorjBlobStoreConfig, type SupabaseBlobStoreConfig, type UploadThingBlobStoreConfig, type VercelBlobStoreConfig, blob, ensureBlob };
+\ No newline at end of file
++import type { EventHandler } from "h3";
++type BlobPathnameSchemaResult<TPathname extends string> = {
++    readonly value: TPathname;
++    readonly issues?: undefined;
++} | {
++    readonly issues: readonly unknown[];
++};
++interface BlobPathnameSchema<TPathname extends string = string> {
++    readonly "~standard": {
++        readonly validate: (value: unknown) => BlobPathnameSchemaResult<TPathname> | Promise<BlobPathnameSchemaResult<TPathname>>;
++    };
++}
++interface BlobServeHandlerOptions<TPathname extends string = string> {
++    decode?: boolean;
++    headers?: Record<string, string>;
++    notFound?: string;
++    param?: string;
++    schema?: BlobPathnameSchema<TPathname>;
++    store?: string;
++}
++declare function defineBlobServeHandler<TPathname extends string = string>(options?: BlobServeHandlerOptions<TPathname>): EventHandler;
++export { type AkamaiBlobStoreConfig, type AzureBlobStoreConfig, type BlobDriver, type BlobEnsureOptions, type BlobListOptions, type BlobListResult, type BlobModuleOptions, type BlobObject, type BlobPathnameSchema, type BlobPutOptions, type BlobServeHandlerOptions, type BlobSignOptions, type BlobSignedRequest, type BlobSize, type BlobStorage, type BlobStoreConfig, type BlobType, type BoxBlobStoreConfig, type CloudflareR2BlobStoreConfig, type DigitalOceanSpacesBlobStoreConfig, type DropboxBlobStoreConfig, type FsBlobStoreConfig, type GcsBlobStoreConfig, type GoogleDriveBlobStoreConfig, type HetznerBlobStoreConfig, type MinioBlobStoreConfig, type NetlifyBlobsStoreConfig, type OneDriveBlobStoreConfig, type ResolvedBlobModuleOptions, type ResolvedBlobStoreConfig, type ResolvedCloudflareR2BlobStoreConfig, type ResolvedFsBlobStoreConfig, type ResolvedMinioBlobStoreConfig, type ResolvedVercelBlobStoreConfig, type S3BlobStoreConfig, type StorjBlobStoreConfig, type SupabaseBlobStoreConfig, type UploadThingBlobStoreConfig, type VercelBlobStoreConfig, blob, defineBlobServeHandler, ensureBlob };
+diff --git a/dist/index.js b/dist/index.js
+index 27b87d5df31e8f15ca27861b7f0236f891e3e253..02f6d32355183a94acbeaa567d58b7069dedc20a 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,3 +1,19 @@
+ import { ensureBlob } from "./ensure.js";
+ import { blob } from "./runtime/storage.js";
+-export { blob, ensureBlob };
++import { defineHandler, getRouterParam, HTTPError, setHeaders } from "h3";
++function defineBlobServeHandler(options = {}) {
++	return defineHandler(async (event) => {
++		let pathname = getRouterParam(event, options.param || "_", { decode: options.decode });
++		if (options.schema) {
++			const result = await options.schema["~standard"].validate(pathname);
++			pathname = result.issues ? void 0 : result.value;
++		}
++		if (!pathname || typeof pathname !== "string") {
++			throw new HTTPError({ status: 404, statusText: options.notFound || "Blob not found" });
++		}
++		if (options.headers) setHeaders(event, options.headers);
++		const storage = options.store ? blob.store(options.store) : blob;
++		return await storage.serve(event, pathname);
++	});
++}
++export { blob, defineBlobServeHandler, ensureBlob };

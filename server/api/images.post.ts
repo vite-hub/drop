@@ -1,9 +1,10 @@
-import { blob } from "@vite-hub/blob"
-import { detectContentType } from "@vite-hub/blob/content-type"
-import { runQueue } from "@vite-hub/queue"
-import { defineRateLimit } from "@vite-hub/rate-limit"
+import { useServerEnv } from "#vitehub/env/server"
 import { assertBodySize, defineHandler, getRequestIP, HTTPError, readBody, requireContentType } from "h3"
-import { useRuntimeConfig } from "nitro/runtime-config"
+import { blob } from "vite-hub/blob"
+import { detectContentType } from "vite-hub/blob/content-type"
+import { kv } from "vite-hub/kv"
+import { runQueue } from "vite-hub/queue"
+import { defineRateLimit } from "vite-hub/rate-limit"
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 const EXPIRY_SECONDS = 23 * 60 * 60 + 55 * 60
@@ -14,11 +15,7 @@ const imageUploadRateLimit = defineRateLimit("image-upload", {
   window: "1m",
 })
 
-const formats = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-} as const
+const supportedContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 
 export default defineHandler(async (event) => {
   let rateLimit
@@ -54,15 +51,15 @@ export default defineHandler(async (event) => {
 
   const bytes = new Uint8Array(await image.arrayBuffer())
   const contentType = detectContentType(bytes)
-  const format = formats[contentType as keyof typeof formats]
-  if (!format) throw new HTTPError({ status: 415, statusText: "Only PNG, JPEG, and WebP images are supported." })
+  if (!contentType || !supportedContentTypes.has(contentType)) {
+    throw new HTTPError({ status: 415, statusText: "Only PNG, JPEG, and WebP images are supported." })
+  }
 
   const id = crypto.randomUUID()
-  const key = `${id}.${format}`
   const expiresAt = new Date(Date.now() + EXPIRY_SECONDS * 1000).toISOString()
 
   try {
-    await blob.put(key, bytes, { access: "private", contentType })
+    await blob.put(id, bytes, { access: "private", contentType })
   }
   catch (error) {
     console.error(JSON.stringify({ counter: "storage_failure", error: error instanceof Error ? error.message : String(error) }))
@@ -70,16 +67,23 @@ export default defineHandler(async (event) => {
   }
 
   try {
-    await runQueue("image-expiry", { contentType: "json", delaySeconds: EXPIRY_SECONDS, payload: { key } })
+    await runQueue("image-expiry", { contentType: "json", delaySeconds: EXPIRY_SECONDS, payload: { key: id } })
   }
   catch (error) {
-    console.error(JSON.stringify({ counter: "queue_dispatch_failure", error: error instanceof Error ? error.message : String(error), key }))
-    await blob.del(key).catch(() => console.error(JSON.stringify({ counter: "upload_cleanup_failure", key })))
+    console.error(JSON.stringify({ counter: "queue_dispatch_failure", error: error instanceof Error ? error.message : String(error), key: id }))
+    await blob.del(id).catch(() => console.error(JSON.stringify({ counter: "upload_cleanup_failure", key: id })))
     throw new HTTPError({ status: 503, statusText: "Image expiry scheduling is temporarily unavailable." })
   }
 
-  const origin = String(useRuntimeConfig().dropOrigin).replace(/\/$/, "")
-  const url = `${origin}/i/${key}`
+  try {
+    await kv.set("uploads", (await kv.get<number>("uploads") ?? 0) + 1)
+  }
+  catch (error) {
+    console.error(JSON.stringify({ counter: "upload_count_failure", error: error instanceof Error ? error.message : String(error) }))
+  }
+
+  const origin = useServerEnv(event).dropOrigin.replace(/\/$/, "")
+  const url = `${origin}/i/${id}`
 
   return {
     contentType,

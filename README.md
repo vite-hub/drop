@@ -58,7 +58,7 @@ Drop is configured for Cloudflare Workers, R2, Queues, and Rate Limiting. You ne
 
 3. Change `domain` in `vite.config.ts` and replace `drop.vitehub.dev` in `public/index.html`. The bundled script can target your deployment through `DROP_ORIGIN`.
 
-   Drop needs no application secrets. `NITRO_DROP_ORIGIN` is the production environment variable that controls the image URLs returned by the API.
+   Drop needs no application secrets. `DROP_ORIGIN` is the production environment variable that controls the image URLs returned by the API.
 
 4. Log in to Cloudflare and create the derived R2 bucket and expiry queue.
 

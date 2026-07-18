@@ -1,6 +1,7 @@
 .nitro/
 .output/
 .pnpm-store/
+.pnpm-patches/
 .vitehub/
 .vercel/
 .wrangler/

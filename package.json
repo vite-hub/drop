@@ -13,19 +13,18 @@
     "dev": "vite --host 127.0.0.1 --port 3031",
     "preview": "nitro preview",
     "test:e2e:github-camo": "node test/e2e/github-camo.mjs",
-    "typecheck": "nitro prepare && tsc --noEmit"
+    "typecheck": "vite build --app && tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1089.0",
     "@aws-sdk/lib-storage": "^3.1089.0",
     "@aws-sdk/s3-presigned-post": "^3.1089.0",
     "@aws-sdk/s3-request-presigner": "^3.1089.0",
-    "@vite-hub/blob": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@1120b81f90e6666c4ed0c23a19e6b0c6a403dbe0",
-    "@vite-hub/queue": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@1120b81f90e6666c4ed0c23a19e6b0c6a403dbe0",
-    "@vite-hub/rate-limit": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@1120b81f90e6666c4ed0c23a19e6b0c6a403dbe0",
     "files-sdk": "^2.1.0",
     "h3": "2.0.1-rc.25",
-    "nitro": "3.0.260603-beta"
+    "nitro": "3.0.260603-beta",
+    "valibot": "^1.4.2",
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@1120b81f90e6666c4ed0c23a19e6b0c6a403dbe0"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",

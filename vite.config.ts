@@ -1,11 +1,10 @@
 import { fileURLToPath } from "node:url"
 
-import { hubBlob } from "@vite-hub/blob/vite"
-import { getCloudflareQueueBindingName, getCloudflareQueueName } from "@vite-hub/queue"
-import { hubQueue } from "@vite-hub/queue/vite"
-import { hubRateLimit } from "@vite-hub/rate-limit/vite"
 import { nitro } from "nitro/vite"
 import { defineConfig } from "vite"
+import { vitehub } from "vite-hub"
+import { env } from "vite-hub/env"
+import { getCloudflareQueueBindingName, getCloudflareQueueName } from "vite-hub/queue"
 
 import packageJson from "./package.json" with { type: "json" }
 
@@ -14,24 +13,33 @@ const imageBucketName = `${packageJson.name}-images`
 const imageExpiryQueueName = getCloudflareQueueName("image-expiry")
 
 export default defineConfig(({ command }) => ({
-  blob: {
-    binding: "DROP_IMAGES",
-    bucketName: imageBucketName,
-    driver: "cloudflare-r2",
-  },
-  queue: { provider: "cloudflare" },
   plugins: [
-    hubBlob(),
-    hubQueue(),
-    hubRateLimit({
-      namespace: packageJson.name,
-      provider: command === "serve" ? "memory" : "cloudflare",
+    vitehub({
+      agent: false,
+      blob: {
+        binding: "DROP_IMAGES",
+        bucketName: imageBucketName,
+        driver: "cloudflare-r2",
+      },
+      database: false,
+      devtools: false,
+      kv: command === "serve"
+        ? { base: ".data/kv", driver: "fs-lite" }
+        : { binding: "DROP_STATS", driver: "cloudflare-kv-binding" },
+      queue: { provider: "cloudflare" },
+      rateLimit: {
+        namespace: packageJson.name,
+        provider: command === "serve" ? "memory" : "cloudflare",
+      },
+      workflow: false,
+      workspace: false,
     }),
     nitro({
       cloudflare: {
         deployConfig: true,
         wrangler: {
           name: packageJson.name,
+          kv_namespaces: [{ binding: "DROP_STATS", id: "af46608653384ae685850fd7582475be" }],
           observability: { enabled: true },
           queues: {
             consumers: [{ queue: imageExpiryQueueName }],
@@ -47,7 +55,7 @@ export default defineConfig(({ command }) => ({
             simple: { limit: 5, period: 60 },
           }],
           route: { custom_domain: true, pattern: domain },
-          vars: { NITRO_DROP_ORIGIN: `https://${domain}` },
+          vars: { DROP_ORIGIN: `https://${domain}` },
         },
       },
       compatibilityDate: "2026-07-17",
@@ -60,8 +68,12 @@ export default defineConfig(({ command }) => ({
         },
       ],
       renderer: false,
-      runtimeConfig: { dropOrigin: `https://${domain}` },
       serverDir: true,
     }),
   ],
+  env: {
+    server: {
+      dropOrigin: env({ default: `https://${domain}`, source: env.source("DROP_ORIGIN") }),
+    },
+  },
 }))

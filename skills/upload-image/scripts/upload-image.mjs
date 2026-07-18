@@ -8,11 +8,10 @@ const bytes = input === "-" ? Buffer.concat(await Array.fromAsync(process.stdin)
 const form = new FormData()
 form.set("image", new File([bytes], "image"))
 
-const uploadResponse = await fetch(new URL("/api/images", process.env.DROP_ORIGIN || "https://drop.vitehub.dev"), {
-  method: "POST",
-  body: form,
-})
-
+const uploadResponse = await fetch(
+  new URL("/api/images", process.env.DROP_ORIGIN || "https://drop.vitehub.dev"),
+  { method: "POST", body: form, }
+)
 if (!uploadResponse.ok) throw new Error(await uploadResponse.text())
 
 const { url } = await uploadResponse.json()

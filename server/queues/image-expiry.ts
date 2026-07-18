@@ -1,16 +1,12 @@
-import { blob } from "@vite-hub/blob"
-import { defineQueue } from "@vite-hub/queue"
+import { blob } from "vite-hub/blob"
+import { defineQueue } from "vite-hub/queue"
+import * as v from "valibot"
 
-interface ImageExpiryPayload {
-  key: string
-}
+import { imageKeySchema } from "../image-key"
 
-const keyPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|png|webp)$/
-
-export default defineQueue<ImageExpiryPayload>(async ({ payload }) => {
-  if (!payload || !keyPattern.test(payload.key)) {
-    console.error(JSON.stringify({ counter: "expiry_invalid_payload" }))
-    return
+export default defineQueue<{key: string}>(async ({ payload }) => {
+  if (!v.is(v.object({ key: imageKeySchema }), payload)) {
+    return console.error(JSON.stringify({ counter: "expiry_invalid_payload" }))
   }
 
   try {
