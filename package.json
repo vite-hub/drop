@@ -9,7 +9,7 @@
   "scripts": {
     "build": "vite build",
     "check": "pnpm typecheck",
-    "deploy": "nitro deploy",
+    "deploy": "vite build && wrangler deploy --config .output/server/wrangler.json",
     "dev": "vite --host 127.0.0.1 --port 3031",
     "preview": "nitro preview",
     "test:e2e:github-camo": "node test/e2e/github-camo.mjs",
