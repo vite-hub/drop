@@ -1,4 +1,5 @@
 .data/
+.netlify/
 .output/
 .pnpm-store/
 .pnpm-patches/

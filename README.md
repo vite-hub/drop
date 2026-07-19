@@ -63,7 +63,24 @@ ViteHub supplies the Sandbox base image and generates the provider Dockerfile. D
 
 ## Host it yourself
 
-Drop runs on Cloudflare Workers with R2, Queues, Rate Limiting, and Sandbox/Containers. Cloudflare Sandbox requires a Workers Paid plan.
+Set `VITEHUB_HOSTING` to choose a generated deployment profile and
+`DROP_DEPLOYMENT_NAME` to namespace provider resources:
+
+| `VITEHUB_HOSTING` | Blob storage | Optimization | Rate limit |
+| --- | --- | --- | --- |
+| `cloudflare` | R2 | Queue and Sandbox | Cloudflare binding |
+| `netlify` | Netlify Blobs | Inline | Process memory |
+| `vercel` | Vercel Blob | Inline | Process memory |
+| `node-server` | Local filesystem | Inline | Process memory |
+| `deno-deploy` | Ephemeral filesystem | Inline | Process memory |
+
+Cloudflare is the only profile that builds the ImageMagick Sandbox container, so
+it is the only hosted build that needs Docker on the deployment machine. The
+Node profile needs a persistent volume for permanent URLs. Deno Deploy currently
+has no durable ViteHub Blob adapter, so its filesystem profile is suitable for
+compatibility testing but does not satisfy Drop's permanent-storage promise.
+
+Cloudflare Sandbox requires a Workers Paid plan.
 
 1. Clone and install:
 
@@ -74,13 +91,19 @@ Drop runs on Cloudflare Workers with R2, Queues, Rate Limiting, and Sandbox/Cont
    pnpm exec wrangler login
    ```
 
-2. Choose a unique package `name` in `package.json` and set `domain` in `vite.config.ts`.
-
-3. Create the R2 bucket and Queue named by the generated `.output/server/wrangler.json`. For this repository's default names:
+2. Choose a unique deployment name and build the provider output:
 
    ```sh
-   pnpm exec wrangler r2 bucket create vitehub-drop-images
-   pnpm exec wrangler queues create queue--696d6167652d6f7074696d697a6174696f6e
+   VITEHUB_HOSTING=cloudflare DROP_DEPLOYMENT_NAME=my-drop pnpm build
+   ```
+
+3. Create the R2 bucket and Queue named by the generated
+   `.output/server/wrangler.json`, then deploy that configuration:
+
+   ```sh
+   pnpm exec wrangler r2 bucket create my-drop-images
+   pnpm exec wrangler queues create QUEUE_NAME_FROM_WRANGLER_JSON
+   pnpm exec wrangler deploy --config .output/server/wrangler.json
    ```
 
    R2, Queue, Rate Limit, Sandbox, Container, Durable Object, and migration bindings are composed by ViteHub.
@@ -88,7 +111,6 @@ Drop runs on Cloudflare Workers with R2, Queues, Rate Limiting, and Sandbox/Cont
 4. Deploy and run the complete deployed-flow test:
 
    ```sh
-   pnpm run deploy
    DROP_ORIGIN=https://YOUR_DOMAIN pnpm test:e2e:deployed
    ```
 

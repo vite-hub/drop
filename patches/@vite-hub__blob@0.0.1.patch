@@ -1,0 +1,67 @@
+diff --git a/dist/drivers/netlify-blobs.js b/dist/drivers/netlify-blobs.js
+index 99bca12158e91d8385eb95cf42ecff4767fd5eca..6e5f3a4905334e655602569231cf7e13942eda01 100644
+--- a/dist/drivers/netlify-blobs.js
++++ b/dist/drivers/netlify-blobs.js
+@@ -1,8 +1,9 @@
+-import { t as importOptionalPeer } from "../optional-peer-Bz4xpDEz.js";
+ import { createFilesSdkDriver } from "./files-sdk.js";
++import { Files } from "files-sdk";
++import { netlifyBlobs } from "files-sdk/netlify-blobs";
+ //#region src/drivers/netlify-blobs.ts
+ function createDriver(options) {
+-	return createFilesSdkDriver(options, async (options) => (await importOptionalPeer("files-sdk/netlify-blobs", options.driver, "files-sdk")).netlifyBlobs(options));
++	return createFilesSdkDriver(options, async (options) => netlifyBlobs(options), Files);
+ }
+ //#endregion
+ export { createDriver };
+diff --git a/dist/drivers/vercel.js b/dist/drivers/vercel.js
+index 34117fea5b0d2832a0261cde853697d52af17596..4a18c6adbb260d3f5c2d544bcbf5101aad4f6b01 100644
+--- a/dist/drivers/vercel.js
++++ b/dist/drivers/vercel.js
+@@ -1,13 +1,14 @@
+-import { t as importOptionalPeer } from "../optional-peer-Bz4xpDEz.js";
+ import { createFilesSdkDriver } from "./files-sdk.js";
++import { Files } from "files-sdk";
++import { vercelBlob } from "files-sdk/vercel-blob";
+ //#region src/drivers/vercel.ts
+ function createDriver(options) {
+-	return createFilesSdkDriver(options, async (options, putOptions = {}) => (await importOptionalPeer("files-sdk/vercel-blob", options.driver, "files-sdk")).vercelBlob({
++	return createFilesSdkDriver(options, async (options, putOptions = {}) => vercelBlob({
+ 		...options,
+ 		access: putOptions.access || options.access,
+ 		addRandomSuffix: false,
+ 		allowOverwrite: options.allowOverwrite ?? true
+-	}));
++	}), Files);
+ }
+ //#endregion
+ export { createDriver };
+diff --git a/dist/vite.js b/dist/vite.js
+index 1e4c3445f8e5e7d2eccced31809541eca5e53fa8..ed2d6b0c91b850cb702bd271cbe1f724f131570e 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -1699,6 +1699,7 @@ async function pushVercelProjectEnv(request, projectId, key, value) {
+ //#region src/vite.ts
+ const RESOLVED_BLOB_VIRTUAL_CONFIG_ID = `\0${BLOB_VIRTUAL_CONFIG_ID}`;
+ const generatedNitroBlobPlugin = ".vitehub/nitro/blob/plugin.ts";
++const generatedNitroBlobRuntime = ".vitehub/nitro/blob/runtime.mjs";
+ const generatedBlobServeRouteHandler = ".vitehub/blob/serve-route.ts";
+ const mergeNoExternal = createNoExternalMerger(blobPackageName);
+ function serializeVirtualConfig(config) {
+@@ -1782,6 +1783,7 @@ function mergeNitroBlobConfig(value, serve) {
+ function renderNitroBlobPlugin(blob, cloudflare, importBase = blobPackageName) {
+ 	return [
+ 		cloudflare ? "import { env as vitehubEnv } from 'cloudflare:workers'" : void 0,
++		cloudflare ? void 0 : `import './runtime.mjs'`,
+ 		`import { ${cloudflare ? "setActiveCloudflareEnv, " : ""}setBlobRuntimeConfig } from '${importBase}/runtime/state'`,
+ 		"",
+ 		`const blobConfig = ${JSON.stringify(blob)}`,
+@@ -1821,6 +1823,8 @@ function renderBlobServeRouteHandler(serve, importBase = blobPackageName) {
+ 	].join("\n");
+ }
+ async function refreshBlobGeneratedFiles(root, blob, cloudflare, importBase = blobPackageName) {
++	const runtimeFile = resolve$1(root, generatedNitroBlobRuntime);
++	await writeFileIfChanged(runtimeFile, renderBlobRuntimeModule(runtimeFile, blob));
+ 	await writeFileIfChanged(resolve$1(root, generatedNitroBlobPlugin), renderNitroBlobPlugin(blob, cloudflare, importBase));
+ 	const serve = blob ? blob.serve : void 0;
+ 	if (!serve) return;

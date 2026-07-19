@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.8.14",
+    "@netlify/blobs": "^10.7.9",
+    "@vercel/blob": "^2.6.1",
     "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
     "nitro": "3.0.260603-beta",
     "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d"

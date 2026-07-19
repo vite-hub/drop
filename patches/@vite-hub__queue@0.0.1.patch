@@ -1,0 +1,108 @@
+diff --git a/dist/cloudflare-vite-DcCBHrW9.js b/dist/cloudflare-vite-DcCBHrW9.js
+index 77b290bddbd49535256bbcbf1c69337072d37872..e5be12390e68b6812f704a7cf554a6e8cedade15 100644
+--- a/dist/cloudflare-vite-DcCBHrW9.js
++++ b/dist/cloudflare-vite-DcCBHrW9.js
+@@ -38,6 +38,7 @@ function createQueueJob(message, batch) {
+ function createQueueCloudflareWorker(options = {}) {
+ 	const queueConfig = options.queue === false ? false : normalizeQueueOptions(options.queue, { hosting: "cloudflare" });
+ 	const registry = options.registry;
++	const definitions = options.definitions;
+ 	const applyRuntimeState = () => {
+ 		setQueueRuntimeConfig(queueConfig);
+ 		setQueueRuntimeRegistry(registry);
+@@ -57,8 +58,10 @@ function createQueueCloudflareWorker(options = {}) {
+ 			applyRuntimeState();
+ 			setActiveCloudflareEnv(env);
+ 			if (queueConfig === false || queueConfig?.provider !== "cloudflare") return;
+-			const definition = await loadQueueDefinition(getCloudflareQueueDefinitionName(batch.queue));
+-			if (!definition) return;
++			const definitionName = definitions ? definitions[batch.queue] : getCloudflareQueueDefinitionName(batch.queue);
++			if (!definitionName) throw new Error(`[vitehub] Cloudflare queue ${JSON.stringify(batch.queue)} is not mapped to a Queue Definition.`);
++			const definition = await loadQueueDefinition(definitionName);
++			if (!definition) throw new Error(`[vitehub] Cloudflare queue ${JSON.stringify(batch.queue)} maps to unknown Queue Definition ${JSON.stringify(definitionName)}.`);
+ 			const runtimeEvent = createCloudflareRuntimeEvent(env, context);
+ 			await createCloudflareQueueBatchHandler({
+ 				concurrency: definition.options?.concurrency,
+diff --git a/dist/cloudflare-vite-DzkS0ArM.d.ts b/dist/cloudflare-vite-DzkS0ArM.d.ts
+index cf3fde6d697f273aaf5e1343c69eebf4567d76e8..d857708cd71e2ed0d8216bf174a194671c3f1722 100644
+--- a/dist/cloudflare-vite-DzkS0ArM.d.ts
++++ b/dist/cloudflare-vite-DzkS0ArM.d.ts
+@@ -11,6 +11,7 @@ interface CloudflareWorkerExecutionContext {
+ type CloudflareWorkerApp = QueueApp;
+ interface QueueCloudflareWorkerOptions {
+   app?: CloudflareWorkerApp;
++  definitions?: Record<string, string>;
+   queue?: false | ResolvedQueueOptions;
+   registry?: QueueDefinitionRegistry;
+ }
+diff --git a/dist/types-CElJ79h_.d.ts b/dist/types-CElJ79h_.d.ts
+index d60e1c98b0670746def34f1c30fdafeaec75960f..880a5a5cfb67bce88b7b974ef7c5c18f652d83e1 100644
+--- a/dist/types-CElJ79h_.d.ts
++++ b/dist/types-CElJ79h_.d.ts
+@@ -75,6 +75,7 @@ interface CloudflareQueueProviderOptions extends QueueSharedOptions {
+ }
+ interface CloudflareQueueModuleProviderOptions extends QueueSharedOptions {
+   binding?: string;
++  namePrefix?: string;
+   provider: "cloudflare";
+ }
+ interface VercelQueueProviderOptions extends QueueSharedOptions {
+diff --git a/dist/vite.js b/dist/vite.js
+index c4c362dad412aff2d549466ec0081669075ba8a7..fb348762d8747b2be7903ef14e84e6335df2d327 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -1161,17 +1161,21 @@ async function writeProviderEntries(rootDir, queue, definitions = discoverQueueD
+ 		vercelServerFile: entryFiles.vercel
+ 	};
+ }
+-function createCloudflareQueueBindings(definitions) {
++function createCloudflareQueueDefinitionNames(definitions, namePrefix = "") {
++	return Object.fromEntries(definitions.map((definition) => [`${namePrefix}${getCloudflareQueueName(definition.name)}`, definition.name]));
++}
++function createCloudflareQueueBindings(definitions, namePrefix = "") {
+ 	if (!definitions.length) return;
++	const names = createCloudflareQueueDefinitionNames(definitions, namePrefix);
+ 	return {
+-		consumers: definitions.map((definition) => ({ queue: getCloudflareQueueName(definition.name) })),
++		consumers: Object.keys(names).map((queue) => ({ queue })),
+ 		producers: definitions.map((definition) => ({
+ 			binding: getCloudflareQueueBindingName(definition.name),
+-			queue: getCloudflareQueueName(definition.name)
++			queue: `${namePrefix}${getCloudflareQueueName(definition.name)}`
+ 		}))
+ 	};
+ }
+-function renderNitroPlugin(pluginFile, registryFile, queueConfig, hasDefinitions, cloudflareQueues) {
++function renderNitroPlugin(pluginFile, registryFile, queueConfig, hasDefinitions, cloudflareQueues, queueDefinitions) {
+ 	const cloudflareRuntime = queueConfig !== false && queueConfig.provider === "cloudflare";
+ 	const cloudflare = cloudflareQueues && cloudflareRuntime;
+ 	const vercel = hasDefinitions && queueConfig !== false && queueConfig.provider === "vercel";
+@@ -1185,7 +1189,7 @@ function renderNitroPlugin(pluginFile, registryFile, queueConfig, hasDefinitions
+ 		"",
+ 		...vercel ? ["globalThis.__vitehubVercelQueue = __vitehubVercelQueue", ""] : [],
+ 		`const queueConfig = ${JSON.stringify(queueConfig, null, 2)}`,
+-		...cloudflare ? ["const queueWorker = createQueueCloudflareWorker({ queue: queueConfig, registry: queueRegistry })"] : [],
++		...cloudflare ? [`const queueDefinitions = ${JSON.stringify(queueDefinitions, null, 2)}`, "const queueWorker = createQueueCloudflareWorker({ definitions: queueDefinitions, queue: queueConfig, registry: queueRegistry })"] : [],
+ 		"",
+ 		"export default definePlugin((nitro) => {",
+ 		"  setQueueRuntimeConfig(queueConfig)",
+@@ -1202,8 +1206,9 @@ async function writeQueueNitroIntegration(rootDir, queue, hosting, cloudflareQue
+ 	const registryFile = resolve(generatedDir, generatedRegistryFileName);
+ 	const pluginFile = resolve(rootDir, generatedQueueNitroPlugin);
+ 	const queueConfig = resolveOutputQueueConfig(typeof queue === "undefined" ? {} : queue, hosting);
++	const queueDefinitions = createCloudflareQueueDefinitionNames(definitions, queue && typeof queue === "object" && queue.provider === "cloudflare" ? queue.namePrefix : void 0);
+ 	await Promise.all([mkdir(dirname(pluginFile), { recursive: true }), mkdir(generatedDir, { recursive: true })]);
+-	await Promise.all([writeFile(registryFile, createRuntimeRegistryContents(registryFile, definitions), "utf8"), writeFile(pluginFile, renderNitroPlugin(pluginFile, registryFile, queueConfig, definitions.length > 0, cloudflareQueues), "utf8")]);
++	await Promise.all([writeFile(registryFile, createRuntimeRegistryContents(registryFile, definitions), "utf8"), writeFile(pluginFile, renderNitroPlugin(pluginFile, registryFile, queueConfig, definitions.length > 0, cloudflareQueues, queueDefinitions), "utf8")]);
+ }
+ async function createCloudflareQueueConfig(options = {}) {
+ 	const rootDir = resolve(process.cwd(), options.rootDir || ".");
+@@ -1519,7 +1524,7 @@ function mergeNitroConfig(config, value, queue, root, definitions = discoverQueu
+ 	if (!compatibilityFlags.includes("nodejs_compat")) compatibilityFlags.push("nodejs_compat");
+ 	const cloudflareQueues = supportsCloudflareQueues(nitro);
+ 	const rollupConfig = cloneNitroConfig(nitro.rollupConfig);
+-	const generated = createCloudflareQueueBindings(definitions);
++	const generated = createCloudflareQueueBindings(definitions, queue?.provider === "cloudflare" ? queue.namePrefix : void 0);
+ 	const baseNitro = {
+ 		...nitro,
+ 		...cloudflareQueues ? { rollupConfig: {

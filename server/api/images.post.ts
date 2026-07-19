@@ -5,6 +5,8 @@ import { defineRateLimit } from "vite-hub/rate-limit"
 
 import { detectImageContentType } from "../image-content-type"
 
+declare const __DROP_ASYNC_OPTIMIZATION__: boolean
+
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 const imageUploadRateLimit = defineRateLimit("image-upload", {
@@ -47,7 +49,16 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 503, statusText: "Image storage is temporarily unavailable." })
   }
 
-  deferQueue("image-optimization", { payload: id })
+  if (__DROP_ASYNC_OPTIMIZATION__) {
+    deferQueue("image-optimization", { payload: id })
+  }
+  else {
+    const { optimizeImage } = await import("../image-optimizer")
+    const optimized = await optimizeImage(bytes, contentType)
+    if (optimized.byteLength < bytes.byteLength) {
+      await blob.put(id, optimized, { access: "private", contentType })
+    }
+  }
 
   return { url: `/i/${id}` }
 })
