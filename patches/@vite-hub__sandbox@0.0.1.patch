@@ -1,8 +1,8 @@
 diff --git a/dist/vite.js b/dist/vite.js
-index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb3138fbeebbc 100644
+index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d918f8e496 100644
 --- a/dist/vite.js
 +++ b/dist/vite.js
-@@ -705,7 +705,69 @@ async function bundleSandboxDefinition(source, file, options = {}) {
+@@ -705,7 +705,59 @@ async function bundleSandboxDefinition(source, file, options = {}) {
  //#region src/cloudflare.ts
  const defaultCloudflareSandboxBinding = "SANDBOX";
  const defaultCloudflareSandboxClassName = "Sandbox";
@@ -37,11 +37,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
 +	return {
 +		name: `vitehub-sandbox-cloudflare-exports:${className}`,
 +		buildStart() {
-+			this.emitFile({
-+				type: "chunk",
-+				id: moduleId,
-+				fileName: "sandbox-cloudflare-exports.mjs"
-+			});
++			this.emitFile({ type: "chunk", id: moduleId, fileName: "sandbox-cloudflare-exports.mjs" });
 +		},
 +		resolveId(id) {
 +			if (id === moduleId) return resolvedModuleId;
@@ -52,10 +48,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
 +		},
 +		renderChunk(code, chunk) {
 +			if (!chunk.isEntry || chunk.fileName !== "index.mjs") return null;
-+			return {
-+				code: `${code}\nexport { ${className} } from "./sandbox-cloudflare-exports.mjs";\n`,
-+				map: null
-+			};
++			return { code: `${code}\nexport { ${className} } from "./sandbox-cloudflare-exports.mjs";\n`, map: null };
 +		}
 +	};
 +}
@@ -65,24 +58,21 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
 +	const plugins = Array.isArray(rollupConfig.plugins) ? [...rollupConfig.plugins] : [];
 +	const name = `vitehub-sandbox-cloudflare-exports:${className}`;
 +	if (!plugins.some((plugin) => plugin && typeof plugin === "object" && plugin.name === name)) plugins.push(createCloudflareSandboxRollupPlugin(options));
-+	target.rollupConfig = {
-+		...rollupConfig,
-+		plugins
-+	};
++	target.rollupConfig = { ...rollupConfig, plugins };
 +}
  //#endregion
  //#region src/definition-options.ts
  const require = createRequire(import.meta.url);
-@@ -1050,7 +1112,7 @@ function readAliasEntries(alias) {
+@@ -1050,7 +1102,7 @@ function readAliasEntries(alias) {
  }
  function resolveStringAliases(alias) {
  	const aliases = {};
 -	for (const entry of readAliasEntries(alias)) if (typeof entry.find === "string" && typeof entry.replacement === "string") aliases[entry.find] = entry.replacement;
-+	for (const entry of readAliasEntries(alias)) if (typeof entry.find === "string" && !entry.find.endsWith("/") && typeof entry.replacement === "string") aliases[entry.find] = entry.replacement;
++	for (const entry of readAliasEntries(alias)) if (typeof entry.find === "string" && !entry.find.endsWith("/") && !builtinModuleSet.has(entry.find) && typeof entry.replacement === "string") aliases[entry.find] = entry.replacement;
  	return aliases;
  }
  function readResolveOptions(config) {
-@@ -1127,6 +1189,7 @@ async function prepareSandboxRuntime(options) {
+@@ -1127,6 +1179,7 @@ async function prepareSandboxRuntime(options) {
  	const aliases = createGeneratedAliasMap(rootDir, plan);
  	if (options.writeArtifacts === false) return {
  		aliases,
@@ -90,7 +80,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
  		definitions,
  		files: [],
  		stateModule
-@@ -1135,6 +1198,7 @@ async function prepareSandboxRuntime(options) {
+@@ -1135,6 +1188,7 @@ async function prepareSandboxRuntime(options) {
  	await writeFileIfChanged(facadeFile, createSandboxRuntimeFacadeContents(facadeFile, context.runtimeConfig.sandbox, aliases[SANDBOX_REGISTRY_ID]));
  	return {
  		aliases,
@@ -98,7 +88,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
  		definitions,
  		files: [facadeFile, ...Array.from(emitted.values(), (artifact) => artifact.dst)],
  		stateModule
-@@ -1699,6 +1763,93 @@ function invalidateGeneratedSandboxModules(files, moduleGraph) {
+@@ -1699,6 +1753,80 @@ function invalidateGeneratedSandboxModules(files, moduleGraph) {
  		if (module) moduleGraph.invalidateModule(module);
  	}
  }
@@ -131,13 +121,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
 +	}
 +	const resolvedOptions = resolveCloudflareSandboxOptions(options);
 +	const containers = Array.isArray(wrangler.containers) ? [...wrangler.containers] : [];
-+	const existingContainer = containers.find((entry) => entry && entry.class_name === resolvedOptions.className);
-+	if (existingContainer) {
-+		if (typeof existingContainer.image !== "string") existingContainer.image = relativeWranglerPath(serverDir, dockerfile);
-+		if (typeof existingContainer.image_build_context !== "string") existingContainer.image_build_context = relativeWranglerPath(serverDir, rootDir);
-+		if (typeof existingContainer.max_instances !== "number") existingContainer.max_instances = 12;
-+		if (resolvedOptions.name && typeof existingContainer.name !== "string") existingContainer.name = resolvedOptions.name;
-+	} else {
++	if (!containers.some((entry) => entry && entry.class_name === resolvedOptions.className)) {
 +		containers.push({
 +			class_name: resolvedOptions.className,
 +			image: relativeWranglerPath(serverDir, dockerfile),
@@ -149,17 +133,13 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
 +	}
 +	const durableObjects = cloneSandboxRecord(wrangler.durable_objects);
 +	const bindings = Array.isArray(durableObjects.bindings) ? [...durableObjects.bindings] : [];
-+	if (!bindings.some((entry) => entry && entry.name === resolvedOptions.binding && entry.class_name === resolvedOptions.className)) bindings.push({
-+		name: resolvedOptions.binding,
-+		class_name: resolvedOptions.className
-+	});
++	if (!bindings.some((entry) => entry && entry.name === resolvedOptions.binding && entry.class_name === resolvedOptions.className)) {
++		bindings.push({ name: resolvedOptions.binding, class_name: resolvedOptions.className });
++	}
 +	const migrations = Array.isArray(wrangler.migrations) ? [...wrangler.migrations] : [];
 +	if (!migrations.some((entry) => Array.isArray(entry?.new_sqlite_classes) && entry.new_sqlite_classes.includes(resolvedOptions.className))) {
 +		const migrationIndex = migrations.findIndex((entry) => entry?.tag === resolvedOptions.migrationTag);
-+		if (migrationIndex < 0) migrations.push({
-+			tag: resolvedOptions.migrationTag,
-+			new_sqlite_classes: [resolvedOptions.className]
-+		});
++		if (migrationIndex < 0) migrations.push({ tag: resolvedOptions.migrationTag, new_sqlite_classes: [resolvedOptions.className] });
 +		else {
 +			const migration = migrations[migrationIndex];
 +			migrations[migrationIndex] = {
@@ -178,10 +158,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
 +				...wrangler,
 +				compatibility_flags: compatibilityFlags,
 +				containers,
-+				durable_objects: {
-+					...durableObjects,
-+					bindings
-+				},
++				durable_objects: { ...durableObjects, bindings },
 +				migrations
 +			}
 +		}
@@ -192,7 +169,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..04ca212cbf92a3cadc53fbe8a09fb313
  function hubSandbox(options) {
  	const internalOptions = options;
  	const mergeNoExternal = createNoExternalMerger("@vite-hub/sandbox");
-@@ -1750,6 +1901,7 @@ function hubSandbox(options) {
+@@ -1750,6 +1878,7 @@ function hubSandbox(options) {
  			generatedAliases = prepared.aliases;
  			generatedFiles = prepared.files;
  			definitions = prepared.definitions;

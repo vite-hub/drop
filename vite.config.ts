@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url"
 import { nitro } from "nitro/vite"
 import { defineConfig } from "vite"
 import { vitehub } from "vite-hub"
-import { env } from "vite-hub/env"
 
 import packageJson from "./package.json" with { type: "json" }
 
@@ -24,7 +23,6 @@ export default defineConfig(({ command }) => ({
             "Content-Disposition": "inline",
             "X-Content-Type-Options": "nosniff",
           },
-          publicBaseUrl: `https://${domain}/i`,
           route: "/i",
         },
       },
@@ -54,10 +52,6 @@ export default defineConfig(({ command }) => ({
           kv_namespaces: [{ binding: "DROP_STATS", id: "af46608653384ae685850fd7582475be" }],
           observability: { enabled: true },
           route: { custom_domain: true, pattern: domain },
-          vars: {
-            DROP_ORIGIN: `https://${domain}`,
-            IMAGE_MAX_DIMENSION: "2048",
-          },
         },
       },
       compatibilityDate: "2026-07-17",
@@ -73,10 +67,4 @@ export default defineConfig(({ command }) => ({
       serverDir: true,
     }),
   ],
-  env: {
-    server: {
-      dropOrigin: env({ default: `https://${domain}`, source: env.source("DROP_ORIGIN") }),
-      imageMaxDimension: env({ default: "2048", source: env.source("IMAGE_MAX_DIMENSION") }),
-    },
-  },
 }))

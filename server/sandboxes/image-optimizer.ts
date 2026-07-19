@@ -5,7 +5,6 @@ import { promisify } from "node:util"
 
 import { defineSandbox } from "vite-hub/sandbox"
 
-
 const run = promisify(execFile)
 const extensions = {
   "image/jpeg": "jpg",

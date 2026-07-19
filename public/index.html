@@ -588,7 +588,7 @@
           <code>npx skills add https://drop.vitehub.dev</code>
           <span aria-live="polite">Copy skill</span>
         </button>
-        <p class="usage-proof" data-usage-proof data-loading aria-live="polite"><strong data-upload-count>0</strong> <span data-upload-label>permanent images</span><span data-savings></span></p>
+        <p class="usage-proof" data-usage-proof data-loading aria-live="polite"><strong data-upload-count>0</strong> <span data-upload-label>permanent images</span></p>
         <nav class="links" aria-label="Service links">
           <span class="link-group">
             <a href="#why">How and why</a>
@@ -646,7 +646,7 @@
             </div>
             <div class="stepper-copy">
               <h3 class="stepper-title">Share</h3>
-              <p class="stepper-description">The command follows the KV job to completion and prints the permanent <code>drop.vitehub.dev/i/…</code> URL.</p>
+              <p class="stepper-description">The command prints the permanent <code>drop.vitehub.dev/i/…</code> URL immediately while optimization continues in the background.</p>
             </div>
           </li>
         </ol>
@@ -657,14 +657,14 @@
       <div class="section-label">Skill</div>
       <div class="section-content">
         <h2 id="api-title">Upload Image to GitHub</h2>
-        <p>The installed skill includes a script that uploads the image, waits for background optimization, and prints its permanent Drop URL.</p>
+        <p>The installed skill includes a script that stores the image and immediately prints its permanent Drop URL.</p>
         <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/image.png"</code></pre>
 
         <h3>Limits</h3>
         <ul class="behavior limit-list">
           <li>One PNG, JPEG, or WebP image per request, up to 4 MiB.</li>
           <li>Target: 5 upload attempts per source address every 60 seconds.</li>
-          <li>On <code>429</code>, wait for <code>Retry-After</code> before retrying.</li>
+          <li>On <code>429</code>, wait one minute before retrying.</li>
         </ul>
 
         <h3 id="errors-title">Errors</h3>
@@ -735,13 +735,10 @@
     const usageProof = document.querySelector("[data-usage-proof]")
     fetch("/api/stats")
       .then(response => response.ok ? response.json() : Promise.reject())
-      .then(({ savingsPercent, uploads }) => {
+      .then(({ uploads }) => {
         if (!Number.isSafeInteger(uploads) || uploads < 1) return
         usageProof.querySelector("[data-upload-count]").textContent = uploads.toLocaleString()
         usageProof.querySelector("[data-upload-label]").textContent = uploads === 1 ? "permanent image" : "permanent images"
-        if (Number.isSafeInteger(savingsPercent) && savingsPercent > 0) {
-          usageProof.querySelector("[data-savings]").textContent = ` · ${savingsPercent}% fewer bytes`
-        }
         usageProof.removeAttribute("data-loading")
       })
       .catch(() => {})

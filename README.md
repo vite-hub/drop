@@ -20,11 +20,11 @@
 ## How it works
 
 1. **Blob** stores the original immediately at its permanent Drop key.
-2. **Queue** dispatches an asynchronous optimization job and **KV** exposes its status.
+2. **Queue** dispatches asynchronous optimization while the permanent URL is already usable.
 3. **Sandbox** applies EXIF orientation, strips metadata, and resizes the image to fit within 2048 × 2048 without upscaling.
-4. Drop replaces the Blob only when the optimized file is smaller, records byte savings in KV, and returns its permanent `/i/<id>` URL.
+4. Drop replaces the Blob only when the optimized file is smaller. **KV** stores one upload count for the landing page.
 
-The Queue is deliberately more machinery than a small image host needs: Drop exists to exercise ViteHub's Blob, Queue, Sandbox, KV, Env, and Rate Limit primitives together with minimal application code.
+Drop exercises ViteHub's Blob, Queue, Sandbox, KV, and Rate Limit primitives with a small application surface.
 
 ## Use Drop
 
@@ -34,7 +34,7 @@ Install the public agent skill:
 npx skills add https://drop.vitehub.dev
 ```
 
-The bundled command uploads, polls the job, and prints the permanent URL:
+The bundled command uploads and immediately prints the permanent URL:
 
 ```sh
 node "<skill-directory>/scripts/upload-image.mjs" "/absolute/path/to/image.png"
@@ -47,7 +47,7 @@ curl --fail-with-body https://drop.vitehub.dev/api/images \
   -F "image=@/absolute/path/to/image.png"
 ```
 
-The upload response contains `statusUrl`. Poll it until `status` is `complete`; that response contains `url`. PNG, JPEG, and WebP images up to 4 MiB are accepted. Uploads are limited to five attempts per source address per minute.
+The upload response contains `url`, which serves the original immediately and the optimized image after background processing. PNG, JPEG, and WebP images up to 4 MiB are accepted. Uploads are limited to five attempts per source address per minute.
 
 ## Run locally
 
@@ -74,7 +74,7 @@ Drop runs on Cloudflare Workers with R2, Queues, KV, Rate Limiting, and Sandbox/
    pnpm exec wrangler login
    ```
 
-2. Choose a unique package `name` in `package.json`, set `domain` in `vite.config.ts`, and set `DROP_ORIGIN` there to the same public origin.
+2. Choose a unique package `name` in `package.json` and set `domain` in `vite.config.ts`.
 
 3. Create the R2 bucket, KV namespace, and Queue named by the generated `.output/server/wrangler.json`. For this repository's default names:
 
@@ -93,4 +93,4 @@ Drop runs on Cloudflare Workers with R2, Queues, KV, Rate Limiting, and Sandbox/
    DROP_ORIGIN=https://YOUR_DOMAIN pnpm test:e2e:deployed
    ```
 
-The deployed test drives the real skill command, Queue consumer, Sandbox, R2 object, KV job and statistics records, public image route, and upload rate limiter. It verifies orientation handling, metadata removal, bounded resizing, no upscaling, and that a larger optimization candidate never replaces the original.
+The deployed test drives the real skill command, Queue consumer, Sandbox, R2 object, upload count, public image route, and rate limiter. It verifies the permanent URL, orientation handling, metadata removal, and bounded resizing.

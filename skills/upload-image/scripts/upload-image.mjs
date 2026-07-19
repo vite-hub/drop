@@ -3,7 +3,6 @@
 import { readFile } from "node:fs/promises"
 
 const origin = process.env.DROP_ORIGIN || "https://drop.vitehub.dev"
-const timeout = Number(process.env.DROP_POLL_TIMEOUT_MS || 5 * 60_000)
 const input = process.argv[2]
 if (!input) throw new Error("Usage: upload-image.mjs <image-path|->")
 
@@ -18,26 +17,6 @@ const uploadResponse = await fetch(new URL("/api/images", origin), {
 })
 if (!uploadResponse.ok) throw new Error(await uploadResponse.text())
 
-const { statusUrl } = await uploadResponse.json()
-if (typeof statusUrl !== "string") throw new Error("Drop did not return an image job URL.")
-
-const deadline = Date.now() + timeout
-while (Date.now() < deadline) {
-  const response = await fetch(statusUrl, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(30_000),
-  })
-  if (!response.ok) throw new Error(await response.text())
-
-  const job = await response.json()
-  if (job.status === "complete" && typeof job.url === "string") {
-    console.log(job.url)
-    process.exit(0)
-  }
-  if (job.status === "failed") throw new Error(job.error || "Image optimization failed.")
-
-  const retryAfter = Number(response.headers.get("Retry-After"))
-  await new Promise(resolve => setTimeout(resolve, Number.isFinite(retryAfter) ? retryAfter * 1_000 : 1_000))
-}
-
-throw new Error(`Image optimization did not finish within ${timeout}ms.`)
+const { url } = await uploadResponse.json()
+if (typeof url !== "string") throw new Error("Drop did not return an image URL.")
+console.log(new URL(url, origin).href)

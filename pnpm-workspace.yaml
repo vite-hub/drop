@@ -1,4 +1,3 @@
 patchedDependencies:
-  '@vite-hub/blob@0.0.1': patches/@vite-hub__blob@0.0.1.patch
   '@vite-hub/sandbox@0.0.1': patches/@vite-hub__sandbox@0.0.1.patch
   vite-hub@0.0.1: patches/vite-hub@0.0.1.patch

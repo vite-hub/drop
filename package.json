@@ -21,7 +21,7 @@
     "h3": "2.0.1-rc.25",
     "nitro": "3.0.260603-beta",
     "valibot": "^1.4.2",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@be60bc09aad1a8f4ecebf1a73fa6ee4bed4c4463"
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",

@@ -1,39 +1,17 @@
-diff --git a/dist/blob/content-type.d.ts b/dist/blob/content-type.d.ts
-new file mode 100644
-index 0000000000000000000000000000000000000000..d80fcd46fd6663af4b74edd5d6250e153344c3b3
---- /dev/null
-+++ b/dist/blob/content-type.d.ts
-@@ -0,0 +1 @@
-+export * from "@vite-hub/blob/content-type";
-diff --git a/dist/blob/content-type.js b/dist/blob/content-type.js
-new file mode 100644
-index 0000000000000000000000000000000000000000..d80fcd46fd6663af4b74edd5d6250e153344c3b3
---- /dev/null
-+++ b/dist/blob/content-type.js
-@@ -0,0 +1 @@
-+export * from "@vite-hub/blob/content-type";
 diff --git a/dist/index.js b/dist/index.js
-index 3d3aed10e7989b2238ac2b7b8163bace27f05e44..81bf155ee8078e85caefbbe01bde7ad7856b0bc5 100644
+index 3d3aed10e7989b2238ac2b7b8163bace27f05e44..3e88c546cce3f7bbd93cbfb06a66c3af7eae63a9 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -58,6 +58,7 @@ var exports = {
- 	"./auth/agent": "./dist/auth/agent.js",
- 	"./auth/server": "./dist/auth/server.js",
- 	"./blob": "./dist/blob.js",
-+	"./blob/content-type": "./dist/blob/content-type.js",
- 	"./box": "./dist/box.js",
- 	"./box/crabbox": "./dist/box/crabbox.js",
- 	"./database": "./dist/database.js",
-@@ -166,6 +167,8 @@ function frameworkDependencyResolver(options, providerImportAliases) {
+@@ -166,6 +166,8 @@ function frameworkDependencyResolver(options, providerImportAliases) {
  			configureProviderOptionalImportAliases(providerImportAliases, options, config.kv);
  		},
  		resolveId(id, importer) {
-+			const providerImportAlias = providerImportAliases[id];
++			const providerImportAlias = providerImportAliases[id] || Object.entries(providerImportAliases).find(([specifier]) => frameworkProviderImportAliases[specifier] === id)?.[1];
 +			if (providerImportAlias) return providerImportAlias;
  			if (!isGeneratedImporter(importer)) return;
  			const isFrameworkPackageImport = id === frameworkPackageName || id.startsWith(`${frameworkPackageName}/`);
  			const isOwnerPackageImport = generatedOwnerPackageNames.some((name) => id === name || id.startsWith(`${name}/`));
-@@ -174,12 +177,44 @@ function frameworkDependencyResolver(options, providerImportAliases) {
+@@ -174,12 +176,44 @@ function frameworkDependencyResolver(options, providerImportAliases) {
  		}
  	};
  }
@@ -78,15 +56,3 @@ index 3d3aed10e7989b2238ac2b7b8163bace27f05e44..81bf155ee8078e85caefbbe01bde7ad7
  	plugins.push(hubMarkdownTemplate({ runtimeImport: `${generatedImportBase}/markdown-template` }));
  	if (options.env !== false) {
  		const envOptions = options.env ?? {};
-diff --git a/package.json b/package.json
-index 509fe6580059e1dedbfe10ffab70907958f0911b..db786ae9bdb7e7a0a9b6dcf6e4794591125a745c 100644
---- a/package.json
-+++ b/package.json
-@@ -73,6 +73,7 @@
-     "./auth/agent": "./dist/auth/agent.js",
-     "./auth/server": "./dist/auth/server.js",
-     "./blob": "./dist/blob.js",
-+    "./blob/content-type": "./dist/blob/content-type.js",
-     "./box": "./dist/box.js",
-     "./box/crabbox": "./dist/box/crabbox.js",
-     "./database": "./dist/database.js",

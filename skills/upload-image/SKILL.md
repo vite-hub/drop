@@ -11,4 +11,4 @@ The input must be an image the user placed in scope. Resolve the bundled script 
 node "<skill-directory>/scripts/upload-image.mjs" "/absolute/path/to/image.png"
 ```
 
-The script waits for background optimization. The upload is complete when it prints a permanent `https://drop.vitehub.dev/i/<id>` URL. Use that URL in GitHub content the user explicitly authorized.
+The script prints a permanent `https://drop.vitehub.dev/i/<id>` URL as soon as Blob stores the original. Drop optimizes the image in the background. Use the URL in GitHub content the user explicitly authorized.
