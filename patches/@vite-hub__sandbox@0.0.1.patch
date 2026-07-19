@@ -1,8 +1,67 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index c95cb490bbc995605af8b5ca821a3cba7760eb27..b50873f398c5660975761d45eb1832ef835e402f 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -7,5 +7,6 @@ import { SandboxDefinitionModules } from "#vitehub-sandbox-registry";
+ //#region src/runtime/registry.d.ts
+ declare function defineSandbox<THandler extends (...args: any[]) => any>(run: THandler, options?: SandboxDefinitionOptions): SandboxDefinitionFromHandler<THandler>;
++declare function defineDockerfile(strings: TemplateStringsArray): string;
+ //#endregion
+ //#region src/internal/shared/request-payload.d.ts
+ declare function readRequestPayload<TPayload = Record<string, never>>(event: H3Event, fallback?: TPayload): Promise<TPayload | unknown>;
+@@ -71,4 +72,4 @@ type SandboxResult<TDefinition> = SandboxRunner<TDefinition> extends ((...args:
+ declare function runSandbox<const TName extends SandboxDefinitionName>(name: TName, payload?: SandboxPayload<SandboxRegistryDefinition<TName>>, options?: SandboxExecutionOptions): Promise<SandboxRunResult<SandboxResult<SandboxRegistryDefinition<TName>>>>;
+ declare function runSandbox(name: string, payload?: unknown, options?: SandboxExecutionOptions): Promise<SandboxRunResult<unknown>>;
+ //#endregion
+-export { type AgentSandboxConfig, type CloudflareSandboxDefinitionProviderOptions, type CloudflareSandboxOptions, type SandboxDefinition, type SandboxDefinitionBundle, type SandboxDefinitionFromHandler, type SandboxDefinitionHandler, type SandboxDefinitionOptions, type SandboxDefinitionProviderOptions, type SandboxDefinitionRuntime, type SandboxErrResult, type SandboxError, type SandboxExecutionOptions, type SandboxOkResult, type SandboxRunResult, type VercelSandboxProviderOptions, createSandboxWithConfig, defineSandbox, type getSandboxFeatureProvider, readRequestPayload, readValidatedPayload, runSandbox };
+\ No newline at end of file
++export { type AgentSandboxConfig, type CloudflareSandboxDefinitionProviderOptions, type CloudflareSandboxOptions, type SandboxDefinition, type SandboxDefinitionBundle, type SandboxDefinitionFromHandler, type SandboxDefinitionHandler, type SandboxDefinitionOptions, type SandboxDefinitionProviderOptions, type SandboxDefinitionRuntime, type SandboxErrResult, type SandboxError, type SandboxExecutionOptions, type SandboxOkResult, type SandboxRunResult, type VercelSandboxProviderOptions, createSandboxWithConfig, defineDockerfile, defineSandbox, type getSandboxFeatureProvider, readRequestPayload, readValidatedPayload, runSandbox };
+diff --git a/dist/index.js b/dist/index.js
+index 248bd50d11b36222bd9bbf1fa5dcb498a2ccc0df..76f4ab4d6d6e95861693cf71f1bcad3015ab9dd0 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -57,6 +57,10 @@ function createSandboxDefinition(functionName, run, options) {
+ function defineSandbox(run, options) {
+ 	return createSandboxDefinition("defineSandbox", run, options);
+ }
++function defineDockerfile(strings) {
++	if (!Array.isArray(strings?.raw) || arguments.length !== 1) throw new TypeError("[vitehub] `defineDockerfile` must be used as a static tagged template without interpolations.");
++	return strings.raw[0];
++}
+ //#endregion
+ //#region src/internal/shared/request-payload.ts
+ async function readRequestPayload(event, fallback = {}) {
+@@ -767,4 +771,4 @@ async function runSandbox(name, payload, options) {
+ 	return await runSandboxRuntime(name, payload, options);
+ }
+ //#endregion
+-export { createSandboxWithConfig, defineSandbox, readRequestPayload, readValidatedPayload, runSandbox };
++export { createSandboxWithConfig, defineDockerfile, defineSandbox, readRequestPayload, readValidatedPayload, runSandbox };
 diff --git a/dist/vite.js b/dist/vite.js
-index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d918f8e496 100644
+index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..74ac32962aa500e5598c4c357bd3c2e9769e01a7 100644
 --- a/dist/vite.js
 +++ b/dist/vite.js
-@@ -705,7 +705,59 @@ async function bundleSandboxDefinition(source, file, options = {}) {
+@@ -651,7 +651,7 @@ async function bundleSandboxDefinition(source, file, options = {}) {
+ 		plugins: [{
+ 			name: SHIM_NAMESPACE,
+ 			setup(pluginBuild) {
+-				pluginBuild.onResolve({ filter: /^@vite-hub\/sandbox(?:\/runtime\/public)?$/ }, () => ({
++				pluginBuild.onResolve({ filter: /^(?:@vite-hub\/sandbox|vite-hub\/sandbox)(?:\/runtime\/public|\/cloudflare)?$/ }, () => ({
+ 					path: "sandbox-runtime-shim",
+ 					namespace: SHIM_NAMESPACE
+ 				}));
+@@ -693,6 +693,10 @@ async function bundleSandboxDefinition(source, file, options = {}) {
+ 						"",
+ 						"export function defineSandbox(run, options) {",
+ 						"  return { run, options }",
++						"}",
++						"",
++						"export function defineDockerfile(strings) {",
++						"  return strings.raw[0]",
+ 						"}"
+ 					].join("\n"),
+ 					loader: "js"
+@@ -705,11 +709,65 @@ async function bundleSandboxDefinition(source, file, options = {}) {
  //#region src/cloudflare.ts
  const defaultCloudflareSandboxBinding = "SANDBOX";
  const defaultCloudflareSandboxClassName = "Sandbox";
@@ -26,7 +85,8 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d9
 +		binding: options.binding || defaultCloudflareSandboxBinding,
 +		className: options.className || defaultCloudflareSandboxClassName,
 +		migrationTag: options.migrationTag || "v1",
-+		name: options.name || void 0
++		name: options.name || void 0,
++		dockerfile: typeof options.dockerfile === "string" ? options.dockerfile : void 0
 +	};
 +}
 +function createCloudflareSandboxRollupPlugin(options = {}) {
@@ -63,7 +123,98 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d9
  //#endregion
  //#region src/definition-options.ts
  const require = createRequire(import.meta.url);
-@@ -1050,7 +1102,7 @@ function readAliasEntries(alias) {
+ const sandboxDefinitionSyntax = "`defineSandbox()`";
++const sandboxDockerfileSyntax = "`export const dockerfile = defineDockerfile`...``";
+ function getTypeScript() {
+ 	return require("typescript");
+ }
+@@ -761,6 +819,39 @@ async function extractSandboxDefinitionOptions(file) {
+ 	if (!ts.isObjectLiteralExpression(options)) throw new Error(`[vitehub] ${sandboxDefinitionSyntax} options must be an object literal.`);
+ 	return readStaticValue(options);
+ }
++function readSandboxDockerfileExport(sourceFile) {
++	const ts = getTypeScript();
++	let match;
++	for (const statement of sourceFile.statements) {
++		if (!ts.isVariableStatement(statement) || !statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
++		for (const declaration of statement.declarationList.declarations) {
++			if (!ts.isIdentifier(declaration.name) || declaration.name.text !== "dockerfile") continue;
++			if (match) throw new Error(`[vitehub] ${sandboxDockerfileSyntax} may be declared only once per sandbox definition.`);
++			const initializer = declaration.initializer;
++			if (!initializer || !ts.isTaggedTemplateExpression(initializer) || !ts.isIdentifier(initializer.tag) || initializer.tag.text !== "defineDockerfile") throw new Error(`[vitehub] Sandbox build export \`dockerfile\` must use ${sandboxDockerfileSyntax}.`);
++			if (!ts.isNoSubstitutionTemplateLiteral(initializer.template)) throw new Error("[vitehub] `defineDockerfile` requires one static template without interpolations.");
++			const fragment = initializer.template.getText(sourceFile).slice(1, -1).trim();
++			if (/^\s*FROM\b/im.test(fragment)) throw new Error("[vitehub] `defineDockerfile` extends ViteHub's version-matched Cloudflare Sandbox base and cannot contain FROM. Configure an application-owned Dockerfile for a custom base image.");
++			match = {
++				fragment: fragment ? `${fragment}\n` : "",
++				statement
++			};
++		}
++	}
++	return match;
++}
++async function extractSandboxDefinitionDockerfile(file) {
++	const source = await readFile(file, "utf8");
++	const ts = getTypeScript();
++	return readSandboxDockerfileExport(ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS))?.fragment;
++}
++function stripSandboxDefinitionDockerfile(source, file) {
++	const ts = getTypeScript();
++	const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
++	const match = readSandboxDockerfileExport(sourceFile);
++	if (!match) return source;
++	return `${source.slice(0, match.statement.getStart(sourceFile))}${source.slice(match.statement.getEnd())}`;
++}
+ //#endregion
+ //#region src/type-template.ts
+ function createSandboxTypeTemplateContents(definitions) {
+@@ -858,7 +949,8 @@ async function loadSandboxDefinitionMetadata(definitions) {
+ 	return await Promise.all(definitions.map(async (definition) => {
+ 		return {
+ 			name: definition.name,
+-			options: normalizeSandboxDefinitionOptions(definition.name, await extractSandboxDefinitionOptions(definition.handler))
++			options: normalizeSandboxDefinitionOptions(definition.name, await extractSandboxDefinitionOptions(definition.handler)),
++			dockerfile: await extractSandboxDefinitionDockerfile(definition.handler)
+ 		};
+ 	}));
+ }
+@@ -922,11 +1014,17 @@ async function createSandboxFeaturePlan(sandboxConfig, definitions, paths, deps,
+ 	});
+ 	const definitionMetadata = await loadSandboxDefinitionMetadata(definitions);
+ 	const metadataByName = new Map(definitionMetadata.map((definition) => [definition.name, definition]));
++	const defaultProvider = getSandboxFeatureProvider(resolvedConfig);
++	const defaultProviderName = defaultProvider?.provider;
++	const dockerfileDefinitions = definitionMetadata.filter((definition) => typeof definition.dockerfile === "string");
++	if (dockerfileDefinitions.length > 0 && definitions.length !== 1) throw new Error("[vitehub] A colocated Cloudflare Dockerfile currently requires exactly one discovered sandbox definition. Configure an application-owned Dockerfile until ViteHub can route definitions to distinct images.");
++	if (dockerfileDefinitions.length > 0 && defaultProviderName !== "cloudflare") throw new Error("[vitehub] A colocated Dockerfile is supported only by the Cloudflare Sandbox provider. Configure a provider-owned image for this host.");
+ 	const sandboxArtifacts = sandboxDefinitions.map((definition) => ({
+ 		key: definition.definitionArtifactKey,
+ 		filename: definition.definitionFilename,
+ 		async getContents() {
+-			const bundle = await bundleSandboxDefinition(await definitionCompiler.readSource(definition._meta.sourcePath), definition._meta.sourcePath, { alias: bundleAlias });
++			const source = stripSandboxDefinitionDockerfile(await definitionCompiler.readSource(definition._meta.sourcePath), definition._meta.sourcePath);
++			const bundle = await bundleSandboxDefinition(source, definition._meta.sourcePath, { alias: bundleAlias });
+ 			const metadata = metadataByName.get(definition.name);
+ 			return `export default ${JSON.stringify({
+ 				bundle,
+@@ -934,14 +1032,13 @@ async function createSandboxFeaturePlan(sandboxConfig, definitions, paths, deps,
+ 			})}\n`;
+ 		}
+ 	}));
+-	const defaultProvider = getSandboxFeatureProvider(resolvedConfig);
+-	const defaultProviderName = defaultProvider?.provider;
+ 	const providerLoaderTarget = resolveSandboxProviderLoaderTarget(defaultProviderName, deps);
+ 	const cloudflareOptions = defaultProvider?.provider === "cloudflare" ? {
+ 		binding: typeof defaultProvider.binding === "string" ? defaultProvider.binding : defaultCloudflareSandboxBinding,
+ 		className: typeof defaultProvider.className === "string" ? defaultProvider.className : defaultCloudflareSandboxClassName,
+ 		migrationTag: typeof defaultProvider.migrationTag === "string" ? defaultProvider.migrationTag : "v1",
+-		name: typeof defaultProvider.name === "string" ? defaultProvider.name : void 0
++		name: typeof defaultProvider.name === "string" ? defaultProvider.name : void 0,
++		dockerfile: dockerfileDefinitions[0]?.dockerfile
+ 	} : void 0;
+ 	return {
+ 		manifest,
+@@ -1050,7 +1147,7 @@ function readAliasEntries(alias) {
  }
  function resolveStringAliases(alias) {
  	const aliases = {};
@@ -72,7 +223,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d9
  	return aliases;
  }
  function readResolveOptions(config) {
-@@ -1127,6 +1179,7 @@ async function prepareSandboxRuntime(options) {
+@@ -1127,6 +1224,7 @@ async function prepareSandboxRuntime(options) {
  	const aliases = createGeneratedAliasMap(rootDir, plan);
  	if (options.writeArtifacts === false) return {
  		aliases,
@@ -80,7 +231,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d9
  		definitions,
  		files: [],
  		stateModule
-@@ -1135,6 +1188,7 @@ async function prepareSandboxRuntime(options) {
+@@ -1135,6 +1233,7 @@ async function prepareSandboxRuntime(options) {
  	await writeFileIfChanged(facadeFile, createSandboxRuntimeFacadeContents(facadeFile, context.runtimeConfig.sandbox, aliases[SANDBOX_REGISTRY_ID]));
  	return {
  		aliases,
@@ -88,7 +239,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d9
  		definitions,
  		files: [facadeFile, ...Array.from(emitted.values(), (artifact) => artifact.dst)],
  		stateModule
-@@ -1699,6 +1753,80 @@ function invalidateGeneratedSandboxModules(files, moduleGraph) {
+@@ -1699,6 +1798,80 @@ function invalidateGeneratedSandboxModules(files, moduleGraph) {
  		if (module) moduleGraph.invalidateModule(module);
  	}
  }
@@ -112,24 +263,24 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d9
 +	const cloudflare = cloneSandboxRecord(nitro.cloudflare);
 +	const wrangler = cloneSandboxRecord(cloudflare.wrangler);
 +	const serverDir = resolveNitroServerDir(rootDir, nitro);
-+	const appDockerfile = resolve(rootDir, "Dockerfile");
 +	const generatedDockerfile = resolve(rootDir, ".vitehub/sandbox/Dockerfile");
-+	const dockerfile = existsSync(appDockerfile) ? appDockerfile : generatedDockerfile;
-+	if (!existsSync(appDockerfile)) {
-+		const version = await resolveCloudflareSandboxVersion();
-+		await writeFileIfChanged(generatedDockerfile, `FROM docker.io/cloudflare/sandbox:${version}\n`);
-+	}
 +	const resolvedOptions = resolveCloudflareSandboxOptions(options);
 +	const containers = Array.isArray(wrangler.containers) ? [...wrangler.containers] : [];
-+	if (!containers.some((entry) => entry && entry.class_name === resolvedOptions.className)) {
-+		containers.push({
++	let container = containers.find((entry) => entry && entry.class_name === resolvedOptions.className);
++	if (!container) {
++		container = {
 +			class_name: resolvedOptions.className,
-+			image: relativeWranglerPath(serverDir, dockerfile),
-+			image_build_context: relativeWranglerPath(serverDir, rootDir),
 +			instance_type: "lite",
 +			max_instances: 12,
 +			...resolvedOptions.name ? { name: resolvedOptions.name } : {}
-+		});
++		};
++		containers.push(container);
++	}
++	if (typeof container.image !== "string") {
++		const version = await resolveCloudflareSandboxVersion();
++		await writeFileIfChanged(generatedDockerfile, `FROM docker.io/cloudflare/sandbox:${version}\n${resolvedOptions.dockerfile || ""}`);
++		container.image = relativeWranglerPath(serverDir, generatedDockerfile);
++		container.image_build_context = relativeWranglerPath(serverDir, rootDir);
 +	}
 +	const durableObjects = cloneSandboxRecord(wrangler.durable_objects);
 +	const bindings = Array.isArray(durableObjects.bindings) ? [...durableObjects.bindings] : [];
@@ -169,7 +320,7 @@ index b73155bd9f7066f7d8167dc2d5c67730e8ca3995..80f648c4103de10f883f0e4d268b42d9
  function hubSandbox(options) {
  	const internalOptions = options;
  	const mergeNoExternal = createNoExternalMerger("@vite-hub/sandbox");
-@@ -1750,6 +1878,7 @@ function hubSandbox(options) {
+@@ -1750,6 +1923,7 @@ function hubSandbox(options) {
  			generatedAliases = prepared.aliases;
  			generatedFiles = prepared.files;
  			definitions = prepared.definitions;

@@ -63,9 +63,9 @@ async function getUploads() {
     signal: AbortSignal.timeout(30_000),
   })
   assert.equal(response.status, 200)
-  const stats = await response.json()
-  assert.ok(Number.isSafeInteger(stats.uploads))
-  return stats.uploads
+  const uploads = await response.json()
+  assert.ok(Number.isSafeInteger(uploads))
+  return uploads
 }
 
 async function waitForUploadCount(expected) {

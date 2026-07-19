@@ -8,19 +8,17 @@
   },
   "scripts": {
     "build": "vite build",
-    "check": "pnpm typecheck",
-    "deploy": "pnpm build && wrangler deploy --config .output/server/wrangler.json",
+    "deploy": "pnpm build && wrangler deploy",
     "dev": "node scripts/dev.mjs",
-    "dev:landing": "vite --host 127.0.0.1 --port 3031",
+    "dev:landing": "vite public --host 127.0.0.1 --port 3031",
     "preview": "nitro preview",
     "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
     "typecheck": "vite build --app && tsc --noEmit"
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.8.14",
-    "h3": "2.0.1-rc.25",
+    "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
     "nitro": "3.0.260603-beta",
-    "valibot": "^1.4.2",
     "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d"
   },
   "devDependencies": {

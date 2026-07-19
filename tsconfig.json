@@ -1,14 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "module": "Preserve",
-    "moduleResolution": "Bundler",
-    "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "ES2024",
-    "types": ["node", "vite/client"]
+    "target": "ES2024"
   },
-  "include": ["server/**/*.ts", "vite.config.ts", ".nitro/types/**/*.d.ts", ".vitehub/**/*.d.ts"]
+  "include": ["server/**/*.ts", "vite.config.ts", ".vitehub/**/*.d.ts"]
 }

@@ -1,5 +1,6 @@
 import { watch } from "node:fs"
 import { spawn } from "node:child_process"
+import { once } from "node:events"
 
 const sources = ["server", "skills", "public", "vite.config.ts"]
 
@@ -11,44 +12,25 @@ const worker = spawn("pnpm", ["exec", "wrangler", "dev", "--config", ".output/se
 const watchers = sources.map(source => watch(source, { recursive: true }, scheduleBuild))
 
 let buildTimer
-let building = false
-let pending = false
+let rebuild = Promise.resolve()
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.once(signal, () => worker.kill(signal))
 }
 
-const exitCode = await new Promise((resolve, reject) => {
-  worker.once("error", reject)
-  worker.once("exit", code => resolve(code ?? 1))
-})
+const [exitCode] = await once(worker, "exit")
 
 for (const watcher of watchers) watcher.close()
-process.exitCode = exitCode
+process.exitCode = exitCode ?? 1
 
 function scheduleBuild() {
   clearTimeout(buildTimer)
-  buildTimer = setTimeout(rebuild, 100)
+  buildTimer = setTimeout(() => {
+    rebuild = rebuild.then(build).catch(console.error)
+  }, 100)
 }
 
-async function rebuild() {
-  if (building) {
-    pending = true
-    return
-  }
-
-  building = true
-  do {
-    pending = false
-    await build()
-  } while (pending)
-  building = false
-}
-
-function build() {
-  return new Promise((resolve, reject) => {
-    const child = spawn("pnpm", ["build"], { stdio: "inherit" })
-    child.once("error", reject)
-    child.once("exit", code => code === 0 ? resolve() : reject(new Error(`Build exited with code ${code}.`)))
-  })
+async function build() {
+  const [code] = await once(spawn("pnpm", ["build"], { stdio: "inherit" }), "exit")
+  if (code !== 0) throw new Error(`Build exited with code ${code}.`)
 }

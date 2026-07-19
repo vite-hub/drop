@@ -1,21 +1,13 @@
-export const IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
+export const IMAGE_EXTENSIONS = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+} as const
 
-export type ImageContentType = typeof IMAGE_CONTENT_TYPES[number]
-
-export function imageExtension(contentType: ImageContentType) {
-  switch (contentType) {
-    case "image/jpeg": return "jpg"
-    case "image/png": return "png"
-    case "image/webp": return "webp"
-  }
-}
+export type ImageContentType = keyof typeof IMAGE_EXTENSIONS
 
 export function detectImageContentType(bytes: Uint8Array): ImageContentType | undefined {
-  if (matches(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg"
-  if (matches(bytes, 0, [137, 80, 78, 71, 13, 10, 26, 10])) return "image/png"
-  if (matches(bytes, 0, [82, 73, 70, 70]) && matches(bytes, 8, [87, 69, 66, 80])) return "image/webp"
-}
-
-function matches(bytes: Uint8Array, offset: number, signature: number[]) {
-  return bytes.length >= offset + signature.length && signature.every((byte, index) => bytes[offset + index] === byte)
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg"
+  if (bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71 && bytes[4] === 13 && bytes[5] === 10 && bytes[6] === 26 && bytes[7] === 10) return "image/png"
+  if (bytes[0] === 82 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 70 && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80) return "image/webp"
 }

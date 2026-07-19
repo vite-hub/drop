@@ -3,10 +3,6 @@ import { blob } from "vite-hub/blob"
 
 export default defineHandler(async (event) => {
   setResponseHeaders(event, { "Cache-Control": "public, max-age=300" })
-  return { uploads: await countImages() }
-})
-
-async function countImages() {
   let uploads = 0
   let cursor: string | undefined
 
@@ -17,4 +13,4 @@ async function countImages() {
   } while (cursor)
 
   return uploads
-}
+})

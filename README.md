@@ -59,7 +59,7 @@ pnpm exec wrangler login
 pnpm dev
 ```
 
-ViteHub supplies the normal Sandbox container configuration. Drop has a root [`Dockerfile`](./Dockerfile) only because its sandbox needs the additional ImageMagick system package. Use `pnpm dev:landing` when you only need the static landing page and do not need the server primitives.
+ViteHub supplies the Sandbox base image and generates the provider Dockerfile. Drop declares its additional ImageMagick build instruction beside the [`image-optimizer` sandbox](./server/sandboxes/image-optimizer.ts), so the workload and its system dependency stay together without a root Dockerfile. Use `pnpm dev:landing` when you only need the static landing page and do not need the server primitives.
 
 ## Host it yourself
 

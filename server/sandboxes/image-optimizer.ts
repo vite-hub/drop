@@ -1,37 +1,21 @@
-import { execFile } from "node:child_process"
-import { randomUUID } from "node:crypto"
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
-import { promisify } from "node:util"
+import { execFileSync } from "node:child_process"
 
-import { defineSandbox } from "vite-hub/sandbox"
+import { defineDockerfile, defineSandbox } from "vite-hub/sandbox"
 
-import { imageExtension, type ImageContentType } from "../image-content-type"
+import { IMAGE_EXTENSIONS, type ImageContentType } from "../image-content-type"
 
-const execFileAsync = promisify(execFile)
+export const dockerfile = defineDockerfile`
+  RUN apt-get update \
+    && apt-get install -y --no-install-recommends imagemagick \
+    && rm -rf /var/lib/apt/lists/*
+`
 
-export default defineSandbox(async (payload: {
-  bytes: string
-  contentType: ImageContentType
-}) => {
-  const directory = `/tmp/vitehub-image-${randomUUID()}`
-  const extension = imageExtension(payload.contentType)
-  const input = `${directory}/input.${extension}`
-  const output = `${directory}/output.${extension}`
+export default defineSandbox((payload: { bytes: string, contentType: ImageContentType }) => {
+  const output = execFileSync("convert", ["-", "-auto-orient", "-strip", "-resize", "2048x2048>", `${IMAGE_EXTENSIONS[payload.contentType]}:-`], {
+    input: Buffer.from(payload.bytes, "base64"),
+    maxBuffer: 24 * 1024 * 1024,
+    timeout: 60 * 1000,
+  })
 
-  await mkdir(directory, { recursive: true })
-  try {
-    await writeFile(input, Buffer.from(payload.bytes, "base64"))
-    await execFileAsync("convert", [
-      input,
-      "-auto-orient",
-      "-strip",
-      "-resize",
-      "2048x2048>",
-      output,
-    ])
-    return { bytes: (await readFile(output)).toString("base64") }
-  }
-  finally {
-    await rm(directory, { force: true, recursive: true })
-  }
+  return { bytes: output.toString("base64") }
 }, { timeout: 60_000 })

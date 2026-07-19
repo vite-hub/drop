@@ -592,7 +592,7 @@
         <nav class="links" aria-label="Service links">
           <span class="link-group">
             <a href="#why">How and why</a>
-            <a href="#api">Skill</a>
+            <a href="#api">Use Drop</a>
             <a href="#self-host">Host it yourself</a>
           </span>
           <span class="link-group external-links">
@@ -616,8 +616,8 @@
     <section class="doc-section" id="why" aria-labelledby="why-title">
       <div class="section-label">How and why</div>
       <div class="section-content">
-        <h2 id="why-title">Give agent images a permanent home</h2>
-        <p>Agents need a stable URL before they can put a local image in GitHub content. ViteHub Drop stores it durably and makes it smaller in the background.</p>
+        <h2 id="why-title">GitHub’s API can’t attach images to Markdown</h2>
+        <p>Agents need a stable URL before they can put a local image in GitHub content. ViteHub Drop gives every image a permanent home, then makes it smaller in the background.</p>
         <ol class="stepper" aria-label="How it works">
           <li class="stepper-item">
             <div class="stepper-track" aria-hidden="true">
@@ -626,7 +626,7 @@
             </div>
             <div class="stepper-copy">
               <h3 class="stepper-title">Upload</h3>
-              <p class="stepper-description">Blob stores the original immediately while Queue starts a durable optimization job.</p>
+              <p class="stepper-description">Send Drop one PNG, JPEG, or WebP image. Blob stores the original immediately.</p>
             </div>
           </li>
           <li class="stepper-item">
@@ -635,8 +635,8 @@
               <span class="stepper-separator"></span>
             </div>
             <div class="stepper-copy">
-              <h3 class="stepper-title">Optimize</h3>
-              <p class="stepper-description">Sandbox applies orientation, removes metadata, and resizes without upscaling. The result replaces the original only when it is smaller.</p>
+              <h3 class="stepper-title">Get the URL</h3>
+              <p class="stepper-description">The image is available immediately at a permanent <code>drop.vitehub.dev/i/…</code> URL identified by its UUID.</p>
             </div>
           </li>
           <li class="stepper-item">
@@ -645,8 +645,8 @@
               <span class="stepper-separator"></span>
             </div>
             <div class="stepper-copy">
-              <h3 class="stepper-title">Share</h3>
-              <p class="stepper-description">The command prints the permanent <code>drop.vitehub.dev/i/…</code> URL immediately while optimization continues in the background.</p>
+              <h3 class="stepper-title">Optimize</h3>
+              <p class="stepper-description">In the background, Queue asks Sandbox to orient, strip, and resize the image. If the result is smaller, it replaces the original at the same URL.</p>
             </div>
           </li>
         </ol>
@@ -654,9 +654,9 @@
     </section>
 
     <section class="doc-section api" id="api" aria-labelledby="api-title">
-      <div class="section-label">Skill</div>
+      <div class="section-label">Use Drop</div>
       <div class="section-content">
-        <h2 id="api-title">Upload Image to GitHub</h2>
+        <h2 id="api-title">Upload an image</h2>
         <p>The installed skill includes a script that stores the image and immediately prints its permanent Drop URL.</p>
         <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/image.png"</code></pre>
 
