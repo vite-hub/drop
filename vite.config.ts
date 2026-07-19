@@ -18,15 +18,30 @@ export default defineConfig(({ command }) => ({
         binding: "DROP_IMAGES",
         bucketName: imageBucketName,
         driver: "cloudflare-r2",
+        serve: {
+          headers: {
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+          },
+          publicBaseUrl: `https://${domain}/i`,
+          route: "/i",
+        },
       },
       database: false,
       devtools: false,
       kv: command === "serve"
         ? { base: ".data/kv", driver: "fs-lite" }
         : { binding: "DROP_STATS", driver: "cloudflare-kv-binding" },
+      queue: { provider: "cloudflare" },
       rateLimit: {
         namespace: packageJson.name,
         provider: command === "serve" ? "memory" : "cloudflare",
+      },
+      sandbox: {
+        provider: "cloudflare",
+        sandboxId: "drop-image-optimizer",
+        sleepAfter: "5m",
       },
       workflow: false,
       workspace: false,
@@ -38,14 +53,11 @@ export default defineConfig(({ command }) => ({
           name: packageJson.name,
           kv_namespaces: [{ binding: "DROP_STATS", id: "af46608653384ae685850fd7582475be" }],
           observability: { enabled: true },
-          r2_buckets: [{ binding: "DROP_IMAGES", bucket_name: imageBucketName }],
-          ratelimits: [{
-            name: "RATE_LIMIT_696D6167652D75706C6F6164",
-            namespace_id: "3576343723",
-            simple: { limit: 5, period: 60 },
-          }],
           route: { custom_domain: true, pattern: domain },
-          vars: { DROP_ORIGIN: `https://${domain}` },
+          vars: {
+            DROP_ORIGIN: `https://${domain}`,
+            IMAGE_MAX_DIMENSION: "2048",
+          },
         },
       },
       compatibilityDate: "2026-07-17",
@@ -64,6 +76,7 @@ export default defineConfig(({ command }) => ({
   env: {
     server: {
       dropOrigin: env({ default: `https://${domain}`, source: env.source("DROP_ORIGIN") }),
+      imageMaxDimension: env({ default: "2048", source: env.source("IMAGE_MAX_DIMENSION") }),
     },
   },
 }))

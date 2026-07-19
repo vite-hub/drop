@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0c0d0c">
   <meta name="application-name" content="Drop">
-  <meta name="description" content="Drop gives agents a permanent image URL they can post on GitHub.">
+  <meta name="description" content="Drop gives agents a permanent, optimized image URL for GitHub and the open web.">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Drop">
   <meta property="og:title" content="Drop | Agent drops images">
-  <meta property="og:description" content="Drop gives agents a permanent image URL they can post on GitHub.">
+  <meta property="og:description" content="Drop gives agents a permanent, optimized image URL for GitHub and the open web.">
   <meta property="og:url" content="https://drop.vitehub.dev/">
   <meta property="og:image" content="https://drop.vitehub.dev/og.png">
   <meta property="og:image:type" content="image/png">
@@ -19,7 +19,7 @@
   <meta property="og:image:alt" content="ViteHub Drop. Permanent image hosting for agents.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Drop | Agent drops images">
-  <meta name="twitter:description" content="Drop gives agents a permanent image URL they can post on GitHub.">
+  <meta name="twitter:description" content="Drop gives agents a permanent, optimized image URL for GitHub and the open web.">
   <meta name="twitter:image" content="https://drop.vitehub.dev/og.png">
   <meta name="twitter:image:alt" content="ViteHub Drop. Permanent image hosting for agents.">
   <title>Drop | Agent drops images</title>
@@ -588,7 +588,7 @@
           <code>npx skills add https://drop.vitehub.dev</code>
           <span aria-live="polite">Copy skill</span>
         </button>
-        <p class="usage-proof" data-usage-proof data-loading aria-live="polite"><strong data-upload-count>0</strong> <span data-upload-label>images uploaded by agents</span></p>
+        <p class="usage-proof" data-usage-proof data-loading aria-live="polite"><strong data-upload-count>0</strong> <span data-upload-label>permanent images</span><span data-savings></span></p>
         <nav class="links" aria-label="Service links">
           <span class="link-group">
             <a href="#why">How and why</a>
@@ -616,8 +616,8 @@
     <section class="doc-section" id="why" aria-labelledby="why-title">
       <div class="section-label">How and why</div>
       <div class="section-content">
-        <h2 id="why-title">Programmatically upload pictures to GitHub</h2>
-        <p>Agents lack a public GitHub attachment API, standard MCP tool, or ready-made upload skill. ViteHub Drop fills the gap.</p>
+        <h2 id="why-title">Give agent images a permanent home</h2>
+        <p>Agents need a stable URL before they can put a local image in GitHub content. ViteHub Drop stores it durably and makes it smaller in the background.</p>
         <ol class="stepper" aria-label="How it works">
           <li class="stepper-item">
             <div class="stepper-track" aria-hidden="true">
@@ -626,7 +626,7 @@
             </div>
             <div class="stepper-copy">
               <h3 class="stepper-title">Upload</h3>
-              <p class="stepper-description">The agent uploads one PNG, JPEG, or WebP image.</p>
+              <p class="stepper-description">Blob stores the original immediately while Queue starts a durable optimization job.</p>
             </div>
           </li>
           <li class="stepper-item">
@@ -635,8 +635,8 @@
               <span class="stepper-separator"></span>
             </div>
             <div class="stepper-copy">
-              <h3 class="stepper-title">Store</h3>
-              <p class="stepper-description">Drop stores the image permanently in Cloudflare R2.</p>
+              <h3 class="stepper-title">Optimize</h3>
+              <p class="stepper-description">Sandbox applies orientation, removes metadata, and resizes without upscaling. The result replaces the original only when it is smaller.</p>
             </div>
           </li>
           <li class="stepper-item">
@@ -645,8 +645,8 @@
               <span class="stepper-separator"></span>
             </div>
             <div class="stepper-copy">
-              <h3 class="stepper-title">Post</h3>
-              <p class="stepper-description">The agent posts the returned public URL to GitHub.</p>
+              <h3 class="stepper-title">Share</h3>
+              <p class="stepper-description">The command follows the KV job to completion and prints the permanent <code>drop.vitehub.dev/i/…</code> URL.</p>
             </div>
           </li>
         </ol>
@@ -657,7 +657,7 @@
       <div class="section-label">Skill</div>
       <div class="section-content">
         <h2 id="api-title">Upload Image to GitHub</h2>
-        <p>The installed skill includes a script that validates the image, uploads it to Drop, and prints its permanent public URL.</p>
+        <p>The installed skill includes a script that uploads the image, waits for background optimization, and prints its permanent Drop URL.</p>
         <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/image.png"</code></pre>
 
         <h3>Limits</h3>
@@ -678,7 +678,7 @@
             <tr><td><code>415</code></td><td>The request is not multipart data, the image format is unsupported, or its signature does not match the declared type.</td></tr>
             <tr><td><code>422</code></td><td>The content type header is malformed.</td></tr>
             <tr><td><code>429</code></td><td>The upload rate limit was reached; retry after 60 seconds.</td></tr>
-            <tr><td><code>503</code></td><td>Rate limiting or storage is unavailable.</td></tr>
+            <tr><td><code>503</code></td><td>Rate limiting, storage, or optimization dispatch is unavailable.</td></tr>
           </tbody>
         </table>
       </div>
@@ -735,10 +735,13 @@
     const usageProof = document.querySelector("[data-usage-proof]")
     fetch("/api/stats")
       .then(response => response.ok ? response.json() : Promise.reject())
-      .then(({ uploads }) => {
+      .then(({ savingsPercent, uploads }) => {
         if (!Number.isSafeInteger(uploads) || uploads < 1) return
         usageProof.querySelector("[data-upload-count]").textContent = uploads.toLocaleString()
-        usageProof.querySelector("[data-upload-label]").textContent = uploads === 1 ? "image uploaded by an agent" : "images uploaded by agents"
+        usageProof.querySelector("[data-upload-label]").textContent = uploads === 1 ? "permanent image" : "permanent images"
+        if (Number.isSafeInteger(savingsPercent) && savingsPercent > 0) {
+          usageProof.querySelector("[data-savings]").textContent = ` · ${savingsPercent}% fewer bytes`
+        }
         usageProof.removeAttribute("data-loading")
       })
       .catch(() => {})

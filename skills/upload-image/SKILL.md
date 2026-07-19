@@ -1,6 +1,6 @@
 ---
 name: upload-image
-description: Uploads a local image and returns a GitHub-renderable URL. Use when an agent needs to include a local image in GitHub content.
+description: Uploads a local image and returns its permanent public URL. Use when an agent needs to include a local image in GitHub content.
 ---
 
 # Upload Image to GitHub
@@ -11,4 +11,4 @@ The input must be an image the user placed in scope. Resolve the bundled script 
 node "<skill-directory>/scripts/upload-image.mjs" "/absolute/path/to/image.png"
 ```
 
-The upload is complete when the command prints a permanent `https://drop.vitehub.dev/i/<id>` URL. Use that URL in GitHub content the user explicitly authorized.
+The script waits for background optimization. The upload is complete when it prints a permanent `https://drop.vitehub.dev/i/<id>` URL. Use that URL in GitHub content the user explicitly authorized.
