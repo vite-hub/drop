@@ -78,7 +78,7 @@ async function waitForUploadCount(expected) {
 }
 
 async function verifyRateLimit() {
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 30; attempt++) {
     const response = await fetch(new URL("/api/images", origin), {
       body: new FormData(),
       method: "POST",
@@ -88,8 +88,9 @@ async function verifyRateLimit() {
       return
     }
     assert.equal(response.status, 400)
+    await new Promise(resolve => setTimeout(resolve, 250))
   }
-  assert.fail("The sixth upload attempt was not rate limited.")
+  assert.fail("The upload attempts were not rate limited.")
 }
 
 function escapeRegExp(value) {

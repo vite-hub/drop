@@ -1,4 +1,4 @@
-import { assertBodySize, defineHandler, getRequestIP, HTTPError, readBody, requireContentType } from "h3"
+import { assertBodySize, defineHandler, HTTPError, readBody, requireContentType } from "h3"
 import { blob } from "vite-hub/blob"
 import { runQueue } from "vite-hub/queue"
 import { defineRateLimit } from "vite-hub/rate-limit"
@@ -14,7 +14,7 @@ const imageUploadRateLimit = defineRateLimit("image-upload", {
 })
 
 export default defineHandler(async (event) => {
-  await imageUploadRateLimit.enforce(getRequestIP(event))
+  await imageUploadRateLimit.enforce()
 
   requireContentType(event, "multipart/form-data")
   await assertBodySize(event, MAX_IMAGE_BYTES + 64 * 1024)
