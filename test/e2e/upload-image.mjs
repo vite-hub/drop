@@ -11,8 +11,8 @@ const fixture = Buffer.from(
 const script = fileURLToPath(new URL("../../skills/upload-image/scripts/upload-image.mjs", import.meta.url))
 const output = execFileSync(process.execPath, [script, "-"], { input: fixture, encoding: "utf8" }).trim()
 
-assert.match(output, /^https:\/\/camo\.githubusercontent\.com\//)
+assert.match(output, /^https:\/\/drop\.vitehub\.dev\/i\/[0-9a-f-]+$/)
 const response = await fetch(output, { signal: AbortSignal.timeout(30_000) })
 assert.equal(response.status, 200)
 
-console.log(`verified GitHub Camo URL: ${output}`)
+console.log(`verified permanent Drop URL: ${output}`)

@@ -1,5 +1,4 @@
 patchedDependencies:
   '@vite-hub/blob@0.0.1': patches/@vite-hub__blob@0.0.1.patch
   '@vite-hub/env@0.0.1': patches/@vite-hub__env@0.0.1.patch
-  '@vite-hub/queue@0.0.1': patches/@vite-hub__queue@0.0.1.patch
   '@vite-hub/rate-limit@0.0.1': patches/@vite-hub__rate-limit@0.0.1.patch

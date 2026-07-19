@@ -3,11 +3,9 @@ import { assertBodySize, defineHandler, getRequestIP, HTTPError, readBody, requi
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { kv } from "vite-hub/kv"
-import { runQueue } from "vite-hub/queue"
 import { defineRateLimit } from "vite-hub/rate-limit"
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
-const EXPIRY_SECONDS = 23 * 60 * 60 + 55 * 60
 
 const imageUploadRateLimit = defineRateLimit("image-upload", {
   failure: "deny",
@@ -56,7 +54,6 @@ export default defineHandler(async (event) => {
   }
 
   const id = crypto.randomUUID()
-  const expiresAt = new Date(Date.now() + EXPIRY_SECONDS * 1000).toISOString()
 
   try {
     await blob.put(id, bytes, { access: "private", contentType })
@@ -64,15 +61,6 @@ export default defineHandler(async (event) => {
   catch (error) {
     console.error(JSON.stringify({ counter: "storage_failure", error: error instanceof Error ? error.message : String(error) }))
     throw new HTTPError({ status: 503, statusText: "Image storage is temporarily unavailable." })
-  }
-
-  try {
-    await runQueue("image-expiry", { contentType: "json", delaySeconds: EXPIRY_SECONDS, payload: { key: id } })
-  }
-  catch (error) {
-    console.error(JSON.stringify({ counter: "queue_dispatch_failure", error: error instanceof Error ? error.message : String(error), key: id }))
-    await blob.del(id).catch(() => console.error(JSON.stringify({ counter: "upload_cleanup_failure", key: id })))
-    throw new HTTPError({ status: 503, statusText: "Image expiry scheduling is temporarily unavailable." })
   }
 
   try {
@@ -87,7 +75,6 @@ export default defineHandler(async (event) => {
 
   return {
     contentType,
-    expiresAt,
     id,
     size: bytes.byteLength,
     url,

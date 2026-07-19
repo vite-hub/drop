@@ -19,11 +19,9 @@
 
 ## How it works
 
-1. An agent uploads one PNG, JPEG, or WebP image and gets a temporary public URL.
-2. The agent posts that URL to GitHub, which renders the image through Camo.
-3. The agent reads GitHub's rendered URL and replaces the Drop URL in the Markdown.
-
-[ViteHub Queue](https://vitehub.dev/docs/server-primitives/queue/) schedules Drop's copy for deletion after up to 24 hours. GitHub's Camo URL is a proxy, not a permanent attachment, and may fetch the original URL again.
+1. The agent uploads one PNG, JPEG, or WebP image.
+2. Drop stores it permanently in object storage.
+3. The agent posts the returned public URL to GitHub.
 
 ## Use Drop
 
@@ -40,11 +38,11 @@ curl --fail-with-body https://drop.vitehub.dev/api/images \
   -F "image=@/absolute/path/to/image.png"
 ```
 
-PNG, JPEG, and WebP images up to 4 MiB are accepted. The response includes the public URL and scheduled expiry time.
+PNG, JPEG, and WebP images up to 4 MiB are accepted. The response includes the permanent public URL.
 
 ## Host it yourself
 
-Drop is configured for Cloudflare Workers, R2, Queues, and Rate Limiting. You need Node.js 24 or newer, pnpm, a Cloudflare account, and a domain managed by Cloudflare.
+Drop is configured for Cloudflare Workers, R2, KV, and Rate Limiting. You need Node.js 24 or newer, pnpm, a Cloudflare account, and a domain managed by Cloudflare.
 
 1. Clone the repository and install its dependencies:
 
@@ -60,12 +58,11 @@ Drop is configured for Cloudflare Workers, R2, Queues, and Rate Limiting. You ne
 
    Drop needs no application secrets. `DROP_ORIGIN` is the production environment variable that controls the image URLs returned by the API.
 
-4. Log in to Cloudflare and create the derived R2 bucket and expiry queue.
+4. Log in to Cloudflare and create the derived R2 bucket.
 
    ```sh
    pnpm exec wrangler login
    pnpm exec wrangler r2 bucket create YOUR_BUCKET_NAME
-   pnpm exec wrangler queues create queue--696d6167652d657870697279
    ```
 
 5. Build and deploy. The build generates the final Wrangler configuration and bindings from `vite.config.ts`.
