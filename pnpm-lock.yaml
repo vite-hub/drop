@@ -9,7 +9,7 @@ patchedDependencies:
     hash: eaecfc846567935c62dbf97fb95a53def80a609170f8c4640395afd8a5159979
     path: patches/@vite-hub__sandbox@0.0.1.patch
   vite-hub@0.0.1:
-    hash: e691fbd2951cd3d8b5dbfd15cf813883331a90bd550a93ecb15364eb226d3263
+    hash: e845c72fe8c688c7b1a8b20a96be1d00da75b241c57da3686daccb6baa3971d9
     path: patches/vite-hub@0.0.1.patch
 
 importers:
@@ -30,7 +30,7 @@ importers:
         version: 1.4.2(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d(patch_hash=e691fbd2951cd3d8b5dbfd15cf813883331a90bd550a93ecb15364eb226d3263)(89939324a0bce01dfe5d8e56de5d50f0)
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d(patch_hash=e845c72fe8c688c7b1a8b20a96be1d00da75b241c57da3686daccb6baa3971d9)(89939324a0bce01dfe5d8e56de5d50f0)
     devDependencies:
       '@types/node':
         specifier: ^25.9.2
@@ -11120,7 +11120,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d(patch_hash=e691fbd2951cd3d8b5dbfd15cf813883331a90bd550a93ecb15364eb226d3263)(89939324a0bce01dfe5d8e56de5d50f0):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d(patch_hash=e845c72fe8c688c7b1a8b20a96be1d00da75b241c57da3686daccb6baa3971d9)(89939324a0bce01dfe5d8e56de5d50f0):
     dependencies:
       '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@003f0246b1e451940af0d8466034aac41bee8e6d(6fe4b18bd3aa1a4454c07e69b08c5796)
       '@vite-hub/auth': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@003f0246b1e451940af0d8466034aac41bee8e6d(@opentelemetry/api@1.9.1)(@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@003f0246b1e451940af0d8466034aac41bee8e6d(6fe4b18bd3aa1a4454c07e69b08c5796))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(kysely@0.29.4)(sql.js@1.14.1))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))

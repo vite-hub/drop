@@ -1,5 +1,5 @@
 diff --git a/dist/index.js b/dist/index.js
-index 3d3aed10e7989b2238ac2b7b8163bace27f05e44..3e88c546cce3f7bbd93cbfb06a66c3af7eae63a9 100644
+index 3d3aed10e7989b2238ac2b7b8163bace27f05e44..7af3538fe570c7e6db64188579146f20cf9d08bc 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -166,6 +166,8 @@ function frameworkDependencyResolver(options, providerImportAliases) {
@@ -11,48 +11,3 @@ index 3d3aed10e7989b2238ac2b7b8163bace27f05e44..3e88c546cce3f7bbd93cbfb06a66c3af
  			if (!isGeneratedImporter(importer)) return;
  			const isFrameworkPackageImport = id === frameworkPackageName || id.startsWith(`${frameworkPackageName}/`);
  			const isOwnerPackageImport = generatedOwnerPackageNames.some((name) => id === name || id.startsWith(`${name}/`));
-@@ -174,12 +176,44 @@ function frameworkDependencyResolver(options, providerImportAliases) {
- 		}
- 	};
- }
-+function hasNitroPlugin(value) {
-+	if (Array.isArray(value)) return value.some(hasNitroPlugin);
-+	return Boolean(value) && typeof value === "object" && (value.name === "nitro:main" || hasNitroPlugin(value.plugins));
-+}
-+function configuredHostingProviders(options) {
-+	const providers = [];
-+	for (const feature of [options.queue, options.rateLimit, options.sandbox]) {
-+		if (feature && typeof feature === "object" && (feature.provider === "cloudflare" || feature.provider === "vercel")) providers.push(feature.provider);
-+	}
-+	if (options.blob && typeof options.blob === "object") {
-+		const stores = [options.blob, options.blob.store, ...Object.values(options.blob.stores || {})].filter(Boolean);
-+		if (stores.some((store) => store.driver === "cloudflare-r2")) providers.push("cloudflare");
-+		if (stores.some((store) => store.driver === "vercel-blob")) providers.push("vercel");
-+	}
-+	return [...new Set(providers)];
-+}
-+function frameworkHostingInference(options) {
-+	return {
-+		name: "vite-hub/hosting",
-+		enforce: "pre",
-+		config(config) {
-+			if (!hasNitroPlugin(config.plugins)) return;
-+			const nitro = config.nitro && typeof config.nitro === "object" && !Array.isArray(config.nitro) ? { ...config.nitro } : {};
-+			if (typeof nitro.preset === "string" || process.env.NITRO_PRESET || process.env.SERVER_PRESET || process.env.VITEHUB_HOSTING) return;
-+			const providers = configuredHostingProviders(options);
-+			if (providers.length !== 1) return;
-+			nitro.preset = providers[0] === "cloudflare" ? "cloudflare-module" : "vercel";
-+			config.nitro = nitro;
-+		}
-+	};
-+}
- function vitehub(options = {}) {
- 	const plugins = [];
- 	const providerImportAliases = {};
- 	configureProviderOptionalImportAliases(providerImportAliases, options);
- 	const workspaceDependencyRuntimeImports = frameworkWorkspaceDependencyRuntimeImports(Boolean(options.sandbox));
- 	plugins.push(frameworkDependencyResolver(options, providerImportAliases));
-+	plugins.push(frameworkHostingInference(options));
- 	plugins.push(hubMarkdownTemplate({ runtimeImport: `${generatedImportBase}/markdown-template` }));
- 	if (options.env !== false) {
- 		const envOptions = options.env ?? {};

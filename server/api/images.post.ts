@@ -1,6 +1,5 @@
 import { assertBodySize, defineHandler, getRequestIP, HTTPError, readBody, requireContentType } from "h3"
 import { blob } from "vite-hub/blob"
-import { kv } from "vite-hub/kv"
 import { runQueue } from "vite-hub/queue"
 import { defineRateLimit } from "vite-hub/rate-limit"
 
@@ -51,17 +50,9 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 503, statusText: "Image storage is temporarily unavailable." })
   }
 
-  await Promise.all([
-    enqueueOptimization({ contentType, id }),
-    incrementUploads(),
-  ])
+  await enqueueOptimization({ contentType, id })
 
-  return {
-    contentType,
-    id,
-    size: bytes.byteLength,
-    url: `/i/${id}`,
-  }
+  return { url: `/i/${id}` }
 })
 
 async function enqueueOptimization(image: { contentType: ImageContentType, id: string }) {
@@ -70,14 +61,5 @@ async function enqueueOptimization(image: { contentType: ImageContentType, id: s
   }
   catch (error) {
     console.error(JSON.stringify({ counter: "queue_dispatch_failure", error: error instanceof Error ? error.message : String(error), key: image.id }))
-  }
-}
-
-async function incrementUploads() {
-  try {
-    await kv.set("uploads", (await kv.get<number>("uploads") ?? 0) + 1)
-  }
-  catch (error) {
-    console.error(JSON.stringify({ counter: "stats_failure", error: error instanceof Error ? error.message : String(error) }))
   }
 }

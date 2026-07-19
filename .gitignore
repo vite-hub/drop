@@ -1,4 +1,5 @@
 .nitro/
+.data/
 .output/
 .pnpm-store/
 .pnpm-patches/

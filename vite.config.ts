@@ -10,6 +10,27 @@ const domain = "drop.vitehub.dev"
 const imageBucketName = `${packageJson.name}-images`
 
 export default defineConfig(({ command }) => ({
+  nitro: {
+    cloudflare: {
+      deployConfig: true,
+      wrangler: {
+        name: packageJson.name,
+        observability: { enabled: true },
+        route: { custom_domain: true, pattern: domain },
+      },
+    },
+    compatibilityDate: "2026-07-17",
+    preset: "cloudflare-module",
+    publicAssets: [
+      {
+        baseURL: "/.well-known/skills",
+        dir: fileURLToPath(new URL("./skills", import.meta.url)),
+        maxAge: 60 * 60 * 24,
+      },
+    ],
+    renderer: false,
+    serverDir: true,
+  },
   plugins: [
     vitehub({
       agent: false,
@@ -19,7 +40,7 @@ export default defineConfig(({ command }) => ({
         driver: "cloudflare-r2",
         serve: {
           headers: {
-            "Cache-Control": "public, max-age=31536000, immutable",
+            "Cache-Control": "public, no-cache",
             "Content-Disposition": "inline",
             "X-Content-Type-Options": "nosniff",
           },
@@ -28,9 +49,7 @@ export default defineConfig(({ command }) => ({
       },
       database: false,
       devtools: false,
-      kv: command === "serve"
-        ? { base: ".data/kv", driver: "fs-lite" }
-        : { binding: "DROP_STATS", driver: "cloudflare-kv-binding" },
+      kv: false,
       queue: { provider: "cloudflare" },
       rateLimit: {
         namespace: packageJson.name,
@@ -44,27 +63,6 @@ export default defineConfig(({ command }) => ({
       workflow: false,
       workspace: false,
     }),
-    nitro({
-      cloudflare: {
-        deployConfig: true,
-        wrangler: {
-          name: packageJson.name,
-          kv_namespaces: [{ binding: "DROP_STATS", id: "af46608653384ae685850fd7582475be" }],
-          observability: { enabled: true },
-          route: { custom_domain: true, pattern: domain },
-        },
-      },
-      compatibilityDate: "2026-07-17",
-      preset: "cloudflare-module",
-      publicAssets: [
-        {
-          baseURL: "/.well-known/skills",
-          dir: fileURLToPath(new URL("./skills", import.meta.url)),
-          maxAge: 60 * 60 * 24,
-        },
-      ],
-      renderer: false,
-      serverDir: true,
-    }),
+    nitro(),
   ],
 }))

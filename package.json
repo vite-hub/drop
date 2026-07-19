@@ -10,7 +10,7 @@
     "build": "vite build",
     "check": "pnpm typecheck",
     "deploy": "pnpm build && wrangler deploy --config .output/server/wrangler.json",
-    "dev": "pnpm build && wrangler dev --config .output/server/wrangler.json --port 3031",
+    "dev": "node scripts/dev.mjs",
     "dev:landing": "vite --host 127.0.0.1 --port 3031",
     "preview": "nitro preview",
     "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",

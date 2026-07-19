@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url"
 
 import sharp from "sharp"
 
-const run = promisify(execFile)
+const execFileAsync = promisify(execFile)
 const origin = process.env.DROP_ORIGIN || "https://drop.vitehub.dev"
 const script = fileURLToPath(new URL("../../skills/upload-image/scripts/upload-image.mjs", import.meta.url))
 const uploadsBefore = await getUploads()
@@ -25,7 +25,7 @@ const original = await sharp({
 const fixtureDirectory = await mkdtemp(join(tmpdir(), "vitehub-drop-e2e-"))
 const fixturePath = join(fixtureDirectory, "oriented.jpg")
 await writeFile(fixturePath, original)
-const { stdout } = await run(process.execPath, [script, fixturePath], {
+const { stdout } = await execFileAsync(process.execPath, [script, fixturePath], {
   env: { ...process.env, DROP_ORIGIN: origin },
   maxBuffer: 1024 * 1024,
   timeout: 30_000,
@@ -49,7 +49,7 @@ async function waitForOptimizedImage(url, originalSize) {
     const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30_000) })
     assert.equal(response.status, 200)
     assert.equal(response.headers.get("content-type"), "image/jpeg")
-    assert.match(response.headers.get("cache-control") || "", /immutable/)
+    assert.match(response.headers.get("cache-control") || "", /no-cache/)
     const bytes = Buffer.from(await response.arrayBuffer())
     if (bytes.byteLength < originalSize) return bytes
     await new Promise(resolve => setTimeout(resolve, 1_000))

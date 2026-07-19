@@ -4,10 +4,10 @@ import { blob } from "vite-hub/blob"
 import { defineQueue } from "vite-hub/queue"
 import * as v from "valibot"
 
-import { detectImageContentType } from "../image-content-type"
+import { detectImageContentType, IMAGE_CONTENT_TYPES } from "../image-content-type"
 
 const payloadSchema = v.object({
-  contentType: v.picklist(["image/jpeg", "image/png", "image/webp"]),
+  contentType: v.picklist(IMAGE_CONTENT_TYPES),
   id: v.pipe(v.string(), v.uuid()),
 })
 
@@ -28,7 +28,6 @@ export default defineQueue(async ({ attempts, payload }) => {
     const result = await runSandbox("image-optimizer", {
       bytes: encodeBase64(originalBytes),
       contentType: image.contentType,
-      maxDimension: 2048,
     })
     if ("error" in result) throw result.error
 

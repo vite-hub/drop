@@ -22,9 +22,9 @@
 1. **Blob** stores the original immediately at its permanent Drop key.
 2. **Queue** dispatches asynchronous optimization while the permanent URL is already usable.
 3. **Sandbox** applies EXIF orientation, strips metadata, and resizes the image to fit within 2048 × 2048 without upscaling.
-4. Drop replaces the Blob only when the optimized file is smaller. **KV** stores one upload count for the landing page.
+4. Drop replaces the Blob only when the optimized file is smaller. The landing page counts the stored images directly.
 
-Drop exercises ViteHub's Blob, Queue, Sandbox, KV, and Rate Limit primitives with a small application surface.
+Drop exercises ViteHub's Blob, Queue, Sandbox, and Rate Limit primitives with a small application surface.
 
 ## Use Drop
 
@@ -51,7 +51,7 @@ The upload response contains `url`, which serves the original immediately and th
 
 ## Run locally
 
-You need Node.js 24 or newer, pnpm, Docker, and an authenticated Wrangler session. The full development command builds ViteHub's generated Worker configuration and starts Cloudflare's local runtime:
+You need Node.js 24 or newer, pnpm, Docker, and an authenticated Wrangler session. The full development command builds ViteHub's generated Worker configuration, watches source changes, and starts Cloudflare's local runtime:
 
 ```sh
 pnpm install
@@ -63,7 +63,7 @@ ViteHub supplies the normal Sandbox container configuration. Drop has a root [`D
 
 ## Host it yourself
 
-Drop runs on Cloudflare Workers with R2, Queues, KV, Rate Limiting, and Sandbox/Containers. Cloudflare Sandbox requires a Workers Paid plan.
+Drop runs on Cloudflare Workers with R2, Queues, Rate Limiting, and Sandbox/Containers. Cloudflare Sandbox requires a Workers Paid plan.
 
 1. Clone and install:
 
@@ -76,15 +76,14 @@ Drop runs on Cloudflare Workers with R2, Queues, KV, Rate Limiting, and Sandbox/
 
 2. Choose a unique package `name` in `package.json` and set `domain` in `vite.config.ts`.
 
-3. Create the R2 bucket, KV namespace, and Queue named by the generated `.output/server/wrangler.json`. For this repository's default names:
+3. Create the R2 bucket and Queue named by the generated `.output/server/wrangler.json`. For this repository's default names:
 
    ```sh
    pnpm exec wrangler r2 bucket create vitehub-drop-images
-   pnpm exec wrangler kv namespace create vitehub-drop-stats
    pnpm exec wrangler queues create queue--696d6167652d6f7074696d697a6174696f6e
    ```
 
-   Put the returned KV namespace ID in the `DROP_STATS` entry in `vite.config.ts`. R2, Queue, Rate Limit, Sandbox, Container, Durable Object, and migration bindings are composed by ViteHub; the app only declares the KV ID because it is an existing Cloudflare resource.
+   R2, Queue, Rate Limit, Sandbox, Container, Durable Object, and migration bindings are composed by ViteHub.
 
 4. Deploy and run the complete deployed-flow test:
 
