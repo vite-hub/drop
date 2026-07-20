@@ -9,7 +9,6 @@
   "scripts": {
     "build": "vite build",
     "deploy": "pnpm build && wrangler deploy",
-    "deploy:deno": "node scripts/deploy-deno.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:landing": "vite public --host 127.0.0.1 --port 3031",
     "preview": "nitro preview",
@@ -17,16 +16,16 @@
     "typecheck": "vite build --app && tsc --noEmit"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.8.14",
-    "@netlify/blobs": "^10.7.9",
-    "@vercel/blob": "^2.6.1",
+    "@vercel/functions": "^3.7.5",
+    "@vercel/queue": "^0.0.0-alpha.40",
     "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
     "nitro": "3.0.260603-beta",
     "sharp": "0.34.5",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d"
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@747"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
+    "@vite-hub/sandbox": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@746",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "wrangler": "4.111.0"

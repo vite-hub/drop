@@ -10,8 +10,9 @@ supportedArchitectures:
     - current
     - glibc
 
-patchedDependencies:
-  '@vite-hub/blob@0.0.1': patches/@vite-hub__blob@0.0.1.patch
-  '@vite-hub/queue@0.0.1': patches/@vite-hub__queue@0.0.1.patch
-  '@vite-hub/sandbox@0.0.1': patches/@vite-hub__sandbox@0.0.1.patch
-  vite-hub@0.0.1: patches/vite-hub@0.0.1.patch
+overrides:
+  '@vite-hub/agent': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@746'
+  '@vite-hub/box': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/box@746'
+  '@vite-hub/sandbox': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@746'
+  '@vite-hub/source': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@746'
+  '@vite-hub/workspace': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@746'
