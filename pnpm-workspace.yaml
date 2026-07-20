@@ -1,3 +1,15 @@
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+    - arm64
+  libc:
+    - current
+    - glibc
+
 patchedDependencies:
   '@vite-hub/blob@0.0.1': patches/@vite-hub__blob@0.0.1.patch
   '@vite-hub/queue@0.0.1': patches/@vite-hub__queue@0.0.1.patch

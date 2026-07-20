@@ -37,6 +37,9 @@ importers:
       nitro:
         specifier: 3.0.260603-beta
         version: 3.0.260603-beta(@libsql/client@0.17.4)(@netlify/blobs@10.7.9)(@vercel/blob@2.6.1)(@vercel/functions@3.7.5(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.21.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(giget@3.3.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260710.0)(rollup@4.62.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))(wrangler@4.111.0)
+      sharp:
+        specifier: 0.34.5
+        version: 0.34.5
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d
         version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@003f0246b1e451940af0d8466034aac41bee8e6d(patch_hash=e845c72fe8c688c7b1a8b20a96be1d00da75b241c57da3686daccb6baa3971d9)(7102175394d68323bf1a1340c64c69b2)
@@ -44,9 +47,6 @@ importers:
       '@types/node':
         specifier: ^25.9.2
         version: 25.9.5
-      sharp:
-        specifier: 0.34.5
-        version: 0.34.5
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

@@ -79,6 +79,19 @@ it is the only hosted build that needs Docker on the deployment machine. The
 Node profile needs a persistent volume for permanent URLs. Deno Deploy currently
 has no durable ViteHub Blob adapter, so its filesystem profile is suitable for
 compatibility testing but does not satisfy Drop's permanent-storage promise.
+Its filesystem is revision-local at best: uploaded images can disappear when a
+new revision is deployed or an instance is replaced.
+
+For a Deno Deploy compatibility deployment, authenticate the Deno CLI and run:
+
+```sh
+DENO_DEPLOY_ORG=my-org DROP_DEPLOYMENT_NAME=my-drop pnpm deploy:deno
+```
+
+The script builds the Deno profile, stages the generated server with Sharp's
+Linux x64 and ARM64 native packages, and forces Deno's dynamic runtime with
+`--allow-node-modules`. Set `DENO_DEPLOY_APP` when the app name should differ
+from `DROP_DEPLOYMENT_NAME`.
 
 Cloudflare Sandbox requires a Workers Paid plan.
 

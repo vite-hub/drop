@@ -40,6 +40,7 @@ export default defineConfig({
       agent: false,
       blob: {
         bucketName: `${deploymentName}-images`,
+        ...(profile.provider === "vercel" ? { access: "private" as const, driver: "vercel-blob" as const } : {}),
         serve: {
           headers: {
             "Cache-Control": "public, no-cache",
