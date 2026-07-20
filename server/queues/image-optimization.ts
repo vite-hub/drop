@@ -11,7 +11,7 @@ export default defineQueue<string>(async ({ payload: id }) => {
 
   const originalBytes = Buffer.from(await original.arrayBuffer())
   const contentType = original.type as ImageContentType
-  const result = await runSandbox("image-optimizer/image-optimizer", {
+  const result = await runSandbox("image-optimizer", {
     bytes: originalBytes.toString("base64"),
     contentType,
   })
