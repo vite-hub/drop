@@ -92,6 +92,15 @@ DENO_DEPLOY_ORG=my-org node .output/deploy.mjs
 ```
 
 Set `DENO_DEPLOY_APP` when the app name should differ from `VITEHUB_DEPLOYMENT_NAME`.
+For an existing app that already has `node_modules` uploads enabled, explicitly assert that persisted policy when redeploying:
+
+```sh
+DENO_DEPLOY_ORG=my-org \
+DENO_DEPLOY_NODE_MODULES_ENABLED=1 \
+node .output/deploy.mjs
+```
+
+The runner refuses to update an existing app without this assertion.
 
 Cloudflare Sandbox requires a Workers Paid plan. After building the `cloudflare` preset, create the R2 bucket and Queue named by `.output/server/wrangler.json`, then deploy that generated configuration:
 
