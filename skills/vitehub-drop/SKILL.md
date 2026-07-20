@@ -1,9 +1,9 @@
 ---
-name: upload-image
+name: vitehub-drop
 description: Uploads a local image and returns its permanent public URL. Use when an agent needs to include a local image in GitHub content.
 ---
 
-# Upload Image to GitHub
+# ViteHub Drop
 
 The input must be an image the user placed in scope. Resolve the bundled script relative to this `SKILL.md`, then run:
 

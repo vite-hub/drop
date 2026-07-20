@@ -12,7 +12,7 @@ import sharp from "sharp"
 
 const execFileAsync = promisify(execFile)
 const origin = process.env.DROP_ORIGIN || "https://drop.vitehub.dev"
-const script = fileURLToPath(new URL("../../skills/upload-image/scripts/upload-image.mjs", import.meta.url))
+const script = fileURLToPath(new URL("../../skills/vitehub-drop/scripts/upload-image.mjs", import.meta.url))
 const uploadsBefore = await getUploads()
 const original = await sharp({
   create: { background: { b: 190, g: 110, r: 35 }, channels: 3, height: 1200, width: 3200 },
