@@ -13,6 +13,7 @@ import sharp from "sharp"
 const execFileAsync = promisify(execFile)
 const origin = process.env.DROP_ORIGIN || "https://drop.vitehub.dev"
 const script = fileURLToPath(new URL("../../skills/vitehub-drop/scripts/upload-image.mjs", import.meta.url))
+const expectRateLimit = process.env.DROP_EXPECT_RATE_LIMIT !== "0"
 const uploadsBefore = await getUploads()
 const original = await sharp({
   create: { background: { b: 190, g: 110, r: 35 }, channels: 3, height: 1200, width: 3200 },
@@ -31,17 +32,22 @@ const { stdout } = await execFileAsync(process.execPath, [script, fixturePath], 
   timeout: 30_000,
 }).finally(() => rm(fixtureDirectory, { force: true, recursive: true }))
 
-const permanentUrl = stdout.trim()
-assert.match(permanentUrl, new RegExp(`^${escapeRegExp(origin)}/i/[0-9a-f-]{36}$`))
-const optimized = await waitForOptimizedImage(permanentUrl, original.byteLength)
+const imageUrl = stdout.trim()
+assert.match(imageUrl, new RegExp(`^${escapeRegExp(origin)}/i/[0-9a-f-]{36}$`))
+const optimized = await waitForOptimizedImage(imageUrl, original.byteLength)
 const metadata = await sharp(optimized).metadata()
 assert.ok(Math.max(metadata.width, metadata.height) <= 2048)
 assert.equal(metadata.orientation, undefined)
 assert.equal(metadata.exif, undefined)
 await waitForUploadCount(uploadsBefore + 1)
-await verifyRateLimit()
+if (expectRateLimit) {
+  await verifyRateLimit()
+}
+else {
+  await verifyNoRateLimit()
+}
 
-console.log(JSON.stringify({ originalBytes: original.byteLength, optimizedBytes: optimized.byteLength, permanentUrl }))
+console.log(JSON.stringify({ imageUrl, originalBytes: original.byteLength, optimizedBytes: optimized.byteLength, rateLimit: expectRateLimit }))
 
 async function waitForOptimizedImage(url, originalSize) {
   const deadline = Date.now() + 5 * 60_000
@@ -91,6 +97,17 @@ async function verifyRateLimit() {
     await new Promise(resolve => setTimeout(resolve, 250))
   }
   assert.fail("The upload attempts were not rate limited.")
+}
+
+async function verifyNoRateLimit() {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const response = await fetch(new URL("/api/images", origin), {
+      body: new FormData(),
+      method: "POST",
+      signal: AbortSignal.timeout(30_000),
+    })
+    assert.equal(response.status, 400)
+  }
 }
 
 function escapeRegExp(value) {

@@ -1,0 +1,9 @@
+{
+  "name": "@vitehub-drop/image-optimizer",
+  "type": "module",
+  "private": true,
+  "packageManager": "npm@11.6.2",
+  "dependencies": {
+    "sharp": "0.34.5"
+  }
+}

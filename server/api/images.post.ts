@@ -1,22 +1,13 @@
 import { assertBodySize, defineHandler, HTTPError, readValidatedBody, requireContentType } from "h3"
 import { blob } from "vite-hub/blob"
-import { deferQueue } from "vite-hub/queue"
-import { defineRateLimit } from "vite-hub/rate-limit"
 
 import { detectImageContentType } from "../image-content-type"
-
-declare const __DROP_ASYNC_OPTIMIZATION__: boolean
+import { optimizeStoredImage } from "../image-optimization"
+import { enforceUploadRateLimit } from "../upload-policy"
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
-
-const imageUploadRateLimit = defineRateLimit("image-upload", {
-  failure: "deny",
-  limit: 5,
-  window: "1m",
-})
-
 export default defineHandler(async (event) => {
-  await imageUploadRateLimit.enforce()
+  await enforceUploadRateLimit(event)
 
   requireContentType(event, "multipart/form-data")
   await assertBodySize(event, MAX_IMAGE_BYTES + 64 * 1024)
@@ -49,16 +40,6 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 503, statusText: "Image storage is temporarily unavailable." })
   }
 
-  if (__DROP_ASYNC_OPTIMIZATION__) {
-    deferQueue("image-optimization", { payload: id })
-  }
-  else {
-    const { optimizeImage } = await import("../image-optimizer")
-    const optimized = await optimizeImage(bytes, contentType)
-    if (optimized.byteLength < bytes.byteLength) {
-      await blob.put(id, optimized, { access: "private", contentType })
-    }
-  }
-
+  await optimizeStoredImage(id, bytes, contentType)
   return { url: `/i/${id}` }
 })
