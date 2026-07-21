@@ -19,7 +19,7 @@
     "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
     "nitro": "3.0.260603-beta",
     "sharp": "0.34.5",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@d8f2806"
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@bec25c9"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
