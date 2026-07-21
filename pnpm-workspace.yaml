@@ -9,12 +9,3 @@ supportedArchitectures:
   libc:
     - current
     - glibc
-
-overrides:
-  '@vite-hub/agent': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@385fb81'
-  '@vite-hub/blob': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@6634cb4'
-  '@vite-hub/box': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/box@385fb81'
-  '@vite-hub/queue': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@a13148b'
-  '@vite-hub/sandbox': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@385fb81'
-  '@vite-hub/source': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@385fb81'
-  '@vite-hub/workspace': 'https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@385fb81'
