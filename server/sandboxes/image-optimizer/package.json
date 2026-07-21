@@ -5,5 +5,10 @@
   "packageManager": "npm@11.6.2",
   "dependencies": {
     "sharp": "0.34.5"
+  },
+  "vitehub": {
+    "sandbox": {
+      "timeout": 60000
+    }
   }
 }

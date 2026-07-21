@@ -1,9 +1,9 @@
-import { defineSandbox } from "@vite-hub/sandbox"
+import { readFile } from "node:fs/promises"
 import sharp from "sharp"
 
 type ImageContentType = "image/jpeg" | "image/png" | "image/webp"
 
-type ImageOptimizationPayload = {
+export interface SandboxPayload {
   bytes: string
   contentType: ImageContentType
 }
@@ -14,24 +14,26 @@ const IMAGE_FORMATS = {
   "image/webp": "webp",
 } as const
 
-export default defineSandbox({
-  timeout: 60_000,
-  async run(payload?: ImageOptimizationPayload) {
-    if (!payload) throw new TypeError("Image optimization requires a payload.")
+const inputPath = process.argv[2]
+if (!inputPath) throw new TypeError("Sandbox input path is required.")
 
-    const optimized = await sharp(Buffer.from(payload.bytes, "base64"))
-      .rotate()
-      .resize({
-        fit: "inside",
-        height: 2048,
-        width: 2048,
-        withoutEnlargement: true,
-      })
-      .toFormat(IMAGE_FORMATS[payload.contentType])
-      .toBuffer()
+const { payload } = JSON.parse(await readFile(inputPath, "utf8")) as {
+  payload?: SandboxPayload
+}
 
-    return {
-      bytes: optimized.toString("base64"),
-    }
-  },
-})
+if (!payload) throw new TypeError("Image optimization requires a payload.")
+
+const optimized = await sharp(Buffer.from(payload.bytes, "base64"))
+  .rotate()
+  .resize({
+    fit: "inside",
+    height: 2048,
+    width: 2048,
+    withoutEnlargement: true,
+  })
+  .toFormat(IMAGE_FORMATS[payload.contentType])
+  .toBuffer()
+
+export default {
+  bytes: optimized.toString("base64"),
+}

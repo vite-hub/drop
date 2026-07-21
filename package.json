@@ -19,11 +19,10 @@
     "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
     "nitro": "3.0.260603-beta",
     "sharp": "0.34.5",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@deef4a7"
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@d8f2806"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
-    "@vite-hub/sandbox": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@deef4a7",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "wrangler": "4.111.0"
