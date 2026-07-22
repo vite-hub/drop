@@ -1,0 +1,11 @@
+{
+  "skills": [
+    {
+      "name": "vitehub-drop",
+      "description": "Uploads a local file and returns a permanent URL. Use when an agent needs to include a local image or document in GitHub content.",
+      "files": [
+        "SKILL.md"
+      ]
+    }
+  ]
+}

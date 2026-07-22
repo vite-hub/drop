@@ -1,0 +1,29 @@
+{
+  "name": "vitehub-drop",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "deploy": "pnpm build && wrangler deploy",
+    "postinstall": "vitehub types prepare",
+    "preview": "nitro preview",
+    "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
+    "typecheck": "vite build --app && tsc --noEmit"
+  },
+  "dependencies": {
+    "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
+    "nitro": "3.0.260603-beta",
+    "sharp": "0.34.5",
+    "vite-hub": "0.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "wrangler": "4.111.0"
+  }
+}

@@ -1,0 +1,11 @@
+.data/
+.netlify/
+.output/
+.pnpm-store/
+.pnpm-patches/
+.vitehub/
+.vercel/
+.wrangler/
+.env*
+dist/
+node_modules/

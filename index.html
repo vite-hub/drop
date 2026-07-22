@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0d0c">
+  <meta name="application-name" content="Drop">
+  <meta name="description" content="Drop gives agents permanent file URLs for GitHub and the open web.">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Drop">
+  <meta property="og:title" content="Drop | Agent drops files">
+  <meta property="og:description" content="Drop gives agents permanent file URLs for GitHub and the open web.">
+  <meta property="og:url" content="https://drop.vitehub.dev/">
+  <meta property="og:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Drop | Agent drops files">
+  <meta name="twitter:description" content="Drop gives agents permanent file URLs for GitHub and the open web.">
+  <meta name="twitter:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
+  <meta name="twitter:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
+  <title>Drop | Agent drops files</title>
+  <link rel="canonical" href="https://drop.vitehub.dev/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: oklch(12% 0.008 145);
+      --surface: oklch(15% 0.01 145);
+      --line: oklch(26% 0.014 145);
+      --text: oklch(96% 0.008 105);
+      --muted: oklch(70% 0.012 120);
+      --accent: oklch(87% 0.18 125);
+      font-family: "Helvetica Neue", "Nimbus Sans L", sans-serif;
+      font-synthesis: none;
+      font-kerning: normal;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-width: 20rem;
+      min-height: 100svh;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      width: min(45rem, calc(100% - 3rem));
+      margin: 0 auto;
+      padding: clamp(3rem, 10vh, 6rem) 0 max(2rem, env(safe-area-inset-bottom));
+    }
+
+    .intro {
+      min-height: calc(100svh - clamp(5rem, 14vh, 8rem));
+      display: grid;
+    }
+
+    .hero {
+      align-self: center;
+    }
+
+    h1 {
+      margin: 0 0 1.5rem -0.055em;
+      display: flex;
+      align-items: center;
+      gap: 0.16em;
+      font-size: clamp(3.75rem, 9vw, 5.75rem);
+      font-weight: 600;
+      letter-spacing: -0.06em;
+      line-height: 0.88;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 0.86em;
+      height: 0.72em;
+      flex: none;
+    }
+
+    .brand-prefix {
+      color: var(--muted);
+    }
+
+    .lede {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 4.4vw, 1.45rem);
+      line-height: 1.45;
+      white-space: nowrap;
+    }
+
+    .command {
+      width: 100%;
+      min-height: 4rem;
+      margin: clamp(2.5rem, 7vh, 3.5rem) 0 0.75rem;
+      padding: 1rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 180ms ease-out, background 180ms ease-out;
+    }
+
+    .command code {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.95rem;
+      font-variant-ligatures: none;
+      line-height: 1.5;
+    }
+
+    .command span {
+      flex: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .command:hover {
+      border-color: var(--accent);
+      background: oklch(17% 0.016 125);
+    }
+
+    .usage-proof {
+      margin: 0 0 1.5rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .usage-proof strong {
+      color: var(--text);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .command:focus-visible,
+    a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 2rem;
+    }
+
+    .link-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 1.5rem;
+    }
+
+    .external-links {
+      margin-left: auto;
+    }
+
+    .external-links a {
+      gap: 0.4rem;
+    }
+
+    .link-icon {
+      width: 1em;
+      height: 1em;
+      flex: none;
+    }
+
+    a {
+      min-height: 3rem;
+      display: inline-flex;
+      align-items: center;
+      color: var(--accent);
+      font-size: 1.05rem;
+      text-underline-offset: 0.32em;
+      text-decoration-thickness: 1px;
+    }
+
+    .doc-section {
+      padding: clamp(5rem, 11vw, 8rem) 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.25rem;
+      border-top: 1px solid var(--line);
+      scroll-margin-top: 2rem;
+    }
+
+    .section-content {
+      margin-inline-start: -0.25rem;
+    }
+
+    .api {
+      --typeset-size: 1rem;
+      --typeset-leading: 1.75;
+      --typeset-flow: 1.25rem;
+    }
+
+    #why {
+      padding: clamp(4rem, 8vw, 6rem) 0;
+      gap: 0.75rem;
+      border-top: 0;
+    }
+
+    #why .section-content {
+      margin-inline-start: 0;
+    }
+
+    .section-label {
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.875rem;
+      letter-spacing: 0.08em;
+      line-height: 1.6;
+      text-transform: uppercase;
+    }
+
+    .section-content h2 {
+      margin: 0;
+      max-width: 18ch;
+      font-size: clamp(2.5rem, 7vw, 4.5rem);
+      font-weight: 600;
+      letter-spacing: -0.055em;
+      line-height: 0.98;
+      text-wrap: balance;
+    }
+
+    .section-content > p {
+      max-width: 40rem;
+      margin: 1.5rem 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.75;
+      text-wrap: pretty;
+    }
+
+    .section-content > p a {
+      min-height: 0;
+      display: inline;
+      color: inherit;
+      font-size: inherit;
+      text-decoration-color: var(--line);
+    }
+
+    .section-content > p a:hover {
+      color: var(--text);
+      text-decoration-color: var(--accent);
+    }
+
+    .repository-link {
+      width: fit-content;
+      margin-top: 1.5rem;
+      padding: 0 1rem;
+      gap: 0.5rem;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      text-decoration: none;
+      transition: border-color 180ms ease-out, background 180ms ease-out;
+    }
+
+    .repository-link:hover {
+      border-color: var(--accent);
+      background: oklch(17% 0.016 125);
+    }
+
+    .provider-grid {
+      margin: clamp(2.5rem, 6vw, 3.5rem) 0 0;
+      padding: 1px;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      list-style: none;
+    }
+
+    .provider {
+      min-width: 0;
+      min-height: 6.5rem;
+      padding: 1rem 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0.65rem;
+      background: var(--bg);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .provider svg {
+      width: 1.75rem;
+      height: 1.75rem;
+      flex: none;
+      color: var(--text);
+    }
+
+    .provider span {
+      font-size: 0.7rem;
+      line-height: 1.3;
+    }
+
+    .stepper {
+      max-width: 40rem;
+      margin: clamp(2.5rem, 6vw, 3.5rem) 0 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      list-style: none;
+    }
+
+    .stepper-item {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 1.75rem minmax(0, 1fr);
+      column-gap: 0.875rem;
+    }
+
+    .stepper-track {
+      display: flex;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    .stepper-indicator {
+      width: 1.75rem;
+      height: 1.75rem;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .stepper-separator {
+      width: 1px;
+      min-height: 1rem;
+      margin: 0.4rem 0;
+      flex: 1;
+      background: var(--line);
+    }
+
+    .stepper-item:last-child .stepper-separator {
+      display: none;
+    }
+
+    .stepper-copy {
+      padding: 0.125rem 0 1.5rem;
+    }
+
+    .stepper-item:last-child .stepper-copy {
+      padding-bottom: 0;
+    }
+
+    .stepper-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .stepper-description {
+      max-width: 36rem;
+      margin: 0.3rem 0 0;
+      color: var(--muted);
+      font-size: 0.925rem;
+      line-height: 1.6;
+      text-wrap: pretty;
+    }
+
+    .stepper-description a {
+      min-height: 0;
+      display: inline;
+      font-size: inherit;
+    }
+
+    .api .section-content > p {
+      margin-block-start: var(--typeset-flow);
+      font-size: var(--typeset-size);
+      line-height: var(--typeset-leading);
+    }
+
+    .api h2 code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.72em;
+      font-weight: 500;
+      letter-spacing: -0.045em;
+    }
+
+    .api h3 {
+      margin: 4rem 0 1rem;
+      font-size: 1.35rem;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+    }
+
+    pre {
+      margin: 1.5rem 0 0;
+      padding: 1.25rem;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.65;
+      tab-size: 2;
+    }
+
+    .behavior {
+      margin: var(--typeset-flow) 0 0;
+      color: var(--muted);
+      font-size: var(--typeset-size);
+      line-height: var(--typeset-leading);
+      text-wrap: pretty;
+    }
+
+    .limit-list {
+      padding-left: 1.2rem;
+    }
+
+    .limit-list li + li {
+      margin-top: 0.35rem;
+    }
+
+    .section-content p code {
+      padding: 0.15em 0.3em;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.875em;
+      font-weight: 600;
+    }
+
+    .api table {
+      width: 100%;
+      border-collapse: collapse;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .api th,
+    .api td {
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .api th {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .api th:first-child,
+    .api td:first-child {
+      width: 4.5rem;
+      padding-right: 1rem;
+    }
+
+    .hero > * {
+      animation: arrive 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .hero > :nth-child(2) { animation-delay: 60ms; }
+    .hero > :nth-child(3) { animation-delay: 120ms; }
+    .hero > :nth-child(4) { animation-delay: 180ms; }
+    .hero > :nth-child(5) { animation-delay: 240ms; }
+    @keyframes arrive {
+      from { opacity: 0; transform: translateY(0.75rem); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 48rem) {
+      .provider-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 34rem) {
+      body {
+        min-width: 0;
+      }
+
+      main {
+        width: 100%;
+        padding-top: max(2.5rem, env(safe-area-inset-top));
+        padding-right: max(1rem, env(safe-area-inset-right));
+        padding-left: max(1rem, env(safe-area-inset-left));
+      }
+
+      .intro {
+        min-height: calc(100svh - 4.5rem);
+      }
+
+      h1 {
+        font-size: clamp(2.625rem, 13.8vw, 3.75rem);
+      }
+
+      .lede {
+        width: 100%;
+        font-size: 1.125rem;
+        white-space: nowrap;
+      }
+
+      .command {
+        margin-top: 2.25rem;
+        padding: 1rem;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.625rem;
+      }
+
+      .command code {
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .command span {
+        align-self: flex-end;
+        font-size: 1rem;
+      }
+
+      .usage-proof {
+        margin-bottom: 1.25rem;
+        font-size: 1rem;
+      }
+
+      .links {
+        width: 100%;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .link-group {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+      }
+
+      .external-links {
+        margin-left: 0;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--line);
+      }
+
+      .links a {
+        width: fit-content;
+        font-size: 1.125rem;
+      }
+
+      .repository-link {
+        position: relative;
+        min-height: 2.5rem;
+        padding: 0 0.75rem;
+        font-size: 1rem;
+      }
+
+      .repository-link::before {
+        width: max(100%, 3rem);
+        height: max(100%, 3rem);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        content: "";
+        transform: translate(-50%, -50%);
+      }
+
+      .doc-section {
+        padding: 4.5rem 0;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.25rem;
+      }
+
+      .section-content {
+        margin-inline-start: 0;
+      }
+
+      .section-label {
+        font-size: 1rem;
+      }
+
+      #why {
+        padding: 3.5rem 0;
+        gap: 0.6rem;
+      }
+
+      .provider-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .provider {
+        min-height: 7rem;
+        padding: 1rem 0.75rem;
+      }
+
+      .provider svg {
+        width: 2rem;
+        height: 2rem;
+      }
+
+      .provider span {
+        font-size: 1rem;
+      }
+
+      .stepper {
+        margin-top: 2rem;
+      }
+
+      .stepper-title {
+        font-size: 1.125rem;
+      }
+
+      .stepper-description {
+        font-size: 1rem;
+      }
+
+      .api h3 {
+        font-size: 1.5rem;
+      }
+
+      pre {
+        margin-inline: -1rem;
+        padding: 1rem;
+        font-size: 1rem;
+      }
+
+      .api table {
+        font-size: 1rem;
+      }
+
+      .api thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .api tbody,
+      .api tr,
+      .api td {
+        display: block;
+        width: 100%;
+      }
+
+      .api tr {
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .api td,
+      .api td:first-child {
+        padding: 0;
+        border: 0;
+      }
+
+      .api td:first-child {
+        width: auto;
+        margin-bottom: 0.35rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      .hero > * {
+        animation: none;
+      }
+
+      .command {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <script server>
+    const uploads = Number(await serverFetch("/api/stats").then(response => response.json()))
+  </script>
+  <main>
+    <section class="intro">
+      <div class="hero" aria-labelledby="title">
+        <h1 id="title">
+          <svg class="brand-mark" viewBox="0 6 36 28" aria-hidden="true">
+            <path fill="#ef9645" d="M17.554 24.8a2 2 0 0 1-1.791-1.106c-1.162-2.324-3.655-4.978-5.411-6.294a2 2 0 1 1 2.401-3.2c2.107 1.581 5.068 4.667 6.589 7.706a2 2 0 0 1-1.788 2.894"/>
+            <path fill="#ffdc5d" d="M18.002 24a2 2 0 0 1-1.791-1.106c-1.162-2.324-3.655-4.978-5.411-6.294a2 2 0 1 1 2.401-3.2c2.107 1.581 5.068 4.667 6.589 7.706A2 2 0 0 1 18.002 24"/>
+            <path fill="#ef9645" d="M23.554 26.8a2 2 0 0 1-1.717-.972c-2.109-3.515-4.404-5.799-9.447-9.401a2.001 2.001 0 0 1 2.324-3.255c5.487 3.919 8.15 6.593 10.553 10.599a2 2 0 0 1-1.713 3.029"/>
+            <path fill="#ffdc5d" d="M24.002 26a2 2 0 0 1-1.717-.972c-2.109-3.515-4.404-5.799-9.447-9.401a2.001 2.001 0 0 1 2.324-3.255c5.487 3.919 8.15 6.593 10.553 10.599A2 2 0 0 1 24.002 26"/>
+            <path fill="#ef9645" d="M29.552 26.299a2 2 0 0 1-1.414-.586c-2.758-2.757-5.871-5.303-10.748-8.787a2 2 0 0 1 2.324-3.255c5.068 3.621 8.329 6.29 11.252 9.213a2 2 0 0 1-1.414 3.415"/>
+            <path fill="#ffdc5d" d="M30 25.5a2 2 0 0 1-1.414-.586c-2.758-2.757-5.871-5.303-10.748-8.787a2 2 0 0 1 2.324-3.255c5.068 3.621 8.329 6.29 11.252 9.213A2 2 0 0 1 30 25.5"/>
+            <path fill="#ef9645" d="m13.734 25.75-1.175-2.08a2.25 2.25 0 0 1-.18-1.832L0 10.135v9.518l.278.069a9.56 9.56 0 0 1 5.028 3.156l5.329 6.473 1.071 2.931c.101.337.435.617.858.704 1.354.246 2.819-.394 3.081-1.368.384-1.959-.664-4.057-1.911-5.868"/>
+            <path fill="#ffdc5d" d="m0 7.932 5.215 2.235c1.182.506 2.439.812 3.722.903l9.516.68c1.678.12 3.309.605 4.78 1.422l5.027 2.793a11.5 11.5 0 0 0 3.705 1.295l2.226.371a2.166 2.166 0 0 1-.356 4.302c-2.527 0-5.025-.541-7.325-1.587l-2.873-1.306a11.53 11.53 0 0 0-9.316-.101 2.247 2.247 0 0 0-1.067 3.185l1.183 2.07a8.43 8.43 0 0 1 .946 5.832 1.945 1.945 0 0 1-2.371 1.507c-.331-.081-.583-.355-.677-.682l-.835-2.919-5.501-6.602a9.56 9.56 0 0 0-5.028-3.156L0 17.932z"/>
+            <path fill="#ef9645" d="M33.834 21.932c-2.527 0-5.025-.541-7.325-1.587l-2.873-1.306a11.53 11.53 0 0 0-9.316-.101 2.25 2.25 0 0 0-1.069.963l.006-.003a11.53 11.53 0 0 1 9.316.101l2.874 1.306a17.7 17.7 0 0 0 7.325 1.587c.816 0 1.519-.457 1.888-1.124a2.2 2.2 0 0 1-.826.164"/>
+          </svg>
+          <span class="brand-prefix">ViteHub</span>
+          <span>Drop</span>
+        </h1>
+        <p class="lede">So your agent can post files on GitHub.</p>
+        <button class="command" type="button" data-copy aria-label="Copy skill install command">
+          <code>npx skills add https://drop.vitehub.dev</code>
+          <span aria-live="polite">Copy skill</span>
+        </button>
+        <p class="usage-proof"><strong>{{ uploads.toLocaleString() }}</strong> files uploaded by agents</p>
+        <nav class="links" aria-label="Service links">
+          <span class="link-group">
+            <a href="#why">How and why</a>
+            <a href="#api">Use Drop</a>
+            <a href="#self-host">Host it yourself</a>
+          </span>
+          <span class="link-group external-links">
+            <a href="https://vitehub.dev">
+              <svg class="link-icon" viewBox="0 0 20 18" aria-hidden="true">
+                <path fill="currentColor" d="M19.734 8.156 15.576.844A1.66 1.66 0 0 0 14.135 0H5.819C5.226 0 4.677.32 4.38.844L.222 8.156a1.71 1.71 0 0 0 0 1.688l4.158 7.312c.297.523.846.844 1.439.844h8.316c.593 0 1.142-.32 1.438-.844l4.158-7.312c.3-.523.3-1.165.003-1.688Z"/>
+              </svg>
+              <span>Built with ViteHub</span>
+            </a>
+            <a href="https://github.com/vite-hub/drop">
+              <svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+              </svg>
+              <span>GitHub</span>
+            </a>
+          </span>
+        </nav>
+      </div>
+    </section>
+
+    <section class="doc-section" id="why" aria-labelledby="why-title">
+      <div class="section-label">How and why</div>
+      <div class="section-content">
+        <h2 id="why-title">GitHub’s API can’t attach local files to Markdown</h2>
+        <p>Agents need a stable URL before they can put a local file in GitHub content. ViteHub Drop gives every file a permanent home and optimizes supported images in the background.</p>
+        <ol class="stepper" aria-label="How it works">
+          <li class="stepper-item">
+            <div class="stepper-track" aria-hidden="true">
+              <span class="stepper-indicator">1</span>
+              <span class="stepper-separator"></span>
+            </div>
+            <div class="stepper-copy">
+              <h3 class="stepper-title">Upload</h3>
+              <p class="stepper-description">Send Drop one file. Blob stores the original immediately, with a 4 MiB limit.</p>
+            </div>
+          </li>
+          <li class="stepper-item">
+            <div class="stepper-track" aria-hidden="true">
+              <span class="stepper-indicator">2</span>
+              <span class="stepper-separator"></span>
+            </div>
+            <div class="stepper-copy">
+              <h3 class="stepper-title">Get the URL</h3>
+              <p class="stepper-description">The file is available immediately at a permanent <code>drop.vitehub.dev/i/…</code> URL identified by its UUID.</p>
+            </div>
+          </li>
+          <li class="stepper-item">
+            <div class="stepper-track" aria-hidden="true">
+              <span class="stepper-indicator">3</span>
+              <span class="stepper-separator"></span>
+            </div>
+            <div class="stepper-copy">
+              <h3 class="stepper-title">Optimize</h3>
+              <p class="stepper-description">For PNG, JPEG, and WebP files, Queue asks Sandbox to orient, strip, and resize the image. Other files skip optimization.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="doc-section api" id="api" aria-labelledby="api-title">
+      <div class="section-label">Use Drop</div>
+      <div class="section-content">
+        <h2 id="api-title">Upload a file</h2>
+        <p>The installed skill includes a script that stores the file and immediately prints its permanent Drop URL.</p>
+        <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/file.pdf"</code></pre>
+
+        <h3>Limits</h3>
+        <ul class="behavior limit-list">
+          <li>One file per request, up to 4 MiB.</li>
+          <li>Target: 5 upload attempts per source address every 60 seconds.</li>
+          <li>On <code>429</code>, wait one minute before retrying.</li>
+        </ul>
+
+        <h3 id="errors-title">Errors</h3>
+        <table aria-labelledby="errors-title">
+          <thead>
+            <tr><th scope="col">Status</th><th scope="col">Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>400</code></td><td>Malformed multipart data, a missing or repeated file, or an unexpected field.</td></tr>
+            <tr><td><code>413</code></td><td>The file exceeds 4 MiB or the request exceeds 4 MiB plus 64 KiB.</td></tr>
+            <tr><td><code>415</code></td><td>The request is not multipart data.</td></tr>
+            <tr><td><code>422</code></td><td>The content type header is malformed.</td></tr>
+            <tr><td><code>429</code></td><td>The upload rate limit was reached; retry after 60 seconds.</td></tr>
+            <tr><td><code>503</code></td><td>Rate limiting, storage, or optimization dispatch is unavailable.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-section" id="self-host" aria-labelledby="self-host-title">
+      <div class="section-label">Open source</div>
+      <div class="section-content">
+        <h2 id="self-host-title">Host it yourself</h2>
+        <a class="repository-link" href="https://github.com/vite-hub/drop">
+          <svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+          </svg>
+          <span>View repository</span>
+        </a>
+        <ul class="provider-grid" aria-label="Platforms supported by ViteHub">
+          <li class="provider">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.056 23.238a.57.57 0 0 1-1.02-.355v-5.202c0-.63-.512-1.143-1.144-1.143H5.148a.57.57 0 0 1-.464-.903l3.777-5.29c.54-.753 0-1.804-.93-1.804H.57a.574.574 0 0 1-.543-.746a.6.6 0 0 1 .08-.157L5.008.78a.57.57 0 0 1 .467-.24h14.589a.57.57 0 0 1 .466.903l-3.778 5.29c-.54.755 0 1.806.93 1.806h5.745c.238 0 .424.138.513.322a.56.56 0 0 1-.063.603z"/></svg>
+            <span>Local Vite</span>
+          </li>
+          <li class="provider">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.509 16.845c.147-.507.09-.971-.155-1.316c-.225-.316-.605-.499-1.062-.52l-8.66-.113a.16.16 0 0 1-.133-.07a.2.2 0 0 1-.02-.156a.24.24 0 0 1 .203-.156l8.736-.113c1.035-.049 2.16-.886 2.554-1.913l.499-1.302a.27.27 0 0 0 .014-.168a5.689 5.689 0 0 0-10.937-.584a2.58 2.58 0 0 0-1.794-.498a2.56 2.56 0 0 0-2.223 3.18A3.634 3.634 0 0 0 0 16.751q.002.264.035.527a.174.174 0 0 0 .17.148h15.98a.22.22 0 0 0 .204-.155zm2.757-5.564c-.077 0-.161 0-.239.011c-.056 0-.105.042-.127.098l-.337 1.174c-.148.507-.092.971.154 1.317c.225.316.605.498 1.062.52l1.844.113c.056 0 .105.026.133.07a.2.2 0 0 1 .021.156a.24.24 0 0 1-.204.156l-1.92.112c-1.042.049-2.159.887-2.553 1.914l-.141.358c-.028.072.021.142.099.142h6.597a.174.174 0 0 0 .17-.126a5 5 0 0 0 .175-1.28a4.74 4.74 0 0 0-4.734-4.727"/></svg>
+            <span>Cloudflare</span>
+          </li>
+          <li class="provider">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 1.608l12 20.784H0Z"/></svg>
+            <span>Vercel</span>
+          </li>
+          <li class="provider">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.49 19.04h-.23L5.13 17.9v-.23l1.73-1.71h1.2l.15.15v1.2L6.5 19.04ZM5.13 6.31V6.1l1.13-1.13h.23L8.2 6.68v1.2l-.15.15h-1.2zm9.96 9.09h-1.65l-.14-.13v-3.83c0-.68-.27-1.2-1.1-1.23c-.42 0-.9 0-1.43.02l-.07.08v4.96l-.14.14H8.9l-.13-.14V8.73l.13-.14h3.7a2.6 2.6 0 0 1 2.61 2.6v4.08l-.13.14Zm-8.37-2.44H.14L0 12.82v-1.64l.14-.14h6.58l.14.14v1.64zm17.14 0h-6.58l-.14-.14v-1.64l.14-.14h6.58l.14.14v1.64zM11.05 6.55V1.64l.14-.14h1.65l.14.14v4.9l-.14.14h-1.65zm0 15.81v-4.9l.14-.14h1.65l.14.13v4.91l-.14.14h-1.65z"/></svg>
+            <span>Netlify</span>
+          </li>
+          <li class="provider">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M1.105 18.02A11.9 11.9 0 0 1 0 12.985q0-.698.078-1.376a12 12 0 0 1 .231-1.34A12 12 0 0 1 4.025 4.02a12 12 0 0 1 5.46-2.771a12 12 0 0 1 3.428-.23c1.452.112 2.825.477 4.077 1.05a12 12 0 0 1 2.78 1.774a12.02 12.02 0 0 1 4.053 7.078A12 12 0 0 1 24 12.985q0 .454-.036.914a12 12 0 0 1-.728 3.305a12 12 0 0 1-2.38 3.875c-1.33 1.357-3.02 1.962-4.43 1.936a4.4 4.4 0 0 1-2.724-1.024c-.99-.853-1.391-1.83-1.53-2.919a5 5 0 0 1 .128-1.518c.105-.38.37-1.116.76-1.437c-.455-.197-1.04-.624-1.226-.829c-.045-.05-.04-.13 0-.183a.155.155 0 0 1 .177-.053c.392.134.869.267 1.372.35c.66.111 1.484.25 2.317.292c2.03.1 4.153-.813 4.812-2.627s.403-3.609-1.96-4.685s-3.454-2.356-5.363-3.128c-1.247-.505-2.636-.205-4.06.582c-3.838 2.121-7.277 8.822-5.69 15.032a.191.191 0 0 1-.315.19a12 12 0 0 1-1.25-1.634a12 12 0 0 1-.769-1.404M11.57 6.087c.649-.051 1.214.501 1.31 1.236c.13.979-.228 1.99-1.41 2.013c-1.01.02-1.315-.997-1.248-1.614c.066-.616.574-1.575 1.35-1.635"/></svg>
+            <span>Deno</span>
+          </li>
+          <li class="provider">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.983 11.078h2.119a.186.186 0 0 0 .186-.185V9.006a.186.186 0 0 0-.186-.186h-2.119a.185.185 0 0 0-.185.185v1.888c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 0 0 .186-.186V3.574a.186.186 0 0 0-.186-.185h-2.118a.185.185 0 0 0-.185.185v1.888c0 .102.082.185.185.185m0 2.716h2.118a.187.187 0 0 0 .186-.186V6.29a.186.186 0 0 0-.186-.185h-2.118a.185.185 0 0 0-.185.185v1.887c0 .102.082.185.185.186m-2.93 0h2.12a.186.186 0 0 0 .184-.186V6.29a.185.185 0 0 0-.185-.185H8.1a.185.185 0 0 0-.185.185v1.887c0 .102.083.185.185.186m-2.964 0h2.119a.186.186 0 0 0 .185-.186V6.29a.185.185 0 0 0-.185-.185H5.136a.186.186 0 0 0-.186.185v1.887c0 .102.084.185.186.186m5.893 2.715h2.118a.186.186 0 0 0 .186-.185V9.006a.186.186 0 0 0-.186-.186h-2.118a.185.185 0 0 0-.185.185v1.888c0 .102.082.185.185.185m-2.93 0h2.12a.185.185 0 0 0 .184-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.185.185 0 0 0-.184.185v1.888c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 0 0 .185-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.186.186 0 0 0-.186.186v1.887c0 .102.084.185.186.185m-2.92 0h2.12a.185.185 0 0 0 .184-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.185.185 0 0 0-.184.185v1.888c0 .102.082.185.185.185M23.763 9.89c-.065-.051-.672-.51-1.954-.51q-.508.001-1.01.087c-.248-1.7-1.653-2.53-1.716-2.566l-.344-.199l-.226.327c-.284.438-.49.922-.612 1.43c-.23.97-.09 1.882.403 2.661c-.595.332-1.55.413-1.744.42H.751a.75.75 0 0 0-.75.748a11.4 11.4 0 0 0 .692 4.062c.545 1.428 1.355 2.48 2.41 3.124c1.18.723 3.1 1.137 5.275 1.137a15.7 15.7 0 0 0 2.93-.266a12.3 12.3 0 0 0 3.823-1.389a10.5 10.5 0 0 0 2.61-2.136c1.252-1.418 1.998-2.997 2.553-4.4h.221c1.372 0 2.215-.549 2.68-1.009c.309-.293.55-.65.707-1.046l.098-.288Z"/></svg>
+            <span>Docker</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+  <script>
+    const button = document.querySelector("[data-copy]")
+    const label = button.querySelector("span")
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText("npx skills add https://drop.vitehub.dev")
+      label.textContent = "Copied"
+      window.setTimeout(() => { label.textContent = "Copy skill" }, 1400)
+    })
+
+  </script>
+</body>
+</html>

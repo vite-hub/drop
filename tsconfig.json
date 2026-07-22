@@ -1,0 +1,11 @@
+{
+  "extends": ["nitro/tsconfig", "vite-hub/tsconfig"],
+  "compilerOptions": {
+    "module": "Preserve",
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2024"
+  },
+  "include": ["server/**/*.ts", "vite.config.ts"]
+}
