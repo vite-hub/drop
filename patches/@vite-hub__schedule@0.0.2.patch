@@ -1,5 +1,5 @@
 diff --git a/dist/vite-Dfeg9ZY3.js b/dist/vite-Dfeg9ZY3.js
-index eb2440a8dbea4fb0ddf5e2ef201aa4bf2712b3e2..ba12b1319992b90b9e4a80b692018193c4afdcf2 100644
+index eb2440a8dbea4fb0ddf5e2ef201aa4bf2712b3e2..b08a5f3e992ec7a8bb67d243efe1ad3058c7a57b 100644
 --- a/dist/vite-Dfeg9ZY3.js
 +++ b/dist/vite-Dfeg9ZY3.js
 @@ -864,7 +864,7 @@ const registryImportAnchor = ".vitehub/schedule/registry.js";
@@ -32,3 +32,5 @@ index eb2440a8dbea4fb0ddf5e2ef201aa4bf2712b3e2..ba12b1319992b90b9e4a80b692018193
  		"  nitro.options.cloudflare ??= {}",
  		"  nitro.options.cloudflare.wrangler ??= {}",
  		"  nitro.options.cloudflare.wrangler.triggers ??= {}",
+@@ -1173 +1171,0 @@ function hubSchedule(options = {}) {
+-			return { nitro };
