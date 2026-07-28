@@ -1,0 +1,34 @@
+diff --git a/dist/vite-Dfeg9ZY3.js b/dist/vite-Dfeg9ZY3.js
+index eb2440a8dbea4fb0ddf5e2ef201aa4bf2712b3e2..ba12b1319992b90b9e4a80b692018193c4afdcf2 100644
+--- a/dist/vite-Dfeg9ZY3.js
++++ b/dist/vite-Dfeg9ZY3.js
+@@ -864,7 +864,7 @@ const registryImportAnchor = ".vitehub/schedule/registry.js";
+ const generatedNitroSchedulePlugin = ".vitehub/nitro/schedule/plugin.ts";
+ const generatedNitroRuntimeRegistry = ".vitehub/nitro/schedule/runtime-registry.js";
+ const generatedNitroStaticRegistry = ".vitehub/nitro/schedule/static-registry.js";
+-const generatedNitroCloudflareModule = "./.vitehub/nitro/schedule/module.ts";
++const generatedNitroCloudflareModule = "./.vitehub/nitro/schedule/module.mjs";
+ const mergeNoExternal = createNoExternalMerger(schedulePackageName);
+ function resolveSchedulePluginRoots(root, options = {}) {
+ 	const resolvedViteRoot = resolve(root);
+@@ -1012,17 +1012,15 @@ function renderNitroSchedulePlugin(options) {
+ }
+ function renderNitroCloudflareModule(crons) {
+ 	return [
+-		"import type { Nitro } from 'nitro/types'",
+-		"",
+ 		`const crons = ${JSON.stringify(crons)}`,
+ 		"",
+-		"function dedupeCloudflareCrons(nitro: Nitro): void {",
++		"function dedupeCloudflareCrons(nitro) {",
+ 		"  const wrangler = nitro.options.cloudflare?.wrangler",
+ 		"  if (!wrangler?.triggers || !Array.isArray(wrangler.triggers.crons)) return",
+-		"  wrangler.triggers.crons = [...new Set(wrangler.triggers.crons.filter((cron): cron is string => typeof cron === 'string'))]",
++		"  wrangler.triggers.crons = [...new Set(wrangler.triggers.crons.filter((cron) => typeof cron === 'string'))]",
+ 		"}",
+ 		"",
+-		"export default function vitehubScheduleModule(nitro: Nitro): void {",
++		"export default function vitehubScheduleModule(nitro) {",
+ 		"  nitro.options.cloudflare ??= {}",
+ 		"  nitro.options.cloudflare.wrangler ??= {}",
+ 		"  nitro.options.cloudflare.wrangler.triggers ??= {}",
