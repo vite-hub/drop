@@ -3,8 +3,8 @@ import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { defineQueue } from "vite-hub/queue"
 
-export default defineQueue<string>(async ({ payload: id }) => {
-  const [readError, original] = await blob.get(id)
+export default defineQueue<string>(async ({ payload: key }) => {
+  const [readError, original] = await blob.get(key)
   if (readError) throw readError
   if (!original) throw new Error("Original image is missing.")
 
@@ -15,7 +15,7 @@ export default defineQueue<string>(async ({ payload: id }) => {
     throw new Error("Sandbox returned an invalid image.")
 
   if (optimized.size < original.size) {
-    const [writeError] = await blob.put(id, optimized, { access: "private", contentType: original.type })
+    const [writeError] = await blob.put(key, optimized, { access: "private", contentType: original.type })
     if (writeError) throw writeError
   }
 }, { onError: error => console.error(error) })

@@ -28,9 +28,10 @@ export default defineHandler(async (event) => {
 
   const bytes = new Uint8Array(await file.arrayBuffer())
   const contentType = detectContentType(bytes) ?? "application/octet-stream"
-  const id = crypto.randomUUID()
+  const extension = file.name.match(/\.[a-z0-9]{1,16}$/i)?.[0].toLowerCase() ?? ""
+  const key = `${crypto.randomUUID()}${extension}`
 
-  const [storageError, stored] = await blob.put(id, bytes, { access: "private", contentType })
+  const [storageError, stored] = await blob.put(key, bytes, { access: "private", contentType })
   if (storageError || !stored.url) {
     console.error(JSON.stringify({ counter: "storage_failure", error: storageError?.message || "No url" }))
     throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
@@ -47,7 +48,7 @@ export default defineHandler(async (event) => {
   }
 
   if (OPTIMIZABLE_IMAGE_CONTENT_TYPES.has(contentType))
-    deferQueue("image-optimization", { payload: id })
+    deferQueue("image-optimization", { payload: key })
 
   return { url: new URL(stored.url, event.req.url).href }
 })

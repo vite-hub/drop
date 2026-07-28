@@ -10,6 +10,7 @@ const form = new FormData()
 form.set("file", new File([await readFile(new URL("../../public/og-vitehub-drop.png", import.meta.url))], "og-vitehub-drop.png"))
 
 const { url } = await (await fetch(endpoint, { body: form, method: "POST", signal: AbortSignal.timeout(30_000) })).json()
+assert.equal(new URL(url).pathname.endsWith(".png"), true)
 const image = await fetch(new URL(url, endpoint), { signal: AbortSignal.timeout(30_000) })
 const stats = await fetch(new URL("/api/stats", endpoint), { signal: AbortSignal.timeout(30_000) })
 
