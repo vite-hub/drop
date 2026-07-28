@@ -2,28 +2,19 @@ import { defineHandler, HTTPError, readValidatedBody, requireContentType } from 
 import { blob } from "vite-hub/blob"
 import { runBrowser } from "vite-hub/browser"
 import { deferQueue } from "vite-hub/queue"
+import * as v from "valibot"
 
-import { MAX_CODE_CHARACTERS, type CodeImageInput } from "../browsers/code-image"
+import { MAX_CODE_CHARACTERS } from "../browsers/code-image"
 
-const CODE_IMAGE_KEYS = new Set<keyof CodeImageInput>(["code", "language", "theme"])
-
-function validateCodeImageInput(input: CodeImageInput): CodeImageInput | false {
-  if (!input || typeof input !== "object" || Array.isArray(input))
-    return false
-  if (Object.keys(input).some(key => !CODE_IMAGE_KEYS.has(key as keyof CodeImageInput)))
-    return false
-  if (typeof input.code !== "string" || input.code.length < 1 || input.code.length > MAX_CODE_CHARACTERS)
-    return false
-  if (input.language !== undefined && typeof input.language !== "string")
-    return false
-  if (input.theme !== undefined && typeof input.theme !== "string")
-    return false
-  return input
-}
+const CodeImageInputSchema = v.strictObject({
+  code: v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_CODE_CHARACTERS)),
+  language: v.optional(v.string()),
+  theme: v.optional(v.string()),
+})
 
 export default defineHandler(async (event) => {
   requireContentType(event, "application/json")
-  const input = await readValidatedBody(event, validateCodeImageInput, {
+  const input = await readValidatedBody(event, CodeImageInputSchema, {
     onError: () => ({
       status: 400,
       statusText: "Invalid code image request",
