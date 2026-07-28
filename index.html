@@ -729,7 +729,7 @@
           <span class="brand-prefix">ViteHub</span>
           <span>Drop</span>
         </h1>
-        <p class="lede">Permanent URLs for files and code images.</p>
+        <p class="lede">Files and code images your agent can post anywhere.</p>
         <button class="command" type="button" data-copy aria-label="Copy skill install command">
           <code>npx skills add https://drop.vitehub.dev</code>
           <span aria-live="polite">Copy skill</span>
@@ -802,14 +802,14 @@
     <section class="doc-section api" id="api" aria-labelledby="api-title">
       <div class="section-label">Use Drop</div>
       <div class="section-content">
-        <h2 id="api-title">Two ways to Drop</h2>
+        <h2 id="api-title">Turn files and code into permanent URLs</h2>
 
         <h3>Upload a file</h3>
-        <p>The installed skill includes a script that stores the file and immediately prints its permanent Drop URL.</p>
+        <p>Give Drop a local file. It stores the file and returns a permanent URL your agent can paste into GitHub.</p>
         <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/file.pdf"</code></pre>
 
         <h3>Render code</h3>
-        <p>Send source text with an optional Ray.so language and theme. Drop auto-fits the frame and returns a permanent PNG URL.</p>
+        <p>Give Drop source code, plus a language or theme when you want one. It returns an auto-fitted PNG your agent can post anywhere.</p>
         <pre><code>curl https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
   --data '{

@@ -1,8 +1,8 @@
 diff --git a/README.md b/README.md
-index c09991dc5c7b07cfd833cba198152777290b6c77..88da4e2bfc13e42e7a39f037c0a3eb493e30d052 100644
+index c09991dc5c7b07cfd833cba198152777290b6c77..e449a1d90d31f8e8e47242bb61977c64ffb008cc 100644
 --- a/README.md
 +++ b/README.md
-@@ -1,80 +1,70 @@
+@@ -1,80 +1,71 @@
  # `@vite-hub/browser`
  
 -Provider-agnostic Browser Sessions for deterministic server code.
@@ -61,11 +61,12 @@ index c09991dc5c7b07cfd833cba198152777290b6c77..88da4e2bfc13e42e7a39f037c0a3eb49
 -const ref = await session.handoff({
 -  audience: "review-agent-run-42",
 -  mode: "live",
-+const image = await runBrowser("code-image", {
++const [error, image] = await runBrowser("code-image", {
 +  url: "https://example.com",
  })
 -
 -const claimed = await browser.claim(ref, { audience: "review-agent-run-42" })
++if (error) throw error
  ```
  
 -References are one-time, short-lived, and scoped to the `BrowserClient` that created them. Cross-process or durable handoff requires a future runtime-backed handoff store; the in-process contract does not pretend otherwise.
@@ -103,7 +104,7 @@ index c09991dc5c7b07cfd833cba198152777290b6c77..88da4e2bfc13e42e7a39f037c0a3eb49
  ```
  
 -Configure Provider Output with `hubBrowser()`:
-+ViteHub generates the Cloudflare Browser Run binding and closes every session after its Browser Definition completes or throws. A definition can open more than one session; each one belongs to that invocation.
++ViteHub generates the Cloudflare Browser Run binding and closes every session after its Browser Definition completes or throws. `runBrowser()` returns an error-first result, so application code handles runtime failures without a `try/catch`. A definition can open more than one session; each one belongs to that invocation.
  
 -```ts
 -import { defineConfig } from "vite"
@@ -130,13 +131,13 @@ index c09991dc5c7b07cfd833cba198152777290b6c77..88da4e2bfc13e42e7a39f037c0a3eb49
  
 -Cloudflare Browser Run plus stock `agent-browser` is not advertised as a live pair. Cloudflare requires authenticated WebSocket headers that the current public `agent-browser --cdp` interface cannot supply without exposing or proxying credentials.
 +Live handoff transfers ownership of the exact provider session through an opaque, audience-bound reference. A handed-off session is not automatically closed.
-diff --git a/dist/cloudflare-D0EM4Dm5.js b/dist/cloudflare-D0EM4Dm5.js
+diff --git a/dist/cloudflare-B2NaEDty.js b/dist/cloudflare-B2NaEDty.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..89f049f05afda39f8b8c0e3478d9537a4763e1e8
+index 0000000000000000000000000000000000000000..4036c377aa8d72d915b574df92b1bfad3832ad24
 --- /dev/null
-+++ b/dist/cloudflare-D0EM4Dm5.js
-@@ -0,0 +1,67 @@
-+import { r as browserProviderError } from "./errors-DE-uwBle.js";
++++ b/dist/cloudflare-B2NaEDty.js
+@@ -0,0 +1,66 @@
++import { r as browserProviderError } from "./errors-mj14eAQE.js";
 +//#region src/internal/connections.ts
 +const cloudflareBrowserTerminated = Symbol("vitehub.browser.cloudflare.terminated");
 +//#endregion
@@ -187,10 +188,9 @@ index 0000000000000000000000000000000000000000..89f049f05afda39f8b8c0e3478d9537a
 +						return;
 +					}
 +					try {
-+						const termination = (await (await driver.connect(binding, acquired.sessionId)).newBrowserCDPSession()).send("Browser.close");
++						await (await (await driver.connect(binding, acquired.sessionId)).newBrowserCDPSession()).send("Browser.close");
 +						connection[cloudflareBrowserTerminated] = true;
 +						closed = true;
-+						Promise.resolve(termination).catch(() => {});
 +					} catch (error) {
 +						throw browserProviderError("cloudflare", "terminate a Browser Run session", { cause: error });
 +					}
@@ -221,29 +221,29 @@ index 8b28f167b5229974d6ad7b033bd56268a2238951..a9269e11ff522f9b69cce6cbc96db9e3
    kind: "cloudflare-binding";
    preferredTargetId?: string;
 diff --git a/dist/controllers/cdp.d.ts b/dist/controllers/cdp.d.ts
-index 8e0a8bde34190ae7319d400fbf833e70b1363d80..c957e883b7eee010925ebc6196c9bda78e79990b 100644
+index 8e0a8bde34190ae7319d400fbf833e70b1363d80..a8411b98fb4c5ec70e88535f5846a97f195ab60a 100644
 --- a/dist/controllers/cdp.d.ts
 +++ b/dist/controllers/cdp.d.ts
 @@ -1,5 +1,5 @@
 -import { r as BrowserController } from "../types-DbK2UeEx.js";
 -import { r as PlaywrightBrowserConnection } from "../connections-CDPKViPz.js";
-+import { i as BrowserController } from "../types-3o_HHwQK.js";
++import { i as BrowserController } from "../types-zmzhpRu-.js";
 +import { r as PlaywrightBrowserConnection } from "../connections-Di5Io-Dx.js";
  
  //#region src/controllers/cdp.d.ts
  interface CDPSocket extends EventTarget {
 diff --git a/dist/controllers/cdp.js b/dist/controllers/cdp.js
-index 44d2505ac5a415868181fb2029b3e4a2c508ece9..ed5d860390886d997fc4c35d824f0200c0fd5ad4 100644
+index 44d2505ac5a415868181fb2029b3e4a2c508ece9..568e7fbae85c743cc07a18437f0dcb3c139b38da 100644
 --- a/dist/controllers/cdp.js
 +++ b/dist/controllers/cdp.js
 @@ -1,4 +1,4 @@
 -import { n as browserProviderError } from "../errors-C6RKeyJ-.js";
-+import { r as browserProviderError } from "../errors-DE-uwBle.js";
++import { r as browserProviderError } from "../errors-mj14eAQE.js";
  //#region src/controllers/cdp.ts
  async function cloudflareSocket(connection) {
  	const binding = connection.binding;
 diff --git a/dist/controllers/playwright.d.ts b/dist/controllers/playwright.d.ts
-index dcd4a05c475f71f9ecd5204a5dc9f83660e255f9..c0ca89ac27bf315eba6472fa8467897cde844e77 100644
+index dcd4a05c475f71f9ecd5204a5dc9f83660e255f9..8448f10170e97a016d639a796734de0ac41db1d2 100644
 --- a/dist/controllers/playwright.d.ts
 +++ b/dist/controllers/playwright.d.ts
 @@ -1,19 +1,3 @@
@@ -266,16 +266,16 @@ index dcd4a05c475f71f9ecd5204a5dc9f83660e255f9..c0ca89ac27bf315eba6472fa8467897c
 -declare function playwright(options?: PlaywrightControllerOptions): BrowserController<PlaywrightClient, PlaywrightBrowserConnection>;
 -//#endregion
 +import { r as PlaywrightBrowserConnection } from "../connections-Di5Io-Dx.js";
-+import { n as PlaywrightControllerOptions, r as playwright, t as PlaywrightClient } from "../playwright-CZPaUyv-.js";
++import { n as PlaywrightControllerOptions, r as playwright, t as PlaywrightClient } from "../playwright-BdtSuehP.js";
  export { type PlaywrightBrowserConnection, PlaywrightClient, PlaywrightControllerOptions, playwright };
 \ No newline at end of file
 diff --git a/dist/controllers/playwright.js b/dist/controllers/playwright.js
-index 8855ca6961a4ece0a923a6fe6f8d6fe804639557..ff251a665769c91ec9a8277327d084bd703c5891 100644
+index 8855ca6961a4ece0a923a6fe6f8d6fe804639557..ac358623dec2a1ecf66ded91782a0c1902d75169 100644
 --- a/dist/controllers/playwright.js
 +++ b/dist/controllers/playwright.js
 @@ -1,4 +1,5 @@
 -import { n as browserProviderError } from "../errors-C6RKeyJ-.js";
-+import { r as browserProviderError } from "../errors-DE-uwBle.js";
++import { r as browserProviderError } from "../errors-mj14eAQE.js";
 +import { t as attachPlaywrightBrowser } from "../playwright-D4ghaUjY.js";
  //#region src/controllers/playwright.ts
  async function loadChromium() {
@@ -334,35 +334,66 @@ index 8855ca6961a4ece0a923a6fe6f8d6fe804639557..ff251a665769c91ec9a8277327d084bd
  		}
  	};
  }
-diff --git a/dist/errors-C6RKeyJ-.js b/dist/errors-DE-uwBle.js
-similarity index 64%
-rename from dist/errors-C6RKeyJ-.js
-rename to dist/errors-DE-uwBle.js
-index 91aaffc9a89087ec01e7fc7f47375112759aa703..1a4954caa18e7931e69af198b216a9c21aa49a6d 100644
---- a/dist/errors-C6RKeyJ-.js
-+++ b/dist/errors-DE-uwBle.js
-@@ -25,5 +25,11 @@ function browserProviderError(provider, operation, options = {}) {
- 		}
- 	});
- }
+diff --git a/dist/errors-C6RKeyJ-.js b/dist/errors-C6RKeyJ-.js
+deleted file mode 100644
+index 91aaffc9a89087ec01e7fc7f47375112759aa703..0000000000000000000000000000000000000000
+diff --git a/dist/errors-mj14eAQE.js b/dist/errors-mj14eAQE.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a1db4bbab610af8276d2c730ea7ff74343adf0a3
+--- /dev/null
++++ b/dist/errors-mj14eAQE.js
+@@ -0,0 +1,42 @@
++import { ViteHubError, getViteHubErrorShape } from "@vite-hub/runtime";
++//#region src/errors.ts
++function browserSessionStateError(action, state) {
++	return new ViteHubError("BROWSER_SESSION_STATE", `[vitehub:browser] Cannot ${action} a Browser Session while it is ${state}.`, { details: {
++		action,
++		state
++	} });
++}
++function browserSessionRefError(reason) {
++	return new ViteHubError("BROWSER_SESSION_REF_INVALID", "[vitehub:browser] The Browser Session reference is invalid or no longer claimable.", { details: { reason } });
++}
++function browserLiveHandoffUnsupportedError(provider, controller) {
++	return new ViteHubError("BROWSER_LIVE_HANDOFF_UNSUPPORTED", `[vitehub:browser] Live handoff is not supported by ${controller ? `${provider} with ${controller}` : provider}.`, { details: {
++		provider,
++		...controller ? { controller } : {}
++	} });
++}
++function browserProviderError(provider, operation, options = {}) {
++	return new ViteHubError("BROWSER_PROVIDER_ERROR", `[vitehub:browser] ${provider} could not ${operation}.`, {
++		cause: options.cause,
++		details: {
++			operation,
++			provider,
++			...options.status === void 0 ? {} : { status: options.status }
++		}
++	});
++}
 +function browserDefinitionNotFoundError(name) {
 +	return new ViteHubError("BROWSER_DEFINITION_NOT_FOUND", `[vitehub:browser] Browser Definition ${JSON.stringify(name)} was not found.`, { details: { name } });
 +}
 +function browserRuntimeNotConfiguredError() {
 +	return new ViteHubError("BROWSER_RUNTIME_NOT_CONFIGURED", "[vitehub:browser] Browser runtime is not configured. Enable Browser through the ViteHub deployment preset.");
 +}
- //#endregion
--export { browserSessionStateError as i, browserProviderError as n, browserSessionRefError as r, browserLiveHandoffUnsupportedError as t };
-+export { browserSessionRefError as a, browserRuntimeNotConfiguredError as i, browserLiveHandoffUnsupportedError as n, browserSessionStateError as o, browserProviderError as r, browserDefinitionNotFoundError as t };
++function isBrowserError(value) {
++	return getViteHubErrorShape(value)?.code.startsWith("BROWSER_") === true;
++}
++function toBrowserError(error) {
++	if (isBrowserError(error)) return error;
++	return new ViteHubError("BROWSER_RUNTIME_ERROR", (error instanceof Error ? error.message : String(error)) || "[vitehub:browser] Browser Definition execution failed.", { cause: error });
++}
++//#endregion
++export { browserSessionRefError as a, browserRuntimeNotConfiguredError as i, browserLiveHandoffUnsupportedError as n, browserSessionStateError as o, browserProviderError as r, toBrowserError as s, browserDefinitionNotFoundError as t };
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index dd2beb0a084f90897cbc23328d7f78b544feb08d..b9c70fca4dde6016cd0cde50cca2ffa37825025b 100644
+index dd2beb0a084f90897cbc23328d7f78b544feb08d..e0aea0257c0c39e4d02d4ab04791fc4ba18a3382 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -1,6 +1,26 @@
 -import { _ as BrowserSessionState, a as BrowserControllerLease, c as BrowserIsolation, d as BrowserProviderInfo, f as BrowserProviderOpenOptions, g as BrowserSessionRef, h as BrowserSessionInfo, i as BrowserControllerContext, l as BrowserPolicy, m as BrowserSession, n as BrowserClient, o as BrowserFeatures, p as BrowserProviderSession, r as BrowserController, s as BrowserHandoffOptions, t as BrowserClaimOptions, u as BrowserProvider, v as CreateBrowserOptions } from "./types-DbK2UeEx.js";
 -
 -//#region src/index.d.ts
-+import { C as BrowserSessionInfo, E as CreateBrowserOptions, S as BrowserSession, T as BrowserSessionState, _ as BrowserProvider, a as BrowserControllerContext, b as BrowserProviderSession, c as BrowserDefinitionBrowser, d as BrowserDefinitionRegistry, f as BrowserFeatures, g as BrowserPolicy, h as BrowserPageSession, i as BrowserController, l as BrowserDefinitionContext, m as BrowserIsolation, n as BrowserClient, o as BrowserControllerLease, p as BrowserHandoffOptions, r as BrowserControl, s as BrowserDefinition, t as BrowserClaimOptions, u as BrowserDefinitionHandler, v as BrowserProviderInfo, w as BrowserSessionRef, y as BrowserProviderOpenOptions } from "./types-3o_HHwQK.js";
++import { C as BrowserSession, D as CreateBrowserOptions, E as BrowserSessionState, T as BrowserSessionRef, _ as BrowserProvider, a as BrowserControllerContext, b as BrowserProviderSession, c as BrowserDefinitionBrowser, d as BrowserDefinitionRegistry, f as BrowserFeatures, g as BrowserPolicy, h as BrowserPageSession, i as BrowserController, l as BrowserDefinitionContext, m as BrowserIsolation, n as BrowserClient, o as BrowserControllerLease, p as BrowserHandoffOptions, r as BrowserControl, s as BrowserDefinition, t as BrowserClaimOptions, u as BrowserDefinitionHandler, v as BrowserProviderInfo, w as BrowserSessionInfo, x as BrowserRunResult, y as BrowserProviderOpenOptions } from "./types-zmzhpRu-.js";
 +//#region src/client.d.ts
  declare function createBrowser<TConnection>(options: CreateBrowserOptions<TConnection>): BrowserClient<TConnection>;
  //#endregion
@@ -386,20 +417,20 @@ index dd2beb0a084f90897cbc23328d7f78b544feb08d..b9c70fca4dde6016cd0cde50cca2ffa3
 +//#endregion
 +//#region src/runtime.d.ts
 +declare function defineBrowser<TInput = unknown, TResult = unknown>(run: BrowserDefinitionHandler<TInput, TResult>): BrowserDefinition<TInput, TResult>;
-+declare function runBrowser<const TName extends BrowserDefinitionName>(name: TName, ...args: BrowserDefinitionInputArgs<BrowserRegistryDefinition<TName>>): Promise<BrowserDefinitionResult<BrowserRegistryDefinition<TName>>>;
-+declare function runBrowser<TName extends string>(name: string extends TName ? TName : never, input?: unknown): Promise<unknown>;
++declare function runBrowser<const TName extends BrowserDefinitionName>(name: TName, ...args: BrowserDefinitionInputArgs<BrowserRegistryDefinition<TName>>): Promise<BrowserRunResult<BrowserDefinitionResult<BrowserRegistryDefinition<TName>>>>;
++declare function runBrowser<TName extends string>(name: string extends TName ? TName : never, input?: unknown): Promise<BrowserRunResult<unknown>>;
 +//#endregion
-+export { type BrowserClaimOptions, type BrowserClient, type BrowserControl, type BrowserController, type BrowserControllerContext, type BrowserControllerLease, type BrowserDefinition, type BrowserDefinitionBrowser, type BrowserDefinitionContext, type BrowserDefinitionHandler, type BrowserDefinitionRegistry, type BrowserFeatures, type BrowserHandoffOptions, type BrowserIsolation, type BrowserPageSession, type BrowserPolicy, type BrowserProvider, type BrowserProviderInfo, type BrowserProviderOpenOptions, type BrowserProviderSession, type BrowserSession, type BrowserSessionInfo, type BrowserSessionRef, type BrowserSessionState, type CreateBrowserOptions, createBrowser, defineBrowser, runBrowser };
++export { type BrowserClaimOptions, type BrowserClient, type BrowserControl, type BrowserController, type BrowserControllerContext, type BrowserControllerLease, type BrowserDefinition, type BrowserDefinitionBrowser, type BrowserDefinitionContext, type BrowserDefinitionHandler, type BrowserDefinitionRegistry, type BrowserFeatures, type BrowserHandoffOptions, type BrowserIsolation, type BrowserPageSession, type BrowserPolicy, type BrowserProvider, type BrowserProviderInfo, type BrowserProviderOpenOptions, type BrowserProviderSession, type BrowserRunResult, type BrowserSession, type BrowserSessionInfo, type BrowserSessionRef, type BrowserSessionState, type CreateBrowserOptions, createBrowser, defineBrowser, runBrowser };
 \ No newline at end of file
 diff --git a/dist/index.js b/dist/index.js
-index 9d8b0b67b13c1c296af8ff456599dd1734939759..8324bb8f69cd78a791c2e7f7b9501fae06344466 100644
+index 9d8b0b67b13c1c296af8ff456599dd1734939759..c4da0eb85fce880d2a3be8e66d53c0a4c4e00797 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,5 +1,9 @@
 -import { i as browserSessionStateError, r as browserSessionRefError, t as browserLiveHandoffUnsupportedError } from "./errors-C6RKeyJ-.js";
 -//#region src/index.ts
-+import { a as browserSessionRefError, i as browserRuntimeNotConfiguredError, n as browserLiveHandoffUnsupportedError, o as browserSessionStateError, r as browserProviderError, t as browserDefinitionNotFoundError } from "./errors-DE-uwBle.js";
-+import { n as cloudflareBrowserTerminated, t as cloudflareBrowser } from "./cloudflare-D0EM4Dm5.js";
++import { a as browserSessionRefError, i as browserRuntimeNotConfiguredError, n as browserLiveHandoffUnsupportedError, o as browserSessionStateError, r as browserProviderError, s as toBrowserError, t as browserDefinitionNotFoundError } from "./errors-mj14eAQE.js";
++import { n as cloudflareBrowserTerminated, t as cloudflareBrowser } from "./cloudflare-B2NaEDty.js";
 +import { t as attachPlaywrightBrowser } from "./playwright-D4ghaUjY.js";
 +import browserRegistry from "#vitehub/browser/registry";
 +import runtimeConfig from "#vitehub/browser/runtime";
@@ -487,7 +518,7 @@ index 9d8b0b67b13c1c296af8ff456599dd1734939759..8324bb8f69cd78a791c2e7f7b9501fae
  	createHandoff(input) {
  		const ttl = input.ttl ?? this.options.policy?.handoffTtl ?? 6e4;
  		if (!Number.isFinite(ttl) || ttl <= 0) throw new TypeError("[vitehub:browser] Browser handoff ttl must be a positive number of milliseconds.");
-@@ -256,4 +272,156 @@ function createBrowser(options) {
+@@ -256,4 +272,160 @@ function createBrowser(options) {
  	return new BrowserClientImpl(options);
  }
  //#endregion
@@ -641,17 +672,21 @@ index 9d8b0b67b13c1c296af8ff456599dd1734939759..8324bb8f69cd78a791c2e7f7b9501fae
 +	return result;
 +}
 +async function runBrowser(name, input) {
-+	return await executeBrowserDefinition(await resolveBrowserDefinition(name), input, { client: resolveConfiguredClient() });
++	try {
++		return [null, await executeBrowserDefinition(await resolveBrowserDefinition(name), input, { client: resolveConfiguredClient() })];
++	} catch (error) {
++		return [toBrowserError(error), void 0];
++	}
 +}
 +//#endregion
 +export { createBrowser, defineBrowser, runBrowser };
 diff --git a/dist/internal/runtime/empty-registry.d.ts b/dist/internal/runtime/empty-registry.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..628bf59fd6fbfd679f6f22758576c5aae92785d8
+index 0000000000000000000000000000000000000000..6def3cf1e5fc0281767df8c91fabf587ece1897e
 --- /dev/null
 +++ b/dist/internal/runtime/empty-registry.d.ts
 @@ -0,0 +1,7 @@
-+import { d as BrowserDefinitionRegistry } from "../../types-3o_HHwQK.js";
++import { d as BrowserDefinitionRegistry } from "../../types-zmzhpRu-.js";
 +
 +//#region src/internal/runtime/empty-registry.d.ts
 +interface BrowserDefinitionModules {}
@@ -671,11 +706,11 @@ index 0000000000000000000000000000000000000000..d4065e51c95e851a42290a172a1303c7
 +export { registry as default };
 diff --git a/dist/internal/runtime/unconfigured.d.ts b/dist/internal/runtime/unconfigured.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..791b0fe39a5e5e8404393b8a3de3827de2c7502d
+index 0000000000000000000000000000000000000000..3955118cbdce88ba9b890833f925b362ec4b7a87
 --- /dev/null
 +++ b/dist/internal/runtime/unconfigured.d.ts
 @@ -0,0 +1,6 @@
-+import { x as BrowserRuntimeConfig } from "../../types-3o_HHwQK.js";
++import { S as BrowserRuntimeConfig } from "../../types-zmzhpRu-.js";
 +
 +//#region src/internal/runtime/unconfigured.d.ts
 +declare const config: BrowserRuntimeConfig;
@@ -692,13 +727,13 @@ index 0000000000000000000000000000000000000000..4523c65ba656e745357cc8893c6f8b7b
 +const config = { binding: "BROWSER" };
 +//#endregion
 +export { config as default };
-diff --git a/dist/playwright-CZPaUyv-.d.ts b/dist/playwright-CZPaUyv-.d.ts
+diff --git a/dist/playwright-BdtSuehP.d.ts b/dist/playwright-BdtSuehP.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..add21779293732d5ad2f0d6b7d65e7810d9c1b25
+index 0000000000000000000000000000000000000000..7f3fb8d92e89b90ac30c6636a422138cc3a8d95a
 --- /dev/null
-+++ b/dist/playwright-CZPaUyv-.d.ts
++++ b/dist/playwright-BdtSuehP.d.ts
 @@ -0,0 +1,19 @@
-+import { i as BrowserController } from "./types-3o_HHwQK.js";
++import { i as BrowserController } from "./types-zmzhpRu-.js";
 +import { r as PlaywrightBrowserConnection } from "./connections-Di5Io-Dx.js";
 +import { Browser, BrowserContext, BrowserType, Page } from "playwright-core";
 +
@@ -770,19 +805,19 @@ index 0000000000000000000000000000000000000000..73ad5dcda598a8be924b998b098ee487
 +//#endregion
 +export { attachPlaywrightBrowser as t };
 diff --git a/dist/providers/cloudflare.d.ts b/dist/providers/cloudflare.d.ts
-index 11c5bae1b2e01ef41dc01356aab666fd83f40e11..0d800bed39426343ed974ad6afdf72d31bb6cf28 100644
+index 11c5bae1b2e01ef41dc01356aab666fd83f40e11..419151d7a9161a6fd5c193f9833444028745107f 100644
 --- a/dist/providers/cloudflare.d.ts
 +++ b/dist/providers/cloudflare.d.ts
 @@ -1,5 +1,5 @@
 -import { u as BrowserProvider } from "../types-DbK2UeEx.js";
 -import { n as CloudflareBrowserBindingConnection } from "../connections-CDPKViPz.js";
-+import { _ as BrowserProvider } from "../types-3o_HHwQK.js";
++import { _ as BrowserProvider } from "../types-zmzhpRu-.js";
 +import { n as CloudflareBrowserBindingConnection } from "../connections-Di5Io-Dx.js";
  
  //#region src/providers/cloudflare.d.ts
  interface CloudflareBrowserHandle {
 diff --git a/dist/providers/cloudflare.js b/dist/providers/cloudflare.js
-index 4ce96260caec22c23299438dbc0a2bc16680fc4f..064a2fd76b7ac238279d96cd00b4055c7554e93f 100644
+index 4ce96260caec22c23299438dbc0a2bc16680fc4f..68dcf09e35cbbaa63ae06c04f21b4481f1b72ec1 100644
 --- a/dist/providers/cloudflare.js
 +++ b/dist/providers/cloudflare.js
 @@ -1,69 +1,2 @@
@@ -854,39 +889,40 @@ index 4ce96260caec22c23299438dbc0a2bc16680fc4f..064a2fd76b7ac238279d96cd00b4055c
 -	};
 -}
 -//#endregion
-+import { t as cloudflareBrowser } from "../cloudflare-D0EM4Dm5.js";
++import { t as cloudflareBrowser } from "../cloudflare-B2NaEDty.js";
  export { cloudflareBrowser };
 diff --git a/dist/providers/local.d.ts b/dist/providers/local.d.ts
-index ef5705ef8122cb6969322389f1e13fc4a446934b..bd72771ccd5a093f35a7ce2142601bf222c48b46 100644
+index ef5705ef8122cb6969322389f1e13fc4a446934b..945a2b38d05721edf702d4578e5aea915d5494c8 100644
 --- a/dist/providers/local.d.ts
 +++ b/dist/providers/local.d.ts
 @@ -1,5 +1,5 @@
 -import { u as BrowserProvider } from "../types-DbK2UeEx.js";
 -import { t as CDPBrowserConnection } from "../connections-CDPKViPz.js";
-+import { _ as BrowserProvider } from "../types-3o_HHwQK.js";
++import { _ as BrowserProvider } from "../types-zmzhpRu-.js";
 +import { t as CDPBrowserConnection } from "../connections-Di5Io-Dx.js";
  
  //#region src/providers/local.d.ts
  interface LocalBrowserOptions {
 diff --git a/dist/providers/local.js b/dist/providers/local.js
-index f33a75e002b81411269e5ab4024b930a36c06ff4..857e170b0eacf4c073dbf233928e648235106e70 100644
+index f33a75e002b81411269e5ab4024b930a36c06ff4..de306f6ac244f8b36bccadae079f056f02299463 100644
 --- a/dist/providers/local.js
 +++ b/dist/providers/local.js
 @@ -1,4 +1,4 @@
 -import { n as browserProviderError } from "../errors-C6RKeyJ-.js";
-+import { r as browserProviderError } from "../errors-DE-uwBle.js";
++import { r as browserProviderError } from "../errors-mj14eAQE.js";
  import { getViteHubErrorShape } from "@vite-hub/runtime";
  import { spawn } from "node:child_process";
  import { mkdtemp, rm } from "node:fs/promises";
-diff --git a/dist/types-DbK2UeEx.d.ts b/dist/types-3o_HHwQK.d.ts
-similarity index 57%
+diff --git a/dist/types-DbK2UeEx.d.ts b/dist/types-zmzhpRu-.d.ts
+similarity index 53%
 rename from dist/types-DbK2UeEx.d.ts
-rename to dist/types-3o_HHwQK.d.ts
-index cb60ad94d9cc6867487695d1ff37f1d419d23695..f0b051009d08f1528cbd90c0db6e590e5a9a131e 100644
+rename to dist/types-zmzhpRu-.d.ts
+index cb60ad94d9cc6867487695d1ff37f1d419d23695..0d12774041d168056ffe5c54e5c65211f86de027 100644
 --- a/dist/types-DbK2UeEx.d.ts
-+++ b/dist/types-3o_HHwQK.d.ts
++++ b/dist/types-zmzhpRu-.d.ts
 @@ -1,4 +1,5 @@
- import { LeaseStore, MaybePromise, TraceEvent } from "@vite-hub/runtime";
+-import { LeaseStore, MaybePromise, TraceEvent } from "@vite-hub/runtime";
++import { LeaseStore, MaybePromise, TraceEvent, ViteHubError } from "@vite-hub/runtime";
 +import { Browser, BrowserContext, Page } from "playwright-core";
  
  //#region src/types.d.ts
@@ -919,7 +955,7 @@ index cb60ad94d9cc6867487695d1ff37f1d419d23695..f0b051009d08f1528cbd90c0db6e590e
  }
  interface BrowserPolicy {
    handoffTtl?: number;
-@@ -82,5 +86,30 @@ interface CreateBrowserOptions<TConnection> {
+@@ -82,5 +86,31 @@ interface CreateBrowserOptions<TConnection> {
    provider: BrowserProvider<TConnection>;
    trace?: (event: TraceEvent) => MaybePromise<void>;
  }
@@ -941,6 +977,7 @@ index cb60ad94d9cc6867487695d1ff37f1d419d23695..f0b051009d08f1528cbd90c0db6e590e
 +interface BrowserDefinition<TInput = unknown, TResult = unknown> {
 +  run: BrowserDefinitionHandler<TInput, TResult>;
 +}
++type BrowserRunResult<TResult = unknown> = [error: null, value: TResult] | [error: ViteHubError<`BROWSER_${string}`>, value: undefined];
 +type BrowserDefinitionRegistry = Record<string, BrowserDefinition | (() => Promise<BrowserDefinition | {
 +  default?: BrowserDefinition;
 +}>)>;
@@ -951,7 +988,7 @@ index cb60ad94d9cc6867487695d1ff37f1d419d23695..f0b051009d08f1528cbd90c0db6e590e
  //#endregion
 -export { BrowserSessionState as _, BrowserControllerLease as a, BrowserIsolation as c, BrowserProviderInfo as d, BrowserProviderOpenOptions as f, BrowserSessionRef as g, BrowserSessionInfo as h, BrowserControllerContext as i, BrowserPolicy as l, BrowserSession as m, BrowserClient as n, BrowserFeatures as o, BrowserProviderSession as p, BrowserController as r, BrowserHandoffOptions as s, BrowserClaimOptions as t, BrowserProvider as u, CreateBrowserOptions as v };
 \ No newline at end of file
-+export { BrowserSessionInfo as C, CreateBrowserOptions as E, BrowserSession as S, BrowserSessionState as T, BrowserProvider as _, BrowserControllerContext as a, BrowserProviderSession as b, BrowserDefinitionBrowser as c, BrowserDefinitionRegistry as d, BrowserFeatures as f, BrowserPolicy as g, BrowserPageSession as h, BrowserController as i, BrowserDefinitionContext as l, BrowserIsolation as m, BrowserClient as n, BrowserControllerLease as o, BrowserHandoffOptions as p, BrowserControl as r, BrowserDefinition as s, BrowserClaimOptions as t, BrowserDefinitionHandler as u, BrowserProviderInfo as v, BrowserSessionRef as w, BrowserRuntimeConfig as x, BrowserProviderOpenOptions as y };
++export { BrowserSession as C, CreateBrowserOptions as D, BrowserSessionState as E, BrowserRuntimeConfig as S, BrowserSessionRef as T, BrowserProvider as _, BrowserControllerContext as a, BrowserProviderSession as b, BrowserDefinitionBrowser as c, BrowserDefinitionRegistry as d, BrowserFeatures as f, BrowserPolicy as g, BrowserPageSession as h, BrowserController as i, BrowserDefinitionContext as l, BrowserIsolation as m, BrowserClient as n, BrowserControllerLease as o, BrowserHandoffOptions as p, BrowserControl as r, BrowserDefinition as s, BrowserClaimOptions as t, BrowserDefinitionHandler as u, BrowserProviderInfo as v, BrowserSessionInfo as w, BrowserRunResult as x, BrowserProviderOpenOptions as y };
 \ No newline at end of file
 diff --git a/dist/vite.d.ts b/dist/vite.d.ts
 index ed34589d1b4b6d0f6b4a4f8069beaa48808e8c7d..d4dcc8890d1bd04477518ee4914d1ca955614595 100644
@@ -966,7 +1003,7 @@ index ed34589d1b4b6d0f6b4a4f8069beaa48808e8c7d..d4dcc8890d1bd04477518ee4914d1ca9
  type BrowserVitePlugin = Plugin & {
    api: {
 diff --git a/dist/vite.js b/dist/vite.js
-index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601cab5c490bb 100644
+index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..0e8b051f302a053286de080ab41cfed3fdad6d40 100644
 --- a/dist/vite.js
 +++ b/dist/vite.js
 @@ -1,5 +1,6 @@
@@ -985,7 +1022,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
  	if (!isProviderJsonRecord(value)) return;
  	const entryValue = value[key];
  	return entryValue === null || typeof entryValue === "boolean" || typeof entryValue === "number" || typeof entryValue === "string" ? entryValue : void 0;
-@@ -174,7 +176,236 @@ async function writeCloudflareWranglerConfig(options) {
+@@ -174,7 +176,237 @@ async function writeCloudflareWranglerConfig(options) {
  	await mkdir(outputRoot, { recursive: true });
  	await writeProviderOutputConfig(configFile, options.wranglerConfig, options.wranglerConfigOwnership, { removeIfEmpty: true });
  }
@@ -1215,6 +1252,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
 +//#region ../internal/src/build/vite.ts
 +const projectRootDirectoryMarkers = [
 +	["server", "agents"],
++	["server", "browsers"],
 +	["server", "schedules"],
 +	["server", "templates"],
 +	["server", "workspaces"]
@@ -1223,7 +1261,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
  	".ts",
  	".mts",
  	".cts",
-@@ -182,6 +413,7 @@ async function writeCloudflareWranglerConfig(options) {
+@@ -182,6 +414,7 @@ async function writeCloudflareWranglerConfig(options) {
  	".mjs",
  	".cjs"
  ].flatMap((extension) => [["server", `email${extension}`], [`server.email${extension}`]]);
@@ -1231,7 +1269,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
  function createNoExternalMerger(packageName) {
  	return (current) => {
  		if (current === true) return true;
-@@ -196,21 +428,77 @@ function isServerEnvironment(name, config) {
+@@ -196,21 +429,77 @@ function isServerEnvironment(name, config) {
  function shouldSkipViteProviderBuild(command, mode) {
  	return command === "serve" || mode === "e2e";
  }
@@ -1319,7 +1357,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
  }
  function cloneRecord(value) {
  	return value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {};
-@@ -238,7 +526,7 @@ function configureNitroBrowser(value, options, enabled) {
+@@ -238,7 +527,7 @@ function configureNitroBrowser(value, options, enabled) {
  		};
  	}
  	const flags = Array.isArray(wrangler.compatibility_flags) ? [...wrangler.compatibility_flags] : [];
@@ -1328,7 +1366,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
  	return {
  		...nitro,
  		cloudflare: {
-@@ -255,14 +543,65 @@ function configureNitroBrowser(value, options, enabled) {
+@@ -255,14 +544,65 @@ function configureNitroBrowser(value, options, enabled) {
  		}
  	};
  }
@@ -1382,7 +1420,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
 +		} : {}, null, 2)}`, ""].join("\n");
 +	}
 +	async function refreshRegistryTypes(root) {
-+		const definitions = discoverDefinitions(root);
++		const definitions = enabled ? discoverDefinitions(root) : [];
 +		await writeFileIfChanged(resolve(projectRoot, ".vitehub", "types", "browser.d.ts"), renderBrowserRegistryTypes(definitions));
 +	}
  	const applyConfig = (config) => {
@@ -1394,7 +1432,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
  		config.nitro = configureNitroBrowser(config.nitro, resolvedOptions, enabled);
  	};
  	return {
-@@ -272,14 +611,29 @@ function hubBrowser(options) {
+@@ -272,14 +612,29 @@ function hubBrowser(options) {
  		config(config) {
  			applyConfig(config);
  		},
@@ -1425,7 +1463,7 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
  		closeBundle: {
  			order: "post",
  			sequential: true,
-@@ -288,8 +642,14 @@ function hubBrowser(options) {
+@@ -288,8 +643,14 @@ function hubBrowser(options) {
  				await writeCloudflareWranglerConfig({
  					outputRoot: createDefaultCloudflareOutputRoot(resolved.root),
  					rootDir: resolved.root,
@@ -1437,13 +1475,13 @@ index 7adcb9d335829950fb8e0d8c824083d754b3c7f4..a2619cb87302060d12edc4e964a601ca
 +					} } : {},
 +					wranglerConfigOwnership: {
 +						keys: ["browser"],
-+						arrays: { compatibility_flags: { values: ["nodejs_compat", "no_websocket_standard_binary_type"] } }
++						arrays: { compatibility_flags: { values: ["no_websocket_standard_binary_type"] } }
 +					}
  				});
  			}
  		}
 diff --git a/package.json b/package.json
-index 8bba2a2caf315fc66086127b41712ef7f694fb70..d1f1796f2677c9c1537ca81379945db4d5bed488 100644
+index 8bba2a2caf315fc66086127b41712ef7f694fb70..6990e433bf82ca38f3235df49d7f2f8362eb1a01 100644
 --- a/package.json
 +++ b/package.json
 @@ -1,7 +1,7 @@
@@ -1455,7 +1493,7 @@ index 8bba2a2caf315fc66086127b41712ef7f694fb70..d1f1796f2677c9c1537ca81379945db4
    "keywords": [
      "browser",
      "cloudflare",
-@@ -25,6 +25,16 @@
+@@ -25,10 +25,22 @@
    "type": "module",
    "sideEffects": false,
    "types": "./dist/index.d.ts",
@@ -1472,3 +1510,19 @@ index 8bba2a2caf315fc66086127b41712ef7f694fb70..d1f1796f2677c9c1537ca81379945db4
    "exports": {
      ".": "./dist/index.js",
      "./controllers/cdp": "./dist/controllers/cdp.js",
+     "./controllers/playwright": "./dist/controllers/playwright.js",
++    "./internal/runtime/empty-registry": "./dist/internal/runtime/empty-registry.js",
++    "./internal/runtime/unconfigured": "./dist/internal/runtime/unconfigured.js",
+     "./providers/cloudflare": "./dist/providers/cloudflare.js",
+     "./providers/local": "./dist/providers/local.js",
+     "./vite": "./dist/vite.js",
+@@ -57,9 +69,6 @@
+     "@cloudflare/playwright": {
+       "optional": true
+     },
+-    "playwright-core": {
+-      "optional": true
+-    },
+     "vite": {
+       "optional": true
+     }

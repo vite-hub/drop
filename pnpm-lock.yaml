@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@vite-hub/browser@0.0.2':
-    hash: e81937db2a093daee5043b9a4d8d1848c95c3832675cc9acf089731f19ea4e31
+    hash: 2e9ce3cd4bad4b659fefa243090fd151eecdace7feddec7fa091e7299a9a88c2
     path: patches/@vite-hub__browser@0.0.2.patch
 
 importers:
@@ -8633,7 +8633,7 @@ snapshots:
       '@cloudflare/sandbox': 0.8.14
       '@vercel/sandbox': 1.10.2
 
-  '@vite-hub/browser@0.0.2(patch_hash=e81937db2a093daee5043b9a4d8d1848c95c3832675cc9acf089731f19ea4e31)(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(playwright-core@1.62.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@vite-hub/browser@0.0.2(patch_hash=2e9ce3cd4bad4b659fefa243090fd151eecdace7feddec7fa091e7299a9a88c2)(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(playwright-core@1.62.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
       '@vite-hub/runtime': 0.0.2
     optionalDependencies:
@@ -12823,7 +12823,7 @@ snapshots:
       '@vite-hub/auth': 0.0.2(@opentelemetry/api@1.9.0)(@vite-hub/agent@0.0.2(e5e33207c01ffd43937ccfee53012b28))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/blob': 0.0.2(3103b870e7cc8069ac79ccfb57375060)
       '@vite-hub/box': 0.0.2(@cloudflare/sandbox@0.8.14)(@vercel/sandbox@1.10.2)
-      '@vite-hub/browser': 0.0.2(patch_hash=e81937db2a093daee5043b9a4d8d1848c95c3832675cc9acf089731f19ea4e31)(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(playwright-core@1.62.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@vite-hub/browser': 0.0.2(patch_hash=2e9ce3cd4bad4b659fefa243090fd151eecdace7feddec7fa091e7299a9a88c2)(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(playwright-core@1.62.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/cli': 0.0.2(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/database': 0.0.2(crossws@0.4.10(srvx@0.11.22))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/email': 0.0.2(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))

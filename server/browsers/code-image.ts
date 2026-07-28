@@ -1,7 +1,7 @@
 import { defineBrowser, type BrowserPageSession } from "vite-hub/browser"
 
 const RAY_URL = "https://ray.so/"
-const MAX_CODE_CHARACTERS = 20_000
+export const MAX_CODE_CHARACTERS = 20_000
 
 export interface CodeImageInput {
   code: string

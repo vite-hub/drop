@@ -2,9 +2,10 @@
   "skills": [
     {
       "name": "vitehub-drop",
-      "description": "Use Drop for local file uploads or source-code screenshots with permanent URLs.",
+      "description": "Uploads a local file and returns a permanent URL. Use when an agent needs to include a local image or document in GitHub content. It can also render source code as a permanent image URL.",
       "files": [
-        "SKILL.md"
+        "SKILL.md",
+        "references/code-options.md"
       ]
     }
   ]

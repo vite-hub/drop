@@ -52,7 +52,7 @@ Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when tha
 
 ### Create a code image
 
-The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language and theme, auto-fits the rendered frame, and stores the resulting PNG in Drop.
+The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language and theme, auto-fits the rendered frame, and stores the resulting PNG in Drop. The same background Sandbox pipeline used for uploaded images then keeps the optimized PNG when it is smaller.
 
 ```sh
 curl --fail-with-body https://drop.vitehub.dev/api/code \
@@ -68,7 +68,7 @@ The response contains the permanent Drop URL:
 }
 ```
 
-`code` is required and accepts up to 20,000 characters. `language` and `theme` are optional, case-sensitive Ray.so option names.
+`code` is required and accepts up to 20,000 characters. `language` and `theme` are optional, case-sensitive option names documented in the [Drop skill reference](./skills/vitehub-drop/references/code-options.md).
 
 ## Host it yourself
 

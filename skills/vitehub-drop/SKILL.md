@@ -1,6 +1,6 @@
 ---
 name: vitehub-drop
-description: Use Drop for local file uploads or source-code screenshots with permanent URLs.
+description: Uploads a local file and returns its permanent public URL. Use when an agent needs to include a local image or document in GitHub content like issues, Pull Request, etc... It can also render source code as a permanent image URL.
 ---
 
 # ViteHub Drop
@@ -20,7 +20,7 @@ curl --fail-with-body --silent --show-error \
 
 ## Code
 
-Send source text as JSON. Add a case-sensitive Ray.so language or theme when specified:
+Send source text as JSON. When the user specifies a language or theme, choose its exact value from [code image options](references/code-options.md):
 
 ```sh
 curl --fail-with-body --silent --show-error \
