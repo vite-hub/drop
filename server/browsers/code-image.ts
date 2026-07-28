@@ -1,5 +1,3 @@
-import { defineBrowser, type BrowserPageSession } from "vite-hub/browser"
-
 const RAY_URL = "https://ray.so/"
 export const MAX_CODE_CHARACTERS = 20_000
 

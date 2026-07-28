@@ -19,6 +19,35 @@ export default defineConfig({
       schedule: true,
     }),
     nitro({
+      imports: {
+        dts: ".vitehub/nitro-imports.d.ts",
+        presets: [
+          {
+            from: "h3",
+            imports: ["assertBodySize", "defineHandler", "HTTPError", "readValidatedBody", "requireContentType"],
+          },
+          {
+            from: "vite-hub/blob",
+            imports: ["blob"],
+          },
+          {
+            from: "vite-hub/browser",
+            imports: [
+              { name: "BrowserPageSession", type: true },
+              "defineBrowser",
+              "runBrowser",
+            ],
+          },
+          {
+            from: "vite-hub/rate-limit",
+            imports: ["requireRateLimit"],
+          },
+          {
+            from: "vite-hub/schedule",
+            imports: ["defineSchedule"],
+          },
+        ],
+      },
       cloudflare: {
         wrangler: {
           observability: { enabled: true },
