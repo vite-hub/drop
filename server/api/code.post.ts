@@ -1,10 +1,10 @@
 import { defineHandler, HTTPError, readValidatedBody, requireContentType } from "h3"
 import { blob } from "vite-hub/blob"
 import { runBrowser } from "vite-hub/browser"
-import { deferQueue } from "vite-hub/queue"
 import * as v from "valibot"
 
 import { MAX_CODE_CHARACTERS } from "../browsers/code-image"
+import { createCodeImageObject } from "../utils/code-images"
 
 const CodeImageInputSchema = v.strictObject({
   code: v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_CODE_CHARACTERS)),
@@ -31,7 +31,7 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 502, statusText: "The code image could not be rendered." })
   }
 
-  const key = `${crypto.randomUUID()}.png`
+  const { expiresAt, key } = createCodeImageObject()
   const [storageError, stored] = await blob.put(key, image, {
     access: "private",
     contentType: "image/png",
@@ -39,7 +39,8 @@ export default defineHandler(async (event) => {
   if (storageError || !stored.url)
     throw new HTTPError({ status: 503, statusText: "The code image could not be stored." })
 
-  deferQueue("image-optimization", { payload: key })
-
-  return { url: new URL(stored.url, event.req.url).href }
+  return {
+    url: new URL(stored.url, event.req.url).href,
+    expiresAt: expiresAt.toISOString(),
+  }
 })

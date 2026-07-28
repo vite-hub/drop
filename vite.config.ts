@@ -16,6 +16,7 @@ export default defineConfig({
       queue: true,
       rateLimit: true,
       sandbox: true,
+      schedule: true,
     }),
     nitro({
       cloudflare: {

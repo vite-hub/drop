@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0c0d0c">
   <meta name="application-name" content="Drop">
-  <meta name="description" content="Drop gives agents permanent URLs for files and source-code screenshots.">
+  <meta name="description" content="Drop gives agents permanent file URLs and temporary source-code screenshots.">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Drop">
   <meta property="og:title" content="Drop | Files and code images for agents">
-  <meta property="og:description" content="Drop gives agents permanent URLs for files and source-code screenshots.">
+  <meta property="og:description" content="Drop gives agents permanent file URLs and temporary source-code screenshots.">
   <meta property="og:url" content="https://drop.vitehub.dev/">
   <meta property="og:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
   <meta property="og:image:type" content="image/png">
@@ -19,7 +19,7 @@
   <meta property="og:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Drop | Files and code images for agents">
-  <meta name="twitter:description" content="Drop gives agents permanent URLs for files and source-code screenshots.">
+  <meta name="twitter:description" content="Drop gives agents permanent file URLs and temporary source-code screenshots.">
   <meta name="twitter:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
   <meta name="twitter:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
   <title>Drop | Files and code images for agents</title>
@@ -802,14 +802,14 @@
     <section class="doc-section api" id="api" aria-labelledby="api-title">
       <div class="section-label">Use Drop</div>
       <div class="section-content">
-        <h2 id="api-title">Turn files and code into permanent URLs</h2>
+        <h2 id="api-title">Keep files permanent and code images temporary</h2>
 
         <h3>Upload a file</h3>
         <p>Give Drop a local file. It stores the file and returns a permanent URL your agent can paste into GitHub.</p>
         <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/file.pdf"</code></pre>
 
         <h3>Render code</h3>
-        <p>Give Drop source code, plus a language or theme when you want one. It returns an auto-fitted PNG your agent can post anywhere.</p>
+        <p>Give Drop source code, plus a language or theme when you want one. It returns an auto-fitted PNG for immediate use. Treat the URL as temporary: it is available for five minutes, and Schedule removes expired code images every hour.</p>
         <pre><code>curl https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
   --data '{

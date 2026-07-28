@@ -1,6 +1,6 @@
 ---
 name: vitehub-drop
-description: Uploads a local file and returns its permanent public URL. Use when an agent needs to include a local image or document in GitHub content like issues, Pull Request, etc... It can also render source code as a permanent image URL.
+description: Uploads a local file and returns its permanent public URL. Use when an agent needs to include a local image or document in GitHub content like issues, Pull Request, etc... It can also render source code as a temporary image URL.
 ---
 
 # ViteHub Drop
@@ -29,3 +29,5 @@ curl --fail-with-body --silent --show-error \
   https://drop.vitehub.dev/api/code |
   jq -er '.url'
 ```
+
+Code image URLs are available for five minutes. When a permanent URL is needed, download the PNG within that window and upload it with the File branch.
