@@ -1,3 +1,5 @@
+patchedDependencies:
+  '@vite-hub/browser@0.0.2': patches/@vite-hub__browser@0.0.2.patch
 supportedArchitectures:
   cpu:
     - current

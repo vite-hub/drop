@@ -4,22 +4,33 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@vite-hub/browser@0.0.2':
+    hash: e81937db2a093daee5043b9a4d8d1848c95c3832675cc9acf089731f19ea4e31
+    path: patches/@vite-hub__browser@0.0.2.patch
+
 importers:
 
   .:
     dependencies:
+      '@cloudflare/playwright':
+        specifier: ^1.3.3
+        version: 1.3.3(playwright-core@1.62.0)
       h3:
         specifier: npm:h3-nightly@2.0.0-20260719-065143-6257713
         version: h3-nightly@2.0.0-20260719-065143-6257713(crossws@0.4.10(srvx@0.11.22))
       nitro:
         specifier: 3.0.260603-beta
         version: 3.0.260603-beta(@azure/identity@4.13.1)(@azure/storage-blob@12.33.0)(@libsql/client@0.17.4)(@netlify/blobs@10.7.9)(@vercel/blob@2.6.1)(@vercel/functions@3.7.5(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.21.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(giget@3.3.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260710.0)(rollup@4.62.2)(uploadthing@7.7.4(express@5.2.1)(h3-nightly@2.0.0-20260719-065143-6257713(crossws@0.4.10(srvx@0.11.22))))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))(wrangler@4.111.0)
+      playwright-core:
+        specifier: ^1.62.0
+        version: 1.62.0
       sharp:
         specifier: 0.34.5
         version: 0.34.5
       vite-hub:
         specifier: 0.0.2
-        version: 0.0.2(8d9c4df5bf90b6a7d4b8d7d7642e6038)
+        version: 0.0.2(dea4eea33e0b1011c2b6d9aee3aed027)
     devDependencies:
       '@types/node':
         specifier: ^25.9.2
@@ -383,6 +394,14 @@ packages:
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
+
+  '@cloudflare/playwright@1.3.3':
+    resolution: {integrity: sha512-Iz66dgICSjWN1yIZDzLIOCGh8mNkDyvkE6gf1Boyc0oz1J/IHvf3T0C+JEJschDyZRLz2uE7ruVLLqEJOfv1+Q==}
+    peerDependencies:
+      playwright-core: '*'
+    peerDependenciesMeta:
+      playwright-core:
+        optional: true
 
   '@cloudflare/sandbox@0.8.14':
     resolution: {integrity: sha512-tIXw1jBJjNouN7NEIPQbmuwbe7p1ikhhV6D83Lkkxif5FKgflzDwXl4diu9yfrho8Lc16rBnJ+Ieb5nFbunSWg==}
@@ -5381,6 +5400,11 @@ packages:
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
 
+  playwright-core@1.62.0:
+    resolution: {integrity: sha512-nsNRyq0r2zsG8AcRHWknc9QRA5XCueC7gWMrs+Gx2tlZn9hcl8zudfh00lhJPY1DE7NmZ6bDsT9g2yey8mXljA==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
@@ -6940,6 +6964,10 @@ snapshots:
   '@cloudflare/containers@0.3.7': {}
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
+
+  '@cloudflare/playwright@1.3.3(playwright-core@1.62.0)':
+    optionalDependencies:
+      playwright-core: 1.62.0
 
   '@cloudflare/sandbox@0.8.14':
     dependencies:
@@ -8605,10 +8633,12 @@ snapshots:
       '@cloudflare/sandbox': 0.8.14
       '@vercel/sandbox': 1.10.2
 
-  '@vite-hub/browser@0.0.2(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@vite-hub/browser@0.0.2(patch_hash=e81937db2a093daee5043b9a4d8d1848c95c3832675cc9acf089731f19ea4e31)(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(playwright-core@1.62.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
       '@vite-hub/runtime': 0.0.2
     optionalDependencies:
+      '@cloudflare/playwright': 1.3.3(playwright-core@1.62.0)
+      playwright-core: 1.62.0
       vite: 8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
   '@vite-hub/cli@0.0.2(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
@@ -11862,6 +11892,8 @@ snapshots:
       exsolve: 1.1.0
       pathe: 2.0.3
 
+  playwright-core@1.62.0: {}
+
   possible-typed-array-names@1.1.0: {}
 
   postcss@8.5.19:
@@ -12772,7 +12804,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-hub@0.0.2(8d9c4df5bf90b6a7d4b8d7d7642e6038):
+  vite-hub@0.0.2(dea4eea33e0b1011c2b6d9aee3aed027):
     dependencies:
       '@aws-sdk/client-s3': 3.1089.0
       '@aws-sdk/lib-storage': 3.1089.0(@aws-sdk/client-s3@3.1089.0)
@@ -12791,7 +12823,7 @@ snapshots:
       '@vite-hub/auth': 0.0.2(@opentelemetry/api@1.9.0)(@vite-hub/agent@0.0.2(e5e33207c01ffd43937ccfee53012b28))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/blob': 0.0.2(3103b870e7cc8069ac79ccfb57375060)
       '@vite-hub/box': 0.0.2(@cloudflare/sandbox@0.8.14)(@vercel/sandbox@1.10.2)
-      '@vite-hub/browser': 0.0.2(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@vite-hub/browser': 0.0.2(patch_hash=e81937db2a093daee5043b9a4d8d1848c95c3832675cc9acf089731f19ea4e31)(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(playwright-core@1.62.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/cli': 0.0.2(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/database': 0.0.2(crossws@0.4.10(srvx@0.11.22))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/email': 0.0.2(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))

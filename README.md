@@ -50,6 +50,26 @@ curl --fail-with-body https://drop.vitehub.dev/api/files \
 
 Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when that makes them smaller; PDFs, spreadsheets, documents, archives, and other files are stored unchanged. The public deployment limits uploads to five attempts per source address per minute.
 
+### Create a code image
+
+The code-image API opens Ray.so through a ViteHub Browser Definition, applies the requested language and theme, auto-fits the rendered frame, and stores the resulting PNG in Drop.
+
+```sh
+curl --fail-with-body https://drop.vitehub.dev/api/code-images \
+  -H "content-type: application/json" \
+  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight"}'
+```
+
+The response contains the permanent Drop URL:
+
+```json
+{
+  "url": "https://drop.vitehub.dev/01k...png"
+}
+```
+
+`code` is required and accepts up to 20,000 characters. `language` and `theme` are optional, case-sensitive Ray.so option names.
+
 ## Host it yourself
 
 Drop targets Cloudflare automatically with the deployment name `vitehub-drop`:

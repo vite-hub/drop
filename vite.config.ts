@@ -10,6 +10,7 @@ export default defineConfig({
           route: "/i",
         },
       },
+      browser: true,
       kv: true,
       preset: "cloudflare",
       queue: true,
