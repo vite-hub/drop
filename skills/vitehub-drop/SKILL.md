@@ -1,15 +1,15 @@
 ---
 name: vitehub-drop
-description: Upload a local file or render source code as an image and return its permanent public URL. Use when an agent needs a durable image, document, or code screenshot for GitHub, social media, or other external content.
+description: Use Drop for local file uploads or source-code screenshots with permanent URLs.
 ---
 
 # ViteHub Drop
 
-Choose the entry point from the input.
+Choose one branch and return its stdout verbatim.
 
-## Upload a file
+## File
 
-Use only a file the user placed in scope. Run:
+Upload a file placed in scope:
 
 ```sh
 curl --fail-with-body --silent --show-error \
@@ -18,11 +18,9 @@ curl --fail-with-body --silent --show-error \
   jq -er '.url'
 ```
 
-Drop stores other files unchanged and optimizes supported images in the background.
+## Code
 
-## Render code
-
-Send source text as JSON. Add a case-sensitive Ray.so language or theme only when the user specifies it.
+Send source text as JSON. Add a case-sensitive Ray.so language or theme when specified:
 
 ```sh
 curl --fail-with-body --silent --show-error \
@@ -31,5 +29,3 @@ curl --fail-with-body --silent --show-error \
   https://drop.vitehub.dev/api/code |
   jq -er '.url'
 ```
-
-Copy stdout verbatim. Never derive or rewrite the permanent URL from an upload endpoint, Blob key, or framework route.

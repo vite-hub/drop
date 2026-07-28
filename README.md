@@ -8,7 +8,7 @@
   </a>
 </p>
 
-<p align="center">Permanent file hosting for agents, built to showcase ViteHub primitives.</p>
+<p align="center">Permanent URLs for agent-uploaded files and rendered code images, built with ViteHub primitives.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·

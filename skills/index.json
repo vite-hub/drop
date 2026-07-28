@@ -2,7 +2,7 @@
   "skills": [
     {
       "name": "vitehub-drop",
-      "description": "Uploads a local file or renders source code as an image and returns a permanent URL.",
+      "description": "Use Drop for local file uploads or source-code screenshots with permanent URLs.",
       "files": [
         "SKILL.md"
       ]
