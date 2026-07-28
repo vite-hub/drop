@@ -52,10 +52,10 @@ Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when tha
 
 ### Create a code image
 
-The code-image API opens Ray.so through a ViteHub Browser Definition, applies the requested language and theme, auto-fits the rendered frame, and stores the resulting PNG in Drop.
+The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language and theme, auto-fits the rendered frame, and stores the resulting PNG in Drop.
 
 ```sh
-curl --fail-with-body https://drop.vitehub.dev/api/code-images \
+curl --fail-with-body https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
   --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight"}'
 ```

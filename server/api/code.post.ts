@@ -16,11 +16,11 @@ export default defineHandler(async (event) => {
     payload = await event.req.json()
   }
   catch {
-    throw new HTTPError({ status: 400, statusText: "A JSON code-image request is required." })
+    throw new HTTPError({ status: 400, statusText: "A JSON code request is required." })
   }
 
   if (!payload || typeof payload !== "object") {
-    throw new HTTPError({ status: 400, statusText: "A JSON code-image request is required." })
+    throw new HTTPError({ status: 400, statusText: "A JSON code request is required." })
   }
   const input = payload as Partial<CodeImageInput>
   if (typeof input.code !== "string"
