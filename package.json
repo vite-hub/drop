@@ -15,7 +15,6 @@
     "typecheck": "vite build --app && tsc --noEmit"
   },
   "dependencies": {
-    "@cloudflare/playwright": "^1.3.3",
     "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
     "nitro": "3.0.260603-beta",
     "sharp": "0.34.5",

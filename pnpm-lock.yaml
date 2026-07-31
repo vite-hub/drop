@@ -4,13 +4,17 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+pnpmfileChecksum: sha256-Oyv0nSxNzTM9aS48dVTQZ7499L+MbVWqNAzyV/TrtFA=
+
+patchedDependencies:
+  '@vite-hub/browser@0.0.1':
+    hash: 41ee06094a81b6a87281903e8d8c54dcfc222d371107d8779c6d2f6cc8b24cc6
+    path: patches/@vite-hub__browser@0.0.1.patch
+
 importers:
 
   .:
     dependencies:
-      '@cloudflare/playwright':
-        specifier: ^1.3.3
-        version: 1.3.3(playwright-core@1.62.0)
       h3:
         specifier: npm:h3-nightly@2.0.0-20260719-065143-6257713
         version: h3-nightly@2.0.0-20260719-065143-6257713(crossws@0.4.10(srvx@0.11.22))
@@ -25,7 +29,7 @@ importers:
         version: 1.4.2(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub@ac8fb119
-        version: https://pkg.pr.new/vite-hub@ac8fb119(1e2bf12d33b08d9af3ade39be9a4b4e2)
+        version: https://pkg.pr.new/vite-hub@ac8fb119(269f64b4bb89f7b71f38a515faa0b497)
     devDependencies:
       '@types/node':
         specifier: ^25.9.2
@@ -2463,7 +2467,7 @@ packages:
     resolution: {integrity: sha512-rWhYfIyW0Va0gFxtz434LhVirV+eQs+AK0QQWtsOPw2oTvOSA4iogQqemRqvRPPbqI8nfZOz6kbCsytVa20gdw==}
 
   '@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@ac8fb11':
-    resolution: {integrity: sha512-gAStQ13WAsJNKwZa34ACvXtcZYw9ENBsBjIVEo18K5ZLoKAiNQySpkaRHRnFNcui147HrqljYGpJ24rNPQ9p/g==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.15.0'}
     peerDependencies:
@@ -2503,7 +2507,7 @@ packages:
         optional: true
 
   '@vite-hub/auth@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@ac8fb11':
-    resolution: {integrity: sha512-uOaab0BRxYatZifQ9iQ/pe2N1N2K89lyn4sIkZ4l/8qhdlxDes9rS5kNXikxqwXtZ0Dtc8kSodCq3Lq0Teai8g==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2516,7 +2520,7 @@ packages:
         optional: true
 
   '@vite-hub/blob@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@ac8fb11':
-    resolution: {integrity: sha512-fjE51+sLmPwoV07MGaJV/jQ3DwsGNVxVB58MTRG1Wl/urYQvmLDbwoGnnz3Y1WrsnHOPpeaw9DyfUPYDGZB5fQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2541,7 +2545,7 @@ packages:
         optional: true
 
   '@vite-hub/box@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/box@ac8fb11':
-    resolution: {integrity: sha512-QAnXH3fplL5rZAvE400f0JHovF0RaPp0ri47TOhWPGrRWeMsan2tat+0Fx3ff7XVrnvPmyDChEOG9X5a9Rpilg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/box@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/box@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2560,20 +2564,17 @@ packages:
         optional: true
 
   '@vite-hub/browser@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@ac8fb11':
-    resolution: {integrity: sha512-jivlbPnSOg3/ZtTGXVUj3HKigAQs4X5+4cCP0XIQNFh40epH1AcXKzzsQnrrWRioYoIeKVljx7mPQPtmQ2LQzg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.15.0'}
     peerDependencies:
-      '@cloudflare/playwright': ^1.3.0
       vite: '>=8.0.0'
     peerDependenciesMeta:
-      '@cloudflare/playwright':
-        optional: true
       vite:
         optional: true
 
   '@vite-hub/cli@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@ac8fb11':
-    resolution: {integrity: sha512-29GW6/A+KtEc3Qd2x9uL8j3hzGWQU+oypjy+XJemmuacUgYucsyhXujcRKoFep6UjN95SHMPlfGhfxNnPhfcAg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     hasBin: true
@@ -2581,7 +2582,7 @@ packages:
       vite: '>=8.0.0'
 
   '@vite-hub/database@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@ac8fb11':
-    resolution: {integrity: sha512-xnoNy4Ifyi1KVxl2eG6x14ho7oEE/JJjjnB18wolc+2+AUXESuFOOqi9etyLYm1jh0p3Dvk7kFf9/B2bmeoRVg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2593,7 +2594,7 @@ packages:
         optional: true
 
   '@vite-hub/email@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@ac8fb11':
-    resolution: {integrity: sha512-4YqDYjxZwt2nqCCSnNaAA14p10SIYvUMKwrUnzH4n5sTYqKdxRJlUrNETJWkRohki4bvL4Nvghk0kk+qbIhqxg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2606,7 +2607,7 @@ packages:
         optional: true
 
   '@vite-hub/env@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@ac8fb11':
-    resolution: {integrity: sha512-Z7Qlrgz6wvVhTfF2oMDOEwCr20NbXs63f7BOOm+W3uAdPRPM3Q5kpFUGC3Yt1h2ch246mu8nSs38w918sIaIcQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2616,7 +2617,7 @@ packages:
         optional: true
 
   '@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@ac8fb11':
-    resolution: {integrity: sha512-QQvrga3gsipIMHeJEVRzFG3zZtkLDwM24KIEDjqkc4oVLg0eo59UL99gpm9/NRNo6Bxx7Pi+LtmdJIq3ABP5/w==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2629,7 +2630,7 @@ packages:
         optional: true
 
   '@vite-hub/markdown-template@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@ac8fb11':
-    resolution: {integrity: sha512-z4OuvGsGzMQ97+jTGhYFIioalicXW68QCMEIeonqfvxy5y4K6cRRNmUgDxmVN2mjJ7whfjDNgtUnP/o/AYWATw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2639,7 +2640,7 @@ packages:
         optional: true
 
   '@vite-hub/queue@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@ac8fb11':
-    resolution: {integrity: sha512-jbxbRcuFsPPyPY+EMqfAed2Zy4oivx3kaNUEpimmnTmbOMU+89b4jmtxztqls7hkDvW+jfWJiKwakhhs0aShaQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2649,7 +2650,7 @@ packages:
         optional: true
 
   '@vite-hub/rate-limit@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@ac8fb11':
-    resolution: {integrity: sha512-XqX7WnjU71lmP3BbQEmYTV893mweYfZFEy9Yf8LJA7iWWn6UpRB0dOY9ABCDhcKRjzGV5kw+B5hgKLU624yR9A==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2659,12 +2660,12 @@ packages:
         optional: true
 
   '@vite-hub/runtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@ac8fb11':
-    resolution: {integrity: sha512-MCPdBmdOlTFk1i/7wtjyq/pwWkP2ES4teFWH+Q1yDK62WgvAuMo1jGBRsX9NLvqhpX9km7tsTMSsT+cPL/GgQg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
 
   '@vite-hub/sandbox@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@ac8fb11':
-    resolution: {integrity: sha512-dJDDQ7fyr09da3hve/wmBwa5KKgjqc4KyId9/KfiqCTdY4V1PhRWxWNX+FCQmjGO1QJn9wAQpA/e+o7sus1xAw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2680,7 +2681,7 @@ packages:
         optional: true
 
   '@vite-hub/schedule@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@ac8fb11':
-    resolution: {integrity: sha512-qXJSLhheiUOKrsAk7ANzEbHAdndk3Cd3QDPhY39iLBgxaHivC/H9qKGlnOaYFlRVLDBZV83Jx2qFqm/ofvamXQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.15.0'}
     peerDependencies:
@@ -2693,17 +2694,17 @@ packages:
         optional: true
 
   '@vite-hub/shell@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@ac8fb11':
-    resolution: {integrity: sha512-+Mr2nDNvSQyorNypZpcROM2ggdNuwoUqPwddBU8dBg3Ia4bEPWDkWrjpCB4w01eZmRGIUgM/j9etYstRvuRMag==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
 
   '@vite-hub/source@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@ac8fb11':
-    resolution: {integrity: sha512-W34/EF3c9edqZBQ9PwnNs4Zj5vsge4PzTF9t5FSCp8gewPc8Lwb8UDmstaH1i1FlpNpLe8/p4hp/24rwTourvA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
 
   '@vite-hub/workflow@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@ac8fb11':
-    resolution: {integrity: sha512-xNQ2auQNW7JVaHzRmOyzx22OJaK4X0tKWexq1MTS8ISkp7dQRW91ABPM1vHusqE6T/jr8qnIMFbD7B+zYpgMVg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2725,7 +2726,7 @@ packages:
         optional: true
 
   '@vite-hub/workspace@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@ac8fb11':
-    resolution: {integrity: sha512-xy6eAI6SjOIlDy/mgDU8+vxiX/ZJEfWi8ebV5dgvHHPZ8ab3jIjXxFtTahaBAhMZFb3rWb21MX22k1vffLvGLw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@ac8fb11}
+    resolution: {tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@ac8fb11}
     version: 0.0.1
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -8614,12 +8615,12 @@ snapshots:
       '@cloudflare/sandbox': 0.8.14
       '@vercel/sandbox': 1.10.2
 
-  '@vite-hub/browser@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@ac8fb11(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@vite-hub/browser@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@ac8fb11(patch_hash=41ee06094a81b6a87281903e8d8c54dcfc222d371107d8779c6d2f6cc8b24cc6)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
+      '@cloudflare/playwright': 1.3.3(playwright-core@1.62.0)
       '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@ac8fb11
       playwright-core: 1.62.0
     optionalDependencies:
-      '@cloudflare/playwright': 1.3.3(playwright-core@1.62.0)
       vite: 8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
   '@vite-hub/cli@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@ac8fb11(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
@@ -12698,7 +12699,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-hub@https://pkg.pr.new/vite-hub@ac8fb119(1e2bf12d33b08d9af3ade39be9a4b4e2):
+  vite-hub@https://pkg.pr.new/vite-hub@ac8fb119(269f64b4bb89f7b71f38a515faa0b497):
     dependencies:
       '@aws-sdk/client-s3': 3.1089.0
       '@aws-sdk/lib-storage': 3.1089.0(@aws-sdk/client-s3@3.1089.0)
@@ -12717,7 +12718,7 @@ snapshots:
       '@vite-hub/auth': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@ac8fb11(@opentelemetry/api@1.9.0)(@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@ac8fb11(619f649d7245ab96bab836797ba84e68))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(react@19.2.8)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@ac8fb11(d63335091f87d5abff3d78ef02052711)
       '@vite-hub/box': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/box@ac8fb11(@cloudflare/sandbox@0.8.14)(@vercel/sandbox@1.10.2)
-      '@vite-hub/browser': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@ac8fb11(@cloudflare/playwright@1.3.3(playwright-core@1.62.0))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@vite-hub/browser': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@ac8fb11(patch_hash=41ee06094a81b6a87281903e8d8c54dcfc222d371107d8779c6d2f6cc8b24cc6)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/cli': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@ac8fb11(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@ac8fb11(crossws@0.4.10(srvx@0.11.22))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(@opentelemetry/api@1.9.0)(kysely@0.29.4)(sql.js@1.14.1))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       '@vite-hub/email': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@ac8fb11(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -12762,7 +12763,6 @@ snapshots:
       - '@capacitor/preferences'
       - '@cfworker/json-schema'
       - '@chat-adapter/discord'
-      - '@cloudflare/playwright'
       - '@cloudflare/workers-types'
       - '@deno/kv'
       - '@electric-sql/pglite'
