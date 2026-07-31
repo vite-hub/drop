@@ -1,0 +1,82 @@
+name: preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: preview-pr-${{ github.event.pull_request.number }}
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build
+
+      - id: prepare
+        env:
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          resources="$(node scripts/prepare-preview.mjs "$PULL_REQUEST")"
+          echo "worker=$(jq -r .worker <<<"$resources")" >> "$GITHUB_OUTPUT"
+          echo "bucket=$(jq -r '.buckets[0]' <<<"$resources")" >> "$GITHUB_OUTPUT"
+          echo "queue=$(jq -r '.queues[0]' <<<"$resources")" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure isolated resources
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PREVIEW_BUCKET: ${{ steps.prepare.outputs.bucket }}
+          PREVIEW_QUEUE: ${{ steps.prepare.outputs.queue }}
+        run: |
+          if ! pnpm exec wrangler r2 bucket info "$PREVIEW_BUCKET" > /dev/null 2>&1; then
+            pnpm exec wrangler r2 bucket create "$PREVIEW_BUCKET"
+          fi
+          if ! pnpm exec wrangler queues info "$PREVIEW_QUEUE" > /dev/null 2>&1; then
+            pnpm exec wrangler queues create "$PREVIEW_QUEUE"
+          fi
+
+      - id: deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          output="$(pnpm exec wrangler deploy --config .output/server/wrangler.preview.json --containers-rollout=none)"
+          echo "$output"
+          url="$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' <<<"$output" | tail -1)"
+          test -n "$url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify preview
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          curl --fail --show-error --silent --retry 5 --retry-delay 5 "$PREVIEW_URL/" > /dev/null
+          curl --fail --show-error --silent --retry 5 --retry-delay 5 \
+            "$PREVIEW_URL/.well-known/skills/index.json" > /dev/null
