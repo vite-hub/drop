@@ -52,7 +52,13 @@ async function selectRayExportScale(
   const option = page.getByRole("menuitemradio", { exact: true, name: `${scale}x` })
   if (await option.count() !== 1)
     throw new Error(`[drop:code-image] Ray does not offer ${scale}x export.`)
-  await option.click({ force: true })
+  await option.press("Enter")
+
+  await openRayExportMenu(page)
+  const selected = page.getByRole("menuitem", { exact: true, name: `Size ${scale}x` })
+  if (await selected.count() !== 1)
+    throw new Error(`[drop:code-image] Ray did not select ${scale}x export.`)
+  await openRayExportMenu(page)
 }
 
 async function readRayDownload(download: Download) {
