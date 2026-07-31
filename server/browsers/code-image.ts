@@ -33,7 +33,7 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   await editor.waitFor({ state: "visible" })
   await editor.fill(input.code)
 
-  const padding = session.page.getByRole("button", { exact: true, name: "16" })
+  const padding = session.page.locator('button[aria-label="16"]')
   if (await padding.count() !== 1)
     throw new Error("[drop:code-image] Ray padding control was not found.")
   await padding.click()
