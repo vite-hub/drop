@@ -24,7 +24,7 @@ Render code in Ray.so wrapper.
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight","format":"png","scale":4}' \
+  --data '{"code":"const answer: number = 42","language":"typescript","theme":"midnight","format":"png","scale":4}' \
   https://drop.vitehub.dev/api/code |
   jq -er '.url'
 ```
@@ -32,7 +32,17 @@ curl --fail-with-body --silent --show-error \
 Code image URLs expire after five minutes; download and re-upload through File to make one permanent.
 
 ## Options
-- `languages`*: Any of:  `Cedar`, `Bash`, `Astro`, `C++`, `C#`, `Clojure`, `Console`, `Crystal`, `CSS`, `Cypher`, `Dart`, `Diff`, `Docker`, `Elm`, `ERB`, `Elixir`, `Erlang`, `Gleam`, `GraphQL`, `Go`, `HCL`, `Haskell`, `HTML`, `Java`, `JavaScript`, `Julia`, `JSON`, `JSX`, `Kotlin`, `LaTeX`, `Liquid`, `Lisp`, `Lua`, `Markdown`, `MATLAB`, `Move`, `Nix`, `Plaintext`, `Powershell`, `Objective-C`, `OCaml`, `PHP`, `Prisma`, `Python`, `R`, `Ruby`, `Rust`, `Scala`, `SCSS`, `Solidity`, `SQL`, `Swift`, `Svelte`, `TOML`, `TypeScript`, `TSX`, `V`, `Vue`, `XML`, `YAML`, `Zig`.
-- `theme`*: `Vercel`, `Supabase`, `Tailwind`, `OpenAI`, `Mintlify`, `Prisma`, `Clerk`, `ElevenLabs`, `Resend`, `Trigger.dev`, `Nuxt`, `Browserbase`, `Cloudflare`, `Gemini`, `Stripe`, `Bitmap`, `Noir`, `Ice`, `Sand`, `Forest`, `Mono`, `Breeze`, `Candy`, `Crimson`, `Falcon`, `Meadow`, `Midnight`, `Raindrop`, `Sunset`, `Firecrawl`, `AWS`, `Auth0`.
-   `format` accepts `png` (default) or `svg`.
+
+Fetch the current case-sensitive IDs directly from Ray.so before setting `language` or `theme`:
+
+```bash
+# Fetch and parse available themes
+curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/store/themes.ts" | grep -oE 'id:[[:space:]]*"[^"]+"' | sed -E 's/id:[[:space:]]*"([^"]+)"/\1/' | sort -u
+
+# Fetch and parse available languages
+curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/util/languages.ts" | grep -oE '^[[:space:]]*"?[a-zA-Z0-9+#-]+"?[[:space:]]*:[[:space:]]*\{' | sed -E 's/^[[:space:]]*"?([^"]+)"?[[:space:]]*:.*/\1/' | sort -u
+```
+
+- `language` and `theme` accept the IDs printed by those commands.
+- `format` accepts `png` (default) or `svg`.
 - `scale` for png accepts `2`, `4` (default), or `6`.

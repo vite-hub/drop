@@ -8,20 +8,29 @@ export interface CodeImageInput {
   theme?: string
 }
 
-async function selectRayOption(
-  page: BrowserPageSession["page"],
-  control: string,
-  name: string,
-) {
-  const button = page.locator(`div:has(> input[value*=${JSON.stringify(`"${control}"`)}]) > button[role="combobox"]`)
-  if (await button.count() !== 1)
-    throw new Error(`[drop:code-image] Ray ${control} control was not found.`)
+function createRayUrl(input: CodeImageInput) {
+  const state = new URLSearchParams()
+  if (input.theme)
+    state.set("theme", input.theme)
+  if (input.language)
+    state.set("language", input.language)
+  const hash = state.toString()
+  return hash ? `${RAY_URL}#${hash}` : RAY_URL
+}
 
-  await button.click()
-  const option = page.getByRole("option", { exact: true, name })
-  if (await option.count() !== 1)
-    throw new Error(`[drop:code-image] Ray does not offer ${control} ${JSON.stringify(name)}.`)
-  await option.click()
+async function assertRayOption(
+  page: BrowserPageSession["page"],
+  name: string,
+  marker: string,
+  id: string,
+) {
+  const control = page.locator(`input[value*=${JSON.stringify(`"${marker}"`)}]`)
+  if (await control.count() !== 1)
+    throw new Error(`[drop:code-image] Ray ${name} control was not found.`)
+
+  const selected = JSON.parse(await control.inputValue()) as { id?: unknown }
+  if (selected.id !== id)
+    throw new Error(`[drop:code-image] Ray does not offer ${name} ${JSON.stringify(id)}.`)
 }
 
 async function openRayExportMenu(page: BrowserPageSession["page"]) {
@@ -108,20 +117,19 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   const format = input.format ?? "png"
   const scale = input.scale ?? 4
   const session = await browser.open()
-  await session.page.goto(RAY_URL, { waitUntil: "domcontentloaded" })
+  await session.page.goto(createRayUrl(input), { waitUntil: "domcontentloaded" })
   const editor = session.page.locator('textarea[data-enable-grammarly="false"]')
   await editor.waitFor({ state: "visible" })
+  if (input.theme)
+    await assertRayOption(session.page, "theme", "background", input.theme)
+  if (input.language)
+    await assertRayOption(session.page, "language", "language", input.language)
   await editor.fill(input.code)
 
   const padding = session.page.locator('button[aria-label="16"]')
   if (await padding.count() !== 1)
     throw new Error("[drop:code-image] Ray padding control was not found.")
   await padding.click()
-
-  if (input.theme)
-    await selectRayOption(session.page, "background", input.theme)
-  if (input.language)
-    await selectRayOption(session.page, "language", input.language)
 
   await selectRayExportScale(session.page, scale)
   return exportRayImage(session.page, format)

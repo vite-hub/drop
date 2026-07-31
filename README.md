@@ -58,7 +58,7 @@ The code API opens Ray.so through a ViteHub Browser Definition, applies the requ
 ```sh
 curl --fail-with-body https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight","format":"png","scale":4}'
+  --data '{"code":"const answer: number = 42","language":"typescript","theme":"midnight","format":"png","scale":4}'
 ```
 
 The response contains the temporary Drop URL and its expiry:
@@ -70,7 +70,7 @@ The response contains the temporary Drop URL and its expiry:
 }
 ```
 
-`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and affects PNG exports. Both default to Ray's primary export settings: PNG at 4×. `language` and `theme` are optional, case-sensitive option names listed in the [Drop skill](./skills/vitehub-drop/SKILL.md#options). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
+`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and affects PNG exports. Both default to Ray's primary export settings: PNG at 4×. `language` and `theme` are optional, case-sensitive IDs discovered through the [Drop skill](./skills/vitehub-drop/SKILL.md#options). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
 
 ## Host it yourself
 

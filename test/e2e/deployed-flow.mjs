@@ -20,7 +20,7 @@ assert.equal(image.headers.get("content-type"), "image/png")
 assert.ok(await stats.json() > 0)
 
 const codeResponse = await fetch(new URL("/api/code", origin), {
-  body: JSON.stringify({ code: "const answer: number = 42", language: "TypeScript", theme: "Nuxt" }),
+  body: JSON.stringify({ code: "const answer: number = 42", language: "typescript", theme: "nuxt" }),
   headers: { "content-type": "application/json" },
   method: "POST",
   signal: AbortSignal.timeout(120_000),
