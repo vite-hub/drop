@@ -1,9 +1,12 @@
 import type { Download } from "playwright-core"
 
-import type { CodeImageFormat, CodeImageScale } from "../utils/code-images"
+import {
+  MAX_CODE_CHARACTERS,
+  type CodeImageFormat,
+  type CodeImageScale,
+} from "../utils/code-images"
 
 const RAY_URL = "https://ray.so/"
-export const MAX_CODE_CHARACTERS = 20_000
 
 export interface CodeImageInput {
   code: string
@@ -40,9 +43,6 @@ async function selectRayExportScale(
   page: BrowserPageSession["page"],
   scale: CodeImageScale,
 ) {
-  if (scale === 4)
-    return
-
   await openRayExportMenu(page)
   const size = page.getByRole("menuitem").filter({ hasText: "Size" })
   if (await size.count() !== 1)
@@ -61,17 +61,7 @@ async function selectRayExportScale(
   await page.keyboard.press("Escape")
 }
 
-async function readRayDownload(download: Download) {
-  const stream = await download.createReadStream()
-  const streamed = await new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = []
-    stream.on("data", chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
-    stream.on("end", () => resolve(Buffer.concat(chunks)))
-    stream.on("error", reject)
-  })
-  if (streamed.length)
-    return streamed
-
+function readRayDownload(download: Download) {
   const url = download.url()
   const separator = url.indexOf(",")
   if (!url.startsWith("data:") || separator === -1)
@@ -142,10 +132,5 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
     await selectRayOption(session.page, "language", input.language)
 
   await selectRayExportScale(session.page, scale)
-  await session.page.addStyleTag({
-    content: '[class*="windowSizeDragPoint"] { display: none !important; }',
-  })
-  const frame = session.page.locator("#frame")
-  await frame.waitFor({ state: "visible" })
-  return await exportRayImage(session.page, format)
+  return exportRayImage(session.page, format)
 })

@@ -1,10 +1,10 @@
 import * as v from "valibot"
 
-import { MAX_CODE_CHARACTERS } from "../browsers/code-image"
 import {
   CODE_IMAGE_FORMATS,
   CODE_IMAGE_SCALES,
-  createCodeImageObject,
+  createCodeImageLocation,
+  MAX_CODE_CHARACTERS,
 } from "../utils/code-images"
 
 const MAX_CODE_BODY_BYTES = 96 * 1024
@@ -39,7 +39,7 @@ export default defineHandler(async (event) => {
   }
 
   const format = input.format ?? "png"
-  const { expiresAt, key } = createCodeImageObject(format)
+  const { expiresAt, key } = createCodeImageLocation(format)
   const [storageError, stored] = await blob.put(key, image, {
     access: "private",
     contentType: format === "png" ? "image/png" : "image/svg+xml",
