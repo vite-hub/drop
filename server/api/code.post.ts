@@ -1,17 +1,10 @@
 import { createError } from "evlog"
 import * as v from "valibot"
 
-import {
-  CODE_IMAGE_FORMATS,
-  CODE_IMAGE_SCALES,
-  createCodeImageLocation,
-  MAX_CODE_CHARACTERS,
-} from "../utils/code-images"
-
 const MAX_CODE_BODY_BYTES = 96 * 1024
 
 const CodeImageInputSchema = v.strictObject({
-  code: v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_CODE_CHARACTERS)),
+  code: v.pipe(v.string(), v.minLength(1), v.maxLength(CODE_IMAGE_MAX_CHARACTERS)),
   format: v.optional(v.picklist(CODE_IMAGE_FORMATS)),
   language: v.optional(v.string()),
   scale: v.optional(v.picklist(CODE_IMAGE_SCALES)),
@@ -26,7 +19,7 @@ export default defineHandler(async (event) => {
     onError: () => ({
       status: 400,
       statusText: "Invalid code image request",
-      message: `Code must contain between 1 and ${MAX_CODE_CHARACTERS} characters. Format must be png or svg, scale must be 2, 4, or 6, and language and theme must be strings.`,
+      message: `Code must contain between 1 and ${CODE_IMAGE_MAX_CHARACTERS} characters. Format must be png or svg, scale must be 2, 4, or 6, and language and theme must be strings.`,
     }),
   })
 

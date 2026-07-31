@@ -20,14 +20,29 @@ curl --fail-with-body --silent --show-error \
 
 ## Code
 
-Send source text as JSON. When the user specifies a language or theme, choose its exact value from [code image options](references/code-options.md):
-
+Render code in Ray.so wrapper.
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight","format":"png","scale":4}' \
+  --data '{"code":"const answer: number = 42","language":"typescript","theme":"midnight","format":"png","scale":4}' \
   https://drop.vitehub.dev/api/code |
   jq -er '.url'
 ```
 
-Code image URLs are available for five minutes. When a permanent URL is needed, download the exported file within that window and upload it with the File branch.
+Code image URLs expire after five minutes; download and re-upload through File to make one permanent.
+
+## Options
+
+Fetch the current case-sensitive IDs directly from Ray.so before setting `language` or `theme`:
+
+```bash
+# Fetch and parse available themes
+curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/store/themes.ts" | grep -oE 'id:[[:space:]]*"[^"]+"' | sed -E 's/id:[[:space:]]*"([^"]+)"/\1/' | sort -u
+
+# Fetch and parse available languages
+curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/util/languages.ts" | grep -oE '^[[:space:]]*"?[a-zA-Z0-9+#-]+"?[[:space:]]*:[[:space:]]*\{' | sed -E 's/^[[:space:]]*"?([^"]+)"?[[:space:]]*:.*/\1/' | sort -u
+```
+
+- `language` and `theme` accept the IDs printed by those commands.
+- `format` accepts `png` (default) or `svg`.
+- `scale` for png accepts `2`, `4` (default), or `6`.

@@ -432,18 +432,52 @@
       tab-size: 2;
     }
 
-    .code-output {
+    .code-example {
       margin: 1.5rem 0 0;
     }
 
-    .code-output figcaption {
-      margin: 0 0 0.75rem;
+    .code-tabs {
+      display: flex;
+      gap: 1.5rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .code-tab {
+      min-height: 3rem;
+      padding: 0;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      background: transparent;
       color: var(--muted);
+      cursor: pointer;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 0.75rem;
       letter-spacing: 0.08em;
       line-height: 1.6;
       text-transform: uppercase;
+    }
+
+    .code-tab:hover {
+      color: var(--text);
+    }
+
+    .code-tab[aria-selected="true"] {
+      border-bottom-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .code-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    .code-panel[hidden] {
+      display: none;
+    }
+
+    .code-panel pre,
+    .code-output {
+      margin-top: 0;
     }
 
     .code-output img {
@@ -675,6 +709,15 @@
         font-size: 1rem;
       }
 
+      .code-tabs,
+      .code-output {
+        margin-inline: -1rem;
+      }
+
+      .code-tabs {
+        padding-inline: 1rem;
+      }
+
       .api table {
         font-size: 1rem;
       }
@@ -856,8 +899,16 @@
       <div class="section-label">Code images</div>
       <div class="section-content">
         <h2 id="code-images-title">Turn code into an image</h2>
-        <p>Choose your Ray.so options and get a PNG or SVG.</p>
-        <pre><code>curl https://drop.vitehub.dev/api/code \
+        <p>Choose your <a href="https://ray.so/">Ray.so</a> options and get a PNG or SVG.</p>
+
+        <div class="code-example">
+          <div class="code-tabs" role="tablist" aria-label="Code image example">
+            <button class="code-tab" id="code-input-tab" type="button" role="tab" aria-controls="code-input-panel" aria-selected="false" tabindex="-1" data-code-tab="input">Input</button>
+            <button class="code-tab" id="code-output-tab" type="button" role="tab" aria-controls="code-output-panel" aria-selected="true" data-code-tab="output">Output</button>
+          </div>
+
+          <div class="code-panel" id="code-input-panel" role="tabpanel" aria-labelledby="code-input-tab" data-code-panel="input" hidden>
+            <pre><code>curl https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
   --data '{
     "code": "#include &lt;iostream&gt;\n\nint main() {\n  std::cout &lt;&lt; \"Hello\";\n}",
@@ -866,11 +917,14 @@
     "format": "png",
     "scale": 2
   }'</code></pre>
+          </div>
 
-        <figure class="code-output">
-          <figcaption>Output</figcaption>
-          <img src="https://drop.vitehub.dev/i/0a5260a2-13ed-40e6-aa18-763948637df0.png" alt="C++ hello-world code rendered with the Nuxt theme" width="1040" height="402" loading="lazy" decoding="async">
-        </figure>
+          <div class="code-panel" id="code-output-panel" role="tabpanel" aria-labelledby="code-output-tab" data-code-panel="output">
+            <figure class="code-output">
+              <img src="https://drop.vitehub.dev/i/0a5260a2-13ed-40e6-aa18-763948637df0.png" alt="C++ hello-world code rendered with the Nuxt theme" width="1040" height="402" loading="lazy" decoding="async">
+            </figure>
+          </div>
+        </div>
 
         <h3>Options</h3>
         <ul class="behavior limit-list">
@@ -930,6 +984,42 @@
       label.textContent = "Copied"
       window.setTimeout(() => { label.textContent = "Copy skill" }, 1400)
     })
+
+    const codeTabs = Array.from(document.querySelectorAll("[data-code-tab]"))
+    const codePanels = Array.from(document.querySelectorAll("[data-code-panel]"))
+    const selectCodeTab = (selectedTab) => {
+      for (const tab of codeTabs) {
+        const selected = tab === selectedTab
+        tab.setAttribute("aria-selected", String(selected))
+        tab.tabIndex = selected ? 0 : -1
+      }
+
+      for (const panel of codePanels)
+        panel.hidden = panel.dataset.codePanel !== selectedTab.dataset.codeTab
+    }
+
+    for (const tab of codeTabs) {
+      tab.addEventListener("click", () => selectCodeTab(tab))
+      tab.addEventListener("keydown", (event) => {
+        const current = codeTabs.indexOf(tab)
+        let next = current
+
+        if (event.key === "ArrowLeft")
+          next = (current - 1 + codeTabs.length) % codeTabs.length
+        else if (event.key === "ArrowRight")
+          next = (current + 1) % codeTabs.length
+        else if (event.key === "Home")
+          next = 0
+        else if (event.key === "End")
+          next = codeTabs.length - 1
+        else
+          return
+
+        event.preventDefault()
+        selectCodeTab(codeTabs[next])
+        codeTabs[next].focus()
+      })
+    }
 
   </script>
 </body>
