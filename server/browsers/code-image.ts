@@ -58,7 +58,7 @@ async function selectRayExportScale(
   const selected = page.getByRole("menuitem", { exact: true, name: `Size ${scale}x` })
   if (await selected.count() !== 1)
     throw new Error(`[drop:code-image] Ray did not select ${scale}x export.`)
-  await openRayExportMenu(page)
+  await page.keyboard.press("Escape")
 }
 
 async function readRayDownload(download: Download) {
