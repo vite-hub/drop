@@ -2,17 +2,12 @@ import { readFile, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const branch = process.argv[2]
-if (!branch)
-  throw new Error("A branch name is required.")
-
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const sourcePath = resolve(root, ".output/server/wrangler.json")
 const previewPath = resolve(root, ".output/server/wrangler.preview.json")
 const config = JSON.parse(await readFile(sourcePath, "utf8"))
 const productionName = config.name
-const previewName = `${productionName}-${branchSuffix(branch)}`
-const previewResourcePrefix = `${productionName}-preview`
+const previewName = `${productionName}-preview`
 
 config.name = previewName
 config.workers_dev = true
@@ -54,27 +49,12 @@ function hashNamespace(value) {
 
 function previewResourceName(name) {
   let previewResource
-  if (name === productionName) previewResource = previewResourcePrefix
+  if (name === productionName) previewResource = previewName
   if (name.startsWith(`${productionName}-`))
-    previewResource = `${previewResourcePrefix}-${name.slice(productionName.length + 1)}`
-  previewResource ??= `${previewResourcePrefix}-${name}`
+    previewResource = `${previewName}-${name.slice(productionName.length + 1)}`
+  previewResource ??= `${previewName}-${name}`
 
   if (previewResource.length < 63) return previewResource
   const hash = Number(hashNamespace(previewResource)).toString(36)
   return `${previewResource.slice(0, 62 - hash.length - 1)}-${hash}`
-}
-
-function branchSuffix(value) {
-  const normalized = value
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9-]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "")
-  if (!normalized)
-    throw new Error("The branch name must contain a letter or number.")
-
-  const maxLength = 63 - productionName.length - 1
-  if (normalized.length <= maxLength) return normalized
-
-  const hash = Number(hashNamespace(value)).toString(36)
-  return `${normalized.slice(0, maxLength - hash.length - 1)}-${hash}`
 }
