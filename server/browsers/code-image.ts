@@ -1,3 +1,5 @@
+import type { Download } from "playwright-core"
+
 import type { CodeImageFormat, CodeImageScale } from "../utils/code-images"
 
 const RAY_URL = "https://ray.so/"
@@ -50,7 +52,33 @@ async function selectRayExportScale(
   const option = page.getByRole("menuitemradio", { exact: true, name: `${scale}x` })
   if (await option.count() !== 1)
     throw new Error(`[drop:code-image] Ray does not offer ${scale}x export.`)
-  await option.click()
+  await option.click({ force: true })
+}
+
+async function readRayDownload(download: Download) {
+  const stream = await download.createReadStream()
+  const streamed = await new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = []
+    stream.on("data", chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+    stream.on("end", () => resolve(Buffer.concat(chunks)))
+    stream.on("error", reject)
+  })
+  if (streamed.length)
+    return streamed
+
+  const url = download.url()
+  const separator = url.indexOf(",")
+  if (!url.startsWith("data:") || separator === -1)
+    throw new Error("[drop:code-image] Ray returned an empty export.")
+
+  const metadata = url.slice(5, separator)
+  const content = url.slice(separator + 1)
+  const decoded = metadata.includes(";base64")
+    ? Buffer.from(content, "base64")
+    : Buffer.from(decodeURIComponent(content))
+  if (!decoded.length)
+    throw new Error("[drop:code-image] Ray returned an empty export.")
+  return decoded
 }
 
 async function exportRayImage(
@@ -77,10 +105,12 @@ async function exportRayImage(
   if (!download.suggestedFilename().endsWith(`.${format}`))
     throw new Error(`[drop:code-image] Ray returned an unexpected ${format} export.`)
 
-  const chunks: Buffer[] = []
-  for await (const chunk of await download.createReadStream())
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-  return Buffer.concat(chunks)
+  const image = await readRayDownload(download)
+  if (format === "png" && !image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
+    throw new Error("[drop:code-image] Ray returned an invalid PNG export.")
+  if (format === "svg" && !image.subarray(0, 512).toString("utf8").includes("<svg"))
+    throw new Error("[drop:code-image] Ray returned an invalid SVG export.")
+  return image
 }
 
 export default defineBrowser(async (input: CodeImageInput, { browser }) => {
