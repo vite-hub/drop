@@ -1,0 +1,43 @@
+diff --git a/dist/vite-BpLW00Di.js b/dist/vite-BpLW00Di.js
+index eb2440a8dbea4fb0ddf5e2ef201aa4bf2712b3e2..b08a5f3e992ec7a8bb67d243efe1ad3058c7a57b 100644
+--- a/dist/vite-BpLW00Di.js
++++ b/dist/vite-BpLW00Di.js
+@@ -864,7 +864,7 @@ const registryImportAnchor = ".vitehub/schedule/registry.js";
+ const generatedNitroSchedulePlugin = ".vitehub/nitro/schedule/plugin.ts";
+ const generatedNitroRuntimeRegistry = ".vitehub/nitro/schedule/runtime-registry.js";
+ const generatedNitroStaticRegistry = ".vitehub/nitro/schedule/static-registry.js";
+-const generatedNitroCloudflareModule = "./.vitehub/nitro/schedule/module.ts";
++const generatedNitroCloudflareModule = "./.vitehub/nitro/schedule/module.mjs";
+ const mergeNoExternal = createNoExternalMerger(schedulePackageName);
+ function resolveSchedulePluginRoots(root, options = {}) {
+ 	const resolvedViteRoot = resolve(root);
+@@ -1012,17 +1012,15 @@ function renderNitroSchedulePlugin(options) {
+ }
+ function renderNitroCloudflareModule(crons) {
+ 	return [
+-		"import type { Nitro } from 'nitro/types'",
+-		"",
+ 		`const crons = ${JSON.stringify(crons)}`,
+ 		"",
+-		"function dedupeCloudflareCrons(nitro: Nitro): void {",
++		"function dedupeCloudflareCrons(nitro) {",
+ 		"  const wrangler = nitro.options.cloudflare?.wrangler",
+ 		"  if (!wrangler?.triggers || !Array.isArray(wrangler.triggers.crons)) return",
+-		"  wrangler.triggers.crons = [...new Set(wrangler.triggers.crons.filter((cron): cron is string => typeof cron === 'string'))]",
++		"  wrangler.triggers.crons = [...new Set(wrangler.triggers.crons.filter((cron) => typeof cron === 'string'))]",
+ 		"}",
+ 		"",
+-		"export default function vitehubScheduleModule(nitro: Nitro): void {",
++		"export default function vitehubScheduleModule(nitro) {",
+ 		"  nitro.options.cloudflare ??= {}",
+ 		"  nitro.options.cloudflare.wrangler ??= {}",
+ 		"  nitro.options.cloudflare.wrangler.triggers ??= {}",
+@@ -1172,8 +1170,7 @@ function hubSchedule(options = {}) {
+ 			});
+ 			if (!nitro) return null;
+ 			config.nitro = nitro;
+-			return { nitro };
+ 		},
+ 		configResolved(config) {
+ 			resolved = config;
+ 			const roots = resolveSchedulePluginRoots(config.root, options);

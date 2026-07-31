@@ -7,5 +7,5 @@
     "strict": true,
     "target": "ES2024"
   },
-  "include": ["server/**/*.ts", "vite.config.ts"]
+  "include": [".vitehub/nitro-imports.d.ts", "server/**/*.ts", "vite.config.ts"]
 }
