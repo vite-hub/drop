@@ -1,9 +1,13 @@
+import type { CodeImageFormat, CodeImageScale } from "../utils/code-images"
+
 const RAY_URL = "https://ray.so/"
 export const MAX_CODE_CHARACTERS = 20_000
 
 export interface CodeImageInput {
   code: string
+  format?: CodeImageFormat
   language?: string
+  scale?: CodeImageScale
   theme?: string
 }
 
@@ -23,10 +27,68 @@ async function selectRayOption(
   await option.click()
 }
 
+async function openRayExportMenu(page: BrowserPageSession["page"]) {
+  const button = page.locator('button[aria-label="See other export options"]')
+  if (await button.count() !== 1)
+    throw new Error("[drop:code-image] Ray export menu was not found.")
+  await button.click()
+}
+
+async function selectRayExportScale(
+  page: BrowserPageSession["page"],
+  scale: CodeImageScale,
+) {
+  if (scale === 4)
+    return
+
+  await openRayExportMenu(page)
+  const size = page.getByRole("menuitem").filter({ hasText: "Size" })
+  if (await size.count() !== 1)
+    throw new Error("[drop:code-image] Ray export size control was not found.")
+  await size.click()
+
+  const option = page.getByRole("menuitemradio", { exact: true, name: `${scale}x` })
+  if (await option.count() !== 1)
+    throw new Error(`[drop:code-image] Ray does not offer ${scale}x export.`)
+  await option.click()
+}
+
+async function exportRayImage(
+  page: BrowserPageSession["page"],
+  format: CodeImageFormat,
+) {
+  const downloadPromise = page.waitForEvent("download")
+
+  if (format === "png") {
+    const button = page.locator('button[aria-label="Export as PNG"]')
+    if (await button.count() !== 1)
+      throw new Error("[drop:code-image] Ray PNG export was not found.")
+    await button.click()
+  }
+  else {
+    await openRayExportMenu(page)
+    const item = page.getByRole("menuitem").filter({ hasText: "Save SVG" })
+    if (await item.count() !== 1)
+      throw new Error("[drop:code-image] Ray SVG export was not found.")
+    await item.click()
+  }
+
+  const download = await downloadPromise
+  if (!download.suggestedFilename().endsWith(`.${format}`))
+    throw new Error(`[drop:code-image] Ray returned an unexpected ${format} export.`)
+
+  const chunks: Buffer[] = []
+  for await (const chunk of await download.createReadStream())
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  return Buffer.concat(chunks)
+}
+
 export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   if (!input.code || input.code.length > MAX_CODE_CHARACTERS)
     throw new TypeError(`[drop:code-image] Code must contain between 1 and ${MAX_CODE_CHARACTERS} characters.`)
 
+  const format = input.format ?? "png"
+  const scale = input.scale ?? 4
   const session = await browser.open()
   await session.page.goto(RAY_URL, { waitUntil: "domcontentloaded" })
   const editor = session.page.locator('textarea[data-enable-grammarly="false"]')
@@ -43,10 +105,11 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   if (input.language)
     await selectRayOption(session.page, "language", input.language)
 
+  await selectRayExportScale(session.page, scale)
   await session.page.addStyleTag({
     content: '[class*="windowSizeDragPoint"] { display: none !important; }',
   })
   const frame = session.page.locator("#frame")
   await frame.waitFor({ state: "visible" })
-  return await frame.screenshot({ type: "png" })
+  return await exportRayImage(session.page, format)
 })

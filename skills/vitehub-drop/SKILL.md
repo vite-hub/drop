@@ -25,9 +25,9 @@ Send source text as JSON. When the user specifies a language or theme, choose it
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight"}' \
+  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight","format":"png","scale":4}' \
   https://drop.vitehub.dev/api/code |
   jq -er '.url'
 ```
 
-Code image URLs are available for five minutes. When a permanent URL is needed, download the PNG within that window and upload it with the File branch.
+Code image URLs are available for five minutes. When a permanent URL is needed, download the exported file within that window and upload it with the File branch.

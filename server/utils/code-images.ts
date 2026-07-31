@@ -1,12 +1,17 @@
 export const CODE_IMAGE_PREFIX = "code-images/"
+export const CODE_IMAGE_FORMATS = ["png", "svg"] as const
+export const CODE_IMAGE_SCALES = [2, 4, 6] as const
+
+export type CodeImageFormat = typeof CODE_IMAGE_FORMATS[number]
+export type CodeImageScale = typeof CODE_IMAGE_SCALES[number]
 
 const CODE_IMAGE_TTL_MS = 5 * 60 * 1000
 
-export function createCodeImageObject(now = new Date()) {
+export function createCodeImageObject(format: CodeImageFormat, now = new Date()) {
   const expiresAt = new Date(now.getTime() + CODE_IMAGE_TTL_MS)
   return {
     expiresAt,
-    key: `${CODE_IMAGE_PREFIX}${expiresAt.getTime()}/${crypto.randomUUID()}.png`,
+    key: `${CODE_IMAGE_PREFIX}${expiresAt.getTime()}/${crypto.randomUUID()}.${format}`,
   }
 }
 

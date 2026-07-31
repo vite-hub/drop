@@ -53,12 +53,12 @@ Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when tha
 
 ### Create a code image
 
-The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language and theme, auto-fits the rendered frame, and stores the resulting PNG temporarily. Treat the URL as available for five minutes; an hourly ViteHub Schedule removes expired code images without touching permanent uploads.
+The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language, theme, and export scale, then uses Ray's native PNG or SVG export. Treat the URL as available for five minutes; an hourly ViteHub Schedule removes expired code images without touching permanent uploads.
 
 ```sh
 curl --fail-with-body https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight"}'
+  --data '{"code":"const answer: number = 42","language":"TypeScript","theme":"Midnight","format":"png","scale":4}'
 ```
 
 The response contains the temporary Drop URL and its expiry:
@@ -70,7 +70,7 @@ The response contains the temporary Drop URL and its expiry:
 }
 ```
 
-`code` is required and accepts up to 20,000 characters. `language` and `theme` are optional, case-sensitive option names documented in the [Drop skill reference](./skills/vitehub-drop/references/code-options.md). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
+`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and affects PNG exports. Both default to Ray's primary export settings: PNG at 4×. `language` and `theme` are optional, case-sensitive option names documented in the [Drop skill reference](./skills/vitehub-drop/references/code-options.md). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
 
 ## Host it yourself
 
