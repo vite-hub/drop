@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0c0d0c">
   <meta name="application-name" content="Drop">
-  <meta name="description" content="Drop gives agents permanent file URLs and temporary source-code screenshots.">
+  <meta name="description" content="Drop gives agents permanent file URLs for GitHub and the open web.">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Drop">
-  <meta property="og:title" content="Drop | Files and code images for agents">
-  <meta property="og:description" content="Drop gives agents permanent file URLs and temporary source-code screenshots.">
+  <meta property="og:title" content="Drop | Agent drops files">
+  <meta property="og:description" content="Drop gives agents permanent file URLs for GitHub and the open web.">
   <meta property="og:url" content="https://drop.vitehub.dev/">
   <meta property="og:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
   <meta property="og:image:type" content="image/png">
@@ -18,11 +18,11 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Drop | Files and code images for agents">
-  <meta name="twitter:description" content="Drop gives agents permanent file URLs and temporary source-code screenshots.">
+  <meta name="twitter:title" content="Drop | Agent drops files">
+  <meta name="twitter:description" content="Drop gives agents permanent file URLs for GitHub and the open web.">
   <meta name="twitter:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
   <meta name="twitter:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
-  <title>Drop | Files and code images for agents</title>
+  <title>Drop | Agent drops files</title>
   <link rel="canonical" href="https://drop.vitehub.dev/">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -729,7 +729,7 @@
           <span class="brand-prefix">ViteHub</span>
           <span>Drop</span>
         </h1>
-        <p class="lede">Files and code images your agent can post anywhere.</p>
+        <p class="lede">So your agent can post files on GitHub.</p>
         <button class="command" type="button" data-copy aria-label="Copy skill install command">
           <code>npx skills add https://drop.vitehub.dev</code>
           <span aria-live="polite">Copy skill</span>
@@ -802,23 +802,11 @@
     <section class="doc-section api" id="api" aria-labelledby="api-title">
       <div class="section-label">Use Drop</div>
       <div class="section-content">
-        <h2 id="api-title">Keep files permanent and code images temporary</h2>
-
-        <h3>Upload a file</h3>
-        <p>Give Drop a local file. It stores the file and returns a permanent URL your agent can paste into GitHub.</p>
+        <h2 id="api-title">Upload a file</h2>
+        <p>The installed skill includes a script that stores the file and immediately prints its permanent Drop URL.</p>
         <pre><code>node "&lt;skill-directory&gt;/scripts/upload-image.mjs" "/absolute/path/to/file.pdf"</code></pre>
 
-        <h3>Render code</h3>
-        <p>Give Drop source code, plus a language or theme when you want one. It returns an auto-fitted PNG for immediate use. Treat the URL as temporary: it is available for five minutes, and Schedule removes expired code images every hour.</p>
-        <pre><code>curl https://drop.vitehub.dev/api/code \
-  -H "content-type: application/json" \
-  --data '{
-    "code": "const answer = 42",
-    "language": "TypeScript",
-    "theme": "Midnight"
-  }'</code></pre>
-
-        <h3>File limits</h3>
+        <h3>Limits</h3>
         <ul class="behavior limit-list">
           <li>One file per request, up to 4 MiB.</li>
           <li>Target: 5 upload attempts per source address every 60 seconds.</li>
@@ -839,6 +827,31 @@
             <tr><td><code>503</code></td><td>Rate limiting, storage, or optimization dispatch is unavailable.</td></tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section class="doc-section api" id="code-images" aria-labelledby="code-images-title">
+      <div class="section-label">Code images</div>
+      <div class="section-content">
+        <h2 id="code-images-title">Turn code into an image</h2>
+        <p>Send source code with the Ray.so options you want. Drop returns a temporary PNG or SVG URL that is available for five minutes.</p>
+        <pre><code>curl https://drop.vitehub.dev/api/code \
+  -H "content-type: application/json" \
+  --data '{
+    "code": "#include &lt;iostream&gt;\n\nint main() {\n  std::cout &lt;&lt; \"Hello\";\n}",
+    "language": "C++",
+    "theme": "Nuxt",
+    "format": "png",
+    "scale": 6
+  }'</code></pre>
+
+        <h3>Options</h3>
+        <ul class="behavior limit-list">
+          <li><code>format</code> accepts <code>png</code> or <code>svg</code>.</li>
+          <li><code>scale</code> accepts <code>2</code>, <code>4</code>, or <code>6</code> for PNG exports.</li>
+          <li><code>language</code> and <code>theme</code> accept Ray.so option names.</li>
+          <li>Download the result within five minutes, or upload it to Drop for a permanent URL.</li>
+        </ul>
       </div>
     </section>
 
