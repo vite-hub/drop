@@ -1,3 +1,4 @@
+import { createError } from "evlog"
 import * as v from "valibot"
 
 import {
@@ -30,13 +31,13 @@ export default defineHandler(async (event) => {
   })
 
   const [browserError, image] = await runBrowser("code-image", input)
-  if (browserError) {
-    console.error(JSON.stringify({
-      counter: "code_image_failure",
-      error: browserError.message,
-    }))
-    throw new HTTPError({ status: 502, statusText: "The code image could not be rendered." })
-  }
+  if (browserError)
+    throw createError({
+      cause: browserError,
+      code: "DROP_CODE_IMAGE_RENDER_FAILED",
+      message: "The code image could not be rendered.",
+      status: 502,
+    })
 
   const format = input.format ?? "png"
   const { expiresAt, key } = createCodeImageLocation(format)
@@ -44,8 +45,14 @@ export default defineHandler(async (event) => {
     access: "private",
     contentType: format === "png" ? "image/png" : "image/svg+xml",
   })
-  if (storageError || !stored.url)
-    throw new HTTPError({ status: 503, statusText: "The code image could not be stored." })
+  if (storageError || !stored.url) {
+    throw createError({
+      cause: storageError ?? undefined,
+      code: "DROP_CODE_IMAGE_STORAGE_FAILED",
+      message: "The code image could not be stored.",
+      status: 503,
+    })
+  }
 
   return {
     url: new URL(stored.url, event.req.url).href,

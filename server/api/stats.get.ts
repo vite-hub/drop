@@ -1,4 +1,5 @@
-import { defineHandler, HTTPError } from "h3"
+import { createError } from "evlog"
+import { defineHandler } from "h3"
 import { blob } from "vite-hub/blob"
 
 export default defineHandler(async (event) => {
@@ -8,7 +9,14 @@ export default defineHandler(async (event) => {
 
   do {
     const [error, page] = await blob.list({ cursor, limit: 1_000 })
-    if (error) throw new HTTPError({ status: 503, statusText: "File statistics are temporarily unavailable." })
+    if (error) {
+      throw createError({
+        cause: error,
+        code: "DROP_FILE_STATS_FAILED",
+        message: "File statistics are temporarily unavailable.",
+        status: 503,
+      })
+    }
     uploads += page.blobs.length
     cursor = page.hasMore ? page.cursor : undefined
   } while (cursor)

@@ -24,7 +24,8 @@
 3. **Queue** dispatches image optimization to a Cloudflare **Sandbox** while the original upload URL is already usable.
 4. Sharp applies EXIF orientation, strips metadata, and resizes images to fit within 2048 × 2048 without upscaling.
 5. **Schedule** runs hourly and deletes expired code images from their prefix without touching uploaded files.
-6. Drop replaces an uploaded Blob only when the optimized image is smaller. Nitro renders the current stored-file count into the landing page.
+6. **Evlog** emits one structured event for each API request, Queue delivery, and Schedule run, including stable error codes and original causes without exposing internal diagnostics to clients.
+7. Drop replaces an uploaded Blob only when the optimized image is smaller. Nitro renders the current stored-file count into the landing page.
 
 The Sandbox is a real npm project in [server/sandboxes/image-optimizer](./server/sandboxes/image-optimizer). ViteHub materializes that project through Workspace and executes it through the selected Box provider.
 

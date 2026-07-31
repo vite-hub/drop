@@ -1,3 +1,4 @@
+import evlog from "evlog/nitro/v3"
 import { nitro } from "nitro/vite"
 import { defineConfig } from "vite"
 import { vitehub } from "vite-hub"
@@ -19,12 +20,21 @@ export default defineConfig({
       schedule: true,
     }),
     nitro({
+      modules: [
+        evlog({
+          env: {
+            service: "vitehub-drop",
+          },
+          include: ["/api/**"],
+          redact: true,
+        }),
+      ],
       imports: {
         dts: ".vitehub/nitro-imports.d.ts",
         presets: [
           {
             from: "h3",
-            imports: ["assertBodySize", "defineHandler", "HTTPError", "readValidatedBody", "requireContentType"],
+            imports: ["assertBodySize", "defineHandler", "readValidatedBody", "requireContentType"],
           },
           {
             from: "vite-hub/blob",

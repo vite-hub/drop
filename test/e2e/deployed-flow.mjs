@@ -7,6 +7,14 @@ const homepage = await fetch(origin, { signal: AbortSignal.timeout(30_000) })
 
 assert.equal(homepage.status, 200)
 
+const invalidUpload = await fetch(filesEndpoint, {
+  body: new FormData(),
+  method: "POST",
+  signal: AbortSignal.timeout(30_000),
+})
+assert.equal(invalidUpload.status, 400)
+assert.equal((await invalidUpload.json()).data.code, "DROP_FILE_REQUIRED")
+
 const form = new FormData()
 form.set("file", new File([await readFile(new URL("../../public/og-vitehub-drop.png", import.meta.url))], "og-vitehub-drop.png"))
 
