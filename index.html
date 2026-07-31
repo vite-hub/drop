@@ -432,6 +432,28 @@
       tab-size: 2;
     }
 
+    .code-output {
+      margin: 1.5rem 0 0;
+    }
+
+    .code-output figcaption {
+      margin: 0 0 0.75rem;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      line-height: 1.6;
+      text-transform: uppercase;
+    }
+
+    .code-output img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+
     .behavior {
       margin: var(--typeset-flow) 0 0;
       color: var(--muted);
@@ -834,7 +856,7 @@
       <div class="section-label">Code images</div>
       <div class="section-content">
         <h2 id="code-images-title">Turn code into an image</h2>
-        <p>Send source code with the Ray.so options you want. Drop returns a temporary PNG or SVG URL that is available for five minutes.</p>
+        <p>Choose your Ray.so options and get a PNG or SVG.</p>
         <pre><code>curl https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
   --data '{
@@ -842,8 +864,13 @@
     "language": "C++",
     "theme": "Nuxt",
     "format": "png",
-    "scale": 6
+    "scale": 2
   }'</code></pre>
+
+        <figure class="code-output">
+          <figcaption>Output</figcaption>
+          <img src="https://drop.vitehub.dev/i/0a5260a2-13ed-40e6-aa18-763948637df0.png" alt="C++ hello-world code rendered with the Nuxt theme" width="1040" height="402" loading="lazy" decoding="async">
+        </figure>
 
         <h3>Options</h3>
         <ul class="behavior limit-list">
