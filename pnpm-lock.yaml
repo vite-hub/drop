@@ -14,6 +14,9 @@ patchedDependencies:
   '@vite-hub/schedule@0.0.2':
     hash: d18bee684f3d610dc225abcf083d128af1dcfe680c621b298f972a452d711086
     path: patches/@vite-hub__schedule@0.0.2.patch
+  vite-hub@0.0.2:
+    hash: 49e54b84adcaffeb98a073937a87b2c944bfb6e69677918eb2076136182e781c
+    path: patches/vite-hub@0.0.2.patch
 
 importers:
 
@@ -39,7 +42,7 @@ importers:
         version: 1.4.2(typescript@6.0.3)
       vite-hub:
         specifier: 0.0.2
-        version: 0.0.2(dea4eea33e0b1011c2b6d9aee3aed027)
+        version: 0.0.2(patch_hash=49e54b84adcaffeb98a073937a87b2c944bfb6e69677918eb2076136182e781c)(dea4eea33e0b1011c2b6d9aee3aed027)
     devDependencies:
       '@types/node':
         specifier: ^25.9.2
@@ -12825,7 +12828,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-hub@0.0.2(dea4eea33e0b1011c2b6d9aee3aed027):
+  vite-hub@0.0.2(patch_hash=49e54b84adcaffeb98a073937a87b2c944bfb6e69677918eb2076136182e781c)(dea4eea33e0b1011c2b6d9aee3aed027):
     dependencies:
       '@aws-sdk/client-s3': 3.1089.0
       '@aws-sdk/lib-storage': 3.1089.0(@aws-sdk/client-s3@3.1089.0)
