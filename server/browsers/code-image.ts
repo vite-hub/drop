@@ -33,6 +33,11 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   await editor.waitFor({ state: "visible" })
   await editor.fill(input.code)
 
+  const padding = session.page.getByRole("button", { exact: true, name: "16" })
+  if (await padding.count() !== 1)
+    throw new Error("[drop:code-image] Ray padding control was not found.")
+  await padding.click()
+
   if (input.theme)
     await selectRayOption(session.page, "background", input.theme)
   if (input.language)
