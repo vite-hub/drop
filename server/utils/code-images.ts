@@ -1,7 +1,7 @@
 export const CODE_IMAGE_PREFIX = "code-images/"
 export const CODE_IMAGE_FORMATS = ["png", "svg"] as const
+export const CODE_IMAGE_MAX_CHARACTERS = 20_000
 export const CODE_IMAGE_SCALES = [2, 4, 6] as const
-export const MAX_CODE_CHARACTERS = 20_000
 
 export type CodeImageFormat = typeof CODE_IMAGE_FORMATS[number]
 export type CodeImageScale = typeof CODE_IMAGE_SCALES[number]

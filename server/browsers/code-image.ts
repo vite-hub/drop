@@ -1,11 +1,3 @@
-import type { BrowserDownload } from "vite-hub/browser"
-
-import {
-  MAX_CODE_CHARACTERS,
-  type CodeImageFormat,
-  type CodeImageScale,
-} from "../utils/code-images"
-
 const RAY_URL = "https://ray.so/"
 
 export interface CodeImageInput {
@@ -110,8 +102,8 @@ async function exportRayImage(
 }
 
 export default defineBrowser(async (input: CodeImageInput, { browser }) => {
-  if (!input.code || input.code.length > MAX_CODE_CHARACTERS)
-    throw new TypeError(`[drop:code-image] Code must contain between 1 and ${MAX_CODE_CHARACTERS} characters.`)
+  if (!input.code || input.code.length > CODE_IMAGE_MAX_CHARACTERS)
+    throw new TypeError(`[drop:code-image] Code must contain between 1 and ${CODE_IMAGE_MAX_CHARACTERS} characters.`)
 
   const format = input.format ?? "png"
   const scale = input.scale ?? 4
