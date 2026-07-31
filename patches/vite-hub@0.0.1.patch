@@ -11,10 +11,10 @@ index 8bb1a16289f45679f73f9537f61455681aae49a7..1a9b64183b8b8f0d5b3cb98bc4587ff6
  
  Blob, Agent, Auth, Database, Email, KV, Queue, Rate Limit, Sandbox, Schedule, Workflow, and Workspace are opt-in:
  
-diff --git a/dist/index.js b/dist/index.js
+diff --git a/dist/src-BWw6N4Sr.js b/dist/src-BWw6N4Sr.js
 index 4b04dd1b8bbae40957b029c40aca6dcaec3cd3c0..0140b71e0eaca3a2be819342877601065932df41 100644
---- a/dist/index.js
-+++ b/dist/index.js
+--- a/dist/src-BWw6N4Sr.js
++++ b/dist/src-BWw6N4Sr.js
 @@ -843,13 +843,17 @@ function packageName(root) {
  		directory = parent;
  	}
@@ -45,9 +45,10 @@ index 4b04dd1b8bbae40957b029c40aca6dcaec3cd3c0..0140b71e0eaca3a2be81934287760106
  	const manifestName = normalizeDeploymentName(packageName(root));
  	if (manifestName) return {
  		name: manifestName,
-@@ -906,7 +914,7 @@ function deploymentPlugins(plan, requestedServices, blobEnabled, services, optio
- 		},
- 		config(config) {
+@@ -909,8 +917,8 @@ function deploymentPlugins(plan, requestedServices, blobEnabled, services, optio
+ 				...cloneRecord(config.vitehub),
+ 				preset: plan.preset
+ 			};
  			for (const service of requestedServices) assertDeploymentService(plan, service);
 -			const identity = resolveDeploymentIdentity(typeof config.root === "string" ? config.root : void 0, options.name);
 +			const identity = resolveDeploymentIdentity(typeof config.root === "string" ? config.root : void 0, options.name, plan.preset === "cloudflare" ? process.env.WRANGLER_CI_OVERRIDE_NAME : void 0);

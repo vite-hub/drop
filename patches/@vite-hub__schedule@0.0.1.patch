@@ -1,7 +1,7 @@
-diff --git a/dist/vite-Dfeg9ZY3.js b/dist/vite-Dfeg9ZY3.js
+diff --git a/dist/vite-BpLW00Di.js b/dist/vite-BpLW00Di.js
 index eb2440a8dbea4fb0ddf5e2ef201aa4bf2712b3e2..b08a5f3e992ec7a8bb67d243efe1ad3058c7a57b 100644
---- a/dist/vite-Dfeg9ZY3.js
-+++ b/dist/vite-Dfeg9ZY3.js
+--- a/dist/vite-BpLW00Di.js
++++ b/dist/vite-BpLW00Di.js
 @@ -864,7 +864,7 @@ const registryImportAnchor = ".vitehub/schedule/registry.js";
  const generatedNitroSchedulePlugin = ".vitehub/nitro/schedule/plugin.ts";
  const generatedNitroRuntimeRegistry = ".vitehub/nitro/schedule/runtime-registry.js";
@@ -32,5 +32,12 @@ index eb2440a8dbea4fb0ddf5e2ef201aa4bf2712b3e2..b08a5f3e992ec7a8bb67d243efe1ad30
  		"  nitro.options.cloudflare ??= {}",
  		"  nitro.options.cloudflare.wrangler ??= {}",
  		"  nitro.options.cloudflare.wrangler.triggers ??= {}",
-@@ -1173 +1171,0 @@ function hubSchedule(options = {}) {
+@@ -1172,8 +1170,7 @@ function hubSchedule(options = {}) {
+ 			});
+ 			if (!nitro) return null;
+ 			config.nitro = nitro;
 -			return { nitro };
+ 		},
+ 		configResolved(config) {
+ 			resolved = config;
+ 			const roots = resolveSchedulePluginRoots(config.root, options);

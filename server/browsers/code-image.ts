@@ -1,4 +1,4 @@
-import type { Download } from "playwright-core"
+import type { BrowserDownload } from "vite-hub/browser"
 
 import {
   MAX_CODE_CHARACTERS,
@@ -61,7 +61,7 @@ async function selectRayExportScale(
   await page.keyboard.press("Escape")
 }
 
-function readRayDownload(download: Download) {
+function readRayDownload(download: { url(): string }) {
   const url = download.url()
   const separator = url.indexOf(",")
   if (!url.startsWith("data:") || separator === -1)
@@ -97,7 +97,7 @@ async function exportRayImage(
     await item.click()
   }
 
-  const download = await downloadPromise
+  const download: BrowserDownload = await downloadPromise
   if (!download.suggestedFilename().endsWith(`.${format}`))
     throw new Error(`[drop:code-image] Ray returned an unexpected ${format} export.`)
 
