@@ -139,13 +139,12 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   const session = await browser.open()
   await session.page.setContent(renderDocument(input, highlighted), { waitUntil: "load" })
   const capture = session.page.locator("#capture")
-
-  if ((input.format ?? "png") === "png")
-    return Buffer.from(await capture.screenshot({ animations: "disabled", type: "png" }))
-
   const box = await capture.boundingBox()
   if (!box)
     throw new Error("[drop:code-image] Kitesurf did not render the code image.")
+  if ((input.format ?? "png") === "png")
+    return Buffer.from(await session.page.screenshot({ animations: "disabled", clip: box, type: "png" }))
+
   const style = await session.page.locator("style").innerText()
   const body = await session.page.locator("body").innerHTML()
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(box.width)}" height="${Math.ceil(box.height)}" viewBox="0 0 ${Math.ceil(box.width)} ${Math.ceil(box.height)}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${body}</div></foreignObject></svg>`)
