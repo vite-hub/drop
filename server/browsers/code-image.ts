@@ -146,9 +146,9 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   if (!size.height || !size.width)
     throw new Error("[drop:code-image] Kitesurf did not render the code image.")
   if ((input.format ?? "png") === "png") {
+    await session.page.setViewportSize(size)
     return Buffer.from(await session.page.screenshot({
       animations: "disabled",
-      clip: { height: size.height, width: size.width, x: 0, y: 0 },
       type: "png",
     }))
   }
