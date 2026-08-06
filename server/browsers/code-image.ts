@@ -139,13 +139,16 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   const session = await browser.open()
   await session.page.setContent(renderDocument(input, highlighted), { waitUntil: "load" })
   const capture = session.page.locator("#capture")
-  const box = await capture.boundingBox()
-  if (!box)
-    throw new Error("[drop:code-image] Kitesurf did not render the code image.")
   if ((input.format ?? "png") === "png")
-    return Buffer.from(await session.page.screenshot({ animations: "disabled", clip: box, type: "png" }))
+    return Buffer.from(await session.page.screenshot({ animations: "disabled", fullPage: true, type: "png" }))
 
+  const size = await capture.evaluate(element => ({
+    height: (element as HTMLElement).offsetHeight,
+    width: (element as HTMLElement).offsetWidth,
+  }))
+  if (!size.height || !size.width)
+    throw new Error("[drop:code-image] Kitesurf did not render the code image.")
   const style = await session.page.locator("style").innerText()
   const body = await session.page.locator("body").innerHTML()
-  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(box.width)}" height="${Math.ceil(box.height)}" viewBox="0 0 ${Math.ceil(box.width)} ${Math.ceil(box.height)}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${body}</div></foreignObject></svg>`)
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${body}</div></foreignObject></svg>`)
 })
