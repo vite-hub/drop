@@ -20,7 +20,7 @@ curl --fail-with-body --silent --show-error \
 
 ## Code
 
-Render code in Ray.so wrapper.
+Render a highlighted code card with Cloudflare Kitesurf.
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \
@@ -33,16 +33,7 @@ Code image URLs expire after five minutes; download and re-upload through File t
 
 ## Options
 
-Fetch the current case-sensitive IDs directly from Ray.so before setting `language` or `theme`:
-
-```bash
-# Fetch and parse available themes
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/store/themes.ts" | grep -oE 'id:[[:space:]]*"[^"]+"' | sed -E 's/id:[[:space:]]*"([^"]+)"/\1/' | sort -u
-
-# Fetch and parse available languages
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/util/languages.ts" | grep -oE '^[[:space:]]*"?[a-zA-Z0-9+#-]+"?[[:space:]]*:[[:space:]]*\{' | sed -E 's/^[[:space:]]*"?([^"]+)"?[[:space:]]*:.*/\1/' | sort -u
-```
-
-- `language` and `theme` accept the IDs printed by those commands.
+- `theme` accepts `breeze`, `candy`, `midnight`, `nuxt`, `raindrop`, or `sunset` without case sensitivity.
+- `language` accepts common names such as `javascript`, `typescript`, `python`, `rust`, `go`, `java`, `c`, `c++`, `c#`, `bash`, `html`, `css`, `json`, `yaml`, `sql`, and `markdown`. Unknown names render as plain text.
 - `format` accepts `png` (default) or `svg`.
-- `scale` for png accepts `2`, `4` (default), or `6`.
+- `scale` accepts `2`, `4` (default), or `6`.
