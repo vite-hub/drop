@@ -109,7 +109,6 @@ function escapeHtml(value: string) {
 
 function renderDocument(input: CodeImageInput, highlighted: string) {
   const scale = (input.scale ?? 4) / 2
-  const width = Math.min(1_040, Math.max(680, Math.max(...input.code.split("\n").map(line => line.length)) * 12 + 180))
   const theme = resolveTheme(input.theme)
   const language = escapeHtml(input.language ?? "Code")
   const unit = (value: number) => `${Math.round(value * scale)}px`
@@ -118,9 +117,9 @@ function renderDocument(input: CodeImageInput, highlighted: string) {
 <html><head><meta charset="utf-8"><style>
 *{box-sizing:border-box}
 html,body{margin:0;background:transparent}
-body{display:inline-block}
-#capture{width:${unit(width)};padding:${unit(56)};background:${theme.background};font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-.window{overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:${unit(18)};background:${theme.panel};box-shadow:0 ${unit(24)} ${unit(70)} rgba(0,0,0,.32)}
+body{min-width:1280px}
+#capture{display:flex;align-items:center;width:1280px;min-height:720px;padding:${unit(56)};background:${theme.background};font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+.window{width:100%;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:${unit(18)};background:${theme.panel};box-shadow:0 ${unit(24)} ${unit(70)} rgba(0,0,0,.32)}
 .toolbar{display:flex;align-items:center;height:${unit(58)};padding:0 ${unit(22)};border-bottom:1px solid rgba(255,255,255,.08)}
 .dots{display:flex;gap:${unit(9)}}
 .dot{width:${unit(11)};height:${unit(11)};border-radius:999px}
@@ -145,13 +144,8 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   }))
   if (!size.height || !size.width)
     throw new Error("[drop:code-image] Kitesurf did not render the code image.")
-  if ((input.format ?? "png") === "png") {
-    await session.page.setViewportSize(size)
-    return Buffer.from(await session.page.screenshot({
-      animations: "disabled",
-      type: "png",
-    }))
-  }
+  if ((input.format ?? "png") === "png")
+    return Buffer.from(await session.page.screenshot({ animations: "disabled", fullPage: true, type: "png" }))
 
   const style = await session.page.locator("style").innerText()
   const body = await session.page.locator("body").innerHTML()

@@ -70,7 +70,7 @@ The response contains the temporary Drop URL and its expiry:
 }
 ```
 
-`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and affects the rendered dimensions. Both default to PNG at 4×. `language` and `theme` are optional IDs listed in the [Drop skill](./skills/vitehub-drop/SKILL.md#options). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
+`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and controls the card's visual density. Both default to PNG at 4×. `language` and `theme` are optional IDs listed in the [Drop skill](./skills/vitehub-drop/SKILL.md#options). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
 
 ## Host it yourself
 
