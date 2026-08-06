@@ -148,6 +148,6 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
     return Buffer.from(await session.page.screenshot({ animations: "disabled", fullPage: true, type: "png" }))
 
   const style = await session.page.locator("style").innerText()
-  const body = await session.page.locator("body").innerHTML()
-  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${body}</div></foreignObject></svg>`)
+  const content = await capture.innerHTML()
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style><div id="capture">${content}</div></div></foreignObject></svg>`)
 })
