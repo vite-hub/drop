@@ -31,7 +31,6 @@ export default defineHandler(async (event) => {
     throw new HTTPError({
       status: 502,
       statusText: "The code image could not be rendered.",
-      message: browserError.message,
     })
   }
 
