@@ -53,7 +53,7 @@ Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when tha
 
 ### Create a code image
 
-The code API highlights the source, then a ViteHub Browser Definition renders the code card with Cloudflare Kitesurf as PNG or SVG. Treat the URL as available for five minutes; an hourly ViteHub Schedule removes expired code images without touching permanent uploads.
+The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language, theme, and export scale, then uses Ray's native PNG or SVG export. Treat the URL as available for five minutes; an hourly ViteHub Schedule removes expired code images without touching permanent uploads.
 
 ```sh
 curl --fail-with-body https://drop.vitehub.dev/api/code \
@@ -70,7 +70,7 @@ The response contains the temporary Drop URL and its expiry:
 }
 ```
 
-`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and controls the card's visual density. Both default to PNG at 4×. `language` and `theme` are optional IDs listed in the [Drop skill](./skills/vitehub-drop/SKILL.md#options). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
+`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and affects PNG exports. Both default to Ray's primary export settings: PNG at 4×. `language` and `theme` are optional, case-sensitive IDs discovered through the [Drop skill](./skills/vitehub-drop/SKILL.md#options). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
 
 ## Host it yourself
 

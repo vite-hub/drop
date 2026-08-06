@@ -28,10 +28,7 @@ export default defineHandler(async (event) => {
       counter: "code_image_failure",
       error: browserError.message,
     }))
-    throw new HTTPError({
-      status: 502,
-      statusText: "The code image could not be rendered.",
-    })
+    throw new HTTPError({ status: 502, statusText: "The code image could not be rendered." })
   }
 
   const format = input.format ?? "png"

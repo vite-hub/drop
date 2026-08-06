@@ -32,10 +32,7 @@ const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), 
 })
 assert.equal(codeImage.status, 200)
 assert.equal(codeImage.headers.get("content-type"), "image/png")
-const codeImageBytes = Buffer.from(await codeImage.arrayBuffer())
 assert.deepEqual(
-  codeImageBytes.subarray(0, 8),
+  Buffer.from(await codeImage.arrayBuffer()).subarray(0, 8),
   Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
 )
-assert.equal(codeImageBytes.readUInt32BE(16), 1280)
-assert.equal(codeImageBytes.readUInt32BE(20), 720)
