@@ -1,0 +1,468 @@
+diff --git a/dist/cloudflare-elUvAJZ7.js b/dist/cloudflare-elUvAJZ7.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..db898066d9998df632959890c8ff6db00862422a
+--- /dev/null
++++ b/dist/cloudflare-elUvAJZ7.js
+@@ -0,0 +1,77 @@
++import { r as browserProviderError } from "./errors-mj14eAQE.js";
++//#region src/internal/connections.ts
++const cloudflareBrowserTerminated = Symbol("vitehub.browser.cloudflare.terminated");
++//#endregion
++//#region src/providers/cloudflare.ts
++async function loadDriver() {
++	try {
++		return await import("@cloudflare/playwright");
++	} catch (error) {
++		throw browserProviderError("cloudflare", "load @cloudflare/playwright", { cause: error });
++	}
++}
++async function runtimeBinding(name) {
++	const globalBinding = globalThis.__env__?.[name];
++	if (globalBinding) return globalBinding;
++	try {
++		return (await import("cloudflare:workers")).env?.[name];
++	} catch {
++		return;
++	}
++}
++function cloudflareBrowser(options = {}) {
++	const bindingOption = options.binding ?? "BROWSER";
++	const engine = options.engine ?? "kitesurf";
++	return {
++		features: { liveHandoff: engine === "chromium" },
++		isolation: "provider",
++		name: "cloudflare",
++		async open(openOptions = {}) {
++			const binding = typeof bindingOption === "string" ? await options.resolveBinding?.(bindingOption) ?? await runtimeBinding(bindingOption) : bindingOption;
++			if (!binding) throw browserProviderError("cloudflare", `resolve Browser Run binding ${JSON.stringify(bindingOption)}`);
++			if (engine === "kitesurf") return {
++				close() {},
++				connection: {
++					binding,
++					engine,
++					kind: "cloudflare-binding"
++				},
++				features: { liveHandoff: false },
++				id: crypto.randomUUID()
++			};
++			const driver = options.driver || await loadDriver();
++			let acquired;
++			try {
++				acquired = openOptions.idleTimeoutMs ? await driver.acquire(binding, { keep_alive: openOptions.idleTimeoutMs }) : await driver.acquire(binding);
++			} catch (error) {
++				throw browserProviderError("cloudflare", "acquire a Browser Run session", { cause: error });
++			}
++			let closed = false;
++			const connection = {
++				binding,
++				kind: "cloudflare-binding",
++				sessionId: acquired.sessionId
++			};
++			return {
++				async close() {
++					if (closed) return;
++					if (connection[cloudflareBrowserTerminated]) {
++						closed = true;
++						return;
++					}
++					try {
++						await (await (await driver.connect(binding, acquired.sessionId)).newBrowserCDPSession()).send("Browser.close");
++						connection[cloudflareBrowserTerminated] = true;
++						closed = true;
++					} catch (error) {
++						throw browserProviderError("cloudflare", "terminate a Browser Run session", { cause: error });
++					}
++				},
++				connection,
++				id: acquired.sessionId
++			};
++		}
++	};
++}
++//#endregion
++export { cloudflareBrowserTerminated as n, cloudflareBrowser as t };
+diff --git a/dist/connections-B65omwXn.d.ts b/dist/connections-B65omwXn.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4a0834ee82904a91c6c4064c8adc73a9b300878
+--- /dev/null
++++ b/dist/connections-B65omwXn.d.ts
+@@ -0,0 +1,21 @@
++import { p as BrowserEngine } from "./types-CHCjIInn.js";
++
++//#region src/internal/connections.d.ts
++interface CDPBrowserConnection {
++  endpoint: string;
++  headers?: Record<string, string>;
++  kind: "cdp";
++  preferredTargetId?: string;
++}
++declare const cloudflareBrowserTerminated: unique symbol;
++interface CloudflareBrowserBindingConnection {
++  [cloudflareBrowserTerminated]?: boolean;
++  binding: unknown;
++  engine?: BrowserEngine;
++  kind: "cloudflare-binding";
++  preferredTargetId?: string;
++  sessionId?: string;
++}
++type PlaywrightBrowserConnection = CDPBrowserConnection | CloudflareBrowserBindingConnection;
++//#endregion
++export { CloudflareBrowserBindingConnection as n, PlaywrightBrowserConnection as r, CDPBrowserConnection as t };
+\ No newline at end of file
+diff --git a/dist/controllers/cdp.d.ts b/dist/controllers/cdp.d.ts
+index 72d7fa3d9ed164ab1d186858ac1783445636ad1a..846dd49230b6f55cfede36f3a8a6ae0b85c7fa13 100644
+--- a/dist/controllers/cdp.d.ts
++++ b/dist/controllers/cdp.d.ts
+@@ -1,5 +1,5 @@
+-import { i as BrowserController } from "../types-BL4xTi7H.js";
+-import { r as PlaywrightBrowserConnection } from "../connections-Di5Io-Dx.js";
++import { i as BrowserController } from "../types-CHCjIInn.js";
++import { r as PlaywrightBrowserConnection } from "../connections-B65omwXn.js";
+ 
+ //#region src/controllers/cdp.d.ts
+ interface CDPSocket extends EventTarget {
+diff --git a/dist/controllers/cdp.js b/dist/controllers/cdp.js
+index 568e7fbae85c743cc07a18437f0dcb3c139b38da..6cf963c41b9ba1697f8a950e6c8e801d21c3ab66 100644
+--- a/dist/controllers/cdp.js
++++ b/dist/controllers/cdp.js
+@@ -3,7 +3,10 @@ import { r as browserProviderError } from "../errors-mj14eAQE.js";
+ async function cloudflareSocket(connection) {
+ 	const binding = connection.binding;
+ 	if (typeof binding?.fetch !== "function") throw browserProviderError("cdp", "connect through the Cloudflare Browser binding");
+-	const response = await binding.fetch(`http://fake.host/v1/devtools/browser/${encodeURIComponent(connection.sessionId)}`, { headers: {
++	const url = new URL("http://fake.host/v1/devtools/browser");
++	if (connection.sessionId) url.pathname += `/${encodeURIComponent(connection.sessionId)}`;
++	if (connection.engine === "kitesurf") url.searchParams.set("browser", "kitesurf");
++	const response = await binding.fetch(url, { headers: {
+ 		"cf-brapi-client": "@vite-hub/browser",
+ 		Upgrade: "websocket"
+ 	} });
+diff --git a/dist/controllers/playwright.d.ts b/dist/controllers/playwright.d.ts
+index c8f27b7198f39858b09e57128cc55fdaf11ab549..e48266bce1c3fd90b42359bc1dff12d69275cc36 100644
+--- a/dist/controllers/playwright.d.ts
++++ b/dist/controllers/playwright.d.ts
+@@ -1,3 +1,3 @@
+-import { r as PlaywrightBrowserConnection } from "../connections-Di5Io-Dx.js";
+-import { n as PlaywrightControllerOptions, r as playwright, t as PlaywrightClient } from "../playwright-BNdJgUED.js";
++import { r as PlaywrightBrowserConnection } from "../connections-B65omwXn.js";
++import { n as PlaywrightControllerOptions, r as playwright, t as PlaywrightClient } from "../playwright-BT_n8gqK.js";
+ export { type PlaywrightBrowserConnection, PlaywrightClient, PlaywrightControllerOptions, playwright };
+\ No newline at end of file
+diff --git a/dist/controllers/playwright.js b/dist/controllers/playwright.js
+index ac358623dec2a1ecf66ded91782a0c1902d75169..6a06e13e1eb0c95fb6674cebb09bb06f263b339b 100644
+--- a/dist/controllers/playwright.js
++++ b/dist/controllers/playwright.js
+@@ -20,7 +20,7 @@ function playwright(options = {}) {
+ 		features: { attachExistingSession: true },
+ 		name: "playwright",
+ 		async attach(connection) {
+-			return await attachPlaywrightBrowser(connection.kind === "cloudflare-binding" ? await (options.cloudflare || await loadCloudflare()).connect(connection.binding, connection.sessionId) : await (options.chromium || await loadChromium()).connectOverCDP(connection.endpoint, { ...connection.headers ? { headers: connection.headers } : {} }), connection);
++			return await attachPlaywrightBrowser(connection.kind === "cloudflare-binding" ? connection.engine === "kitesurf" ? await (options.cloudflare || await loadCloudflare()).launch(connection.binding, { browser: "kitesurf" }) : await (options.cloudflare || await loadCloudflare()).connect(connection.binding, connection.sessionId) : await (options.chromium || await loadChromium()).connectOverCDP(connection.endpoint, { ...connection.headers ? { headers: connection.headers } : {} }), connection);
+ 		}
+ 	};
+ }
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index a620e95dd9836e796049a701a7345d34c84622a4..df54ddddebafb662a558449ec2be5a3766132777 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,4 +1,4 @@
+-import { D as BrowserSessionState, E as BrowserSessionRef, O as CreateBrowserOptions, S as BrowserRunResult, T as BrowserSessionInfo, _ as BrowserPolicy, a as BrowserControllerContext, b as BrowserProviderOpenOptions, c as BrowserDefinitionBrowser, d as BrowserDefinitionRegistry, f as BrowserDownload, g as BrowserPageSession, h as BrowserIsolation, i as BrowserController, l as BrowserDefinitionContext, m as BrowserHandoffOptions, n as BrowserClient, o as BrowserControllerLease, p as BrowserFeatures, r as BrowserControl, s as BrowserDefinition, t as BrowserClaimOptions, u as BrowserDefinitionHandler, v as BrowserProvider, w as BrowserSession, x as BrowserProviderSession, y as BrowserProviderInfo } from "./types-BL4xTi7H.js";
++import { C as BrowserRunResult, D as BrowserSessionRef, E as BrowserSessionInfo, O as BrowserSessionState, S as BrowserProviderSession, T as BrowserSession, _ as BrowserPageSession, a as BrowserControllerContext, b as BrowserProviderInfo, c as BrowserDefinitionBrowser, d as BrowserDefinitionRegistry, f as BrowserDownload, g as BrowserIsolation, h as BrowserHandoffOptions, i as BrowserController, k as CreateBrowserOptions, l as BrowserDefinitionContext, m as BrowserFeatures, n as BrowserClient, o as BrowserControllerLease, r as BrowserControl, s as BrowserDefinition, t as BrowserClaimOptions, u as BrowserDefinitionHandler, v as BrowserPolicy, x as BrowserProviderOpenOptions, y as BrowserProvider } from "./types-CHCjIInn.js";
+ //#region src/client.d.ts
+ declare function createBrowser<TConnection>(options: CreateBrowserOptions<TConnection>): BrowserClient<TConnection>;
+ //#endregion
+diff --git a/dist/index.js b/dist/index.js
+index e0975326895212d6bd8d4ee8e45ea769fbff0815..71eb88bc3b69c34b10cec8a82791c26e6d4eae3d 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,5 +1,5 @@
+ import { a as browserSessionRefError, i as browserRuntimeNotConfiguredError, n as browserLiveHandoffUnsupportedError, o as browserSessionStateError, r as browserProviderError, s as toBrowserError, t as browserDefinitionNotFoundError } from "./errors-mj14eAQE.js";
+-import { n as cloudflareBrowserTerminated, t as cloudflareBrowser } from "./cloudflare-B2NaEDty.js";
++import { n as cloudflareBrowserTerminated, t as cloudflareBrowser } from "./cloudflare-elUvAJZ7.js";
+ import { t as attachPlaywrightBrowser } from "./playwright-D4ghaUjY.js";
+ import browserRegistry from "#vitehub/browser/registry";
+ import runtimeConfig from "#vitehub/browser/runtime";
+@@ -296,7 +296,8 @@ function cloudflarePlaywright(driver) {
+ 		features: { attachExistingSession: true },
+ 		name: "playwright",
+ 		async attach(connection) {
+-			const browser = await (driver || await loadCloudflare()).connect(connection.binding, connection.sessionId);
++			const cloudflare = driver || await loadCloudflare();
++			const browser = connection.engine === "kitesurf" ? await cloudflare.launch(connection.binding, { browser: "kitesurf" }) : await cloudflare.connect(connection.binding, connection.sessionId);
+ 			const attached = await attachPlaywrightBrowser(browser, connection);
+ 			let released = false;
+ 			return {
+@@ -397,7 +398,10 @@ let configuredClient;
+ function resolveConfiguredClient() {
+ 	if (configuredClient) return configuredClient;
+ 	if (runtimeConfig.provider !== "cloudflare") throw browserRuntimeNotConfiguredError();
+-	configuredClient = createBrowser({ provider: cloudflareBrowser({ binding: runtimeConfig.binding }) });
++	configuredClient = createBrowser({ provider: cloudflareBrowser({
++		binding: runtimeConfig.binding,
++		engine: runtimeConfig.engine
++	}) });
+ 	return configuredClient;
+ }
+ function isBrowserDefinition(value) {
+diff --git a/dist/internal/runtime/empty-registry.d.ts b/dist/internal/runtime/empty-registry.d.ts
+index 4a05b8ef641f8c5581f99c943a7e1a295015fcf5..38823c46ef83c70510ada2a47ef417b044ea30e5 100644
+--- a/dist/internal/runtime/empty-registry.d.ts
++++ b/dist/internal/runtime/empty-registry.d.ts
+@@ -1,4 +1,4 @@
+-import { d as BrowserDefinitionRegistry } from "../../types-BL4xTi7H.js";
++import { d as BrowserDefinitionRegistry } from "../../types-CHCjIInn.js";
+ 
+ //#region src/internal/runtime/empty-registry.d.ts
+ interface BrowserDefinitionModules {}
+diff --git a/dist/internal/runtime/unconfigured.d.ts b/dist/internal/runtime/unconfigured.d.ts
+index 9392e15c2346e088f409c9ba48152810d6164fa0..68faf10dbac00c440c1b4e80f19d2d3d9fb03c3c 100644
+--- a/dist/internal/runtime/unconfigured.d.ts
++++ b/dist/internal/runtime/unconfigured.d.ts
+@@ -1,4 +1,4 @@
+-import { C as BrowserRuntimeConfig } from "../../types-BL4xTi7H.js";
++import { w as BrowserRuntimeConfig } from "../../types-CHCjIInn.js";
+ 
+ //#region src/internal/runtime/unconfigured.d.ts
+ declare const config: BrowserRuntimeConfig;
+diff --git a/dist/playwright-BT_n8gqK.d.ts b/dist/playwright-BT_n8gqK.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..eb4c0aa7e6cd9b67e4b3fa77783a51b10fc47a38
+--- /dev/null
++++ b/dist/playwright-BT_n8gqK.d.ts
+@@ -0,0 +1,22 @@
++import { i as BrowserController } from "./types-CHCjIInn.js";
++import { r as PlaywrightBrowserConnection } from "./connections-B65omwXn.js";
++import { Browser, BrowserContext, BrowserType, Page } from "playwright-core";
++
++//#region src/controllers/playwright.d.ts
++interface PlaywrightClient {
++  browser: Browser;
++  context: BrowserContext;
++  page: Page;
++}
++interface PlaywrightControllerOptions {
++  chromium?: Pick<BrowserType, "connectOverCDP">;
++  cloudflare?: {
++    connect(binding: unknown, sessionId: string): Promise<Browser>;
++    launch(binding: unknown, options: {
++      browser: "kitesurf";
++    }): Promise<Browser>;
++  };
++}
++declare function playwright(options?: PlaywrightControllerOptions): BrowserController<PlaywrightClient, PlaywrightBrowserConnection>;
++//#endregion
++export { PlaywrightControllerOptions as n, playwright as r, PlaywrightClient as t };
+\ No newline at end of file
+diff --git a/dist/providers/cloudflare.d.ts b/dist/providers/cloudflare.d.ts
+index bb750255cfdfe23bc96894ef870c3a6ab45a23cd..25f4060f16f8d055982b5cc63daa16b9382eb053 100644
+--- a/dist/providers/cloudflare.d.ts
++++ b/dist/providers/cloudflare.d.ts
+@@ -1,5 +1,5 @@
+-import { v as BrowserProvider } from "../types-BL4xTi7H.js";
+-import { n as CloudflareBrowserBindingConnection } from "../connections-Di5Io-Dx.js";
++import { p as BrowserEngine, y as BrowserProvider } from "../types-CHCjIInn.js";
++import { n as CloudflareBrowserBindingConnection } from "../connections-B65omwXn.js";
+ 
+ //#region src/providers/cloudflare.d.ts
+ interface CloudflareBrowserHandle {
+@@ -20,6 +20,7 @@ interface CloudflarePlaywrightDriver {
+ interface CloudflareBrowserOptions {
+   binding?: string | unknown;
+   driver?: CloudflarePlaywrightDriver;
++  engine?: BrowserEngine;
+   resolveBinding?: (name: string) => unknown | Promise<unknown>;
+ }
+ declare function cloudflareBrowser(options?: CloudflareBrowserOptions): BrowserProvider<CloudflareBrowserBindingConnection>;
+diff --git a/dist/providers/cloudflare.js b/dist/providers/cloudflare.js
+index 68dcf09e35cbbaa63ae06c04f21b4481f1b72ec1..06034184e3f3f6e3c74b9d0c4016ab8728eea46c 100644
+--- a/dist/providers/cloudflare.js
++++ b/dist/providers/cloudflare.js
+@@ -1,2 +1,2 @@
+-import { t as cloudflareBrowser } from "../cloudflare-B2NaEDty.js";
++import { t as cloudflareBrowser } from "../cloudflare-elUvAJZ7.js";
+ export { cloudflareBrowser };
+diff --git a/dist/providers/local.d.ts b/dist/providers/local.d.ts
+index b340692edfc9c77975e85c266a380177e35ae0f9..271cff235268a3a7f913346f7d3deabe7455884d 100644
+--- a/dist/providers/local.d.ts
++++ b/dist/providers/local.d.ts
+@@ -1,5 +1,5 @@
+-import { v as BrowserProvider } from "../types-BL4xTi7H.js";
+-import { t as CDPBrowserConnection } from "../connections-Di5Io-Dx.js";
++import { y as BrowserProvider } from "../types-CHCjIInn.js";
++import { t as CDPBrowserConnection } from "../connections-B65omwXn.js";
+ 
+ //#region src/providers/local.d.ts
+ interface LocalBrowserOptions {
+diff --git a/dist/types-CHCjIInn.d.ts b/dist/types-CHCjIInn.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcee49092d272b30620cf1821bcd8326a361dd40
+--- /dev/null
++++ b/dist/types-CHCjIInn.d.ts
+@@ -0,0 +1,119 @@
++import { LeaseStore, MaybePromise, TraceEvent, ViteHubError } from "@vite-hub/runtime";
++import { Browser, BrowserContext, Download, Page } from "playwright-core";
++
++//#region src/types.d.ts
++type BrowserDownload = Download;
++type BrowserEngine = "chromium" | "kitesurf";
++interface BrowserFeatures {
++  liveHandoff: boolean;
++}
++type BrowserIsolation = "process" | "provider" | "trusted-host";
++interface BrowserProviderInfo {
++  features: BrowserFeatures;
++  isolation: BrowserIsolation;
++  name: string;
++}
++interface BrowserProviderOpenOptions {
++  idleTimeoutMs?: number;
++}
++interface BrowserProviderSession<TConnection = unknown> {
++  close(): MaybePromise<void>;
++  connection: TConnection;
++  expiresAt?: Date | string;
++  features?: Partial<BrowserFeatures>;
++  id: string;
++}
++interface BrowserProvider<TConnection = unknown> extends BrowserProviderInfo {
++  open(options?: BrowserProviderOpenOptions): MaybePromise<BrowserProviderSession<TConnection>>;
++}
++interface BrowserControllerLease<TClient> {
++  client: TClient;
++  preservesSessionOnRelease?: boolean;
++  release(): MaybePromise<void>;
++}
++interface BrowserControl<TClient> {
++  readonly client: TClient;
++  release(): Promise<void>;
++}
++interface BrowserControllerContext {
++  provider: BrowserProviderInfo;
++  sessionId: string;
++}
++interface BrowserController<TClient, TConnection = unknown> {
++  attach(connection: TConnection, context: BrowserControllerContext): MaybePromise<BrowserControllerLease<TClient>>;
++  features: {
++    attachExistingSession: boolean;
++  };
++  name: string;
++}
++type BrowserSessionState = "closed" | "controlled" | "handed-off" | "released";
++interface BrowserSessionInfo {
++  expiresAt?: string;
++  features: BrowserFeatures;
++  id: string;
++  provider: string;
++  state: BrowserSessionState;
++}
++interface BrowserSessionRef {
++  readonly audience: string;
++  readonly expiresAt: string;
++  readonly id: string;
++}
++interface BrowserHandoffOptions {
++  audience: string;
++  mode: "live";
++  ttl?: number;
++}
++interface BrowserClaimOptions {
++  audience: string;
++}
++interface BrowserSession<TConnection = unknown> {
++  readonly id: string;
++  attach<TClient>(controller: BrowserController<TClient, TConnection>): Promise<BrowserControl<TClient>>;
++  close(): Promise<void>;
++  handoff(options: BrowserHandoffOptions): Promise<BrowserSessionRef>;
++  inspect(): BrowserSessionInfo;
++}
++interface BrowserClient<TConnection = unknown> {
++  claim(ref: BrowserSessionRef, options: BrowserClaimOptions): Promise<BrowserSession<TConnection>>;
++  open(options?: BrowserProviderOpenOptions): Promise<BrowserSession<TConnection>>;
++}
++interface BrowserPolicy {
++  handoffTtl?: number;
++  idleTimeoutMs?: number;
++}
++interface CreateBrowserOptions<TConnection> {
++  leaseStore?: LeaseStore;
++  policy?: BrowserPolicy;
++  provider: BrowserProvider<TConnection>;
++  trace?: (event: TraceEvent) => MaybePromise<void>;
++}
++interface BrowserPageSession {
++  readonly browser: Browser;
++  readonly context: BrowserContext;
++  readonly id: string;
++  readonly page: Page;
++  close(): Promise<void>;
++  inspect(): BrowserSessionInfo;
++}
++interface BrowserDefinitionBrowser {
++  open(options?: BrowserProviderOpenOptions): Promise<BrowserPageSession>;
++}
++interface BrowserDefinitionContext {
++  browser: BrowserDefinitionBrowser;
++}
++type BrowserDefinitionHandler<TInput = unknown, TResult = unknown> = (input: TInput, context: BrowserDefinitionContext) => MaybePromise<TResult>;
++interface BrowserDefinition<TInput = unknown, TResult = unknown> {
++  run: BrowserDefinitionHandler<TInput, TResult>;
++}
++type BrowserRunResult<TResult = unknown> = [error: null, value: TResult] | [error: ViteHubError<`BROWSER_${string}`>, value: undefined];
++type BrowserDefinitionRegistry = Record<string, BrowserDefinition | (() => Promise<BrowserDefinition | {
++  default?: BrowserDefinition;
++}>)>;
++interface BrowserRuntimeConfig {
++  binding: string;
++  engine?: BrowserEngine;
++  provider?: "cloudflare";
++}
++//#endregion
++export { BrowserRunResult as C, BrowserSessionRef as D, BrowserSessionInfo as E, BrowserSessionState as O, BrowserProviderSession as S, BrowserSession as T, BrowserPageSession as _, BrowserControllerContext as a, BrowserProviderInfo as b, BrowserDefinitionBrowser as c, BrowserDefinitionRegistry as d, BrowserDownload as f, BrowserIsolation as g, BrowserHandoffOptions as h, BrowserController as i, CreateBrowserOptions as k, BrowserDefinitionContext as l, BrowserFeatures as m, BrowserClient as n, BrowserControllerLease as o, BrowserEngine as p, BrowserControl as r, BrowserDefinition as s, BrowserClaimOptions as t, BrowserDefinitionHandler as u, BrowserPolicy as v, BrowserRuntimeConfig as w, BrowserProviderOpenOptions as x, BrowserProvider as y };
+\ No newline at end of file
+diff --git a/dist/vite.d.ts b/dist/vite.d.ts
+index 94ca1d4d1ea60e57c281c1c209691c8484cbb03e..32cfb1836e8db8a66089cef97f32dad3012a31a2 100644
+--- a/dist/vite.d.ts
++++ b/dist/vite.d.ts
+@@ -1,8 +1,10 @@
++import { p as BrowserEngine } from "./types-CHCjIInn.js";
+ import { Plugin } from "vite";
+ 
+ //#region src/vite.d.ts
+ interface BrowserModuleOptions {
+   binding?: string;
++  engine?: BrowserEngine;
+   remote?: boolean;
+ }
+ type BrowserVitePlugin = Plugin & {
+diff --git a/dist/vite.js b/dist/vite.js
+index 5b19b3d480376caa8df1ad890a67e2b6eaad2e98..ddd38f978a5c5823f1303ff6101dbb37d810dfcc 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -401,6 +401,7 @@ async function writeFileIfChanged(file, contents) {
+ //#region ../internal/src/build/vite.ts
+ const projectRootDirectoryMarkers = [
+ 	["server", "agents"],
++	["server", "channels"],
+ 	["server", "browsers"],
+ 	["server", "schedules"],
+ 	["server", "templates"],
+@@ -499,8 +500,11 @@ const mergeNoExternal = createNoExternalMerger("@vite-hub/browser");
+ function resolveOptions(options) {
+ 	const binding = options && options.binding || "BROWSER";
+ 	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(binding)) throw new TypeError("[vitehub:browser] Browser binding must be a valid Cloudflare binding name.");
++	const engine = options && options.engine || "kitesurf";
++	if (engine !== "chromium" && engine !== "kitesurf") throw new TypeError("[vitehub:browser] Browser engine must be chromium or kitesurf.");
+ 	return {
+ 		binding,
++		engine,
+ 		remote: Boolean(options && options.remote)
+ 	};
+ }
+@@ -599,6 +603,7 @@ function hubBrowser(options) {
+ 	function runtimeContents() {
+ 		return [`export default ${JSON.stringify(enabled ? {
+ 			binding: resolvedOptions.binding,
++			engine: resolvedOptions.engine,
+ 			provider: "cloudflare"
+ 		} : {}, null, 2)}`, ""].join("\n");
+ 	}
