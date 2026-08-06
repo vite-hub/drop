@@ -119,7 +119,13 @@ export default defineBrowser(async (input: CodeImageInput, { browser }) => {
   const session = await browser.open()
   await session.page.goto(createRayUrl(input), { waitUntil: "domcontentloaded" })
   const editor = session.page.locator('textarea[data-enable-grammarly="false"]')
-  await editor.waitFor({ state: "visible" })
+  try {
+    await editor.waitFor({ state: "visible" })
+  }
+  catch (error) {
+    const body = await session.page.locator("body").innerText().catch(() => "")
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nPage: ${body.slice(0, 2_000)}`)
+  }
   if (input.theme)
     await assertRayOption(session.page, "theme", "background", input.theme)
   if (input.language)
