@@ -20,7 +20,7 @@ curl --fail-with-body --silent --show-error \
 
 ## Code
 
-Render code in Ray.so wrapper.
+Render code with Drop's built-in highlighter and Kitesurf renderer.
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \
@@ -33,16 +33,7 @@ Code image URLs expire after five minutes; download and re-upload through File t
 
 ## Options
 
-Fetch the current case-sensitive IDs directly from Ray.so before setting `language` or `theme`:
-
-```bash
-# Fetch and parse available themes
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/store/themes.ts" | grep -oE 'id:[[:space:]]*"[^"]+"' | sed -E 's/id:[[:space:]]*"([^"]+)"/\1/' | sort -u
-
-# Fetch and parse available languages
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/util/languages.ts" | grep -oE '^[[:space:]]*"?[a-zA-Z0-9+#-]+"?[[:space:]]*:[[:space:]]*\{' | sed -E 's/^[[:space:]]*"?([^"]+)"?[[:space:]]*:.*/\1/' | sort -u
-```
-
-- `language` and `theme` accept the IDs printed by those commands.
+- `language` is case-insensitive and falls back to plain text when unsupported.
+- `theme` accepts `midnight` (default), `breeze`, `candy`, `nuxt`, `raindrop`, or `sunset`.
 - `format` accepts `png` (default) or `svg`.
-- `scale` for png accepts `2`, `4` (default), or `6`.
+- `scale` accepts `2`, `4` (default), or `6`.
