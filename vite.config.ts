@@ -34,7 +34,7 @@ export default defineConfig({
             from: "vite-hub/browser",
             imports: [
               { name: "BrowserDownload", type: true },
-              { name: "BrowserPageSession", type: true },
+              { name: "BrowserPage", type: true },
               "defineBrowser",
               "runBrowser",
             ],

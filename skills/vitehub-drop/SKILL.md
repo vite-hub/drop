@@ -20,7 +20,7 @@ curl --fail-with-body --silent --show-error \
 
 ## Code
 
-Render code in Ray.so wrapper.
+Render code through Ray.so's native export.
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \

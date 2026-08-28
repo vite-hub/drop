@@ -53,7 +53,7 @@ Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when tha
 
 ### Create a code image
 
-The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language, theme, and export scale, then uses Ray's native PNG or SVG export. Treat the URL as available for five minutes; an hourly ViteHub Schedule removes expired code images without touching permanent uploads.
+The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language, theme, and export scale, then clicks Ray's native PNG or SVG export. Treat the URL as available for five minutes; an hourly ViteHub Schedule removes expired code images without touching permanent uploads.
 
 ```sh
 curl --fail-with-body https://drop.vitehub.dev/api/code \
