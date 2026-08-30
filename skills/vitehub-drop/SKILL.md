@@ -1,11 +1,11 @@
 ---
 name: vitehub-drop
-description: Publishes a local file at an immutable public URL. Use when an agent needs to share an image, document, or readable Markdown plan in GitHub content. It can also render source code as a temporary image URL.
+description: Publishes a local file at a permanent public URL. Use when an agent needs to share an image, document, or readable Markdown plan in GitHub content. It can also render source code as a temporary image URL.
 ---
 
 # ViteHub Drop
 
-Publish one file and return its URL. A published URL never changes; publish a new file for every revision.
+Publish one file and return its URL. Files cannot be edited through the API, so publish a new file for every revision. PNG, JPEG, and WebP files may replace the original bytes at the same URL with a smaller optimized version.
 
 ## Publish a file
 

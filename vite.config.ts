@@ -13,6 +13,7 @@ export default defineConfig({
       browser: true,
       kv: true,
       preset: "cloudflare",
+      queue: true,
       rateLimit: true,
       sandbox: true,
       schedule: true,

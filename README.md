@@ -8,7 +8,7 @@
   </a>
 </p>
 
-<p align="center">Immutable files and readable agent plans, built with ViteHub primitives.</p>
+<p align="center">Permanent files and readable agent plans, built with ViteHub primitives.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·
@@ -19,11 +19,12 @@
 
 ## How it works
 
-1. PNG, JPEG, and WebP uploads pass through a Cloudflare **Sandbox**, where Sharp applies EXIF orientation, strips metadata, and resizes them to fit within 2048 × 2048 without upscaling.
-2. **Blob** writes each uploaded file once at a random `/i/` URL. If image optimization fails or does not make the file smaller, Drop stores the original.
-3. Markdown files render as server-generated HTML at that URL through **Comark**. Their exact source remains available with `?raw`.
-4. **Schedule** runs hourly and deletes expired code images from their separate prefix without touching uploaded files.
-5. Nitro renders the current stored-file count into the landing page.
+1. **Blob** stores the original upload immediately at a random `/i/` URL.
+2. For PNG, JPEG, and WebP files, **Queue** asks a Cloudflare **Sandbox** to apply EXIF orientation, strip metadata, and resize the image to fit within 2048 × 2048 without upscaling.
+3. Drop replaces the original image at the same URL only when the optimized version is smaller. Other files never change.
+4. Markdown files render as server-generated HTML at that URL through **Comark**. Their exact source remains available with `?raw`.
+5. **Schedule** runs hourly and deletes expired code images from their separate prefix without touching uploaded files.
+6. Nitro renders the current stored-file count into the landing page.
 
 The Sandbox is a real npm project in [server/sandboxes/image-optimizer](./server/sandboxes/image-optimizer). ViteHub materializes that project through Workspace and executes it through the selected Box provider.
 
@@ -50,7 +51,7 @@ curl --fail-with-body https://drop.vitehub.dev/api/files \
   -F "file=@/absolute/path/to/file.pdf"
 ```
 
-Files up to 4 MiB are accepted. Every successful upload creates a new immutable URL. PNG, JPEG, and WebP files are optimized before storage when that makes them smaller; PDFs, spreadsheets, documents, archives, and other files are stored unchanged. Markdown renders as HTML at its URL and as source with `?raw`. The public deployment limits uploads to five attempts per source address per minute.
+Files up to 4 MiB are accepted. Every successful upload creates a permanent, non-editable URL. PNG, JPEG, and WebP files are available immediately and may be replaced at the same URL by a smaller optimized version; PDFs, spreadsheets, documents, archives, and other files never change. Markdown renders as HTML at its URL and as source with `?raw`. The public deployment limits uploads to five attempts per source address per minute.
 
 ### Create a code image
 
@@ -82,14 +83,15 @@ pnpm install
 pnpm build
 ```
 
-Cloudflare Sandbox requires a Workers Paid plan. Create the R2 bucket named by `.output/server/wrangler.json`, then deploy that generated configuration:
+Cloudflare Sandbox requires a Workers Paid plan. Create the R2 bucket and Queue named by `.output/server/wrangler.json`, then deploy that generated configuration:
 
 ```sh
 pnpm exec wrangler r2 bucket create vitehub-drop
+pnpm exec wrangler queues create QUEUE_NAME_FROM_WRANGLER_JSON
 pnpm exec wrangler deploy --config .output/server/wrangler.json
 ```
 
-ViteHub composes the R2, Rate Limit, Sandbox, Container, Durable Object, and migration bindings, then emits the hourly Cron Trigger from the Schedule Definition.
+ViteHub composes the R2, Queue, Rate Limit, Sandbox, Container, Durable Object, and migration bindings, then emits the hourly Cron Trigger from the Schedule Definition.
 
 Run the deployed smoke test:
 

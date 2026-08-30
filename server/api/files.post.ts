@@ -2,8 +2,8 @@ import { assertBodySize, defineHandler, HTTPError, requireContentType } from "h3
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { kv } from "vite-hub/kv"
+import { deferQueue } from "vite-hub/queue"
 import { requireRateLimit } from "vite-hub/rate-limit"
-import { runSandbox } from "vite-hub/sandbox"
 
 const OPTIMIZABLE_IMAGE_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 const MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -27,7 +27,7 @@ export default defineHandler(async (event) => {
   if (file.size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
 
   const extension = file.name.match(/\.[a-z0-9]{1,16}$/i)?.[0].toLowerCase() ?? ""
-  let bytes = new Uint8Array(await file.arrayBuffer())
+  const bytes = new Uint8Array(await file.arrayBuffer())
   let contentType = detectContentType(bytes) ?? "application/octet-stream"
 
   if ([".md", ".markdown"].includes(extension)) {
@@ -38,24 +38,6 @@ export default defineHandler(async (event) => {
       throw new HTTPError({ status: 400, statusText: "Markdown files must contain valid UTF-8." })
     }
     contentType = "text/markdown; charset=utf-8"
-  }
-
-  if (OPTIMIZABLE_IMAGE_CONTENT_TYPES.has(contentType)) {
-    const original = new Blob([bytes], { type: contentType })
-    const [optimizationError, optimized] = await runSandbox("image-optimizer", { image: original })
-
-    if (optimizationError) {
-      console.error(JSON.stringify({ counter: "optimization_failure", error: optimizationError.message }))
-    }
-    else {
-      const optimizedBytes = new Uint8Array(await optimized.arrayBuffer())
-      if (detectContentType(optimizedBytes) !== contentType) {
-        console.error(JSON.stringify({ counter: "optimization_failure", error: "Sandbox returned an invalid image." }))
-      }
-      else if (optimizedBytes.byteLength < bytes.byteLength) {
-        bytes = optimizedBytes
-      }
-    }
   }
 
   const key = `${crypto.randomUUID()}${extension}`
@@ -75,6 +57,9 @@ export default defineHandler(async (event) => {
     if (statsWriteError)
       console.error(JSON.stringify({ counter: "stats_failure", error: statsWriteError.message }))
   }
+
+  if (OPTIMIZABLE_IMAGE_CONTENT_TYPES.has(contentType))
+    deferQueue("image-optimization", { payload: key })
 
   return { url: new URL(stored.url, event.req.url).href }
 })
