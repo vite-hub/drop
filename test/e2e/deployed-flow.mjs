@@ -7,6 +7,10 @@ const homepage = await fetch(origin, { signal: AbortSignal.timeout(30_000) })
 
 assert.equal(homepage.status, 200)
 
+const mediumZoom = await fetch(new URL("/vendor/medium-zoom/medium-zoom.min.js", origin), { signal: AbortSignal.timeout(30_000) })
+assert.equal(mediumZoom.status, 200)
+assert.match(await mediumZoom.text(), /medium-zoom-image/)
+
 const form = new FormData()
 form.set("file", new File([await readFile(new URL("../../public/og-vitehub-drop.png", import.meta.url))], "og-vitehub-drop.png"))
 

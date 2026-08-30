@@ -17,9 +17,10 @@ test("does not frame Mermaid diagrams twice", () => {
   assert.doesNotMatch(mermaidStyles, /\b(?:background|border|padding):/)
 })
 
-test("zooms images and opt-in visual components", () => {
-  assert.match(zoomScript, /\.typeset img, \.typeset \[data-zoomable\]/)
-  assert.match(zoomScript, /dialog\.showModal\(\)/)
+test("zooms images and Mermaid with medium-zoom", () => {
+  assert.match(zoomScript, /window\.mediumZoom/)
+  assert.match(zoomScript, /\.mermaid svg/)
+  assert.match(zoomScript, /data:image\/svg\+xml/)
   assert.match(zoomScript, /\["Enter", " "\]/)
 })
 
@@ -44,8 +45,9 @@ graph LR
   assert.match(html, /<h1 id="ship-the-renderer">Ship the renderer<\/h1>/)
   assert.match(html, /<aside class="callout" data-kind="decision">Keep the existing endpoint\.<\/aside>/)
   assert.match(html, /<div class="mermaid" data-zoomable><svg/)
-  assert.match(html, /<dialog class="visual-zoom"/)
+  assert.match(html, /<script src="\/vendor\/medium-zoom\/medium-zoom\.min\.js" defer><\/script>/)
   assert.match(html, /<script src="\/document-zoom\.js" defer><\/script>/)
+  assert.doesNotMatch(html, /<dialog class="visual-zoom"/)
   assert.match(html, /<article class="typeset typeset-compact">/)
   assert.match(html, /Built with drop\.vitehub\.dev/)
   assert.doesNotMatch(html, /class="site-header"/)

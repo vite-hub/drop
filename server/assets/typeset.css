@@ -587,7 +587,8 @@ main {
   overflow-x: auto;
 }
 
-.typeset .mermaid svg {
+.typeset .mermaid svg,
+.typeset .mermaid-image {
   display: block;
   min-width: 28rem;
   max-width: 100%;
@@ -599,53 +600,9 @@ main {
   border-color: oklch(0.637 0.237 25.331);
 }
 
-.typeset img:not(a img),
-.typeset [data-zoomable] {
-  cursor: zoom-in;
-}
-
-.typeset img:not(a img):focus-visible,
-.typeset [data-zoomable]:focus-visible {
+.typeset img:not(a img):focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: 3px;
-}
-
-.visual-zoom {
-  width: 100vw;
-  max-width: none;
-  height: 100vh;
-  max-height: none;
-  margin: 0;
-  padding: 1rem;
-  border: 0;
-  background: transparent;
-  cursor: zoom-out;
-}
-
-.visual-zoom::backdrop {
-  background: oklch(1 0 0 / 0.94);
-}
-
-.visual-zoom__content {
-  display: grid;
-  width: 100%;
-  min-height: 100%;
-  place-items: center;
-}
-
-.visual-zoom__content > img,
-.visual-zoom__content .mermaid svg {
-  width: auto;
-  max-width: calc(100vw - 2rem);
-  height: auto;
-  max-height: calc(100vh - 2rem);
-  margin: 0;
-}
-
-.visual-zoom__content > .mermaid {
-  max-width: none;
-  margin: 0;
-  overflow: visible;
 }
 
 .empty-document {
@@ -707,10 +664,6 @@ main {
   }
 
   .document-footer {
-    display: none;
-  }
-
-  .visual-zoom {
     display: none;
   }
 }

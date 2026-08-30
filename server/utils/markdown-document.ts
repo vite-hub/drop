@@ -175,9 +175,7 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
     <span aria-hidden="true">·</span>
     <a href="${escapeHtml(pathname)}?raw">Source</a>
   </footer>
-  <dialog class="visual-zoom" id="visual-zoom" aria-label="Expanded visual" data-not-typeset>
-    <div class="visual-zoom__content"></div>
-  </dialog>
+  <script src="/vendor/medium-zoom/medium-zoom.min.js" defer></script>
   <script src="/document-zoom.js" defer></script>
 </body>
 </html>`
