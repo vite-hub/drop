@@ -8,7 +8,7 @@
   </a>
 </p>
 
-<p align="center">Permanent URLs for agent-uploaded files and temporary rendered code images, built with ViteHub primitives.</p>
+<p align="center">Immutable files and readable agent plans, built with ViteHub primitives.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·
@@ -19,12 +19,11 @@
 
 ## How it works
 
-1. **Blob** stores uploaded files permanently and keeps rendered code images under a separate temporary prefix.
-2. PNG, JPEG, and WebP uploads continue through image optimization; other files are complete as soon as they are stored.
-3. **Queue** dispatches image optimization to a Cloudflare **Sandbox** while the original upload URL is already usable.
-4. Sharp applies EXIF orientation, strips metadata, and resizes images to fit within 2048 × 2048 without upscaling.
-5. **Schedule** runs hourly and deletes expired code images from their prefix without touching uploaded files.
-6. Drop replaces an uploaded Blob only when the optimized image is smaller. Nitro renders the current stored-file count into the landing page.
+1. PNG, JPEG, and WebP uploads pass through a Cloudflare **Sandbox**, where Sharp applies EXIF orientation, strips metadata, and resizes them to fit within 2048 × 2048 without upscaling.
+2. **Blob** writes each uploaded file once at a random `/i/` URL. If image optimization fails or does not make the file smaller, Drop stores the original.
+3. Markdown files render as server-generated HTML at that URL through **Comark**. Their exact source remains available with `?raw`.
+4. **Schedule** runs hourly and deletes expired code images from their separate prefix without touching uploaded files.
+5. Nitro renders the current stored-file count into the landing page.
 
 The Sandbox is a real npm project in [server/sandboxes/image-optimizer](./server/sandboxes/image-optimizer). ViteHub materializes that project through Workspace and executes it through the selected Box provider.
 
@@ -36,10 +35,12 @@ Install the public agent skill:
 npx skills add https://drop.vitehub.dev
 ```
 
-The bundled command uploads and immediately prints the file URL:
+Upload a file and print its URL:
 
 ```sh
-node "<skill-directory>/scripts/upload-image.mjs" "/absolute/path/to/file.pdf"
+curl --fail-with-body --silent --show-error \
+  -F "file=@/absolute/path/to/file.pdf" \
+  https://drop.vitehub.dev/api/files | jq -er '.url'
 ```
 
 Or use the API directly:
@@ -49,7 +50,7 @@ curl --fail-with-body https://drop.vitehub.dev/api/files \
   -F "file=@/absolute/path/to/file.pdf"
 ```
 
-Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when that makes them smaller; PDFs, spreadsheets, documents, archives, and other files are stored unchanged. The public deployment limits uploads to five attempts per source address per minute.
+Files up to 4 MiB are accepted. Every successful upload creates a new immutable URL. PNG, JPEG, and WebP files are optimized before storage when that makes them smaller; PDFs, spreadsheets, documents, archives, and other files are stored unchanged. Markdown renders as HTML at its URL and as source with `?raw`. The public deployment limits uploads to five attempts per source address per minute.
 
 ### Create a code image
 
@@ -81,15 +82,14 @@ pnpm install
 pnpm build
 ```
 
-Cloudflare Sandbox requires a Workers Paid plan. Create the R2 bucket and Queue named by `.output/server/wrangler.json`, then deploy that generated configuration:
+Cloudflare Sandbox requires a Workers Paid plan. Create the R2 bucket named by `.output/server/wrangler.json`, then deploy that generated configuration:
 
 ```sh
 pnpm exec wrangler r2 bucket create vitehub-drop
-pnpm exec wrangler queues create QUEUE_NAME_FROM_WRANGLER_JSON
 pnpm exec wrangler deploy --config .output/server/wrangler.json
 ```
 
-ViteHub composes the R2, Queue, Rate Limit, Sandbox, Container, Durable Object, and migration bindings, then emits the hourly Cron Trigger from the Schedule Definition.
+ViteHub composes the R2, Rate Limit, Sandbox, Container, Durable Object, and migration bindings, then emits the hourly Cron Trigger from the Schedule Definition.
 
 Run the deployed smoke test:
 
@@ -97,6 +97,6 @@ Run the deployed smoke test:
 pnpm test:e2e:deployed
 ```
 
-The test uploads `public/og-vitehub-drop.png` to the production URL and confirms the returned image is publicly accessible.
+The test uploads an image and a Markdown plan, confirms the image is publicly accessible, checks the rendered document and raw source, and exercises code-image rendering.
 
 The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

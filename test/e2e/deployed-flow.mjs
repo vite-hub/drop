@@ -19,6 +19,26 @@ assert.equal(image.status, 200)
 assert.equal(image.headers.get("content-type"), "image/png")
 assert.ok(await stats.json() > 0)
 
+const markdownSource = "---\ntitle: Smoke-test plan\n---\n\n# Smoke-test plan\n\n```mermaid\ngraph LR\n  Upload --> Render\n```\n"
+const markdownForm = new FormData()
+markdownForm.set("file", new File([markdownSource], "plan.md", { type: "text/markdown" }))
+const markdownUpload = await fetch(filesEndpoint, { body: markdownForm, method: "POST", signal: AbortSignal.timeout(30_000) })
+assert.equal(markdownUpload.status, 200)
+
+const markdownUrl = new URL((await markdownUpload.json()).url, origin)
+assert.match(markdownUrl.pathname, /^\/i\/[0-9a-f-]+\.md$/)
+
+const markdownPage = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })
+assert.equal(markdownPage.status, 200)
+assert.equal(markdownPage.headers.get("content-type"), "text/html; charset=utf-8")
+assert.match(await markdownPage.text(), /<div class="mermaid"><svg/)
+
+markdownUrl.search = "?raw"
+const markdownRaw = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })
+assert.equal(markdownRaw.status, 200)
+assert.match(markdownRaw.headers.get("content-type") ?? "", /^text\/markdown/)
+assert.equal(await markdownRaw.text(), markdownSource)
+
 const codeResponse = await fetch(new URL("/api/code", origin), {
   body: JSON.stringify({ code: "const answer: number = 42", language: "typescript", theme: "nuxt" }),
   headers: { "content-type": "application/json" },

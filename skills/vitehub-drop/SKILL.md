@@ -1,26 +1,31 @@
 ---
 name: vitehub-drop
-description: Uploads a local file and returns its permanent public URL. Use when an agent needs to include a local image or document in GitHub content like issues, Pull Request, etc... It can also render source code as a temporary image URL.
+description: Publishes a local file at an immutable public URL. Use when an agent needs to share an image, document, or readable Markdown plan in GitHub content. It can also render source code as a temporary image URL.
 ---
 
 # ViteHub Drop
 
-Choose one branch and return its stdout verbatim.
+Publish one file and return its URL. A published URL never changes; publish a new file for every revision.
 
-## File
+## Publish a file
 
-Upload a file placed in scope:
+Upload a file already in scope:
 
 ```sh
 curl --fail-with-body --silent --show-error \
-  -F "file=@/absolute/path/to/file.pdf" \
+  -F "file=@/absolute/path/to/file" \
   https://drop.vitehub.dev/api/files |
   jq -er '.url'
 ```
 
-## Code
+Return the command's stdout verbatim. Do not retry a successful upload: every successful request creates another permanent URL.
+
+Markdown files render as HTML at the returned URL. Append `?raw` to read their exact source. Before publishing Markdown, follow [the Markdown plan guide](references/markdown.md).
+
+## Render code
 
 Render code through Ray.so's native export.
+
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \
@@ -29,7 +34,7 @@ curl --fail-with-body --silent --show-error \
   jq -er '.url'
 ```
 
-Code image URLs expire after five minutes; download and re-upload through File to make one permanent.
+Code image URLs expire after five minutes; download and publish the result to make it permanent.
 
 ## Options
 
