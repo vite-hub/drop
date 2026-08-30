@@ -5,10 +5,9 @@ import alert from "@comark/html/plugins/alert"
 import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
 import frontmatter from "@comark/html/plugins/frontmatter"
-import mermaid from "@comark/html/plugins/mermaid"
+import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
-import { renderMermaidSVG } from "beautiful-mermaid"
 
 const ALLOWED_TAGS = [
   "a",
@@ -55,7 +54,7 @@ const plugins = [
   taskList(),
   components(),
   attributes(),
-  mermaid(),
+  mermaid({ theme: "zinc-light" }),
   security({
     allowedProtocols: ["http", "https", "mailto"],
     allowedTags: ALLOWED_TAGS,
@@ -110,25 +109,17 @@ const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render })
   return `<aside class="callout" data-kind="${escapeHtml(kind)}">${await render(children)}</aside>`
 }
 
-const renderMermaid: NodeHandler = ([, attrs]) => {
+const renderMermaid: NodeHandler = (node) => {
+  const [, attrs] = node
   const content = String(attrs.content ?? "")
+  const rendered = Mermaid(node)
 
-  try {
-    const svg = renderMermaidSVG(content, {
-      accent: "#1b365d",
-      bg: "#faf9f5",
-      border: "#9b998f",
-      fg: "#141413",
-      font: "Georgia",
-      line: "#504e49",
-      muted: "#6b6a64",
-      surface: "#f0eee6",
-    }).replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
-    return `<div class="mermaid" data-zoomable>${svg}</div>`
-  }
-  catch {
+  if (!rendered.startsWith('<div class="mermaid">'))
     return `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
-  }
+
+  return rendered
+    .replace('<div class="mermaid">', '<div class="mermaid" data-zoomable>')
+    .replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
 }
 
 export async function renderMarkdownDocument(markdown: string, pathname: string, styles: string): Promise<string> {
