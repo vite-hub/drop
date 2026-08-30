@@ -20,7 +20,7 @@ export default defineHandler(async (event) => {
 
   const html = await renderMarkdownDocument(await source.text(), event.url.pathname, typesetStyles)
   event.res.headers.set("Cache-Control", "public, max-age=60")
-  event.res.headers.set("Content-Security-Policy", "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+  event.res.headers.set("Content-Security-Policy", "default-src 'none'; img-src https: data:; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
   event.res.headers.set("Content-Type", "text/html; charset=utf-8")
   event.res.headers.set("Referrer-Policy", "no-referrer")
   event.res.headers.set("X-Content-Type-Options", "nosniff")

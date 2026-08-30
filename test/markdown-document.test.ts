@@ -5,10 +5,23 @@ import { renderMarkdownDocument as renderMarkdownDocumentWithStyles } from "../s
 
 const pathname = "/i/00000000-0000-4000-8000-000000000000.md"
 const styles = await readFile(new URL("../server/assets/typeset.css", import.meta.url), "utf8")
+const zoomScript = await readFile(new URL("../public/document-zoom.js", import.meta.url), "utf8")
 
 function renderMarkdownDocument(markdown: string, path: string) {
   return renderMarkdownDocumentWithStyles(markdown, path, styles)
 }
+
+test("does not frame Mermaid diagrams twice", () => {
+  const mermaidStyles = styles.match(/\.typeset \.mermaid \{([\s\S]*?)\}/)?.[1]
+  assert.ok(mermaidStyles)
+  assert.doesNotMatch(mermaidStyles, /\b(?:background|border|padding):/)
+})
+
+test("zooms images and opt-in visual components", () => {
+  assert.match(zoomScript, /\.typeset img, \.typeset \[data-zoomable\]/)
+  assert.match(zoomScript, /dialog\.showModal\(\)/)
+  assert.match(zoomScript, /\["Enter", " "\]/)
+})
 
 test("renders frontmatter, Markdown, Comark callouts, and Mermaid", async () => {
   const html = await renderMarkdownDocument(`---
@@ -30,7 +43,9 @@ graph LR
   assert.match(html, /<title>Release plan · Drop<\/title>/)
   assert.match(html, /<h1 id="ship-the-renderer">Ship the renderer<\/h1>/)
   assert.match(html, /<aside class="callout" data-kind="decision">Keep the existing endpoint\.<\/aside>/)
-  assert.match(html, /<div class="mermaid"><svg/)
+  assert.match(html, /<div class="mermaid" data-zoomable><svg/)
+  assert.match(html, /<dialog class="visual-zoom"/)
+  assert.match(html, /<script src="\/document-zoom\.js" defer><\/script>/)
   assert.match(html, /<article class="typeset typeset-compact">/)
   assert.match(html, /Built with drop\.vitehub\.dev/)
   assert.doesNotMatch(html, /class="site-header"/)

@@ -31,7 +31,8 @@ assert.match(markdownUrl.pathname, /^\/i\/[0-9a-f-]+\.md$/)
 const markdownPage = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })
 assert.equal(markdownPage.status, 200)
 assert.equal(markdownPage.headers.get("content-type"), "text/html; charset=utf-8")
-assert.match(await markdownPage.text(), /<div class="mermaid"><svg/)
+assert.match(await markdownPage.text(), /<div class="mermaid" data-zoomable><svg/)
+assert.match(markdownPage.headers.get("content-security-policy"), /script-src 'self'/)
 
 markdownUrl.search = "?raw"
 const markdownRaw = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })

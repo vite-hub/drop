@@ -124,7 +124,7 @@ const renderMermaid: NodeHandler = ([, attrs]) => {
       muted: "#6b6a64",
       surface: "#f0eee6",
     }).replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
-    return `<div class="mermaid">${svg}</div>`
+    return `<div class="mermaid" data-zoomable>${svg}</div>`
   }
   catch {
     return `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
@@ -184,6 +184,10 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
     <span aria-hidden="true">·</span>
     <a href="${escapeHtml(pathname)}?raw">Source</a>
   </footer>
+  <dialog class="visual-zoom" id="visual-zoom" aria-label="Expanded visual" data-not-typeset>
+    <div class="visual-zoom__content"></div>
+  </dialog>
+  <script src="/document-zoom.js" defer></script>
 </body>
 </html>`
 }
