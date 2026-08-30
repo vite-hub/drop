@@ -5,8 +5,7 @@
       "description": "Publishes local files at permanent public URLs, with readable HTML rendering for Markdown and temporary image rendering for source code. Use when attaching files to GitHub issues or pull requests.",
       "files": [
         "SKILL.md",
-        "references/documents.md",
-        "references/markdown.md"
+        "references/documents.md"
       ]
     }
   ]
