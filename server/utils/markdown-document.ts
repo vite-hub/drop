@@ -1,6 +1,6 @@
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
-import { parseMarkdown } from "@comark/html/parse"
+import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
 import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
@@ -9,44 +9,7 @@ import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 
-const ALLOWED_TAGS = [
-  "a",
-  "alert",
-  "blockquote",
-  "br",
-  "callout",
-  "code",
-  "del",
-  "em",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "hr",
-  "img",
-  "info",
-  "input",
-  "li",
-  "mermaid",
-  "note",
-  "ol",
-  "p",
-  "pre",
-  "s",
-  "span",
-  "strong",
-  "table",
-  "tbody",
-  "td",
-  "th",
-  "thead",
-  "tip",
-  "tr",
-  "ul",
-  "warning",
-]
+const ALLOWED_TAGS = "a alert blockquote br callout code del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s span strong table tbody td th thead tip tr ul warning".split(" ")
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
 
@@ -68,6 +31,8 @@ const plugins = [
     ],
   }),
 ] as const
+
+const parseMarkdown = createMarkdownParser({ plugins, registerDefaultPlugins: false })
 
 function escapeHtml(value: string): string {
   return value
@@ -116,18 +81,17 @@ function createMermaidRenderer(): NodeHandler {
   let sourceCharacters = 0
 
   return (node) => {
-    const [, attrs] = node
-    const content = String(attrs.content ?? "")
-    const fallback = () => `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
+    const content = String(node[1].content ?? "")
+    const fallback = `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
 
     diagrams += 1
     sourceCharacters += content.length
-    if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback()
+    if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback
 
     const rendered = Mermaid(node)
     return rendered.startsWith('<div class="mermaid">')
       ? rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
-      : fallback()
+      : fallback
   }
 }
 
@@ -137,10 +101,7 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
   let body: string
 
   try {
-    const document = await parseMarkdown(markdown, {
-      plugins,
-      registerDefaultPlugins: false,
-    })
+    const document = await parseMarkdown(markdown)
     title = documentTitle(document)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     if (supersedes)
