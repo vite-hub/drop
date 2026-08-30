@@ -8,21 +8,37 @@ Choose the source format before writing:
 - Use HTML when layout, visual comparison, or custom presentation carries meaning.
 - Treat prompts and `SKILL.md` files as agent instructions, even when they use Markdown syntax.
 
-## Prompts and agent instructions
+## Agent prompts
 
-Write the shortest instruction that reliably produces the requested result.
+A prompt is an executable contract. Spend words only on context and decisions the target agent cannot infer.
 
-- Put the goal and concrete deliverables first.
-- Keep a constraint beside the behavior it controls.
-- State what the agent may read, change, publish, or leave untouched when authority matters.
-- Replace vague quality requests with checks the agent can observe.
-- Remove advice the agent already follows without being told.
-- Keep one prompt or skill responsible for one job. Split unrelated jobs instead of building a catch-all.
-- Keep the main instructions easy to scan. Move conditional procedures and detailed examples into references.
+First choose its lifespan:
 
-For a `SKILL.md` description, name both the capability and its trigger. Use concrete nouns such as the product, action, and file type so another agent can decide when to load it.
+- A task prompt carries current state toward one result.
+- Persistent instructions contain rules that remain useful across requests. Keep temporary state out of them.
 
-Before publishing agent instructions, check their YAML frontmatter, local links, trigger wording, safety limits, and stopping conditions.
+When the project is available, inspect its instructions and a representative prompt. Preserve exact skill names, project terms, targets, and authority. Expose any assumption that would change execution.
+
+Keep only the outcome, target, necessary context, source of truth, required capabilities, authority, and proof of completion. Omit any item that does not change execution.
+
+Write a task prompt in execution order: outcome and target, current evidence, required capabilities, authority and constraints, then verification and the stopping condition. For persistent instructions, order identity and audience, evidence and source routing, capabilities, authority, then the answer contract.
+
+Name only skills and tools available to the target agent. Let each named skill own its process instead of copying its instructions into the prompt.
+
+Delete role theatre, generic quality requests, duplicated meaning, speculative implementation detail, and headings that contain no useful grouping. The finished prompt must be short enough to scan and complete enough to execute without reconstructing the author's intent.
+
+## Skill files
+
+Keep a skill responsible for one job and one trigger family. Split unrelated jobs instead of building a catch-all.
+
+- Use `SKILL.md` for the decision rules every run needs.
+- Put conditional procedures, schemas, and substantial examples in references linked from the branch that needs them.
+- Write the description in third person. State the capability first, then `Use when` with concrete product, action, and file-type triggers.
+- Keep automatic invocation when the trigger is narrow and the skill is useful whenever it appears. Set `disable-model-invocation: true` for explicit workflows, expensive work, mutation boundaries, or actions the agent should not infer.
+- Refer to another skill only when the target environment guarantees it is available.
+- Add a script only when deterministic execution avoids repeatedly rewriting the same logic.
+
+Before publishing, check the YAML frontmatter, local links, trigger wording, progressive disclosure, authority limits, and observable stopping conditions. Each remaining instruction should change behavior.
 
 ## HTML documents
 
@@ -102,12 +118,14 @@ supersedes: https://drop.vitehub.dev/i/previous.md
 Make the final document sound like a person wrote it for this specific reader.
 
 - Prefer concrete facts, plain words, and active voice.
+- Use first person and state a clear opinion when the document calls for judgment.
 - Vary sentence length. Split sentences that require rereading.
 - Remove puffery, marketing language, vague attribution, and generic conclusions.
 - Remove filler such as "in order to," "it is important to note," and "due to the fact that."
 - Replace abstract technical metaphors with the actual mechanism.
 - Avoid forced groups of three, repeated synonyms, decorative emoji, and excessive bold text.
 - Avoid em dashes. Use a period or rewrite the sentence.
+- Use sentence-case headings and straight quotes. Use colons for lists or examples, not as a substitute for a sentence.
 - State the point directly instead of using "not just X, but Y."
 - Name uncertainty precisely. Do not pad it with several hedges.
 

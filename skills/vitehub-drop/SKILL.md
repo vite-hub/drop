@@ -20,7 +20,7 @@ curl --fail-with-body --silent --show-error \
 
 Return the command's stdout verbatim. Do not retry a successful upload: every successful request creates another permanent URL.
 
-Markdown files render as HTML at the returned URL. Append `?raw` to read their exact source. Before publishing a human-readable Markdown or HTML file, follow [the document guide](references/documents.md).
+Markdown files render as HTML at the returned URL. Append `?raw` to read their exact source. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
 
 ## Render code
 
