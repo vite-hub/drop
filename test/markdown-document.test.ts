@@ -1,8 +1,14 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import test from "node:test"
-import { renderMarkdownDocument } from "../server/utils/markdown-document.ts"
+import { renderMarkdownDocument as renderMarkdownDocumentWithStyles } from "../server/utils/markdown-document.ts"
 
 const pathname = "/i/00000000-0000-4000-8000-000000000000.md"
+const styles = await readFile(new URL("../server/assets/typeset.css", import.meta.url), "utf8")
+
+function renderMarkdownDocument(markdown: string, path: string) {
+  return renderMarkdownDocumentWithStyles(markdown, path, styles)
+}
 
 test("renders frontmatter, Markdown, Comark callouts, and Mermaid", async () => {
   const html = await renderMarkdownDocument(`---
@@ -25,6 +31,9 @@ graph LR
   assert.match(html, /<h1 id="ship-the-renderer">Ship the renderer<\/h1>/)
   assert.match(html, /<aside class="callout" data-kind="decision">Keep the existing endpoint\.<\/aside>/)
   assert.match(html, /<div class="mermaid"><svg/)
+  assert.match(html, /<article class="typeset typeset-compact">/)
+  assert.match(html, /Built with drop\.vitehub\.dev/)
+  assert.doesNotMatch(html, /class="site-header"/)
   assert.doesNotMatch(html, /fonts\.googleapis\.com/)
 })
 

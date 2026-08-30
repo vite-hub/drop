@@ -1,5 +1,6 @@
 import { defineHandler, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
+import typesetStyles from "../assets/typeset.css?raw"
 import { renderMarkdownDocument } from "../utils/markdown-document"
 
 const MARKDOWN_PATH = /^\/i\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:md|markdown))$/i
@@ -17,7 +18,7 @@ export default defineHandler(async (event) => {
   }
   if (!source) return
 
-  const html = await renderMarkdownDocument(await source.text(), event.url.pathname)
+  const html = await renderMarkdownDocument(await source.text(), event.url.pathname, typesetStyles)
   event.res.headers.set("Cache-Control", "public, max-age=60")
   event.res.headers.set("Content-Security-Policy", "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
   event.res.headers.set("Content-Type", "text/html; charset=utf-8")

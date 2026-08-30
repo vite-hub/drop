@@ -2,6 +2,8 @@
 
 Write for the person deciding or implementing, not for the agent that produced the plan.
 
+Treat a conversational prompt as input, not an outline. Resolve obvious shorthand from the named repository, verify suggested fixes as hypotheses, and lead with any evidence that changes the premise. Do not invent work to preserve the requested solution.
+
 ## Shape
 
 - Open with the outcome or recommendation.
@@ -9,7 +11,7 @@ Write for the person deciding or implementing, not for the agent that produced t
 - Preserve reasons, evidence, constraints, and meaningful trade-offs.
 - Prefer short sections with concrete names. Remove research chronology, repeated summaries, and generic setup prose.
 - Aim for one screen of prose. Exceed it only when omitted evidence could change the decision.
-- Use a table for repeated comparisons and Mermaid for relationships or flows that are harder to read linearly.
+- Use a table for repeated comparisons and at most one Mermaid diagram for relationships or flows that are harder to read linearly.
 - End with unresolved decisions or the next action, if either exists.
 
 ## Supported syntax
