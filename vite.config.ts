@@ -57,7 +57,6 @@ export default defineConfig({
       handlers: [
         {
           handler: "./server/handlers/markdown-documents.ts",
-          lazy: true,
           middleware: true,
           route: "/i/*.(md|markdown)",
         },
