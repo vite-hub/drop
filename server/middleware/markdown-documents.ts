@@ -3,10 +3,14 @@ import { blob } from "vite-hub/blob"
 import typesetStyles from "../assets/typeset.css?raw"
 import { renderMarkdownDocument } from "../utils/markdown-document"
 
+const MARKDOWN_PATH = /^\/i\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:md|markdown))$/i
+
 export default defineHandler(async (event) => {
   if (!(["GET", "HEAD"].includes(event.req.method)) || event.url.searchParams.has("raw")) return
 
-  const key = event.url.pathname.slice("/i/".length)
+  const key = event.url.pathname.match(MARKDOWN_PATH)?.[1]
+  if (!key) return
+
   const [error, source] = await blob.get(key)
   if (error) {
     console.error(JSON.stringify({ counter: "storage_failure", error: error.message }))
