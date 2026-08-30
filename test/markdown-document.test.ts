@@ -44,7 +44,7 @@ graph LR
   assert.match(html, /<title>Release plan · Drop<\/title>/)
   assert.match(html, /<h1 id="ship-the-renderer">Ship the renderer<\/h1>/)
   assert.match(html, /<aside class="callout" data-kind="decision">Keep the existing endpoint\.<\/aside>/)
-  assert.match(html, /<div class="mermaid" data-zoomable><svg/)
+  assert.match(html, /<div class="mermaid"><svg/)
   assert.match(html, /<script src="\/vendor\/medium-zoom\/medium-zoom\.min\.js" defer><\/script>/)
   assert.match(html, /<script src="\/document-zoom\.js" defer><\/script>/)
   assert.doesNotMatch(html, /<dialog class="visual-zoom"/)
@@ -69,6 +69,17 @@ test("escapes invalid Mermaid source", async () => {
   assert.match(html, /class="mermaid-error"/)
   assert.doesNotMatch(html, /<script>/)
   assert.match(html, /&lt;script&gt;/)
+})
+
+test("bounds Mermaid rendering work", async () => {
+  const diagrams = Array.from({ length: 5 }, (_, index) => `\`\`\`mermaid\ngraph LR\n  A${index} --> B${index}\n\`\`\``).join("\n\n")
+  const html = await renderMarkdownDocument(diagrams, pathname)
+
+  assert.equal(html.match(/<div class="mermaid">/g)?.length, 4)
+  assert.match(html, /class="mermaid-error"/)
+
+  const oversized = await renderMarkdownDocument(`\`\`\`mermaid\n${"A --> B\n".repeat(1_001)}\`\`\``, pathname)
+  assert.doesNotMatch(oversized, /<div class="mermaid">/)
 })
 
 test("replaces unknown Comark components with readable content", async () => {

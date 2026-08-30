@@ -3,11 +3,6 @@
  * https://github.com/shadcn-ui/ui/blob/b4a618b97e35f5dadf3a00d51f410c84a2567d4d/apps/v4/app/(app)/(typeset)/typeset.css
  */
 
-/*
- * shadcn/typeset
- * https://ui.shadcn.com/docs/typeset.
- */
-
 @layer components {
   .typeset {
     --typeset-font-body: inherit;

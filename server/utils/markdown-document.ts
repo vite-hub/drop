@@ -47,6 +47,8 @@ const ALLOWED_TAGS = [
   "ul",
   "warning",
 ]
+const MAX_MERMAID_DIAGRAMS = 4
+const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
 
 const plugins = [
   frontmatter(),
@@ -84,12 +86,12 @@ function textContent(node: MarkdownNode): string {
   return node.slice(2).map(child => textContent(child as MarkdownNode)).join("")
 }
 
-function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>, fallback: string): string {
+function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): string {
   if (typeof document.frontmatter.title === "string" && document.frontmatter.title.trim())
     return document.frontmatter.title.trim()
 
   const heading = document.nodes.find(node => Array.isArray(node) && node[0] === "h1")
-  return heading ? textContent(heading).trim() || fallback : fallback
+  return (heading && textContent(heading).trim()) || "Untitled document"
 }
 
 function supersedesHref(value: unknown): string | undefined {
@@ -109,22 +111,28 @@ const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render })
   return `<aside class="callout" data-kind="${escapeHtml(kind)}">${await render(children)}</aside>`
 }
 
-const renderMermaid: NodeHandler = (node) => {
-  const [, attrs] = node
-  const content = String(attrs.content ?? "")
-  const rendered = Mermaid(node)
+function createMermaidRenderer(): NodeHandler {
+  let diagrams = 0
+  let sourceCharacters = 0
 
-  if (!rendered.startsWith('<div class="mermaid">'))
-    return `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
+  return (node) => {
+    const [, attrs] = node
+    const content = String(attrs.content ?? "")
+    const fallback = () => `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
 
-  return rendered
-    .replace('<div class="mermaid">', '<div class="mermaid" data-zoomable>')
-    .replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
+    diagrams += 1
+    sourceCharacters += content.length
+    if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback()
+
+    const rendered = Mermaid(node)
+    return rendered.startsWith('<div class="mermaid">')
+      ? rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
+      : fallback()
+  }
 }
 
 export async function renderMarkdownDocument(markdown: string, pathname: string, styles: string): Promise<string> {
-  const fallback = /^\/[iI]\/[0-9a-f-]+\.(?:md|markdown)$/i.test(pathname) ? "Untitled document" : pathname.split("/").at(-1)?.replace(/\.(?:md|markdown)$/i, "") || "Untitled document"
-  let title = fallback
+  let title = "Untitled document"
   let revision = ""
   let body: string
 
@@ -133,7 +141,7 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
       plugins,
       registerDefaultPlugins: false,
     })
-    title = documentTitle(document, fallback)
+    title = documentTitle(document)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     if (supersedes)
       revision = `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
@@ -143,7 +151,7 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
         alert: renderCallout,
         callout: renderCallout,
         info: renderCallout,
-        mermaid: renderMermaid,
+        mermaid: createMermaidRenderer(),
         note: renderCallout,
         tip: renderCallout,
         warning: renderCallout,

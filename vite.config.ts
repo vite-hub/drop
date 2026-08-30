@@ -54,6 +54,14 @@ export default defineConfig({
         },
       },
       compatibilityDate: "2026-07-17",
+      handlers: [
+        {
+          handler: "./server/handlers/markdown-documents.ts",
+          lazy: true,
+          middleware: true,
+          route: "/i/*.(md|markdown)",
+        },
+      ],
       publicAssets: [
         {
           baseURL: "/vendor/medium-zoom",
