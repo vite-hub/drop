@@ -5,6 +5,7 @@
       "description": "Publishes a local file at an immutable public URL. Use when an agent needs to share an image, document, or readable Markdown plan in GitHub content. It can also render source code as a temporary image URL.",
       "files": [
         "SKILL.md",
+        "references/documents.md",
         "references/markdown.md"
       ]
     }
