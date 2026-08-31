@@ -24,7 +24,7 @@
     "nitro": "3.0.260603-beta",
     "sharp": "0.34.5",
     "valibot": "^1.4.2",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@84cfad6269dc74e61e904f4d92facede8b6569ab"
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@6e33af55e8bebd69d115d3739c4c94c14be0282c"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
