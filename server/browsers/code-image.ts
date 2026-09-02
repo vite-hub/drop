@@ -91,6 +91,10 @@ async function selectRayExportScale(
   const option = page.locator('[role="menuitemradio"]', { hasText: `${scale}x` })
   if (await option.count() !== 1)
     throw new Error(`[drop:code-image] Ray does not offer ${scale}x export.`)
+  if (await option.getAttribute("aria-checked") === "true") {
+    await page.keyboard.press("Escape")
+    return
+  }
   await option.click()
 
   await openRayExportMenu(page)

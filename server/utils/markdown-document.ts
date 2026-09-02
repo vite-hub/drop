@@ -2,7 +2,6 @@ import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
 import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
-import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
 import frontmatter from "@comark/html/plugins/frontmatter"
 import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
@@ -18,7 +17,6 @@ const plugins = [
   alert(),
   taskList(),
   components(),
-  attributes(),
   mermaid({ theme: "zinc-light" }),
   security({
     allowedProtocols: ["http", "https", "mailto"],

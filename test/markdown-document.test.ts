@@ -54,11 +54,12 @@ graph LR
   assert.doesNotMatch(html, /fonts\.googleapis\.com/)
 })
 
-test("does not execute raw HTML", async () => {
-  const html = await renderMarkdownDocument("---\ntitle: Safe </title><script>\n---\n\n# Safe\n\n<script>alert('no')</script>\n\n[bad](javascript:alert(1)) [good](https://example.com)", pathname)
+test("does not execute raw HTML or allow arbitrary attributes", async () => {
+  const html = await renderMarkdownDocument("---\ntitle: Safe </title><script>\n---\n\n# Safe\n\n<script>alert('no')</script>\n\n[bad](javascript:alert(1)) [good](https://example.com){style=\"position:fixed\" onclick=\"alert(1)\"}", pathname)
 
   assert.doesNotMatch(html, /<script>/)
   assert.doesNotMatch(html, /href="javascript:/)
+  assert.doesNotMatch(html, /<a\b[^>]*(?:style=|onclick=)/)
   assert.match(html, /&lt;script&gt;alert\('no'\)&lt;\/script&gt;/)
   assert.match(html, /href="https:\/\/example\.com"/)
 })
