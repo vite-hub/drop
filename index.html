@@ -1231,13 +1231,11 @@ Draft --&gt; Review --&gt; Ship
     </section>
 
     <section class="doc-section api" id="api" aria-labelledby="api-title">
-      <div class="section-label">Use Drop</div>
+        <div class="section-label">Use Drop</div>
       <div class="section-content">
         <h2 id="api-title">Upload a file</h2>
-        <p>The installed skill uploads the file and returns its permanent Drop URL.</p>
-        <pre><code>curl --fail-with-body --silent --show-error \
-  -F "file=@/absolute/path/to/file.pdf" \
-  https://drop.vitehub.dev/api/files | jq -er '.url'</code></pre>
+        <p>The installed skill stores the file and immediately prints its permanent Drop URL.</p>
+        <pre><code>curl -fsS -F "file=@/absolute/path/to/file.pdf" https://drop.vitehub.dev/api/files | jq -er '.url'</code></pre>
 
         <h3>Limits</h3>
         <ul class="behavior limit-list">
