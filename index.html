@@ -57,9 +57,15 @@
     }
 
     main {
-      width: min(45rem, calc(100% - 3rem));
+      width: min(74rem, calc(100% - 3rem));
       margin: 0 auto;
       padding: clamp(3rem, 10vh, 6rem) 0 max(2rem, env(safe-area-inset-bottom));
+    }
+
+    .intro,
+    .doc-section:not(#why) {
+      width: min(45rem, 100%);
+      margin-inline: auto;
     }
 
     .intro {
@@ -218,13 +224,317 @@
     }
 
     #why {
-      padding: clamp(4rem, 8vw, 6rem) 0;
-      gap: 0.75rem;
+      padding: clamp(5rem, 10vw, 8rem) 0 0;
+      display: block;
       border-top: 0;
     }
 
-    #why .section-content {
-      margin-inline-start: 0;
+    .showcase-head {
+      max-width: 45rem;
+      margin-inline: auto;
+    }
+
+    .showcase-head h2 {
+      max-width: 10ch;
+      margin: 0.75rem 0 0;
+      font-size: clamp(3rem, 7vw, 5.75rem);
+      font-weight: 600;
+      letter-spacing: -0.06em;
+      line-height: 0.94;
+      text-wrap: balance;
+    }
+
+    .showcase-head p {
+      max-width: 38rem;
+      margin: 1.5rem 0 0;
+      color: var(--muted);
+      font-size: 1.1rem;
+      line-height: 1.7;
+    }
+
+    .showcase-list {
+      margin-top: clamp(3rem, 7vw, 5rem);
+    }
+
+    .showcase-item {
+      min-height: 36rem;
+      padding: clamp(4.5rem, 8vw, 6rem) 0;
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(24rem, 1.18fr);
+      align-items: center;
+      gap: clamp(3rem, 8vw, 8rem);
+      border-top: 1px solid var(--line);
+    }
+
+    .showcase-item:nth-child(even) .showcase-copy {
+      order: 2;
+    }
+
+    .showcase-item:nth-child(even) .showcase-visual {
+      order: 1;
+    }
+
+    .showcase-number {
+      width: 2.25rem;
+      height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+    }
+
+    .showcase-copy h3 {
+      margin: 1.4rem 0 0;
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-weight: 600;
+      letter-spacing: -0.055em;
+      line-height: 0.96;
+      text-wrap: balance;
+    }
+
+    .showcase-copy > p {
+      margin: 1.3rem 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.7;
+    }
+
+    .showcase-details {
+      margin: 1.5rem 0 0;
+      padding: 0;
+      display: grid;
+      gap: 0.65rem;
+      list-style: none;
+      font-size: 0.95rem;
+    }
+
+    .showcase-details li {
+      display: flex;
+      gap: 0.7rem;
+      align-items: baseline;
+    }
+
+    .showcase-details li::before {
+      content: "↳";
+      color: var(--accent);
+    }
+
+    .showcase-visual {
+      min-height: 28rem;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .showcase-visual-bar {
+      height: 2.75rem;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .showcase-lights {
+      display: flex;
+      gap: 0.35rem;
+    }
+
+    .showcase-lights i {
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 50%;
+      background: var(--line);
+    }
+
+    .file-stage {
+      height: calc(28rem - 2.75rem);
+      position: relative;
+      display: grid;
+      place-items: center;
+    }
+
+    .file-card {
+      width: 9.5rem;
+      height: 11.5rem;
+      position: absolute;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid var(--line);
+      background: oklch(18% 0.012 145);
+      box-shadow: 0 1rem 3rem oklch(5% 0.01 145 / 0.35);
+      transform-origin: bottom center;
+    }
+
+    .file-card:nth-child(1) { transform: translate(-8.8rem, 0.7rem) rotate(-9deg); }
+    .file-card:nth-child(2) { transform: translate(-4.5rem, -1.4rem) rotate(-4deg); }
+    .file-card:nth-child(3) { z-index: 2; transform: translate(0, -2.2rem); }
+    .file-card:nth-child(4) { transform: translate(4.6rem, -1.2rem) rotate(4deg); }
+    .file-card:nth-child(5) { transform: translate(8.8rem, 0.8rem) rotate(9deg); }
+
+    .file-extension {
+      width: fit-content;
+      padding: 0.25rem 0.45rem;
+      border: 1px solid currentColor;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+    }
+
+    .file-name {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .file-pdf { color: oklch(68% 0.19 28); }
+    .file-xlsx { color: oklch(72% 0.15 150); }
+    .file-docx { color: oklch(70% 0.14 250); }
+    .file-png { color: oklch(75% 0.15 330); }
+    .file-zip { color: var(--accent); }
+
+    .file-url {
+      max-width: calc(100% - 3rem);
+      position: absolute;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      left: 1.5rem;
+      padding: 0.85rem 1rem;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--bg);
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.74rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .render-stage {
+      min-height: calc(28rem - 2.75rem);
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 0.88fr 1.12fr;
+      gap: 1rem;
+    }
+
+    .source-pane,
+    .document-pane {
+      min-width: 0;
+      border: 1px solid var(--line);
+      background: var(--bg);
+    }
+
+    .pane-label {
+      padding: 0.65rem 0.8rem;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .markdown-source {
+      padding: 1rem;
+      color: var(--muted);
+      font: 0.72rem/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .markdown-source b {
+      color: var(--accent);
+      font-weight: 400;
+    }
+
+    .document-preview {
+      padding: 1.3rem;
+    }
+
+    .document-preview h4 {
+      margin: 0;
+      font-size: 1.45rem;
+      letter-spacing: -0.04em;
+    }
+
+    .document-preview p {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    .document-callout {
+      margin-top: 1rem;
+      padding: 0.8rem;
+      border-left: 2px solid var(--accent);
+      background: var(--surface);
+      font-size: 0.75rem;
+    }
+
+    .document-flow {
+      margin-top: 1rem;
+      padding: 1rem 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font: 0.68rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .document-flow span {
+      padding: 0.45rem 0.55rem;
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+
+    .document-flow i {
+      color: var(--accent);
+      font-style: normal;
+    }
+
+    .showcase-code-stage {
+      height: calc(28rem - 2.75rem);
+      padding: 1.5rem;
+      display: grid;
+      place-items: center;
+    }
+
+    .showcase-code-window {
+      width: min(31rem, 100%);
+      overflow: hidden;
+      border: 1px solid oklch(38% 0.04 285);
+      background: oklch(18% 0.035 285);
+      box-shadow: 0 1.5rem 4rem oklch(5% 0.02 285 / 0.5);
+      transform: rotate(-1.5deg);
+    }
+
+    .showcase-code-top {
+      height: 2.4rem;
+      padding: 0 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid oklch(30% 0.04 285);
+      color: oklch(75% 0.04 285);
+      font-size: 0.7rem;
+    }
+
+    .showcase-code-body {
+      padding: 1.4rem;
+      font: 0.78rem/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .code-pink { color: oklch(78% 0.16 340); }
+    .code-blue { color: oklch(78% 0.13 235); }
+    .code-green { color: oklch(82% 0.14 150); }
     }
 
     .section-label {
@@ -319,83 +629,6 @@
     .provider span {
       font-size: 0.7rem;
       line-height: 1.3;
-    }
-
-    .stepper {
-      max-width: 40rem;
-      margin: clamp(2.5rem, 6vw, 3.5rem) 0 0;
-      padding: 0;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      list-style: none;
-    }
-
-    .stepper-item {
-      min-width: 0;
-      display: grid;
-      grid-template-columns: 1.75rem minmax(0, 1fr);
-      column-gap: 0.875rem;
-    }
-
-    .stepper-track {
-      display: flex;
-      align-items: center;
-      flex-direction: column;
-    }
-
-    .stepper-indicator {
-      width: 1.75rem;
-      height: 1.75rem;
-      flex: none;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.7rem;
-      font-weight: 600;
-    }
-
-    .stepper-separator {
-      width: 1px;
-      min-height: 1rem;
-      margin: 0.4rem 0;
-      flex: 1;
-      background: var(--line);
-    }
-
-    .stepper-item:last-child .stepper-separator {
-      display: none;
-    }
-
-    .stepper-copy {
-      padding: 0.125rem 0 1.5rem;
-    }
-
-    .stepper-item:last-child .stepper-copy {
-      padding-bottom: 0;
-    }
-
-    .stepper-title {
-      margin: 0;
-      font-size: 1.05rem;
-      font-weight: 500;
-      line-height: 1.4;
-    }
-
-    .stepper-description {
-      max-width: 36rem;
-      margin: 0.3rem 0 0;
-      color: var(--muted);
-      font-size: 0.925rem;
-      line-height: 1.6;
-      text-wrap: pretty;
-    }
-
-    .stepper-description a {
-      min-height: 0;
-      display: inline;
-      font-size: inherit;
     }
 
     .api .section-content > p {
@@ -553,6 +786,19 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    @media (max-width: 52rem) {
+      .showcase-item {
+        min-height: 0;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2.5rem;
+      }
+
+      .showcase-item:nth-child(even) .showcase-copy,
+      .showcase-item:nth-child(even) .showcase-visual {
+        order: initial;
+      }
+    }
+
     @media (max-width: 48rem) {
       .provider-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -665,8 +911,52 @@
       }
 
       #why {
-        padding: 3.5rem 0;
-        gap: 0.6rem;
+        padding: 4.5rem 0 0;
+      }
+
+      .showcase-head h2 {
+        font-size: clamp(2.75rem, 14vw, 4rem);
+      }
+
+      .showcase-head p {
+        font-size: 1rem;
+      }
+
+      .showcase-item {
+        padding: 4.5rem 0;
+      }
+
+      .showcase-copy h3 {
+        font-size: 2.75rem;
+      }
+
+      .showcase-copy > p,
+      .showcase-details {
+        font-size: 1rem;
+      }
+
+      .showcase-visual {
+        min-height: 24rem;
+        margin-inline: -1rem;
+      }
+
+      .file-stage {
+        height: calc(24rem - 2.75rem);
+        transform: scale(0.8);
+      }
+
+      .render-stage {
+        min-height: calc(24rem - 2.75rem);
+        padding: 1rem;
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .source-pane {
+        display: none;
+      }
+
+      .showcase-code-stage {
+        height: calc(24rem - 2.75rem);
       }
 
       .provider-grid {
@@ -684,18 +974,6 @@
       }
 
       .provider span {
-        font-size: 1rem;
-      }
-
-      .stepper {
-        margin-top: 2rem;
-      }
-
-      .stepper-title {
-        font-size: 1.125rem;
-      }
-
-      .stepper-description {
         font-size: 1rem;
       }
 
@@ -802,7 +1080,7 @@
         <p class="usage-proof"><strong>{{ uploads.toLocaleString() }}</strong> files dropped by agents</p>
         <nav class="links" aria-label="Service links">
           <span class="link-group">
-            <a href="#why">How and why</a>
+            <a href="#why">What Drop makes</a>
             <a href="#api">Use Drop</a>
             <a href="#self-host">Host it yourself</a>
           </span>
@@ -825,42 +1103,96 @@
     </section>
 
     <section class="doc-section" id="why" aria-labelledby="why-title">
-      <div class="section-label">How and why</div>
-      <div class="section-content">
-        <h2 id="why-title">Give agent-made files a place to land</h2>
-        <p>ViteHub Drop publishes files at stable URLs, turns Markdown into readable pages, and renders source code as images. Install the skill once and let your agent handle the rest.</p>
-        <ol class="stepper" aria-label="How it works">
-          <li class="stepper-item">
-            <div class="stepper-track" aria-hidden="true">
-              <span class="stepper-indicator">1</span>
-              <span class="stepper-separator"></span>
+      <div class="showcase-head">
+        <div class="section-label">What Drop makes</div>
+        <h2 id="why-title">Three things worth dropping.</h2>
+        <p>Publish a file, turn Markdown into a readable page, or render source code as an image. Install the skill once and let your agent choose the right output.</p>
+      </div>
+
+      <div class="showcase-list">
+        <article class="showcase-item">
+          <div class="showcase-copy">
+            <span class="showcase-number">01</span>
+            <h3>Upload any file</h3>
+            <p>Give PDFs, spreadsheets, documents, images, and archives a permanent URL. Drop stores the original immediately and optimizes supported images in the background.</p>
+            <ul class="showcase-details">
+              <li>Up to 4 MiB per file</li>
+              <li>Permanent, non-editable URL</li>
+            </ul>
+          </div>
+          <div class="showcase-visual" aria-label="PDF, spreadsheet, document, image, and archive files becoming one Drop URL">
+            <div class="showcase-visual-bar"><span>One file in. One URL out.</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
+            <div class="file-stage" aria-hidden="true">
+              <div class="file-card file-pdf"><span class="file-extension">PDF</span><span class="file-name">brief.pdf</span></div>
+              <div class="file-card file-xlsx"><span class="file-extension">XLSX</span><span class="file-name">forecast.xlsx</span></div>
+              <div class="file-card file-docx"><span class="file-extension">DOCX</span><span class="file-name">notes.docx</span></div>
+              <div class="file-card file-png"><span class="file-extension">PNG</span><span class="file-name">screen.png</span></div>
+              <div class="file-card file-zip"><span class="file-extension">ZIP</span><span class="file-name">assets.zip</span></div>
+              <div class="file-url">drop.vitehub.dev/i/0d7a…/forecast.xlsx</div>
             </div>
-            <div class="stepper-copy">
-              <h3 class="stepper-title">Upload</h3>
-              <p class="stepper-description">Send Drop one file, up to 4 MiB. Blob stores it immediately; Queue optimizes supported images in the background.</p>
+          </div>
+        </article>
+
+        <article class="showcase-item">
+          <div class="showcase-copy">
+            <span class="showcase-number">02</span>
+            <h3>Render Markdown</h3>
+            <p>Publish Markdown as a readable HTML document at the same URL. Callouts, tables, and Mermaid diagrams arrive ready to share. The exact source stays available with <code>?raw</code>.</p>
+            <ul class="showcase-details">
+              <li>Styled HTML by default</li>
+              <li>Immutable source on demand</li>
+            </ul>
+          </div>
+          <div class="showcase-visual" aria-label="Markdown source rendered as a readable HTML document">
+            <div class="showcase-visual-bar"><span>Markdown → HTML</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
+            <div class="render-stage" aria-hidden="true">
+              <div class="source-pane">
+                <div class="pane-label">plan.md</div>
+                <div class="markdown-source"><b># Launch plan</b>
+
+Ship the smallest useful change.
+
+<b>::callout{type="decision"}</b>
+Keep the existing endpoint.
+<b>::</b>
+
+```mermaid
+Draft --&gt; Review --&gt; Ship
+```</div>
+              </div>
+              <div class="document-pane">
+                <div class="pane-label">Rendered document</div>
+                <div class="document-preview">
+                  <h4>Launch plan</h4>
+                  <p>Ship the smallest useful change.</p>
+                  <div class="document-callout">Decision<br>Keep the existing endpoint.</div>
+                  <div class="document-flow"><span>Draft</span><i>→</i><span>Review</span><i>→</i><span>Ship</span></div>
+                </div>
+              </div>
             </div>
-          </li>
-          <li class="stepper-item">
-            <div class="stepper-track" aria-hidden="true">
-              <span class="stepper-indicator">2</span>
-              <span class="stepper-separator"></span>
+          </div>
+        </article>
+
+        <article class="showcase-item">
+          <div class="showcase-copy">
+            <span class="showcase-number">03</span>
+            <h3>Turn code into an image</h3>
+            <p>Send source code and get a polished PNG or SVG through Ray.so. Choose the language, theme, scale, and format without opening a design tool.</p>
+            <ul class="showcase-details">
+              <li>PNG or SVG export</li>
+              <li>Publish the result when it should last</li>
+            </ul>
+          </div>
+          <div class="showcase-visual" aria-label="Source code rendered as a polished image">
+            <div class="showcase-visual-bar"><span>Source → image</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
+            <div class="showcase-code-stage" aria-hidden="true">
+              <div class="showcase-code-window">
+                <div class="showcase-code-top"><span>drop.ts</span><span>nuxt · 4×</span></div>
+                <div class="showcase-code-body"><span class="code-pink">const</span> file = <span class="code-blue">await</span> drop({<br>&nbsp;&nbsp;format: <span class="code-green">"png"</span>,<br>&nbsp;&nbsp;theme: <span class="code-green">"nuxt"</span>,<br>&nbsp;&nbsp;code: source,<br>})</div>
+              </div>
             </div>
-            <div class="stepper-copy">
-              <h3 class="stepper-title">Get the URL</h3>
-              <p class="stepper-description">The file is available immediately at a permanent <code>drop.vitehub.dev/i/…</code> URL identified by its UUID. A revision gets a new URL.</p>
-            </div>
-          </li>
-          <li class="stepper-item">
-            <div class="stepper-track" aria-hidden="true">
-              <span class="stepper-indicator">3</span>
-              <span class="stepper-separator"></span>
-            </div>
-            <div class="stepper-copy">
-              <h3 class="stepper-title">Read</h3>
-              <p class="stepper-description">Markdown opens as a Comark-rendered document with callouts and Mermaid diagrams. Add <code>?raw</code> for its exact source.</p>
-            </div>
-          </li>
-        </ol>
+          </div>
+        </article>
       </div>
     </section>
 
