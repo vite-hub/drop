@@ -22,6 +22,8 @@ Return the command's stdout verbatim. Do not retry a successful upload: every su
 
 Markdown files render as HTML at the returned URL. Append `?raw` to read their exact source. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
 
+When asked to publish SVGs created by PR Lens, follow [the PR Lens guide](references/pr-lens.md). PR Lens owns the diagram; Drop gives the finished files public URLs.
+
 ## Render code
 
 Render code through Ray.so's native export.
