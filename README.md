@@ -8,23 +8,23 @@
   </a>
 </p>
 
-<p align="center">Permanent URLs for agent-uploaded files and temporary rendered code images, built with ViteHub primitives.</p>
+<p align="center">Permanent files, readable Markdown, and code images, built with ViteHub primitives.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·
   <a href="https://vitehub.dev">ViteHub</a> ·
   <a href="https://vitehub.dev/docs/">ViteHub docs</a> ·
-  <a href="https://github.com/vite-hub/vitehub">ViteHub on GitHub</a>
+  <a href="https://github.com/vite-hub/drop">Source</a>
 </p>
 
 ## How it works
 
-1. **Blob** stores uploaded files permanently and keeps rendered code images under a separate temporary prefix.
-2. PNG, JPEG, and WebP uploads continue through image optimization; other files are complete as soon as they are stored.
-3. **Queue** dispatches image optimization to a Cloudflare **Sandbox** while the original upload URL is already usable.
-4. Sharp applies EXIF orientation, strips metadata, and resizes images to fit within 2048 × 2048 without upscaling.
-5. **Schedule** runs hourly and deletes expired code images from their prefix without touching uploaded files.
-6. Drop replaces an uploaded Blob only when the optimized image is smaller. Nitro renders the current stored-file count into the landing page.
+1. **Blob** stores the original upload immediately at a random `/i/` URL.
+2. For PNG, JPEG, and WebP files, **Queue** asks a Cloudflare **Sandbox** to apply EXIF orientation, strip metadata, and resize the image to fit within 2048 × 2048 without upscaling.
+3. Drop replaces the original image at the same URL only when the optimized version is smaller. Other files never change.
+4. Markdown files render as server-generated HTML at that URL through **Comark**. Their exact source remains available with `?raw`.
+5. **Schedule** runs hourly and deletes expired code images from their separate prefix without touching uploaded files.
+6. Nitro renders the current stored-file count into the landing page.
 
 The Sandbox is a real npm project in [server/sandboxes/image-optimizer](./server/sandboxes/image-optimizer). ViteHub materializes that project through Workspace and executes it through the selected Box provider.
 
@@ -36,10 +36,12 @@ Install the public agent skill:
 npx skills add https://drop.vitehub.dev
 ```
 
-The bundled command uploads and immediately prints the file URL:
+Upload a file and print its URL:
 
 ```sh
-node "<skill-directory>/scripts/upload-image.mjs" "/absolute/path/to/file.pdf"
+curl --fail-with-body --silent --show-error \
+  -F "file=@/absolute/path/to/file.pdf" \
+  https://drop.vitehub.dev/api/files | jq -er '.url'
 ```
 
 Or use the API directly:
@@ -49,7 +51,7 @@ curl --fail-with-body https://drop.vitehub.dev/api/files \
   -F "file=@/absolute/path/to/file.pdf"
 ```
 
-Files up to 4 MiB are accepted. PNG, JPEG, and WebP files are optimized when that makes them smaller; PDFs, spreadsheets, documents, archives, and other files are stored unchanged. The public deployment limits uploads to five attempts per source address per minute.
+Files up to 4 MiB are accepted. Every successful upload creates a permanent, non-editable URL. PNG, JPEG, and WebP files are available immediately and may be replaced at the same URL by a smaller optimized version; PDFs, spreadsheets, documents, archives, and other files never change. Markdown renders as HTML at its URL and as source with `?raw`. The public deployment limits uploads to five attempts per source address per minute.
 
 ### Create a code image
 
@@ -97,6 +99,6 @@ Run the deployed smoke test:
 pnpm test:e2e:deployed
 ```
 
-The test uploads `public/og-vitehub-drop.png` to the production URL and confirms the returned image is publicly accessible.
+The test uploads an image and a Markdown plan, confirms the image is publicly accessible, checks the rendered document and raw source, and exercises code-image rendering.
 
 The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

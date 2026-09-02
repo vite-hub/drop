@@ -1,4 +1,42 @@
+import { connect } from "@cloudflare/playwright"
+import { createBrowser } from "vite-hub/browser"
+import { cloudflareBrowser } from "vite-hub/browser/providers/cloudflare"
+
+import type { Browser, Download, Page } from "@cloudflare/playwright"
+import type { BrowserController } from "vite-hub/browser"
+import type { CloudflareBrowserBindingConnection } from "vite-hub/browser/providers/cloudflare"
+
 const RAY_URL = "https://ray.so/"
+
+interface CloudflarePlaywrightClient {
+  browser: Browser
+  page: Page
+}
+
+function cloudflarePlaywright(): BrowserController<CloudflarePlaywrightClient, CloudflareBrowserBindingConnection> {
+  return {
+    features: { attachExistingSession: true },
+    name: "cloudflare-playwright",
+    async attach(connection) {
+      if (connection.engine === "kitesurf" || !connection.sessionId)
+        throw new Error("[drop:code-image] Code image export requires a Chromium Browser session.")
+
+      const browser = await connect(connection.binding as never, connection.sessionId)
+      const contexts = browser.contexts()
+      const context = contexts.find(value => value.pages().length > 0)
+        ?? contexts[0]
+        ?? await browser.newContext()
+      const page = context.pages()[0] ?? await context.newPage()
+      return {
+        client: { browser, page },
+        preservesSessionOnRelease: false,
+        async release() {
+          await browser.close()
+        },
+      }
+    },
+  }
+}
 
 export interface CodeImageInput {
   code: string
@@ -19,7 +57,7 @@ function createRayUrl(input: CodeImageInput) {
 }
 
 async function assertRayOption(
-  page: BrowserPage,
+  page: Page,
   name: string,
   marker: string,
   id: string,
@@ -33,42 +71,21 @@ async function assertRayOption(
     throw new Error(`[drop:code-image] Ray does not offer ${name} ${JSON.stringify(id)}.`)
 }
 
-async function openRayExportMenu(page: BrowserPage) {
+async function openRayExportMenu(page: Page) {
   const button = page.locator('button[aria-label="See other export options"]')
   if (await button.count() !== 1)
     throw new Error("[drop:code-image] Ray export menu was not found.")
   await button.click()
 }
 
-async function selectRayExportScale(
-  page: BrowserPage,
-  scale: CodeImageScale,
-) {
-  await openRayExportMenu(page)
-  const size = page.locator('[role="menuitem"]', { hasText: "Size" })
-  if (await size.count() !== 1)
-    throw new Error("[drop:code-image] Ray export size control was not found.")
-  await size.click()
-
-  const option = page.locator('[role="menuitemradio"]', { hasText: `${scale}x` })
-  if (await option.count() !== 1)
-    throw new Error(`[drop:code-image] Ray does not offer ${scale}x export.`)
-  await option.click()
-
-  await openRayExportMenu(page)
-  const selected = page.locator('[role="menuitem"]', { hasText: `Size ${scale}x` })
-  if (await selected.count() !== 1)
-    throw new Error(`[drop:code-image] Ray did not select ${scale}x export.`)
-  await page.press("Escape")
-}
-
-function readRayDownload(download: BrowserDownload) {
-  const separator = download.url.indexOf(",")
-  if (!download.url.startsWith("data:") || separator === -1)
+function readRayDownload(download: Download) {
+  const url = download.url()
+  const separator = url.indexOf(",")
+  if (!url.startsWith("data:") || separator === -1)
     throw new Error("[drop:code-image] Ray returned an empty export.")
 
-  const metadata = download.url.slice(5, separator)
-  const content = download.url.slice(separator + 1)
+  const metadata = url.slice(5, separator)
+  const content = url.slice(separator + 1)
   const decoded = metadata.includes(";base64")
     ? Buffer.from(content, "base64")
     : Buffer.from(decodeURIComponent(content))
@@ -78,26 +95,26 @@ function readRayDownload(download: BrowserDownload) {
 }
 
 async function exportRayImage(
-  page: BrowserPage,
+  page: Page,
   format: CodeImageFormat,
 ) {
-  const download = await page.waitForDownload(async () => {
-    if (format === "png") {
-      const button = page.locator('button[aria-label="Export as PNG"]', { hasText: "Export Image" })
-      if (await button.count() !== 1)
-        throw new Error("[drop:code-image] Ray PNG export was not found.")
-      await button.click()
-    }
-    else {
-      await openRayExportMenu(page)
-      const item = page.locator('[role="menuitem"]', { hasText: "Save SVG" })
-      if (await item.count() !== 1)
-        throw new Error("[drop:code-image] Ray SVG export was not found.")
-      await item.click()
-    }
-  })
+  const downloadPromise = page.waitForEvent("download")
+  if (format === "png") {
+    const button = page.locator('button[aria-label="Export as PNG"]', { hasText: "Export Image" })
+    if (await button.count() !== 1)
+      throw new Error("[drop:code-image] Ray PNG export was not found.")
+    await button.click()
+  }
+  else {
+    await openRayExportMenu(page)
+    const item = page.locator('[role="menuitem"]', { hasText: "Save SVG" })
+    if (await item.count() !== 1)
+      throw new Error("[drop:code-image] Ray SVG export was not found.")
+    await item.click()
+  }
+  const download = await downloadPromise
 
-  if (!download.suggestedFilename.endsWith(`.${format}`))
+  if (!download.suggestedFilename().endsWith(`.${format}`))
     throw new Error(`[drop:code-image] Ray returned an unexpected ${format} export.`)
 
   const image = readRayDownload(download)
@@ -108,27 +125,42 @@ async function exportRayImage(
   return image
 }
 
-export default defineBrowser(async (input: CodeImageInput, { browser }) => {
+export default defineBrowser(async (input: CodeImageInput) => {
   if (!input.code || input.code.length > CODE_IMAGE_MAX_CHARACTERS)
     throw new TypeError(`[drop:code-image] Code must contain between 1 and ${CODE_IMAGE_MAX_CHARACTERS} characters.`)
 
   const format = input.format ?? "png"
   const scale = input.scale ?? 4
-  const { page } = await browser.open()
-  await page.goto(createRayUrl(input))
-  const editor = page.locator('textarea[data-enable-grammarly="false"]')
-  await editor.waitFor()
-  if (input.theme)
-    await assertRayOption(page, "theme", "background", input.theme)
-  if (input.language)
-    await assertRayOption(page, "language", "language", input.language)
-  await editor.fill(input.code)
+  const browser = createBrowser({
+    provider: cloudflareBrowser({ binding: "BROWSER", engine: "chromium" }),
+  })
+  const session = await browser.open()
+  try {
+    const control = await session.attach(cloudflarePlaywright())
+    try {
+      const page = control.client.page
+      await page.addInitScript(value => localStorage.setItem("size", JSON.stringify(value)), scale)
+      await page.goto(createRayUrl(input), { waitUntil: "domcontentloaded" })
+      const editor = page.locator('textarea[data-enable-grammarly="false"]')
+      await editor.waitFor({ state: "visible" })
+      if (input.theme)
+        await assertRayOption(page, "theme", "background", input.theme)
+      if (input.language)
+        await assertRayOption(page, "language", "language", input.language)
+      await editor.fill(input.code)
 
-  const padding = page.locator('button[aria-label="16"]')
-  if (await padding.count() !== 1)
-    throw new Error("[drop:code-image] Ray padding control was not found.")
-  await padding.click()
+      const padding = page.locator('button[aria-label="16"]')
+      if (await padding.count() !== 1)
+        throw new Error("[drop:code-image] Ray padding control was not found.")
+      await padding.click()
 
-  await selectRayExportScale(page, scale)
-  return await exportRayImage(page, format)
+      return await exportRayImage(page, format)
+    }
+    finally {
+      await control.release()
+    }
+  }
+  finally {
+    await session.close()
+  }
 })

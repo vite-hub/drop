@@ -2,9 +2,10 @@
   "skills": [
     {
       "name": "vitehub-drop",
-      "description": "Uploads a local file and returns a permanent URL. Use when an agent needs to include a local image or document in GitHub content. It can also render source code as a temporary image URL.",
+      "description": "Publishes local files at permanent public URLs, renders Markdown as readable HTML, and turns source code into temporary images. Use when the user asks to publish a file, share a rendered document, or create a code image.",
       "files": [
-        "SKILL.md"
+        "SKILL.md",
+        "references/documents.md"
       ]
     }
   ]

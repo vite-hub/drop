@@ -26,9 +26,20 @@ export default defineHandler(async (event) => {
 
   if (file.size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
 
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  const contentType = detectContentType(bytes) ?? "application/octet-stream"
   const extension = file.name.match(/\.[a-z0-9]{1,16}$/i)?.[0].toLowerCase() ?? ""
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  let contentType = detectContentType(bytes) ?? "application/octet-stream"
+
+  if ([".md", ".markdown"].includes(extension)) {
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+    }
+    catch {
+      throw new HTTPError({ status: 400, statusText: "Markdown files must contain valid UTF-8." })
+    }
+    contentType = "text/markdown; charset=utf-8"
+  }
+
   const key = `${crypto.randomUUID()}${extension}`
 
   const [storageError, stored] = await blob.put(key, bytes, { access: "private", contentType })

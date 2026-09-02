@@ -1,26 +1,31 @@
 ---
 name: vitehub-drop
-description: Uploads a local file and returns its permanent public URL. Use when an agent needs to include a local image or document in GitHub content like issues, Pull Request, etc... It can also render source code as a temporary image URL.
+description: Publishes local files at permanent public URLs, renders Markdown as readable HTML, and turns source code into temporary images. Use when the user asks to publish a file, share a rendered document, or create a code image.
 ---
 
 # ViteHub Drop
 
-Choose one branch and return its stdout verbatim.
+Publish one file and return its URL. Files cannot be edited through the API, so publish a new file for every revision. PNG, JPEG, and WebP files may replace the original bytes at the same URL with a smaller optimized version.
 
-## File
+## Publish a file
 
-Upload a file placed in scope:
+Upload a file already in scope:
 
 ```sh
 curl --fail-with-body --silent --show-error \
-  -F "file=@/absolute/path/to/file.pdf" \
+  -F "file=@/absolute/path/to/file" \
   https://drop.vitehub.dev/api/files |
   jq -er '.url'
 ```
 
-## Code
+Return the command's stdout verbatim. Do not retry a successful upload: every successful request creates another permanent URL.
+
+Markdown files render as HTML at the returned URL. Append `?raw` to read their exact source. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
+
+## Render code
 
 Render code through Ray.so's native export.
+
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "content-type: application/json" \
@@ -29,20 +34,11 @@ curl --fail-with-body --silent --show-error \
   jq -er '.url'
 ```
 
-Code image URLs expire after five minutes; download and re-upload through File to make one permanent.
+Code image URLs expire after five minutes; download and publish the result to make it permanent.
 
 ## Options
 
-Fetch the current case-sensitive IDs directly from Ray.so before setting `language` or `theme`:
-
-```bash
-# Fetch and parse available themes
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/store/themes.ts" | grep -oE 'id:[[:space:]]*"[^"]+"' | sed -E 's/id:[[:space:]]*"([^"]+)"/\1/' | sort -u
-
-# Fetch and parse available languages
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/util/languages.ts" | grep -oE '^[[:space:]]*"?[a-zA-Z0-9+#-]+"?[[:space:]]*:[[:space:]]*\{' | sed -E 's/^[[:space:]]*"?([^"]+)"?[[:space:]]*:.*/\1/' | sort -u
-```
-
-- `language` and `theme` accept the IDs printed by those commands.
+- `language` accepts a case-sensitive Ray.so ID such as `cpp` or `typescript`. Omit it when plain text is enough.
+- `theme` accepts a case-sensitive Ray.so ID such as `nuxt` or `midnight`.
 - `format` accepts `png` (default) or `svg`.
 - `scale` for png accepts `2`, `4` (default), or `6`.

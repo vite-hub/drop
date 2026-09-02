@@ -10,7 +10,7 @@ export default defineConfig({
           route: "/i",
         },
       },
-      browser: true,
+      browser: { engine: "chromium" },
       kv: true,
       preset: "cloudflare",
       queue: true,
@@ -33,8 +33,6 @@ export default defineConfig({
           {
             from: "vite-hub/browser",
             imports: [
-              { name: "BrowserDownload", type: true },
-              { name: "BrowserPage", type: true },
               "defineBrowser",
               "runBrowser",
             ],
@@ -56,6 +54,11 @@ export default defineConfig({
       },
       compatibilityDate: "2026-07-17",
       publicAssets: [
+        {
+          baseURL: "/vendor/medium-zoom",
+          dir: "node_modules/medium-zoom/dist",
+          maxAge: 60 * 60 * 24 * 365,
+        },
         {
           baseURL: "/.well-known/skills",
           dir: "skills",
