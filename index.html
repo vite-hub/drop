@@ -429,24 +429,20 @@
 
     .render-stage {
       min-height: 0;
+      position: relative;
       padding: 0;
     }
 
     .source-pane,
     .document-pane {
-      height: 100%;
+      height: calc(100% - 4.5rem);
       min-width: 0;
       border: 1px solid var(--line);
       background: var(--bg);
     }
 
-    .pane-label {
-      padding: 0.65rem 0.8rem;
-      border-bottom: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 0.68rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+    .markdown-url {
+      bottom: 1rem;
     }
 
     .markdown-source {
@@ -538,6 +534,7 @@
     .showcase-code-body {
       padding: 1.4rem;
       font: 0.78rem/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      overflow-wrap: anywhere;
     }
 
     .showcase-code-image {
@@ -1169,7 +1166,6 @@
               </div>
               <div class="code-panel render-stage" id="markdown-input-panel" role="tabpanel" aria-labelledby="markdown-input-tab" data-panel="source" hidden>
                 <div class="source-pane">
-                  <div class="pane-label">drop.vitehub.dev/i/launch-plan.md?raw</div>
                   <div class="markdown-source"><b># Launch plan</b>
 
 Ship the smallest useful change.
@@ -1182,10 +1178,10 @@ Keep the existing endpoint.
 Draft --&gt; Review --&gt; Ship
 ```</div>
                 </div>
+                <div class="file-url markdown-url">drop.vitehub.dev/i/launch-plan.md?raw</div>
               </div>
               <div class="code-panel render-stage" id="markdown-output-panel" role="tabpanel" aria-labelledby="markdown-output-tab" data-panel="output">
                 <div class="document-pane">
-                  <div class="pane-label">drop.vitehub.dev/i/launch-plan.md</div>
                   <div class="document-preview">
                     <h4>Launch plan</h4>
                     <p>Ship the smallest useful change.</p>
@@ -1193,6 +1189,7 @@ Draft --&gt; Review --&gt; Ship
                     <div class="document-flow"><span>Draft</span><i>→</i><span>Review</span><i>→</i><span>Ship</span></div>
                   </div>
                 </div>
+                <div class="file-url markdown-url">drop.vitehub.dev/i/launch-plan.md</div>
               </div>
             </div>
           </div>
@@ -1217,8 +1214,8 @@ Draft --&gt; Review --&gt; Ship
               <div class="code-panel" id="showcase-code-input-panel" role="tabpanel" aria-labelledby="showcase-code-input-tab" data-panel="input" hidden>
                 <div class="showcase-code-stage">
                   <div class="showcase-code-window">
-                    <div class="showcase-code-top"><span>drop.ts</span><span>input</span></div>
-                    <div class="showcase-code-body"><span class="code-pink">const</span> file = <span class="code-blue">await</span> drop({<br>&nbsp;&nbsp;format: <span class="code-green">"png"</span>,<br>&nbsp;&nbsp;theme: <span class="code-green">"nuxt"</span>,<br>&nbsp;&nbsp;code: source,<br>})</div>
+                    <div class="showcase-code-top"><span>curl</span><span>input</span></div>
+                    <div class="showcase-code-body"><span class="code-pink">curl</span> https://drop.vitehub.dev/api/code \<br>&nbsp;&nbsp;-H <span class="code-green">"content-type: application/json"</span> \<br>&nbsp;&nbsp;--data <span class="code-green">'{<br>&nbsp;&nbsp;&nbsp;&nbsp;"code": "console.log(\"Hello\")",<br>&nbsp;&nbsp;&nbsp;&nbsp;"language": "typescript",<br>&nbsp;&nbsp;&nbsp;&nbsp;"theme": "nuxt", "format": "png", "scale": 4<br>&nbsp;&nbsp;}'</span></div>
                   </div>
                 </div>
               </div>
