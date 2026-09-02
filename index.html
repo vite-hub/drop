@@ -401,12 +401,25 @@
       bottom: 1.5rem;
       left: 1.5rem;
       padding: 0.85rem 1rem;
-      overflow: hidden;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
       border: 1px solid var(--line);
       background: var(--bg);
       color: var(--accent);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 0.74rem;
+    }
+
+    .file-url img {
+      width: 1.25rem;
+      height: 1.25rem;
+      flex: none;
+    }
+
+    .file-url-text {
+      min-width: 0;
+      overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -511,30 +524,12 @@
       place-items: center;
     }
 
-    .showcase-code-window {
-      width: min(31rem, 100%);
-      overflow: hidden;
-      border: 1px solid oklch(38% 0.04 285);
-      background: oklch(18% 0.035 285);
-      box-shadow: 0 1.5rem 4rem oklch(5% 0.02 285 / 0.5);
-      transform: rotate(-1.5deg);
-    }
-
-    .showcase-code-top {
-      height: 2.4rem;
-      padding: 0 0.8rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid oklch(30% 0.04 285);
-      color: oklch(75% 0.04 285);
-      font-size: 0.7rem;
-    }
-
-    .showcase-code-body {
-      padding: 1.4rem;
-      font: 0.78rem/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      overflow-wrap: anywhere;
+    .showcase-code-input {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      border: 0;
+      white-space: pre-wrap;
     }
 
     .showcase-code-image {
@@ -545,10 +540,6 @@
       box-shadow: 0 1.5rem 4rem oklch(5% 0.02 285 / 0.5);
       transform: rotate(-1.5deg);
     }
-
-    .code-pink { color: oklch(78% 0.16 340); }
-    .code-blue { color: oklch(78% 0.13 235); }
-    .code-green { color: oklch(82% 0.14 150); }
 
     .section-label {
       color: var(--accent);
@@ -1173,7 +1164,7 @@
               <div class="file-card file-figma"><img src="https://api.iconify.design/logos/figma.svg" alt=""><span class="file-name">screens.fig</span></div>
               <div class="file-card file-png"><span class="file-extension">PNG</span><span class="file-name">screen.png</span></div>
               <div class="file-card file-zip"><span class="file-extension">ZIP</span><span class="file-name">assets.zip</span></div>
-              <div class="file-url">drop.vitehub.dev/i/0d7a…/forecast.xlsx</div>
+              <div class="file-url"><img src="/favicon.svg" alt=""><span class="file-url-text">drop.vitehub.dev/i/0d7a…/forecast.xlsx</span></div>
             </div>
           </div>
         </article>
@@ -1208,7 +1199,7 @@ Keep the existing endpoint.
 Draft --&gt; Review --&gt; Ship
 ```</div>
                 </div>
-                <div class="file-url markdown-url">drop.vitehub.dev/i/launch-plan.md?raw</div>
+                <div class="file-url markdown-url"><img src="/favicon.svg" alt=""><span class="file-url-text">drop.vitehub.dev/i/launch-plan.md?raw</span></div>
               </div>
               <div class="code-panel render-stage" id="markdown-output-panel" role="tabpanel" aria-labelledby="markdown-output-tab" data-panel="output">
                 <div class="document-pane">
@@ -1219,7 +1210,7 @@ Draft --&gt; Review --&gt; Ship
                     <div class="document-flow"><span>Draft</span><i>→</i><span>Review</span><i>→</i><span>Ship</span></div>
                   </div>
                 </div>
-                <div class="file-url markdown-url">drop.vitehub.dev/i/launch-plan.md</div>
+                <div class="file-url markdown-url"><img src="/favicon.svg" alt=""><span class="file-url-text">drop.vitehub.dev/i/launch-plan.md</span></div>
               </div>
             </div>
           </div>
@@ -1243,10 +1234,15 @@ Draft --&gt; Review --&gt; Ship
               </div>
               <div class="code-panel" id="showcase-code-input-panel" role="tabpanel" aria-labelledby="showcase-code-input-tab" data-panel="input" hidden>
                 <div class="showcase-code-stage">
-                  <div class="showcase-code-window">
-                    <div class="showcase-code-top"><span>curl</span><span>input</span></div>
-                    <div class="showcase-code-body"><span class="code-pink">curl</span> https://drop.vitehub.dev/api/code \<br>&nbsp;&nbsp;-H <span class="code-green">"content-type: application/json"</span> \<br>&nbsp;&nbsp;--data <span class="code-green">'{<br>&nbsp;&nbsp;&nbsp;&nbsp;"code": "console.log(\"Hello\")",<br>&nbsp;&nbsp;&nbsp;&nbsp;"language": "typescript",<br>&nbsp;&nbsp;&nbsp;&nbsp;"theme": "nuxt", "format": "png", "scale": 4<br>&nbsp;&nbsp;}'</span></div>
-                  </div>
+                  <pre class="showcase-code-input"><code>curl https://drop.vitehub.dev/api/code \
+  -H "content-type: application/json" \
+  --data '{
+    "code": "console.log(\"Hello\")",
+    "language": "typescript",
+    "theme": "nuxt",
+    "format": "png",
+    "scale": 4
+  }'</code></pre>
                 </div>
               </div>
               <div class="code-panel" id="showcase-code-output-panel" role="tabpanel" aria-labelledby="showcase-code-output-tab" data-panel="output">
