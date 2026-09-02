@@ -78,32 +78,6 @@ async function openRayExportMenu(page: Page) {
   await button.click()
 }
 
-async function selectRayExportScale(
-  page: Page,
-  scale: CodeImageScale,
-) {
-  await openRayExportMenu(page)
-  const size = page.locator('[role="menuitem"]', { hasText: "Size" })
-  if (await size.count() !== 1)
-    throw new Error("[drop:code-image] Ray export size control was not found.")
-  await size.click()
-
-  const option = page.locator('[role="menuitemradio"]', { hasText: `${scale}x` })
-  if (await option.count() !== 1)
-    throw new Error(`[drop:code-image] Ray does not offer ${scale}x export.`)
-  if (await option.getAttribute("aria-checked") === "true") {
-    await page.keyboard.press("Escape")
-    return
-  }
-  await option.dispatchEvent("click")
-
-  await openRayExportMenu(page)
-  const selected = page.locator('[role="menuitem"]', { hasText: `Size ${scale}x` })
-  if (await selected.count() !== 1)
-    throw new Error(`[drop:code-image] Ray did not select ${scale}x export.`)
-  await page.keyboard.press("Escape")
-}
-
 function readRayDownload(download: Download) {
   const url = download.url()
   const separator = url.indexOf(",")
@@ -165,6 +139,7 @@ export default defineBrowser(async (input: CodeImageInput) => {
     const control = await session.attach(cloudflarePlaywright())
     try {
       const page = control.client.page
+      await page.addInitScript(value => localStorage.setItem("size", JSON.stringify(value)), scale)
       await page.goto(createRayUrl(input), { waitUntil: "domcontentloaded" })
       const editor = page.locator('textarea[data-enable-grammarly="false"]')
       await editor.waitFor({ state: "visible" })
@@ -179,7 +154,6 @@ export default defineBrowser(async (input: CodeImageInput) => {
         throw new Error("[drop:code-image] Ray padding control was not found.")
       await padding.click()
 
-      await selectRayExportScale(page, scale)
       return await exportRayImage(page, format)
     }
     finally {
