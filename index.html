@@ -361,10 +361,10 @@
     }
 
     .file-card {
-      width: 9.5rem;
-      height: 11.5rem;
+      width: 7.25rem;
+      height: 8.75rem;
       position: absolute;
-      padding: 1rem;
+      padding: 0.85rem;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -374,11 +374,19 @@
       transform-origin: bottom center;
     }
 
-    .file-card:nth-child(1) { transform: translate(-8.8rem, 0.7rem) rotate(-9deg); }
-    .file-card:nth-child(2) { transform: translate(-4.5rem, -1.4rem) rotate(-4deg); }
-    .file-card:nth-child(3) { z-index: 2; transform: translate(0, -2.2rem); }
-    .file-card:nth-child(4) { transform: translate(4.6rem, -1.2rem) rotate(4deg); }
-    .file-card:nth-child(5) { transform: translate(8.8rem, 0.8rem) rotate(9deg); }
+    .file-card:nth-child(1) { transform: translate(-11.2rem, -2.7rem) rotate(-8deg); }
+    .file-card:nth-child(2) { transform: translate(-5.8rem, -4.2rem) rotate(-3deg); }
+    .file-card:nth-child(3) { z-index: 2; transform: translate(0, -4.7rem); }
+    .file-card:nth-child(4) { transform: translate(5.8rem, -4.1rem) rotate(3deg); }
+    .file-card:nth-child(5) { transform: translate(11.2rem, -2.6rem) rotate(8deg); }
+    .file-card:nth-child(6) { transform: translate(-3.2rem, 4.4rem) rotate(-4deg); }
+    .file-card:nth-child(7) { transform: translate(3.3rem, 4.5rem) rotate(4deg); }
+
+    .file-card img {
+      width: 2.2rem;
+      height: 2.2rem;
+      object-fit: contain;
+    }
 
     .file-extension {
       width: fit-content;
@@ -394,9 +402,11 @@
       font-size: 0.78rem;
     }
 
-    .file-pdf { color: oklch(68% 0.19 28); }
-    .file-xlsx { color: oklch(72% 0.15 150); }
-    .file-docx { color: oklch(70% 0.14 250); }
+    .file-pdf { color: #ec1c24; }
+    .file-xlsx { color: #217346; }
+    .file-docx { color: #2b579a; }
+    .file-pptx { color: #d24726; }
+    .file-figma { color: #a259ff; }
     .file-png { color: oklch(75% 0.15 330); }
     .file-zip { color: var(--accent); }
 
@@ -417,16 +427,30 @@
       white-space: nowrap;
     }
 
+    .showcase-tabs {
+      height: calc(28rem - 2.75rem);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .showcase-tabs .code-tabs {
+      flex: none;
+      padding-inline: 1.5rem;
+    }
+
+    .showcase-tabs .code-panel {
+      min-height: 0;
+      flex: 1;
+    }
+
     .render-stage {
-      min-height: calc(28rem - 2.75rem);
+      min-height: 0;
       padding: 1.5rem;
-      display: grid;
-      grid-template-columns: 0.88fr 1.12fr;
-      gap: 1rem;
     }
 
     .source-pane,
     .document-pane {
+      height: 100%;
       min-width: 0;
       border: 1px solid var(--line);
       background: var(--bg);
@@ -501,7 +525,7 @@
     }
 
     .showcase-code-stage {
-      height: calc(28rem - 2.75rem);
+      height: 100%;
       padding: 1.5rem;
       display: grid;
       place-items: center;
@@ -530,6 +554,15 @@
     .showcase-code-body {
       padding: 1.4rem;
       font: 0.78rem/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .showcase-code-image {
+      width: min(31rem, 100%);
+      height: auto;
+      display: block;
+      border: 1px solid oklch(38% 0.04 285);
+      box-shadow: 0 1.5rem 4rem oklch(5% 0.02 285 / 0.5);
+      transform: rotate(-1.5deg);
     }
 
     .code-pink { color: oklch(78% 0.16 340); }
@@ -1123,9 +1156,11 @@
           <div class="showcase-visual" aria-label="PDF, spreadsheet, document, image, and archive files becoming one Drop URL">
             <div class="showcase-visual-bar"><span>One file in. One URL out.</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
             <div class="file-stage" aria-hidden="true">
-              <div class="file-card file-pdf"><span class="file-extension">PDF</span><span class="file-name">brief.pdf</span></div>
-              <div class="file-card file-xlsx"><span class="file-extension">XLSX</span><span class="file-name">forecast.xlsx</span></div>
-              <div class="file-card file-docx"><span class="file-extension">DOCX</span><span class="file-name">notes.docx</span></div>
+              <div class="file-card file-pdf"><img src="https://cdn.simpleicons.org/adobeacrobatreader/EC1C24" alt=""><span class="file-name">brief.pdf</span></div>
+              <div class="file-card file-xlsx"><img src="https://cdn.simpleicons.org/microsoftexcel/217346" alt=""><span class="file-name">forecast.xlsx</span></div>
+              <div class="file-card file-docx"><img src="https://cdn.simpleicons.org/microsoftword/2B579A" alt=""><span class="file-name">notes.docx</span></div>
+              <div class="file-card file-pptx"><img src="https://cdn.simpleicons.org/microsoftpowerpoint/D24726" alt=""><span class="file-name">deck.pptx</span></div>
+              <div class="file-card file-figma"><img src="https://cdn.simpleicons.org/figma/A259FF" alt=""><span class="file-name">screens.fig</span></div>
               <div class="file-card file-png"><span class="file-extension">PNG</span><span class="file-name">screen.png</span></div>
               <div class="file-card file-zip"><span class="file-extension">ZIP</span><span class="file-name">assets.zip</span></div>
               <div class="file-url">drop.vitehub.dev/i/0d7a…/forecast.xlsx</div>
@@ -1145,10 +1180,15 @@
           </div>
           <div class="showcase-visual" aria-label="Markdown source rendered as a readable HTML document">
             <div class="showcase-visual-bar"><span>Markdown → HTML</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
-            <div class="render-stage" aria-hidden="true">
-              <div class="source-pane">
-                <div class="pane-label">plan.md</div>
-                <div class="markdown-source"><b># Launch plan</b>
+            <div class="showcase-tabs" data-tabs>
+              <div class="code-tabs" role="tablist" aria-label="Markdown example">
+                <button class="code-tab" id="markdown-input-tab" type="button" role="tab" aria-controls="markdown-input-panel" aria-selected="false" tabindex="-1" data-tab="source">plan.md</button>
+                <button class="code-tab" id="markdown-output-tab" type="button" role="tab" aria-controls="markdown-output-panel" aria-selected="true" data-tab="output">Rendered page</button>
+              </div>
+              <div class="code-panel render-stage" id="markdown-input-panel" role="tabpanel" aria-labelledby="markdown-input-tab" data-panel="source" hidden>
+                <div class="source-pane">
+                  <div class="pane-label">drop.vitehub.dev/i/launch-plan.md?raw</div>
+                  <div class="markdown-source"><b># Launch plan</b>
 
 Ship the smallest useful change.
 
@@ -1159,14 +1199,17 @@ Keep the existing endpoint.
 ```mermaid
 Draft --&gt; Review --&gt; Ship
 ```</div>
+                </div>
               </div>
-              <div class="document-pane">
-                <div class="pane-label">Rendered document</div>
-                <div class="document-preview">
-                  <h4>Launch plan</h4>
-                  <p>Ship the smallest useful change.</p>
-                  <div class="document-callout">Decision<br>Keep the existing endpoint.</div>
-                  <div class="document-flow"><span>Draft</span><i>→</i><span>Review</span><i>→</i><span>Ship</span></div>
+              <div class="code-panel render-stage" id="markdown-output-panel" role="tabpanel" aria-labelledby="markdown-output-tab" data-panel="output">
+                <div class="document-pane">
+                  <div class="pane-label">drop.vitehub.dev/i/launch-plan.md</div>
+                  <div class="document-preview">
+                    <h4>Launch plan</h4>
+                    <p>Ship the smallest useful change.</p>
+                    <div class="document-callout">Decision<br>Keep the existing endpoint.</div>
+                    <div class="document-flow"><span>Draft</span><i>→</i><span>Review</span><i>→</i><span>Ship</span></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1185,10 +1228,23 @@ Draft --&gt; Review --&gt; Ship
           </div>
           <div class="showcase-visual" aria-label="Source code rendered as a polished image">
             <div class="showcase-visual-bar"><span>Source → image</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
-            <div class="showcase-code-stage" aria-hidden="true">
-              <div class="showcase-code-window">
-                <div class="showcase-code-top"><span>drop.ts</span><span>nuxt · 4×</span></div>
-                <div class="showcase-code-body"><span class="code-pink">const</span> file = <span class="code-blue">await</span> drop({<br>&nbsp;&nbsp;format: <span class="code-green">"png"</span>,<br>&nbsp;&nbsp;theme: <span class="code-green">"nuxt"</span>,<br>&nbsp;&nbsp;code: source,<br>})</div>
+            <div class="showcase-tabs" data-tabs>
+              <div class="code-tabs" role="tablist" aria-label="Code image example">
+                <button class="code-tab" id="showcase-code-input-tab" type="button" role="tab" aria-controls="showcase-code-input-panel" aria-selected="false" tabindex="-1" data-tab="input">Input</button>
+                <button class="code-tab" id="showcase-code-output-tab" type="button" role="tab" aria-controls="showcase-code-output-panel" aria-selected="true" data-tab="output">Output</button>
+              </div>
+              <div class="code-panel" id="showcase-code-input-panel" role="tabpanel" aria-labelledby="showcase-code-input-tab" data-panel="input" hidden>
+                <div class="showcase-code-stage">
+                  <div class="showcase-code-window">
+                    <div class="showcase-code-top"><span>drop.ts</span><span>input</span></div>
+                    <div class="showcase-code-body"><span class="code-pink">const</span> file = <span class="code-blue">await</span> drop({<br>&nbsp;&nbsp;format: <span class="code-green">"png"</span>,<br>&nbsp;&nbsp;theme: <span class="code-green">"nuxt"</span>,<br>&nbsp;&nbsp;code: source,<br>})</div>
+                  </div>
+                </div>
+              </div>
+              <div class="code-panel" id="showcase-code-output-panel" role="tabpanel" aria-labelledby="showcase-code-output-tab" data-panel="output">
+                <div class="showcase-code-stage">
+                  <img class="showcase-code-image" src="https://drop.vitehub.dev/i/0a5260a2-13ed-40e6-aa18-763948637df0.png" alt="C++ hello-world code rendered as a Nuxt-themed image" width="1040" height="402" loading="lazy" decoding="async">
+                </div>
               </div>
             </div>
           </div>
@@ -1235,13 +1291,13 @@ Draft --&gt; Review --&gt; Ship
         <h2 id="code-images-title">Turn code into an image</h2>
         <p>Choose a language, theme, scale, and format to get a PNG or SVG.</p>
 
-        <div class="code-example">
+        <div class="code-example" data-tabs>
           <div class="code-tabs" role="tablist" aria-label="Code image example">
-            <button class="code-tab" id="code-input-tab" type="button" role="tab" aria-controls="code-input-panel" aria-selected="false" tabindex="-1" data-code-tab="input">Input</button>
-            <button class="code-tab" id="code-output-tab" type="button" role="tab" aria-controls="code-output-panel" aria-selected="true" data-code-tab="output">Output</button>
+            <button class="code-tab" id="code-input-tab" type="button" role="tab" aria-controls="code-input-panel" aria-selected="false" tabindex="-1" data-tab="input">Input</button>
+            <button class="code-tab" id="code-output-tab" type="button" role="tab" aria-controls="code-output-panel" aria-selected="true" data-tab="output">Output</button>
           </div>
 
-          <div class="code-panel" id="code-input-panel" role="tabpanel" aria-labelledby="code-input-tab" data-code-panel="input" hidden>
+          <div class="code-panel" id="code-input-panel" role="tabpanel" aria-labelledby="code-input-tab" data-panel="input" hidden>
             <pre><code>curl https://drop.vitehub.dev/api/code \
   -H "content-type: application/json" \
   --data '{
@@ -1253,7 +1309,7 @@ Draft --&gt; Review --&gt; Ship
   }'</code></pre>
           </div>
 
-          <div class="code-panel" id="code-output-panel" role="tabpanel" aria-labelledby="code-output-tab" data-code-panel="output">
+          <div class="code-panel" id="code-output-panel" role="tabpanel" aria-labelledby="code-output-tab" data-panel="output">
             <figure class="code-output">
               <img src="https://drop.vitehub.dev/i/0a5260a2-13ed-40e6-aa18-763948637df0.png" alt="C++ hello-world code rendered with the Nuxt theme" width="1040" height="402" loading="lazy" decoding="async">
             </figure>
@@ -1320,40 +1376,42 @@ Draft --&gt; Review --&gt; Ship
       window.setTimeout(() => { label.textContent = "Copy skill" }, 1400)
     })
 
-    const codeTabs = Array.from(document.querySelectorAll("[data-code-tab]"))
-    const codePanels = Array.from(document.querySelectorAll("[data-code-panel]"))
-    const selectCodeTab = (selectedTab) => {
-      for (const tab of codeTabs) {
-        const selected = tab === selectedTab
-        tab.setAttribute("aria-selected", String(selected))
-        tab.tabIndex = selected ? 0 : -1
+    for (const tabGroup of document.querySelectorAll("[data-tabs]")) {
+      const tabs = Array.from(tabGroup.querySelectorAll(":scope > .code-tabs [data-tab]"))
+      const panels = Array.from(tabGroup.querySelectorAll(":scope > [data-panel]"))
+      const selectTab = (selectedTab) => {
+        for (const tab of tabs) {
+          const selected = tab === selectedTab
+          tab.setAttribute("aria-selected", String(selected))
+          tab.tabIndex = selected ? 0 : -1
+        }
+
+        for (const panel of panels)
+          panel.hidden = panel.dataset.panel !== selectedTab.dataset.tab
       }
 
-      for (const panel of codePanels)
-        panel.hidden = panel.dataset.codePanel !== selectedTab.dataset.codeTab
-    }
+      for (const tab of tabs) {
+        tab.addEventListener("click", () => selectTab(tab))
+        tab.addEventListener("keydown", (event) => {
+          const current = tabs.indexOf(tab)
+          let next = current
 
-    for (const tab of codeTabs) {
-      tab.addEventListener("click", () => selectCodeTab(tab))
-      tab.addEventListener("keydown", (event) => {
-        const current = codeTabs.indexOf(tab)
-        let next = current
+          if (event.key === "ArrowLeft")
+            next = (current - 1 + tabs.length) % tabs.length
+          else if (event.key === "ArrowRight")
+            next = (current + 1) % tabs.length
+          else if (event.key === "Home")
+            next = 0
+          else if (event.key === "End")
+            next = tabs.length - 1
+          else
+            return
 
-        if (event.key === "ArrowLeft")
-          next = (current - 1 + codeTabs.length) % codeTabs.length
-        else if (event.key === "ArrowRight")
-          next = (current + 1) % codeTabs.length
-        else if (event.key === "Home")
-          next = 0
-        else if (event.key === "End")
-          next = codeTabs.length - 1
-        else
-          return
-
-        event.preventDefault()
-        selectCodeTab(codeTabs[next])
-        codeTabs[next].focus()
-      })
+          event.preventDefault()
+          selectTab(tabs[next])
+          tabs[next].focus()
+        })
+      }
     }
 
   </script>
