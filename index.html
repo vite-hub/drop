@@ -1120,7 +1120,7 @@
       <div class="section-content">
         <h2 id="api-title">Upload a file</h2>
         <p>The installed skill stores the file and immediately prints its permanent Drop URL.</p>
-        <pre><code>curl -fsS -F file=@/path/to/file.pdf https://drop.vitehub.dev/api/files | jq -er '.url'</code></pre>
+        <pre><code>curl -fsS -F file=@/path/file.pdf https://drop.vitehub.dev/api/files | jq -r .url</code></pre>
 
         <h3>Limits</h3>
         <ul class="behavior limit-list">
