@@ -75,7 +75,7 @@ Keep one local path while drafting. Drop uploads are non-editable, so publish a 
 
 ## Markdown and Comark
 
-Use standard Markdown, GitHub-style tables, task lists, alerts, and the supported Comark syntax. Drop renders Markdown as HTML and escapes raw HTML.
+Use standard Markdown tables, task lists, alerts, and the supported Comark syntax. Drop renders Markdown as HTML and escapes raw HTML.
 
 For the full Comark authoring model, find [Comark on skills.sh](https://skills.sh/search?q=comark) or read its official [skill source](https://comark.dev/.well-known/skills/comark/SKILL.md). This Drop reference remains usable when that skill is not installed.
 

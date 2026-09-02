@@ -8,13 +8,13 @@
   </a>
 </p>
 
-<p align="center">Permanent files and readable agent plans, built with ViteHub primitives.</p>
+<p align="center">Permanent files, readable Markdown, and code images, built with ViteHub primitives.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·
   <a href="https://vitehub.dev">ViteHub</a> ·
   <a href="https://vitehub.dev/docs/">ViteHub docs</a> ·
-  <a href="https://github.com/vite-hub/vitehub">ViteHub on GitHub</a>
+  <a href="https://github.com/vite-hub/drop">Source</a>
 </p>
 
 ## How it works

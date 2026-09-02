@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0c0d0c">
   <meta name="application-name" content="Drop">
-  <meta name="description" content="Drop gives agents permanent file URLs and readable Markdown plans for GitHub and the open web.">
+  <meta name="description" content="Drop gives agents a place to publish files, render Markdown as readable pages, and turn source code into images.">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Drop">
   <meta property="og:title" content="Drop | Agent drops files">
-  <meta property="og:description" content="Drop gives agents permanent file URLs and readable Markdown plans for GitHub and the open web.">
+  <meta property="og:description" content="Drop gives agents a place to publish files, render Markdown as readable pages, and turn source code into images.">
   <meta property="og:url" content="https://drop.vitehub.dev/">
   <meta property="og:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
   <meta property="og:image:type" content="image/png">
@@ -19,7 +19,7 @@
   <meta property="og:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Drop | Agent drops files">
-  <meta name="twitter:description" content="Drop gives agents permanent file URLs and readable Markdown plans for GitHub and the open web.">
+  <meta name="twitter:description" content="Drop gives agents a place to publish files, render Markdown as readable pages, and turn source code into images.">
   <meta name="twitter:image" content="https://drop.vitehub.dev/og-vitehub-drop.png">
   <meta name="twitter:image:alt" content="Mic-drop emoji beside ViteHub Drop. Permanent file hosting for agents.">
   <title>Drop | Agent drops files</title>
@@ -794,12 +794,12 @@
           <span class="brand-prefix">ViteHub</span>
           <span>Drop</span>
         </h1>
-        <p class="lede">So your agent can publish files and readable plans.</p>
+        <p class="lede">A place for agents to drop their work.</p>
         <button class="command" type="button" data-copy aria-label="Copy skill install command">
           <code>npx skills add https://drop.vitehub.dev</code>
           <span aria-live="polite">Copy skill</span>
         </button>
-        <p class="usage-proof"><strong>{{ uploads.toLocaleString() }}</strong> files uploaded by agents</p>
+        <p class="usage-proof"><strong>{{ uploads.toLocaleString() }}</strong> files dropped by agents</p>
         <nav class="links" aria-label="Service links">
           <span class="link-group">
             <a href="#why">How and why</a>
@@ -815,9 +815,9 @@
             </a>
             <a href="https://github.com/vite-hub/drop">
               <svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+                <path fill="currentColor" d="m8.7 16.3-4.3-4.3 4.3-4.3 1.4 1.4L7.2 12l2.9 2.9zm6.6 0-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 4.3 4.3zm-4.8 3.2 2.8-15 2 .4-2.8 15z"/>
               </svg>
-              <span>GitHub</span>
+              <span>Source</span>
             </a>
           </span>
         </nav>
@@ -827,8 +827,8 @@
     <section class="doc-section" id="why" aria-labelledby="why-title">
       <div class="section-label">How and why</div>
       <div class="section-content">
-        <h2 id="why-title">GitHub’s API can’t attach local files to Markdown</h2>
-        <p>Agents need a stable URL before they can put a local file in GitHub content. ViteHub Drop gives every upload a permanent home and turns Markdown plans into readable pages.</p>
+        <h2 id="why-title">Give agent-made files a place to land</h2>
+        <p>ViteHub Drop publishes files at stable URLs, turns Markdown into readable pages, and renders source code as images. Install the skill once and let your agent handle the rest.</p>
         <ol class="stepper" aria-label="How it works">
           <li class="stepper-item">
             <div class="stepper-track" aria-hidden="true">
@@ -914,8 +914,8 @@
   -H "content-type: application/json" \
   --data '{
     "code": "#include &lt;iostream&gt;\n\nint main() {\n  std::cout &lt;&lt; \"Hello\";\n}",
-    "language": "C++",
-    "theme": "Nuxt",
+    "language": "cpp",
+    "theme": "nuxt",
     "format": "png",
     "scale": 2
   }'</code></pre>
@@ -932,8 +932,8 @@
         <ul class="behavior limit-list">
           <li><code>format</code> accepts <code>png</code> or <code>svg</code>.</li>
           <li><code>scale</code> accepts <code>2</code>, <code>4</code>, or <code>6</code>.</li>
-          <li><code>language</code> is case-insensitive; unsupported values render as plain text.</li>
-          <li><code>theme</code> accepts <code>midnight</code>, <code>breeze</code>, <code>candy</code>, <code>nuxt</code>, <code>raindrop</code>, or <code>sunset</code>.</li>
+          <li><code>language</code> accepts a case-sensitive Ray.so ID such as <code>cpp</code> or <code>typescript</code>.</li>
+          <li><code>theme</code> accepts a case-sensitive Ray.so ID such as <code>nuxt</code> or <code>midnight</code>.</li>
           <li>Download the result within five minutes, or upload it to Drop for a permanent URL.</li>
         </ul>
       </div>
@@ -945,7 +945,7 @@
         <h2 id="self-host-title">Host it yourself</h2>
         <a class="repository-link" href="https://github.com/vite-hub/drop">
           <svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+            <path fill="currentColor" d="m8.7 16.3-4.3-4.3 4.3-4.3 1.4 1.4L7.2 12l2.9 2.9zm6.6 0-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 4.3 4.3zm-4.8 3.2 2.8-15 2 .4-2.8 15z"/>
           </svg>
           <span>View repository</span>
         </a>

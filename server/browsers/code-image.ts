@@ -157,32 +157,32 @@ export default defineBrowser(async (input: CodeImageInput) => {
     provider: cloudflareBrowser({ binding: "BROWSER", engine: "chromium" }),
   })
   const session = await browser.open()
-  const control = await session.attach(cloudflarePlaywright())
   try {
-    const page = control.client.page
-    await page.goto(createRayUrl(input), { waitUntil: "domcontentloaded" })
-    const editor = page.locator('textarea[data-enable-grammarly="false"]')
-    await editor.waitFor({ state: "visible" })
-    if (input.theme)
-      await assertRayOption(page, "theme", "background", input.theme)
-    if (input.language)
-      await assertRayOption(page, "language", "language", input.language)
-    await editor.fill(input.code)
-
-    const padding = page.locator('button[aria-label="16"]')
-    if (await padding.count() !== 1)
-      throw new Error("[drop:code-image] Ray padding control was not found.")
-    await padding.click()
-
-    await selectRayExportScale(page, scale)
-    return await exportRayImage(page, format)
-  }
-  finally {
+    const control = await session.attach(cloudflarePlaywright())
     try {
-      await control.release()
+      const page = control.client.page
+      await page.goto(createRayUrl(input), { waitUntil: "domcontentloaded" })
+      const editor = page.locator('textarea[data-enable-grammarly="false"]')
+      await editor.waitFor({ state: "visible" })
+      if (input.theme)
+        await assertRayOption(page, "theme", "background", input.theme)
+      if (input.language)
+        await assertRayOption(page, "language", "language", input.language)
+      await editor.fill(input.code)
+
+      const padding = page.locator('button[aria-label="16"]')
+      if (await padding.count() !== 1)
+        throw new Error("[drop:code-image] Ray padding control was not found.")
+      await padding.click()
+
+      await selectRayExportScale(page, scale)
+      return await exportRayImage(page, format)
     }
     finally {
-      await session.close()
+      await control.release()
     }
+  }
+  finally {
+    await session.close()
   }
 })

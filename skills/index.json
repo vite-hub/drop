@@ -2,7 +2,7 @@
   "skills": [
     {
       "name": "vitehub-drop",
-      "description": "Publishes local files at permanent public URLs, with readable HTML rendering for Markdown and temporary image rendering for source code. Use when attaching files to GitHub issues or pull requests.",
+      "description": "Publishes local files at permanent public URLs, renders Markdown as readable HTML, and turns source code into temporary images. Use when the user asks to publish a file, share a rendered document, or create a code image.",
       "files": [
         "SKILL.md",
         "references/documents.md"

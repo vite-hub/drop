@@ -1,6 +1,6 @@
 ---
 name: vitehub-drop
-description: Publishes local files at permanent public URLs, with readable HTML rendering for Markdown and temporary image rendering for source code. Use when attaching files to GitHub issues or pull requests.
+description: Publishes local files at permanent public URLs, renders Markdown as readable HTML, and turns source code into temporary images. Use when the user asks to publish a file, share a rendered document, or create a code image.
 ---
 
 # ViteHub Drop
@@ -38,16 +38,7 @@ Code image URLs expire after five minutes; download and publish the result to ma
 
 ## Options
 
-Fetch the current case-sensitive IDs directly from Ray.so before setting `language` or `theme`:
-
-```bash
-# Fetch and parse available themes
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/store/themes.ts" | grep -oE 'id:[[:space:]]*"[^"]+"' | sed -E 's/id:[[:space:]]*"([^"]+)"/\1/' | sort -u
-
-# Fetch and parse available languages
-curl -s "https://raw.githubusercontent.com/raycast/ray-so/main/app/(navigation)/(code)/util/languages.ts" | grep -oE '^[[:space:]]*"?[a-zA-Z0-9+#-]+"?[[:space:]]*:[[:space:]]*\{' | sed -E 's/^[[:space:]]*"?([^"]+)"?[[:space:]]*:.*/\1/' | sort -u
-```
-
-- `language` and `theme` accept the IDs printed by those commands.
+- `language` accepts a case-sensitive Ray.so ID such as `cpp` or `typescript`. Omit it when plain text is enough.
+- `theme` accepts a case-sensitive Ray.so ID such as `nuxt` or `midnight`.
 - `format` accepts `png` (default) or `svg`.
 - `scale` for png accepts `2`, `4` (default), or `6`.
