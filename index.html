@@ -270,8 +270,12 @@
       order: 2;
     }
 
-    .showcase-item:nth-child(even) .showcase-visual {
+    .showcase-item:nth-child(even) .showcase-media {
       order: 1;
+    }
+
+    .showcase-media {
+      min-width: 0;
     }
 
     .showcase-number {
@@ -394,30 +398,29 @@
     .file-png { color: oklch(75% 0.15 330); }
     .file-zip { color: var(--accent); }
 
-    .file-url {
-      max-width: calc(100% - 3rem);
-      position: absolute;
-      right: 1.5rem;
-      bottom: 1.5rem;
-      left: 1.5rem;
-      padding: 0.85rem 1rem;
+    .showcase-result {
+      width: fit-content;
+      max-width: 100%;
+      margin: 1.25rem auto 0;
       display: flex;
       align-items: center;
       gap: 0.65rem;
-      border: 1px solid var(--line);
-      background: var(--bg);
       color: var(--accent);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 0.74rem;
     }
 
-    .file-url img {
+    .showcase-result[hidden] {
+      display: none;
+    }
+
+    .showcase-result img {
       width: 1.25rem;
       height: 1.25rem;
       flex: none;
     }
 
-    .file-url-text {
+    .showcase-result-text {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -448,14 +451,10 @@
 
     .source-pane,
     .document-pane {
-      height: calc(100% - 4.5rem);
+      height: 100%;
       min-width: 0;
       border: 1px solid var(--line);
       background: var(--bg);
-    }
-
-    .markdown-url {
-      bottom: 1rem;
     }
 
     .markdown-source {
@@ -798,7 +797,7 @@
       }
 
       .showcase-item:nth-child(even) .showcase-copy,
-      .showcase-item:nth-child(even) .showcase-visual {
+      .showcase-item:nth-child(even) .showcase-media {
         order: initial;
       }
     }
@@ -1155,17 +1154,19 @@
               <li>Permanent, non-editable URL</li>
             </ul>
           </div>
-          <div class="showcase-visual" aria-label="PDF, spreadsheet, document, image, and archive files becoming one Drop URL">
-            <div class="file-stage" aria-hidden="true">
-              <div class="file-card file-pdf"><img src="https://api.iconify.design/vscode-icons/file-type-pdf2.svg" alt=""><span class="file-name">brief.pdf</span></div>
-              <div class="file-card file-xlsx"><img src="https://api.iconify.design/vscode-icons/file-type-excel.svg" alt=""><span class="file-name">forecast.xlsx</span></div>
-              <div class="file-card file-docx"><img src="https://api.iconify.design/vscode-icons/file-type-word.svg" alt=""><span class="file-name">notes.docx</span></div>
-              <div class="file-card file-pptx"><img src="https://api.iconify.design/vscode-icons/file-type-powerpoint.svg" alt=""><span class="file-name">deck.pptx</span></div>
-              <div class="file-card file-figma"><img src="https://api.iconify.design/logos/figma.svg" alt=""><span class="file-name">screens.fig</span></div>
-              <div class="file-card file-png"><span class="file-extension">PNG</span><span class="file-name">screen.png</span></div>
-              <div class="file-card file-zip"><span class="file-extension">ZIP</span><span class="file-name">assets.zip</span></div>
-              <div class="file-url"><img src="/favicon.svg" alt=""><span class="file-url-text">drop.vitehub.dev/i/0d7a…/forecast.xlsx</span></div>
+          <div class="showcase-media">
+            <div class="showcase-visual" aria-label="PDF, spreadsheet, document, image, and archive files becoming one Drop URL">
+              <div class="file-stage" aria-hidden="true">
+                <div class="file-card file-pdf"><img src="https://api.iconify.design/vscode-icons/file-type-pdf2.svg" alt=""><span class="file-name">brief.pdf</span></div>
+                <div class="file-card file-xlsx"><img src="https://api.iconify.design/vscode-icons/file-type-excel.svg" alt=""><span class="file-name">forecast.xlsx</span></div>
+                <div class="file-card file-docx"><img src="https://api.iconify.design/vscode-icons/file-type-word.svg" alt=""><span class="file-name">notes.docx</span></div>
+                <div class="file-card file-pptx"><img src="https://api.iconify.design/vscode-icons/file-type-powerpoint.svg" alt=""><span class="file-name">deck.pptx</span></div>
+                <div class="file-card file-figma"><img src="https://api.iconify.design/logos/figma.svg" alt=""><span class="file-name">screens.fig</span></div>
+                <div class="file-card file-png"><span class="file-extension">PNG</span><span class="file-name">screen.png</span></div>
+                <div class="file-card file-zip"><span class="file-extension">ZIP</span><span class="file-name">assets.zip</span></div>
+              </div>
             </div>
+            <div class="showcase-result"><img src="/favicon.svg" alt=""><span class="showcase-result-text">drop.vitehub.dev/i/0d7a…/forecast.xlsx</span></div>
           </div>
         </article>
 
@@ -1179,15 +1180,16 @@
               <li>Immutable source on demand</li>
             </ul>
           </div>
-          <div class="showcase-visual" aria-label="Markdown source rendered as a readable HTML document">
-            <div class="showcase-tabs" data-tabs>
-              <div class="code-tabs" role="tablist" aria-label="Markdown example">
-                <button class="code-tab" id="markdown-input-tab" type="button" role="tab" aria-controls="markdown-input-panel" aria-selected="false" tabindex="-1" data-tab="source">plan.md</button>
-                <button class="code-tab" id="markdown-output-tab" type="button" role="tab" aria-controls="markdown-output-panel" aria-selected="true" data-tab="output">Rendered HTML</button>
-              </div>
-              <div class="code-panel render-stage" id="markdown-input-panel" role="tabpanel" aria-labelledby="markdown-input-tab" data-panel="source" hidden>
-                <div class="source-pane">
-                  <div class="markdown-source"><b># Launch plan</b>
+          <div class="showcase-media">
+            <div class="showcase-visual" aria-label="Markdown source rendered as a readable HTML document">
+              <div class="showcase-tabs" data-tabs>
+                <div class="code-tabs" role="tablist" aria-label="Markdown example">
+                  <button class="code-tab" id="markdown-input-tab" type="button" role="tab" aria-controls="markdown-input-panel" aria-selected="false" tabindex="-1" data-tab="source">plan.md</button>
+                  <button class="code-tab" id="markdown-output-tab" type="button" role="tab" aria-controls="markdown-output-panel" aria-selected="true" data-tab="output">Rendered HTML</button>
+                </div>
+                <div class="code-panel render-stage" id="markdown-input-panel" role="tabpanel" aria-labelledby="markdown-input-tab" data-panel="source" hidden>
+                  <div class="source-pane">
+                    <div class="markdown-source"><b># Launch plan</b>
 
 Ship the smallest useful change.
 
@@ -1198,21 +1200,22 @@ Keep the existing endpoint.
 ```mermaid
 Draft --&gt; Review --&gt; Ship
 ```</div>
-                </div>
-                <div class="file-url markdown-url"><img src="/favicon.svg" alt=""><span class="file-url-text">drop.vitehub.dev/i/launch-plan.md?raw</span></div>
-              </div>
-              <div class="code-panel render-stage" id="markdown-output-panel" role="tabpanel" aria-labelledby="markdown-output-tab" data-panel="output">
-                <div class="document-pane">
-                  <div class="document-preview">
-                    <h4>Launch plan</h4>
-                    <p>Ship the smallest useful change.</p>
-                    <div class="document-callout">Decision<br>Keep the existing endpoint.</div>
-                    <div class="document-flow"><span>Draft</span><i>→</i><span>Review</span><i>→</i><span>Ship</span></div>
                   </div>
                 </div>
-                <div class="file-url markdown-url"><img src="/favicon.svg" alt=""><span class="file-url-text">drop.vitehub.dev/i/launch-plan.md</span></div>
+                <div class="code-panel render-stage" id="markdown-output-panel" role="tabpanel" aria-labelledby="markdown-output-tab" data-panel="output">
+                  <div class="document-pane">
+                    <div class="document-preview">
+                      <h4>Launch plan</h4>
+                      <p>Ship the smallest useful change.</p>
+                      <div class="document-callout">Decision<br>Keep the existing endpoint.</div>
+                      <div class="document-flow"><span>Draft</span><i>→</i><span>Review</span><i>→</i><span>Ship</span></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+            <div class="showcase-result" data-tab-result="source" hidden><img src="/favicon.svg" alt=""><span class="showcase-result-text">drop.vitehub.dev/i/launch-plan.md?raw</span></div>
+            <div class="showcase-result" data-tab-result="output"><img src="/favicon.svg" alt=""><span class="showcase-result-text">drop.vitehub.dev/i/launch-plan.md</span></div>
           </div>
         </article>
 
@@ -1226,8 +1229,9 @@ Draft --&gt; Review --&gt; Ship
               <li>Publish the result when it should last</li>
             </ul>
           </div>
-          <div class="showcase-visual" aria-label="Source code rendered as a polished image">
-            <div class="showcase-tabs" data-tabs>
+          <div class="showcase-media">
+            <div class="showcase-visual" aria-label="Source code rendered as a polished image">
+              <div class="showcase-tabs" data-tabs>
               <div class="code-tabs" role="tablist" aria-label="Code image example">
                 <button class="code-tab" id="showcase-code-input-tab" type="button" role="tab" aria-controls="showcase-code-input-panel" aria-selected="false" tabindex="-1" data-tab="input">Input</button>
                 <button class="code-tab" id="showcase-code-output-tab" type="button" role="tab" aria-controls="showcase-code-output-panel" aria-selected="true" data-tab="output">Output</button>
@@ -1249,6 +1253,7 @@ Draft --&gt; Review --&gt; Ship
                 <div class="showcase-code-stage">
                   <img class="showcase-code-image" src="https://drop.vitehub.dev/i/0a5260a2-13ed-40e6-aa18-763948637df0.png" alt="C++ hello-world code rendered as a Nuxt-themed image" width="1040" height="402" loading="lazy" decoding="async">
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -1308,6 +1313,7 @@ Draft --&gt; Review --&gt; Ship
     for (const tabGroup of document.querySelectorAll("[data-tabs]")) {
       const tabs = Array.from(tabGroup.querySelectorAll(":scope > .code-tabs [data-tab]"))
       const panels = Array.from(tabGroup.querySelectorAll(":scope > [data-panel]"))
+      const results = Array.from(tabGroup.closest(".showcase-media")?.querySelectorAll(":scope > [data-tab-result]") ?? [])
       const selectTab = (selectedTab) => {
         for (const tab of tabs) {
           const selected = tab === selectedTab
@@ -1317,6 +1323,9 @@ Draft --&gt; Review --&gt; Ship
 
         for (const panel of panels)
           panel.hidden = panel.dataset.panel !== selectedTab.dataset.tab
+
+        for (const result of results)
+          result.hidden = result.dataset.tabResult !== selectedTab.dataset.tab
       }
 
       for (const tab of tabs) {
