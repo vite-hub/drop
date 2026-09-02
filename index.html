@@ -549,7 +549,6 @@
     .code-pink { color: oklch(78% 0.16 340); }
     .code-blue { color: oklch(78% 0.13 235); }
     .code-green { color: oklch(82% 0.14 150); }
-    }
 
     .section-label {
       color: var(--accent);
@@ -1121,7 +1120,7 @@
       <div class="section-content">
         <h2 id="api-title">Upload a file</h2>
         <p>The installed skill stores the file and immediately prints its permanent Drop URL.</p>
-        <pre><code>curl -fsS -F "file=@/absolute/path/to/file.pdf" https://drop.vitehub.dev/api/files | jq -er '.url'</code></pre>
+        <pre><code>curl -fsS -F file=@/path/to/file.pdf https://drop.vitehub.dev/api/files | jq -er '.url'</code></pre>
 
         <h3>Limits</h3>
         <ul class="behavior limit-list">
