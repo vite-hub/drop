@@ -330,29 +330,6 @@
       background: var(--surface);
     }
 
-    .showcase-visual-bar {
-      height: 2.75rem;
-      padding: 0 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 0.75rem;
-    }
-
-    .showcase-lights {
-      display: flex;
-      gap: 0.35rem;
-    }
-
-    .showcase-lights i {
-      width: 0.45rem;
-      height: 0.45rem;
-      border-radius: 50%;
-      background: var(--line);
-    }
-
     .file-stage {
       height: 28rem;
       position: relative;
@@ -435,7 +412,7 @@
     }
 
     .showcase-tabs {
-      height: calc(28rem - 2.75rem);
+      height: 28rem;
       display: flex;
       flex-direction: column;
     }
@@ -452,7 +429,7 @@
 
     .render-stage {
       min-height: 0;
-      padding: 1.5rem;
+      padding: 0;
     }
 
     .source-pane,
@@ -533,7 +510,7 @@
 
     .showcase-code-stage {
       height: 100%;
-      padding: 1.5rem;
+      padding: 0;
       display: grid;
       place-items: center;
     }
@@ -986,17 +963,17 @@
       }
 
       .render-stage {
-        min-height: calc(24rem - 2.75rem);
-        padding: 1rem;
+        min-height: 0;
+        padding: 0;
         grid-template-columns: minmax(0, 1fr);
       }
 
-      .source-pane {
-        display: none;
+      .showcase-tabs {
+        height: 24rem;
       }
 
       .showcase-code-stage {
-        height: calc(24rem - 2.75rem);
+        height: 100%;
       }
 
       .provider-grid {
@@ -1185,7 +1162,6 @@
             </ul>
           </div>
           <div class="showcase-visual" aria-label="Markdown source rendered as a readable HTML document">
-            <div class="showcase-visual-bar"><span>Markdown → HTML</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
             <div class="showcase-tabs" data-tabs>
               <div class="code-tabs" role="tablist" aria-label="Markdown example">
                 <button class="code-tab" id="markdown-input-tab" type="button" role="tab" aria-controls="markdown-input-panel" aria-selected="false" tabindex="-1" data-tab="source">plan.md</button>
@@ -1233,7 +1209,6 @@ Draft --&gt; Review --&gt; Ship
             </ul>
           </div>
           <div class="showcase-visual" aria-label="Source code rendered as a polished image">
-            <div class="showcase-visual-bar"><span>Source → image</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
             <div class="showcase-tabs" data-tabs>
               <div class="code-tabs" role="tablist" aria-label="Code image example">
                 <button class="code-tab" id="showcase-code-input-tab" type="button" role="tab" aria-controls="showcase-code-input-panel" aria-selected="false" tabindex="-1" data-tab="input">Input</button>
@@ -1288,48 +1263,6 @@ Draft --&gt; Review --&gt; Ship
             <tr><td><code>503</code></td><td>Rate limiting, storage, or optimization dispatch is unavailable.</td></tr>
           </tbody>
         </table>
-      </div>
-    </section>
-
-    <section class="doc-section api" id="code-images" aria-labelledby="code-images-title">
-      <div class="section-label">Code images</div>
-      <div class="section-content">
-        <h2 id="code-images-title">Turn code into an image</h2>
-        <p>Choose a language, theme, scale, and format to get a PNG or SVG.</p>
-
-        <div class="code-example" data-tabs>
-          <div class="code-tabs" role="tablist" aria-label="Code image example">
-            <button class="code-tab" id="code-input-tab" type="button" role="tab" aria-controls="code-input-panel" aria-selected="false" tabindex="-1" data-tab="input">Input</button>
-            <button class="code-tab" id="code-output-tab" type="button" role="tab" aria-controls="code-output-panel" aria-selected="true" data-tab="output">Output</button>
-          </div>
-
-          <div class="code-panel" id="code-input-panel" role="tabpanel" aria-labelledby="code-input-tab" data-panel="input" hidden>
-            <pre><code>curl https://drop.vitehub.dev/api/code \
-  -H "content-type: application/json" \
-  --data '{
-    "code": "#include &lt;iostream&gt;\n\nint main() {\n  std::cout &lt;&lt; \"Hello\";\n}",
-    "language": "cpp",
-    "theme": "nuxt",
-    "format": "png",
-    "scale": 2
-  }'</code></pre>
-          </div>
-
-          <div class="code-panel" id="code-output-panel" role="tabpanel" aria-labelledby="code-output-tab" data-panel="output">
-            <figure class="code-output">
-              <img src="https://drop.vitehub.dev/i/0a5260a2-13ed-40e6-aa18-763948637df0.png" alt="C++ hello-world code rendered with the Nuxt theme" width="1040" height="402" loading="lazy" decoding="async">
-            </figure>
-          </div>
-        </div>
-
-        <h3>Options</h3>
-        <ul class="behavior limit-list">
-          <li><code>format</code> accepts <code>png</code> or <code>svg</code>.</li>
-          <li><code>scale</code> accepts <code>2</code>, <code>4</code>, or <code>6</code>.</li>
-          <li><code>language</code> accepts a case-sensitive Ray.so ID such as <code>cpp</code> or <code>typescript</code>.</li>
-          <li><code>theme</code> accepts a case-sensitive Ray.so ID such as <code>nuxt</code> or <code>midnight</code>.</li>
-          <li>Download the result within five minutes, or upload it to Drop for a permanent URL.</li>
-        </ul>
       </div>
     </section>
 
