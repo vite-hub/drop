@@ -354,7 +354,7 @@
     }
 
     .file-stage {
-      height: calc(28rem - 2.75rem);
+      height: 28rem;
       position: relative;
       display: grid;
       place-items: center;
@@ -381,6 +381,13 @@
     .file-card:nth-child(5) { transform: translate(11.2rem, -2.6rem) rotate(8deg); }
     .file-card:nth-child(6) { transform: translate(-3.2rem, 4.4rem) rotate(-4deg); }
     .file-card:nth-child(7) { transform: translate(3.3rem, 4.5rem) rotate(4deg); }
+
+    .file-card:nth-child(1) > * { transform: rotate(8deg); }
+    .file-card:nth-child(2) > * { transform: rotate(3deg); }
+    .file-card:nth-child(4) > * { transform: rotate(-3deg); }
+    .file-card:nth-child(5) > * { transform: rotate(-8deg); }
+    .file-card:nth-child(6) > * { transform: rotate(4deg); }
+    .file-card:nth-child(7) > * { transform: rotate(-4deg); }
 
     .file-card img {
       width: 2.2rem;
@@ -974,7 +981,7 @@
       }
 
       .file-stage {
-        height: calc(24rem - 2.75rem);
+        height: 24rem;
         transform: scale(0.8);
       }
 
@@ -1154,7 +1161,6 @@
             </ul>
           </div>
           <div class="showcase-visual" aria-label="PDF, spreadsheet, document, image, and archive files becoming one Drop URL">
-            <div class="showcase-visual-bar"><span>One file in. One URL out.</span><span class="showcase-lights" aria-hidden="true"><i></i><i></i><i></i></span></div>
             <div class="file-stage" aria-hidden="true">
               <div class="file-card file-pdf"><img src="https://api.iconify.design/vscode-icons/file-type-pdf2.svg" alt=""><span class="file-name">brief.pdf</span></div>
               <div class="file-card file-xlsx"><img src="https://api.iconify.design/vscode-icons/file-type-excel.svg" alt=""><span class="file-name">forecast.xlsx</span></div>
