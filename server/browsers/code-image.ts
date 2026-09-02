@@ -95,7 +95,7 @@ async function selectRayExportScale(
     await page.keyboard.press("Escape")
     return
   }
-  await option.click()
+  await option.press("Enter")
 
   await openRayExportMenu(page)
   const selected = page.locator('[role="menuitem"]', { hasText: `Size ${scale}x` })
