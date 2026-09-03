@@ -52,7 +52,7 @@ curl --fail-with-body https://drop.vitehub.dev/api/files \
   -F "file=@/absolute/path/to/file.pdf"
 ```
 
-Files up to 4 MiB are accepted. Every successful upload creates a permanent, non-editable URL. PNG, JPEG, and WebP files are available immediately and may be replaced at the same URL by a smaller optimized version; PDFs, spreadsheets, documents, archives, and other files never change. Markdown renders as styled HTML, while HTML renders unchanged inside a restrictive browser sandbox. Append `?raw` to either document URL for its exact source. The public deployment limits uploads to five attempts per source address per minute.
+Files up to 4 MiB are accepted. Every successful upload creates a permanent, non-editable URL. PNG, JPEG, and WebP files are available immediately and may be replaced at the same URL by a smaller optimized version; PDFs, spreadsheets, documents, archives, and other files never change. Markdown and HTML uploads must use UTF-8. Markdown renders as styled HTML, while HTML renders unchanged inside a restrictive browser sandbox. Append `?raw` to either document URL for its exact source. The public deployment limits uploads to five attempts per source address per minute.
 
 ### Create a code image
 
@@ -100,6 +100,6 @@ Run the deployed smoke test:
 pnpm test:e2e:deployed
 ```
 
-The test uploads an image, Markdown, and HTML, confirms their public responses, checks document rendering and raw Markdown, and exercises code-image rendering.
+The test uploads an image and Markdown, confirms their public responses, checks document rendering and raw source, and exercises code-image rendering.
 
 The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

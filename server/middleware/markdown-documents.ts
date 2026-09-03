@@ -5,7 +5,7 @@ import { renderMarkdownDocument } from "../utils/markdown-document"
 
 const DOCUMENT_PATH = /^\/i\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html))$/i
 const MARKDOWN_CONTENT_SECURITY_POLICY = "default-src 'none'; img-src https: data:; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-const HTML_CONTENT_SECURITY_POLICY = "sandbox allow-scripts; default-src 'none'; font-src data:; img-src https: data:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+const HTML_CONTENT_SECURITY_POLICY = "sandbox; default-src 'none'; font-src data:; img-src https: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 export default defineHandler(async (event) => {
   if (!(["GET", "HEAD"].includes(event.req.method)) || event.url.searchParams.has("raw")) return

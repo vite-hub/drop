@@ -66,12 +66,12 @@ Write HTML as a document, not as a landing page.
 - Keep the file self-contained and under 512 KB.
 - Prefer dense, scannable content over decorative framing or marketing copy.
 - Use responsive semantic HTML, inline CSS, and inline SVG.
-- Use a small inline script when interaction helps the reader. Keep the behavior inside the file.
-- Embed styles, scripts, fonts, and images. External links are fine.
+- Keep the document useful without JavaScript. Drop blocks scripts in uploaded HTML.
+- Embed styles, fonts, and images. External links are fine.
 - Keep secrets, private URLs, and local filesystem paths out of published content.
 - For UI variants, render the actual styled options, label them `A`, `B`, and `C`, and place them together for comparison.
 
-Drop renders HTML with a browser sandbox. Inline styles and scripts work, but the page has an opaque origin and cannot submit forms, open popups, or load external scripts. Network access is limited to HTTPS images. Embedded fonts and images work.
+Drop renders HTML with a browser sandbox. Inline styles work, but scripts, forms, popups, and external resources other than HTTPS images are blocked. Embedded fonts and images work.
 
 Keep one local path while drafting. Drop uploads are non-editable, so publish a new URL for each finished revision. Open the document in a browser when the user asks to inspect it.
 

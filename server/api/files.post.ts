@@ -30,14 +30,15 @@ export default defineHandler(async (event) => {
   const bytes = new Uint8Array(await file.arrayBuffer())
   let contentType = detectContentType(bytes) ?? "application/octet-stream"
 
-  if ([".md", ".markdown"].includes(extension)) {
+  if ([".md", ".markdown", ".html"].includes(extension)) {
     try {
       new TextDecoder("utf-8", { fatal: true }).decode(bytes)
     }
     catch {
-      throw new HTTPError({ status: 400, statusText: "Markdown files must contain valid UTF-8." })
+      const format = extension === ".html" ? "HTML" : "Markdown"
+      throw new HTTPError({ status: 400, statusText: `${format} files must contain valid UTF-8.` })
     }
-    contentType = "text/markdown; charset=utf-8"
+    if (extension !== ".html") contentType = "text/markdown; charset=utf-8"
   }
 
   const key = `${crypto.randomUUID()}${extension}`
