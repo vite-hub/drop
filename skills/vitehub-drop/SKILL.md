@@ -1,6 +1,6 @@
 ---
 name: vitehub-drop
-description: Publishes local files at permanent public URLs, renders Markdown as readable HTML, and turns source code into temporary images. Use when the user asks to publish a file, share a rendered document, or create a code image.
+description: Publishes local files at permanent public URLs, renders Markdown and HTML documents, and turns source code into temporary images. Use when the user asks to publish a file, share a rendered document, or create a code image.
 ---
 
 # ViteHub Drop
@@ -20,7 +20,7 @@ curl --fail-with-body --silent --show-error \
 
 Return the command's stdout verbatim. Do not retry a successful upload: every successful request creates another permanent URL.
 
-Markdown files render as HTML at the returned URL. Append `?raw` to read their exact source. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
+Markdown and HTML files render at the returned URL. Append `?raw` to read their exact source. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
 
 ## Render code
 

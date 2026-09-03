@@ -71,6 +71,8 @@ Write HTML as a document, not as a landing page.
 - Keep secrets, private URLs, and local filesystem paths out of published content.
 - For UI variants, render the actual styled options, label them `A`, `B`, and `C`, and place them together for comparison.
 
+Drop renders HTML with a browser sandbox. Inline styles and scripts work, but the page has an opaque origin and cannot submit forms, open popups, or load external scripts. Network access is limited to HTTPS images. Embedded fonts and images work.
+
 Keep one local path while drafting. Drop uploads are non-editable, so publish a new URL for each finished revision. Open the document in a browser when the user asks to inspect it.
 
 ## Markdown and Comark
