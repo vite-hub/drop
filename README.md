@@ -94,4 +94,12 @@ pnpm exec wrangler deploy --config .output/server/wrangler.json
 
 ViteHub composes the R2, Queue, Rate Limit, Sandbox, Container, Durable Object, and migration bindings, then emits the hourly Cron Trigger from the Schedule Definition.
 
+Run the deployed smoke test:
+
+```sh
+pnpm test:e2e:deployed
+```
+
+The test uploads an image and Markdown, confirms their public responses, checks document rendering and raw source, and exercises code-image rendering.
+
 The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
