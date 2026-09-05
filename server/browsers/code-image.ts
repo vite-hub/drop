@@ -1,42 +1,14 @@
-import { connect } from "@cloudflare/playwright"
-import { createBrowser } from "vite-hub/browser"
+import { createBrowser, defineBrowser } from "vite-hub/browser"
+import { playwright } from "vite-hub/browser/controllers/playwright"
 import { cloudflareBrowser } from "vite-hub/browser/providers/cloudflare"
+import { CODE_IMAGE_MAX_CHARACTERS } from "../utils/code-images.ts"
 
-import type { Browser, Download, Page } from "@cloudflare/playwright"
-import type { BrowserController } from "vite-hub/browser"
-import type { CloudflareBrowserBindingConnection } from "vite-hub/browser/providers/cloudflare"
+import type { PlaywrightClient } from "vite-hub/browser/controllers/playwright"
+import type { CodeImageFormat, CodeImageScale } from "../utils/code-images.ts"
+
+type Page = PlaywrightClient["page"]
 
 const RAY_URL = "https://ray.so/"
-
-interface CloudflarePlaywrightClient {
-  browser: Browser
-  page: Page
-}
-
-function cloudflarePlaywright(): BrowserController<CloudflarePlaywrightClient, CloudflareBrowserBindingConnection> {
-  return {
-    features: { attachExistingSession: true },
-    name: "cloudflare-playwright",
-    async attach(connection) {
-      if (connection.engine === "kitesurf" || !connection.sessionId)
-        throw new Error("[drop:code-image] Code image export requires a Chromium Browser session.")
-
-      const browser = await connect(connection.binding as never, connection.sessionId)
-      const contexts = browser.contexts()
-      const context = contexts.find(value => value.pages().length > 0)
-        ?? contexts[0]
-        ?? await browser.newContext()
-      const page = context.pages()[0] ?? await context.newPage()
-      return {
-        client: { browser, page },
-        preservesSessionOnRelease: false,
-        async release() {
-          await browser.close()
-        },
-      }
-    },
-  }
-}
 
 export interface CodeImageInput {
   code: string
@@ -78,8 +50,7 @@ async function openRayExportMenu(page: Page) {
   await button.click()
 }
 
-function readRayDownload(download: Download) {
-  const url = download.url()
+function readRayDownload(url: string) {
   const separator = url.indexOf(",")
   if (!url.startsWith("data:") || separator === -1)
     throw new Error("[drop:code-image] Ray returned an empty export.")
@@ -117,7 +88,7 @@ async function exportRayImage(
   if (!download.suggestedFilename().endsWith(`.${format}`))
     throw new Error(`[drop:code-image] Ray returned an unexpected ${format} export.`)
 
-  const image = readRayDownload(download)
+  const image = readRayDownload(download.url())
   if (format === "png" && !image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
     throw new Error("[drop:code-image] Ray returned an invalid PNG export.")
   if (format === "svg" && !image.subarray(0, 512).toString("utf8").includes("<svg"))
@@ -136,7 +107,7 @@ export default defineBrowser(async (input: CodeImageInput) => {
   })
   const session = await browser.open()
   try {
-    const control = await session.attach(cloudflarePlaywright())
+    const control = await session.attach(playwright())
     try {
       const page = control.client.page
       await page.addInitScript(value => localStorage.setItem("size", JSON.stringify(value)), scale)

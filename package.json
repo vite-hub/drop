@@ -11,7 +11,6 @@
     "deploy": "pnpm build && wrangler deploy",
     "postinstall": "vitehub types prepare",
     "preview": "nitro preview",
-    "test": "node --test test/*.test.ts",
     "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
     "typecheck": "vite build --app && tsc --noEmit"
   },
@@ -24,10 +23,11 @@
     "nitro": "3.0.260603-beta",
     "sharp": "0.34.5",
     "valibot": "^1.4.2",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@cb6d0919c4e1e5dcdf5e90311aa0b0e187f562de"
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@1ba80e377e6d45f7d3ad71aa5d9143d235cf31a5"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
+    "playwright-core": "1.62.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "wrangler": "4.111.0"

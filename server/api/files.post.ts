@@ -60,7 +60,7 @@ export default defineHandler(async (event) => {
   }
 
   if (OPTIMIZABLE_IMAGE_CONTENT_TYPES.has(contentType))
-    deferQueue("image-optimization", { payload: key })
+    deferQueue("image-optimization", key)
 
   return { url: new URL(stored.url, event.req.url).href }
 })
