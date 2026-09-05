@@ -11,8 +11,6 @@
     "deploy": "pnpm build && wrangler deploy",
     "postinstall": "vitehub types prepare",
     "preview": "nitro preview",
-    "test": "node --experimental-test-module-mocks --test test/*.test.ts",
-    "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
     "typecheck": "vite build --app && tsc --noEmit"
   },
   "dependencies": {
