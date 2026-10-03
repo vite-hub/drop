@@ -8,8 +8,9 @@ export default defineQueue<string>(async ({ payload: key }) => {
   if (readError) throw readError
   if (!original) throw new Error("Original image is missing.")
 
-  const [error, optimized] = await runSandbox("image-optimizer", { image: original })
-  if (error) throw error
+  const response = await runSandbox("image-optimizer", { image: original })
+  if (!response.ok) throw new Error(await response.text())
+  const optimized = await response.blob()
 
   if (detectContentType(new Uint8Array(await optimized.arrayBuffer())) !== original.type)
     throw new Error("Sandbox returned an invalid image.")

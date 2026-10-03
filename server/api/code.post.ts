@@ -22,15 +22,16 @@ export default defineHandler(async (event) => {
     }),
   })
 
-  const [browserError, image] = await runBrowser("code-image", input)
-  if (browserError) {
+  const response = await runBrowser("code-image", input)
+  if (!response.ok) {
     console.error(JSON.stringify({
       counter: "code_image_failure",
-      error: browserError.message,
+      error: await response.text(),
     }))
     throw new HTTPError({ status: 502, statusText: "The code image could not be rendered." })
   }
 
+  const image = await response.blob()
   const format = input.format ?? "png"
   const { expiresAt, key } = createCodeImageLocation(format)
   const [storageError, stored] = await blob.put(key, image, {
