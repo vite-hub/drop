@@ -1,4 +1,10 @@
+import { assertBodySize, defineHandler, HTTPError, readValidatedBody, requireContentType } from "h3"
 import * as v from "valibot"
+import { blob } from "vite-hub/blob"
+import { runBrowser } from "vite-hub/browser"
+import { requireRateLimit } from "vite-hub/rate-limit"
+import { requireIdentity } from "../utils/identity"
+import { CODE_IMAGE_FORMATS, CODE_IMAGE_MAX_CHARACTERS, CODE_IMAGE_SCALES, createCodeImageLocation } from "../utils/code-images"
 
 const MAX_CODE_BODY_BYTES = 96 * 1024
 
@@ -11,7 +17,9 @@ const CodeImageInputSchema = v.strictObject({
 })
 
 export default defineHandler(async (event) => {
-  await requireRateLimit(event, "code-image", { failure: "deny", limit: 5, window: "1m" })
+  const who = await requireIdentity(event)
+  // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
+  if (!import.meta.dev) await requireRateLimit(event, "code-image", { failure: "deny", key: who.userId, limit: 10, window: "1m" })
   requireContentType(event, "application/json")
   await assertBodySize(event, MAX_CODE_BODY_BYTES)
   const input = await readValidatedBody(event, CodeImageInputSchema, {

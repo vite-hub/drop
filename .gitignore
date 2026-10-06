@@ -9,3 +9,5 @@
 .env*
 dist/
 node_modules/
+.nuxt/
+!.env.example

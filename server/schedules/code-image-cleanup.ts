@@ -1,3 +1,7 @@
+import { blob } from "vite-hub/blob"
+import { defineSchedule } from "vite-hub/schedule"
+import { CODE_IMAGE_PREFIX, isExpiredCodeImage } from "../utils/code-images"
+
 export default defineSchedule({
   cron: "0 * * * *",
   async handler({ scheduledAt }) {

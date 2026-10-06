@@ -3,7 +3,7 @@ import { blob } from "vite-hub/blob"
 import typesetStyles from "../assets/typeset.css?raw"
 import { renderMarkdownDocument } from "../utils/markdown-document"
 
-const DOCUMENT_PATH = /^\/i\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html))$/i
+const DOCUMENT_PATH = /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html))$/i
 const MARKDOWN_CONTENT_SECURITY_POLICY = "default-src 'none'; img-src https: data:; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 const HTML_CONTENT_SECURITY_POLICY = "sandbox; default-src 'none'; font-src data:; img-src https: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
@@ -23,7 +23,7 @@ export default defineHandler(async (event) => {
   }
   if (!source) return
 
-  event.res.headers.set("Cache-Control", "public, max-age=60")
+  event.res.headers.set("Cache-Control", event.context.dropPrivate ? "private, no-store" : "public, max-age=60")
   event.res.headers.set("Content-Security-Policy", isHtml ? HTML_CONTENT_SECURITY_POLICY : MARKDOWN_CONTENT_SECURITY_POLICY)
   event.res.headers.set("Content-Type", "text/html; charset=utf-8")
   event.res.headers.set("Referrer-Policy", "no-referrer")

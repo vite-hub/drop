@@ -2,34 +2,51 @@
   "name": "vitehub-drop",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@11.18.0",
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "vite build",
-    "deploy": "pnpm build && wrangler deploy",
-    "postinstall": "vitehub types prepare",
-    "preview": "nitro preview",
+    "build": "nuxt build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "mkdir -p .vitehub/data/database && drizzle-kit migrate --config .vitehub/database/drizzle.config.ts",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config .output/server/wrangler.json",
+    "deploy": "pnpm build && pnpm db:migrate:remote && wrangler deploy --config .output/server/wrangler.json --keep-vars",
+    "dev": "nuxt dev",
+    "postinstall": "vitehub types prepare && nuxt prepare",
+    "preview": "nuxt preview",
     "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
-    "typecheck": "vite build --app && tsc --noEmit"
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@better-auth/agent-auth": "0.6.2",
+    "@better-auth/api-key": "1.7.7",
     "@cloudflare/playwright": "1.3.6",
     "@comark/html": "0.6.2",
+    "@iconify-json/lucide": "^1.2.121",
+    "@iconify-json/simple-icons": "^1.2.60",
+    "@nuxt/ui": "4.11.0",
+    "@vueuse/core": "^14.4.0",
     "beautiful-mermaid": "1.1.3",
-    "h3": "npm:h3-nightly@2.0.0-20260719-065143-6257713",
+    "better-auth": "1.7.7",
+    "drizzle-orm": "0.45.2",
+    "h3": "2.0.1-rc.26",
     "medium-zoom": "1.1.0",
-    "nitro": "3.0.260603-beta",
+    "nuxt": "npm:nuxt-nightly@5.0.0-29766097.1e475df9",
     "sharp": "0.34.5",
+    "tailwindcss": "4.3.3",
     "valibot": "^1.4.2",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@016f1ef5a26920cd38ee252626163bf57be4f494"
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@016f1ef5a26920cd38ee252626163bf57be4f494",
+    "vue": "3.5.41",
+    "vue-router": "5.2.0"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
+    "drizzle-kit": "^0.31.10",
+    "nitro": "3.0.260610-beta",
     "playwright-core": "1.62.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16",
-    "wrangler": "4.111.0"
+    "vue-tsc": "^3.3.9",
+    "wrangler": "4.126.0"
   }
 }

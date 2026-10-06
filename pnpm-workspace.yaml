@@ -9,3 +9,27 @@ supportedArchitectures:
   os:
     - current
     - linux
+
+blockExoticSubdeps: false
+
+overrides:
+  # Nuxt and Nuxt UI must share one Vue instance.
+  vue: 3.5.41
+
+patchedDependencies:
+  # Keeps Nuxt's dev-only module URL out of the Workers bundle.
+  nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch
+
+# Only workerd (local Workers runtime) needs its install script.
+allowBuilds:
+  '@mongodb-js/zstd': false
+  '@swc/core': false
+  cbor-extract: false
+  cpu-features: false
+  esbuild: false
+  msgpackr-extract: false
+  node-liblzma: false
+  sharp: false
+  ssh2: false
+  vue-demi: false
+  workerd: true
