@@ -34,7 +34,13 @@ function typedAuth() {
 
 export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event) as unknown as ReturnType<typeof typedAuth>
 
-export async function identify(event: H3Event): Promise<Identity | null> {
+/** Who is calling. Resolved once per request (middleware and route share it). */
+export function identify(event: H3Event): Promise<Identity | null> {
+  const context = event.context as { dropIdentity?: Promise<Identity | null> }
+  return (context.dropIdentity ??= resolveIdentity(event))
+}
+
+async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   const auth = authFor(event)
   const key = apiKeyFrom(event.req.headers)
   if (key) {

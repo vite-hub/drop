@@ -1,5 +1,6 @@
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
+import { defineCachedFunction } from "nitro/cache"
 import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
 import components from "@comark/html/plugins/components"
@@ -115,8 +116,17 @@ export async function renderMarkdownBody(markdown: string): Promise<{ title: str
   }
 }
 
-export async function renderMarkdownDocument(markdown: string, pathname: string): Promise<string> {
-  const { title, html: body } = await renderMarkdownBody(markdown)
+/**
+ * Blobs never change once uploaded, so a render is keyed by its blob key and cached for a month in the Worker's
+ * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
+ */
+export const renderMarkdownCached = defineCachedFunction(
+  (_key: string, markdown: string) => renderMarkdownBody(markdown),
+  { name: "markdown", getKey: (key: string) => key, maxAge: 60 * 60 * 24 * 30 },
+)
+
+export async function renderMarkdownDocument(markdown: string, pathname: string, key: string): Promise<string> {
+  const { title, html: body } = await renderMarkdownCached(key, markdown)
   return `<!doctype html>
 <html lang="en">
 <head>

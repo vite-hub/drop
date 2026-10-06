@@ -47,8 +47,15 @@ export default defineNuxtConfig({
 
   icon: {
     provider: "none",
-    // Kind icons are picked at runtime (KIND_ICONS), so the scanner can't see them.
-    clientBundle: { scan: true, icons: ["lucide:file-text", "lucide:code", "lucide:image", "lucide:file", "lucide:folder", "lucide:bot", "lucide:key-round", "lucide:user"] },
+    // Kind and agent icons are picked at runtime (KIND_ICONS, agentLogo), so the scanner can't see them.
+    clientBundle: {
+      scan: true,
+      icons: [
+        "lucide:file-text", "lucide:code", "lucide:image", "lucide:file", "lucide:folder", "lucide:bot", "lucide:key-round", "lucide:user",
+        "simple-icons:claude", "simple-icons:openai", "simple-icons:cursor", "simple-icons:githubcopilot", "simple-icons:googlegemini",
+        "simple-icons:windsurf", "simple-icons:zedindustries", "simple-icons:opencode", "simple-icons:githubactions",
+      ],
+    },
   },
 
   nitro: {

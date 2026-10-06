@@ -1,9 +1,10 @@
+import { eq, max } from "drizzle-orm"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentSchema } from "#shared/schemas"
 import { comments } from "../../../databases/config"
-import { listComments, toComment } from "../../../utils/comments"
+import { toComment } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -18,11 +19,11 @@ export default defineValidatedHandler({
     // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
     if (!import.meta.dev) await requireRateLimit(event, "comment", { failure: "deny", key: who?.userId, limit: 20, window: "1m" })
     const body = await event.req.json()
-    const existing = await listComments(drop.id)
+    const [last] = await db.select({ n: max(comments.n) }).from(comments).where(eq(comments.dropId, drop.id))
     const row = {
       id: crypto.randomUUID(),
       dropId: drop.id,
-      n: (existing.at(-1)?.n ?? 0) + 1,
+      n: (last?.n ?? 0) + 1,
       ...body,
       quote: body.quote ?? null,
       label: body.label ?? null,

@@ -6,7 +6,6 @@ const fallback = computed(() => ({ agent: "i-lucide-bot", key: "i-lucide-key-rou
 </script>
 
 <template>
-  <!-- eslint-disable-next-line vue/no-v-html -->
-  <svg v-if="logo" aria-hidden="true" class="shrink-0" :fill="logo.color ?? 'currentColor'" :viewBox="logo.viewBox" v-html="logo.body" />
+  <UIcon v-if="logo" :name="logo.icon" class="shrink-0" :style="logo.color ? { color: logo.color } : undefined" />
   <UIcon v-else :name="fallback" class="shrink-0 text-muted" />
 </template>

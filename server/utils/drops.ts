@@ -6,7 +6,7 @@ import { db } from "vite-hub/database/drizzle"
 import { dropFiles, drops } from "../databases/config"
 import { kv } from "vite-hub/kv"
 import { kindFromFilename, titleFromSource } from "#shared/plans"
-import { renderMarkdownBody } from "./markdown-document"
+import { renderMarkdownCached } from "./markdown-document"
 import { contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
 import type { Identity } from "./identity"
@@ -71,21 +71,14 @@ async function readText(key: string) {
 /** The version chain of a doc, newest first. */
 async function versionsOf(row: DropRow): Promise<DropVersion[]> {
   if (row.kind === "app") return [{ id: row.id, title: row.title, version: row.version, createdAt: row.updatedAt, current: true }]
-  const chain: DropRow[] = [row]
-  let older = row
-  while (older.supersedesId && chain.length < 20) {
-    const previous = await findDrop(older.supersedesId)
-    if (!previous) break
-    chain.push(previous)
-    older = previous
-  }
-  let newer = row
-  while (chain.length < 40) {
-    const [next] = await db.select().from(drops).where(eq(drops.supersedesId, newer.id)).limit(1)
-    if (!next) break
-    chain.unshift(next)
-    newer = next
-  }
+  // Versions always share an owner, so one query loads every candidate and the chain is walked in memory.
+  const docs = await db.select({ id: drops.id, title: drops.title, version: drops.version, createdAt: drops.createdAt, supersedesId: drops.supersedesId })
+    .from(drops).where(eq(drops.ownerId, row.ownerId))
+  const byId = new Map(docs.map(doc => [doc.id, doc]))
+  const next = new Map(docs.filter(doc => doc.supersedesId).map(doc => [doc.supersedesId!, doc]))
+  const chain = [byId.get(row.id) ?? row]
+  for (let older = chain[0]!.supersedesId; older && byId.has(older) && chain.length < 50; older = byId.get(older)!.supersedesId) chain.push(byId.get(older)!)
+  for (let newer = next.get(row.id); newer && chain.length < 100; newer = next.get(newer.id)) chain.unshift(newer)
   return chain.map(item => ({ id: item.id, title: item.title, version: item.version, createdAt: item.createdAt, current: item.id === row.id }))
 }
 
@@ -105,7 +98,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
   }
   else if (row.blobKey) {
     if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
-    if (row.kind === "markdown") detail.html = (await renderMarkdownBody(detail.content ?? "")).html
+    if (row.kind === "markdown") detail.html = (await renderMarkdownCached(row.blobKey, detail.content ?? "")).html
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
   return detail
@@ -146,7 +139,8 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
   const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
   if (storageError) throw storageFailure(storageError)
 
-  const parsedTitle = kind === "markdown" && text ? (await renderMarkdownBody(text)).title : undefined
+  // Renders once at upload: the title comes from Comark, and the first view hits a warm cache.
+  const parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, text)).title : undefined
   const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
   const now = Date.now()
   const row: DropRow = {
