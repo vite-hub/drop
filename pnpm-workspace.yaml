@@ -29,7 +29,6 @@ allowBuilds:
   esbuild: false
   msgpackr-extract: false
   node-liblzma: false
-  sharp: false
   ssh2: false
   vue-demi: false
   workerd: true

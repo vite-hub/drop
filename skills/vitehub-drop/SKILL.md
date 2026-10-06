@@ -56,19 +56,19 @@ curl --fail-with-body --silent --show-error \
 
 ## Render code
 
-Render code through Ray.so's native export.
+Drop highlights the code with Shiki and returns it as a framed PNG or SVG.
 
 ```sh
 curl --fail-with-body --silent --show-error \
   -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"typescript","theme":"midnight","format":"png","scale":4}' \
+  --data '{"code":"const answer: number = 42","language":"typescript","theme":"github-dark","format":"png","scale":4}' \
   https://drop.vitehub.dev/api/code |
   jq -er '.url'
 ```
 
 Code image URLs are public and expire after five minutes; download and drop the result to keep it.
 
-- `language` accepts a case-sensitive Ray.so ID such as `cpp` or `typescript`. Omit it when plain text is enough.
-- `theme` accepts a case-sensitive Ray.so ID such as `nuxt` or `midnight`.
+- `language`: `typescript`, `javascript`, `tsx`, `vue`, `python`, `go`, `rust`, `bash`, `json`, `yaml`, `sql`, `css`, `html`, `markdown`, `diff`, and other common ones (aliases like `ts`, `py`, `sh` work). Omit it for plain text.
+- `theme`: `github-dark` (default), `github-light`, `vitesse-dark`, `vitesse-light`, `one-dark-pro`, `night-owl`, `tokyo-night`, `dracula`, `nord`, `catppuccin-mocha`.
 - `format` accepts `png` (default) or `svg`.
 - `scale` for png accepts `2`, `4` (default), or `6`.

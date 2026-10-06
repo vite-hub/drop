@@ -1,4 +1,6 @@
-export { formatBytes, timeAgo } from "#shared/plans"
+import prettyBytes from "pretty-bytes"
+
+export const formatBytes = (bytes: number) => prettyBytes(bytes)
 
 export const KIND_ICONS: Record<string, string> = {
   markdown: "i-lucide-file-text",

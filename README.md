@@ -30,8 +30,7 @@ Under the hood:
 - **Database** is D1 through `vite-hub/database`: drops, app files, and comments.
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
 - Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
-- **Queue** asks a Cloudflare **Sandbox** to shrink uploaded images.
-- **Browser** renders code images through Ray.so, and an hourly **Schedule** deletes them.
+- **Code images** come from Shiki as SVG; a single **Browser** screenshot action turns them into PNG, and an hourly **Schedule** deletes them.
 
 ## Use Drop
 
@@ -65,7 +64,7 @@ MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_ap
 ```sh
 curl --fail-with-body https://drop.vitehub.dev/api/code \
   -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"typescript","theme":"midnight","format":"png","scale":4}'
+  --data '{"code":"const answer: number = 42","language":"typescript","theme":"github-dark","format":"png","scale":4}'
 ```
 
 It returns `{ url, expiresAt }`. The image is public and lasts five minutes; drop it to keep it.
@@ -81,14 +80,13 @@ Drop is a Nuxt app on Cloudflare Workers. The first person to sign in becomes th
 | **Member** | Their own drops. This is the default. |
 
 1. Create a GitHub OAuth app with the callback `https://<your-domain>/api/auth/callback/github`. To use another sign-in provider, edit [server/auth.ts](./server/auth.ts).
-2. Create the Cloudflare resources. Sandbox needs Workers Paid.
+2. Create the Cloudflare resources.
 
    ```sh
    pnpm install
    pnpm exec wrangler d1 create vitehub-drop   # copy the id into CLOUDFLARE_D1_DATABASE_ID
    pnpm exec wrangler r2 bucket create vitehub-drop
    pnpm build
-   pnpm exec wrangler queues create QUEUE_NAME_FROM_.output/server/wrangler.json
    ```
 
 3. Fill `.env` from [.env.example](./.env.example), then deploy. Deploy applies the D1 migrations, then publishes the Worker with `.env` as its secrets:

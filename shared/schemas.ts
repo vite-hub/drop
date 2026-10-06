@@ -61,3 +61,11 @@ export const FilePathSchema = v.object({
 export type InviteInput = v.InferOutput<typeof InviteSchema>
 export type ApiKeyInput = v.InferOutput<typeof ApiKeySchema>
 export type CommentInput = v.InferOutput<typeof CommentSchema>
+
+export const CodeImageSchema = v.strictObject({
+  code: v.pipe(v.string(), v.minLength(1, "Send some code."), v.maxLength(20_000, "Code images take at most 20,000 characters.")),
+  format: v.optional(v.picklist(["png", "svg"], "Format must be png or svg."), "png"),
+  language: v.optional(v.string()),
+  scale: v.optional(v.picklist([2, 4, 6], "Scale must be 2, 4, or 6."), 4),
+  theme: v.optional(v.string()),
+})

@@ -1,7 +1,8 @@
-// Serves a project folder inside one sandboxed document, so the prototype behaves like static hosting:
+// Serves a project folder inside one sandboxed document, so an app drop behaves like static hosting:
 // stylesheets, scripts and SVGs are inlined, ES module imports resolve to inline modules, fetch() of a
 // project file returns that file, and links to other .html pages switch pages.
-// Real Drop serves the same folder from Blob at /s/:project/*, where none of this is needed.
+
+import { lookup } from "mrmime";
 
 export type ProjectFiles = Record<string, string>;
 
@@ -18,10 +19,7 @@ export function resolvePath(from: string, ref: string): string | null {
   return parts.join("/");
 }
 
-export function contentTypeOf(path: string): string {
-  const extension = path.split(".").pop()?.toLowerCase() ?? "";
-  return ({ html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", json: "application/json", svg: "image/svg+xml", md: "text/markdown", txt: "text/plain" } as Record<string, string>)[extension] ?? "text/plain";
-}
+export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain";
 
 const dataUrl = (path: string, content: string) => `data:${contentTypeOf(path)};charset=utf-8,${encodeURIComponent(content)}`;
 const safeScript = (code: string) => code.replace(/<\/script/gi, "<\\/script");

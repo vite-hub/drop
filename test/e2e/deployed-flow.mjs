@@ -80,6 +80,19 @@ const mcp = async body => (await fetch(new URL("/mcp", origin), {
 assert.deepEqual((await mcp({ method: "tools/list" })).result.tools.map(tool => tool.name), ["list_drops", "read_drop", "list_comments", "create_doc", "publish_app"])
 assert.match((await mcp({ method: "tools/call", params: { name: "create_doc", arguments: { markdown: "# From MCP" } } })).result.content[0].text, /^Dropped privately: /)
 
+// SVG comes straight from Shiki, no browser involved.
+const svgResponse = await fetch(new URL("/api/code", origin), {
+  body: JSON.stringify({ code: "const answer = 42", language: "ts", format: "svg" }),
+  headers: { ...auth, "content-type": "application/json" },
+  method: "POST",
+  signal: timeout(),
+})
+assert.equal(svgResponse.status, 200)
+const svgImage = await fetch(new URL((await svgResponse.json()).url, origin), { signal: timeout() })
+assert.equal(svgImage.headers.get("content-type"), "image/svg+xml")
+assert.match(await svgImage.text(), /^<svg/)
+
+// PNG is one Browser Run screenshot of that SVG.
 const codeResponse = await fetch(new URL("/api/code", origin), {
   body: JSON.stringify({ code: "const answer: number = 42", language: "typescript", theme: "nuxt" }),
   headers: { ...auth, "content-type": "application/json" },

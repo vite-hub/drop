@@ -35,6 +35,8 @@ export interface DropDetail extends DropSummary {
   canEdit: boolean
   /** Text source for Markdown and HTML docs. */
   content?: string
+  /** Markdown docs, rendered by the server's Comark renderer: the viewer shows exactly what /f/ shows. */
+  html?: string
   /** Where the raw file is served, for images and other files. */
   url?: string
   /** App files keyed by path. */

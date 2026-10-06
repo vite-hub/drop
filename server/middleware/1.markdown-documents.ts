@@ -1,7 +1,5 @@
 import { defineHandler, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import typesetStyles from "../assets/typeset.css?raw"
-import { renderMarkdownDocument } from "../utils/markdown-document"
 
 const DOCUMENT_PATH = /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html))$/i
 const MARKDOWN_CONTENT_SECURITY_POLICY = "default-src 'none'; img-src https: data:; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
@@ -33,5 +31,9 @@ export default defineHandler(async (event) => {
   if (event.req.method === "HEAD") return ""
 
   const text = await source.text()
-  return isHtml ? text : renderMarkdownDocument(text, event.url.pathname, typesetStyles)
+  if (isHtml) return text
+  // Loaded lazily: middleware lands in the Worker's entry module, and its static imports would be re-exported
+  // from there, which Workers rejects for anything that isn't a handler.
+  const { renderMarkdownDocument } = await import("../utils/markdown-document")
+  return renderMarkdownDocument(text, event.url.pathname)
 })

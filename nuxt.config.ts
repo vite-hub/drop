@@ -7,7 +7,8 @@ export default defineNuxtConfig({
     preset: "cloudflare",
     auth: true,
     blob: { serve: { route: "/f" } },
-    browser: { engine: "chromium" },
+    // Stateless Browser Run actions only (code-image screenshots): no Playwright, no page sessions.
+    browser: true,
     database: {
       driver: "d1",
       databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || "vitehub-drop",
@@ -15,9 +16,7 @@ export default defineNuxtConfig({
       databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || "00000000-0000-4000-8000-000000000000",
     },
     kv: true,
-    queue: true,
     rateLimit: true,
-    sandbox: true,
     schedule: true,
   },
 

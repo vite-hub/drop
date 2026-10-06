@@ -2,7 +2,7 @@
 // The drop viewer (T3 Code's layout): a main column with its own header, and one full-height side panel with
 // tabs (Comments, Source or Files, Details) that pushes the content. Docs and apps share it. State lives in
 // composables (useDrop, useViewerPanel, useDropEditor, useAppFiles, useDropFrame); this file wires them up.
-import { editorDocument, planDocument } from "#shared/markdown"
+import { editorDocument, planDocument } from "#shared/documents"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument } from "#shared/project-bundle"
@@ -56,7 +56,7 @@ const srcdoc = computed(() => {
   if (isApp.value) return injectRuntime(buildProjectDocument(previewFiles.value, page.value), dark.value)
   if (docEdit.value?.mode === "rich") return editorDocument(editorSource.value, dark.value)
   if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value) : ""
-  return planDocument(drop.value.kind as PlanKind, drop.value.content ?? "", dark.value)
+  return planDocument(drop.value.kind as PlanKind, drop.value.content ?? "", dark.value, drop.value.html)
 })
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")

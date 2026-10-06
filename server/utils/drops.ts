@@ -5,8 +5,8 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { dropFiles, drops } from "../databases/config"
 import { kv } from "vite-hub/kv"
-import { deferQueue } from "vite-hub/queue"
 import { kindFromFilename, titleFromSource } from "#shared/plans"
+import { renderMarkdownBody } from "./markdown-document"
 import { contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
 import type { Identity } from "./identity"
@@ -17,7 +17,6 @@ import { MAX_FILE_BYTES } from "#shared/schemas"
 
 export { MAX_FILE_BYTES }
 export const MAX_APP_FILES = 200
-const OPTIMIZABLE_IMAGES = new Set(["image/jpeg", "image/png", "image/webp"])
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /** What the caller may do with a drop. Editors and admins act on every drop in the workspace. */
@@ -106,6 +105,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
   }
   else if (row.blobKey) {
     if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
+    if (row.kind === "markdown") detail.html = (await renderMarkdownBody(detail.content ?? "")).html
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
   return detail
@@ -146,12 +146,14 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
   const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
   if (storageError) throw storageFailure(storageError)
 
+  const parsedTitle = kind === "markdown" && text ? (await renderMarkdownBody(text)).title : undefined
+  const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
   const now = Date.now()
   const row: DropRow = {
     id: crypto.randomUUID(),
     ownerId: previous?.ownerId ?? who.userId,
     kind,
-    title: (input.title?.trim() || titleFromSource(text ?? "", kind, filename)).slice(0, 160),
+    title: (input.title?.trim() || markdownTitle || titleFromSource(text ?? "", kind, filename)).slice(0, 160),
     filename,
     blobKey: key,
     contentType,
@@ -173,7 +175,6 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
     throw error
   }
   await bumpUploadCount()
-  if (OPTIMIZABLE_IMAGES.has(contentType)) deferQueue("image-optimization", key)
   return row
 }
 
