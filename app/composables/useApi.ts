@@ -1,9 +1,9 @@
 import type { Viewer } from "#shared/types"
 
 /**
- * `useFetch` that runs as the visitor. On the server, Nuxt calls the API without the request's cookies
- * (in this Nuxt nightly, `useRequestFetch()` doesn't forward them either), so pass the session cookie along
- * and SSR renders the visitor's own drops.
+ * `useFetch` that runs as the visitor. On the server, this Nuxt nightly's `useRequestFetch()` is plain
+ * `$fetch` and drops the request's cookies, so pass the session cookie along and SSR renders the visitor's
+ * own drops. Newer nightlies forward it; this goes away with the next Nuxt bump.
  */
 export const useApi = createUseFetch(() => ({ headers: useRequestHeaders(["cookie"]) }))
 

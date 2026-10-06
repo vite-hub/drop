@@ -2,7 +2,7 @@
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 
 const route = useRoute("drops-id")
-const { drop, comments } = provideDrop(() => route.params.id)
+const { drop, comments } = provideDrop(() => String(route.params.id))
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop" })
 </script>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // What someone with the link sees: the drop, full screen, no sidebar. Private drops 404.
 const route = useRoute("d-id")
-const { drop, comments } = provideDrop(() => route.params.id)
+const { drop, comments } = provideDrop(() => String(route.params.id))
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex" })
 </script>

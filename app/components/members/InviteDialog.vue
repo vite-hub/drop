@@ -30,7 +30,7 @@ async function submit(event: FormSubmitEvent<InviteInput>) {
 <template>
   <UModal v-model:open="open" title="Invite to Drop" description="They sign in with GitHub using this email.">
     <template #body>
-      <UForm id="invite" ref="form" class="space-y-4" :schema="InviteSchema" :state="state" @submit="submit">
+      <UForm id="invite" ref="form" class="space-y-4" novalidate :schema="InviteSchema" :state="state" @submit="submit">
         <UFormField label="Email" name="email">
           <UInput v-model="state.email" autofocus class="w-full" placeholder="name@company.com" type="email" />
         </UFormField>
