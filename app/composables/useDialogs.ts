@@ -1,3 +1,4 @@
+import type { GenericSchema } from "valibot"
 import { ConfirmModal, PromptModal } from "#components"
 
 /** `await confirm({ title })` instead of window.confirm: same modal, same keyboard handling everywhere. */
@@ -9,5 +10,5 @@ export function useConfirm() {
 /** `await prompt({ title, label })` instead of window.prompt. Resolves null when cancelled. */
 export function usePrompt() {
   const modal = useOverlay().create(PromptModal)
-  return async (props: { title: string; label: string; placeholder?: string; initial?: string; confirmLabel?: string }) => (await modal.open(props).result) ?? null
+  return async (props: { title: string; label: string; placeholder?: string; initial?: string; confirmLabel?: string; schema?: GenericSchema<string, string> }) => (await modal.open(props).result) ?? null
 }

@@ -4,7 +4,6 @@ import { ACCESS_LABELS, type DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
 const emit = defineEmits<{ share: [] }>()
-const now = useRelativeNow()
 const facts = computed(() => [
   KIND_LABELS[props.drop.kind] ?? "File",
   ...(props.drop.kind === "app" ? [`${props.drop.paths?.length ?? 0} files`] : []),
@@ -22,7 +21,7 @@ const access = computed(() => props.drop.visibility === "shared" ? `Anyone with 
       </span>
       <div class="min-w-0 pt-0.5">
         <p class="text-sm"><span class="font-medium text-highlighted">{{ drop.actorName }}</span> <span class="text-muted">dropped this</span></p>
-        <p class="mt-0.5 text-xs text-muted" :title="new Date(drop.updatedAt).toLocaleString()">{{ timeAgo(drop.updatedAt, now) }} · via {{ VIA_LABELS[drop.actorKind] }}</p>
+        <p class="mt-0.5 text-xs text-muted"><TimeAgo :at="drop.updatedAt" /> · via {{ VIA_LABELS[drop.actorKind] }}</p>
       </div>
     </section>
 
@@ -53,7 +52,7 @@ const access = computed(() => props.drop.visibility === "shared" ? `Anyone with 
           <div class="min-w-0">
             <p v-if="version.current" class="font-medium text-highlighted">v{{ version.version }} · This version</p>
             <NuxtLink v-else class="block truncate hover:underline" :to="`/drops/${version.id}`">v{{ version.version }} · {{ version.title }}</NuxtLink>
-            <p class="text-xs text-muted">{{ timeAgo(version.createdAt, now) }}</p>
+            <p class="text-xs text-muted"><TimeAgo :at="version.createdAt" /></p>
           </div>
         </li>
       </ol>

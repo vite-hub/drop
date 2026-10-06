@@ -15,8 +15,11 @@ const signedIn = computed(() => mounted.value && loggedIn.value)
 const dark = computed(() => colorMode.value === "dark")
 const toggleTheme = () => (colorMode.preference = dark.value ? "light" : "dark")
 
+// Back to where the auth guard sent you from; only same-site paths, never a full URL.
+const next = computed(() => (typeof route.query.redirect === "string" && route.query.redirect.startsWith("/") && !route.query.redirect.startsWith("//") ? route.query.redirect : "/drops"))
+
 async function signInWithGitHub() {
-  const { error } = await signIn.social({ provider: "github", callbackURL: "/drops" })
+  const { error } = await signIn.social({ provider: "github", callbackURL: next.value })
   if (error) toast.add({ title: error.message ?? "Couldn't start GitHub sign-in.", color: "error" })
 }
 
@@ -26,10 +29,13 @@ const dev = reactive({ email: "", password: "", error: "", pending: false })
 async function signInWithEmail() {
   dev.pending = true
   dev.error = ""
-  const { error } = await signIn.email({ email: dev.email, password: dev.password, callbackURL: "/drops" })
+  const { error } = await signIn.email({ email: dev.email, password: dev.password, callbackURL: next.value })
   dev.pending = false
   if (error) dev.error = error.message ?? "Couldn't sign in."
-  else await navigateTo("/drops")
+  else {
+    clearNuxtData("me")
+    await navigateTo(next.value)
+  }
 }
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
@@ -116,12 +122,12 @@ const PERSONAL = ["One deploy to Cloudflare", "You're the admin", "Private by de
       <section class="border-y border-default">
         <div class="mx-auto flex max-w-5xl items-center gap-6 px-4 py-5 sm:px-6">
           <span class="label-mono shrink-0">Works with</span>
-          <LandingLogoLoop class="min-w-0 flex-1">
+          <LazyLandingLogoLoop class="min-w-0 flex-1" hydrate-on-visible>
             <span v-for="name in AGENTS" :key="name" class="flex shrink-0 items-center gap-2 text-sm text-muted">
               <AgentIcon :name="name" kind="agent" class="size-4" />{{ name }}
             </span>
             <span class="shrink-0 text-sm text-muted">Any MCP client</span>
-          </LandingLogoLoop>
+          </LazyLandingLogoLoop>
         </div>
       </section>
 
@@ -129,14 +135,14 @@ const PERSONAL = ["One deploy to Cloudflare", "You're the admin", "Private by de
         <h2 class="mb-6 text-2xl font-semibold tracking-tight text-highlighted">How it works</h2>
         <ol class="grid gap-px overflow-hidden rounded-lg border border-default bg-(--ui-border) md:grid-cols-3">
           <li v-for="step in STEPS" :key="step.n" class="flex">
-            <LandingSpotlightCard class="flex-1 p-6">
+            <LazyLandingSpotlightCard class="flex-1 p-6" hydrate-on-interaction="pointerenter">
               <span class="font-mono text-xs text-muted">{{ step.n }}</span>
               <p class="mt-3 font-medium text-highlighted">{{ step.title }}</p>
               <div class="mt-1.5 flex flex-col text-sm leading-relaxed text-muted">
                 {{ step.body }}
                 <code class="mt-4 self-start rounded-md border border-default bg-elevated px-2 py-1 font-mono text-xs text-highlighted">{{ step.snippet }}</code>
               </div>
-            </LandingSpotlightCard>
+            </LazyLandingSpotlightCard>
           </li>
         </ol>
       </section>
@@ -144,15 +150,16 @@ const PERSONAL = ["One deploy to Cloudflare", "You're the admin", "Private by de
       <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6">
         <h2 class="mb-6 text-2xl font-semibold tracking-tight text-highlighted">What's in it</h2>
         <div class="grid gap-px overflow-hidden rounded-lg border border-default bg-(--ui-border) sm:grid-cols-2 lg:grid-cols-3">
-          <LandingSpotlightCard v-for="feature in FEATURES" :key="feature.title" class="p-6">
+          <LazyLandingSpotlightCard v-for="feature in FEATURES" :key="feature.title" class="p-6" hydrate-on-interaction="pointerenter">
             <UIcon :name="feature.icon" class="size-4 text-muted" />
             <p class="mt-3 font-medium text-highlighted">{{ feature.title }}</p>
             <p class="mt-1.5 text-sm leading-relaxed text-muted">{{ feature.body }}</p>
-          </LandingSpotlightCard>
+          </LazyLandingSpotlightCard>
         </div>
       </section>
 
-      <LandingOwnIt />
+      <!-- Below the fold: rendered on the server, hydrated only when scrolled into view. -->
+      <LazyLandingOwnIt hydrate-on-visible />
 
       <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6">
         <h2 class="mb-6 text-2xl font-semibold tracking-tight text-highlighted">For one person or a team</h2>

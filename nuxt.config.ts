@@ -53,6 +53,9 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
+    storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } },
+    devStorage: { cache: { driver: "memory" } },
     cloudflare: { wrangler: { observability: { enabled: true } } },
     // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.
     publicAssets: [

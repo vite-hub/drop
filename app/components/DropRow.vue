@@ -1,27 +1,19 @@
 <script setup lang="ts">
 import type { DropSummary } from "#shared/types"
 
-const props = defineProps<{ drop: DropSummary; now: number }>()
+const props = defineProps<{ drop: DropSummary }>()
 const emit = defineEmits<{ delete: [] }>()
 const toast = useToast()
 const { copy } = useCopy()
-const shared = ref(props.drop.visibility === "shared")
-watch(() => props.drop.visibility, value => (shared.value = value === "shared"))
+const { setVisibility } = useDropActions()
+const shared = computed(() => props.drop.visibility === "shared")
 
 const link = computed(() => (import.meta.client ? `${location.origin}/d/${props.drop.id}` : `/d/${props.drop.id}`))
 const detail = computed(() => props.drop.kind === "app" ? `${props.drop.filename} · ${props.drop.paths?.length ?? 0} files` : props.drop.filename)
 
 async function setShared(next: boolean) {
-  shared.value = next
-  try {
-    await $fetch(`/api/drops/${props.drop.id}`, { method: "PATCH", body: { visibility: next ? "shared" : "private" } })
-    await refreshDrops()
+  if (await setVisibility(props.drop, next ? "shared" : "private"))
     toast.add({ title: next ? "Shared" : "Private again", description: next ? "Anyone with the link can comment." : "Only you can open it." })
-  }
-  catch (error) {
-    shared.value = !next
-    toast.add({ title: "Couldn't change sharing", description: errorText(error) })
-  }
 }
 
 async function copyLink() {
@@ -53,7 +45,7 @@ const menu = computed(() => [
         <UBadge v-if="drop.version > 1" class="hidden sm:inline-flex" color="neutral" icon="i-lucide-history" :label="`v${drop.version}`" size="sm" variant="outline" />
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
-        <span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · {{ timeAgo(drop.updatedAt, now) }}</span>
+        <span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span>
       </p>
     </div>
     <div class="hidden min-w-0 md:block">
@@ -61,7 +53,7 @@ const menu = computed(() => [
         <AgentIcon class="size-3.5" :kind="drop.actorKind" :name="drop.actorName" />
         <span class="truncate">{{ drop.actorName }}</span>
       </span>
-      <span class="mt-0.5 block text-xs text-muted tabular-nums" :title="new Date(drop.updatedAt).toLocaleString()">{{ timeAgo(drop.updatedAt, now) }}</span>
+      <span class="mt-0.5 block text-xs text-muted tabular-nums"><TimeAgo :at="drop.updatedAt" /></span>
     </div>
     <label class="relative z-10 hidden items-center gap-2.5 md:flex">
       <USwitch :model-value="shared" color="neutral" :aria-label="shared ? 'Make private' : 'Share'" @update:model-value="setShared" />

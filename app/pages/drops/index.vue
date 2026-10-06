@@ -4,14 +4,12 @@ import type { DropSummary } from "#shared/types"
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
-const toast = useToast()
-const { data: drops, status } = useDrops()
+const { drops, status, create, upload, remove } = useDrops()
 const filter = ref<"all" | "private" | "shared">("all")
 const search = ref("")
 const searchInput = useTemplateRef("searchInput")
-const confirm = useConfirm()
 const picker = useFileDialog({ multiple: false, reset: true })
-picker.onChange(files => files?.[0] && void upload(files[0]))
+picker.onChange(files => files?.[0] && void onPick(files[0]))
 const creating = ref(false)
 const now = useRelativeNow()
 
@@ -51,41 +49,14 @@ defineShortcuts({ "/": () => searchInput.value?.inputRef?.focus() })
 
 async function newDrop() {
   creating.value = true
-  try {
-    const drop = await $fetch<DropSummary>("/api/drops", { method: "POST", body: { filename: "untitled.md", title: "Untitled", content: "# Untitled\n\n" } })
-    await refreshDrops()
-    await navigateTo({ path: `/drops/${drop.id}`, query: { edit: "1" } })
-  }
-  catch (error) {
-    toast.add({ title: "Couldn't create a drop", description: errorText(error) })
-  }
+  const drop = await create()
   creating.value = false
+  if (drop) await navigateTo({ path: `/drops/${drop.id}`, query: { edit: "1" } })
 }
 
-async function upload(file: File) {
-  const form = new FormData()
-  form.append("file", file)
-  try {
-    const result = await $fetch<{ id: string }>("/api/files", { method: "POST", body: form })
-    await refreshDrops()
-    toast.add({ title: "Dropped privately", description: file.name })
-    await navigateTo(`/drops/${result.id}`)
-  }
-  catch (error) {
-    toast.add({ title: "Upload failed", description: errorText(error) })
-  }
-}
-
-async function remove(drop: DropSummary) {
-  if (!await confirm({ title: "Delete this drop?", description: `${drop.title}. Its link stops working and its comments go with it.`, confirmLabel: "Delete", destructive: true })) return
-  try {
-    await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
-    await refreshDrops()
-    toast.add({ title: "Drop deleted", description: "Its link no longer works." })
-  }
-  catch (error) {
-    toast.add({ title: "Couldn't delete", description: errorText(error) })
-  }
+async function onPick(file: File) {
+  const result = await upload(file)
+  if (result) await navigateTo(`/drops/${result.id}`)
 }
 </script>
 
@@ -133,7 +104,7 @@ async function remove(drop: DropSummary) {
       <template v-for="group in groups" :key="group.label">
         <p class="label-mono border-b border-default bg-muted px-4 py-2">{{ group.label }}</p>
         <ul class="divide-y divide-default border-b border-default last:border-b-0">
-          <DropRow v-for="drop in group.drops" :key="drop.id" :drop="drop" :now="now" @delete="remove(drop)" />
+          <DropRow v-for="drop in group.drops" :key="drop.id" :drop="drop" @delete="remove(drop)" />
         </ul>
       </template>
     </div>

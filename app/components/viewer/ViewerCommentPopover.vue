@@ -9,7 +9,6 @@ const props = defineProps<{ x: number; y: number; pending?: PendingComment; comm
 const emit = defineEmits<{ submit: [body: string]; cancel: []; resolve: [id: string, resolved: boolean]; delete: [id: string] }>()
 const body = ref("")
 const busy = ref(false)
-const now = useRelativeNow()
 const viewport = useWindowSize()
 const width = 320
 const style = computed(() => {
@@ -51,7 +50,7 @@ defineExpose({ fail: () => (busy.value = false) })
       <UButton aria-label="Send comment" class="size-8 justify-center rounded-full" color="neutral" :disabled="!body.trim()" icon="i-lucide-arrow-up" :loading="busy" @click="send" />
     </div>
     <template v-else-if="comment">
-      <ViewerCommentHeader :comment="comment" :now="now" />
+      <ViewerCommentHeader :comment="comment" />
       <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-[13px] text-muted">{{ comment.quote }}</p>
       <p class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
       <div v-if="canManage || comment.mine" class="flex justify-end gap-1.5">

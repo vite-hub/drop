@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TabsItem } from "@nuxt/ui"
-import type { ApiKeyRow } from "#shared/types"
 import { PLAN_TEMPLATE } from "#shared/plan-template"
 
 definePageMeta({ layout: "dashboard", middleware: "auth" })
@@ -13,7 +12,6 @@ const origin = useRequestURL().origin
 const server = `${origin}/mcp`
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
 
 const MCP_CLIENTS: Record<McpClient, string> = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", vscode: "VS Code", any: "Any client" }
 const MCP_SNIPPETS: Record<McpClient, string> = {
@@ -42,31 +40,11 @@ const method = computed<Method>({
 const client = ref<McpClient>("claude")
 const command = computed(() => (method.value === "mcp" ? MCP_SNIPPETS[client.value] : `npx skills add ${origin}\nexport DROP_API_KEY=drop_…`))
 
-const { data: keys, status, refresh } = useApi<ApiKeyRow[]>("/api/keys", { key: "keys", default: () => [] })
-const now = useRelativeNow()
+const { keys, status, create, revoke } = useApiKeys()
 const keyDialog = ref(false)
-const revoking = ref<ApiKeyRow | null>(null)
-const revokeBusy = ref(false)
 
 const { copy } = useCopy()
 
-async function revoke() {
-  const key = revoking.value
-  if (!key) return
-  revokeBusy.value = true
-  try {
-    await $fetch(`/api/keys/${key.id}`, { method: "DELETE" })
-    toast.add({ title: `Revoked “${key.name}”`, description: "Anything using it gets a 401 on its next request." })
-    revoking.value = null
-    await refresh()
-  }
-  catch (error) {
-    toast.add({ title: "Couldn't revoke the key", description: errorText(error), color: "error" })
-  }
-  finally {
-    revokeBusy.value = false
-  }
-}
 </script>
 
 <template>
@@ -136,28 +114,15 @@ async function revoke() {
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium text-highlighted">{{ key.name }}</p>
             <p class="truncate font-mono text-xs text-muted">
-              {{ key.start ? `${key.start}…` : "drop_…" }} · {{ key.lastRequest ? `used ${timeAgo(key.lastRequest, now)}` : "never used" }}
+              {{ key.start ? `${key.start}…` : "drop_…" }} · <template v-if="key.lastRequest">used <TimeAgo :at="key.lastRequest" /></template><template v-else>never used</template>
             </p>
           </div>
-          <UButton color="neutral" label="Revoke" size="sm" variant="ghost" @click="revoking = key" />
+          <UButton color="neutral" label="Revoke" size="sm" variant="ghost" @click="revoke(key)" />
         </li>
       </ul>
     </section>
 
-    <AgentsCreateKeyDialog v-model:open="keyDialog" @created="refresh()" />
+    <AgentsCreateKeyDialog v-model:open="keyDialog" :create="create" />
 
-    <UModal
-      :open="revoking !== null"
-      :title="`Revoke “${revoking?.name ?? ''}”?`"
-      description="Anything using it gets a 401 on its next request. Drops it made stay."
-      @update:open="value => { if (!value) revoking = null }"
-    >
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" label="Cancel" variant="ghost" @click="revoking = null" />
-          <UButton color="error" label="Revoke" :loading="revokeBusy" @click="revoke" />
-        </div>
-      </template>
-    </UModal>
   </PageShell>
 </template>

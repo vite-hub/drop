@@ -1,17 +1,14 @@
 <script setup lang="ts">
 // What someone with the link sees: the drop, full screen, no sidebar. Private drops 404.
-import type { DropComment, DropDetail } from "#shared/types"
-
-const route = useRoute()
-const id = computed(() => String(route.params.id))
-const { data: drop, refresh } = await useApi<DropDetail>(() => `/api/drops/${id.value}`, { key: `drop:${id.value}` })
-const { data: comments, refresh: refreshComments } = await useApi<DropComment[]>(() => `/api/drops/${id.value}/comments`, { key: `comments:${id.value}`, default: () => [] })
-useSeoMeta({ title: () => drop.value?.title ?? "Drop", robots: "noindex" })
+const route = useRoute("d-id")
+const { drop, comments } = provideDrop(() => route.params.id)
+await Promise.all([drop, comments])
+useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex" })
 </script>
 
 <template>
-  <UDashboardGroup v-if="drop" unit="rem" storage="cookie" storage-key="drop-public">
-    <DropViewer :key="drop.id" :comments="comments" :drop="drop" public-view @refresh="refresh" @refresh-comments="refreshComments" />
+  <UDashboardGroup v-if="drop.data.value" unit="rem" storage="cookie" storage-key="drop-public">
+    <DropViewer :key="drop.data.value.id" public-view />
   </UDashboardGroup>
   <div v-else class="grid min-h-dvh place-items-center px-6 text-center">
     <div>

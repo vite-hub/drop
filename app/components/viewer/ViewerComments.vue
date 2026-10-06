@@ -4,7 +4,6 @@ import type { DropComment } from "#shared/types"
 const props = defineProps<{ comments: DropComment[]; canComment: boolean; canManage: boolean }>()
 const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
 const filter = ref<"open" | "resolved">("open")
-const now = useRelativeNow()
 const visible = computed(() => props.comments.filter(comment => (filter.value === "open" ? !comment.resolved : comment.resolved)))
 </script>
 
@@ -30,7 +29,7 @@ const visible = computed(() => props.comments.filter(comment => (filter.value ==
       </li>
       <li v-for="comment in visible" :key="comment.id" class="space-y-2 px-4 py-3">
         <button class="w-full cursor-pointer space-y-2 text-left" type="button" @click="emit('focus', comment)">
-          <ViewerCommentHeader :comment="comment" :now="now" />
+          <ViewerCommentHeader :comment="comment" />
           <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-[13px] text-muted">{{ comment.quote }}</p>
           <p class="text-sm">{{ comment.body }}</p>
         </button>

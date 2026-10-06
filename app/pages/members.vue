@@ -7,15 +7,11 @@ definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Members" })
 
 // Personal or team comes from who's here, not from a setting. Three roles; new people join as Member.
-const toast = useToast()
 const { data: me } = useMe()
-const { data: members, status, refresh } = useApi<Member[]>("/api/members", { key: "members", default: () => [] })
+const { members, status, invite, setRole, ban, unban, remove } = useMembers()
 const admin = computed(() => me.value?.role === "admin")
-const now = useRelativeNow()
 const search = ref("")
 const inviteOpen = ref(false)
-const removing = ref<Member | null>(null)
-const removeBusy = ref(false)
 
 const description = computed(() => {
   const total = members.value.length || me.value?.members || 1
@@ -34,48 +30,15 @@ const rows = computed(() => {
 const roleItems = ROLES.map(value => ({ label: ROLE_LABELS[value], value }))
 const statusOf = (member: Member) => (member.banned ? "Banned" : member.lastActiveAt === null ? "Invited" : "Active")
 
-const reload = () => Promise.all([refresh(), refreshNuxtData("me")])
-
-async function update(member: Member, body: { role?: Role; banned?: boolean }, title: string, detail?: string) {
-  try {
-    await $fetch(`/api/members/${member.id}`, { method: "PATCH", body })
-    toast.add({ title, description: detail })
-  }
-  catch (error) {
-    toast.add({ title: `Couldn't update ${member.name}`, description: errorText(error), color: "error" })
-  }
-  await reload()
-}
-
-const setRole = (member: Member, role: Role) =>
-  role !== member.role && update(member, { role }, `${member.name} is now ${ROLE_LABELS[role]}`, ROLE_SUMMARY[role])
-
 function menu(member: Member): DropdownMenuItem[][] {
   return [[
     member.banned
-      ? { label: "Unban", icon: "i-lucide-rotate-ccw", onSelect: () => update(member, { banned: false }, `${member.name} can sign in again`) }
-      : { label: "Ban", icon: "i-lucide-ban", color: "error", onSelect: () => update(member, { banned: true }, `${member.name} is banned`, "Their sessions and API keys stop working.") },
-    { label: "Remove", icon: "i-lucide-trash-2", color: "error", onSelect: () => (removing.value = member) },
+      ? { label: "Unban", icon: "i-lucide-rotate-ccw", onSelect: () => unban(member) }
+      : { label: "Ban", icon: "i-lucide-ban", color: "error", onSelect: () => ban(member) },
+    { label: "Remove", icon: "i-lucide-trash-2", color: "error", onSelect: () => remove(member) },
   ]]
 }
 
-async function remove() {
-  const member = removing.value
-  if (!member) return
-  removeBusy.value = true
-  try {
-    await $fetch(`/api/members/${member.id}`, { method: "DELETE" })
-    toast.add({ title: `${member.name} removed`, description: "Their drops stay in the workspace." })
-    removing.value = null
-    await reload()
-  }
-  catch (error) {
-    toast.add({ title: `Couldn't remove ${member.name}`, description: errorText(error), color: "error" })
-  }
-  finally {
-    removeBusy.value = false
-  }
-}
 </script>
 
 <template>
@@ -120,7 +83,7 @@ async function remove() {
                     {{ member.name }}<span v-if="member.you" class="ml-1.5 font-normal text-muted">(you)</span>
                   </p>
                   <p class="truncate font-mono text-xs text-muted">
-                    {{ member.email }}<template v-if="member.lastActiveAt && !member.you"> · {{ timeAgo(member.lastActiveAt, now) }}</template>
+                    {{ member.email }}<template v-if="member.lastActiveAt && !member.you"> · <TimeAgo :at="member.lastActiveAt" /></template>
                   </p>
                   <p class="mt-1 sm:hidden">
                     <UBadge :color="member.banned ? 'error' : 'neutral'" :label="statusOf(member)" size="sm" :variant="member.banned ? 'subtle' : 'outline'" />
@@ -157,20 +120,7 @@ async function remove() {
 
     <p v-if="!admin && me" class="mt-3 text-xs text-muted">Only admins can invite people or change roles.</p>
 
-    <MembersInviteDialog v-if="admin" v-model:open="inviteOpen" @invited="reload" />
+    <MembersInviteDialog v-if="admin" v-model:open="inviteOpen" :invite="invite" />
 
-    <UModal
-      :open="removing !== null"
-      :title="`Remove ${removing?.name ?? ''}?`"
-      description="They lose access right away. Their drops stay in the workspace."
-      @update:open="value => { if (!value) removing = null }"
-    >
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" label="Cancel" variant="ghost" @click="removing = null" />
-          <UButton color="error" label="Remove" :loading="removeBusy" @click="remove" />
-        </div>
-      </template>
-    </UModal>
   </PageShell>
 </template>

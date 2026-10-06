@@ -3,24 +3,19 @@ import { type Access, ACCESS_HINTS, ACCESS_LABELS, type DropDetail } from "#shar
 
 const props = defineProps<{ drop: DropDetail }>()
 const open = defineModel<boolean>("open", { default: false })
-const emit = defineEmits<{ changed: [] }>()
-const toast = useToast()
+const notify = useNotify()
+const { setVisibility } = useDropActions()
+const { copy, copied } = useCopy()
 const shared = computed(() => props.drop.visibility === "shared")
 const url = computed(() => (import.meta.client ? `${location.origin}/d/${props.drop.id}` : `/d/${props.drop.id}`))
 const levels = Object.keys(ACCESS_LABELS) as Access[]
 
-async function update(body: { visibility?: "private" | "shared"; access?: Access }, message: string) {
-  try {
-    await $fetch(`/api/drops/${props.drop.id}`, { method: "PATCH", body })
-    emit("changed")
-    toast.add({ title: message })
-  }
-  catch (error) {
-    toast.add({ title: "Couldn't change sharing", description: errorText(error) })
-  }
+async function setShared(next: boolean) {
+  if (await setVisibility(props.drop, next ? "shared" : "private")) notify.done(next ? "Shared" : "Private again")
 }
-
-const { copy, copied } = useCopy()
+async function setAccess(level: Access) {
+  if (level !== props.drop.access && await setVisibility(props.drop, "shared", level)) notify.done(`Anyone with the link ${ACCESS_LABELS[level].toLowerCase()}`)
+}
 </script>
 
 <template>
@@ -39,7 +34,7 @@ const { copy, copied } = useCopy()
             aria-label="Share with anyone with the link"
             color="neutral"
             :model-value="shared"
-            @update:model-value="next => update({ visibility: next ? 'shared' : 'private' }, next ? 'Shared' : 'Private again')"
+            @update:model-value="setShared"
           />
         </div>
         <div v-if="shared" class="space-y-1 p-2" role="radiogroup">
@@ -51,7 +46,7 @@ const { copy, copied } = useCopy()
             :class="drop.access === level && 'bg-elevated'"
             role="radio"
             type="button"
-            @click="drop.access !== level && update({ access: level }, `Anyone with the link ${ACCESS_LABELS[level].toLowerCase()}`)"
+            @click="setAccess(level)"
           >
             <span class="grid size-4 shrink-0 place-items-center rounded-full border" :class="drop.access === level ? 'border-(--ui-text-highlighted)' : 'border-default'">
               <span v-if="drop.access === level" class="size-2 rounded-full bg-inverted" />

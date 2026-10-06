@@ -13,7 +13,9 @@ import type { Identity } from "./identity"
 
 export type DropRow = typeof drops.$inferSelect
 
-export const MAX_FILE_BYTES = 4 * 1024 * 1024
+import { MAX_FILE_BYTES } from "#shared/schemas"
+
+export { MAX_FILE_BYTES }
 export const MAX_APP_FILES = 200
 const OPTIMIZABLE_IMAGES = new Set(["image/jpeg", "image/png", "image/webp"])
 const TEXT_KINDS = new Set(["markdown", "html"])
