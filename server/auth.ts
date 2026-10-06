@@ -30,9 +30,9 @@ export default defineAuth(({ env, requestOrigin }) => ({
   route: false,
   access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
   socialProviders: {
-    github: { clientId: env.auth.github.clientId, clientSecret: env.auth.github.clientSecret.unseal() },
+    github: { clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal() },
   },
-  emailAndPassword: { enabled: import.meta.dev },
+  emailAndPassword: { enabled: import.meta.dev === true },
   account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
   databaseHooks: {
     user: {

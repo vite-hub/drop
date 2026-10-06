@@ -1,24 +1,30 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui"
 
-const { user, signOut } = useUserSession()
+const { signOut } = useUserSession()
+// From /api/me, which SSR fetches with the session cookie; the client-side session only exists after hydration.
 const { data: me } = useMe()
 const colorMode = useColorMode()
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: "label", slot: "account" as const }],
   [{ label: "Theme", slot: "theme" as const, onSelect: (event: Event) => event.preventDefault() }],
-  [{ label: "Sign Out", icon: "i-lucide-log-out", onSelect: () => void signOut().then(() => navigateTo("/")) }],
+  [{ label: "Sign Out", icon: "i-lucide-log-out", onSelect: () => void leave() }],
 ])
+async function leave() {
+  await signOut()
+  clearNuxtData()
+  await navigateTo("/")
+}
 const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "Member" })[me.value?.role ?? "member"])
 </script>
 
 <template>
   <UDropdownMenu :items="items" :content="{ side: 'top', align: 'start', sideOffset: 6 }" :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width) min-w-52' }">
     <button class="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-elevated" type="button" aria-label="Account menu">
-      <UAvatar :alt="user?.name ?? 'You'" :src="user?.image ?? undefined" size="sm" />
+      <UAvatar :alt="me?.name ?? 'You'" :src="me?.image ?? undefined" size="sm" />
       <span class="min-w-0 flex-1">
-        <span class="block truncate text-xs font-medium text-highlighted">{{ user?.name ?? "You" }}</span>
+        <span class="block truncate text-xs font-medium text-highlighted">{{ me?.name ?? "You" }}</span>
         <span class="block truncate text-xs text-muted">{{ me?.team ? "Team" : "Personal" }} · {{ roleLabel }}</span>
       </span>
       <UIcon name="i-lucide-chevrons-up-down" class="size-3.5 shrink-0 text-dimmed" />
@@ -26,10 +32,10 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
 
     <template #account>
       <div class="flex min-w-0 items-center gap-2.5 py-0.5">
-        <UAvatar :alt="user?.name ?? 'You'" :src="user?.image ?? undefined" size="sm" />
+        <UAvatar :alt="me?.name ?? 'You'" :src="me?.image ?? undefined" size="sm" />
         <div class="min-w-0">
-          <p class="truncate text-sm font-medium text-highlighted">{{ user?.name }}</p>
-          <p class="truncate text-xs font-normal text-muted">{{ user?.email }}</p>
+          <p class="truncate text-sm font-medium text-highlighted">{{ me?.name }}</p>
+          <p class="truncate text-xs font-normal text-muted">{{ me?.email }}</p>
         </div>
       </div>
     </template>

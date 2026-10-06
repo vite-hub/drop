@@ -1,26 +1,58 @@
 ---
 name: vitehub-drop
-description: Publishes local files at permanent public URLs, renders Markdown and HTML documents, and turns source code into temporary images. Use when the user asks to publish a file, share a rendered document, or create a code image.
+description: Drops plans, docs, and small static apps into Drop for review, reads the comments people leave, and publishes the next version. Also turns source code into temporary images. Use when the user asks to share a plan or document for review, publish a file or a small app, read review feedback, or create a code image.
 ---
 
 # ViteHub Drop
 
-Publish one file and return its URL. Files cannot be edited through the API, so publish a new file for every revision. PNG, JPEG, and WebP files may replace the original bytes at the same URL with a smaller optimized version.
+Drop keeps what you publish private until the user shares it. People comment on the exact spot; you read the open comments and drop the next version.
 
-## Publish a file
+Every request needs the user's API key in `DROP_API_KEY`. If it's unset, ask the user to create one at `https://drop.vitehub.dev/agents` (name it after yourself, like "Claude Code") and export it. Drop also speaks MCP at `https://drop.vitehub.dev/mcp` with the same key as a bearer token; prefer it when your client has it registered.
 
-Upload a file already in scope:
+## Drop a file
 
 ```sh
 curl --fail-with-body --silent --show-error \
-  -F "file=@/absolute/path/to/file" \
+  -H "x-api-key: $DROP_API_KEY" \
+  -F "file=@/absolute/path/to/plan.md" \
   https://drop.vitehub.dev/api/files |
-  jq -er '.url'
+  jq -er '.page'
 ```
 
-Return the command's stdout verbatim. Do not retry a successful upload: every successful request creates another permanent URL.
+The response is `{ id, url, page, visibility, version }`:
 
-Markdown and HTML files render at the returned URL. Append `?raw` to read their exact source. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
+- `page` is where people review it. Give the user this link.
+- `url` serves the file itself at `/f/<key>`. Markdown and HTML render there; append `?raw` for the exact source.
+- New drops are `private`. Only the user can open them until they share them.
+
+Do not retry a successful upload: every success creates another drop. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
+
+## Publish the next version
+
+Add `supersedes` with the id of the drop it replaces, as a form field (`-F "supersedes=<id>"`) or in the front matter (`supersedes: <id>`). The new version keeps the old one's sharing, and the old one stays in history.
+
+## Read feedback
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "x-api-key: $DROP_API_KEY" \
+  https://drop.vitehub.dev/api/drops/<id>/comments |
+  jq -r '.[] | select(.resolved | not) | "\(.n). \(.quote // .selector): \(.body)"'
+```
+
+Address the open comments, then publish the next version.
+
+## Publish an app
+
+A small static app is a set of files keyed by path, with an `index.html`. Pass `id` to publish its next version.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \
+  --data '{"name":"Launch board","files":{"index.html":"<h1>Hi</h1><script type=\"module\" src=\"app.js\"></script>","app.js":"console.log(1)"}}' \
+  https://drop.vitehub.dev/api/apps |
+  jq -er '.page'
+```
 
 ## Render code
 
@@ -28,15 +60,13 @@ Render code through Ray.so's native export.
 
 ```sh
 curl --fail-with-body --silent --show-error \
-  -H "content-type: application/json" \
+  -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \
   --data '{"code":"const answer: number = 42","language":"typescript","theme":"midnight","format":"png","scale":4}' \
   https://drop.vitehub.dev/api/code |
   jq -er '.url'
 ```
 
-Code image URLs expire after five minutes; download and publish the result to make it permanent.
-
-## Options
+Code image URLs are public and expire after five minutes; download and drop the result to keep it.
 
 - `language` accepts a case-sensitive Ray.so ID such as `cpp` or `typescript`. Omit it when plain text is enough.
 - `theme` accepts a case-sensitive Ray.so ID such as `nuxt` or `midnight`.

@@ -8,7 +8,7 @@
   </a>
 </p>
 
-<p align="center">Permanent files, rendered documents, and code images, built with ViteHub primitives.</p>
+<p align="center">Review what your agents plan. Agents drop docs and small apps; you comment on the exact spot and share the ones worth sharing. Built with ViteHub.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·
@@ -19,87 +19,98 @@
 
 ## How it works
 
-1. **Blob** stores the original upload immediately at a random `/i/` URL.
-2. For PNG, JPEG, and WebP files, **Queue** asks a Cloudflare **Sandbox** to apply EXIF orientation, strip metadata, and resize the image to fit within 2048 × 2048 without upscaling.
-3. Drop replaces the original image at the same URL only when the optimized version is smaller. Other files never change.
-4. Markdown files render as server-generated HTML at that URL through **Comark**. Their exact source remains available with `?raw`.
-5. HTML files render unchanged inside a restrictive browser sandbox. Their exact source remains available with `?raw`.
-6. **Schedule** runs hourly and deletes expired code images from their separate prefix without touching uploaded files.
-7. Nitro renders the current stored-file count into the landing page.
+1. **Agents drop their work** with an API key or over MCP: a plan in Markdown, an HTML report, an image, or a small static app made of files.
+2. **Every drop starts private.** Only its owner (and the workspace's editors and admins) can open it.
+3. **People review it** full screen: select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit.
+4. **The agent reads the open comments** and drops the next version. Older versions stay in history.
 
-The Sandbox is a real npm project in [server/sandboxes/image-optimizer](./server/sandboxes/image-optimizer). ViteHub materializes that project through Workspace and executes it through the selected Box provider.
+Under the hood:
+
+- **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and API keys.
+- **Database** is D1 through `vite-hub/database`: drops, app files, and comments.
+- **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
+- Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
+- **Queue** asks a Cloudflare **Sandbox** to shrink uploaded images.
+- **Browser** renders code images through Ray.so, and an hourly **Schedule** deletes them.
 
 ## Use Drop
 
-Install the public agent skill:
+1. Create an API key at `/agents`. Name it after the agent that uses it (like "Claude Code"); drops it makes show that name and logo.
+2. Connect the agent. The easiest way is MCP:
 
-```sh
-npx skills add https://drop.vitehub.dev
-```
+   ```sh
+   claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp \
+     --header "Authorization: Bearer $DROP_API_KEY"
+   ```
 
-Upload a file and print its URL:
+   Or install the skill, which uses the HTTP API:
 
-```sh
-curl --fail-with-body --silent --show-error \
-  -F "file=@/absolute/path/to/file.pdf" \
-  https://drop.vitehub.dev/api/files | jq -er '.url'
-```
+   ```sh
+   npx skills add https://drop.vitehub.dev
+   ```
 
-Or use the API directly:
+3. Drop a file:
 
-```sh
-curl --fail-with-body https://drop.vitehub.dev/api/files \
-  -F "file=@/absolute/path/to/file.pdf"
-```
+   ```sh
+   curl --fail-with-body -H "x-api-key: $DROP_API_KEY" \
+     -F "file=@plan.md" https://drop.vitehub.dev/api/files
+   ```
 
-Files up to 4 MiB are accepted. Every successful upload creates a permanent, non-editable URL. PNG, JPEG, and WebP files are available immediately and may be replaced at the same URL by a smaller optimized version; PDFs, spreadsheets, documents, archives, and other files never change. Markdown and HTML uploads must use UTF-8. Markdown renders as styled HTML, while HTML renders unchanged inside a restrictive browser sandbox. Append `?raw` to either document URL for its exact source. The public deployment limits uploads to five attempts per source address per minute.
+   This returns `{ id, url, page, visibility, version }`. `page` is the review page and `url` serves the file. Add `-F supersedes=<id>` to publish the next version.
+
+MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`. The `/docs` page lists every endpoint.
 
 ### Create a code image
 
-The code API opens Ray.so through a ViteHub Browser Definition, applies the requested language, theme, and export scale, then clicks Ray's native PNG or SVG export. Treat the URL as available for five minutes; an hourly ViteHub Schedule removes expired code images without touching permanent uploads.
-
 ```sh
 curl --fail-with-body https://drop.vitehub.dev/api/code \
-  -H "content-type: application/json" \
+  -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \
   --data '{"code":"const answer: number = 42","language":"typescript","theme":"midnight","format":"png","scale":4}'
 ```
 
-The response contains the temporary Drop URL and its expiry:
-
-```json
-{
-  "url": "https://drop.vitehub.dev/i/code-images/1785240300000/4aa...png",
-  "expiresAt": "2026-07-28T12:05:00.000Z"
-}
-```
-
-`code` is required and accepts up to 20,000 characters. `format` accepts `png` or `svg`, while `scale` accepts `2`, `4`, or `6` and affects PNG exports. Both default to Ray's primary export settings: PNG at 4×. `language` and `theme` are optional, case-sensitive IDs discovered through the [Drop skill](./skills/vitehub-drop/SKILL.md#options). When the image needs a permanent URL, download it before `expiresAt` and upload it through `/api/files`.
+It returns `{ url, expiresAt }`. The image is public and lasts five minutes; drop it to keep it.
 
 ## Host it yourself
 
-Drop targets Cloudflare automatically with the deployment name `vitehub-drop`:
+Drop is a Nuxt app on Cloudflare Workers. The first person to sign in becomes the admin. After that, Drop is invite-only: admins add people on `/members`, with one of three roles:
+
+| Role | What they can do |
+| --- | --- |
+| **Admin** | Everything, plus members. |
+| **Editor** | Edit and share any drop. |
+| **Member** | Their own drops. This is the default. |
+
+1. Create a GitHub OAuth app with the callback `https://<your-domain>/api/auth/callback/github`. To use another sign-in provider, edit [server/auth.ts](./server/auth.ts).
+2. Create the Cloudflare resources. Sandbox needs Workers Paid.
+
+   ```sh
+   pnpm install
+   pnpm exec wrangler d1 create vitehub-drop   # copy the id into CLOUDFLARE_D1_DATABASE_ID
+   pnpm exec wrangler r2 bucket create vitehub-drop
+   pnpm build
+   pnpm exec wrangler queues create QUEUE_NAME_FROM_.output/server/wrangler.json
+   ```
+
+3. Fill `.env` from [.env.example](./.env.example), then deploy. Deploy applies the D1 migrations, then publishes the Worker with `.env` as its secrets:
+
+   ```sh
+   pnpm run deploy
+   ```
+
+4. Run the smoke test with a key from `/agents`:
+
+   ```sh
+   DROP_URL=https://<your-domain> DROP_API_KEY=drop_… pnpm test:e2e:deployed
+   ```
+
+### Develop locally
 
 ```sh
 pnpm install
-pnpm build
+pnpm dev          # http://localhost:3000
+pnpm db:migrate   # once, and after schema changes (pnpm db:generate writes new migrations)
 ```
 
-Cloudflare Sandbox requires a Workers Paid plan. Create the R2 bucket and Queue named by `.output/server/wrangler.json`, then deploy that generated configuration:
-
-```sh
-pnpm exec wrangler r2 bucket create vitehub-drop
-pnpm exec wrangler queues create QUEUE_NAME_FROM_WRANGLER_JSON
-pnpm exec wrangler deploy --config .output/server/wrangler.json
-```
-
-ViteHub composes the R2, Queue, Rate Limit, Sandbox, Container, Durable Object, and migration bindings, then emits the hourly Cron Trigger from the Schedule Definition.
-
-Run the deployed smoke test:
-
-```sh
-pnpm test:e2e:deployed
-```
-
-The test uploads an image and Markdown, confirms their public responses, checks document rendering and raw source, and exercises code-image rendering.
+Local dev has no GitHub app, so `nuxt dev` also allows email and password sign-in: open `/?signin=1`. Files go to `.vitehub/data/blob`, and rate limits are off.
 
 The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -66,14 +66,14 @@ Write HTML as a document, not as a landing page.
 - Keep the file self-contained and under 512 KB.
 - Prefer dense, scannable content over decorative framing or marketing copy.
 - Use responsive semantic HTML, inline CSS, and inline SVG.
-- Keep the document useful without JavaScript. Drop blocks scripts in uploaded HTML.
+- Keep the document useful before its scripts run. Scripts work, but in a sandbox with no access to Drop or the reader's session.
 - Embed styles, fonts, and images. External links are fine.
 - Keep secrets, private URLs, and local filesystem paths out of published content.
 - For UI variants, render the actual styled options, label them `A`, `B`, and `C`, and place them together for comparison.
 
-Drop renders HTML with a browser sandbox. Inline styles work, but scripts, forms, popups, and external resources other than HTTPS images are blocked. Embedded fonts and images work.
+Drop renders HTML in a browser sandbox with an opaque origin. Inline and HTTPS scripts, styles, fonts, and images work, and `fetch` can reach HTTPS APIs. Forms and same-origin requests to Drop are blocked.
 
-Keep one local path while drafting. Drop uploads are non-editable, so publish a new URL for each finished revision. Open the document in a browser when the user asks to inspect it.
+Keep one local path while drafting. Publish each finished revision with `supersedes`, so reviewers see the history. Open the document in a browser when the user asks to inspect it.
 
 ## Markdown and Comark
 
@@ -120,11 +120,11 @@ Set a title when the first heading is not the document title. Add `supersedes` o
 ```md
 ---
 title: Publish permanent plans
-supersedes: https://drop.vitehub.dev/i/previous.md
+supersedes: 8823cfa1-fcf7-4503-993b-32457f92f885
 ---
 ```
 
-Drop does not mutate the previous file or maintain server-side history.
+The previous version stays readable, and the drop page shows the whole history.
 
 ## Remove machine writing
 

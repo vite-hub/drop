@@ -1,60 +1,94 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
+// DROP_URL=<deployment> DROP_API_KEY=drop_… pnpm test:e2e:deployed
 const origin = new URL(process.env.DROP_URL ?? "https://drop.vitehub.dev")
+const key = process.env.DROP_API_KEY
+assert.ok(key?.startsWith("drop_"), "Set DROP_API_KEY to a key created at /agents.")
+const auth = { "x-api-key": key }
+const timeout = () => AbortSignal.timeout(30_000)
 const filesEndpoint = new URL("/api/files", origin)
-const homepage = await fetch(origin, { signal: AbortSignal.timeout(30_000) })
 
+const homepage = await fetch(origin, { signal: timeout() })
 assert.equal(homepage.status, 200)
 
-const mediumZoom = await fetch(new URL("/vendor/medium-zoom/medium-zoom.min.js", origin), { signal: AbortSignal.timeout(30_000) })
+const mediumZoom = await fetch(new URL("/vendor/medium-zoom/medium-zoom.min.js", origin), { signal: timeout() })
 assert.equal(mediumZoom.status, 200)
 assert.match(await mediumZoom.text(), /medium-zoom-image/)
 
+// Uploading needs a key.
+const anonymous = new FormData()
+anonymous.set("file", new File(["# nope"], "nope.md", { type: "text/markdown" }))
+assert.equal((await fetch(filesEndpoint, { body: anonymous, method: "POST", signal: timeout() })).status, 401)
+
 const form = new FormData()
 form.set("file", new File([await readFile(new URL("../../public/og-vitehub-drop.png", import.meta.url))], "og-vitehub-drop.png"))
+const upload = await (await fetch(filesEndpoint, { body: form, headers: auth, method: "POST", signal: timeout() })).json()
+assert.match(new URL(upload.url).pathname, /^\/f\/[0-9a-f-]+\.png$/)
+assert.equal(upload.visibility, "private")
 
-const { url } = await (await fetch(filesEndpoint, { body: form, method: "POST", signal: AbortSignal.timeout(30_000) })).json()
-assert.equal(new URL(url).pathname.endsWith(".png"), true)
-const image = await fetch(new URL(url, origin), { signal: AbortSignal.timeout(30_000) })
-const stats = await fetch(new URL("/api/stats", origin), { signal: AbortSignal.timeout(30_000) })
-
+// Private: the owner's key reads it, everyone else gets a 404.
+assert.equal((await fetch(upload.url, { signal: timeout() })).status, 404)
+const image = await fetch(upload.url, { headers: auth, signal: timeout() })
 assert.equal(image.status, 200)
 assert.equal(image.headers.get("content-type"), "image/png")
-assert.ok(await stats.json() > 0)
+
+// Shared: anyone with the link.
+const share = await fetch(new URL(`/api/drops/${upload.id}`, origin), {
+  body: JSON.stringify({ visibility: "shared" }),
+  headers: { ...auth, "content-type": "application/json" },
+  method: "PATCH",
+  signal: timeout(),
+})
+assert.equal(share.status, 200)
+assert.equal((await fetch(upload.url, { signal: timeout() })).status, 200)
+
+// Old /i/ links redirect to /f/.
+const legacy = await fetch(new URL(new URL(upload.url).pathname.replace(/^\/f\//, "/i/"), origin), { redirect: "manual", signal: timeout() })
+assert.equal(legacy.status, 301)
+assert.equal(new URL(legacy.headers.get("location"), origin).pathname, new URL(upload.url).pathname)
 
 const markdownSource = "---\ntitle: Smoke-test plan\n---\n\n# Smoke-test plan\n\n```mermaid\ngraph LR\n  Upload --> Render\n```\n"
 const markdownForm = new FormData()
 markdownForm.set("file", new File([markdownSource], "plan.md", { type: "text/markdown" }))
-const markdownUpload = await fetch(filesEndpoint, { body: markdownForm, method: "POST", signal: AbortSignal.timeout(30_000) })
+const markdownUpload = await fetch(filesEndpoint, { body: markdownForm, headers: auth, method: "POST", signal: timeout() })
 assert.equal(markdownUpload.status, 200)
 
 const markdownUrl = new URL((await markdownUpload.json()).url, origin)
-assert.match(markdownUrl.pathname, /^\/i\/[0-9a-f-]+\.md$/)
+assert.match(markdownUrl.pathname, /^\/f\/[0-9a-f-]+\.md$/)
 
-const markdownPage = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })
+const markdownPage = await fetch(markdownUrl, { headers: auth, signal: timeout() })
 assert.equal(markdownPage.status, 200)
 assert.equal(markdownPage.headers.get("content-type"), "text/html; charset=utf-8")
+assert.equal(markdownPage.headers.get("cache-control"), "private, no-store")
 assert.match(await markdownPage.text(), /<div class="mermaid"><svg/)
 assert.match(markdownPage.headers.get("content-security-policy"), /script-src 'self'/)
 
 markdownUrl.search = "?raw"
-const markdownRaw = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })
+const markdownRaw = await fetch(markdownUrl, { headers: auth, signal: timeout() })
 assert.equal(markdownRaw.status, 200)
 assert.match(markdownRaw.headers.get("content-type") ?? "", /^text\/markdown/)
 assert.equal(await markdownRaw.text(), markdownSource)
 
+// MCP: the same key as a bearer token.
+const mcp = async body => (await fetch(new URL("/mcp", origin), {
+  body: JSON.stringify({ jsonrpc: "2.0", id: 1, ...body }),
+  headers: { "authorization": `Bearer ${key}`, "content-type": "application/json" },
+  method: "POST",
+  signal: timeout(),
+})).json()
+assert.deepEqual((await mcp({ method: "tools/list" })).result.tools.map(tool => tool.name), ["list_drops", "read_drop", "list_comments", "create_doc", "publish_app"])
+assert.match((await mcp({ method: "tools/call", params: { name: "create_doc", arguments: { markdown: "# From MCP" } } })).result.content[0].text, /^Dropped privately: /)
+
 const codeResponse = await fetch(new URL("/api/code", origin), {
   body: JSON.stringify({ code: "const answer: number = 42", language: "typescript", theme: "nuxt" }),
-  headers: { "content-type": "application/json" },
+  headers: { ...auth, "content-type": "application/json" },
   method: "POST",
   signal: AbortSignal.timeout(120_000),
 })
 assert.equal(codeResponse.status, 200)
 
-const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), {
-  signal: AbortSignal.timeout(30_000),
-})
+const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), { signal: timeout() })
 assert.equal(codeImage.status, 200)
 assert.equal(codeImage.headers.get("content-type"), "image/png")
 assert.deepEqual(

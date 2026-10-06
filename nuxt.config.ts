@@ -26,7 +26,7 @@ export default defineNuxtConfig({
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
   },
 
-  css: ["~/assets/css/main.css"],
+  css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "~/assets/css/main.css"],
   devtools: false,
   compatibilityDate: "2026-07-17",
 
@@ -42,23 +42,21 @@ export default defineNuxtConfig({
 
   ui: {
     colorMode: true,
-  },
-
-  fonts: {
-    families: [
-      { name: "Geist", provider: "google", weights: [400, 500, 600] },
-      { name: "Geist Mono", provider: "google", weights: [400, 500] },
-    ],
+    // Geist is self-hosted from Fontsource (see `css`).
+    fonts: false,
   },
 
   icon: {
     provider: "none",
-    clientBundle: { scan: true },
+    // Kind icons are picked at runtime (KIND_ICONS), so the scanner can't see them.
+    clientBundle: { scan: true, icons: ["lucide:file-text", "lucide:code", "lucide:image", "lucide:file", "lucide:folder", "lucide:bot", "lucide:key-round", "lucide:user"] },
   },
 
   nitro: {
     cloudflare: { wrangler: { observability: { enabled: true } } },
+    // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.
     publicAssets: [
+      { baseURL: "/", dir: "public", maxAge: 60 * 60 },
       { baseURL: "/vendor/medium-zoom", dir: "node_modules/medium-zoom/dist", maxAge: 60 * 60 * 24 * 365 },
       { baseURL: "/.well-known/skills", dir: "skills", maxAge: 60 * 60 * 24 },
     ],
@@ -77,7 +75,8 @@ export default defineNuxtConfig({
       server: {
         auth: {
           github: {
-            clientId: env({ source: env.source("GITHUB_CLIENT_ID") }),
+            // Declared secret so wrangler passes it through with the others (it only injects declared secrets).
+            clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID") }),
             clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET") }),
           },
           secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
