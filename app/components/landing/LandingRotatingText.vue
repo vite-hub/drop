@@ -4,16 +4,12 @@ const props = withDefaults(defineProps<{ words: string[]; interval?: number }>()
 
 const index = ref(0)
 const rotated = ref(false)
-let timer: ReturnType<typeof setInterval> | undefined
-
-onMounted(() => {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return
-  timer = setInterval(() => {
-    rotated.value = true
-    index.value = (index.value + 1) % props.words.length
-  }, props.interval)
-})
-onBeforeUnmount(() => clearInterval(timer))
+const motion = usePreferredReducedMotion()
+const { pause, resume } = useIntervalFn(() => {
+  rotated.value = true
+  index.value = (index.value + 1) % props.words.length
+}, () => props.interval, { immediate: false })
+onMounted(() => watch(motion, value => (value === "reduce" ? pause() : resume()), { immediate: true }))
 </script>
 
 <template>

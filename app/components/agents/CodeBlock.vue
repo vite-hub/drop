@@ -1,15 +1,8 @@
 <script setup lang="ts">
 // A copyable snippet. The copy button sits on its own strip so long commands never run under it.
 const props = withDefaults(defineProps<{ code: string; message?: string }>(), { message: "Copied" })
-const toast = useToast()
-const copied = ref(false)
-
-async function copy() {
-  await navigator.clipboard.writeText(props.code)
-  copied.value = true
-  toast.add({ title: props.message, icon: "i-lucide-check" })
-  setTimeout(() => (copied.value = false), 1500)
-}
+const { copy: copyText, copied } = useCopy()
+const copy = () => copyText(props.code, props.message)
 </script>
 
 <template>

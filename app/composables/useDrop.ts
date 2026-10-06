@@ -1,16 +1,20 @@
 import type { DropSummary, Viewer } from "#shared/types"
 
-/** Server-side fetches carry the visitor's session cookie, so SSR renders their drops. */
-export const sessionHeaders = () => useRequestHeaders(["cookie"])
+/**
+ * `useFetch` that runs as the visitor. On the server, Nuxt calls the API without the request's cookies
+ * (in this Nuxt nightly, `useRequestFetch()` doesn't forward them either), so pass the session cookie along
+ * and SSR renders the visitor's own drops.
+ */
+export const useApi = createUseFetch(() => ({ headers: useRequestHeaders(["cookie"]) }))
 
 /** The signed-in person, their role, and whether this Drop is personal or a team. */
 export function useMe() {
-  return useFetch<Viewer | null>("/api/me", { key: "me", default: () => null, headers: sessionHeaders() })
+  return useApi<Viewer | null>("/api/me", { key: "me", default: () => null })
 }
 
 /** Your drops, newest first. Shared by the sidebar tree and the Drops page. */
 export function useDrops() {
-  return useFetch<DropSummary[]>("/api/drops", { key: "drops", default: () => [], headers: sessionHeaders() })
+  return useApi<DropSummary[]>("/api/drops", { key: "drops", default: () => [] })
 }
 
 export const refreshDrops = () => refreshNuxtData("drops")

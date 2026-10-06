@@ -1,7 +1,7 @@
 import { env } from "vite-hub/env"
 
 export default defineNuxtConfig({
-  modules: ["@nuxt/ui", "vite-hub/nuxt"],
+  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt"],
 
   vitehub: {
     preset: "cloudflare",

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // New comments: a one-line composer (Enter sends, Shift+Enter breaks). The selection stays highlighted
 // in the document, so the composer doesn't repeat it. Existing comments: the thread with resolve/delete.
-import { useTimestamp } from "@vueuse/core"
 import type { DropComment, NewComment } from "#shared/types"
 
 export type PendingComment = Omit<NewComment, "body">
@@ -10,15 +9,14 @@ const props = defineProps<{ x: number; y: number; pending?: PendingComment; comm
 const emit = defineEmits<{ submit: [body: string]; cancel: []; resolve: [id: string, resolved: boolean]; delete: [id: string] }>()
 const body = ref("")
 const busy = ref(false)
-const input = useTemplateRef<HTMLTextAreaElement>("input")
-const now = useTimestamp({ interval: 30_000 })
+const now = useRelativeNow()
+const viewport = useWindowSize()
 const width = 320
 const style = computed(() => {
-  const left = Math.min(Math.max(8, props.x), window.innerWidth - width - 8)
-  const top = Math.min(Math.max(56, props.y + 8), window.innerHeight - 240)
+  const left = Math.min(Math.max(8, props.x), viewport.width.value - width - 8)
+  const top = Math.min(Math.max(56, props.y + 8), viewport.height.value - 240)
   return { left: `${left}px`, top: `${top}px`, width: `${width}px` }
 })
-onMounted(() => input.value?.focus())
 
 function send() {
   if (!body.value.trim() || busy.value) return
@@ -36,13 +34,17 @@ defineExpose({ fail: () => (busy.value = false) })
     :style="style"
   >
     <div v-if="pending" class="flex items-end gap-2">
-      <textarea
-        ref="input"
+      <UTextarea
         v-model="body"
         aria-label="Comment"
-        class="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-relaxed text-highlighted outline-none [field-sizing:content] placeholder:text-dimmed"
+        autofocus
+        autoresize
+        class="flex-1"
+        :maxrows="6"
         :placeholder="pending.quote ? 'Comment on the selection' : 'Comment on this spot'"
-        rows="1"
+        :rows="1"
+        :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
+        variant="none"
         @keydown.enter.exact.prevent="send"
         @keydown.esc="emit('cancel')"
       />

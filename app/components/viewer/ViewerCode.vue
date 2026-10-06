@@ -3,12 +3,7 @@
 const props = withDefaults(defineProps<{ path: string; source: string; editable?: boolean }>(), { editable: false })
 const emit = defineEmits<{ change: [value: string] }>()
 const lines = computed(() => props.source.split("\n").length)
-const toast = useToast()
-
-async function copy() {
-  await navigator.clipboard.writeText(props.source)
-  toast.add({ title: "Copied" })
-}
+const { copy, copied } = useCopy()
 
 function tab(event: KeyboardEvent) {
   const target = event.target as HTMLTextAreaElement
@@ -25,7 +20,7 @@ function tab(event: KeyboardEvent) {
       <span class="font-mono text-[11px] whitespace-nowrap text-muted">{{ lines }} lines · {{ formatBytes(source.length) }}</span>
       <span class="ml-auto flex items-center gap-0.5">
         <slot name="actions" />
-        <UButton aria-label="Copy file" color="neutral" icon="i-lucide-copy" size="sm" variant="ghost" @click="copy" />
+        <UButton aria-label="Copy file" color="neutral" :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'" size="sm" variant="ghost" @click="copy(source)" />
       </span>
     </div>
     <div class="flex min-h-0 flex-1 overflow-auto font-mono text-[12.5px] leading-6">

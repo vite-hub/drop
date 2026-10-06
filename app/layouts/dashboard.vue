@@ -15,7 +15,7 @@ const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transit
 </script>
 
 <template>
-  <UDashboardGroup unit="rem" storage="local" storage-key="drop">
+  <UDashboardGroup unit="rem" storage="cookie" storage-key="drop">
     <UDashboardSidebar
       id="nav"
       v-model:open="open"
@@ -36,8 +36,11 @@ const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transit
       <NuxtLink :class="[item, route.path === '/drops' ? 'bg-elevated font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted']" to="/drops" @click="close">
         <UIcon name="i-lucide-layers" class="size-4" />Drops
       </NuxtLink>
-      <div class="-mx-2 mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        <DropTree @navigate="close" />
+      <!-- Drops live under the Drops item: a guide line ties them to it, like folders in a file tree. -->
+      <div class="-mx-2 mt-0.5 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        <div class="ml-[1.0625rem] border-l border-default pl-1.5">
+          <DropTree @navigate="close" />
+        </div>
       </div>
       <div class="flex flex-col gap-px border-t border-default pt-2">
         <NuxtLink

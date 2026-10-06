@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { useTimestamp } from "@vueuse/core"
 import type { DropComment } from "#shared/types"
 
 const props = defineProps<{ comments: DropComment[]; canComment: boolean; canManage: boolean }>()
 const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
 const filter = ref<"open" | "resolved">("open")
-const now = useTimestamp({ interval: 30_000 })
+const now = useRelativeNow()
 const visible = computed(() => props.comments.filter(comment => (filter.value === "open" ? !comment.resolved : comment.resolved)))
 </script>
 

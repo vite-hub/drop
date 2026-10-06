@@ -4,13 +4,13 @@ import type { DropComment, DropDetail } from "#shared/types"
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
-const { data: drop, refresh } = await useFetch<DropDetail>(() => `/api/drops/${id.value}`, { key: `drop:${id.value}`, headers: sessionHeaders() })
-const { data: comments, refresh: refreshComments } = await useFetch<DropComment[]>(() => `/api/drops/${id.value}/comments`, { key: `comments:${id.value}`, default: () => [], headers: sessionHeaders() })
+const { data: drop, refresh } = await useApi<DropDetail>(() => `/api/drops/${id.value}`, { key: `drop:${id.value}` })
+const { data: comments, refresh: refreshComments } = await useApi<DropComment[]>(() => `/api/drops/${id.value}/comments`, { key: `comments:${id.value}`, default: () => [] })
 useSeoMeta({ title: () => drop.value?.title ?? "Drop", robots: "noindex" })
 </script>
 
 <template>
-  <UDashboardGroup v-if="drop" unit="rem" storage="local" storage-key="drop-public">
+  <UDashboardGroup v-if="drop" unit="rem" storage="cookie" storage-key="drop-public">
     <DropViewer :key="drop.id" :comments="comments" :drop="drop" public-view @refresh="refresh" @refresh-comments="refreshComments" />
   </UDashboardGroup>
   <div v-else class="grid min-h-dvh place-items-center px-6 text-center">

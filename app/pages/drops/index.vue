@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useTimestamp } from "@vueuse/core"
 import type { DropSummary } from "#shared/types"
 
 definePageMeta({ layout: "dashboard", middleware: "auth" })
@@ -10,10 +9,11 @@ const { data: drops, status } = useDrops()
 const filter = ref<"all" | "private" | "shared">("all")
 const search = ref("")
 const searchInput = useTemplateRef("searchInput")
-const fileInput = useTemplateRef<HTMLInputElement>("fileInput")
-const pendingDelete = ref<DropSummary | null>(null)
+const confirm = useConfirm()
+const picker = useFileDialog({ multiple: false, reset: true })
+picker.onChange(files => files?.[0] && void upload(files[0]))
 const creating = ref(false)
-const now = useTimestamp({ interval: 30_000 })
+const now = useRelativeNow()
 
 const counts = computed(() => ({
   all: drops.value.length,
@@ -62,9 +62,7 @@ async function newDrop() {
   creating.value = false
 }
 
-async function upload(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
+async function upload(file: File) {
   const form = new FormData()
   form.append("file", file)
   try {
@@ -76,13 +74,10 @@ async function upload(event: Event) {
   catch (error) {
     toast.add({ title: "Upload failed", description: errorText(error) })
   }
-  if (fileInput.value) fileInput.value.value = ""
 }
 
-async function remove() {
-  const drop = pendingDelete.value
-  if (!drop) return
-  pendingDelete.value = null
+async function remove(drop: DropSummary) {
+  if (!await confirm({ title: "Delete this drop?", description: `${drop.title}. Its link stops working and its comments go with it.`, confirmLabel: "Delete", destructive: true })) return
   try {
     await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
     await refreshDrops()
@@ -97,8 +92,7 @@ async function remove() {
 <template>
   <PageShell id="drops" title="Drops" description="Docs and apps you and your agents dropped. Private until you share them.">
     <template #actions>
-      <input ref="fileInput" class="hidden" type="file" @change="upload">
-      <UButton color="neutral" icon="i-lucide-upload" label="Upload" variant="outline" @click="fileInput?.click()" />
+      <UButton color="neutral" icon="i-lucide-upload" label="Upload" variant="outline" @click="picker.open()" />
       <UButton color="neutral" icon="i-lucide-plus" label="New Drop" :loading="creating" @click="newDrop" />
     </template>
 
@@ -139,21 +133,10 @@ async function remove() {
       <template v-for="group in groups" :key="group.label">
         <p class="label-mono border-b border-default bg-muted px-4 py-2">{{ group.label }}</p>
         <ul class="divide-y divide-default border-b border-default last:border-b-0">
-          <DropRow v-for="drop in group.drops" :key="drop.id" :drop="drop" :now="now" @delete="pendingDelete = drop" />
+          <DropRow v-for="drop in group.drops" :key="drop.id" :drop="drop" :now="now" @delete="remove(drop)" />
         </ul>
       </template>
     </div>
 
-    <UModal :open="Boolean(pendingDelete)" title="Delete this drop?" :description="pendingDelete?.title" @update:open="value => !value && (pendingDelete = null)">
-      <template #body>
-        <p class="text-sm text-muted">Its link stops working and its comments go with it. Older versions stay.</p>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" label="Cancel" variant="ghost" @click="pendingDelete = null" />
-          <UButton color="error" label="Delete" @click="remove" />
-        </div>
-      </template>
-    </UModal>
   </PageShell>
 </template>

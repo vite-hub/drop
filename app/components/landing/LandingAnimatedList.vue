@@ -5,13 +5,10 @@ const props = withDefaults(defineProps<{ items: T[]; visible?: number; interval?
 defineSlots<{ default(props: { item: T }): unknown }>()
 
 const count = ref(props.visible)
-let timer: ReturnType<typeof setInterval> | undefined
-
-onMounted(() => {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return
-  timer = setInterval(() => count.value++, props.interval)
-})
-onBeforeUnmount(() => clearInterval(timer))
+const motion = usePreferredReducedMotion()
+const { pause, resume } = useIntervalFn(() => count.value++, () => props.interval, { immediate: false })
+// Client only, and never under reduced motion; follows the setting if it changes.
+onMounted(() => watch(motion, value => (value === "reduce" ? pause() : resume()), { immediate: true }))
 
 const arrived = computed(() => count.value > props.visible)
 const shown = computed(() =>

@@ -5,8 +5,8 @@ definePageMeta({ layout: "dashboard", middleware: "auth" })
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
-const { data: drop, error, refresh } = await useFetch<DropDetail>(() => `/api/drops/${id.value}`, { key: `drop:${id.value}`, headers: sessionHeaders() })
-const { data: comments, refresh: refreshComments } = await useFetch<DropComment[]>(() => `/api/drops/${id.value}/comments`, { key: `comments:${id.value}`, default: () => [], headers: sessionHeaders() })
+const { data: drop, error, refresh } = await useApi<DropDetail>(() => `/api/drops/${id.value}`, { key: `drop:${id.value}` })
+const { data: comments, refresh: refreshComments } = await useApi<DropComment[]>(() => `/api/drops/${id.value}/comments`, { key: `comments:${id.value}`, default: () => [] })
 useSeoMeta({ title: () => drop.value?.title ?? "Drop" })
 </script>
 

@@ -42,18 +42,13 @@ const method = computed<Method>({
 const client = ref<McpClient>("claude")
 const command = computed(() => (method.value === "mcp" ? MCP_SNIPPETS[client.value] : `npx skills add ${origin}\nexport DROP_API_KEY=drop_…`))
 
-const { data: keys, status, refresh } = useFetch<ApiKeyRow[]>("/api/keys", { key: "keys", default: () => [], headers: sessionHeaders() })
-// Taken once on the server and reused on hydration, so relative times match.
-const now = useState("now", () => Date.now())
-onMounted(() => (now.value = Date.now()))
+const { data: keys, status, refresh } = useApi<ApiKeyRow[]>("/api/keys", { key: "keys", default: () => [] })
+const now = useRelativeNow()
 const keyDialog = ref(false)
 const revoking = ref<ApiKeyRow | null>(null)
 const revokeBusy = ref(false)
 
-async function copy(text: string, message: string) {
-  await navigator.clipboard.writeText(text)
-  toast.add({ title: message, icon: "i-lucide-check" })
-}
+const { copy } = useCopy()
 
 async function revoke() {
   const key = revoking.value

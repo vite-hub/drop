@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The drop viewer (T3 Code's layout): a main column with its own header, and one full-height side panel with
 // tabs (Comments, Source or Files, Details) that pushes the content. Docs and apps share it.
-import { createReusableTemplate, useLocalStorage, useMediaQuery } from "@vueuse/core"
+import { breakpointsTailwind } from "@vueuse/core"
 import { editorDocument, planDocument } from "#shared/markdown"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
@@ -9,7 +9,6 @@ import { buildProjectDocument } from "#shared/project-bundle"
 import type { DropComment, DropDetail, DropSummary } from "#shared/types"
 import type { PendingComment } from "./viewer/ViewerCommentPopover.vue"
 
-type SideTab = "comments" | "source" | "details"
 type Selection = { quote: string; selector: string; label: string; rect: { left: number; top: number; right: number; bottom: number } }
 type Lightbox = { src: string; alt: string; selector: string; label: string }
 type Popover = { x: number; y: number } & ({ type: "new"; pending: PendingComment } | { type: "thread"; id: string })
@@ -19,21 +18,25 @@ const emit = defineEmits<{ refresh: []; refreshComments: [] }>()
 
 const route = useRoute()
 const toast = useToast()
+const confirm = useConfirm()
+const prompt = usePrompt()
+const { copy } = useCopy()
 const colorMode = useColorMode()
 const dark = computed(() => colorMode.value === "dark")
-const wide = useMediaQuery("(min-width: 1024px)")
+// The server assumes a laptop width, so SSR renders the panel where the browser will put it.
+const wide = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 }).greaterOrEqual("lg")
 const [DefineSide, ReuseSide] = createReusableTemplate()
+const { width: windowWidth } = useWindowSize()
 
 const isApp = computed(() => props.drop.kind === "app")
 const owner = computed(() => props.drop.isOwner && !props.publicView)
 const openCount = computed(() => props.comments.filter(comment => !comment.resolved).length)
 const link = computed(() => (import.meta.client ? `${location.origin}/d/${props.drop.id}` : `/d/${props.drop.id}`))
 
-// Side panel: open on wide screens unless you closed it; the last tab sticks across drops.
-const sideOpenStored = useLocalStorage("drop-side-open", true)
-const sideOpen = computed({ get: () => sideOpenStored.value && (wide.value || mobileSide.value), set: value => (sideOpenStored.value = value) })
+// Side panel: open on wide screens unless you closed it; the last tab sticks across drops (cookies, see useSidePanel).
+const { open: sideOpenStored, tab: storedTab } = useSidePanel()
+const sideOpen = computed({ get: () => sideOpenStored.value && wide.value, set: value => (sideOpenStored.value = value) })
 const mobileSide = ref(false)
-const storedTab = useLocalStorage<SideTab>("drop-side-tab", "comments")
 const tabs = computed(() => [
   { value: "comments" as const, label: "Comments", count: openCount.value },
   { value: "source" as const, label: isApp.value ? "Files" : "Source", count: isApp.value ? props.drop.paths?.length : undefined },
@@ -73,23 +76,15 @@ const dirty = computed(() => docDirty.value || appDirty.value)
 const saving = computed(() => Boolean(docEdit.value?.saving || appSaving.value))
 
 // Images load into the sandbox as data URLs: the opaque-origin frame can't send your session cookie.
-const imageData = ref("")
+const imageBlob = shallowRef<Blob>()
+const { base64: imageData } = useBase64(imageBlob)
 onMounted(async () => {
   if (props.drop.kind !== "image" || !props.drop.url) return
-  const blob = await $fetch<Blob>(props.drop.url, { responseType: "blob" }).catch(() => null)
-  if (!blob) return
-  const reader = new FileReader()
-  reader.onload = () => (imageData.value = String(reader.result))
-  reader.readAsDataURL(blob)
+  imageBlob.value = await $fetch<Blob>(props.drop.url, { responseType: "blob" }).catch(() => undefined)
 })
 
 // Live app preview while editing, debounced so typing doesn't reload the app on every key.
-const previewFiles = ref(files.value)
-let previewTimer: ReturnType<typeof setTimeout> | undefined
-watch(files, (value) => {
-  clearTimeout(previewTimer)
-  previewTimer = setTimeout(() => (previewFiles.value = value), drafts.value ? 450 : 0)
-})
+const previewFiles = refDebounced(files, () => (drafts.value ? 450 : 0))
 
 const srcdoc = computed(() => {
   if (isApp.value) return injectRuntime(buildProjectDocument(previewFiles.value, page.value), dark.value)
@@ -105,7 +100,6 @@ const lightbox = ref<Lightbox | null>(null)
 const popover = ref<Popover | null>(null)
 const popoverRef = useTemplateRef<{ fail: () => void }>("popoverRef")
 const shareOpen = ref(false)
-const confirmDelete = ref(false)
 
 const pageComments = computed(() => (isApp.value ? props.comments.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : props.comments))
 const send = (message: Record<string, unknown>) => frame.value?.contentWindow?.postMessage({ __drop: true, ...message }, "*")
@@ -142,21 +136,15 @@ function onMessage(event: MessageEvent) {
     selection.value = null
   }
 }
-function onKey(event: KeyboardEvent) {
-  if (editing.value && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
-    event.preventDefault()
-    void save()
-  }
-}
+useEventListener(import.meta.client ? window : undefined, "message", onMessage)
+defineShortcuts({
+  meta_s: { usingInput: true, handler: () => editing.value && void save() },
+  escape: { usingInput: true, handler: () => (popover.value = selection.value = null) },
+  c: () => !editing.value && showTab("comments"),
+})
 onMounted(() => {
-  window.addEventListener("message", onMessage)
-  window.addEventListener("keydown", onKey)
   if (route.query.edit === "1" && props.drop.canEdit) startEdit()
   openFileFromQuery()
-})
-onBeforeUnmount(() => {
-  window.removeEventListener("message", onMessage)
-  window.removeEventListener("keydown", onKey)
 })
 
 // The sidebar tree links straight to a file: HTML opens as a page, anything else in the code view.
@@ -178,10 +166,6 @@ function openFile(path: string) {
   }
 }
 
-async function copy(text: string, message: string) {
-  await navigator.clipboard.writeText(text)
-  toast.add({ title: message })
-}
 const copyFeedback = () => copy(feedbackMarkdown(props.drop.title, link.value, props.comments), "Feedback copied as Markdown")
 function copyLink() {
   if (props.drop.visibility === "shared") void copy(link.value, "Link copied")
@@ -200,8 +184,8 @@ function startEdit() {
   docEdit.value = { text: props.drop.content ?? "", mode: props.drop.kind === "markdown" ? "rich" : "source", saving: false }
 }
 
-function cancelEdit() {
-  if (dirty.value && !window.confirm("Discard your changes?")) return
+async function cancelEdit() {
+  if (dirty.value && !await confirm({ title: "Discard your changes?", description: "Nothing was published.", confirmLabel: "Discard", destructive: true })) return
   docEdit.value = null
   drafts.value = null
 }
@@ -234,8 +218,8 @@ async function save() {
   appSaving.value = false
 }
 
-function addFile() {
-  const path = window.prompt("File path", "components/button.js")?.trim().replace(/^\/+/, "")
+async function addFile() {
+  const path = (await prompt({ title: "New file", label: "Path", placeholder: "components/button.js", confirmLabel: "Add File" }))?.replace(/^\/+/, "")
   if (!path || !drafts.value) return
   if (!(path in drafts.value)) drafts.value = { ...drafts.value, [path]: "" }
   openFile(path)
@@ -288,6 +272,7 @@ function focusComment(comment: DropComment) {
 }
 
 async function deleteDrop() {
+  if (!await confirm({ title: "Delete this drop?", description: `${props.drop.title}. Its link stops working and its comments go with it.`, confirmLabel: "Delete", destructive: true })) return
   try {
     await $fetch(`/api/drops/${props.drop.id}`, { method: "DELETE" })
     await refreshDrops()
@@ -392,7 +377,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? props.c
           <ViewerAction icon="i-lucide-sparkles" label="Copy feedback for your agent" @click="copyFeedback" />
           <ViewerAction icon="i-lucide-link" label="Copy link" @click="copyLink" />
           <ViewerAction v-if="drop.url" icon="i-lucide-download" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
-          <ViewerAction destructive icon="i-lucide-trash" label="Delete drop" @click="confirmDelete = true" />
+          <ViewerAction destructive icon="i-lucide-trash" label="Delete drop" @click="deleteDrop" />
         </template>
       </ViewerOverview>
     </div>
@@ -476,7 +461,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? props.c
   <div
     v-if="selection && !popover"
     class="fixed z-30 -translate-x-1/2 -translate-y-full"
-    :style="{ left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), 4000)}px`, top: `${Math.max(56, selection.rect.top - 8)}px` }"
+    :style="{ left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`, top: `${Math.max(56, selection.rect.top - 8)}px` }"
   >
     <div class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]">
       <UButton color="neutral" icon="i-lucide-message-circle" label="Comment" size="sm" variant="ghost" @click="commentOnSelection" @mousedown.prevent />
@@ -509,13 +494,4 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? props.c
   />
 
   <ViewerShareModal v-if="owner" v-model:open="shareOpen" :drop="drop" @changed="emit('refresh'); refreshDrops()" />
-  <UModal v-if="owner" v-model:open="confirmDelete" :description="drop.title" title="Delete this drop?">
-    <template #body><p class="text-sm text-muted">Its link stops working and its comments go with it.</p></template>
-    <template #footer>
-      <div class="flex w-full justify-end gap-2">
-        <UButton color="neutral" label="Cancel" variant="ghost" @click="confirmDelete = false" />
-        <UButton color="error" label="Delete" @click="deleteDrop" />
-      </div>
-    </template>
-  </UModal>
 </template>

@@ -1,11 +1,8 @@
 <script setup lang="ts">
 // A card whose surface lights up under the pointer. No spotlight under reduced motion.
-const card = ref<HTMLElement | null>(null)
-const tracks = ref(false)
-
-onMounted(() => {
-  tracks.value = !matchMedia("(prefers-reduced-motion: reduce)").matches
-})
+const card = useTemplateRef<HTMLElement>("card")
+const motion = usePreferredReducedMotion()
+const tracks = computed(() => motion.value !== "reduce")
 
 function move(event: PointerEvent) {
   if (!tracks.value || !card.value) return

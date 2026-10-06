@@ -3,7 +3,7 @@
 const emit = defineEmits<{ navigate: [] }>()
 const { data: drops, status } = useDrops()
 const route = useRoute()
-const open = ref<Record<string, boolean>>({})
+const open = useTreeOpen()
 const file = computed(() => (typeof route.query.file === "string" ? route.query.file : null))
 const here = (id: string) => route.path === `/drops/${id}`
 
@@ -17,13 +17,14 @@ const active = "bg-elevated text-highlighted"
     <USkeleton v-for="index in 3" :key="index" class="h-5 w-full" />
   </div>
   <ul v-else class="flex flex-col gap-px">
+    <li v-if="!drops.length" class="px-2 py-1 text-[13px] text-dimmed">No drops yet</li>
     <li v-for="drop in drops" :key="drop.id">
-      <NuxtLink v-if="drop.kind !== 'app'" :class="[row, 'px-2.5', here(drop.id) ? active : idle]" :to="`/drops/${drop.id}`" @click="emit('navigate')">
+      <NuxtLink v-if="drop.kind !== 'app'" :class="[row, 'px-2', here(drop.id) ? active : idle]" :to="`/drops/${drop.id}`" @click="emit('navigate')">
         <UIcon :name="KIND_ICONS[drop.kind]!" class="size-3.5 shrink-0 text-dimmed" />
         <span class="truncate" :title="drop.title">{{ drop.title }}</span>
       </NuxtLink>
       <template v-else>
-        <div :class="[row, 'pl-2.5 pr-1', here(drop.id) && !file ? active : idle]">
+        <div :class="[row, 'pl-2 pr-1', here(drop.id) && !file ? active : idle]">
           <NuxtLink class="flex min-w-0 flex-1 items-center gap-2" :to="`/drops/${drop.id}`" @click="emit('navigate')">
             <UIcon name="i-lucide-folder" class="size-3.5 shrink-0 text-dimmed" />
             <span class="truncate" :title="drop.title">{{ drop.title }}</span>

@@ -5,9 +5,7 @@ import type { DropComment } from "#shared/types"
 const props = defineProps<{ src: string; alt: string; comments: DropComment[]; canComment: boolean }>()
 const emit = defineEmits<{ close: []; pick: [ox: number, oy: number, x: number, y: number]; thread: [id: string, x: number, y: number] }>()
 const aspect = ref(16 / 9)
-const onKey = (event: KeyboardEvent) => event.key === "Escape" && emit("close")
-onMounted(() => window.addEventListener("keydown", onKey))
-onBeforeUnmount(() => window.removeEventListener("keydown", onKey))
+onKeyStroke("Escape", () => emit("close"))
 
 function loaded(event: Event) {
   const { naturalWidth, naturalHeight } = event.target as HTMLImageElement

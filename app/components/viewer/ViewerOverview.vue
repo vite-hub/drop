@@ -1,11 +1,10 @@
 <script setup lang="ts">
 // Details as a short story instead of a table: who dropped it, what it is, who can see it, its history.
-import { useTimestamp } from "@vueuse/core"
 import { ACCESS_LABELS, type DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
 const emit = defineEmits<{ share: [] }>()
-const now = useTimestamp({ interval: 30_000 })
+const now = useRelativeNow()
 const facts = computed(() => [
   KIND_LABELS[props.drop.kind] ?? "File",
   ...(props.drop.kind === "app" ? [`${props.drop.paths?.length ?? 0} files`] : []),

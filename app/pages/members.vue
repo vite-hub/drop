@@ -9,11 +9,9 @@ useSeoMeta({ title: "Members" })
 // Personal or team comes from who's here, not from a setting. Three roles; new people join as Member.
 const toast = useToast()
 const { data: me } = useMe()
-const { data: members, status, refresh } = useFetch<Member[]>("/api/members", { key: "members", default: () => [], headers: sessionHeaders() })
+const { data: members, status, refresh } = useApi<Member[]>("/api/members", { key: "members", default: () => [] })
 const admin = computed(() => me.value?.role === "admin")
-// Taken once on the server and reused on hydration, so relative times match.
-const now = useState("now", () => Date.now())
-onMounted(() => (now.value = Date.now()))
+const now = useRelativeNow()
 const search = ref("")
 const inviteOpen = ref(false)
 const removing = ref<Member | null>(null)

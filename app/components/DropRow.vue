@@ -4,6 +4,7 @@ import type { DropSummary } from "#shared/types"
 const props = defineProps<{ drop: DropSummary; now: number }>()
 const emit = defineEmits<{ delete: [] }>()
 const toast = useToast()
+const { copy } = useCopy()
 const shared = ref(props.drop.visibility === "shared")
 watch(() => props.drop.visibility, value => (shared.value = value === "shared"))
 
@@ -28,8 +29,7 @@ async function copyLink() {
     toast.add({ title: "This drop is private", description: "Share it first so the link works for others.", actions: [{ label: "Share & copy", color: "neutral", variant: "outline", onClick: () => void setShared(true).then(copyLink) }] })
     return
   }
-  await navigator.clipboard.writeText(link.value)
-  toast.add({ title: "Link copied" })
+  await copy(link.value, "Link copied")
 }
 
 const menu = computed(() => [

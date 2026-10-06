@@ -9,8 +9,7 @@ const colorMode = useColorMode()
 const { loggedIn, signIn } = useUserSession()
 
 // The session loads client-side; gate on mount so the server and first client render agree.
-const mounted = ref(false)
-onMounted(() => (mounted.value = true))
+const mounted = useMounted()
 const signedIn = computed(() => mounted.value && loggedIn.value)
 
 const dark = computed(() => colorMode.value === "dark")
