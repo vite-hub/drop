@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm"
+import { and, desc, eq, exists, inArray, isNotNull, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
@@ -296,8 +296,16 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
     else {
       const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, publishToken: token })
         .where(and(eq(drops.id, id), eq(drops.version, row.version)))
-      const replace = db.run(sql`DELETE FROM drop_files WHERE drop_id = ${id} AND EXISTS (SELECT 1 FROM drops WHERE id = ${id} AND publish_token = ${token})`)
-      const inserts = encoded.map(([path, bytes]) => db.run(sql`INSERT INTO drop_files (drop_id, path, blob_key, size) SELECT ${id}, ${path}, ${`${prefix}/${path}`}, ${bytes.byteLength} WHERE EXISTS (SELECT 1 FROM drops WHERE id = ${id} AND publish_token = ${token})`))
+      // The file set changes only if the update above won: both statements check for this publish's token.
+      // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
+      const won = and(eq(drops.id, id), eq(drops.publishToken, token))
+      const replace = db.delete(dropFiles).where(and(eq(dropFiles.dropId, id), exists(db.select({ id: drops.id }).from(drops).where(won))))
+      const inserts = encoded.map(([path, bytes]) => db.insert(dropFiles).select(qb => qb.select({
+        dropId: drops.id,
+        path: sql<string>`${path}`.as("path"),
+        blobKey: sql<string>`${`${prefix}/${path}`}`.as("blob_key"),
+        size: sql<number>`${bytes.byteLength}`.as("size"),
+      }).from(drops).where(won)))
       await atomic.batch([update, replace, ...inserts])
       committedPublish = true
       const [committed] = await db.select({ publishToken: drops.publishToken }).from(drops).where(eq(drops.id, id)).limit(1)

@@ -22,7 +22,7 @@ anonymous.set("file", new File(["# nope"], "nope.md", { type: "text/markdown" })
 assert.equal((await fetch(filesEndpoint, { body: anonymous, method: "POST", signal: timeout() })).status, 401)
 
 const form = new FormData()
-form.set("file", new File([await readFile(new URL("../../public/og-vitehub-drop.png", import.meta.url))], "og-vitehub-drop.png"))
+form.set("file", new File([await readFile(new URL("../../public/og.png", import.meta.url))], "og.png"))
 const upload = await (await fetch(filesEndpoint, { body: form, headers: auth, method: "POST", signal: timeout() })).json()
 assert.match(new URL(upload.url).pathname, /^\/f\/[0-9a-f-]+\.png$/)
 assert.equal(upload.visibility, "private")
@@ -70,6 +70,17 @@ assert.equal(markdownRaw.status, 200)
 assert.match(markdownRaw.headers.get("content-type") ?? "", /^text\/markdown/)
 assert.equal(await markdownRaw.text(), markdownSource)
 
+// Raw HTML never runs on Drop's origin: the blob route serves it under a CSP sandbox.
+const htmlForm = new FormData()
+htmlForm.set("file", new File(["<!doctype html><script>fetch('/api/me')</script>"], "report.html", { type: "text/html" }))
+const htmlUpload = await fetch(filesEndpoint, { body: htmlForm, headers: auth, method: "POST", signal: timeout() })
+assert.equal(htmlUpload.status, 200)
+const htmlRaw = new URL((await htmlUpload.json()).url, origin)
+htmlRaw.search = "?raw"
+const htmlRawResponse = await fetch(htmlRaw, { headers: auth, signal: timeout() })
+assert.equal(htmlRawResponse.status, 200)
+assert.match(htmlRawResponse.headers.get("content-security-policy") ?? "", /^sandbox/)
+
 // MCP (2026-07-28): the same key as a bearer token; the protocol version rides in each request's _meta.
 const mcp = async (method, params = {}) => (await fetch(new URL("/mcp", origin), {
   body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientInfo": { name: "e2e", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } }),
@@ -102,6 +113,7 @@ assert.equal(svgResponse.status, 200)
 const svgImage = await fetch(new URL((await svgResponse.json()).url, origin), { signal: timeout() })
 assert.equal(svgImage.headers.get("content-type"), "image/svg+xml")
 assert.match(await svgImage.text(), /^<svg/)
+assert.equal((await fetch(new URL(`/f/code-images/${Date.now() - 1000}/expired.svg`, origin), { signal: timeout() })).status, 404)
 
 // PNG is one Browser Run screenshot of that SVG.
 const codeResponse = await fetch(new URL("/api/code", origin), {
