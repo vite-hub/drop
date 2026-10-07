@@ -80,6 +80,9 @@ export default defineNuxtConfig({
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
   },
 
+  // The public docs are the same for everyone: built once, served as static HTML on every host.
+  routeRules: { "/docs": { prerender: true }, "/docs/**": { prerender: true } },
+
   css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "~/assets/css/main.css"],
   devtools: false,
   compatibilityDate: "2026-07-17",
@@ -109,6 +112,8 @@ export default defineNuxtConfig({
         "lucide:file-text", "lucide:code", "lucide:image", "lucide:file", "lucide:folder", "lucide:bot", "lucide:key-round", "lucide:user",
         "simple-icons:claude", "simple-icons:openai", "simple-icons:cursor", "simple-icons:githubcopilot", "simple-icons:googlegemini",
         "simple-icons:windsurf", "simple-icons:zedindustries", "simple-icons:opencode", "simple-icons:githubactions",
+        // Host icons in the docs (app/utils/docs.ts).
+        "simple-icons:cloudflare", "simple-icons:vercel", "simple-icons:netlify", "simple-icons:deno", "lucide:server",
       ],
     },
   },

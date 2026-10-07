@@ -4,7 +4,7 @@ const POINTS = [
   "Sign in with GitHub, or swap in any Better Auth provider",
   "Database and file storage provisioned on deploy",
   "MCP server with browser sign-in for your agents",
-  "Cloudflare today. ViteHub also targets Vercel, Netlify, Deno, and Node",
+  "Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
 ]
 const CONFIG_FILE = "nuxt.config.ts"
 const CONFIG = `export default defineNuxtConfig({
@@ -35,7 +35,7 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
         </ul>
         <div class="mt-8 flex flex-wrap gap-2">
           <UButton color="neutral" variant="outline" icon="i-simple-icons-github" label="Fork on GitHub" to="https://github.com/vite-hub/drop" target="_blank" />
-          <UButton color="neutral" variant="ghost" label="What's ViteHub?" to="https://vitehub.dev" target="_blank" />
+          <UButton color="neutral" variant="ghost" label="Self-hosting guide" to="/docs/self-host" />
         </div>
       </div>
 

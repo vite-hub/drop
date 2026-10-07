@@ -4,36 +4,7 @@ import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 useSeoMeta({ title: "Drop", description: "Review what your agents plan." })
 
 const route = useRoute()
-const toast = useToast()
-const colorMode = useColorMode()
-const { loggedIn, signIn } = useUserSession()
-
-// The session loads client-side; gate on mount so the server and first client render agree.
-const mounted = useMounted()
-const signedIn = computed(() => mounted.value && loggedIn.value)
-
-const dark = computed(() => colorMode.value === "dark")
-const toggleTheme = () => (colorMode.preference = dark.value ? "light" : "dark")
-
-// Back to where the auth guard sent you from; only same-site paths, never a full URL.
-const appOrigin = useRequestURL().origin
-const next = computed(() => {
-  const value = route.query.redirect
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/drops"
-  try {
-    const resolved = new URL(value, appOrigin)
-    if (resolved.origin !== appOrigin) return "/drops"
-    return `${resolved.pathname}${resolved.search}${resolved.hash}`
-  }
-  catch {
-    return "/drops"
-  }
-})
-
-async function signInWithGitHub() {
-  const { error } = await signIn.social({ provider: "github", callbackURL: next.value })
-  if (error) toast.add({ title: error.message ?? "Couldn't start GitHub sign-in.", color: "error" })
-}
+const { signedIn, next, signIn, signInWithGitHub } = useGitHubSignIn()
 
 // `nuxt dev` has no GitHub app: /?signin=1 shows a tiny email form instead.
 const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
@@ -72,35 +43,7 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
 
 <template>
   <div class="min-h-dvh bg-default text-default">
-    <header class="sticky top-0 z-30 border-b border-default bg-default">
-      <div class="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
-        <div class="flex items-center gap-2.5">
-          <NuxtLink class="flex items-center gap-2 font-semibold tracking-tight text-highlighted" to="/">
-            <DropMark class="h-5 w-7" />
-            <span>Drop</span>
-          </NuxtLink>
-          <span aria-hidden="true" class="text-lg font-light text-(--ui-border-accented)">/</span>
-          <a aria-label="ViteHub" class="flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-highlighted" href="https://vitehub.dev" rel="noreferrer" target="_blank">
-            <ViteHubMark class="size-3.5" /><span class="hidden sm:inline">ViteHub</span>
-          </a>
-        </div>
-        <div class="ml-auto flex items-center gap-1">
-          <ClientOnly>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="dark ? 'i-lucide-sun' : 'i-lucide-moon'"
-              :aria-label="dark ? 'Switch to light theme' : 'Switch to dark theme'"
-              @click="toggleTheme"
-            />
-            <template #fallback><span class="size-8" /></template>
-          </ClientOnly>
-          <LandingGitHubStars />
-          <UButton v-if="signedIn" class="ml-1" color="neutral" variant="outline" label="Open Drop" to="/drops" />
-          <UButton v-else class="ml-1" color="neutral" variant="outline" label="Sign In" @click="signInWithGitHub" />
-        </div>
-      </div>
-    </header>
+    <SiteHeader />
 
     <main>
       <section class="relative overflow-hidden">
@@ -214,17 +157,6 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
       </section>
     </main>
 
-    <footer class="border-t border-default">
-      <div class="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm text-muted sm:px-6">
-        <span class="flex items-center gap-2">
-          <ViteHubMark class="size-3.5" />Built with
-          <a class="font-medium text-highlighted hover:underline" href="https://vitehub.dev" rel="noreferrer" target="_blank">ViteHub</a>
-        </span>
-        <span class="flex gap-5">
-          <NuxtLink class="hover:text-highlighted" to="/docs">Docs</NuxtLink>
-          <a class="hover:text-highlighted" href="https://github.com/vite-hub/drop" rel="noreferrer" target="_blank">GitHub</a>
-        </span>
-      </div>
-    </footer>
+    <SiteFooter />
   </div>
 </template>
