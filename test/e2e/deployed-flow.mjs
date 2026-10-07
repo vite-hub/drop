@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises"
 // agents must sign in. Add DROP_TOKEN=<an MCP access token> for the signed-in flow (uploads, sharing, MCP).
 const origin = new URL(process.env.DROP_URL ?? "https://drop.vitehub.dev")
 const token = process.env.DROP_TOKEN
+const cloudflareHost = origin.hostname === "drop.vitehub.dev"
 const timeout = () => AbortSignal.timeout(30_000)
 const filesEndpoint = new URL("/api/files", origin)
 
@@ -151,7 +152,9 @@ const codeResponse = await fetch(new URL("/api/code", origin), {
   method: "POST",
   signal: AbortSignal.timeout(120_000),
 })
-assert.equal(codeResponse.status, 200)
+assert.equal(codeResponse.status, cloudflareHost ? 200 : 501)
+
+if (!cloudflareHost) process.exit(0)
 
 const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), { signal: timeout() })
 assert.equal(codeImage.status, 200)

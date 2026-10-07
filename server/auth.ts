@@ -40,7 +40,7 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
     socialProviders: {
       github: { clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal() },
     },
-    emailAndPassword: { enabled: import.meta.dev === true },
+    emailAndPassword: { enabled: import.meta.dev === true || process.env.DROP_TEST_SIGNIN === "1" },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
     hooks: { before: nativeClientRegistration },
     databaseHooks: {
