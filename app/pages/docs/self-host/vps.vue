@@ -8,7 +8,7 @@ const STEPS = {
   run: "node --env-file=.env .output/server/index.mjs",
   unit: "[Unit]\nDescription=Drop\nAfter=network.target\n\n[Service]\nUser=drop\nWorkingDirectory=/srv/drop\nEnvironmentFile=/srv/drop/.env\nExecStart=/usr/bin/node .output/server/index.mjs\nRestart=always\n\n[Install]\nWantedBy=multi-user.target",
   enable: "sudo systemctl enable --now drop",
-  caddy: "drop.example.com {\n  reverse_proxy 127.0.0.1:3000\n}",
+  caddy: "drop.example.com {\n  header /f/* Cache-Control \"private, no-store\"\n  reverse_proxy 127.0.0.1:3000\n}",
   smoke: "DROP_URL=https://drop.example.com pnpm test:e2e:deployed",
   update: "git pull\npnpm install\nDROP_HOST=vps pnpm build\npnpm db:migrate:d1\nsudo systemctl restart drop",
   backup: "rsync -a .data/blob/ /backups/blob/",
