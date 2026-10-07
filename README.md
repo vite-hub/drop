@@ -27,10 +27,10 @@
 Under the hood:
 
 - **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and an OAuth 2.1 provider that MCP clients sign in through (dynamic client registration, PKCE, JWT access tokens bound to `/mcp`).
-- **Database** is D1 through `vite-hub/database`: drops, app files, and comments.
+- **Database** is SQLite through `vite-hub/database`: D1 on Cloudflare, Turso (libSQL) on Vercel, Netlify, and Deno Deploy, a SQLite file on a VPS. It holds drops, app files, and comments.
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
 - Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
-- **Code images** come from Shiki as SVG; a single **Browser** screenshot action turns them into PNG, and an hourly **Schedule** deletes them.
+- **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. An hourly **Schedule** deletes them.
 - **MCP** is [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit): one file per tool and prompt in `server/mcp/`, both protocol revisions, and the [Skills extension](https://modelcontextprotocol.io/seps/2640-skills-extension).
 - **Skills** are defined once in `skills/` and served over MCP (`skills/list`, `skill://` resources), at `/.well-known/agent-skills/` ([Discovery v0.2.0](https://github.com/cloudflare/agent-skills-discovery-rfc)), and at the older `/.well-known/skills/`.
 - **Logs** are [evlog](https://www.evlog.dev) wide events: one structured line per request with the caller, the agent, what it did, and why it failed. Workers Logs is on, so they're queryable in the Cloudflare dashboard.
@@ -47,17 +47,31 @@ Under the hood:
    The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. The `/agents` page has the setup for Codex, Cursor, VS Code, and other clients, and lists the agents you've connected.
 3. Ask your agent to drop a plan. It answers with the review link.
 
-MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. The `vitehub-drop` skill comes with the server (`skills/list`); it's also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. The `/docs` page has the details.
+MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. The `vitehub-drop` skill comes with the server (`skills/list`); it's also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. [The docs](https://drop.vitehub.dev/docs) have the details.
 
 ## Host it yourself
 
-Drop is a Nuxt app on Cloudflare Workers. [drop.vitehub.dev](https://drop.vitehub.dev) is one instance anyone can use; you can run your own. Anyone with a GitHub account can sign in and joins as a Member. The GitHub users in `DROP_ADMINS` join as Admin, and admins change roles on `/members`:
+[drop.vitehub.dev](https://drop.vitehub.dev) is one instance anyone can use; you can run your own. `DROP_HOST` picks the host at build time, and [the self-hosting docs](https://drop.vitehub.dev/docs/self-host) have the steps for each:
+
+| Host | Build | Database | Files | Guide |
+| --- | --- | --- | --- | --- |
+| Cloudflare (default) | `pnpm build` | D1 | R2 | [/docs/self-host/cloudflare](https://drop.vitehub.dev/docs/self-host/cloudflare) |
+| Vercel | `DROP_HOST=vercel pnpm build` | Turso | Vercel Blob | [/docs/self-host/vercel](https://drop.vitehub.dev/docs/self-host/vercel) |
+| Netlify | `DROP_HOST=netlify pnpm build` | Turso | Netlify Blobs | [/docs/self-host/netlify](https://drop.vitehub.dev/docs/self-host/netlify) |
+| Deno Deploy | `DROP_HOST=deno pnpm build` | Turso | S3-compatible bucket | [/docs/self-host/deno](https://drop.vitehub.dev/docs/self-host/deno) |
+| VPS (Node) | `DROP_HOST=vps pnpm build` | SQLite file | Local disk | [/docs/self-host/vps](https://drop.vitehub.dev/docs/self-host/vps) |
+
+Only Cloudflare renders PNG code images (Browser Run) and has a distributed rate limiter; elsewhere code images are SVG and rate limits count per instance. Migrations apply with `pnpm db:migrate:remote` (D1) or `pnpm db:migrate:libsql` (Turso or the VPS's SQLite file).
+
+Anyone with a GitHub account can sign in and joins as a Member. The GitHub users in `DROP_ADMINS` join as Admin, and admins change roles on `/members`:
 
 | Role | What they can do |
 | --- | --- |
 | **Admin** | Everything, plus members. |
 | **Editor** | Edit and share any drop. |
 | **Member** | Their own drops. This is the default. |
+
+On Cloudflare:
 
 1. Create a GitHub OAuth app with the callback `https://<your-domain>/api/auth/callback/github`. To use another sign-in provider, edit [server/auth.ts](./server/auth.ts).
 2. Create the Cloudflare resources.
