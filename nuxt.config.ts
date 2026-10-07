@@ -1,17 +1,36 @@
 import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
+import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
 
-export default defineNuxtConfig({
-  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt"],
+/**
+ * Where this build runs, picked at build time: `DROP_HOST=vercel pnpm build`. Cloudflare is the default.
+ * Every host keeps a SQLite-family database, so the migrations in server/databases/migrations apply as they are.
+ */
+const HOSTS = ["cloudflare", "vercel", "netlify", "deno", "vps"] as const
+type Host = typeof HOSTS[number]
+const host = (process.env.DROP_HOST || "cloudflare") as Host
+if (!HOSTS.includes(host)) throw new Error(`DROP_HOST must be one of ${HOSTS.join(", ")}; got "${host}".`)
 
-  vitehub: {
+// Hosted libSQL (Turso) on the serverless hosts, read at runtime. The VPS defaults to a SQLite file in .data/.
+const libsql = (fallback?: string) => ({
+  url: env({ source: env.source(["TURSO_DATABASE_URL", "DATABASE_URL"]), ...(fallback ? { default: fallback } : {}) }),
+  authToken: env({ secret: true, optional: true, source: env.source(["TURSO_AUTH_TOKEN", "DATABASE_AUTH_TOKEN"]) }),
+})
+const files = { serve: { route: "/f" } }
+
+/**
+ * ViteHub per host. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
+ * for Nitro's cache. Elsewhere code images are SVG only, rate limits count per server instance (ViteHub's
+ * in-memory limiter), and Nitro's cache stays in memory.
+ */
+const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
+  cloudflare: {
     preset: "cloudflare",
-    auth: true,
-    blob: { serve: { route: "/f" } },
+    blob: files,
     // Stateless Browser Run actions only (code-image screenshots): no Playwright, no page sessions.
     browser: true,
     database: {
@@ -23,6 +42,37 @@ export default defineNuxtConfig({
     kv: true,
     rateLimit: true,
     schedule: true,
+  },
+  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), Turso, and the hourly cleanup as a Vercel Cron Job.
+  vercel: { preset: "vercel", blob: { ...files, driver: "vercel-blob", access: "private" }, database: { connection: libsql() }, schedule: true },
+  // Netlify Blobs, Turso, and the cleanup as a scheduled function.
+  netlify: { preset: "netlify", blob: files, database: { connection: libsql() }, schedule: true },
+  // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). ViteHub's
+  // Deno preset has no schedule: expired code images stop being served but stay in the bucket.
+  deno: {
+    preset: "deno",
+    blob: { ...files, driver: "s3", bucket: process.env.S3_BUCKET || "drop", endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || "auto" },
+    database: { connection: libsql() },
+  },
+  // One Node process: a SQLite file and files on disk under .data/, in-memory rate limits, an in-process schedule.
+  vps: {
+    preset: "node",
+    blob: { ...files, driver: "fs", base: ".data/blob" },
+    database: { connection: libsql("file:.data/drop.sqlite") },
+    rateLimit: true,
+    schedule: true,
+  },
+}
+
+export default defineNuxtConfig({
+  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt"],
+
+  vitehub: { ...VITEHUB[host], auth: true },
+
+  alias: {
+    // PNG code images are a Browser Run screenshot. Browser Run only exists on Cloudflare, and ViteHub only
+    // generates its runtime module in builds that enable it, so other hosts get a stub that says so.
+    "#code-image-png": fileURLToPath(new URL(`./server/code-image-png/${host === "cloudflare" ? "browser-run" : "unavailable"}.ts`, import.meta.url)),
   },
 
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
@@ -65,7 +115,8 @@ export default defineNuxtConfig({
 
   nitro: {
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
-    storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } },
+    // Other hosts keep Nitro's default in-memory cache.
+    ...(host === "cloudflare" ? { storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } } } : {}),
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.

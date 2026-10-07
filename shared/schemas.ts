@@ -54,7 +54,8 @@ export type CommentInput = v.InferOutput<typeof CommentSchema>
 
 export const CodeImageSchema = v.strictObject({
   code: v.pipe(v.string(), v.minLength(1, "Send some code."), v.maxLength(20_000, "Code images take at most 20,000 characters.")),
-  format: v.optional(v.picklist(["png", "svg"], "Format must be png or svg."), "png"),
+  // No default here: PNG where the Drop can render it (Cloudflare), SVG elsewhere. See server/utils/code-image-store.ts.
+  format: v.optional(v.picklist(["png", "svg"], "Format must be png or svg.")),
   language: v.optional(v.string()),
   scale: v.optional(v.picklist([2, 4, 6], "Scale must be 2, 4, or 6."), 4),
   theme: v.optional(v.string()),

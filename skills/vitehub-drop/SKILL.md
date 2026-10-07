@@ -33,5 +33,5 @@ A small static app is a set of files keyed by path, with an `index.html`. Call `
 
 - `language`: `typescript`, `javascript`, `tsx`, `vue`, `python`, `go`, `rust`, `bash`, `json`, `yaml`, `sql`, `css`, `html`, `markdown`, `diff`, and other common ones (aliases like `ts`, `py`, `sh` work). Omit it for plain text.
 - `theme`: `github-dark` (default), `github-light`, `vitesse-dark`, `vitesse-light`, `one-dark-pro`, `night-owl`, `tokyo-night`, `dracula`, `nord`, `catppuccin-mocha`.
-- `format` accepts `png` (default) or `svg`.
+- `format` accepts `png` or `svg`. PNG is the default on Drops that run on Cloudflare, like drop.vitehub.dev; Drops on other hosts render SVG only, and the tool description says which.
 - `scale` for png accepts `2`, `4` (default), or `6`.
