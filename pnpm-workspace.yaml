@@ -12,6 +12,11 @@ supportedArchitectures:
 
 blockExoticSubdeps: false
 
+# DROP_HOST=vps bundles libSQL's loader, which then requires its native binary (@libsql/linux-x64-gnu and the
+# like) from the app's node_modules at runtime.
+publicHoistPattern:
+  - "@libsql/*"
+
 overrides:
   # Nuxt and Nuxt UI must share one Vue instance.
   vue: 3.5.41

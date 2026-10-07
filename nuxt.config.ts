@@ -45,8 +45,8 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   },
   // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), Turso, and the hourly cleanup as a Vercel Cron Job.
   vercel: { preset: "vercel", blob: { ...files, driver: "vercel-blob", access: "private" }, database: { connection: libsql() }, schedule: true },
-  // Netlify Blobs, Turso, and the cleanup as a scheduled function.
-  netlify: { preset: "netlify", blob: files, database: { connection: libsql() }, schedule: true },
+  // Netlify Blobs, Turso, and the cleanup as a scheduled function (.netlify/v1/functions).
+  netlify: { preset: "netlify", blob: files, database: { connection: libsql() }, schedule: { providerOutput: "standalone" } },
   // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). ViteHub's
   // Deno preset has no schedule: expired code images stop being served but stay in the bucket.
   deno: {
@@ -54,13 +54,15 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     blob: { ...files, driver: "s3", bucket: process.env.S3_BUCKET || "drop", endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || "auto" },
     database: { connection: libsql() },
   },
-  // One Node process: a SQLite file and files on disk under .data/, in-memory rate limits, an in-process schedule.
+  // One Node process: a SQLite file and files on disk under .data/, in-memory rate limits, and the cleanup on a
+  // timer inside the process (its run history in KV files).
   vps: {
     preset: "node",
     blob: { ...files, driver: "fs", base: ".data/blob" },
     database: { connection: libsql("file:.data/drop.sqlite") },
+    kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: true,
-    schedule: true,
+    schedule: { runtime: { driver: "process" } },
   },
 }
 
@@ -122,6 +124,8 @@ export default defineNuxtConfig({
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.
     ...(host === "cloudflare" ? { storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } } } : {}),
+    // Netlify Functions can't load libSQL's native binary; the `netlify` condition picks @libsql/client's HTTP-only build.
+    ...(host === "netlify" ? { exportConditions: ["netlify"] } : {}),
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
