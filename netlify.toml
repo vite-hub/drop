@@ -6,3 +6,11 @@
 [build.environment]
   DROP_HOST = "netlify"
   NODE_VERSION = "24"
+
+[functions]
+  directory = ".netlify/functions-internal"
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/server"
+  status = 200
