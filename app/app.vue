@@ -4,12 +4,12 @@ const origin = useRequestURL().origin
 useSeoMeta({
   titleTemplate: title => (title && title !== "Drop" ? `${title} · Drop` : "Drop"),
   ogSiteName: "Drop",
-  ogTitle: "Drop",
-  ogDescription: "Review what your agents plan. Agents drop docs and small apps; you comment on the exact spot and send the feedback back.",
+  ogTitle: "The shared drive for people and agents",
+  ogDescription: "Drop docs, sites, and small apps. People and agents review, comment, revise, and share every version in one place.",
   ogImage: `${origin}/og.png`,
   ogImageWidth: 1200,
   ogImageHeight: 630,
-  ogImageAlt: "Drop: review what your agents plan.",
+  ogImageAlt: "Drop: the shared drive for people and agents.",
   twitterCard: "summary_large_image",
 })
 </script>
