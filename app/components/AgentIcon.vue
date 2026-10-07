@@ -2,7 +2,7 @@
 // Official mark for known agents (Claude Code, Codex, Cursor…), otherwise a neutral icon by how it connected.
 const props = defineProps<{ name: string; kind?: string }>()
 const logo = computed(() => agentLogo(props.name))
-const fallback = computed(() => ({ agent: "i-lucide-bot", key: "i-lucide-key-round", browser: "i-lucide-user" })[props.kind ?? "browser"] ?? "i-lucide-user")
+const fallback = computed(() => ({ agent: "i-lucide-bot", browser: "i-lucide-user" })[props.kind ?? "browser"] ?? "i-lucide-user")
 </script>
 
 <template>

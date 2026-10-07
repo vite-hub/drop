@@ -3,6 +3,7 @@ import evlog from "evlog/nitro/v3"
 import { env } from "vite-hub/env"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
+const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
 
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt"],
@@ -94,6 +95,10 @@ export default defineNuxtConfig({
   serverHandlers: [
     { route: "/.well-known/agent-skills/**", handler: skillsHandler, lazy: true },
     { route: "/.well-known/skills/**", handler: skillsHandler, lazy: true },
+    ...["oauth-protected-resource", "oauth-authorization-server", "openid-configuration"].flatMap(name => [
+      { route: `/.well-known/${name}`, handler: oauthMetadataHandler, lazy: true },
+      { route: `/.well-known/${name}/**`, handler: oauthMetadataHandler, lazy: true },
+    ]),
   ],
 
   hooks: {

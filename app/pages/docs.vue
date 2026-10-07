@@ -12,7 +12,6 @@ const SECTIONS = [
   ["connect", "Connect an agent"],
   ["mcp", "MCP server"],
   ["docs", "Drop a doc"],
-  ["upload", "Upload API"],
   ["apps", "Drop an app"],
   ["review", "Comments and review"],
   ["sharing", "Sharing and access"],
@@ -27,12 +26,8 @@ const code = "rounded bg-elevated px-1 py-0.5 font-mono text-[12px] text-highlig
 const link = "text-highlighted underline underline-offset-4"
 
 const snippets = {
-  mcp: `claude mcp add --transport http --scope user drop ${origin}/mcp \\\n  --header "Authorization: Bearer $DROP_API_KEY"`,
-  upload: `curl -fsS -H "x-api-key: $DROP_API_KEY" -F file=@plan.md ${origin}/api/files`,
-  uploadResponse: `{\n  "id": "3f2c…",\n  "url": "${origin}/f/8a1e….md",\n  "page": "${origin}/d/3f2c…",\n  "visibility": "private",\n  "version": 1\n}`,
-  revise: `curl -fsS -H "x-api-key: $DROP_API_KEY" \\\n  -F file=@plan.md -F supersedes=3f2c… ${origin}/api/files`,
-  frontMatter: `---\nsupersedes: 3f2c…\n---\n\n# Plan, revised`,
-  app: `curl -fsS -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \\\n  -d '{ "name": "Launch board", "files": { "index.html": "…", "app.js": "…", "data.json": "[…]" } }' \\\n  ${origin}/api/apps`,
+  mcp: `claude mcp add --transport http --scope user drop ${origin}/mcp`,
+  app: `publish_app({\n  name: "Launch board",\n  files: { "index.html": "…", "app.js": "…", "data.json": "[…]" }\n})`,
   clone: "git clone https://github.com/vite-hub/drop my-drop\ncd my-drop && pnpm install",
   env: `# GitHub OAuth app, callback ${origin}/api/auth/callback/github\nGITHUB_CLIENT_ID=\nGITHUB_CLIENT_SECRET=\n# openssl rand -base64 32\nBETTER_AUTH_SECRET=\n# Your GitHub user id (gh api users/<login> --jq .id); comma-separate several admins\nDROP_ADMINS=\n# wrangler d1 create vitehub-drop\nCLOUDFLARE_D1_DATABASE_ID=\nCLOUDFLARE_D1_DATABASE_NAME=vitehub-drop`,
 }
@@ -48,18 +43,14 @@ const snippets = {
         </DocsSection>
 
         <DocsSection id="connect" title="Connect an agent">
-          <p>Both ways start on the <NuxtLink :class="link" to="/agents">Agents</NuxtLink> page:</p>
-          <ul class="list-disc space-y-1 pl-5">
-            <li><strong>MCP</strong>: register Drop's server in Claude Code, Codex, Cursor, or VS Code. Recommended.</li>
-            <li><strong>API key + skill</strong>: <code :class="code">npx skills add {{ origin }}</code> and a key in <code :class="code">DROP_API_KEY</code>.</li>
-          </ul>
-          <p>Name each key after the agent that uses it, like “Claude Code” or “Codex”. Drops made with a key show that name and the agent's logo. <strong>Agent Auth</strong>, where each agent gets its own identity and you approve what it may do, is coming.</p>
+          <p>Agents connect over MCP. Add Drop's server to Claude Code, Codex, Cursor, VS Code, or any MCP client (the <NuxtLink :class="link" to="/agents">Agents</NuxtLink> page has the command for each):</p>
+          <AgentsCodeBlock :code="snippets.mcp" />
+          <p>There's no key to paste. The first time the client connects, it opens Drop in your browser: sign in with GitHub if you haven't, and allow the agent. The client keeps its token, and the agent acts as you. Drops it makes show its name and logo. Disconnect it any time on the Agents page.</p>
         </DocsSection>
 
         <DocsSection id="mcp" title="MCP server">
-          <p>Streamable HTTP at <code :class="code">{{ origin }}/mcp</code>. Speaks MCP <code :class="code">{{ MCP_LATEST }}</code> and answers clients on {{ MCP_LEGACY.join(", ") }}. Authenticate with a Drop API key: <code :class="code">Authorization: Bearer drop_…</code>.</p>
+          <p>Streamable HTTP at <code :class="code">{{ origin }}/mcp</code>. Speaks MCP <code :class="code">{{ MCP_LATEST }}</code> and answers clients on {{ MCP_LEGACY.join(", ") }}. It's an OAuth 2.1 protected resource: clients find Drop's authorization server through <code :class="code">/.well-known/oauth-protected-resource/mcp</code>, register themselves, and send the user through the browser once.</p>
           <p>It also serves the <code :class="code">vitehub-drop</code> skill through the MCP Skills extension (<code :class="code">skills/list</code>, <code :class="code">skill://</code> resources), and at <code :class="code">/.well-known/agent-skills/</code> for agents that discover skills over HTTP.</p>
-          <AgentsCodeBlock :code="snippets.mcp" />
           <div class="overflow-hidden rounded-lg border border-default">
             <table class="w-full table-fixed text-left text-sm">
               <thead>
@@ -81,27 +72,15 @@ const snippets = {
         </DocsSection>
 
         <DocsSection id="docs" title="Drop a doc">
-          <p>Markdown renders as a clean document with tables, task lists, callouts, and Mermaid diagrams. HTML renders as-is, scripts included, in a sandbox with no access to your session.</p>
+          <p>Agents call <code :class="code">create_doc</code> with Markdown, or with a self-contained HTML page (<code :class="code">format: "html"</code>). People can also upload a file or start a doc from the Drops page. Markdown renders as a clean document with tables, task lists, callouts, and Mermaid diagrams. HTML renders as-is, scripts included, in a sandbox with no access to your session.</p>
           <p>To publish a revision, call <code :class="code">create_doc</code> with <code :class="code">supersedes</code>, or add <code :class="code">supersedes:</code> to the front matter. For rich HTML docs, follow the template:</p>
           <ul class="list-disc space-y-1 pl-5">
             <li v-for="rule in PLAN_AUTHORING_GUIDE.split('\n')" :key="rule">{{ rule }}</li>
           </ul>
         </DocsSection>
 
-        <DocsSection id="upload" title="Upload API">
-          <p>Without MCP, agents upload one file per request to <code :class="code">POST /api/files</code> with their key in <code :class="code">x-api-key</code>. Markdown and HTML become docs; images and other files are served as they are. Up to 4 MiB per file.</p>
-          <AgentsCodeBlock :code="snippets.upload" />
-          <p>It returns the new drop. <code :class="code">url</code> serves the raw file under <code :class="code">/f/</code> (old <code :class="code">/i/</code> links redirect there), and <code :class="code">page</code> opens it for review.</p>
-          <AgentsCodeBlock :code="snippets.uploadResponse" />
-          <p>To publish the next version, send <code :class="code">supersedes</code> with the previous drop's id, as a form field or in the front matter. The old version stays in history.</p>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <AgentsCodeBlock :code="snippets.revise" />
-            <AgentsCodeBlock :code="snippets.frontMatter" />
-          </div>
-        </DocsSection>
-
         <DocsSection id="apps" title="Drop an app">
-          <p>Agents publish apps through MCP (<code :class="code">publish_app</code>) or <code :class="code">POST /api/apps</code> with <code :class="code">{ name, files, id? }</code>. Send files keyed by path with an <code :class="code">index.html</code>; relative links, stylesheets, ES modules, and <code :class="code">fetch("data.json")</code> resolve like on any static host.</p>
+          <p>Agents publish apps with <code :class="code">publish_app</code>: files keyed by path, with an <code :class="code">index.html</code>. Relative links, stylesheets, ES modules, and <code :class="code">fetch("data.json")</code> resolve like on any static host.</p>
           <AgentsCodeBlock :code="snippets.app" />
           <p>Publishing with an existing <code :class="code">id</code> creates the next version. People with edit access can change files in the browser and publish too. Up to 200 files and 4 MiB per app.</p>
         </DocsSection>

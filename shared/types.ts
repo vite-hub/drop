@@ -4,7 +4,7 @@ import type { Role } from "./roles"
 export type DropKind = "markdown" | "html" | "image" | "file" | "app"
 export type Visibility = "private" | "shared"
 export type Access = "view" | "comment" | "edit"
-export type ActorKind = "agent" | "key" | "browser"
+export type ActorKind = "agent" | "browser"
 
 export const ACCESS_RANK: Record<Access, number> = { view: 0, comment: 1, edit: 2 }
 export const ACCESS_LABELS: Record<Access, string> = { view: "Can view", comment: "Can comment", edit: "Can edit" }
@@ -85,12 +85,11 @@ export interface Member {
   you: boolean
 }
 
-export interface ApiKeyRow {
+/** An MCP client someone approved on /oauth: it acts as them until disconnected. */
+export interface ConnectedAgent {
   id: string
   name: string
-  start: string | null
-  createdAt: number
-  lastRequest: number | null
+  connectedAt: number | null
 }
 
 export interface Viewer {

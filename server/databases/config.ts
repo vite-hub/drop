@@ -1,8 +1,9 @@
-// Better Auth tables (user, session, account, verification, apikey) plus Drop's own (./drops.ts).
+// Better Auth tables (user, session, account, verification), its OAuth provider's (./oauth.ts), and Drop's own (./drops.ts).
 import { defineDatabase } from 'vite-hub/database'
 import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { blobCleanup, comments, dropFiles, drops } from './drops'
+import { jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource } from './oauth'
 
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
@@ -55,35 +56,9 @@ export const verification = sqliteTable('verification', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).$onUpdate(() => new Date()).notNull()
 }, table => [index('verification_identifier_idx').on(table.identifier)])
 
-// API keys for agents (@better-auth/api-key). Only a hash of each key is stored.
-export const apikey = sqliteTable('apikey', {
-  id: text('id').primaryKey(),
-  configId: text('config_id').default('default').notNull(),
-  name: text('name'),
-  start: text('start'),
-  prefix: text('prefix'),
-  key: text('key').notNull(),
-  referenceId: text('reference_id').notNull(),
-  refillInterval: integer('refill_interval'),
-  refillAmount: integer('refill_amount'),
-  lastRefillAt: integer('last_refill_at', { mode: 'timestamp_ms' }),
-  enabled: integer('enabled', { mode: 'boolean' }).default(true),
-  rateLimitEnabled: integer('rate_limit_enabled', { mode: 'boolean' }).default(true),
-  rateLimitTimeWindow: integer('rate_limit_time_window'),
-  rateLimitMax: integer('rate_limit_max'),
-  requestCount: integer('request_count').default(0),
-  remaining: integer('remaining'),
-  lastRequest: integer('last_request', { mode: 'timestamp_ms' }),
-  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-  permissions: text('permissions'),
-  metadata: text('metadata')
-}, table => [index('apikey_reference_idx').on(table.referenceId), index('apikey_key_idx').on(table.key)])
-
-export { blobCleanup, comments, dropFiles, drops }
+export { blobCleanup, comments, dropFiles, drops, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 export default defineDatabase({
   cloudflare: {},
-  schema: { account, apikey, blobCleanup, comments, dropFiles, drops, session, user, verification }
+  schema: { account, blobCleanup, comments, dropFiles, drops, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })

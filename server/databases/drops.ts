@@ -19,7 +19,7 @@ export const drops = sqliteTable("drops", {
   supersedesId: text("supersedes_id"),
   visibility: text("visibility", { enum: ["private", "shared"] }).notNull().default("private"),
   access: text("access", { enum: ["view", "comment", "edit"] }).notNull().default("comment"),
-  actorKind: text("actor_kind", { enum: ["agent", "key", "browser"] }).notNull(),
+  actorKind: text("actor_kind", { enum: ["agent", "browser"] }).notNull(),
   actorName: text("actor_name").notNull(),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),

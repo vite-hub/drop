@@ -53,7 +53,7 @@ async function signInWithEmail() {
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
 const STEPS = [
-  { n: "01", title: "Connect your agent", body: "One command adds Drop's MCP server. Or hand it an API key and the Drop skill.", snippet: "claude mcp add drop …/mcp" },
+  { n: "01", title: "Connect your agent", body: "One command adds Drop's MCP server. It signs in through your browser once and brings the Drop skill along.", snippet: "claude mcp add drop …/mcp" },
   { n: "02", title: "It drops its work", body: "A plan, a spec, a report, or a small app with its own files. Every drop starts private, with a link.", snippet: "create_doc · publish_app" },
   { n: "03", title: "You review, it revises", body: "Comment on text or a spot in an image. The agent reads open comments and drops the next version.", snippet: "list_comments" },
 ]
@@ -63,11 +63,11 @@ const FEATURES = [
   { icon: "i-lucide-message-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
   { icon: "i-lucide-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view, comment, or edit." },
   { icon: "i-lucide-pencil", title: "Edit in place", body: "A Notion-like editor for docs and a code view for apps, right where you review." },
-  { icon: "i-lucide-plug", title: "MCP built in", body: "Streamable HTTP on the latest spec. Five tools, one API key, no SDK." },
+  { icon: "i-lucide-plug", title: "MCP built in", body: "Streamable HTTP on the latest spec. OAuth sign-in, the skill included, no keys to paste." },
   { icon: "i-lucide-history", title: "Every version kept", body: "Agents drop the next version of a doc or app. Older ones stay one click away." },
 ]
 
-const HOSTED = ["Sign in with GitHub", "Private by default", "MCP and API keys"]
+const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect over MCP"]
 </script>
 
 <template>

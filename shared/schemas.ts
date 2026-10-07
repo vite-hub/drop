@@ -45,15 +45,11 @@ export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 
 export const MemberPatchSchema = v.object({ role: v.optional(v.picklist(ROLES)), banned: v.optional(v.boolean()) })
 
-export const ApiKeySchema = v.object({
-  name: v.pipe(v.string(), v.trim(), v.minLength(1, "Name the key, ideally after the agent."), v.maxLength(60, "Keep it under 60 characters.")),
-})
-
 export const FilePathSchema = v.object({
   path: v.pipe(v.string(), v.trim(), v.minLength(1, "Enter a path."), v.maxLength(300), v.regex(/^(?!\/)(?!.*\.\.)/, "Use a relative path without `..`.")),
 })
 
-export type ApiKeyInput = v.InferOutput<typeof ApiKeySchema>
+export type CodeImageInput = v.InferOutput<typeof CodeImageSchema>
 export type CommentInput = v.InferOutput<typeof CommentSchema>
 
 export const CodeImageSchema = v.strictObject({

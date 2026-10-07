@@ -1,11 +1,12 @@
-import { apiKey } from "@better-auth/api-key"
+import { oauthProvider } from "@better-auth/oauth-provider"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { admin } from "better-auth/plugins"
+import { admin, jwt } from "better-auth/plugins"
 import { eq } from "drizzle-orm"
 import { defineAuth } from "vite-hub/auth"
 import { db, schema } from "vite-hub/database/drizzle"
 import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
+import { nativeClientRegistration } from "./utils/oauth-clients"
 
 /**
  * Who can sign in, and how.
@@ -17,8 +18,12 @@ import { ac, roles } from "./utils/access"
  * share them. The GitHub users listed in `DROP_ADMINS` (numeric ids, from `gh api users/<login> --jq .id`) become
  * admins when their account is created; admins can make anyone else an editor or an admin on the Members page.
  *
+ * Agents have no keys. Drop is an OAuth 2.1 authorization server for its own MCP endpoint (`oauthProvider`):
+ * an MCP client registers itself, opens the browser once, and the person approves it on /oauth (signing in
+ * with GitHub first if needed). The client keeps the token; `jwt` signs it, scoped to `<origin>/mcp`.
+ * `/token` is the JWT plugin's session-to-JWT endpoint, which agents don't need.
+ *
  * Local dev has no GitHub OAuth app, so email and password sign-in is on in `nuxt dev` only.
- * Agents send their API key as `Authorization: Bearer drop_…` (MCP) or `x-api-key: drop_…` (curl).
  *
  * Keep comments outside the options object: ViteHub reads its top-level keys statically.
  */
@@ -28,12 +33,14 @@ export default defineAuth(({ env, requestOrigin }) => ({
   database: drizzleAdapter(db, { provider: "sqlite", schema }),
   secret: env.auth.secret.unseal(),
   route: false,
+  disabledPaths: ["/token"],
   access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
   socialProviders: {
     github: { clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal() },
   },
   emailAndPassword: { enabled: import.meta.dev === true },
   account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
+  hooks: { before: nativeClientRegistration },
   databaseHooks: {
     account: {
       create: {
@@ -47,14 +54,15 @@ export default defineAuth(({ env, requestOrigin }) => ({
   },
   plugins: [
     admin({ ac, roles, defaultRole: "member", adminRoles: ["admin"] }),
-    apiKey({
-      defaultPrefix: "drop_",
-      enableSessionForAPIKeys: true,
-      customAPIKeyGetter: (ctx) => {
-        const header = ctx.headers?.get("x-api-key") ?? ctx.headers?.get("authorization")?.replace(/^Bearer\s+/i, "")
-        return header?.startsWith("drop_") ? header : null
-      },
-      rateLimit: { enabled: false },
+    jwt(),
+    oauthProvider({
+      loginPage: "/oauth",
+      consentPage: "/oauth",
+      scopes: ["openid", "profile", "email", "offline_access"],
+      resources: [`${requestOrigin}/mcp`],
+      enforcePerClientResources: false,
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
     }),
   ],
 }))

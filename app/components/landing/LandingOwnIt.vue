@@ -3,7 +3,7 @@
 const POINTS = [
   "Sign in with GitHub, or swap in any Better Auth provider",
   "Database and file storage provisioned on deploy",
-  "MCP server and API keys for your agents",
+  "MCP server with browser sign-in for your agents",
   "Cloudflare today. ViteHub also targets Vercel, Netlify, Deno, and Node",
 ]
 const CONFIG_FILE = "nuxt.config.ts"

@@ -23,7 +23,7 @@ export function useMembers() {
     members,
     status,
     setRole: (member: Member, role: Role) => role !== member.role && update(member, { role }, `${member.name} is now ${ROLE_LABELS[role]}`, ROLE_SUMMARY[role]),
-    ban: (member: Member) => update(member, { banned: true }, `${member.name} is banned`, "Their sessions and API keys stop working."),
+    ban: (member: Member) => update(member, { banned: true }, `${member.name} is banned`, "Their sessions and connected agents stop working."),
     unban: (member: Member) => update(member, { banned: false }, `${member.name} can sign in again`),
     async remove(member: Member) {
       if (!await confirm({ title: `Remove ${member.name}?`, description: "They lose access. Their drops stay in the workspace.", confirmLabel: "Remove", destructive: true })) return

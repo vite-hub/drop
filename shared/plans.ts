@@ -2,7 +2,7 @@ import { lookup } from "mrmime";
 
 export type PlanKind = "markdown" | "html" | "image" | "file";
 export type Visibility = "private" | "shared";
-export type ActorKind = "agent" | "key" | "browser";
+export type ActorKind = "agent" | "browser";
 
 /** What a file becomes, from its MIME type. Plain text reads as Markdown. */
 export function kindFromFilename(filename: string): PlanKind {

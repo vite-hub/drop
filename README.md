@@ -19,14 +19,14 @@
 
 ## How it works
 
-1. **Agents drop their work** with an API key or over MCP: a plan in Markdown, an HTML report, an image, or a small static app made of files.
+1. **Agents drop their work** over MCP: a plan in Markdown, an HTML report, or a small static app made of files. They sign in through your browser once; there are no keys.
 2. **Every drop starts private.** Only its owner (and the workspace's editors and admins) can open it.
 3. **People review it** full screen: select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit.
 4. **The agent reads the open comments** and drops the next version. Older versions stay in history.
 
 Under the hood:
 
-- **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and API keys.
+- **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and an OAuth 2.1 provider that MCP clients sign in through (dynamic client registration, PKCE, JWT access tokens bound to `/mcp`).
 - **Database** is D1 through `vite-hub/database`: drops, app files, and comments.
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
 - Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
@@ -37,40 +37,17 @@ Under the hood:
 
 ## Use Drop
 
-1. Create an API key at `/agents`. Name it after the agent that uses it (like "Claude Code"); drops it makes show that name and logo.
-2. Connect the agent. The easiest way is MCP:
+1. Sign in at [drop.vitehub.dev](https://drop.vitehub.dev) with GitHub.
+2. Add Drop's MCP server to your agent:
 
    ```sh
-   claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp \
-     --header "Authorization: Bearer $DROP_API_KEY"
+   claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp
    ```
 
-   Or install the skill, which uses the HTTP API:
+   The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. The `/agents` page has the setup for Codex, Cursor, VS Code, and other clients, and lists the agents you've connected.
+3. Ask your agent to drop a plan. It answers with the review link.
 
-   ```sh
-   npx skills add https://drop.vitehub.dev
-   ```
-
-3. Drop a file:
-
-   ```sh
-   curl --fail-with-body -H "x-api-key: $DROP_API_KEY" \
-     -F "file=@plan.md" https://drop.vitehub.dev/api/files
-   ```
-
-   This returns `{ id, url, page, visibility, version }`. `page` is the review page and `url` serves the file. Add `-F supersedes=<id>` to publish the next version.
-
-MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, plus the `address_feedback` prompt. MCP clients that support skills get `vitehub-drop` from `skills/list`; others can install it with `npx skills add`. The `/docs` page lists every endpoint.
-
-### Create a code image
-
-```sh
-curl --fail-with-body https://drop.vitehub.dev/api/code \
-  -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \
-  --data '{"code":"const answer: number = 42","language":"typescript","theme":"github-dark","format":"png","scale":4}'
-```
-
-It returns `{ url, expiresAt }`. The image is public and lasts five minutes; drop it to keep it.
+MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. The `vitehub-drop` skill comes with the server (`skills/list`); it's also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. The `/docs` page has the details.
 
 ## Host it yourself
 
@@ -100,10 +77,10 @@ Drop is a Nuxt app on Cloudflare Workers. [drop.vitehub.dev](https://drop.vitehu
    pnpm run deploy
    ```
 
-4. Run the smoke test with a key from `/agents`:
+4. Run the smoke test. It checks the public pages, the OAuth discovery documents, and that `/mcp` asks for sign-in:
 
    ```sh
-   DROP_URL=https://<your-domain> DROP_API_KEY=drop_… pnpm test:e2e:deployed
+   DROP_URL=https://<your-domain> pnpm test:e2e:deployed
    ```
 
 ### Develop locally
