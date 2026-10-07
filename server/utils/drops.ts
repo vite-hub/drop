@@ -109,8 +109,8 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
 }
 
 /**
- * Runs statements in one transaction. Every driver ViteHub picks (D1, libSQL, the dev SQLite proxy) has
- * Drizzle's `batch()`, but `db` is typed as their common base, which leaves it out.
+ * Runs statements in one transaction. The SQLite drivers ViteHub picks expose Drizzle's `batch()`,
+ * but `db` is typed as their common base, which leaves it out.
  */
 const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
 

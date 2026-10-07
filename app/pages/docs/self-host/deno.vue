@@ -5,8 +5,8 @@ const STEPS = {
   clone: "npx giget gh:vite-hub/drop my-drop\ncd my-drop\npnpm install",
   database: "pnpm exec wrangler d1 create vitehub-drop-deno   # copy the id into CLOUDFLARE_D1_DATABASE_ID",
   migrate: "CLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-deno pnpm db:migrate:d1",
-  bucket: "pnpm exec wrangler r2 bucket create drop-files",
-  build: "DROP_HOST=deno S3_BUCKET=drop-files S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com pnpm build",
+  bucket: "pnpm exec wrangler r2 bucket create vitehub-drop-deno",
+  build: "DROP_HOST=deno S3_BUCKET=vitehub-drop-deno S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com pnpm build",
   deploy: "DENO_DEPLOY_ORG=<your-org> DENO_DEPLOY_APP=my-drop node .output/deploy.mjs",
   env: "deno deploy env add --org <your-org> --app my-drop CLOUDFLARE_ACCOUNT_ID \"…\"\ndeno deploy env add --org <your-org> --app my-drop CLOUDFLARE_API_TOKEN \"…\" --secret\ndeno deploy env add --org <your-org> --app my-drop CLOUDFLARE_D1_DATABASE_ID \"…\"\ndeno deploy env add --org <your-org> --app my-drop CLOUDFLARE_D1_DATABASE_NAME \"vitehub-drop-deno\"\ndeno deploy env add --org <your-org> --app my-drop AWS_ACCESS_KEY_ID \"…\"\ndeno deploy env add --org <your-org> --app my-drop AWS_SECRET_ACCESS_KEY \"…\" --secret\ndeno deploy env add --org <your-org> --app my-drop GITHUB_CLIENT_ID \"…\"\ndeno deploy env add --org <your-org> --app my-drop GITHUB_CLIENT_SECRET \"…\" --secret\ndeno deploy env add --org <your-org> --app my-drop BETTER_AUTH_SECRET \"$(openssl rand -base64 32)\" --secret\ndeno deploy env add --org <your-org> --app my-drop DROP_ADMINS \"…\"",
   smoke: "DROP_URL=https://my-drop.<your-org>.deno.net pnpm test:e2e:deployed",
@@ -67,7 +67,6 @@ const STEPS = {
         :extra="[
           ['CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN', 'Cloudflare account id and an account API token with D1 edit access.'],
           ['CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME', 'The id and name of vitehub-drop-deno.'],
-          ['CLOUDFLARE_API_TOKEN', 'Cloudflare account API token with D1 edit access.'],
           ['S3_BUCKET, S3_ENDPOINT, S3_REGION', 'The bucket, its endpoint, and its region (auto for R2). Read at build time.'],
           ['AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY', 'The bucket\'s access key.'],
         ]"
