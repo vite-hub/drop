@@ -10,11 +10,11 @@ const emit = defineEmits<{ submit: [body: string]; cancel: []; resolve: [id: str
 const body = ref("")
 const busy = ref(false)
 const viewport = useWindowSize()
-const width = 320
+const width = computed(() => Math.min(320, Math.max(0, viewport.width.value - 16)))
 const style = computed(() => {
-  const left = Math.min(Math.max(8, props.x), viewport.width.value - width - 8)
+  const left = Math.min(Math.max(8, props.x), Math.max(8, viewport.width.value - width.value - 8))
   const top = Math.min(Math.max(56, props.y + 8), viewport.height.value - 240)
-  return { left: `${left}px`, top: `${top}px`, width: `${width}px` }
+  return { left: `${left}px`, top: `${top}px`, width: `${width.value}px` }
 })
 
 function send() {

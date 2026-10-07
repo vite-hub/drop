@@ -16,7 +16,19 @@ const dark = computed(() => colorMode.value === "dark")
 const toggleTheme = () => (colorMode.preference = dark.value ? "light" : "dark")
 
 // Back to where the auth guard sent you from; only same-site paths, never a full URL.
-const next = computed(() => (typeof route.query.redirect === "string" && route.query.redirect.startsWith("/") && !route.query.redirect.startsWith("//") ? route.query.redirect : "/drops"))
+const appOrigin = useRequestURL().origin
+const next = computed(() => {
+  const value = route.query.redirect
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/drops"
+  try {
+    const resolved = new URL(value, appOrigin)
+    if (resolved.origin !== appOrigin) return "/drops"
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`
+  }
+  catch {
+    return "/drops"
+  }
+})
 
 async function signInWithGitHub() {
   const { error } = await signIn.social({ provider: "github", callbackURL: next.value })

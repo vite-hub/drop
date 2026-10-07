@@ -5,8 +5,8 @@ import type { Access, DropSummary, Visibility } from "#shared/types"
  * and the Drops page; actions patch it after the server agrees, or refresh it when the server computes fields.
  */
 export function useDrops() {
-  const { data: drops, status, refresh } = useApi<DropSummary[]>("/api/drops", { key: "drops", default: () => [] })
-  return { drops, status, refresh, ...useDropActions() }
+  const { data: drops, status, error, refresh } = useApi<DropSummary[]>("/api/drops", { key: "drops", default: () => [] })
+  return { drops, status, error, refresh, ...useDropActions() }
 }
 
 /**

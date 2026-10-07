@@ -222,6 +222,21 @@ export const EDITOR_CSS = `
  */
 export const EDITOR_SCRIPT = String.raw`
 const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
+const promptResults = new Map();
+let nextPromptId = 0;
+window.addEventListener("message", (event) => {
+  const message = event.data;
+  if (!message || !message.__drop || event.source !== parent || message.type !== "edit-prompt-result") return;
+  const resolve = promptResults.get(message.requestId);
+  if (!resolve) return;
+  promptResults.delete(message.requestId);
+  resolve(message.value ?? null);
+});
+const askPrompt = (initial) => new Promise((resolve) => {
+  const requestId = ++nextPromptId;
+  promptResults.set(requestId, resolve);
+  post({ type: "edit-prompt", requestId, initial });
+});
 const raw = JSON.parse(document.getElementById("drop-source").textContent);
 // Front matter (title, supersedes) is metadata, not content: keep it out of the editor and put it back on save.
 const frontmatter = (raw.match(/^---\n[\s\S]*?\n---\n?/) || [""])[0];
@@ -281,11 +296,11 @@ try {
       const b = document.createElement("button");
       b.textContent = text; b.title = title;
       if (editor.isActive(name, attrs)) b.classList.add("active");
-      b.onmousedown = (e) => {
+      b.onmousedown = async (e) => {
         e.preventDefault();
         if (name === "link") {
           const previous = editor.getAttributes("link").href || "";
-          const href = prompt("Link URL", previous);
+          const href = await askPrompt(previous);
           if (href === null) return;
           href ? editor.chain().focus().extendMarkRange("link").setLink({ href }).run() : editor.chain().focus().unsetLink().run();
         } else run(editor.chain().focus()).run();
@@ -355,12 +370,10 @@ try {
     else if (e.key === "Escape") { e.preventDefault(); slash = null; menu.classList.remove("on"); }
   }, true);
 
-  let timer = 0;
   editor.on("update", () => {
     picked = 0;
     renderMenu();
-    clearTimeout(timer);
-    timer = setTimeout(() => post({ type: "edit-change", markdown: withFrontmatter(editor.getMarkdown()) }), 250);
+    post({ type: "edit-change", markdown: withFrontmatter(editor.getMarkdown()) });
   });
   editor.on("selectionUpdate", () => { renderMenu(); renderBar(); });
   editor.on("blur", () => setTimeout(() => { bar.classList.remove("on"); menu.classList.remove("on"); }, 120));

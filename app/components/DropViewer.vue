@@ -59,6 +59,11 @@ const srcdoc = computed(() => {
   return planDocument(drop.value.kind as PlanKind, drop.value.content ?? "", dark.value, drop.value.html)
 })
 
+// Keep the iframe's initial source in sync before a theme rebuild, without reloading it for each edit.
+watch(dark, () => {
+  if (docEdit.value?.mode === "rich") editorSource.value = docEdit.value.text
+}, { flush: "sync" })
+
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const selection = ref<Selection | null>(null)
 const lightbox = ref<Lightbox | null>(null)
@@ -71,6 +76,9 @@ const pageComments = computed(() => (isApp.value ? comments.value.filter(comment
 const { ready, send } = useDropFrame(frame, (message, rect) => {
   if (message.type === "navigate" && isApp.value) page.value = message.path
   if (message.type === "copy") void copy(message.text, "Code copied")
+  if (message.type === "edit-prompt") {
+    void prompt({ title: "Insert link", label: "URL", initial: message.initial, confirmLabel: "Insert" }).then(value => send({ type: "edit-prompt-result", requestId: message.requestId, value }))
+  }
   if (message.type === "edit-change" && docEdit.value) docEdit.value.text = message.markdown
   if (message.type === "edit-save") void editor.save()
   if (message.type === "edit-error" && docEdit.value) {
@@ -115,6 +123,7 @@ function startEdit() {
 const cancelEdit = editor.cancel
 const save = editor.save
 const togglePanel = panel.toggle
+const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
 
 async function addFile() {
   const path = await editor.addFile(await prompt({ title: "New file", label: "Path", placeholder: "components/button.js", confirmLabel: "Add File", schema: FilePathSchema.entries.path }))
@@ -196,27 +205,28 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
             <div v-if="row.folder" class="flex h-7 items-center gap-1.5 text-muted" :style="{ paddingLeft: `${12 + row.depth * 12}px` }">
               <UIcon name="i-lucide-folder" class="size-3.5" />{{ row.name }}
             </div>
-            <button
-              v-else
-              class="group flex h-7 w-full cursor-pointer items-center gap-1.5 pr-2 text-left font-mono text-xs hover:bg-elevated"
-              :class="(view === 'code' && file === row.path) || (view === 'preview' && page === row.path) ? 'bg-elevated text-highlighted' : 'text-muted'"
-              :style="{ paddingLeft: `${12 + row.depth * 12}px` }"
-              type="button"
-              @click="openFile(row.path)"
-            >
-              <UIcon name="i-lucide-file" class="size-3.5 shrink-0" />
-              <span class="truncate">{{ row.name }}</span>
-              <span v-if="drafts && drafts[row.path] !== drop.files?.[row.path]" aria-label="Changed" class="ml-auto size-1.5 shrink-0 rounded-full bg-inverted" />
-              <span
+            <div v-else class="group flex h-7 items-center hover:bg-elevated">
+              <button
+                class="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-1.5 pr-2 text-left font-mono text-xs"
+                :class="(view === 'code' && file === row.path) || (view === 'preview' && page === row.path) ? 'bg-elevated text-highlighted' : 'text-muted'"
+                :style="{ paddingLeft: `${12 + row.depth * 12}px` }"
+                type="button"
+                @click="openFile(row.path)"
+              >
+                <UIcon name="i-lucide-file" class="size-3.5 shrink-0" />
+                <span class="truncate">{{ row.name }}</span>
+                <span v-if="drafts && drafts[row.path] !== drop.files?.[row.path]" aria-label="Changed" class="ml-auto size-1.5 shrink-0 rounded-full bg-inverted" />
+              </button>
+              <button
                 v-if="row.path.endsWith('.html')"
                 :aria-label="`Source of ${row.name}`"
-                class="ml-auto hidden size-5 place-items-center rounded text-muted group-hover:grid hover:text-highlighted"
-                role="button"
-                @click.stop="file = row.path; view = 'code'"
+                class="grid size-5 shrink-0 place-items-center rounded text-muted opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-highlighted"
+                type="button"
+                @click="file = row.path; view = 'code'"
               >
                 <UIcon name="i-lucide-code" class="size-3" />
-              </span>
-            </button>
+              </button>
+            </div>
           </li>
         </ul>
         <div v-if="drop.canEdit && !drafts" class="border-t border-default p-2">
@@ -264,8 +274,8 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
             <UButton v-if="owner" color="neutral" :icon="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" :label="drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'shared' ? 'outline' : 'solid'" @click="shareOpen = true" />
             <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
             <span class="relative">
-              <UButton :aria-label="sideOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="sideOpen" color="neutral" icon="i-lucide-panel-right" :variant="sideOpen ? 'soft' : 'ghost'" @click="togglePanel" />
-              <span v-if="openCount && !sideOpen" class="pointer-events-none absolute top-1.5 right-1.5 size-1.5 rounded-full bg-inverted ring-2 ring-(--ui-bg)" />
+              <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-lucide-panel-right" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />
+              <span v-if="openCount && !panelOpen" class="pointer-events-none absolute top-1.5 right-1.5 size-1.5 rounded-full bg-inverted ring-2 ring-(--ui-bg)" />
             </span>
           </template>
         </template>
