@@ -99,7 +99,7 @@ async function onPick(file: File) {
       <UIcon name="i-lucide-circle-alert" class="size-6 text-error" />
       <p class="mt-3 font-medium text-highlighted">Couldn't load your drops</p>
       <p class="mt-1 text-sm text-muted">Try again in a moment.</p>
-      <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh" />
+      <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh()" />
     </div>
 
     <div v-else-if="!drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
