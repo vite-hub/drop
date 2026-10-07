@@ -1,0 +1,34 @@
+diff --git a/dist/config-fGBGQo_p.js b/dist/config-fGBGQo_p.js
+index 6ac38eb023b76a009d405ea7bca2557532f5467a..3159ec27897b814efb05dc712465ce302151ef40 100644
+--- a/dist/config-fGBGQo_p.js
++++ b/dist/config-fGBGQo_p.js
+@@ -833,8 +833,16 @@ function resolveDBViteConfig(options, rootDir = process.cwd(), discovery = {}) {
+ 		const generatedSchemaFile = createGeneratedSchemaFile(rootDir, definition.name);
+ 		generatedDrizzleConfigFilesByDatabase[definition.name] = createGeneratedDrizzleConfigFile(rootDir, definition.name);
+ 		generatedSchemaFilesByDatabase[definition.name] = generatedSchemaFile;
++		const optionCloudflare = options?.driver === "d1" ? {
++			...typeof options.binding !== "undefined" ? { binding: options.binding } : {},
++			...typeof options.databaseId !== "undefined" ? { databaseId: options.databaseId } : {},
++			...typeof options.databaseName !== "undefined" ? { databaseName: options.databaseName } : {},
++			...typeof options.http !== "undefined" ? { http: options.http } : {},
++			...typeof options.cloudflare?.http !== "undefined" ? { http: options.cloudflare.http } : {}
++		} : void 0;
++		const cloudflare = optionCloudflare ? { ...definitionCloudflare.value, ...optionCloudflare } : definitionCloudflare.value;
+ 		databases[definition.name] = {
+-			cloudflare: normalizeCloudflareConfig(definitionCloudflare.value, definition.name, migrationsDir),
++			cloudflare: normalizeCloudflareConfig(cloudflare, definition.name, migrationsDir),
+ 			connection: resolveDefinitionConnection(definition.handler, definition.name, options?.connection),
+ 			dialect: "sqlite",
+ 			drizzle: {},
+diff --git a/dist/nuxt.js b/dist/nuxt.js
+index 7248bec899783bbde4428784bfe85a8a6b127c46..66e545cf26870d06f681dd9f969f01e74f9dc9b9 100644
+--- a/dist/nuxt.js
++++ b/dist/nuxt.js
+@@ -198,6 +198,7 @@ function resolveDatabaseViteOptions(options) {
+ 		viteOptions.binding = options.binding;
+ 		viteOptions.databaseId = options.databaseId;
+ 		viteOptions.databaseName = options.databaseName;
++		viteOptions.http = options.cloudflare?.http ?? options.http;
+ 		viteOptions.local = options.local;
+ 		viteOptions.migrationsTable = options.migrationsTable;
+ 		viteOptions.previewDatabaseId = options.previewDatabaseId;
