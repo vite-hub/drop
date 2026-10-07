@@ -8,7 +8,7 @@
   NODE_VERSION = "24"
 
 [functions]
-  directory = ".netlify/functions-internal"
+  directory = ".netlify/functions-internal/server"
 
 [[redirects]]
   from = "/*"
