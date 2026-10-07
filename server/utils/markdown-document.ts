@@ -1,5 +1,7 @@
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
+import { log } from "evlog"
+import { defineCachedFunction } from "nitro/cache"
 import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
 import components from "@comark/html/plugins/components"
@@ -7,6 +9,8 @@ import frontmatter from "@comark/html/plugins/frontmatter"
 import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
+import { escapeUTF8 as escapeHtml } from "entities"
+import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
 
 const ALLOWED_TAGS = "a alert blockquote br callout code del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s span strong table tbody td th thead tip tr ul warning".split(" ")
 const MAX_MERMAID_DIAGRAMS = 4
@@ -32,14 +36,6 @@ const plugins = [
 
 const parseMarkdown = createMarkdownParser({ plugins, registerDefaultPlugins: false })
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;")
-}
 
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
@@ -59,7 +55,7 @@ function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): str
 
 function supersedesHref(value: unknown): string | undefined {
   if (typeof value !== "string") return
-  if (/^\/i\/[0-9a-f-]+\.(?:md|markdown)$/i.test(value)) return value
+  if (/^\/[fi]\/[0-9a-f-]+\.(?:md|markdown)$/i.test(value)) return value
 
   try {
     const url = new URL(value)
@@ -93,18 +89,15 @@ function createMermaidRenderer(): NodeHandler {
   }
 }
 
-export async function renderMarkdownDocument(markdown: string, pathname: string, styles: string): Promise<string> {
-  let title = "Untitled document"
-  let revision = ""
-  let body: string
-
+/**
+ * The one Markdown renderer: Comark with front matter, alerts, task lists, server-rendered Mermaid SVG, and a
+ * tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
+ */
+export async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string }> {
   try {
     const document = await parseMarkdown(markdown)
-    title = documentTitle(document)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
-    if (supersedes)
-      revision = `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
-
+    const revision = supersedes ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>` : ""
     const content = await renderHtmlFromDocument(document, {
       components: {
         alert: renderCallout,
@@ -116,13 +109,25 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
         warning: renderCallout,
       },
     })
-    body = content || '<p class="empty-document">This document is empty.</p>'
+    return { title: documentTitle(document), html: revision + (content || '<p class="empty-document">This document is empty.</p>') }
   }
   catch (error) {
-    console.error(JSON.stringify({ counter: "markdown_render_failure", error: error instanceof Error ? error.message : "Unknown error" }))
-    body = `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>`
+    log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })
+    return { title: "Untitled document", html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>` }
   }
+}
 
+/**
+ * Blobs never change once uploaded, so a render is keyed by its blob key and cached for a month in the Worker's
+ * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
+ */
+export const renderMarkdownCached = defineCachedFunction(
+  (_key: string, markdown: string) => renderMarkdownBody(markdown),
+  { name: "markdown", getKey: (key: string) => key, maxAge: 60 * 60 * 24 * 30 },
+)
+
+export async function renderMarkdownDocument(markdown: string, pathname: string, key: string): Promise<string> {
+  const { title, html: body } = await renderMarkdownCached(key, markdown)
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -131,11 +136,11 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <title>${escapeHtml(title)} · Drop</title>
-  <style>${styles}</style>
+  <style>${TYPESET_CSS}${CALLOUT_CSS}</style>
 </head>
 <body>
   <main>
-    ${revision}<article class="typeset typeset-compact">${body}</article>
+    <article class="typeset typeset-compact">${body}</article>
   </main>
   <footer class="document-footer">
     <a href="https://drop.vitehub.dev">Built with drop.vitehub.dev</a>

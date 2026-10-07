@@ -1,60 +1,130 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
+// DROP_URL=<deployment> DROP_API_KEY=drop_… pnpm test:e2e:deployed
 const origin = new URL(process.env.DROP_URL ?? "https://drop.vitehub.dev")
+const key = process.env.DROP_API_KEY
+assert.ok(key?.startsWith("drop_"), "Set DROP_API_KEY to a key created at /agents.")
+const auth = { "x-api-key": key }
+const timeout = () => AbortSignal.timeout(30_000)
 const filesEndpoint = new URL("/api/files", origin)
-const homepage = await fetch(origin, { signal: AbortSignal.timeout(30_000) })
 
+const homepage = await fetch(origin, { signal: timeout() })
 assert.equal(homepage.status, 200)
 
-const mediumZoom = await fetch(new URL("/vendor/medium-zoom/medium-zoom.min.js", origin), { signal: AbortSignal.timeout(30_000) })
+const mediumZoom = await fetch(new URL("/vendor/medium-zoom/medium-zoom.min.js", origin), { signal: timeout() })
 assert.equal(mediumZoom.status, 200)
 assert.match(await mediumZoom.text(), /medium-zoom-image/)
 
+// Uploading needs a key.
+const anonymous = new FormData()
+anonymous.set("file", new File(["# nope"], "nope.md", { type: "text/markdown" }))
+assert.equal((await fetch(filesEndpoint, { body: anonymous, method: "POST", signal: timeout() })).status, 401)
+
 const form = new FormData()
-form.set("file", new File([await readFile(new URL("../../public/og-vitehub-drop.png", import.meta.url))], "og-vitehub-drop.png"))
+form.set("file", new File([await readFile(new URL("../../public/og.png", import.meta.url))], "og.png"))
+const upload = await (await fetch(filesEndpoint, { body: form, headers: auth, method: "POST", signal: timeout() })).json()
+assert.match(new URL(upload.url).pathname, /^\/f\/[0-9a-f-]+\.png$/)
+assert.equal(upload.visibility, "private")
 
-const { url } = await (await fetch(filesEndpoint, { body: form, method: "POST", signal: AbortSignal.timeout(30_000) })).json()
-assert.equal(new URL(url).pathname.endsWith(".png"), true)
-const image = await fetch(new URL(url, origin), { signal: AbortSignal.timeout(30_000) })
-const stats = await fetch(new URL("/api/stats", origin), { signal: AbortSignal.timeout(30_000) })
-
+// Private: the owner's key reads it, everyone else gets a 404.
+assert.equal((await fetch(upload.url, { signal: timeout() })).status, 404)
+const image = await fetch(upload.url, { headers: auth, signal: timeout() })
 assert.equal(image.status, 200)
 assert.equal(image.headers.get("content-type"), "image/png")
-assert.ok(await stats.json() > 0)
+
+// Shared: anyone with the link.
+const share = await fetch(new URL(`/api/drops/${upload.id}`, origin), {
+  body: JSON.stringify({ visibility: "shared" }),
+  headers: { ...auth, "content-type": "application/json" },
+  method: "PATCH",
+  signal: timeout(),
+})
+assert.equal(share.status, 200)
+assert.equal((await fetch(upload.url, { signal: timeout() })).status, 200)
+
+// Old /i/ links redirect to /f/.
+const legacy = await fetch(new URL(new URL(upload.url).pathname.replace(/^\/f\//, "/i/"), origin), { redirect: "manual", signal: timeout() })
+assert.equal(legacy.status, 301)
+assert.equal(new URL(legacy.headers.get("location"), origin).pathname, new URL(upload.url).pathname)
 
 const markdownSource = "---\ntitle: Smoke-test plan\n---\n\n# Smoke-test plan\n\n```mermaid\ngraph LR\n  Upload --> Render\n```\n"
 const markdownForm = new FormData()
 markdownForm.set("file", new File([markdownSource], "plan.md", { type: "text/markdown" }))
-const markdownUpload = await fetch(filesEndpoint, { body: markdownForm, method: "POST", signal: AbortSignal.timeout(30_000) })
+const markdownUpload = await fetch(filesEndpoint, { body: markdownForm, headers: auth, method: "POST", signal: timeout() })
 assert.equal(markdownUpload.status, 200)
 
 const markdownUrl = new URL((await markdownUpload.json()).url, origin)
-assert.match(markdownUrl.pathname, /^\/i\/[0-9a-f-]+\.md$/)
+assert.match(markdownUrl.pathname, /^\/f\/[0-9a-f-]+\.md$/)
 
-const markdownPage = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })
+const markdownPage = await fetch(markdownUrl, { headers: auth, signal: timeout() })
 assert.equal(markdownPage.status, 200)
 assert.equal(markdownPage.headers.get("content-type"), "text/html; charset=utf-8")
+assert.equal(markdownPage.headers.get("cache-control"), "private, no-store")
 assert.match(await markdownPage.text(), /<div class="mermaid"><svg/)
 assert.match(markdownPage.headers.get("content-security-policy"), /script-src 'self'/)
 
 markdownUrl.search = "?raw"
-const markdownRaw = await fetch(markdownUrl, { signal: AbortSignal.timeout(30_000) })
+const markdownRaw = await fetch(markdownUrl, { headers: auth, signal: timeout() })
 assert.equal(markdownRaw.status, 200)
 assert.match(markdownRaw.headers.get("content-type") ?? "", /^text\/markdown/)
 assert.equal(await markdownRaw.text(), markdownSource)
 
+// Raw HTML never runs on Drop's origin: the blob route serves it under a CSP sandbox.
+const htmlForm = new FormData()
+htmlForm.set("file", new File(["<!doctype html><script>fetch('/api/me')</script>"], "report.html", { type: "text/html" }))
+const htmlUpload = await fetch(filesEndpoint, { body: htmlForm, headers: auth, method: "POST", signal: timeout() })
+assert.equal(htmlUpload.status, 200)
+const htmlRaw = new URL((await htmlUpload.json()).url, origin)
+htmlRaw.search = "?raw"
+const htmlRawResponse = await fetch(htmlRaw, { headers: auth, signal: timeout() })
+assert.equal(htmlRawResponse.status, 200)
+assert.match(htmlRawResponse.headers.get("content-security-policy") ?? "", /^sandbox/)
+
+// MCP (2026-07-28): the same key as a bearer token; the protocol version rides in each request's _meta.
+const mcp = async (method, params = {}) => (await fetch(new URL("/mcp", origin), {
+  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientInfo": { name: "e2e", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } }),
+  headers: { "authorization": `Bearer ${key}`, "content-type": "application/json", "accept": "application/json, text/event-stream", "mcp-protocol-version": "2026-07-28", "mcp-method": method, ...(params.name || params.uri ? { "mcp-name": params.name ?? params.uri } : {}) },
+  method: "POST",
+  signal: timeout(),
+})).json()
+assert.ok((await mcp("server/discover")).result.capabilities.extensions["io.modelcontextprotocol/skills"])
+assert.deepEqual((await mcp("tools/list")).result.tools.map(tool => tool.name), ["list_drops", "read_drop", "list_comments", "create_doc", "publish_app"])
+assert.match((await mcp("tools/call", { name: "create_doc", arguments: { markdown: "# From MCP" } })).result.content[0].text, /^Dropped privately: /)
+const [skill] = (await mcp("skills/list")).result.skills
+assert.equal(skill.frontmatter.name, "vitehub-drop")
+assert.match((await mcp("resources/read", { uri: skill.uri })).result.contents[0].text, /^---\nname: vitehub-drop/)
+
+// Agent Skills Discovery v0.2.0: the archive's digest matches the index.
+const index = await (await fetch(new URL("/.well-known/agent-skills/index.json", origin), { signal: timeout() })).json()
+assert.equal(index.$schema, "https://schemas.agentskills.io/discovery/0.2.0/schema.json")
+const archive = new Uint8Array(await (await fetch(new URL(index.skills[0].url, origin), { signal: timeout() })).arrayBuffer())
+const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", archive)), byte => byte.toString(16).padStart(2, "0")).join("")
+assert.equal(index.skills[0].digest, `sha256:${hash}`)
+
+// SVG comes straight from Shiki, no browser involved.
+const svgResponse = await fetch(new URL("/api/code", origin), {
+  body: JSON.stringify({ code: "const answer = 42", language: "ts", format: "svg" }),
+  headers: { ...auth, "content-type": "application/json" },
+  method: "POST",
+  signal: timeout(),
+})
+assert.equal(svgResponse.status, 200)
+const svgImage = await fetch(new URL((await svgResponse.json()).url, origin), { signal: timeout() })
+assert.equal(svgImage.headers.get("content-type"), "image/svg+xml")
+assert.match(await svgImage.text(), /^<svg/)
+assert.equal((await fetch(new URL(`/f/code-images/${Date.now() - 1000}/expired.svg`, origin), { signal: timeout() })).status, 404)
+
+// PNG is one Browser Run screenshot of that SVG.
 const codeResponse = await fetch(new URL("/api/code", origin), {
   body: JSON.stringify({ code: "const answer: number = 42", language: "typescript", theme: "nuxt" }),
-  headers: { "content-type": "application/json" },
+  headers: { ...auth, "content-type": "application/json" },
   method: "POST",
   signal: AbortSignal.timeout(120_000),
 })
 assert.equal(codeResponse.status, 200)
 
-const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), {
-  signal: AbortSignal.timeout(30_000),
-})
+const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), { signal: timeout() })
 assert.equal(codeImage.status, 200)
 assert.equal(codeImage.headers.get("content-type"), "image/png")
 assert.deepEqual(

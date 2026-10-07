@@ -4,8 +4,11 @@
 .pnpm-store/
 .pnpm-patches/
 .vitehub/
+app/.vitehub
 .vercel/
 .wrangler/
 .env*
 dist/
 node_modules/
+.nuxt/
+!.env.example

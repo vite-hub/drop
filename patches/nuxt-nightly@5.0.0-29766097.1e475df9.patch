@@ -1,0 +1,13 @@
+diff --git a/dist/app/utils.js b/dist/app/utils.js
+index ed4cab40ef4bdccc134dd143d5864a36ba014903..1a7bef10d89c0e908ca7cc42a3e14f6ffaff2abc 100644
+--- a/dist/app/utils.js
++++ b/dist/app/utils.js
+@@ -8,7 +8,7 @@ const BOT_RE = /bot\b|chrome-lighthouse|facebookexternalhit|google\b/i;
+ function isBotUserAgent(userAgent) {
+ 	return BOT_RE.test(userAgent);
+ }
+-const distURL = import.meta.url.replace(/\/app\/.*$/, "/");
++const distURL = import.meta.dev ? import.meta.url.replace(/\/app\/.*$/, "/") : "";
+ function getUserTrace() {
+ 	if (!import.meta.dev) return [];
+ 	const trace = captureStackTrace();

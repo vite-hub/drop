@@ -1,0 +1,68 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/*
+ * Executor's grayscale system (UsefulSoftwareCo/executor): near-neutral surfaces, hairlines over shadows,
+ * Geist + Geist Mono, one filled button per view, destructive red as the only hue.
+ */
+@theme static {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root {
+  --ui-primary: #0a0a0a;
+  --ui-bg: #ffffff;
+  --ui-bg-muted: #fafafa;
+  --ui-bg-elevated: #f5f5f5;
+  --ui-bg-accented: #ededed;
+  --ui-text: #111111;
+  --ui-text-highlighted: #0a0a0a;
+  --ui-text-muted: #666666;
+  --ui-text-dimmed: #8f8f8f;
+  --ui-text-toned: #444444;
+  --ui-border: #eaeaea;
+  --ui-border-muted: #f0f0f0;
+  --ui-border-accented: #d4d4d4;
+  --ui-error: #b4261a;
+  --ui-radius: 0.375rem;
+}
+
+.dark {
+  --ui-primary: #ededed;
+  --ui-bg: #0a0a0a;
+  --ui-bg-muted: #111111;
+  --ui-bg-elevated: #1a1a1a;
+  --ui-bg-accented: #222222;
+  --ui-text: #ededed;
+  --ui-text-highlighted: #ffffff;
+  --ui-text-muted: #a1a1a1;
+  --ui-text-dimmed: #7a7a7a;
+  --ui-text-toned: #cfcfcf;
+  --ui-border: #1f1f1f;
+  --ui-border-muted: #171717;
+  --ui-border-accented: #333333;
+  --ui-error: #f2564a;
+}
+
+/* Mono uppercase section labels, Executor's signature. */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ui-text-muted);
+}
+
+@keyframes word-in { from { opacity: 0; transform: translateY(70%) } }
+@keyframes row-in { from { grid-template-rows: 0fr; opacity: 0 } }
+@keyframes row-out { to { grid-template-rows: 0fr; opacity: 0 } }
+@keyframes marquee { to { transform: translateX(-50%) } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(4px) scale(0.97) } }
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes word-in { from { opacity: 0 } }
+  @keyframes pop-in { from { opacity: 0 } }
+}

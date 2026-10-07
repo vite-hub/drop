@@ -1,0 +1,5 @@
+import { defineHandler } from "h3"
+import { mcp } from "../mcp"
+
+/** What the MCP server serves, for the Docs page: the same catalog clients see in tools/list. */
+export default defineHandler(() => mcp.definitions.map(({ kind, name, title, description, uri }) => ({ kind, name, title, description, uri })))
