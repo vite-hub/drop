@@ -6,7 +6,6 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../databases/config"
 import type { DrizzleD1Database } from "drizzle-orm/d1"
-import { kv } from "vite-hub/kv"
 import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
 import { contentTypeOf } from "#shared/project-bundle"
@@ -107,12 +106,6 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
   return detail
-}
-
-async function bumpUploadCount() {
-  const [readError, uploads] = await kv.get<number>("stats:uploads")
-  if (readError) return
-  await kv.set("stats:uploads", (uploads ?? 0) + 1)
 }
 
 /**
@@ -235,7 +228,6 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
       throw new HTTPError({ status: 409, statusText: "This drop was published by someone else. Retry from the latest version.", cause: error })
     throw error
   }
-  await bumpUploadCount()
   return row
 }
 
