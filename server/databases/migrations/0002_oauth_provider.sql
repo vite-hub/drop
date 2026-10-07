@@ -43,7 +43,7 @@ CREATE TABLE `oauth_client` (
 	`jwks_uri` text,
 	`grant_types` text,
 	`response_types` text,
-	`require_p_k_c_e` integer,
+	`require_pkce` integer,
 	`dpop_bound_access_tokens` integer,
 	`reference_id` text,
 	`metadata` text,

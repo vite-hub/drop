@@ -46,7 +46,7 @@ export const oauthClient = sqliteTable("oauth_client", {
   jwksUri: text("jwks_uri"),
   grantTypes: text("grant_types"),
   responseTypes: text("response_types"),
-  requirePKCE: integer("require_p_k_c_e", { mode: "boolean" }),
+  requirePKCE: integer("require_pkce", { mode: "boolean" }),
   dpopBoundAccessTokens: integer("dpop_bound_access_tokens", { mode: "boolean" }),
   referenceId: text("reference_id"),
   metadata: text("metadata"),
