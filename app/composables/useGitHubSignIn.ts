@@ -32,13 +32,3 @@ export function useGitHubSignIn() {
 
   return { signedIn, next, signIn, signInWithGitHub }
 }
-
-/**
- * This Drop's origin, for snippets like the MCP server URL. Prerendered pages (the docs) are built without a
- * request, so their HTML says drop.vitehub.dev and switches to the real origin once the page hydrates.
- */
-export function useSiteOrigin() {
-  const origin = useState("site-origin", () => (import.meta.prerender ? "https://drop.vitehub.dev" : useRequestURL().origin))
-  onMounted(() => (origin.value = window.location.origin))
-  return origin
-}

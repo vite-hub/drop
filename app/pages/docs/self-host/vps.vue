@@ -70,7 +70,7 @@ const STEPS = {
     </DocsSection>
 
     <DocsSection id="data" title="Database and files">
-      <p>Everything lives in <code>.data/</code>, next to the code: the database in <code>.data/drop.sqlite</code> and files in <code>.data/blob/</code>. Paths are relative to the working directory, so start Drop from <code>/srv/drop</code> as the unit does. Back up both:</p>
+      <p>Everything lives in <code>.data/</code>, next to the code: the database in <code>.data/drop.sqlite</code>, files in <code>.data/blob/</code>, and the cleanup job's run history in <code>.data/kv/</code>. Paths are relative to the working directory, so start Drop from <code>/srv/drop</code> as the unit does. Back up the database and the files:</p>
       <AgentsCodeBlock :code="STEPS.backup" />
       <p>To update, pull, rebuild, migrate, and restart. <code>pnpm db:migrate:libsql</code> skips the migrations already applied.</p>
       <AgentsCodeBlock :code="STEPS.update" />
@@ -80,7 +80,8 @@ const STEPS = {
       <ul>
         <li>One process holds everything, so run one instance. Rate limits are counted in its memory and reset when it restarts.</li>
         <li>Code images are SVG only: PNG needs Cloudflare Browser Run.</li>
-        <li>The hourly cleanup of expired code images runs inside the process.</li>
+        <li>The hourly cleanup of expired code images runs on a timer inside the process.</li>
+        <li>The build loads libSQL's native binary from the checkout's <code>node_modules</code>, so run <code>.output</code> from the directory you built in, on the same OS and CPU.</li>
       </ul>
     </DocsSection>
   </DocsPage>

@@ -3,8 +3,8 @@ import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 
 definePageMeta({ layout: "docs" })
 
-const origin = useSiteOrigin()
-const mcp = computed(() => mcpSnippets(`${origin.value}/mcp`).claude)
+const origin = useRequestURL().origin
+const mcp = mcpSnippets(`${origin}/mcp`).claude
 </script>
 
 <template>

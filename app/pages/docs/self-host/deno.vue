@@ -7,9 +7,8 @@ const STEPS = {
   migrate: "TURSO_DATABASE_URL=libsql://… TURSO_AUTH_TOKEN=… pnpm db:migrate:libsql",
   bucket: "pnpm exec wrangler r2 bucket create drop-files",
   build: "DROP_HOST=deno S3_BUCKET=drop-files S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com pnpm build",
-  create: "cd .output\ndeno deploy create --org <your-org> --app my-drop --source local --runtime-mode dynamic --entrypoint server/index.ts",
-  env: "deno deploy env add TURSO_DATABASE_URL \"libsql://…\"\ndeno deploy env add TURSO_AUTH_TOKEN \"…\" --secret\ndeno deploy env add AWS_ACCESS_KEY_ID \"…\"\ndeno deploy env add AWS_SECRET_ACCESS_KEY \"…\" --secret\ndeno deploy env add GITHUB_CLIENT_ID \"…\"\ndeno deploy env add GITHUB_CLIENT_SECRET \"…\" --secret\ndeno deploy env add BETTER_AUTH_SECRET \"$(openssl rand -base64 32)\" --secret\ndeno deploy env add DROP_ADMINS \"…\"",
-  deploy: "deno deploy --prod",
+  deploy: "DENO_DEPLOY_ORG=<your-org> DENO_DEPLOY_APP=my-drop node .output/deploy.mjs",
+  env: "deno deploy env add --org <your-org> --app my-drop TURSO_DATABASE_URL \"libsql://…\"\ndeno deploy env add --org <your-org> --app my-drop TURSO_AUTH_TOKEN \"…\" --secret\ndeno deploy env add --org <your-org> --app my-drop AWS_ACCESS_KEY_ID \"…\"\ndeno deploy env add --org <your-org> --app my-drop AWS_SECRET_ACCESS_KEY \"…\" --secret\ndeno deploy env add --org <your-org> --app my-drop GITHUB_CLIENT_ID \"…\"\ndeno deploy env add --org <your-org> --app my-drop GITHUB_CLIENT_SECRET \"…\" --secret\ndeno deploy env add --org <your-org> --app my-drop BETTER_AUTH_SECRET \"$(openssl rand -base64 32)\" --secret\ndeno deploy env add --org <your-org> --app my-drop DROP_ADMINS \"…\"",
   smoke: "DROP_URL=https://my-drop.<your-org>.deno.net pnpm test:e2e:deployed",
 }
 </script>
@@ -20,7 +19,7 @@ const STEPS = {
 
     <DocsSection id="need" title="What you need">
       <ul>
-        <li>A <a href="https://console.deno.com">Deno Deploy</a> organization and Deno 2.4 or newer, for <code>deno deploy</code>.</li>
+        <li>A <a href="https://console.deno.com">Deno Deploy</a> organization, and Deno 2.4 or newer signed in to it, for <code>deno deploy</code>.</li>
         <li>A <a href="https://turso.tech">Turso</a> account and its CLI (<code>turso auth login</code>). The free plan is enough.</li>
         <li>An S3-compatible bucket and an access key for it. Deno Deploy has no file storage of its own.</li>
         <li>Node.js 24 and pnpm, to build.</li>
@@ -49,16 +48,15 @@ const STEPS = {
           <AgentsCodeBlock :code="STEPS.build" />
         </li>
         <li>
-          <p>Create the app from the build output:</p>
-          <AgentsCodeBlock :code="STEPS.create" />
+          <p>Deploy. ViteHub writes <code>.output/deploy.mjs</code>, which creates the app on the first run (entrypoint <code>server/index.mjs</code>, with the traced <code>node_modules</code>) and deploys it to production:</p>
+          <AgentsCodeBlock :code="STEPS.deploy" />
         </li>
         <li>
-          <p>Add the settings:</p>
+          <p>Add the settings, then deploy again so the app picks them up:</p>
           <AgentsCodeBlock :code="STEPS.env" />
         </li>
         <li>
-          <p>Deploy, then run the smoke test:</p>
-          <AgentsCodeBlock :code="STEPS.deploy" />
+          <p>Run the smoke test:</p>
           <AgentsCodeBlock :code="STEPS.smoke" />
         </li>
       </ol>

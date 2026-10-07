@@ -4,9 +4,8 @@ import type { McpClient } from "~/utils/mcp-clients"
 
 definePageMeta({ layout: "docs" })
 
-const origin = useSiteOrigin()
-const server = computed(() => `${origin.value}/mcp`)
-const snippets = computed(() => mcpSnippets(server.value))
+const server = `${useRequestURL().origin}/mcp`
+const snippets = mcpSnippets(server)
 const clients = Object.keys(MCP_CLIENTS) as McpClient[]
 
 // The MCP server's own catalog (tools, prompts, skill resources), so the docs never drift from it.

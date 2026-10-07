@@ -82,9 +82,6 @@ export default defineNuxtConfig({
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
   },
 
-  // The public docs are the same for everyone: built once, served as static HTML on every host.
-  routeRules: { "/docs": { prerender: true }, "/docs/**": { prerender: true } },
-
   css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "~/assets/css/main.css"],
   devtools: false,
   compatibilityDate: "2026-07-17",
