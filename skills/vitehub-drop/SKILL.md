@@ -29,7 +29,7 @@ Do not retry a successful upload: every success creates another drop. Before pub
 
 ## Publish the next version
 
-Add `supersedes` with the id of the drop it replaces, as a form field (`-F "supersedes=<id>"`) or in the front matter (`supersedes: <id>`). The new version keeps the old one's sharing, and the old one stays in history.
+Add `supersedes` with the id of the drop it replaces, as a form field (`-F "supersedes=<id>"`) or in the front matter (`supersedes: <id>`). The new version keeps the old one's sharing, and the old one stays in history. Any id from the chain works: the new version always lands on top of the latest. If someone else publishes at the same moment you get `409`; read the latest version and publish again. Files are limited to 4 MiB.
 
 ## Read feedback
 

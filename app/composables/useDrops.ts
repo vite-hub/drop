@@ -66,7 +66,7 @@ export function useDropActions() {
   }
 
   async function remove(drop: Pick<DropSummary, "id" | "title">) {
-    if (!await confirm({ title: "Delete this drop?", description: `${drop.title}. Its link stops working and its comments go with it.`, confirmLabel: "Delete", destructive: true })) return false
+    if (!await confirm({ title: "Delete this drop?", description: `${drop.title}, with every version. Its link stops working and its comments go with it.`, confirmLabel: "Delete", destructive: true })) return false
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
       drops.value = drops.value.filter(item => item.id !== drop.id)
