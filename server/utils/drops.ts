@@ -5,6 +5,7 @@ import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../databases/config"
+import type { DrizzleD1Database } from "drizzle-orm/d1"
 import { kv } from "vite-hub/kv"
 import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
@@ -114,6 +115,12 @@ async function bumpUploadCount() {
   await kv.set("stats:uploads", (uploads ?? 0) + 1)
 }
 
+/**
+ * Runs statements in one transaction. Every driver ViteHub picks (D1, libSQL, the dev SQLite proxy) has
+ * Drizzle's `batch()`, but `db` is typed as their common base, which leaves it out.
+ */
+const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
+
 async function queueBlobCleanup(keys: string[]) {
   const unique = [...new Set(keys)]
   if (!unique.length) return
@@ -216,6 +223,7 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
     actorName: who.actorName,
     createdAt: now,
     updatedAt: now,
+    publishToken: null,
   }
   try {
     await db.insert(drops).values(row)
@@ -279,7 +287,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
     }
     const fileRows = encoded.map(([path, bytes]) => ({ dropId: id, path, blobKey: `${prefix}/${path}`, size: bytes.byteLength }))
     if (!row) {
-      await db.batch([
+      await atomic.batch([
         db.insert(drops).values(next),
         db.insert(dropFiles).values(fileRows),
       ])
@@ -290,7 +298,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
         .where(and(eq(drops.id, id), eq(drops.version, row.version)))
       const replace = db.run(sql`DELETE FROM drop_files WHERE drop_id = ${id} AND EXISTS (SELECT 1 FROM drops WHERE id = ${id} AND publish_token = ${token})`)
       const inserts = encoded.map(([path, bytes]) => db.run(sql`INSERT INTO drop_files (drop_id, path, blob_key, size) SELECT ${id}, ${path}, ${`${prefix}/${path}`}, ${bytes.byteLength} WHERE EXISTS (SELECT 1 FROM drops WHERE id = ${id} AND publish_token = ${token})`))
-      await db.batch([update, replace, ...inserts])
+      await atomic.batch([update, replace, ...inserts])
       committedPublish = true
       const [committed] = await db.select({ publishToken: drops.publishToken }).from(drops).where(eq(drops.id, id)).limit(1)
       if (committed?.publishToken !== token) {
@@ -324,7 +332,7 @@ export async function deleteDrop(row: DropRow) {
   const cleanupRows = [...new Set(keys)].map(blobKey => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() }))
   const deleteRows = db.delete(drops).where(inArray(drops.id, chain.map(item => item.id)))
   if (cleanupRows.length)
-    await db.batch([db.insert(blobCleanup).values(cleanupRows).onConflictDoNothing(), deleteRows])
+    await atomic.batch([db.insert(blobCleanup).values(cleanupRows).onConflictDoNothing(), deleteRows])
   else
     await deleteRows
   await deleteBlobKeys(keys)

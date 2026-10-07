@@ -18,7 +18,7 @@ export default defineValidatedHandler({
     const share: { visibility?: "private" | "shared"; access?: "view" | "comment" | "edit" } = {}
     if (body.visibility !== undefined) share.visibility = body.visibility
     if (body.access !== undefined) share.access = body.access
-    const title = "title" in body ? { title: body.title } : {}
+    const title = typeof body.title === "string" ? { title: body.title } : {}
     if (Object.keys(share).length) {
       // A link belongs to the document chain, so every version must carry the same permission state.
       const ids = (await versionChain(drop)).map(item => item.id)
