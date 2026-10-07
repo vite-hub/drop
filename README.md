@@ -92,6 +92,8 @@ Drop is a Nuxt app on Cloudflare Workers. The first person to sign in becomes th
    pnpm build
    ```
 
+   The KV namespace (Drop's render cache) has no ID to fill in: Wrangler creates it on the first deploy.
+
 3. Fill `.env` from [.env.example](./.env.example), then deploy. Deploy applies the D1 migrations, then publishes the Worker with `.env` as its secrets:
 
    ```sh
