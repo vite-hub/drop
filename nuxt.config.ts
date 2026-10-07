@@ -15,12 +15,15 @@ type Host = typeof HOSTS[number]
 const host = (process.env.DROP_HOST || "cloudflare") as Host
 if (!HOSTS.includes(host)) throw new Error(`DROP_HOST must be one of ${HOSTS.join(", ")}; got "${host}".`)
 
-// Hosted libSQL (Turso) on the serverless hosts, read at runtime. The VPS defaults to a SQLite file in .data/.
-const libsql = (fallback?: string) => ({
-  url: env({ source: env.source(["TURSO_DATABASE_URL", "DATABASE_URL"]), ...(fallback ? { default: fallback } : {}) }),
-  authToken: env({ secret: true, optional: true, source: env.source(["TURSO_AUTH_TOKEN", "DATABASE_AUTH_TOKEN"]) }),
-})
 const files = { serve: { route: "/f" } }
+
+// D1's HTTP driver works from every host. The account and API token are read at runtime.
+const d1 = (fallback: string) => ({
+  driver: "d1" as const,
+  databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || fallback,
+  databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || "00000000-0000-4000-8000-000000000000",
+  cloudflare: { http: true },
+})
 
 /**
  * ViteHub per host. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
@@ -43,23 +46,23 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     rateLimit: true,
     schedule: true,
   },
-  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), Turso, and the hourly cleanup as a Vercel Cron Job.
-  vercel: { preset: "vercel", blob: { ...files, driver: "vercel-blob", access: "private" }, database: { connection: libsql() }, schedule: true },
-  // Netlify Blobs, Turso, and the cleanup as a scheduled function (.netlify/v1/functions).
-  netlify: { preset: "netlify", blob: files, database: { connection: libsql() }, schedule: { providerOutput: "standalone" } },
+  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and the hourly cleanup as a Vercel Cron Job.
+  vercel: { preset: "vercel", blob: { ...files, driver: "vercel-blob", access: "private" }, database: d1("vitehub-drop-vercel"), schedule: true },
+  // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
+  netlify: { preset: "netlify", blob: files, database: d1("vitehub-drop-netlify"), schedule: { providerOutput: "standalone" } },
   // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). ViteHub's
   // Deno preset has no schedule: expired code images stop being served but stay in the bucket.
   deno: {
     preset: "deno",
     blob: { ...files, driver: "s3", bucket: process.env.S3_BUCKET || "drop", endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || "auto" },
-    database: { connection: libsql() },
+    database: d1("vitehub-drop-deno"),
   },
-  // One Node process: a SQLite file and files on disk under .data/, in-memory rate limits, and the cleanup on a
+  // One Node process: D1 over HTTP and files on disk under .data/, in-memory rate limits, and the cleanup on a
   // timer inside the process (its run history in KV files).
   vps: {
     preset: "node",
     blob: { ...files, driver: "fs", base: ".data/blob" },
-    database: { connection: libsql("file:.data/drop.sqlite") },
+    database: d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: true,
     schedule: { runtime: { driver: "process" } },
@@ -121,8 +124,6 @@ export default defineNuxtConfig({
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.
     ...(host === "cloudflare" ? { storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } } } : {}),
-    // Netlify Functions can't load libSQL's native binary; the `netlify` condition picks @libsql/client's HTTP-only build.
-    ...(host === "netlify" ? { exportConditions: ["netlify"] } : {}),
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.

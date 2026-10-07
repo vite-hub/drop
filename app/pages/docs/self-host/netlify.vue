@@ -3,22 +3,22 @@ definePageMeta({ layout: "docs" })
 
 const STEPS = {
   clone: "npx giget gh:vite-hub/drop my-drop\ncd my-drop\npnpm install\nnpx netlify login\nnpx netlify sites:create --name my-drop",
-  turso: "turso db create drop\nturso db show drop --url      # TURSO_DATABASE_URL\nturso db tokens create drop   # TURSO_AUTH_TOKEN",
-  migrate: "TURSO_DATABASE_URL=libsql://… TURSO_AUTH_TOKEN=… pnpm db:migrate:libsql",
-  env: "npx netlify env:set TURSO_DATABASE_URL libsql://…\nnpx netlify env:set TURSO_AUTH_TOKEN … --secret\nnpx netlify env:set GITHUB_CLIENT_ID …\nnpx netlify env:set GITHUB_CLIENT_SECRET … --secret\nnpx netlify env:set BETTER_AUTH_SECRET \"$(openssl rand -base64 32)\" --secret\nnpx netlify env:set DROP_ADMINS …",
+  database: "pnpm exec wrangler d1 create vitehub-drop-netlify   # copy the id into CLOUDFLARE_D1_DATABASE_ID",
+  migrate: "CLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-netlify pnpm db:migrate:d1",
+  env: "npx netlify env:set CLOUDFLARE_ACCOUNT_ID …\nnpx netlify env:set CLOUDFLARE_API_TOKEN … --secret\nnpx netlify env:set CLOUDFLARE_D1_DATABASE_ID …\nnpx netlify env:set CLOUDFLARE_D1_DATABASE_NAME vitehub-drop-netlify\nnpx netlify env:set GITHUB_CLIENT_ID …\nnpx netlify env:set GITHUB_CLIENT_SECRET … --secret\nnpx netlify env:set BETTER_AUTH_SECRET \"$(openssl rand -base64 32)\" --secret\nnpx netlify env:set DROP_ADMINS …",
   deploy: "npx netlify deploy --build --prod",
   smoke: "DROP_URL=https://my-drop.netlify.app pnpm test:e2e:deployed",
 }
 </script>
 
 <template>
-  <DocsPage title="Deploy to Netlify" lead="Drop on Netlify Functions, with a Turso database, Netlify Blobs for files, and a scheduled function that deletes expired code images.">
+  <DocsPage title="Deploy to Netlify" lead="Drop on Netlify Functions, with a Cloudflare D1 database, Netlify Blobs for files, and a scheduled function that deletes expired code images.">
     <DocsHostFacts host="netlify" />
 
     <DocsSection id="need" title="What you need">
       <ul>
         <li>A Netlify account.</li>
-        <li>A <a href="https://turso.tech">Turso</a> account and its CLI (<code>turso auth login</code>). The free plan is enough.</li>
+        <li>A Cloudflare account and Wrangler (<code>pnpm exec wrangler login</code>).</li>
         <li>Node.js 24 and pnpm.</li>
         <li>A GitHub OAuth app with the callback <code>https://&lt;your-site&gt;.netlify.app/api/auth/callback/github</code>, or your own domain.</li>
       </ul>
@@ -32,8 +32,8 @@ const STEPS = {
           <p><code>netlify.toml</code> already sets <code>DROP_HOST=netlify</code>, Node.js 24, and the build command.</p>
         </li>
         <li>
-          <p>Create the database and a token for it:</p>
-          <AgentsCodeBlock :code="STEPS.turso" />
+          <p>Create the D1 database and copy its id into the environment:</p>
+          <AgentsCodeBlock :code="STEPS.database" />
           <p>Apply the migrations:</p>
           <AgentsCodeBlock :code="STEPS.migrate" />
         </li>
@@ -57,15 +57,16 @@ const STEPS = {
     <DocsSection id="env" title="Settings">
       <DocsEnv
         :extra="[
-          ['TURSO_DATABASE_URL', 'The libsql:// URL of your Turso database.'],
-          ['TURSO_AUTH_TOKEN', 'A token for that database.'],
+          ['CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN', 'Cloudflare account id and an account API token with D1 edit access.'],
+          ['CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME', 'The id and name of vitehub-drop-netlify.'],
+          ['CLOUDFLARE_API_TOKEN', 'Cloudflare account API token with D1 edit access.'],
           ['DROP_HOST', 'netlify. Set in netlify.toml.'],
         ]"
       />
     </DocsSection>
 
     <DocsSection id="database" title="Database">
-      <p>Turso, a hosted libSQL database that speaks SQLite. <code>pnpm db:migrate:libsql</code> applies new migrations and skips the ones already applied; run it before you deploy a schema change.</p>
+      <p>Cloudflare D1 over HTTPS. <code>pnpm db:migrate:d1</code> applies new migrations and skips the ones already applied; run it before you deploy a schema change.</p>
     </DocsSection>
 
     <DocsSection id="different" title="On Netlify">

@@ -10,7 +10,7 @@
     "build": "nuxt build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "mkdir -p .vitehub/data/database && drizzle-kit migrate --config .vitehub/database/drizzle.config.ts",
-    "db:migrate:libsql": "mkdir -p .data && drizzle-kit migrate --config drizzle.libsql.config.ts",
+    "db:migrate:d1": "wrangler d1 migrations apply \"${CLOUDFLARE_D1_DATABASE_NAME}\" --remote --directory server/databases/migrations",
     "db:migrate:remote": "cp -r server/databases/migrations .output/server/ && wrangler d1 migrations apply DB --remote --config .output/server/wrangler.json",
     "deploy": "pnpm build && pnpm db:migrate:remote && wrangler deploy --config .output/server/wrangler.json --secrets-file .env",
     "dev": "nuxt dev",

@@ -11,7 +11,7 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
 <template>
   <DocsPage title="Host it yourself" lead="Drop is a Nuxt app built on ViteHub, and it runs on Cloudflare, Vercel, Netlify, Deno Deploy, or a server of your own. One setting at build time picks the host; your drops, comments, and files stay in your accounts.">
     <DocsSection id="hosts" title="Pick a host">
-      <p>Cloudflare has everything Drop uses in one account. Vercel, Netlify, and Deno Deploy also need a Turso database. Every host but Cloudflare renders code images as SVG only.</p>
+      <p>Cloudflare has everything Drop uses in one account. The other hosts use D1 over HTTP with a separate database per deployment. Every host but Cloudflare renders code images as SVG only.</p>
       <div class="overflow-x-auto rounded-lg border border-default">
         <table>
           <thead><tr><th>Host</th><th>Database</th><th>Files</th><th>Rate limits</th><th>Code images</th></tr></thead>
@@ -54,10 +54,10 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
     </DocsSection>
 
     <DocsSection id="database" title="Database and migrations">
-      <p>Every host uses SQLite. That's D1 on Cloudflare, Turso's hosted libSQL on Vercel, Netlify, and Deno Deploy, and a SQLite file on a VPS. The same migrations in <code>server/databases/migrations</code> apply to all of them:</p>
+      <p>Every host uses a separate Cloudflare D1 database. The non-Cloudflare hosts connect through D1's HTTP API. The same migrations in <code>server/databases/migrations</code> apply to all of them:</p>
       <ul>
         <li><code>pnpm db:migrate:remote</code> applies them to D1. <code>pnpm run deploy</code> runs it for you.</li>
-        <li><code>pnpm db:migrate:libsql</code> applies them to Turso (with <code>TURSO_DATABASE_URL</code> and <code>TURSO_AUTH_TOKEN</code>) or to the VPS's SQLite file. It skips the ones already applied.</li>
+        <li><code>CLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-… pnpm db:migrate:d1</code> applies them to a remote D1 database. Wrangler records each migration in <code>d1_migrations</code>.</li>
       </ul>
       <p>After you change the schema in <code>server/databases/</code>, <code>pnpm db:generate</code> writes the next migration.</p>
     </DocsSection>

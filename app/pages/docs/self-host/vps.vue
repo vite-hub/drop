@@ -3,20 +3,20 @@ definePageMeta({ layout: "docs" })
 
 const STEPS = {
   clone: "git clone https://github.com/vite-hub/drop /srv/drop\ncd /srv/drop\npnpm install",
-  build: "DROP_HOST=vps pnpm build\npnpm db:migrate:libsql   # creates .data/drop.sqlite",
-  env: "GITHUB_CLIENT_ID=\nGITHUB_CLIENT_SECRET=\nBETTER_AUTH_SECRET=\nDROP_ADMINS=\nHOST=127.0.0.1\nPORT=3000",
+  build: "DROP_HOST=vps pnpm build\nCLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-vps pnpm db:migrate:d1",
+  env: "GITHUB_CLIENT_ID=\nGITHUB_CLIENT_SECRET=\nBETTER_AUTH_SECRET=\nDROP_ADMINS=\nCLOUDFLARE_ACCOUNT_ID=\nCLOUDFLARE_API_TOKEN=\nCLOUDFLARE_D1_DATABASE_ID=\nCLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-vps\nHOST=127.0.0.1\nPORT=3000",
   run: "node --env-file=.env .output/server/index.mjs",
   unit: "[Unit]\nDescription=Drop\nAfter=network.target\n\n[Service]\nUser=drop\nWorkingDirectory=/srv/drop\nEnvironmentFile=/srv/drop/.env\nExecStart=/usr/bin/node .output/server/index.mjs\nRestart=always\n\n[Install]\nWantedBy=multi-user.target",
   enable: "sudo systemctl enable --now drop",
   caddy: "drop.example.com {\n  reverse_proxy 127.0.0.1:3000\n}",
   smoke: "DROP_URL=https://drop.example.com pnpm test:e2e:deployed",
-  update: "git pull\npnpm install\nDROP_HOST=vps pnpm build\npnpm db:migrate:libsql\nsudo systemctl restart drop",
-  backup: "sqlite3 .data/drop.sqlite \".backup /backups/drop.sqlite\"\nrsync -a .data/blob/ /backups/blob/",
+  update: "git pull\npnpm install\nDROP_HOST=vps pnpm build\npnpm db:migrate:d1\nsudo systemctl restart drop",
+  backup: "rsync -a .data/blob/ /backups/blob/",
 }
 </script>
 
 <template>
-  <DocsPage title="Run it on a VPS" lead="Drop as one Node.js process on a server of yours: a SQLite file for the database, the disk for files, and a reverse proxy in front for HTTPS.">
+  <DocsPage title="Run it on a VPS" lead="Drop as one Node.js process on a server of yours: D1 over HTTP for the database, the disk for files, and a reverse proxy in front for HTTPS.">
     <DocsHostFacts host="vps" />
 
     <DocsSection id="need" title="What you need">
@@ -64,15 +64,16 @@ const STEPS = {
       <DocsEnv
         :extra="[
           ['HOST, PORT', 'Where Node listens. 127.0.0.1 and 3000 behind Caddy.'],
-          ['DATABASE_URL', 'Optional. Another SQLite file (file:/var/lib/drop/drop.sqlite) or a Turso database. Defaults to file:.data/drop.sqlite.'],
+          ['CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN', 'Cloudflare account id and an account API token with D1 edit access.'],
+          ['CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME', 'The id and name of vitehub-drop-vps.'],
         ]"
       />
     </DocsSection>
 
     <DocsSection id="data" title="Database and files">
-      <p>Everything lives in <code>.data/</code>, next to the code: the database in <code>.data/drop.sqlite</code>, files in <code>.data/blob/</code>, and the cleanup job's run history in <code>.data/kv/</code>. Paths are relative to the working directory, so start Drop from <code>/srv/drop</code> as the unit does. Back up the database and the files:</p>
+      <p>Files and the cleanup job's run history live in <code>.data/</code>, next to the code. The database is D1 over HTTPS. Paths are relative to the working directory, so start Drop from <code>/srv/drop</code> as the unit does. Back up the database and the files:</p>
       <AgentsCodeBlock :code="STEPS.backup" />
-      <p>To update, pull, rebuild, migrate, and restart. <code>pnpm db:migrate:libsql</code> skips the migrations already applied.</p>
+      <p>To update, pull, rebuild, migrate, and restart. <code>pnpm db:migrate:d1</code> skips the migrations already applied.</p>
       <AgentsCodeBlock :code="STEPS.update" />
     </DocsSection>
 
@@ -81,7 +82,7 @@ const STEPS = {
         <li>One process holds everything, so run one instance. Rate limits are counted in its memory and reset when it restarts.</li>
         <li>Code images are SVG only: PNG needs Cloudflare Browser Run.</li>
         <li>The hourly cleanup of expired code images runs on a timer inside the process.</li>
-        <li>The build loads libSQL's native binary from the checkout's <code>node_modules</code>, so run <code>.output</code> from the directory you built in, on the same OS and CPU.</li>
+        <li>The Node process calls D1 over HTTPS, so keep the account id, API token, database id, and database name in its environment.</li>
       </ul>
     </DocsSection>
   </DocsPage>

@@ -27,7 +27,7 @@
 Under the hood:
 
 - **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and an OAuth 2.1 provider that MCP clients sign in through (dynamic client registration, PKCE, JWT access tokens bound to `/mcp`).
-- **Database** is SQLite through `vite-hub/database`: D1 on Cloudflare, Turso (libSQL) on Vercel, Netlify, and Deno Deploy, a SQLite file on a VPS. It holds drops, app files, and comments.
+- **Database** is SQLite through `vite-hub/database`: D1 on every host, using D1's HTTP API outside Cloudflare. It holds drops, app files, and comments.
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
 - Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
 - **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. An hourly **Schedule** deletes them.
@@ -56,12 +56,12 @@ MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_ap
 | Host | Build | Database | Files | Guide |
 | --- | --- | --- | --- | --- |
 | Cloudflare (default) | `pnpm build` | D1 | R2 | [/docs/self-host/cloudflare](https://drop.vitehub.dev/docs/self-host/cloudflare) |
-| Vercel | `DROP_HOST=vercel pnpm build` | Turso | Vercel Blob | [/docs/self-host/vercel](https://drop.vitehub.dev/docs/self-host/vercel) |
-| Netlify | `DROP_HOST=netlify pnpm build` | Turso | Netlify Blobs | [/docs/self-host/netlify](https://drop.vitehub.dev/docs/self-host/netlify) |
-| Deno Deploy | `DROP_HOST=deno pnpm build` | Turso | S3-compatible bucket | [/docs/self-host/deno](https://drop.vitehub.dev/docs/self-host/deno) |
-| VPS (Node) | `DROP_HOST=vps pnpm build` | SQLite file | Local disk | [/docs/self-host/vps](https://drop.vitehub.dev/docs/self-host/vps) |
+| Vercel | `DROP_HOST=vercel pnpm build` | D1 over HTTP | Vercel Blob | [/docs/self-host/vercel](https://drop.vitehub.dev/docs/self-host/vercel) |
+| Netlify | `DROP_HOST=netlify pnpm build` | D1 over HTTP | Netlify Blobs | [/docs/self-host/netlify](https://drop.vitehub.dev/docs/self-host/netlify) |
+| Deno Deploy | `DROP_HOST=deno pnpm build` | D1 over HTTP | R2 S3 API | [/docs/self-host/deno](https://drop.vitehub.dev/docs/self-host/deno) |
+| VPS (Node) | `DROP_HOST=vps pnpm build` | D1 over HTTP | Local disk | [/docs/self-host/vps](https://drop.vitehub.dev/docs/self-host/vps) |
 
-Only Cloudflare renders PNG code images (Browser Run) and has a distributed rate limiter; elsewhere code images are SVG and rate limits count per instance. Migrations apply with `pnpm db:migrate:remote` (D1) or `pnpm db:migrate:libsql` (Turso or the VPS's SQLite file).
+Only Cloudflare renders PNG code images (Browser Run) and has a distributed rate limiter; elsewhere code images are SVG and rate limits count per instance. Migrations apply with `pnpm db:migrate:remote` for Cloudflare builds, or `CLOUDFLARE_D1_DATABASE_NAME=<name> pnpm db:migrate:d1` for the other hosts.
 
 Anyone with a GitHub account can sign in and joins as a Member. The GitHub users in `DROP_ADMINS` join as Admin, and admins change roles on `/members`:
 
