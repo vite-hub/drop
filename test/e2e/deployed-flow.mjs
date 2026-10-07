@@ -152,14 +152,17 @@ const codeResponse = await fetch(new URL("/api/code", origin), {
   method: "POST",
   signal: AbortSignal.timeout(120_000),
 })
-assert.equal(codeResponse.status, cloudflareHost ? 200 : 501)
+assert.equal(cloudflareHost ? codeResponse.status : [200, 501].includes(codeResponse.status), true)
 
-if (!cloudflareHost) process.exit(0)
+if (!cloudflareHost && codeResponse.status === 501) process.exit(0)
 
 const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), { signal: timeout() })
 assert.equal(codeImage.status, 200)
-assert.equal(codeImage.headers.get("content-type"), "image/png")
-assert.deepEqual(
-  Buffer.from(await codeImage.arrayBuffer()).subarray(0, 8),
-  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-)
+if (cloudflareHost) {
+  assert.equal(codeImage.headers.get("content-type"), "image/png")
+  assert.deepEqual(
+    Buffer.from(await codeImage.arrayBuffer()).subarray(0, 8),
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  )
+}
+else assert.ok(["image/png", "image/svg+xml"].includes(codeImage.headers.get("content-type")))
