@@ -23,10 +23,13 @@ export const drops = sqliteTable("drops", {
   actorName: text("actor_name").notNull(),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
+  /** CAS token used while replacing an app's file set. */
+  publishToken: text("publish_token"),
 }, table => [
   index("drops_owner_idx").on(table.ownerId, table.updatedAt),
   uniqueIndex("drops_blob_key_idx").on(table.blobKey),
   index("drops_supersedes_idx").on(table.supersedesId),
+  uniqueIndex("drops_supersedes_unique").on(table.supersedesId),
 ])
 
 /** Files of an app drop. Publishing a new version replaces the set. */
@@ -53,4 +56,11 @@ export const comments = sqliteTable("comments", {
   authorName: text("author_name").notNull(),
   resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
-}, table => [index("comments_drop_idx").on(table.dropId, table.n)])
+}, table => [index("comments_drop_idx").on(table.dropId, table.n), uniqueIndex("comments_drop_n_unique").on(table.dropId, table.n)])
+
+/** Blob deletions that need another attempt after metadata has been removed. */
+export const blobCleanup = sqliteTable("blob_cleanup", {
+  id: text("id").primaryKey(),
+  blobKey: text("blob_key").notNull().unique(),
+  createdAt: integer("created_at").notNull(),
+})

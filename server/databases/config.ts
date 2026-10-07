@@ -2,7 +2,7 @@
 import { defineDatabase } from 'vite-hub/database'
 import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
-import { comments, dropFiles, drops } from './drops'
+import { blobCleanup, comments, dropFiles, drops } from './drops'
 
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
@@ -81,9 +81,9 @@ export const apikey = sqliteTable('apikey', {
   metadata: text('metadata')
 }, table => [index('apikey_reference_idx').on(table.referenceId), index('apikey_key_idx').on(table.key)])
 
-export { comments, dropFiles, drops }
+export { blobCleanup, comments, dropFiles, drops }
 
 export default defineDatabase({
   cloudflare: {},
-  schema: { account, apikey, comments, dropFiles, drops, session, user, verification }
+  schema: { account, apikey, blobCleanup, comments, dropFiles, drops, session, user, verification }
 })

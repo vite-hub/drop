@@ -2,7 +2,7 @@ import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
-import { createDocDrop, dropPageUrl } from "../../utils/drops"
+import { createDocDrop, dropPageUrl, MAX_FILE_BYTES } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
 
 export default defineMcpTool({
@@ -11,7 +11,7 @@ export default defineMcpTool({
   description: "Drop a Markdown doc. Private unless shared is true. Pass supersedes to publish it as the next version of an existing doc.",
   inputSchema: toStandardJsonSchema(v.object({
     // No v.trim(): transformations can't become JSON Schema, and tools/list publishes every input schema.
-    markdown: v.pipe(v.string(), v.nonEmpty("markdown is required.")),
+    markdown: v.pipe(v.string(), v.nonEmpty("markdown is required."), v.maxLength(MAX_FILE_BYTES, "Markdown is limited to 4 MiB when UTF-8 encoded.")),
     title: v.optional(v.string()),
     shared: v.optional(v.boolean(), false),
     supersedes: v.optional(v.pipe(v.string(), v.description("Id of the doc this replaces."))),

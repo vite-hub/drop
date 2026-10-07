@@ -8,7 +8,7 @@ export const MAX_FILE_BYTES = 4 * 1024 * 1024
 
 export const NewDocSchema = v.object({
   filename: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
-  content: v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES)),
+  content: v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES, "The file exceeds the 4 MiB limit.")),
   title: v.optional(v.string()),
   supersedes: v.optional(v.string()),
 })
@@ -20,7 +20,7 @@ export const DropPatchSchema = v.object({
 })
 
 export const VersionSchema = v.union([
-  v.object({ content: v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES)) }),
+  v.object({ content: v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES, "The file exceeds the 4 MiB limit.")) }),
   v.object({ files: v.record(v.string(), v.string()) }),
 ])
 
