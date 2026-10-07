@@ -15,12 +15,12 @@ const rows = computed(() => [
 
 <template>
   <div class="overflow-x-auto rounded-lg border border-default">
-    <table>
-      <tbody>
-        <tr v-for="[label, value] in rows" :key="label"><td class="w-44">{{ label }}</td><td>{{ value }}</td></tr>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-default">
+        <tr v-for="[label, value] in rows" :key="label"><td class="w-44 px-3 py-2 text-muted">{{ label }}</td><td class="px-3 py-2 text-highlighted">{{ value }}</td></tr>
         <tr>
-          <td>Live</td>
-          <td>
+          <td class="px-3 py-2 text-muted">Live</td>
+          <td class="px-3 py-2">
             <a v-if="info.live" :href="info.live">{{ info.live.replace("https://", "") }}</a>
             <span v-else>Not deployed yet</span>
           </td>
