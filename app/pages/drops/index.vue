@@ -4,7 +4,7 @@ import type { DropSummary } from "#shared/types"
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
-const { drops, status, create, upload, remove } = useDrops()
+const { drops, status, error, refresh, create, upload, remove } = useDrops()
 const filter = ref<"all" | "private" | "shared">("all")
 const search = ref("")
 const searchInput = useTemplateRef("searchInput")
@@ -26,14 +26,21 @@ const visible = computed(() => {
     .filter(drop => !query || `${drop.title} ${drop.filename} ${drop.actorName}`.toLowerCase().includes(query))
 })
 
-/** Today, Yesterday, This week, then month names. */
+/**
+ * Today, Yesterday, This week, then month names. The Worker renders in UTC, so the server render and hydration
+ * group in UTC and the browser regroups in the reader's own timezone once mounted.
+ */
+const mounted = useMounted()
 const groups = computed(() => {
-  const start = new Date(now.value).setHours(0, 0, 0, 0)
+  const timeZone = mounted.value ? undefined : "UTC"
+  const start = new Date(now.value)
+  if (timeZone) start.setUTCHours(0, 0, 0, 0)
+  else start.setHours(0, 0, 0, 0)
   const label = (at: number) => {
-    if (at >= start) return "Today"
-    if (at >= start - 86_400_000) return "Yesterday"
-    if (at >= start - 6 * 86_400_000) return "This week"
-    return new Date(at).toLocaleDateString("en", { month: "long", year: "numeric" })
+    if (at >= start.getTime()) return "Today"
+    if (at >= start.getTime() - 86_400_000) return "Yesterday"
+    if (at >= start.getTime() - 6 * 86_400_000) return "This week"
+    return new Date(at).toLocaleDateString("en", { timeZone, month: "long", year: "numeric" })
   }
   const out: Array<{ label: string; drops: DropSummary[] }> = []
   for (const drop of visible.value) {
@@ -86,6 +93,13 @@ async function onPick(file: File) {
 
     <div v-if="status === 'pending' && !drops.length" class="space-y-2">
       <USkeleton v-for="index in 4" :key="index" class="h-16 w-full" />
+    </div>
+
+    <div v-else-if="error" class="rounded-lg border border-dashed border-default px-6 py-16 text-center" role="alert">
+      <UIcon name="i-lucide-circle-alert" class="size-6 text-error" />
+      <p class="mt-3 font-medium text-highlighted">Couldn't load your drops</p>
+      <p class="mt-1 text-sm text-muted">Try again in a moment.</p>
+      <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh" />
     </div>
 
     <div v-else-if="!drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">

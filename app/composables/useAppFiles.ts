@@ -47,7 +47,11 @@ export function useAppFiles(drop: Ref<DropDetail>, drafts: Ref<Record<string, st
 
   function openFromQuery() {
     const target = typeof route.query.file === "string" ? route.query.file : null
-    if (drop.value.kind === "app" && target && target in files.value) openFile(target)
+    if (drop.value.kind !== "app") return
+    if (target && target in files.value) return openFile(target)
+    page.value = "index.html"
+    file.value = "index.html"
+    view.value = "preview"
   }
   onMounted(openFromQuery)
   watch(() => route.query.file, openFromQuery)
