@@ -6,7 +6,7 @@ const STEPS = {
   database: "pnpm exec wrangler d1 create vitehub-drop-vercel   # copy the id into CLOUDFLARE_D1_DATABASE_ID",
   migrate: "CLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-vercel pnpm db:migrate:d1",
   blob: "npx vercel blob create-store drop-files --access private --yes",
-  env: "npx vercel env add DROP_HOST production                 # vercel\nnpx vercel env add ENABLE_EXPERIMENTAL_COREPACK production   # 1\nnpx vercel env add CLOUDFLARE_D1_DATABASE_NAME production\nnpx vercel env add CLOUDFLARE_API_TOKEN production --sensitive\nnpx vercel env add GITHUB_CLIENT_ID production\nnpx vercel env add GITHUB_CLIENT_SECRET production --sensitive\nnpx vercel env add BETTER_AUTH_SECRET production --sensitive\nnpx vercel env add DROP_ADMINS production",
+  env: "npx vercel env add DROP_HOST production                 # vercel\nnpx vercel env add ENABLE_EXPERIMENTAL_COREPACK production   # 1\nnpx vercel env add CLOUDFLARE_D1_DATABASE_ID production\nnpx vercel env add CLOUDFLARE_D1_DATABASE_NAME production\nnpx vercel env add CLOUDFLARE_API_TOKEN production --sensitive\nnpx vercel env add GITHUB_CLIENT_ID production\nnpx vercel env add GITHUB_CLIENT_SECRET production --sensitive\nnpx vercel env add BETTER_AUTH_SECRET production --sensitive\nnpx vercel env add DROP_ADMINS production",
   deploy: "npx vercel deploy --prod",
   smoke: "DROP_URL=https://<your-domain> pnpm test:e2e:deployed",
 }
