@@ -59,6 +59,10 @@ export const verification = sqliteTable('verification', {
 export { blobCleanup, comments, dropFiles, drops, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 export default defineDatabase({
-  cloudflare: {},
+  cloudflare: {
+    databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || '00000000-0000-4000-8000-000000000000',
+    databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || 'vitehub-drop',
+    http: true,
+  },
   schema: { account, blobCleanup, comments, dropFiles, drops, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })
