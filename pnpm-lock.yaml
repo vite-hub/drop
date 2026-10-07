@@ -34,6 +34,9 @@ importers:
       '@iconify-json/simple-icons':
         specifier: ^1.2.60
         version: 1.2.99
+      '@libsql/linux-x64-gnu':
+        specifier: 0.5.29
+        version: 0.5.29
       '@nuxt/ui':
         specifier: 4.11.0
         version: 4.11.0(7a8a3c6ab8368ffb3c67c3683b77ad6b)
@@ -10000,8 +10003,7 @@ snapshots:
   '@libsql/linux-arm64-musl@0.5.29':
     optional: true
 
-  '@libsql/linux-x64-gnu@0.5.29':
-    optional: true
+  '@libsql/linux-x64-gnu@0.5.29': {}
 
   '@libsql/linux-x64-musl@0.5.29':
     optional: true
