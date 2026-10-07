@@ -53,7 +53,7 @@ async function signInWithEmail() {
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
 const STEPS = [
-  { n: "01", title: "Connect your agent", body: "One command adds Drop's MCP server. Or hand it an API key, or let it ask for access with Agent Auth.", snippet: "claude mcp add drop …/mcp" },
+  { n: "01", title: "Connect your agent", body: "One command adds Drop's MCP server. Or hand it an API key and the Drop skill.", snippet: "claude mcp add drop …/mcp" },
   { n: "02", title: "It drops its work", body: "A plan, a spec, a report, or a small app with its own files. Every drop starts private, with a link.", snippet: "create_doc · publish_app" },
   { n: "03", title: "You review, it revises", body: "Comment on text or a spot in an image. The agent reads open comments and drops the next version.", snippet: "list_comments" },
 ]
@@ -67,7 +67,7 @@ const FEATURES = [
   { icon: "i-lucide-history", title: "Every version kept", body: "Agents drop the next version of a doc or app. Older ones stay one click away." },
 ]
 
-const PERSONAL = ["One deploy to Cloudflare", "You're the admin", "Private by default"]
+const HOSTED = ["Sign in with GitHub", "Private by default", "MCP and API keys"]
 </script>
 
 <template>
@@ -174,22 +174,22 @@ const PERSONAL = ["One deploy to Cloudflare", "You're the admin", "Private by de
       <LazyLandingOwnIt hydrate-on-visible />
 
       <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <h2 class="mb-6 text-2xl font-semibold tracking-tight text-highlighted">For one person or a team</h2>
+        <h2 class="mb-6 text-2xl font-semibold tracking-tight text-highlighted">Use it here, or run your own</h2>
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-lg border border-default p-6">
-            <p class="label-mono">Personal</p>
-            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Deploy it, sign in, done.</p>
-            <p class="mt-2 text-sm leading-relaxed text-muted">The first person to sign in is the admin. Nothing to configure. Your agents drop, you review.</p>
+            <p class="label-mono">drop.vitehub.dev</p>
+            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Sign in and start dropping.</p>
+            <p class="mt-2 text-sm leading-relaxed text-muted">Anyone with a GitHub account can use it. Drops start private, and a link shares them only when you say so.</p>
             <ul class="mt-5 space-y-2 text-sm">
-              <li v-for="item in PERSONAL" :key="item" class="flex items-center gap-2">
+              <li v-for="item in HOSTED" :key="item" class="flex items-center gap-2">
                 <UIcon name="i-lucide-check" class="size-4 text-muted" />{{ item }}
               </li>
             </ul>
           </div>
           <div class="rounded-lg border border-default p-6">
-            <p class="label-mono">Team</p>
-            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Invite people. Three roles.</p>
-            <p class="mt-2 text-sm leading-relaxed text-muted">Everyone can create drops. New people join as {{ ROLE_LABELS.member }}.</p>
+            <p class="label-mono">Your own</p>
+            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Deploy it, name the admins. Three roles.</p>
+            <p class="mt-2 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. The GitHub accounts you list as admins can promote anyone.</p>
             <dl class="mt-5 divide-y divide-default border-y border-default text-sm">
               <div v-for="role in ROLES" :key="role" class="flex gap-4 py-2">
                 <dt class="w-16 shrink-0 font-medium text-highlighted">{{ ROLE_LABELS[role] }}</dt>

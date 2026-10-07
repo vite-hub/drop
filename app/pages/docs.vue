@@ -34,7 +34,7 @@ const snippets = {
   frontMatter: `---\nsupersedes: 3f2c…\n---\n\n# Plan, revised`,
   app: `curl -fsS -H "x-api-key: $DROP_API_KEY" -H "content-type: application/json" \\\n  -d '{ "name": "Launch board", "files": { "index.html": "…", "app.js": "…", "data.json": "[…]" } }' \\\n  ${origin}/api/apps`,
   clone: "git clone https://github.com/vite-hub/drop my-drop\ncd my-drop && pnpm install",
-  env: `# GitHub OAuth app, callback ${origin}/api/auth/callback/github\nGITHUB_CLIENT_ID=\nGITHUB_CLIENT_SECRET=\n# openssl rand -base64 32\nBETTER_AUTH_SECRET=\n# wrangler d1 create vitehub-drop\nCLOUDFLARE_D1_DATABASE_ID=\nCLOUDFLARE_D1_DATABASE_NAME=vitehub-drop`,
+  env: `# GitHub OAuth app, callback ${origin}/api/auth/callback/github\nGITHUB_CLIENT_ID=\nGITHUB_CLIENT_SECRET=\n# openssl rand -base64 32\nBETTER_AUTH_SECRET=\n# Your GitHub user id (gh api users/<login> --jq .id); comma-separate several admins\nDROP_ADMINS=\n# wrangler d1 create vitehub-drop\nCLOUDFLARE_D1_DATABASE_ID=\nCLOUDFLARE_D1_DATABASE_NAME=vitehub-drop`,
 }
 </script>
 
@@ -120,8 +120,8 @@ const snippets = {
           <AgentsCodeBlock :code="snippets.clone" />
           <p>Create a GitHub OAuth app with the callback URL <code :class="code">{{ origin }}/api/auth/callback/github</code>, then fill in <code :class="code">.env</code>:</p>
           <AgentsCodeBlock :code="snippets.env" />
-          <p>Deploy with <code :class="code">pnpm deploy</code>. It builds, applies the D1 migrations, and ships the Worker.</p>
-          <p>The <strong>first person to sign in becomes the admin</strong>. After that Drop is invite-only: an admin adds people on <NuxtLink :class="link" to="/members">Members</NuxtLink>, and they sign in with GitHub using that email. To change sign-in providers, edit <code :class="code">server/auth.ts</code> (Better Auth).</p>
+          <p>Deploy with <code :class="code">pnpm run deploy</code>. It builds, applies the D1 migrations, and ships the Worker.</p>
+          <p><strong>Anyone with a GitHub account can sign in</strong> and joins as a Member. The accounts in <code :class="code">DROP_ADMINS</code> join as Admin, and admins promote people on <NuxtLink :class="link" to="/members">Members</NuxtLink>. To change sign-in providers, edit <code :class="code">server/auth.ts</code> (Better Auth).</p>
         </DocsSection>
       </div>
 

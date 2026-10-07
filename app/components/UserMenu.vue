@@ -25,7 +25,7 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
       <UAvatar :alt="me?.name ?? 'You'" :src="me?.image ?? undefined" size="sm" />
       <span class="min-w-0 flex-1">
         <span class="block truncate text-xs font-medium text-highlighted">{{ me?.name ?? "You" }}</span>
-        <span class="block truncate text-xs text-muted">{{ me?.team ? "Team" : "Personal" }} · {{ roleLabel }}</span>
+        <span class="block truncate text-xs text-muted">{{ roleLabel }}</span>
       </span>
       <UIcon name="i-lucide-chevrons-up-down" class="size-3.5 shrink-0 text-dimmed" />
     </button>

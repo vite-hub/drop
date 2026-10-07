@@ -6,18 +6,17 @@ import { DEFAULT_ROLE, ROLE_LABELS, ROLE_SUMMARY, ROLES, type Role } from "#shar
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Members" })
 
-// Personal or team comes from who's here, not from a setting. Three roles; new people join as Member.
+// Anyone can sign in with GitHub and joins as Member; admins promote people from here.
 const { data: me } = useMe()
-const { members, status, invite, setRole, ban, unban, remove } = useMembers()
+const { members, status, setRole, ban, unban, remove } = useMembers()
 const admin = computed(() => me.value?.role === "admin")
 const search = ref("")
-const inviteOpen = ref(false)
 
 const description = computed(() => {
   const total = members.value.length || me.value?.members || 1
   return total > 1
-    ? `Team workspace · ${total} people. Everyone can create drops; new people join as ${ROLE_LABELS[DEFAULT_ROLE]}.`
-    : "Personal workspace. You're the admin. Invite people when you want a team."
+    ? `${total} people. Anyone can sign in with GitHub and joins as ${ROLE_LABELS[DEFAULT_ROLE]}; their drops stay private to them.`
+    : `Just you so far. Anyone can sign in with GitHub and joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
 })
 
 const rows = computed(() => {
@@ -28,7 +27,7 @@ const rows = computed(() => {
 })
 
 const roleItems = ROLES.map(value => ({ label: ROLE_LABELS[value], value }))
-const statusOf = (member: Member) => (member.banned ? "Banned" : member.lastActiveAt === null ? "Invited" : "Active")
+const statusOf = (member: Member) => (member.banned ? "Banned" : "Active")
 
 function menu(member: Member): DropdownMenuItem[][] {
   return [[
@@ -43,10 +42,6 @@ function menu(member: Member): DropdownMenuItem[][] {
 
 <template>
   <PageShell id="members" title="Members" :description="description">
-    <template v-if="admin" #actions>
-      <UButton color="neutral" icon="i-lucide-plus" label="Invite" @click="inviteOpen = true" />
-    </template>
-
     <div class="mb-6 grid grid-cols-1 divide-y divide-default rounded-lg border border-default sm:grid-cols-3 sm:divide-x sm:divide-y-0">
       <div v-for="role in ROLES" :key="role" class="px-4 py-3">
         <p class="flex items-center gap-2 text-sm font-medium text-highlighted">
@@ -118,9 +113,8 @@ function menu(member: Member): DropdownMenuItem[][] {
       </table>
     </div>
 
-    <p v-if="!admin && me" class="mt-3 text-xs text-muted">Only admins can invite people or change roles.</p>
+    <p v-if="!admin && me" class="mt-3 text-xs text-muted">Only admins can change roles.</p>
 
-    <MembersInviteDialog v-if="admin" v-model:open="inviteOpen" :invite="invite" />
 
   </PageShell>
 </template>

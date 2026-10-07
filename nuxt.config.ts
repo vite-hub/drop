@@ -115,6 +115,10 @@ export default defineNuxtConfig({
           },
           secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
         },
+        drop: {
+          // GitHub user ids (not logins, which can be renamed and reclaimed) that sign in as admins, comma-separated.
+          admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
+        },
       },
     },
   } as never,

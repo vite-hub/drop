@@ -1,8 +1,7 @@
 import type { Member } from "#shared/types"
-import type { InviteInput } from "#shared/schemas"
 import { type Role, ROLE_LABELS, ROLE_SUMMARY } from "#shared/roles"
 
-/** Who's in this Drop, and the admin actions on them. Changing people also changes "Personal" vs "Team" (me). */
+/** Who's in this Drop, and the admin actions on them. */
 export function useMembers() {
   const { data: members, status, refresh } = useApi<Member[]>("/api/members", { key: "members", default: () => [] })
   const notify = useNotify()
@@ -23,11 +22,6 @@ export function useMembers() {
   return {
     members,
     status,
-    async invite(input: InviteInput) {
-      await $fetch("/api/members", { method: "POST", body: input })
-      notify.done(`Invited ${input.email}`, `They join as ${ROLE_LABELS[input.role]} when they sign in with GitHub.`)
-      await reload()
-    },
     setRole: (member: Member, role: Role) => role !== member.role && update(member, { role }, `${member.name} is now ${ROLE_LABELS[role]}`, ROLE_SUMMARY[role]),
     ban: (member: Member) => update(member, { banned: true }, `${member.name} is banned`, "Their sessions and API keys stop working."),
     unban: (member: Member) => update(member, { banned: false }, `${member.name} can sign in again`),

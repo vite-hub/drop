@@ -74,7 +74,7 @@ It returns `{ url, expiresAt }`. The image is public and lasts five minutes; dro
 
 ## Host it yourself
 
-Drop is a Nuxt app on Cloudflare Workers. The first person to sign in becomes the admin. After that, Drop is invite-only: admins add people on `/members`, with one of three roles:
+Drop is a Nuxt app on Cloudflare Workers. [drop.vitehub.dev](https://drop.vitehub.dev) is one instance anyone can use; you can run your own. Anyone with a GitHub account can sign in and joins as a Member. The GitHub users in `DROP_ADMINS` join as Admin, and admins change roles on `/members`:
 
 | Role | What they can do |
 | --- | --- |
@@ -94,7 +94,7 @@ Drop is a Nuxt app on Cloudflare Workers. The first person to sign in becomes th
 
    The KV namespace (Drop's render cache) has no ID to fill in: Wrangler creates it on the first deploy.
 
-3. Fill `.env` from [.env.example](./.env.example), then deploy. Deploy applies the D1 migrations, then publishes the Worker with `.env` as its secrets:
+3. Fill `.env` from [.env.example](./.env.example), with your GitHub user id (`gh api users/<login> --jq .id`) in `DROP_ADMINS`. Then deploy. Deploy applies the D1 migrations, then publishes the Worker with `.env` as its secrets:
 
    ```sh
    pnpm run deploy

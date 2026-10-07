@@ -1,5 +1,5 @@
-// Three roles, no configuration. The first person on a Drop is its Admin; everyone after joins as Member.
-// In the real app these map onto Better Auth's admin plugin (role field + createAccessControl).
+// Three roles on Better Auth's admin plugin (role field + createAccessControl). Everyone who signs in joins as
+// Member; the GitHub users in DROP_ADMINS join as Admin.
 export type Role = "admin" | "editor" | "member";
 
 export const ROLES: Role[] = ["admin", "editor", "member"];
