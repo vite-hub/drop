@@ -1,0 +1,16 @@
+diff --git a/dist/vite-CAS6rh-w.js b/dist/vite-CAS6rh-w.js
+index 9148bad6ebf91de156fd20eb3ff95fc1628dbd6e..85786bf714d8d5e7644c0c5a689e6f4821d451a7 100644
+--- a/dist/vite-CAS6rh-w.js
++++ b/dist/vite-CAS6rh-w.js
+@@ -679,9 +679,9 @@ function arrayLiteralBody(value) {
+ 	return typeof closeIndex === "undefined" ? void 0 : trimmed.slice(1, closeIndex);
+ }
+ function readEntryKey(entry) {
+-	const property = /^\s*(?:([A-Za-z_$][\w$]*)|["'`]([^"'`]+)["'`])\s*(?::|$)/.exec(entry);
++	const property = /^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*(?:\n|$)))*\s*(?:([A-Za-z_$][\w$]*)|["'`]([^"'`]+)["'`])\s*(?::|$)/.exec(entry);
+ 	if (property) return property[1] || property[2];
+-	return /^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/.exec(entry)?.[1];
++	return /^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*(?:\n|$)))*\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/.exec(entry)?.[1];
+ }
+ function readEntryValue(entry) {
+ 	const match = /^\s*(?:[A-Za-z_$][\w$]*|["'`][^"'`]+["'`])\s*:/.exec(entry);

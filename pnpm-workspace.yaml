@@ -17,6 +17,8 @@ overrides:
   vue: 3.5.41
 
 patchedDependencies:
+  # Auth's static scanner accepts comments before object options.
+  '@vite-hub/auth@0.0.4': patches/@vite-hub__auth@0.0.4.patch
   # Keeps Nuxt's dev-only module URL out of the Workers bundle.
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch

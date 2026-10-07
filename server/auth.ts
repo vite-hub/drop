@@ -25,7 +25,6 @@ import { nativeClientRegistration } from "./utils/oauth-clients"
  *
  * Local dev has no GitHub OAuth app, so email and password sign-in is on in `nuxt dev` only.
  *
- * Keep comments outside the options object: ViteHub reads its top-level keys statically.
  */
 export default defineAuth(({ env, requestOrigin }) => ({
   appName: "Drop",

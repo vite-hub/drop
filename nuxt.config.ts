@@ -21,7 +21,7 @@ const files = { serve: { route: "/f" } }
 const d1 = (fallback: string) => ({
   driver: "d1" as const,
   databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || fallback,
-  databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || "00000000-0000-4000-8000-000000000000",
+  databaseId: env({ source: env.source("CLOUDFLARE_D1_DATABASE_ID") }),
   cloudflare: { http: true },
 })
 
