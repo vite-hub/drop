@@ -1,0 +1,26 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 7031e13e10e1b5cb18bb6852470b24b2dc3f22bd..dc33b8a5a509a0f613304a920586fd50a3bdffa1 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -386,6 +386,8 @@ function normalizeModernError(error) {
+ 			status: 500
+ 		};
+ 	}
++	// Patched (drop): the client only sees "Internal error", so say what it was where the server logs.
++	console.error("[h3-mcp] internal error", error);
+ 	return {
+ 		code: JSON_RPC_INTERNAL_ERROR,
+ 		message: "Internal error",
+diff --git a/dist/modern/index.mjs b/dist/modern/index.mjs
+index 1fa1fcde46c3ea00bfca517ec7872db4a258eace..0a571235c80a33afa9c4047398ffeb056637e685 100644
+--- a/dist/modern/index.mjs
++++ b/dist/modern/index.mjs
+@@ -374,6 +374,8 @@ function normalizeModernError(error) {
+ 			status: 500
+ 		};
+ 	}
++	// Patched (drop): the client only sees "Internal error", so say what it was where the server logs.
++	console.error("[h3-mcp] internal error", error);
+ 	return {
+ 		code: JSON_RPC_INTERNAL_ERROR,
+ 		message: "Internal error",

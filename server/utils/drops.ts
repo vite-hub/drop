@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm"
+import { log } from "evlog"
 import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
@@ -58,8 +59,8 @@ export async function listDrops(who: Identity): Promise<DropSummary[]> {
 }
 
 function storageFailure(error: Error) {
-  console.error(JSON.stringify({ counter: "storage_failure", error: error.message, cause: String((error as { cause?: unknown }).cause ?? "") }))
-  return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
+  log.error({ action: "storage", error: error.message, cause: String((error as { cause?: unknown }).cause ?? "") })
+  return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 
 async function readText(key: string) {

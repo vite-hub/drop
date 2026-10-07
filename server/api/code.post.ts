@@ -1,3 +1,4 @@
+import { useLogger } from "evlog/nitro/v3"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { runBrowserAction } from "vite-hub/browser/actions"
@@ -18,6 +19,7 @@ export default defineValidatedHandler({
     if (!import.meta.dev) await requireRateLimit(event, "code-image", { failure: "deny", key: who.userId, limit: 10, window: "1m" })
     const input = await event.req.json()
     const { svg, width, height } = await renderCodeSvg(input)
+    useLogger(event).set({ codeImage: { format: input.format, language: input.language, theme: input.theme, characters: input.code.length } })
 
     let image: Blob = new Blob([svg], { type: "image/svg+xml" })
     if (input.format === "png") {
@@ -28,7 +30,7 @@ export default defineValidatedHandler({
         screenshotOptions: { type: "png", omitBackground: true },
       })
       if (!response.ok) {
-        console.error(JSON.stringify({ counter: "code_image_failure", status: response.status, error: await response.text() }))
+        useLogger(event).error(new Error(await response.text()), { codeImage: { status: response.status } })
         throw new HTTPError({ status: 502, statusText: "The PNG couldn't be rendered. Try format \"svg\"." })
       }
       image = await response.blob()

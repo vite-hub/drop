@@ -1,5 +1,6 @@
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
+import { log } from "evlog"
 import { defineCachedFunction } from "nitro/cache"
 import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
@@ -111,7 +112,7 @@ export async function renderMarkdownBody(markdown: string): Promise<{ title: str
     return { title: documentTitle(document), html: revision + (content || '<p class="empty-document">This document is empty.</p>') }
   }
   catch (error) {
-    console.error(JSON.stringify({ counter: "markdown_render_failure", error: error instanceof Error ? error.message : "Unknown error" }))
+    log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })
     return { title: "Untitled document", html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>` }
   }
 }

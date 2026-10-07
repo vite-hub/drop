@@ -7,7 +7,7 @@ description: Drops plans, docs, and small static apps into Drop for review, read
 
 Drop keeps what you publish private until the user shares it. People comment on the exact spot; you read the open comments and drop the next version.
 
-Every request needs the user's API key in `DROP_API_KEY`. If it's unset, ask the user to create one at `https://drop.vitehub.dev/agents` (name it after yourself, like "Claude Code") and export it. Drop also speaks MCP at `https://drop.vitehub.dev/mcp` with the same key as a bearer token; prefer it when your client has it registered.
+Every request needs the user's API key in `DROP_API_KEY`. If it's unset, ask the user to create one at `https://drop.vitehub.dev/agents` (name it after yourself, like "Claude Code") and export it. Drop also speaks MCP at `https://drop.vitehub.dev/mcp` with the same key as a bearer token; prefer it when your client has it registered. Its tools mirror this API: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`.
 
 ## Drop a file
 

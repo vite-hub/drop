@@ -31,6 +31,9 @@ Under the hood:
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
 - Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
 - **Code images** come from Shiki as SVG; a single **Browser** screenshot action turns them into PNG, and an hourly **Schedule** deletes them.
+- **MCP** is [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit): one file per tool and prompt in `server/mcp/`, both protocol revisions, and the [Skills extension](https://modelcontextprotocol.io/seps/2640-skills-extension).
+- **Skills** are defined once in `skills/` and served over MCP (`skills/list`, `skill://` resources), at `/.well-known/agent-skills/` ([Discovery v0.2.0](https://github.com/cloudflare/agent-skills-discovery-rfc)), and at the older `/.well-known/skills/`.
+- **Logs** are [evlog](https://www.evlog.dev) wide events: one structured line per request with the caller, the agent, what it did, and why it failed. Workers Logs is on, so they're queryable in the Cloudflare dashboard.
 
 ## Use Drop
 
@@ -57,7 +60,7 @@ Under the hood:
 
    This returns `{ id, url, page, visibility, version }`. `page` is the review page and `url` serves the file. Add `-F supersedes=<id>` to publish the next version.
 
-MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`. The `/docs` page lists every endpoint.
+MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, plus the `address_feedback` prompt. MCP clients that support skills get `vitehub-drop` from `skills/list`; others can install it with `npx skills add`. The `/docs` page lists every endpoint.
 
 ### Create a code image
 

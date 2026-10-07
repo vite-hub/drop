@@ -1,4 +1,8 @@
+import { fileURLToPath } from "node:url"
+import evlog from "evlog/nitro/v3"
 import { env } from "vite-hub/env"
+
+const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt"],
@@ -62,14 +66,26 @@ export default defineNuxtConfig({
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } },
     devStorage: { cache: { driver: "memory" } },
-    cloudflare: { wrangler: { observability: { enabled: true } } },
+    // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
+    // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
+    modules: [evlog({
+      env: { service: "drop" },
+      exclude: ["/_nuxt/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
+      redact: { paths: ["**.key", "**.secret", "**.password"] },
+    })],
+    cloudflare: { wrangler: { observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } } } },
     // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.
     publicAssets: [
       { baseURL: "/", dir: "public", maxAge: 60 * 60 },
       { baseURL: "/vendor/medium-zoom", dir: "node_modules/medium-zoom/dist", maxAge: 60 * 60 * 24 * 365 },
-      { baseURL: "/.well-known/skills", dir: "skills", maxAge: 60 * 60 * 24 },
     ],
   },
+
+  // Agent Skills Discovery, v0.2.0 and the older v0.1.0 path (server/utils/skills.ts holds the skills).
+  serverHandlers: [
+    { route: "/.well-known/agent-skills/**", handler: skillsHandler, lazy: true },
+    { route: "/.well-known/skills/**", handler: skillsHandler, lazy: true },
+  ],
 
   hooks: {
     // The CLI nightly adds a dev-only socket-cleanup plugin from @nuxt/cli, which this Nuxt nightly's

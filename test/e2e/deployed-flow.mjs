@@ -70,15 +70,26 @@ assert.equal(markdownRaw.status, 200)
 assert.match(markdownRaw.headers.get("content-type") ?? "", /^text\/markdown/)
 assert.equal(await markdownRaw.text(), markdownSource)
 
-// MCP: the same key as a bearer token.
-const mcp = async body => (await fetch(new URL("/mcp", origin), {
-  body: JSON.stringify({ jsonrpc: "2.0", id: 1, ...body }),
-  headers: { "authorization": `Bearer ${key}`, "content-type": "application/json" },
+// MCP (2026-07-28): the same key as a bearer token; the protocol version rides in each request's _meta.
+const mcp = async (method, params = {}) => (await fetch(new URL("/mcp", origin), {
+  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientInfo": { name: "e2e", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } }),
+  headers: { "authorization": `Bearer ${key}`, "content-type": "application/json", "accept": "application/json, text/event-stream", "mcp-protocol-version": "2026-07-28", "mcp-method": method, ...(params.name || params.uri ? { "mcp-name": params.name ?? params.uri } : {}) },
   method: "POST",
   signal: timeout(),
 })).json()
-assert.deepEqual((await mcp({ method: "tools/list" })).result.tools.map(tool => tool.name), ["list_drops", "read_drop", "list_comments", "create_doc", "publish_app"])
-assert.match((await mcp({ method: "tools/call", params: { name: "create_doc", arguments: { markdown: "# From MCP" } } })).result.content[0].text, /^Dropped privately: /)
+assert.ok((await mcp("server/discover")).result.capabilities.extensions["io.modelcontextprotocol/skills"])
+assert.deepEqual((await mcp("tools/list")).result.tools.map(tool => tool.name), ["list_drops", "read_drop", "list_comments", "create_doc", "publish_app"])
+assert.match((await mcp("tools/call", { name: "create_doc", arguments: { markdown: "# From MCP" } })).result.content[0].text, /^Dropped privately: /)
+const [skill] = (await mcp("skills/list")).result.skills
+assert.equal(skill.frontmatter.name, "vitehub-drop")
+assert.match((await mcp("resources/read", { uri: skill.uri })).result.contents[0].text, /^---\nname: vitehub-drop/)
+
+// Agent Skills Discovery v0.2.0: the archive's digest matches the index.
+const index = await (await fetch(new URL("/.well-known/agent-skills/index.json", origin), { signal: timeout() })).json()
+assert.equal(index.$schema, "https://schemas.agentskills.io/discovery/0.2.0/schema.json")
+const archive = new Uint8Array(await (await fetch(new URL(index.skills[0].url, origin), { signal: timeout() })).arrayBuffer())
+const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", archive)), byte => byte.toString(16).padStart(2, "0")).join("")
+assert.equal(index.skills[0].digest, `sha256:${hash}`)
 
 // SVG comes straight from Shiki, no browser involved.
 const svgResponse = await fetch(new URL("/api/code", origin), {

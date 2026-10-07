@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MCP_LATEST, MCP_LEGACY, MCP_TOOLS } from "#shared/mcp"
+import { MCP_LATEST, MCP_LEGACY } from "#shared/mcp"
 import { PLAN_AUTHORING_GUIDE } from "#shared/plan-runtime"
 
 definePageMeta({ layout: "dashboard", middleware: "auth" })
@@ -19,11 +19,9 @@ const SECTIONS = [
   ["self-host", "Self-host"],
 ] as const
 
-const tools = MCP_TOOLS.map(tool => ({
-  name: tool.name,
-  description: tool.description,
-  args: "properties" in tool.inputSchema ? Object.keys(tool.inputSchema.properties).join(", ") : "none",
-}))
+// The MCP server's own catalog (tools, prompts, skill resources), so the docs never drift from it.
+const { data: catalog } = await useFetch("/api/mcp", { key: "mcp-catalog", default: () => [] })
+const tools = computed(() => catalog.value.map(item => ({ name: item.uri ?? item.name, description: item.description ?? item.title ?? "", args: item.kind })))
 
 const code = "rounded bg-elevated px-1 py-0.5 font-mono text-[12px] text-highlighted"
 const link = "text-highlighted underline underline-offset-4"
@@ -60,14 +58,15 @@ const snippets = {
 
         <DocsSection id="mcp" title="MCP server">
           <p>Streamable HTTP at <code :class="code">{{ origin }}/mcp</code>. Speaks MCP <code :class="code">{{ MCP_LATEST }}</code> and answers clients on {{ MCP_LEGACY.join(", ") }}. Authenticate with a Drop API key: <code :class="code">Authorization: Bearer drop_…</code>.</p>
+          <p>It also serves the <code :class="code">vitehub-drop</code> skill through the MCP Skills extension (<code :class="code">skills/list</code>, <code :class="code">skill://</code> resources), and at <code :class="code">/.well-known/agent-skills/</code> for agents that discover skills over HTTP.</p>
           <AgentsCodeBlock :code="snippets.mcp" />
           <div class="overflow-hidden rounded-lg border border-default">
             <table class="w-full table-fixed text-left text-sm">
               <thead>
                 <tr class="border-b border-default text-xs text-muted">
-                  <th class="w-32 px-3 py-2 font-medium sm:w-36">Tool</th>
+                  <th class="w-32 px-3 py-2 font-medium sm:w-44">Name</th>
                   <th class="px-3 py-2 font-medium">What it does</th>
-                  <th class="hidden w-40 px-3 py-2 font-medium sm:table-cell">Arguments</th>
+                  <th class="hidden w-24 px-3 py-2 font-medium sm:table-cell">Kind</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-default">

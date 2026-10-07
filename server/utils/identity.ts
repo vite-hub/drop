@@ -3,6 +3,7 @@ import { type H3Event, HTTPError } from "h3"
 import { apiKey } from "@better-auth/api-key"
 import { betterAuth } from "better-auth"
 import { admin } from "better-auth/plugins"
+import { useLogger } from "evlog/nitro/v3"
 import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
 import { user as users } from "../databases/config"
@@ -37,7 +38,11 @@ export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefine
 /** Who is calling. Resolved once per request (middleware and route share it). */
 export function identify(event: H3Event): Promise<Identity | null> {
   const context = event.context as { dropIdentity?: Promise<Identity | null> }
-  return (context.dropIdentity ??= resolveIdentity(event))
+  return (context.dropIdentity ??= resolveIdentity(event).then((who) => {
+    // Every request's wide event says who made it, never the credential itself.
+    if (who) useLogger(event).set({ user: { id: who.userId, role: who.role }, actor: { kind: who.actorKind, name: who.actorName } })
+    return who
+  }))
 }
 
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {

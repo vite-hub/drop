@@ -1,3 +1,4 @@
+import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 
@@ -18,7 +19,7 @@ export default defineHandler(async (event) => {
 
   const [error, source] = await blob.get(key)
   if (error) {
-    console.error(JSON.stringify({ counter: "storage_failure", error: error.message }))
+    useLogger(event).error(error, { action: "storage" })
     throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
   }
   if (!source) return
