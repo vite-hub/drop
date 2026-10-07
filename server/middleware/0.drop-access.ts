@@ -12,7 +12,14 @@ export default defineHandler(async (event) => {
   if (!["GET", "HEAD"].includes(event.req.method) || !event.url.pathname.startsWith("/f/")) return
   const key = decodeURIComponent(event.url.pathname.slice(3))
   if (key.startsWith("apps/")) throw new HTTPError({ status: 404, statusText: "Not found" })
-  if (key.startsWith("code-images/")) return
+  if (event.url.searchParams.has("raw") || /\.(html?|shtml|xht(?:ml)?|svgz?)$/i.test(key)) {
+    event.res.headers.set("Content-Security-Policy", "sandbox")
+  }
+  if (key.startsWith("code-images/")) {
+    const { isExpiredCodeImage } = await import("../utils/code-image")
+    if (isExpiredCodeImage(key, new Date())) throw new HTTPError({ status: 404, statusText: "Not found" })
+    return
+  }
 
   const [drop] = await db.select().from(drops).where(eq(drops.blobKey, key)).limit(1)
   if (!drop) return
