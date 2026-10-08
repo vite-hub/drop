@@ -22,10 +22,10 @@ export interface Host {
 
 export const HOSTS: Host[] = [
   { id: "cloudflare", name: "Cloudflare", icon: "i-simple-icons-cloudflare", live: "https://drop.vitehub.dev", database: "D1", files: "R2", rateLimits: "Workers rate limiting", codeImages: "PNG and SVG", cleanup: "Cron trigger" },
-  { id: "vercel", name: "Vercel", icon: "i-simple-icons-vercel", database: "D1 over HTTP", files: "Vercel Blob", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Vercel Cron Job" },
-  { id: "netlify", name: "Netlify", icon: "i-simple-icons-netlify", database: "D1 over HTTP", files: "Netlify Blobs", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Scheduled function" },
-  { id: "deno", name: "Deno Deploy", icon: "i-simple-icons-deno", database: "D1 over HTTP", files: "R2 S3 API", rateLimits: "Per instance", codeImages: "SVG", cleanup: "None" },
-  { id: "vps", name: "VPS", icon: "i-lucide-server", database: "D1 over HTTP", files: "Local disk", rateLimits: "In memory", codeImages: "SVG", cleanup: "In process" },
+  { id: "vercel", name: "Vercel", icon: "i-simple-icons-vercel", live: "https://vitehub-drop.vercel.app", database: "D1 over HTTP", files: "Vercel Blob", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Vercel Cron Job" },
+  { id: "netlify", name: "Netlify", icon: "i-simple-icons-netlify", live: "https://vitehub-drop.netlify.app", database: "D1 over HTTP", files: "Netlify Blobs", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Scheduled function" },
+  { id: "deno", name: "Deno Deploy", icon: "i-simple-icons-deno", live: "https://vitehub-drop.onmax.deno.net", database: "D1 over HTTP", files: "R2 S3 API", rateLimits: "Per instance", codeImages: "SVG", cleanup: "None" },
+  { id: "vps", name: "VPS", icon: "i-lucide-server", live: "https://drop-vps.vitehub.dev", database: "D1 over HTTP", files: "Local disk", rateLimits: "In memory", codeImages: "SVG", cleanup: "In process" },
 ]
 
 export const hostById = (id: HostId) => HOSTS.find(host => host.id === id)!

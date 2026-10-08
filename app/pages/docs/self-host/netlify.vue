@@ -29,7 +29,7 @@ const STEPS = {
         <li>
           <p>Get the code and create the site:</p>
           <AgentsCodeBlock :code="STEPS.clone" />
-          <p><code>netlify.toml</code> already sets <code>DROP_HOST=netlify</code>, Node.js 24, and the build command.</p>
+          <p><code>netlify.toml</code> already sets <code>DROP_HOST=netlify</code>, Node.js 24, and the build command. The build keeps Nitro's tracked function wrapper and copies the native runtime that Netlify's bundler needs.</p>
         </li>
         <li>
           <p>Create the D1 database and copy its id into the environment:</p>
@@ -59,7 +59,6 @@ const STEPS = {
         :extra="[
           ['CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN', 'Cloudflare account id and an account API token with D1 edit access.'],
           ['CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME', 'The id and name of vitehub-drop-netlify.'],
-          ['CLOUDFLARE_API_TOKEN', 'Cloudflare account API token with D1 edit access.'],
           ['DROP_HOST', 'netlify. Set in netlify.toml.'],
         ]"
       />
