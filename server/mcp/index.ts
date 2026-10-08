@@ -38,7 +38,11 @@ export function mcpFor(origin: string) {
   const mcp = createMcpHandler({
     ...MCP_SERVER_INFO,
     description: "Agents drop plans, docs, and small apps for review, read the comments, and publish the next version.",
-    websiteUrl: "https://drop.vitehub.dev",
+    websiteUrl: origin,
+    icons: [
+      { src: `${origin}/favicon.svg`, mimeType: "image/svg+xml", sizes: ["any"] },
+      { src: `${origin}/icon.png`, mimeType: "image/png", sizes: ["512x512"] },
+    ],
     instructions: MCP_INSTRUCTIONS,
     // MCP clients send no Origin; the access token, not the origin, is the boundary.
     origin: false,
