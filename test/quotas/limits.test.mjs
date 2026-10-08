@@ -5,6 +5,8 @@ import { readFileSync, mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
 import { Worker } from "node:worker_threads"
+import { toStandardJsonSchema } from "@valibot/to-json-schema"
+import * as v from "valibot"
 import { H3Event, HTTPError, toResponse } from "h3"
 import { createMcpHandler, defineMcpTool } from "nitro-mcp-toolkit"
 import { MCP_LATEST, MCP_LEGACY } from "../../shared/mcp.ts"
@@ -171,7 +173,7 @@ test("concurrent SQLite clients cannot reserve more than three slots or the rema
 for (const version of [MCP_LATEST, ...MCP_LEGACY]) {
   test(`quota failures are normal tool results with structured content over MCP ${version}`, async () => {
     const failure = quotaFailure("writes", 1000, 1000)
-    const handler = createMcpHandler({ name: "quota-test", version: "1", origin: false, tools: [defineMcpTool({ name: "denied", inputSchema: { type: "object", properties: {} }, handler: async () => quotaToolFailure(failure) })] })
+    const handler = createMcpHandler({ name: "quota-test", version: "1", origin: false, tools: [defineMcpTool({ name: "denied", inputSchema: toStandardJsonSchema(v.object({})), handler: async () => quotaToolFailure(failure) })] })
     const params = { name: "denied", arguments: {}, ...(version === MCP_LATEST ? { _meta: { "io.modelcontextprotocol/protocolVersion": version, "io.modelcontextprotocol/clientInfo": { name: "quota-test", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } : {}) }
     const event = new H3Event(new Request("https://drop.example/mcp", { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": version, "mcp-method": "tools/call", "mcp-name": "denied" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params }) }))
     const response = await toResponse(await handler(event), event)
