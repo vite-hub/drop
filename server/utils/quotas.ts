@@ -125,8 +125,10 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
         // A failed guard violates the ledger CHECK and rolls back the entire D1 batch.
         const finish = db.update(quotaReservations).set({ committed: true, drops: 0, bytes: 0, writes: sql`CASE WHEN (${success}) THEN ${quotaReservations.writes} ELSE -1 END` })
           .where(eq(quotaReservations.id, id)).returning({ id: quotaReservations.id })
+        const batch: [Statement, ...Statement[]] = [finish]
+        batch.unshift(...statements)
         let results
-        try { results = await atomic.batch([...statements, finish] as [Statement, ...Statement[]]) }
+        try { results = await atomic.batch(batch) }
         catch (error) {
           if (/CHECK constraint failed.*writes/i.test(String(error)))
             throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version.", cause: error })
