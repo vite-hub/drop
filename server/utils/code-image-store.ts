@@ -1,6 +1,8 @@
 import { useLogger } from "evlog/nitro/v3"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
+import { db } from "vite-hub/database/drizzle"
+import { codeImages } from "../databases/config"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { PNG_CODE_IMAGES, renderCodePng } from "#code-image-png"
 import type { CodeImageInput } from "#shared/schemas"
@@ -23,5 +25,12 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
   const { expiresAt, key } = createCodeImageLocation(format)
   const [storageError, stored] = await blob.put(key, image, { access: "private", contentType: format === "png" ? "image/png" : "image/svg+xml" })
   if (storageError || !stored.url) throw new HTTPError({ status: 503, statusText: "The code image could not be stored." })
+  try {
+    await db.insert(codeImages).values({ blobKey: key, ownerId: who.userId, expiresAt: expiresAt.getTime() })
+  }
+  catch (error) {
+    await blob.del(key)
+    throw error
+  }
   return { url: new URL(stored.url, event.req.url).href, expiresAt: expiresAt.toISOString() }
 }

@@ -1,18 +1,19 @@
-import { and, desc, eq, exists, inArray, isNotNull, sql } from "drizzle-orm"
+import { and, desc, eq, exists, inArray, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, drops } from "../databases/config"
+import { blobCleanup, blobTombstones, dropFiles, dropHeads, drops, user } from "../databases/config"
 import type { DrizzleD1Database } from "drizzle-orm/d1"
 import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
+import { deleteMarkdownCache } from "./markdown-cache"
 import { contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
 import type { Identity } from "./identity"
 
-export type DropRow = typeof drops.$inferSelect
+export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean }
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
 
@@ -26,11 +27,12 @@ export function permissions(drop: DropRow, who: Identity | null) {
   const staff = Boolean(who && (who.role === "admin" || who.role === "editor"))
   const shared = drop.visibility === "shared"
   const level = ACCESS_RANK[drop.access as Access]
+  const available = !drop.ownerBanned
   return {
     owner,
-    view: owner || staff || shared,
-    comment: owner || staff || (shared && level >= ACCESS_RANK.comment),
-    edit: owner || staff || (shared && level >= ACCESS_RANK.edit),
+    view: available && (owner || staff || shared),
+    comment: available && (owner || staff || (shared && level >= ACCESS_RANK.comment)),
+    edit: available && (owner || staff || (shared && level >= ACCESS_RANK.edit)),
     manage: owner || staff,
   }
 }
@@ -44,18 +46,25 @@ export function toSummary(row: DropRow, paths?: string[]): DropSummary {
 }
 
 export async function findDrop(id: string) {
-  const [row] = await db.select().from(drops).where(eq(drops.id, id)).limit(1)
-  return row ?? null
+  const [row] = await db.select({ drop: drops, ownerId: user.id, banned: user.banned }).from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.id, id)).limit(1)
+  return row ? { ...row.drop, ownerBanned: !row.ownerId || Boolean(row.banned) } : null
+}
+
+export async function findDropByBlob(key: string) {
+  const [row] = await db.select({ drop: drops, ownerId: user.id, banned: user.banned }).from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.blobKey, key)).limit(1)
+  return row ? { ...row.drop, ownerBanned: !row.ownerId || Boolean(row.banned) } : null
 }
 
 /** Your drops, newest first. Older versions of a doc hide behind their latest. */
 export async function listDrops(who: Identity): Promise<DropSummary[]> {
-  const rows = await db.select().from(drops).where(eq(drops.ownerId, who.userId)).orderBy(desc(drops.updatedAt)).limit(500)
-  const superseded = new Set(rows.map(row => row.supersedesId).filter(Boolean))
+  const rows = (await db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .where(eq(dropHeads.ownerId, who.userId)).orderBy(desc(dropHeads.updatedAt)).limit(500)).map(row => row.drop)
   const apps = rows.filter(row => row.kind === "app").map(row => row.id)
   const files = apps.length ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).where(inArray(dropFiles.dropId, apps)) : []
   const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
-  return rows.filter(row => !superseded.has(row.id)).map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined))
+  return rows.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined))
 }
 
 function storageFailure(error: Error) {
@@ -71,8 +80,24 @@ async function readText(key: string) {
 }
 
 export async function versionChain(row: DropRow) {
-  // Versions always share an owner, so one query loads every candidate and the chain is walked in memory.
-  const docs = await db.select().from(drops).where(eq(drops.ownerId, row.ownerId))
+  // Follow indexed parent/child links, retaining the existing 50 older / 100 total view bounds.
+  const docs = await db.select().from(drops).where(inArray(drops.id, sql`(
+    WITH RECURSIVE
+    older(id, supersedes_id, depth) AS (
+      SELECT id, supersedes_id, 0 FROM drops WHERE id = ${row.id} AND owner_id = ${row.ownerId}
+      UNION ALL
+      SELECT d.id, d.supersedes_id, o.depth + 1 FROM drops d JOIN older o ON d.id = o.supersedes_id
+      WHERE d.owner_id = ${row.ownerId} AND o.depth < 49
+    ),
+    newer(id, depth) AS (
+      SELECT id, 0 FROM drops WHERE id = ${row.id} AND owner_id = ${row.ownerId}
+      UNION ALL
+      SELECT d.id, n.depth + 1 FROM drops d JOIN newer n ON d.supersedes_id = n.id
+      WHERE d.owner_id = ${row.ownerId} AND n.depth < 99
+    )
+    SELECT id FROM older UNION SELECT id FROM newer
+  )
+  `))
   const byId = new Map(docs.map(doc => [doc.id, doc]))
   const next = new Map(docs.filter(doc => doc.supersedesId).map(doc => [doc.supersedesId!, doc]))
   const chain = [byId.get(row.id) ?? row]
@@ -88,6 +113,7 @@ async function versionsOf(row: DropRow): Promise<DropVersion[]> {
 
 export async function dropDetail(row: DropRow, who: Identity | null, origin: string): Promise<DropDetail> {
   const can = permissions(row, who)
+  if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const detail: DropDetail = {
     ...toSummary(row),
     isOwner: can.manage,
@@ -101,8 +127,12 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
     detail.paths = files.map(file => file.path).sort()
   }
   else if (row.blobKey) {
-    if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
-    if (row.kind === "markdown") detail.html = (await renderMarkdownCached(row.blobKey, detail.content ?? "")).html
+    if (row.kind === "markdown") {
+      const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!))
+      detail.content = rendered.source
+      detail.html = rendered.html
+    }
+    else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
   return detail
@@ -129,6 +159,10 @@ async function queueBlobCleanup(keys: string[]) {
 async function drainBlobCleanup() {
   const pending = await db.select().from(blobCleanup).limit(20)
   for (const item of pending) {
+    try {
+      await deleteMarkdownCache(item.blobKey)
+    }
+    catch { continue }
     const [error] = await blob.del(item.blobKey)
     if (error) continue
     await db.delete(blobCleanup).where(eq(blobCleanup.id, item.id))
@@ -142,6 +176,14 @@ async function drainBlobCleanup() {
 async function deleteBlobKeys(keys: string[]) {
   const unique = [...new Set(keys)]
   if (!unique.length) return
+  try {
+    await Promise.all(unique.map(deleteMarkdownCache))
+  }
+  catch (error) {
+    log.error({ action: "markdown-cache-cleanup", error: String(error) })
+    await queueBlobCleanup(unique)
+    return
+  }
   const [error] = await blob.del(unique)
   if (error) {
     log.error({ action: "blob-cleanup", error: error.message, keys: unique.length })
@@ -174,7 +216,7 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
   let previous: DropRow | null = null
   const supersedes = input.supersedes ?? (text ? text.match(/^---\n[\s\S]*?^supersedes:\s*["']?(?:\S*\/)?([0-9a-f-]{36})(?:\.\w+)?["']?\s*$/m)?.[1] : undefined)
   if (supersedes) {
-    previous = await findDrop(supersedes) ?? (await db.select().from(drops).where(and(isNotNull(drops.blobKey), eq(drops.blobKey, supersedes))).limit(1))[0] ?? null
+    previous = await findDrop(supersedes) ?? await findDropByBlob(supersedes)
     if (previous && !permissions(previous, who).edit) previous = null
     if (previous) previous = (await versionChain(previous))[0] ?? previous
   }
@@ -182,8 +224,7 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
   const key = `${crypto.randomUUID()}${extension}`
   const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
   if (storageError) {
-    const [cleanupError] = await blob.del(key)
-    if (cleanupError) await queueBlobCleanup([key])
+    await deleteBlobKeys([key])
     throw storageFailure(storageError)
   }
 
@@ -193,8 +234,7 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
     parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, text)).title : undefined
   }
   catch (error) {
-    const [cleanupError] = await blob.del(key)
-    if (cleanupError) await queueBlobCleanup([key])
+    await deleteBlobKeys([key])
     throw error
   }
   const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
@@ -222,8 +262,7 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
     await db.insert(drops).values(row)
   }
   catch (error) {
-    const [cleanupError] = await blob.del(key)
-    if (cleanupError) await queueBlobCleanup([key])
+    await deleteBlobKeys([key])
     if (previous && /unique|constraint/i.test(String(error)))
       throw new HTTPError({ status: 409, statusText: "This drop was published by someone else. Retry from the latest version.", cause: error })
     throw error
@@ -250,7 +289,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
 
   await drainBlobCleanup()
   const now = Date.now()
-  let row = input.id ? await findDrop(input.id) : null
+  let row: DropRow | null = input.id ? await findDrop(input.id) : null
   if (input.id && (!row || row.kind !== "app")) throw new HTTPError({ status: 404, statusText: "No app with that id." })
   if (row && !permissions(row, who).edit) throw new HTTPError({ status: 403, statusText: "You can't edit this app." })
   if (row) row = (await versionChain(row))[0] ?? row
@@ -332,7 +371,11 @@ export async function deleteDrop(row: DropRow) {
   const cleanupRows = [...new Set(keys)].map(blobKey => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() }))
   const deleteRows = db.delete(drops).where(inArray(drops.id, chain.map(item => item.id)))
   if (cleanupRows.length)
-    await atomic.batch([db.insert(blobCleanup).values(cleanupRows).onConflictDoNothing(), deleteRows])
+    await atomic.batch([
+      db.insert(blobTombstones).values(cleanupRows.map(item => ({ blobKey: item.blobKey }))).onConflictDoNothing(),
+      db.insert(blobCleanup).values(cleanupRows).onConflictDoNothing(),
+      deleteRows,
+    ])
   else
     await deleteRows
   await deleteBlobKeys(keys)

@@ -2,7 +2,7 @@
 import { defineDatabase } from 'vite-hub/database'
 import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
-import { blobCleanup, comments, dropFiles, drops } from './drops'
+import { blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats } from './drops'
 import { jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource } from './oauth'
 
 export const user = sqliteTable('user', {
@@ -56,7 +56,7 @@ export const verification = sqliteTable('verification', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).$onUpdate(() => new Date()).notNull()
 }, table => [index('verification_identifier_idx').on(table.identifier)])
 
-export { blobCleanup, comments, dropFiles, drops, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
+export { blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 export default defineDatabase({
   cloudflare: {
@@ -64,5 +64,5 @@ export default defineDatabase({
     databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || 'vitehub-drop',
     http: true,
   },
-  schema: { account, blobCleanup, comments, dropFiles, drops, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
+  schema: { account, blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })

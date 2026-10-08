@@ -16,7 +16,8 @@ type Host = typeof HOSTS[number]
 const host = (process.env.DROP_HOST || "cloudflare") as Host
 if (!HOSTS.includes(host)) throw new Error(`DROP_HOST must be one of ${HOSTS.join(", ")}; got "${host}".`)
 
-const files = { serve: { route: "/f" } }
+// The blob handler also handles conditional requests; keep its policy aligned with the access gate.
+const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-store" } } }
 
 // D1's HTTP driver works from every host. The account and API token are read at runtime.
 const d1 = (fallback: string) => ({

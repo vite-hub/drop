@@ -1,4 +1,4 @@
-import { count, desc, max } from "drizzle-orm"
+import { count, desc, inArray, max } from "drizzle-orm"
 import { defineHandler } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { drops as dropsTable, session, user } from "../../databases/config"
@@ -10,8 +10,10 @@ import { requireIdentity } from "../../utils/identity"
 export default defineHandler(async (event): Promise<Member[]> => {
   const who = await requireIdentity(event)
   const users = await db.select().from(user).orderBy(desc(user.createdAt)).limit(500)
-  const drops = await db.select({ ownerId: dropsTable.ownerId, total: count() }).from(dropsTable).groupBy(dropsTable.ownerId)
-  const seen = await db.select({ userId: session.userId, at: max(session.updatedAt) }).from(session).groupBy(session.userId)
+  const ids = users.map(user => user.id)
+  if (!ids.length) return []
+  const drops = await db.select({ ownerId: dropsTable.ownerId, total: count() }).from(dropsTable).where(inArray(dropsTable.ownerId, ids)).groupBy(dropsTable.ownerId)
+  const seen = await db.select({ userId: session.userId, at: max(session.updatedAt) }).from(session).where(inArray(session.userId, ids)).groupBy(session.userId)
   return users.map(user => ({
     id: user.id,
     name: user.name,

@@ -47,7 +47,7 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   const token = bearerFrom(event.req.headers)
   if (token) return fromAccessToken(event, token)
   const session = await authFor(event).api.getSession({ headers: event.req.headers }).catch(() => null)
-  if (!session?.user) return null
+  if (!session?.user || (session.user as { banned?: boolean }).banned) return null
   const role = (session.user as { role?: string }).role ?? "member"
   return {
     userId: session.user.id, name: session.user.name, email: session.user.email, image: session.user.image ?? null,

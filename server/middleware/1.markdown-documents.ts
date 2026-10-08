@@ -17,24 +17,32 @@ export default defineHandler(async (event) => {
   if (!key || !extension) return
   const isHtml = extension.toLowerCase() === "html"
 
-  const [error, source] = await blob.get(key)
-  if (error) {
-    useLogger(event).error(error, { action: "storage" })
-    throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
+  if (!event.context.dropAccessChecked) {
+    const { requireBlobAccess } = await import("../utils/content-access")
+    await requireBlobAccess(event, key)
   }
-  if (!source) return
+  const readSource = async () => {
+    const [error, source] = await blob.get(key)
+    if (error) {
+      useLogger(event).error(error, { action: "storage" })
+      throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
+    }
+    if (!source) throw new HTTPError({ status: 404, statusText: "Not found" })
+    return source.text()
+  }
 
-  event.res.headers.set("Cache-Control", event.context.dropPrivate ? "private, no-store" : "public, max-age=60")
+  event.res.headers.set("Cache-Control", "private, no-store")
   event.res.headers.set("Content-Security-Policy", isHtml ? HTML_CONTENT_SECURITY_POLICY : MARKDOWN_CONTENT_SECURITY_POLICY)
   event.res.headers.set("Content-Type", "text/html; charset=utf-8")
   event.res.headers.set("Referrer-Policy", "no-referrer")
   event.res.headers.set("X-Content-Type-Options", "nosniff")
-  if (event.req.method === "HEAD") return ""
-
-  const text = await source.text()
-  if (isHtml) return text
+  if (isHtml) {
+    const text = await readSource()
+    return event.req.method === "HEAD" ? "" : text
+  }
   // Loaded lazily: middleware lands in the Worker's entry module, and its static imports would be re-exported
   // from there, which Workers rejects for anything that isn't a handler.
   const { renderMarkdownDocument } = await import("../utils/markdown-document")
-  return renderMarkdownDocument(text, event.url.pathname, key)
+  const rendered = await renderMarkdownDocument(readSource, event.url.pathname, key)
+  return event.req.method === "HEAD" ? "" : rendered
 })

@@ -1,7 +1,6 @@
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
 import { log } from "evlog"
-import { defineCachedFunction } from "nitro/cache"
 import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
 import components from "@comark/html/plugins/components"
@@ -11,6 +10,7 @@ import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
+import { cachedMarkdown } from "./markdown-cache"
 
 const ALLOWED_TAGS = "a alert blockquote br callout code del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s span strong table tbody td th thead tip tr ul warning".split(" ")
 const MAX_MERMAID_DIAGRAMS = 4
@@ -121,12 +121,10 @@ export async function renderMarkdownBody(markdown: string): Promise<{ title: str
  * Blobs never change once uploaded, so a render is keyed by its blob key and cached for a month in the Worker's
  * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
  */
-export const renderMarkdownCached = defineCachedFunction(
-  (_key: string, markdown: string) => renderMarkdownBody(markdown),
-  { name: "markdown", getKey: (key: string) => key, maxAge: 60 * 60 * 24 * 30 },
-)
+export const renderMarkdownCached = (key: string, markdown: string | (() => Promise<string>)) =>
+  cachedMarkdown(key, typeof markdown === "string" ? async () => markdown : markdown, renderMarkdownBody)
 
-export async function renderMarkdownDocument(markdown: string, pathname: string, key: string): Promise<string> {
+export async function renderMarkdownDocument(markdown: string | (() => Promise<string>), pathname: string, key: string): Promise<string> {
   const { title, html: body } = await renderMarkdownCached(key, markdown)
   return `<!doctype html>
 <html lang="en">
