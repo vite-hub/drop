@@ -5,7 +5,7 @@ import { useRuntimeConfig } from "nitro/runtime-config"
 import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
 import { requireRateLimit } from "vite-hub/rate-limit"
-import { isPlan, planLimits, quotaFailure, quotaToolFailure, type Plan, type QuotaFailure, type Usage } from "#shared/quotas"
+import { DEFAULT_PRO_LIMITS, MAX_APP_BYTES, MAX_APP_FILES, isPlan, planLimits, quotaFailure, quotaToolFailure, type Plan, type QuotaFailure, type Usage } from "#shared/quotas"
 import { quotaBlobs, quotaReservations, user } from "../databases/config"
 import { reserveSQL, usageSQL } from "./quota-sql"
 
@@ -18,7 +18,7 @@ export function quotaConfig() {
   return {
     enabled: process.env.DROP_QUOTAS === "1" || config.enabled === true || String(config.enabled) === "1" || String(config.enabled) === "true",
     defaultPlan: isPlan(config.defaultPlan) ? config.defaultPlan : "free" as Plan,
-    pro: { drops: positive(config.proDrops, 100), bytes: positive(config.proBytes, 1073741824), writes: positive(config.proWrites, 10_000) },
+    pro: { drops: positive(config.proDrops, DEFAULT_PRO_LIMITS.drops), bytes: positive(config.proBytes, DEFAULT_PRO_LIMITS.bytes), writes: positive(config.proWrites, DEFAULT_PRO_LIMITS.writes) },
   }
 }
 
@@ -75,7 +75,7 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   const config = quotaConfig()
   const usage = config.enabled ? await getUsage(ownerId) : {
     month: new Date().toISOString().slice(0, 7), plan: "unlimited",
-    drops: { limit: null }, bytes: { limit: null }, writes: { limit: null }, app: { files: 200, bytes: 4 * 1024 * 1024 },
+    drops: { limit: null }, bytes: { limit: null }, writes: { limit: null }, app: { files: MAX_APP_FILES, bytes: MAX_APP_BYTES },
   }
   if (cost.app) {
     if (cost.app.files > usage.app.files) throw new DropQuotaError(quotaFailure("appFiles", cost.app.files, usage.app.files))

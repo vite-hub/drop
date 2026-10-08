@@ -16,9 +16,10 @@ import { withDropQuota } from "./quotas"
 export type DropRow = typeof drops.$inferSelect
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
+import { MAX_APP_FILES } from "#shared/quotas"
 
 export { MAX_FILE_BYTES }
-export const MAX_APP_FILES = 200
+export { MAX_APP_FILES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /** What the caller may do with a drop. Editors and admins act on every drop in the workspace. */

@@ -1,6 +1,9 @@
 export const PLANS = ["free", "pro", "unlimited"] as const
 export type Plan = typeof PLANS[number]
 export const MIB = 1024 * 1024
+export const MAX_APP_FILES = 200
+export const MAX_APP_BYTES = 4 * MIB
+export const DEFAULT_PRO_LIMITS = { drops: 100, bytes: 1024 * MIB, writes: 10_000 } as const
 
 export interface PlanLimits {
   drops: number | null
@@ -13,8 +16,8 @@ export interface PlanLimits {
 /** Global app safety limits also apply when owner quotas are disabled. */
 export function planLimits(plan: Plan, pro: { drops?: number; bytes?: number; writes?: number } = {}): PlanLimits {
   if (plan === "free") return { drops: 3, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB }
-  if (plan === "pro") return { drops: pro.drops ?? 100, bytes: pro.bytes ?? 1024 * MIB, writes: pro.writes ?? 10_000, appFiles: 200, appBytes: 4 * MIB }
-  return { drops: null, bytes: null, writes: null, appFiles: 200, appBytes: 4 * MIB }
+  if (plan === "pro") return { drops: pro.drops ?? DEFAULT_PRO_LIMITS.drops, bytes: pro.bytes ?? DEFAULT_PRO_LIMITS.bytes, writes: pro.writes ?? DEFAULT_PRO_LIMITS.writes, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
+  return { drops: null, bytes: null, writes: null, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
 }
 
 export function isPlan(value: unknown): value is Plan {

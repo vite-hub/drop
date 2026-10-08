@@ -1,11 +1,11 @@
 // Request bodies, defined once. Server routes validate with them (readValidatedBody) and forms reuse them
 // (UForm :schema), so a field's rules and messages are the same on both sides.
 import * as v from "valibot"
-import { PLANS } from "./quotas"
+import { MAX_APP_BYTES, PLANS } from "./quotas"
 import { ROLES } from "./roles"
 
 /** 4 MiB: the most one file (or one app) may weigh. */
-export const MAX_FILE_BYTES = 4 * 1024 * 1024
+export const MAX_FILE_BYTES = MAX_APP_BYTES
 
 export const NewDocSchema = v.object({
   filename: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
