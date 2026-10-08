@@ -2,7 +2,7 @@
 
 Apply `server/databases/migrations/0003_content_gates.sql` before deploying. It adds permanent blob tombstones, temporary code-image ownership, current drop ids for bounded listings, and a member count maintained by user insert/delete triggers. Pending blob cleanup records become tombstones during the migration. Drop insert/delete/update triggers maintain the current ids, including app ordering after publishes. No new environment variables are required.
 
-The legacy upload cutoff is `2026-10-07T11:48:03Z`, the timestamp of the account rebuild commit `b82ecfc`. Confirm that this precedes the first account-backed production upload. Untracked uploads at or after this timestamp return 404. An upload with a missing or invalid timestamp also returns 404. Tombstones always deny access, even for an older object. Deleted accounts stop serving content too; admins can still delete their drops.
+The legacy upload cutoff is `2026-10-07T12:59:35Z`, when the account-backed app first deployed to production; the old app's last upload is from 12:38:54Z. Untracked uploads at or after this timestamp return 404. An upload with a missing or invalid timestamp also returns 404. Tombstones always deny access, even for an older object. Deleted accounts stop serving content too; admins can still delete their drops.
 
 Code images created before this deployment have no owner record and return 404. They would otherwise expire within five minutes. New code images follow their owner's ban immediately. Shared files and pages use `private, no-store` so conditional requests and browser caches recheck access.
 

@@ -8,7 +8,7 @@ import { identify } from "./identity"
 import { isExpiredCodeImage } from "./code-image"
 
 // The account rebuild landed on 2026-10-07. New orphaned blobs must never become anonymous uploads.
-export const LEGACY_UPLOAD_CUTOFF = Date.parse("2026-10-07T11:48:03Z")
+export const LEGACY_UPLOAD_CUTOFF = Date.parse("2026-10-07T12:59:35Z")
 const notFound = () => new HTTPError({ status: 404, statusText: "Not found" })
 
 /** One owner join for managed files. Only genuinely old anonymous uploads need a storage HEAD. */
