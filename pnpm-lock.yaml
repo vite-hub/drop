@@ -10,7 +10,7 @@ overrides:
 patchedDependencies:
   '@vite-hub/auth@0.0.4': 5cfb6feddcbb55ff03dec3d75cd1c37f2655563f28e24b5edac8959e7eda0663
   '@vite-hub/database@0.0.4': 8c5f2fa1aef65bf4e12ea9ac3dba8371132b282fcd5ab72804148f55667b17c1
-  h3-mcp@0.2.0: d44edd6ae58d05304af0ac5b88fc4fc6aadd5204f993f57949f4ad22e2e34331
+  h3-mcp@0.2.0: 300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b
   nuxt-nightly@5.0.0-29766097.1e475df9: bcd24143fcf00377e7d327374a487779a871a24c60d4823333a143c2ada1517a
 
 importers:
@@ -76,7 +76,7 @@ importers:
         version: 2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0)
       h3-mcp:
         specifier: 0.2.0
-        version: 0.2.0(patch_hash=d44edd6ae58d05304af0ac5b88fc4fc6aadd5204f993f57949f4ad22e2e34331)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))
+        version: 0.2.0(patch_hash=300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))
       jose:
         specifier: ^6.2.12
         version: 6.2.12
@@ -14502,7 +14502,7 @@ snapshots:
       ipaddr.js: 2.2.0
       undici: 7.29.0
 
-  h3-mcp@0.2.0(patch_hash=d44edd6ae58d05304af0ac5b88fc4fc6aadd5204f993f57949f4ad22e2e34331)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0)):
+  h3-mcp@0.2.0(patch_hash=300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0)):
     dependencies:
       h3: 2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0)
 
@@ -15605,7 +15605,7 @@ snapshots:
   nitro-mcp-toolkit@0.4.0(@modelcontextprotocol/client@2.3.1)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))(nitro@3.0.260610-beta(@azure/identity@4.13.3(supports-color@8.1.1))(@azure/storage-blob@12.34.0(supports-color@8.1.1))(@libsql/client@0.18.0)(@vercel/functions@3.9.11(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20261005.1)(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)(bun-types@1.4.2)(kysely@0.29.6)(sql.js@1.14.2))(giget@3.3.1)(jiti@2.7.0)(lru-cache@11.5.3)(uploadthing@7.7.4(express@5.2.1(supports-color@8.1.1))(h3@2.0.1-rc.31(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))(tailwindcss@4.3.3))(vite@8.3.2)(wrangler@4.148.0(@cloudflare/workers-types@5.20261005.1)(@types/node@25.9.9))):
     dependencies:
       h3: 2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0)
-      h3-mcp: 0.2.0(patch_hash=d44edd6ae58d05304af0ac5b88fc4fc6aadd5204f993f57949f4ad22e2e34331)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))
+      h3-mcp: 0.2.0(patch_hash=300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))
       jose: 6.2.12
       pathe: 2.0.3
       tinyglobby: 0.2.17
