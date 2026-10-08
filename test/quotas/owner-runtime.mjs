@@ -11,7 +11,7 @@ async function request(path, method = "GET", body, headers = {}) {
 }
 const email = `quota-${crypto.randomUUID()}@example.com`
 const signin = await request("/api/auth/sign-up/email", "POST", { name: "Quota test", email, password: `Quota-test-${crypto.randomUUID()}` }, { origin })
-assert.equal(signin.response.status, 200)
+assert.equal(signin.response.status, 200, JSON.stringify(signin.data))
 cookie = signin.response.headers.getSetCookie().map(value => value.split(";")[0]).join("; ")
 assert.ok(cookie)
 const usage = await request("/api/usage")
@@ -33,7 +33,7 @@ try {
   assert.equal(currentUsage.writes.used, 4)
   const denied = await request("/api/drops", "POST", { filename: "fourth.md", content: "# Blocked" })
   assert.equal(denied.response.status, 402)
-  assert.equal(denied.data.code, "DROP_LIMIT_REACHED")
+  assert.equal(denied.data.code, "DROP_LIMIT_REACHED", JSON.stringify(denied.data))
   assert.deepEqual(denied.data.quota, { unit: "drops", used: 3, limit: 3 })
   assert.equal(denied.data.retryable, false)
   assert.equal(denied.data.upgradeUrl, "/settings/billing")

@@ -5,7 +5,9 @@ import { createDocDrop, dropPageUrl, MAX_FILE_BYTES } from "../utils/drops"
 import { requireIdentity } from "../utils/identity"
 
 /** Agents upload one file. It becomes a private drop; `url` serves the file, `page` opens it for review. */
-export default defineHandler(async (event) => {
+import { quotaApiHandler } from "../utils/quotas"
+
+export default quotaApiHandler(defineHandler(async (event) => {
   const who = await requireIdentity(event).catch(async (error) => {
     // Release the unread upload before answering, or the connection can drop mid-stream instead of a clean 401.
     await event.req.body?.cancel().catch(() => {})
@@ -47,4 +49,4 @@ export default defineHandler(async (event) => {
     visibility: drop.visibility,
     version: drop.version,
   }
-})
+}))

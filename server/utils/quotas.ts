@@ -163,3 +163,14 @@ export async function cleanupQuotaBlobs(now: Date) {
     await releaseQuotaBlobs(keys)
   }
 }
+
+/** Return quota JSON directly before generic error handlers reshape HTTPError bodies. */
+export function quotaApiHandler<Args extends unknown[], Result>(handler: (...args: Args) => Result) {
+  return async (...args: Args): Promise<Awaited<Result> | Response> => {
+    try { return await handler(...args) }
+    catch (error) {
+      if (!(error instanceof DropQuotaError)) throw error
+      return Response.json(error.quotaBody, { status: 402 })
+    }
+  }
+}
