@@ -42,6 +42,10 @@ try {
   const app = await request("/api/apps", "POST", { files: { "index.html": "<h1>Owner</h1>" } })
   assert.equal(app.status, 200)
   drops.push(app.data.id)
+  const fiftyFiles = { "index.html": "<h1>Max</h1>", ...Object.fromEntries(Array.from({ length: 49 }, (_, i) => [`${i}.txt`, ""])) }
+  const maxApp = await request("/api/apps", "POST", { files: fiftyFiles })
+  assert.equal(maxApp.status, 200, JSON.stringify(maxApp.data))
+  assert.equal((await request(`/api/drops/${maxApp.data.id}`, "DELETE")).status, 200)
   const image = await request("/api/code", "POST", { code: "const quota = 1", format: "svg" })
   assert.equal(image.status, 200)
   const imageResponse = await fetch(image.data.url)
@@ -74,6 +78,17 @@ try {
   assert.equal(pro.writes.limit, 10_000)
   assert.equal(pro.app.files, 200)
   assert.equal(pro.app.bytes, 4 * 1024 * 1024)
+  let previous = null
+  let fixtureId
+  const insert = db.prepare("INSERT INTO drops (id,owner_id,kind,title,filename,size,version,supersedes_id,actor_kind,actor_name,created_at,updated_at) VALUES (?,?,'file','History fixture','fixture.txt',0,?,?,'browser','Fixture',0,0)")
+  for (let i = 0; i < 300; i++) {
+    fixtureId = crypto.randomUUID()
+    insert.run(fixtureId, owner.id, i + 1, previous)
+    previous = fixtureId
+  }
+  assert.equal((await request("/api/usage")).data.drops.used, 3)
+  assert.equal((await request(`/api/drops/${fixtureId}`, "DELETE")).status, 200)
+  assert.equal((await request("/api/usage")).data.drops.used, 2)
   db.prepare("UPDATE quota_blobs SET expires_at=0 WHERE owner_id=?").run(owner.id)
   const cleanup = await fetch(`${origin}/cdn-cgi/local/scheduled`)
   assert.equal(cleanup.status, 200)
@@ -81,7 +96,7 @@ try {
   assert.equal(afterCleanup.bytes.used, pro.bytes.used - imageBytes)
   assert.equal(afterCleanup.writes.used, 1001)
   assert.equal((await fetch(image.data.url)).status, 404)
-  console.log("Quota admin smoke passed: plan changes, exhausted monthly budget, owner app cap, admin attribution, retained image cleanup")
+  console.log("Quota admin smoke passed: plan changes, exhausted monthly budget, owner app cap, admin attribution, 50-file app, full history deletion, retained image cleanup")
 }
 finally {
   for (const id of drops) await request(`/api/drops/${id}`, "DELETE")

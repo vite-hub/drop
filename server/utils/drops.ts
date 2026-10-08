@@ -12,6 +12,7 @@ import { contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
+import { deleteRetainedDrop } from "./quota-deletion"
 
 export type DropRow = typeof drops.$inferSelect
 
@@ -286,7 +287,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
       if (!row) {
         await quota.commit([
           db.insert(drops).values(next),
-          db.insert(dropFiles).values(fileRows),
+          ...quota.fileInserts(fileRows),
         ])
         committedPublish = true
       }
@@ -325,18 +326,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
 /** Removes a drop, its files, and its comments. */
 export async function deleteDrop(row: DropRow) {
   await drainBlobCleanup()
-  const chain = await versionChain(row)
-  const files = chain.some(item => item.kind === "app")
-    ? await db.select().from(dropFiles).where(inArray(dropFiles.dropId, chain.map(item => item.id)))
-    : []
-  const keys = [...files.map(file => file.blobKey), ...chain.map(item => item.blobKey).filter((key): key is string => Boolean(key))]
-  const cleanupRows = [...new Set(keys)].map(blobKey => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() }))
-  const deleteRows = db.delete(drops).where(inArray(drops.id, chain.map(item => item.id)))
-  if (cleanupRows.length)
-    await atomic.batch([db.insert(blobCleanup).values(cleanupRows).onConflictDoNothing(), deleteRows])
-  else
-    await deleteRows
-  await deleteBlobKeys(keys)
+  await deleteRetainedDrop(row, deleteBlobKeys)
 }
 
 export const dropPageUrl = (origin: string, id: string) => new URL(`/d/${id}`, origin).href

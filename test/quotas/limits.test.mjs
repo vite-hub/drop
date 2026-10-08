@@ -11,7 +11,7 @@ import { H3Event, HTTPError, toResponse } from "h3"
 import { createMcpHandler, defineMcpTool } from "nitro-mcp-toolkit"
 import { MCP_LATEST, MCP_LEGACY } from "../../shared/mcp.ts"
 import { MIB, planLimits, quotaFailure, quotaToolFailure, usageNearLimit } from "../../shared/quotas.ts"
-import { reserveSQL, usageSQL } from "../../server/utils/quota-sql.ts"
+import { appFileChunks, deletionChainSQL, reserveSQL, usageSQL } from "../../server/utils/quota-sql.ts"
 
 function setup(path = ":memory:") {
   const db = new DatabaseSync(path)
@@ -194,4 +194,37 @@ test("REST quota errors preserve the same top-level JSON fields with 402", async
   assert.equal(response.status, 402)
   const body = await response.json()
   for (const [key, value] of Object.entries(failure)) assert.deepEqual(body[key], value)
+})
+
+test("deleting a long version chain frees every retained byte and slot without refunding writes", () => {
+  const db = setup()
+  for (let i = 0; i < 300; i++) doc(db, `long${i}`, { size: 1, previous: i ? `long${i - 1}` : null })
+  doc(db, "unrelated", { size: 1 })
+  doc(db, "other", { owner: "other" })
+  const ledger = reserve(db, { drops: 0, bytes: 0, writes: 7 })
+  commit(db, ledger, () => {})
+  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run("long150", "owner", "owner", "long150", "owner", "owner")
+  assert.deepEqual(used(db), { drops: 1, bytes: 1, writes: 7 })
+  assert.deepEqual(used(db, "other"), { drops: 1, bytes: 10, writes: 0 })
+  db.close()
+})
+
+test("full-chain deletion never follows a parent belonging to another owner", () => {
+  const db = setup()
+  doc(db, "foreign", { owner: "other" })
+  doc(db, "owned", { previous: "foreign" })
+  doc(db, "owned-next", { previous: "owned" })
+  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run("owned", "owner", "owner", "owned", "owner", "owner")
+  assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 0 })
+  assert.deepEqual(used(db, "other"), { drops: 1, bytes: 10, writes: 0 })
+  db.close()
+})
+
+test("app metadata inserts stay within D1's bound-parameter limit at both plan maximums", () => {
+  for (const count of [50, 200]) {
+    const files = Array.from({ length: count }, (_, i) => ({ dropId: "app", path: `${i}.html`, blobKey: `${i}.html`, size: 0 }))
+    const chunks = appFileChunks(files)
+    assert.deepEqual(chunks.flat(), files)
+    assert.ok(chunks.every(chunk => chunk.length * 4 <= 100))
+  }
 })

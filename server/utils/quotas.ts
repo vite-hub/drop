@@ -6,8 +6,8 @@ import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { DEFAULT_PRO_LIMITS, MAX_APP_BYTES, MAX_APP_FILES, isPlan, planLimits, quotaFailure, quotaToolFailure, type Plan, type QuotaFailure, type Usage } from "#shared/quotas"
-import { quotaBlobs, quotaReservations, user } from "../databases/config"
-import { reserveSQL, usageSQL } from "./quota-sql"
+import { dropFiles, quotaBlobs, quotaReservations, user } from "../databases/config"
+import { appFileChunks, bindQuotaSQL, reserveSQL, usageSQL } from "./quota-sql"
 
 const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
 type Statement = Parameters<DrizzleD1Database["batch"]>[0][number]
@@ -26,14 +26,8 @@ export function effectivePlan(value: unknown): Plan {
   return isPlan(value) ? value : quotaConfig().defaultPlan
 }
 
-// Bind values, never interpolate them into the SQL text.
-function bind(query: string, values: unknown[]): SQL {
-  const parts = query.split("?")
-  return sql.join(parts.flatMap((part, index) => index < values.length ? [sql.raw(part), sql`${values[index]}`] : [sql.raw(part)]), sql.raw(""))
-}
-
 async function ownerUsage(ownerId: string, month: string) {
-  const [row] = await db.all<{ drops: number; bytes: number; writes: number }>(bind(usageSQL, [ownerId, month]))
+  const [row] = await db.all<{ drops: number; bytes: number; writes: number }>(bindQuotaSQL(usageSQL, [ownerId, month]))
   return row ?? { drops: 0, bytes: 0, writes: 0 }
 }
 
@@ -71,7 +65,7 @@ export async function quotaToolResult<T>(operation: () => Promise<T>) {
 interface Cost { drops: number; bytes: number; writes: number; targetId?: string; app?: { files: number; bytes: number } }
 
 /** Reserve before touching blobs. Transfer to the write ledger in the metadata batch, or release on failure. */
-export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Event | undefined, operation: (quota: { commit: (statements: Statement[], success?: SQL) => Promise<void> }) => Promise<T>): Promise<T> {
+export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Event | undefined, operation: (quota: { commit: (statements: Statement[], success?: SQL) => Promise<void>; fileInserts: (rows: (typeof dropFiles.$inferInsert)[]) => Statement[] }) => Promise<T>): Promise<T> {
   const config = quotaConfig()
   const usage = config.enabled ? await getUsage(ownerId) : {
     month: new Date().toISOString().slice(0, 7), plan: "unlimited",
@@ -93,7 +87,7 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   const id = crypto.randomUUID()
   let reserved: { id: string }[]
   try {
-    reserved = config.enabled ? await db.all<{ id: string }>(bind(reserveSQL, [
+    reserved = config.enabled ? await db.all<{ id: string }>(bindQuotaSQL(reserveSQL, [
       ownerId, usage.month, id, cost.drops, cost.bytes, cost.writes, cost.targetId ?? null, Date.now(),
       usage.drops.limit === null ? 0 : 1, cost.drops, usage.drops.limit ?? 0,
       usage.bytes.limit === null ? 0 : 1, cost.bytes, usage.bytes.limit ?? 0,
@@ -121,6 +115,7 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   let committed = false
   try {
     const result = await operation({
+      fileInserts: rows => appFileChunks(rows).map(chunk => db.insert(dropFiles).values(chunk)),
       commit: async (statements, success = sql`1`) => {
         // A failed guard violates the ledger CHECK and rolls back the entire D1 batch.
         const finish = db.update(quotaReservations).set({ committed: true, drops: 0, bytes: 0, writes: sql`CASE WHEN (${success}) THEN ${quotaReservations.writes} ELSE -1 END` })
