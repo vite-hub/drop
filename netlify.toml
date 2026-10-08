@@ -1,6 +1,6 @@
 # Netlify builds Drop for its own host. Secrets go in the site's environment variables (docs/self-host/netlify).
 [build]
-  command = "pnpm build"
+  command = "pnpm build && pnpm db:migrate:d1"
   publish = "dist"
 
 [build.environment]
@@ -15,3 +15,14 @@
   from = "/*"
   to = "/.netlify/functions/server"
   status = 200
+
+# The deploy button prompts for these values before its first build.
+[template.environment]
+  GITHUB_CLIENT_ID = "GitHub OAuth app client id. Callback: https://<site>.netlify.app/api/auth/callback/github"
+  GITHUB_CLIENT_SECRET = "Client secret from that GitHub OAuth app"
+  BETTER_AUTH_SECRET = "Generate with openssl rand -base64 32"
+  DROP_ADMINS = "Your GitHub user id: gh api users/<login> --jq .id. Comma-separated for multiple admins"
+  CLOUDFLARE_ACCOUNT_ID = "Account id from the Cloudflare dashboard"
+  CLOUDFLARE_API_TOKEN = "Account API token with Account, D1, Edit permission"
+  CLOUDFLARE_D1_DATABASE_ID = "Database id printed by wrangler d1 create my-drop"
+  CLOUDFLARE_D1_DATABASE_NAME = "Name of that D1 database"

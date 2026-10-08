@@ -1,0 +1,19 @@
+services:
+  drop:
+    build:
+      context: .
+      args:
+        CLOUDFLARE_D1_DATABASE_ID: ${CLOUDFLARE_D1_DATABASE_ID:?Set the D1 database id in .env}
+        CLOUDFLARE_D1_DATABASE_NAME: ${CLOUDFLARE_D1_DATABASE_NAME:-my-drop}
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - drop-data:/app/.data
+    restart: unless-stopped
+
+volumes:
+  drop-data:

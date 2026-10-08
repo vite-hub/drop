@@ -1,20 +1,11 @@
 {
   "deploy": {
-    "org": "onmax",
-    "app": "vitehub-drop"
+    "install": "npm install --global pnpm@11.18.0 && pnpm install --frozen-lockfile",
+    "build": "DROP_HOST=deno pnpm build",
+    "predeploy": "deno run --allow-env --allow-read=server/databases/migrations --allow-net=api.cloudflare.com scripts/migrate-d1.mjs",
+    "runtime": {
+      "type": "dynamic",
+      "entrypoint": ".output/server/index.mjs"
+    }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
