@@ -1,8 +1,52 @@
 diff --git a/dist/config-fGBGQo_p.js b/dist/config-fGBGQo_p.js
-index 6ac38eb023b76a009d405ea7bca2557532f5467a..3159ec27897b814efb05dc712465ce302151ef40 100644
+index 6ac38eb023b76a009d405ea7bca2557532f5467a..812767241d25393f2346cb4d5337ce130a1711a4 100644
 --- a/dist/config-fGBGQo_p.js
 +++ b/dist/config-fGBGQo_p.js
-@@ -833,8 +833,16 @@ function resolveDBViteConfig(options, rootDir = process.cwd(), discovery = {}) {
+@@ -593,13 +593,13 @@ function findIdentifierCalls(source, name) {
+ //#region src/config.ts
+ const configFilePattern = /^config\.(?:c|m)?[jt]s$/i;
+ const viteDatabaseSuffixPattern = /\.database\.(?:c|m)?[jt]s$/i;
+-function readDefinitionObjectBody(file) {
++function readDefinitionObjectBody(file, exact = false) {
+ 	const source = readFileSync(file, "utf8");
+ 	const calls = findIdentifierCalls(source, "defineDatabase");
+ 	const argument = (calls.find((item) => /(?:^|[;\n])\s*export\s+default\s*$/.test(source.slice(Math.max(0, item.start - 100), item.start))) || calls[0])?.arguments[0]?.trim();
+ 	if (!argument?.startsWith("{")) return;
+ 	const closeIndex = findMatching(argument, 0, "{", "}");
+-	return closeIndex === void 0 ? void 0 : argument.slice(1, closeIndex);
++	return closeIndex === void 0 || (exact && argument.slice(closeIndex + 1).trim()) ? void 0 : argument.slice(1, closeIndex);
+ }
+ function objectLiteralBody(value) {
+ 	const trimmed = value?.trim();
+@@ -712,6 +712,27 @@ function readDefinitionCloudflareConfig(file) {
+ 		...Object.values(value).some((item) => typeof item !== "undefined") ? { value } : {}
+ 	};
+ }
++// Partial scanner results cannot prove HTTP stays enabled after runtime spreads.
++function isStaticD1HttpDefinition(file) {
++  if (!existsSync(file)) return false
++  const definitionBody = readDefinitionObjectBody(file, true)
++  if (typeof definitionBody === "undefined") return false
++  const definitionEntries = splitTopLevel(definitionBody).filter(entry => entry.trim())
++  if (definitionEntries.some(entry => !readEntryKey(entry))) return false
++  const cloudflareEntries = definitionEntries.filter(entry => readEntryKey(entry) === "cloudflare")
++  if (cloudflareEntries.length !== 1) return false
++  const expression = readEntryValue(cloudflareEntries[0])?.trim()
++  const body = objectLiteralBody(expression)
++  if (typeof body === "undefined" || expression !== `{${body}}`) return false
++  const entries = splitTopLevel(body).filter(entry => entry.trim())
++  if (entries.some(entry => !readEntryKey(entry))) return false
++  const httpEntries = entries.filter(entry => readEntryKey(entry) === "http")
++  if (httpEntries.length !== 1) return false
++  const http = readEntryValue(httpEntries[0])?.trim()
++  const httpBody = objectLiteralBody(http)
++  return http === "true" || (typeof httpBody === "string" && http === `{${httpBody}}`)
++}
++
+ function readDefinitionConnectionConfig(file) {
+ 	const body = objectLiteralBody(readObjectPropertyValue(readDefinitionObjectBody(file), "connection"));
+ 	if (!body) return;
+@@ -833,8 +854,16 @@ function resolveDBViteConfig(options, rootDir = process.cwd(), discovery = {}) {
  		const generatedSchemaFile = createGeneratedSchemaFile(rootDir, definition.name);
  		generatedDrizzleConfigFilesByDatabase[definition.name] = createGeneratedDrizzleConfigFile(rootDir, definition.name);
  		generatedSchemaFilesByDatabase[definition.name] = generatedSchemaFile;
@@ -20,6 +64,12 @@ index 6ac38eb023b76a009d405ea7bca2557532f5467a..3159ec27897b814efb05dc712465ce30
  			connection: resolveDefinitionConnection(definition.handler, definition.name, options?.connection),
  			dialect: "sqlite",
  			drizzle: {},
+@@ -864,4 +893,4 @@ function resolveDBViteConfig(options, rootDir = process.cwd(), discovery = {}) {
+ 	};
+ }
+ //#endregion
+-export { splitTopLevel as a, createImportPath as c, maskSourceLiterals as i, ensureGeneratedDir as l, resolveDBViteConfig as n, writeFileIfChanged as o, findMatching as r, computePackageDir as s, discoverDatabaseDefinitions as t, resolveRuntimeModule as u };
++export { isStaticD1HttpDefinition, splitTopLevel as a, createImportPath as c, maskSourceLiterals as i, ensureGeneratedDir as l, resolveDBViteConfig as n, writeFileIfChanged as o, findMatching as r, computePackageDir as s, discoverDatabaseDefinitions as t, resolveRuntimeModule as u };
 diff --git a/dist/drizzle-adapter-gfvzcSk_.js b/dist/drizzle-adapter-gfvzcSk_.js
 index 5feb04bac48823cd071e1c1df60510b49c1dea21..438139ed4fc4e25040f0a6f1569d611bfa716189 100644
 --- a/dist/drizzle-adapter-gfvzcSk_.js
@@ -91,15 +141,24 @@ index 0000000000000000000000000000000000000000..e1729b80cde468d4e5e27a7cd879043b
 +  return createHostedDrizzleDb(runtimeConfig(definition), definition.schema);
 +}
 diff --git a/dist/vite-CJMeCoSq.js b/dist/vite-CJMeCoSq.js
-index dc4f736164520de68936e60f74a52cd57a1ff693..1064b3709b77527533283a818f32b3a78adb00d9 100644
+index dc4f736164520de68936e60f74a52cd57a1ff693..fc3fd6cf428f6e89ff0dedde4a210710adb212be 100644
 --- a/dist/vite-CJMeCoSq.js
 +++ b/dist/vite-CJMeCoSq.js
+@@ -1,7 +1,7 @@
+ import { t as isPlainObject } from "./object-DULWYS8e.js";
+ import { t as databaseErrorDiagnostics } from "./error-diagnostics-ChkgrjKq.js";
+ import { createDbCliContributor } from "./cli.js";
+-import { a as splitTopLevel, c as createImportPath, i as maskSourceLiterals, l as ensureGeneratedDir, n as resolveDBViteConfig, r as findMatching, s as computePackageDir, t as discoverDatabaseDefinitions, u as resolveRuntimeModule$1 } from "./config-fGBGQo_p.js";
++import { isStaticD1HttpDefinition, a as splitTopLevel, c as createImportPath, i as maskSourceLiterals, l as ensureGeneratedDir, n as resolveDBViteConfig, r as findMatching, s as computePackageDir, t as discoverDatabaseDefinitions, u as resolveRuntimeModule$1 } from "./config-fGBGQo_p.js";
+ import { t as internalErrorDiagnostics } from "./error-diagnostics-Cw33fOn6.js";
+ import { n as renderConfigValueExpression, r as resolveConfigValue } from "./config-value-GbX6yaWX.js";
+ import { createRequire } from "node:module";
 @@ -3250,6 +3250,9 @@ function normalizeDefinitionDefaults(defaults) {
  		}
  	};
  }
 +function usesD1HttpOnly(runtimeConfig) {
-+	return runtimeConfig.databaseNames.length > 0 && runtimeConfig.databaseNames.every(name => Boolean(runtimeConfig.databases[name]?.cloudflare?.http));
++	return runtimeConfig.databaseNames.length > 0 && runtimeConfig.databaseNames.every(name => Boolean(runtimeConfig.databases[name]?.cloudflare?.http)) && runtimeConfig.definitions.every(definition => isStaticD1HttpDefinition(definition.handler));
 +}
  function renderRuntimeModule(file, runtimeConfig) {
  	const imports = runtimeConfig.definitions.flatMap((definition, index) => [`import definition_${index} from ${JSON.stringify(createImportPath(file, definition.handler))}`, `import schema_${index} from ${JSON.stringify(createImportPath(file, runtimeConfig.generatedSchemaFilesByDatabase[definition.name]))}`]);
