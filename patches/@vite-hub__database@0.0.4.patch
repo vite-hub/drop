@@ -20,11 +20,50 @@ index 6ac38eb023b76a009d405ea7bca2557532f5467a..3159ec27897b814efb05dc712465ce30
  			connection: resolveDefinitionConnection(definition.handler, definition.name, options?.connection),
  			dialect: "sqlite",
  			drizzle: {},
+diff --git a/dist/drizzle-adapter-gfvzcSk_.js b/dist/drizzle-adapter-gfvzcSk_.js
+index 5feb04bac48823cd071e1c1df60510b49c1dea21..438139ed4fc4e25040f0a6f1569d611bfa716189 100644
+--- a/dist/drizzle-adapter-gfvzcSk_.js
++++ b/dist/drizzle-adapter-gfvzcSk_.js
+@@ -119,7 +119,7 @@ function createDrizzleSqliteAdapter(config, schema, options) {
+ 			return d1HttpInstance;
+ 		}
+ 		const url = resolveConfigValue(config.connection?.url);
+-		if (!url || options.requireRemoteUrl && !isRemoteSqliteUrl(url)) throw databaseErrorDiagnostics.DATABASE_R0014({ message: options.missingConnectionMessage(config) });
++		if (!url || !options.libsql || options.requireRemoteUrl && !isRemoteSqliteUrl(url)) throw databaseErrorDiagnostics.DATABASE_R0014({ message: options.missingConnectionMessage(config) });
+ 		if (libsqlInstance && libsqlInstanceUrl === url) return libsqlInstance;
+ 		libsqlInstance = options.libsql.drizzle({
+ 			casing: config.drizzle.casing,
 diff --git a/dist/nuxt.js b/dist/nuxt.js
-index 7248bec899783bbde4428784bfe85a8a6b127c46..66e545cf26870d06f681dd9f969f01e74f9dc9b9 100644
+index 7248bec899783bbde4428784bfe85a8a6b127c46..6a5cfb8aef1a6f034953b5b67b1828e3bfad0b27 100644
 --- a/dist/nuxt.js
 +++ b/dist/nuxt.js
-@@ -198,6 +198,7 @@ function resolveDatabaseViteOptions(options) {
+@@ -2,7 +2,7 @@ import { t as isPlainObject } from "./object-DULWYS8e.js";
+ import { t as databaseErrorDiagnostics } from "./error-diagnostics-ChkgrjKq.js";
+ import { n as resolveDBViteConfig, o as writeFileIfChanged } from "./config-fGBGQo_p.js";
+ import { r as resolveConfigValue } from "./config-value-GbX6yaWX.js";
+-import { c as renderDatabaseRuntimeModule, d as resolveCloudflareD1Binding, f as readProvisionStateSync, h as resolveViteHubProjectRoot, i as hubDb$1, l as getDatabaseNuxtProvisionStateKey, m as resolveViteHubGeneratedRoot, o as writeHostedDatabaseRuntimeModules, p as VITEHUB_GENERATED_ROOT, s as writeGeneratedDatabaseArtifacts, u as mergeCloudflareD1Bindings } from "./vite-CJMeCoSq.js";
++import { usesD1HttpOnly, c as renderDatabaseRuntimeModule, d as resolveCloudflareD1Binding, f as readProvisionStateSync, h as resolveViteHubProjectRoot, i as hubDb$1, l as getDatabaseNuxtProvisionStateKey, m as resolveViteHubGeneratedRoot, o as writeHostedDatabaseRuntimeModules, p as VITEHUB_GENERATED_ROOT, s as writeGeneratedDatabaseArtifacts, u as mergeCloudflareD1Bindings } from "./vite-CJMeCoSq.js";
+ import { resolve } from "node:path";
+ import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+@@ -98,9 +98,14 @@ function hubDb(options = {}) {
+ 			if (!nuxtOptions.dev && (provider || d1)) mergeNitroHostedCondition(config);
+ 			if (nuxtOptions.dev) await installNitroLocalDatabaseRuntime(config, root, generatedRoot, resolvedOptions, serverDirs);
+ 			if (!nuxtOptions.dev) {
+-				const runtimeProvider = provider ?? (d1 ? "cloudflare" : void 0);
++				const runtime = resolveDBViteConfig(resolvedOptions, root, { serverDirs });
++				const d1Only = runtime && usesD1HttpOnly(runtime);
++				const runtimeProvider = provider === "vercel" ? "vercel" : provider === "cloudflare" || d1 || d1Only ? "cloudflare" : provider;
++				if (d1Only) {
++					const alias = ensureRecord(config, "alias");
++					alias["#vitehub/database/definition-runtime"] ??= resolve(databaseRuntimeDir, "d1.js");
++				}
+ 				if (runtimeProvider === "cloudflare" || runtimeProvider === "vercel") {
+-					const runtime = resolveDBViteConfig(resolvedOptions, root, { serverDirs });
+ 					if (runtime) {
+ 						await writeGeneratedDatabaseArtifacts(runtime);
+ 						await writeHostedDatabaseRuntimeModules(resolve(root, ".vitehub/database"), runtime, [runtimeProvider]);
+@@ -198,6 +203,7 @@ function resolveDatabaseViteOptions(options) {
  		viteOptions.binding = options.binding;
  		viteOptions.databaseId = options.databaseId;
  		viteOptions.databaseName = options.databaseName;
@@ -32,3 +71,51 @@ index 7248bec899783bbde4428784bfe85a8a6b127c46..66e545cf26870d06f681dd9f969f01e7
  		viteOptions.local = options.local;
  		viteOptions.migrationsTable = options.migrationsTable;
  		viteOptions.previewDatabaseId = options.previewDatabaseId;
+diff --git a/dist/runtime/d1.js b/dist/runtime/d1.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..e1729b80cde468d4e5e27a7cd879043b4d70c7ba
+--- /dev/null
++++ b/dist/runtime/d1.js
+@@ -0,0 +1,13 @@
++import { t as createDrizzleSqliteAdapter } from "../drizzle-adapter-gfvzcSk_.js";
++import { t as runtimeConfig } from "../definition-config-DMytzfZ4.js";
++
++const options = {
++  missingConnectionMessage: config => `[vitehub] D1 database "${config.name}" requires a Cloudflare binding or cloudflare.http configuration.`,
++  requireRemoteUrl: true
++};
++export function createHostedDrizzleDb(config, schema) {
++  return createDrizzleSqliteAdapter(config, schema, options);
++}
++export function createDefinitionRuntime(definition) {
++  return createHostedDrizzleDb(runtimeConfig(definition), definition.schema);
++}
+diff --git a/dist/vite-CJMeCoSq.js b/dist/vite-CJMeCoSq.js
+index dc4f736164520de68936e60f74a52cd57a1ff693..1064b3709b77527533283a818f32b3a78adb00d9 100644
+--- a/dist/vite-CJMeCoSq.js
++++ b/dist/vite-CJMeCoSq.js
+@@ -3250,6 +3250,9 @@ function normalizeDefinitionDefaults(defaults) {
+ 		}
+ 	};
+ }
++function usesD1HttpOnly(runtimeConfig) {
++	return runtimeConfig.databaseNames.length > 0 && runtimeConfig.databaseNames.every(name => Boolean(runtimeConfig.databases[name]?.cloudflare?.http));
++}
+ function renderRuntimeModule(file, runtimeConfig) {
+ 	const imports = runtimeConfig.definitions.flatMap((definition, index) => [`import definition_${index} from ${JSON.stringify(createImportPath(file, definition.handler))}`, `import schema_${index} from ${JSON.stringify(createImportPath(file, runtimeConfig.generatedSchemaFilesByDatabase[definition.name]))}`]);
+ 	const databaseEntries = runtimeConfig.databaseNames.map((name, index) => [
+@@ -3262,7 +3265,7 @@ function renderRuntimeModule(file, runtimeConfig) {
+ 		createAgentDatabaseImport: createImportPath(file, resolveRuntimeModule("runtime/agent")),
+ 		databaseEntries,
+ 		imports: [
+-			`import { createHostedDrizzleDb } from ${JSON.stringify(createImportPath(file, resolveRuntimeModule("runtime/hosted")))}`,
++			`import { createHostedDrizzleDb } from ${JSON.stringify(createImportPath(file, resolveRuntimeModule(usesD1HttpOnly(runtimeConfig) ? "runtime/d1" : "runtime/hosted")))}`,
+ 			"",
+ 			...imports
+ 		]
+@@ -3774,4 +3777,4 @@ function hubDb(options) {
+ 	};
+ }
+ //#endregion
+-export { inspectDatabaseDefinitions as a, renderDatabaseRuntimeModule as c, resolveCloudflareD1Binding as d, readProvisionStateSync as f, resolveViteHubProjectRoot as h, hubDb as i, getDatabaseNuxtProvisionStateKey as l, resolveViteHubGeneratedRoot as m, DB_VIRTUAL_SCHEMA_ID as n, writeHostedDatabaseRuntimeModules as o, VITEHUB_GENERATED_ROOT as p, DB_VITE_PLUGIN_NAME as r, writeGeneratedDatabaseArtifacts as s, DB_VIRTUAL_DATABASES_ID as t, mergeCloudflareD1Bindings as u };
++export { usesD1HttpOnly, inspectDatabaseDefinitions as a, renderDatabaseRuntimeModule as c, resolveCloudflareD1Binding as d, readProvisionStateSync as f, resolveViteHubProjectRoot as h, hubDb as i, getDatabaseNuxtProvisionStateKey as l, resolveViteHubGeneratedRoot as m, DB_VIRTUAL_SCHEMA_ID as n, writeHostedDatabaseRuntimeModules as o, VITEHUB_GENERATED_ROOT as p, DB_VITE_PLUGIN_NAME as r, writeGeneratedDatabaseArtifacts as s, DB_VIRTUAL_DATABASES_ID as t, mergeCloudflareD1Bindings as u };

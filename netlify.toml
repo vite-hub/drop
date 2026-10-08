@@ -1,6 +1,6 @@
 # Netlify builds Drop for its own host. Secrets go in the site's environment variables (docs/self-host/netlify).
 [build]
-  command = "pnpm build && node scripts/netlify-native.mjs"
+  command = "pnpm build"
   publish = "dist"
 
 [build.environment]
@@ -10,8 +10,6 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "none"
-  external_node_modules = ["@libsql/linux-x64-gnu"]
-  included_files = ["node_modules/@libsql/linux-x64-gnu/**"]
 
 [[redirects]]
   from = "/*"
