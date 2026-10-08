@@ -98,7 +98,7 @@ assert.match(markdownUrl.pathname, /^\/f\/[0-9a-f-]+\.md$/)
 const markdownPage = await fetch(markdownUrl, { headers: auth, signal: timeout() })
 assert.equal(markdownPage.status, 200)
 assert.equal(markdownPage.headers.get("content-type"), "text/html; charset=utf-8")
-assert.match(markdownPage.headers.get("cache-control") ?? "", /private, no-store/)
+assert.match(markdownPage.headers.get("cache-control") ?? "", /private,\s*no-store/)
 assert.match(await markdownPage.text(), /<div class="mermaid"><svg/)
 assert.match(markdownPage.headers.get("content-security-policy"), /script-src 'self'/)
 
