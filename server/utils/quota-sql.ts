@@ -1,5 +1,5 @@
 import { getTableColumns, sql, type SQL } from "drizzle-orm"
-import { dropFiles } from "../databases/drops"
+import { dropFiles } from "../databases/drops.ts"
 
 export function bindQuotaSQL(query: string, values: unknown[]): SQL {
   const parts = query.split("?")
