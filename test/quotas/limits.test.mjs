@@ -127,6 +127,18 @@ test("downgraded owners can revise without growing storage or adding slots", () 
   db.close()
 })
 
+test("unlimited plans reserve beyond free and Pro caps without imposing owner limits", () => {
+  const db = setup()
+  const limits = planLimits("unlimited")
+  for (let i = 0; i < 5; i++) {
+    const id = reserve(db, { limits, bytes: 2 * 1024 * MIB, writes: 20_000 })
+    assert.ok(id)
+    commit(db, id, () => doc(db, `big${i}`, { size: 2 * 1024 * MIB }))
+  }
+  assert.deepEqual(used(db), { drops: 5, bytes: 10 * 1024 * MIB, writes: 100_000 })
+  db.close()
+})
+
 test("temporary code images charge a write and bytes until blob cleanup, with no drop", () => {
   const db = setup()
   const id = reserve(db, { drops: 0, bytes: 15 })

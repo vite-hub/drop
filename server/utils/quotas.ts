@@ -73,20 +73,15 @@ interface Cost { drops: number; bytes: number; writes: number; targetId?: string
 /** Reserve before touching blobs. Transfer to the write ledger in the metadata batch, or release on failure. */
 export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Event | undefined, operation: (quota: { commit: (statements: Statement[], success?: SQL) => Promise<void> }) => Promise<T>): Promise<T> {
   const config = quotaConfig()
-  if (!config.enabled) {
-    return operation({ commit: async (statements, success = sql`1`) => {
-      const probe = db.select({ won: sql<number>`CASE WHEN (${success}) THEN 1 ELSE 0 END` }).from(sql`(SELECT 1)`)
-      const results = await atomic.batch([...statements, probe] as [Statement, ...Statement[]])
-      if (!(results.at(-1) as { won: number }[])[0]?.won)
-        throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version." })
-    } })
+  const usage = config.enabled ? await getUsage(ownerId) : {
+    month: new Date().toISOString().slice(0, 7), plan: "unlimited",
+    drops: { limit: null }, bytes: { limit: null }, writes: { limit: null }, app: { files: 200, bytes: 4 * 1024 * 1024 },
   }
-  const usage = await getUsage(ownerId)
   if (cost.app) {
     if (cost.app.files > usage.app.files) throw new DropQuotaError(quotaFailure("appFiles", cost.app.files, usage.app.files))
     if (cost.app.bytes > usage.app.bytes) throw new DropQuotaError(quotaFailure("appBytes", cost.app.bytes, usage.app.bytes))
   }
-  if (event && !import.meta.dev && usage.plan !== "unlimited") {
+  if (config.enabled && event && !import.meta.dev && usage.plan !== "unlimited") {
     try { await requireRateLimit(event, "owner-publish", { failure: "deny", key: ownerId, limit: 30, window: "1m" }) }
     catch (error) {
       if ((error as { status?: number; statusCode?: number }).status === 429 || (error as { statusCode?: number }).statusCode === 429)
@@ -98,12 +93,14 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   const id = crypto.randomUUID()
   let reserved: { id: string }[]
   try {
-    reserved = await db.all<{ id: string }>(bind(reserveSQL, [
+    reserved = config.enabled ? await db.all<{ id: string }>(bind(reserveSQL, [
       ownerId, usage.month, id, cost.drops, cost.bytes, cost.writes, cost.targetId ?? null, Date.now(),
       usage.drops.limit === null ? 0 : 1, cost.drops, usage.drops.limit ?? 0,
       usage.bytes.limit === null ? 0 : 1, cost.bytes, usage.bytes.limit ?? 0,
       usage.writes.limit === null ? 0 : 1, cost.writes, usage.writes.limit ?? 0,
-    ]))
+    ])) : await db.insert(quotaReservations).values({
+      id, ownerId, month: usage.month, drops: cost.drops, bytes: cost.bytes, writes: cost.writes, targetId: null, createdAt: Date.now(),
+    }).returning({ id: quotaReservations.id })
   }
   catch (error) {
     if (/quota_pending_target_idx|quota_reservations.target_id/i.test(String(error)))
