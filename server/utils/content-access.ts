@@ -36,7 +36,9 @@ export async function requireBlobAccess(event: H3Event, key: string) {
   const [tombstone] = await db.select({ key: blobTombstones.blobKey }).from(blobTombstones).where(eq(blobTombstones.blobKey, key)).limit(1)
   if (tombstone) throw notFound()
   const [error, object] = await blob.head(key)
+  if (error?.code === "BLOB_NOT_FOUND") throw notFound()
   if (error) throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
+  if (!object) throw notFound()
   const uploaded = object?.uploadedAt?.getTime()
   if (!uploaded || uploaded >= LEGACY_UPLOAD_CUTOFF) throw notFound()
 }

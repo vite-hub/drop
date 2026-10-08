@@ -21,7 +21,12 @@ export default defineValidatedHandler({
       if (decodeURIComponent(target.slice(3)).startsWith("apps/")) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
       if (!target.startsWith("/f/")) throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
       const [error, file] = await blob.get(decodeURIComponent(target.slice(3)))
-      if (error || !file) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
+      if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "No public file with that link." })
+      if (error) {
+        useLogger(event).error(error, { action: "storage" })
+        throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
+      }
+      if (!file) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
     }
     const id = crypto.randomUUID()
     await db.insert(abuseReports).values({ id, target, dropId: drop?.id, ownerId: drop?.ownerId, reason: body.reason, details: body.details, email: body.email || null, createdAt: Date.now() })

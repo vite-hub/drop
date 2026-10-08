@@ -1,0 +1,54 @@
+diff --git a/dist/index.js b/dist/index.js
+index 52c20d006d4f000408c7b9ff7742e48a33194a5b..c1cf486c42e69ec4b3131602fba476d85d8013a7 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -130,7 +130,7 @@ function createRuntimeBlobStorage(name = "default") {
+ 			const [resolutionError, storage] = await resolveStorageResult("head", name);
+ 			if (resolutionError) return [resolutionError, void 0];
+ 			const [error, object] = await storage.head(pathname);
+-			return error ? [error, void 0] : [null, await withServedBlobUrl(name, object)];
++			return error ? [error, void 0] : [null, object && await withServedBlobUrl(name, object)];
+ 		},
+ 		async list(options) {
+ 			const [resolutionError, storage] = await resolveStorageResult("list", name);
+diff --git a/dist/storage.js b/dist/storage.js
+index d653a946edd088d4fc011e50ec375ed349a7f463..c3a4a417e33fc49304c2559acbbf1eeae741b399 100644
+--- a/dist/storage.js
++++ b/dist/storage.js
+@@ -62,9 +62,7 @@ function createBlobStorage(driver, store = driver.name) {
+ 		},
+ 		async head(pathname) {
+ 			const normalizedPathname = normalizePathname(pathname);
+-			const [error, meta] = await blobResult("head", store, () => driver.head(normalizedPathname));
+-			if (error) return [error, void 0];
+-			return meta ? [null, meta] : [blobError("BLOB_NOT_FOUND", "head", store), void 0];
++			return blobResult("head", store, () => driver.head(normalizedPathname));
+ 		},
+ 		async list(options = {}) {
+ 			const normalizedPrefix = options.prefix ? normalizePathname(options.prefix) : options.prefix;
+diff --git a/dist/types-GmhP-LqW.d.ts b/dist/types-GmhP-LqW.d.ts
+index 84e82d3dff163a496a18eebc6afd667665fe1920..cd0ed71bd5a3f070f8dd7c6f28e9f287c4aecfc2 100644
+--- a/dist/types-GmhP-LqW.d.ts
++++ b/dist/types-GmhP-LqW.d.ts
+@@ -80,7 +80,7 @@ interface BlobServeEvent {
+ interface BlobStorage {
+   del(pathnames: string | string[]): Promise<BlobResult<void>>;
+   get(pathname: string): Promise<BlobResult<Blob | null>>;
+-  head(pathname: string): Promise<BlobResult<BlobObject>>;
++  head(pathname: string): Promise<BlobResult<BlobObject | null>>;
+   list(options?: BlobListOptions): Promise<BlobResult<BlobListResult>>;
+   put(pathname: string, body: BlobPutBody, options?: BlobPutOptions): Promise<BlobResult<BlobObject>>;
+   sign(pathname: string, options: BlobSignOptions): Promise<BlobResult<BlobSignedRequest>>;
+diff --git a/dist/vite.js b/dist/vite.js
+index 34195f5dfd6366f51819fc0edf00cc3918eba697..343cb332fc6c2722acef674cec03ff243378c7cb 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -2721,7 +2721,7 @@ function renderBlobRuntimeModule(file, blobConfig, provider) {
+ 			"    ...storage,",
+ 			"    async head(pathname) {",
+ 			"      const [error, object] = await storage.head(pathname)",
+-			"      return error ? [error, undefined] : [null, withServedBlobUrl(name, object)]",
++			"      return error ? [error, undefined] : [null, object && withServedBlobUrl(name, object)]",
+ 			"    },",
+ 			"    async list(options) {",
+ 			"      const [error, result] = await storage.list(options)",

@@ -86,6 +86,7 @@ function storageFailure(error: Error) {
 
 async function readText(key: string) {
   const [error, file] = await blob.get(key)
+  if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
   if (error) throw storageFailure(error)
   if (!file) throw new HTTPError({ status: 404, statusText: "File content is missing." })
   return await file.text()

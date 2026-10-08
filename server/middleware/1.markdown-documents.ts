@@ -23,6 +23,7 @@ export default defineHandler(async (event) => {
   }
   const readSource = async () => {
     const [error, source] = await blob.get(key)
+    if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "Not found" })
     if (error) {
       useLogger(event).error(error, { action: "storage" })
       throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
