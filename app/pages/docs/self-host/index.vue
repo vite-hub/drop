@@ -5,34 +5,15 @@ definePageMeta({ layout: "docs" })
 
 const build = "DROP_HOST=vercel pnpm build   # cloudflare (default), vercel, netlify, deno, or vps"
 const local = "pnpm install\npnpm db:migrate   # once, and after schema changes\npnpm dev          # http://localhost:3000"
+const database = "npx wrangler login\nnpx wrangler d1 create my-drop"
 const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
 </script>
 
 <template>
-  <DocsPage title="Host it yourself" lead="Drop is a Nuxt app built on ViteHub, and it runs on Cloudflare, Vercel, Netlify, Deno Deploy, or a server of your own. One setting at build time picks the host; your drops, comments, and files stay in your accounts.">
-    <DocsSection id="hosts" title="Pick a host">
-      <p>Cloudflare has everything Drop uses in one account. The other hosts use D1 over HTTP with a separate database per deployment. Every host but Cloudflare renders code images as SVG only.</p>
-      <div class="overflow-x-auto rounded-lg border border-default">
-        <table>
-          <thead><tr><th>Host</th><th>Database</th><th>Files</th><th>Rate limits</th><th>Code images</th></tr></thead>
-          <tbody>
-            <tr v-for="host in HOSTS" :key="host.id">
-              <td><NuxtLink :to="`/docs/self-host/${host.id}`">{{ host.name }}</NuxtLink></td>
-              <td>{{ host.database }}</td>
-              <td>{{ host.files }}</td>
-              <td>{{ host.rateLimits }}</td>
-              <td>{{ host.codeImages }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </DocsSection>
+  <DocsPage title="Host it yourself" lead="Run your own Drop on Cloudflare, Vercel, Netlify, Deno Deploy, or a VPS.">
+    <DocsDeployButtons />
 
-    <DocsSection id="build" title="Choose the host at build time">
-      <p><code>DROP_HOST</code> picks the host when you build. Without it, Drop builds for Cloudflare.</p>
-      <AgentsCodeBlock :code="build" />
-      <p><code>nuxt.config.ts</code> maps each host to its ViteHub preset and drivers: the database, file storage, rate limiting, and the hourly job that deletes expired code images. Your code doesn't change; ViteHub swaps the drivers behind <code>vite-hub/database</code>, <code>vite-hub/blob</code>, and the rest.</p>
-    </DocsSection>
+    <p>Start with the button for your host. You still supply GitHub sign-in and your admin user id. The steps below cover those values and the database.</p>
 
     <DocsSection id="github" title="Sign-in and admins">
       <p>Every Drop signs in with GitHub. <a href="https://github.com/settings/applications/new">Create a GitHub OAuth app</a> with:</p>
@@ -55,18 +36,48 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
 
     <DocsSection id="database" title="Database and migrations">
       <p>Every host uses a separate Cloudflare D1 database. The non-Cloudflare hosts connect through D1's HTTP API. The same migrations in <code>server/databases/migrations</code> apply to all of them:</p>
+      <p>For a host outside Cloudflare, create D1 from a machine with Node.js:</p>
+      <AgentsCodeBlock :code="database" />
+      <p>Copy its id and name, your Cloudflare account id, and an account API token with Account, D1, Edit permission into the host's settings. Limit the token to your account.</p>
+      <p>From your cloned repository, <code>pnpm db:migrate:d1</code> needs <code>CLOUDFLARE_ACCOUNT_ID</code>, <code>CLOUDFLARE_API_TOKEN</code>, and <code>CLOUDFLARE_D1_DATABASE_ID</code> in its environment. It records migrations in <code>d1_migrations</code> and skips those already applied.</p>
       <ul>
-        <li><code>pnpm db:migrate:remote</code> applies them to D1. <code>pnpm run deploy</code> runs it for you.</li>
-        <li><code>CLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-… pnpm db:migrate:d1</code> applies them to a remote D1 database. Wrangler records each migration in <code>d1_migrations</code>.</li>
+        <li>Cloudflare's button runs <code>pnpm run deploy</code>, which applies migrations by the <code>DB</code> binding. Existing Workers Builds using <code>npx wrangler deploy</code> still need <code>pnpm db:migrate:remote</code> after schema changes.</li>
+        <li>Vercel and Netlify run <code>pnpm db:migrate:d1</code> after building, before publishing.</li>
+        <li>Deno runs it as a pre-deploy command. Docker Compose runs it before starting Drop.</li>
       </ul>
+      <p>Use a separate D1 database for previews, or disable preview deployments. A build with production D1 credentials migrates that database.</p>
       <p>After you change the schema in <code>server/databases/</code>, <code>pnpm db:generate</code> writes the next migration.</p>
+    </DocsSection>
+
+    <DocsSection id="hosts" title="Pick a host">
+      <p>Cloudflare has everything Drop uses in one account. The other hosts use D1 over HTTP with a separate database per deployment. Every host but Cloudflare renders code images as SVG only.</p>
+      <div class="overflow-x-auto rounded-lg border border-default">
+        <table>
+          <thead><tr><th>Host</th><th>Database</th><th>Files</th><th>Rate limits</th><th>Code images</th></tr></thead>
+          <tbody>
+            <tr v-for="host in HOSTS" :key="host.id">
+              <td><NuxtLink :to="`/docs/self-host/${host.id}`">{{ host.name }}</NuxtLink></td>
+              <td>{{ host.database }}</td>
+              <td>{{ host.files }}</td>
+              <td>{{ host.rateLimits }}</td>
+              <td>{{ host.codeImages }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </DocsSection>
+
+    <DocsSection id="build" title="Choose the host at build time">
+      <p><code>DROP_HOST</code> picks the host when you build. Without it, Drop builds for Cloudflare.</p>
+      <AgentsCodeBlock :code="build" />
+      <p><code>nuxt.config.ts</code> maps each host to its ViteHub preset and drivers: the database, file storage, rate limiting, and the job that deletes expired code images. Your code doesn't change; ViteHub swaps the drivers behind <code>vite-hub/database</code>, <code>vite-hub/blob</code>, and the rest.</p>
     </DocsSection>
 
     <DocsSection id="differences" title="What changes between hosts">
       <ul>
         <li><strong>Code images.</strong> PNG is a Cloudflare Browser Run screenshot of the SVG, so only Cloudflare has it. Elsewhere <code>create_code_image</code> returns SVG, and asking for PNG fails with a clear error.</li>
         <li><strong>Rate limits.</strong> Cloudflare uses its rate limiting binding. Other hosts count in memory, per server instance, so limits are looser on serverless hosts that run many instances.</li>
-        <li><strong>Expired code images.</strong> An hourly job deletes them: a Cron Trigger on Cloudflare, a Cron Job on Vercel, a scheduled function on Netlify, and a timer in the Node process on a VPS. Deno Deploy has none; expired images stop being served but stay in the bucket.</li>
+        <li><strong>Expired code images.</strong> An hourly job deletes them on Cloudflare, Netlify, and a VPS. Vercel runs cleanup daily so it works on Hobby. Deno Deploy has none; expired images stop being served but stay in the bucket.</li>
         <li><strong>Caching.</strong> Rendered Markdown and the file count are cached in Workers KV on Cloudflare, and in memory elsewhere.</li>
       </ul>
     </DocsSection>

@@ -1,71 +1,34 @@
 <script setup lang="ts">
 definePageMeta({ layout: "docs" })
-
-const STEPS = {
-  clone: "npx giget gh:vite-hub/drop my-drop\ncd my-drop\npnpm install\nnpx netlify login\nnpx netlify sites:create --name my-drop",
-  database: "pnpm exec wrangler d1 create vitehub-drop-netlify   # copy the id into CLOUDFLARE_D1_DATABASE_ID",
-  migrate: "CLOUDFLARE_D1_DATABASE_NAME=vitehub-drop-netlify pnpm db:migrate:d1",
-  env: "npx netlify env:set CLOUDFLARE_ACCOUNT_ID …\nnpx netlify env:set CLOUDFLARE_API_TOKEN … --secret\nnpx netlify env:set CLOUDFLARE_D1_DATABASE_ID …\nnpx netlify env:set CLOUDFLARE_D1_DATABASE_NAME vitehub-drop-netlify\nnpx netlify env:set GITHUB_CLIENT_ID …\nnpx netlify env:set GITHUB_CLIENT_SECRET … --secret\nnpx netlify env:set BETTER_AUTH_SECRET \"$(openssl rand -base64 32)\" --secret\nnpx netlify env:set DROP_ADMINS …",
-  deploy: "npx netlify deploy --build --prod",
-  smoke: "DROP_URL=https://my-drop.netlify.app pnpm test:e2e:deployed",
-}
 </script>
 
 <template>
   <DocsPage title="Deploy to Netlify" lead="Drop on Netlify Functions, with a Cloudflare D1 database, Netlify Blobs for files, and a scheduled function that deletes expired code images.">
-    <DocsHostFacts host="netlify" />
+    <DocsDeployButtons host="netlify" />
 
-    <DocsSection id="need" title="What you need">
-      <ul>
-        <li>A Netlify account.</li>
-        <li>A Cloudflare account and Wrangler (<code>pnpm exec wrangler login</code>).</li>
-        <li>Node.js 24 and pnpm.</li>
-        <li>A GitHub OAuth app with the callback <code>https://&lt;your-site&gt;.netlify.app/api/auth/callback/github</code>, or your own domain.</li>
-      </ul>
-    </DocsSection>
-
-    <DocsSection id="steps" title="Deploy">
+    <DocsSection id="button" title="Deploy with the button">
+      <p>The button clones Drop, creates a site, and prompts for the variables described in <code>netlify.toml</code>. Netlify sets the host, builds, applies D1 migrations, and publishes. Netlify Blobs needs no setup.</p>
       <ol>
-        <li>
-          <p>Get the code and create the site:</p>
-          <AgentsCodeBlock :code="STEPS.clone" />
-          <p><code>netlify.toml</code> already sets <code>DROP_HOST=netlify</code>, Node.js 24, and the build command. The build keeps Nitro's tracked function wrapper and copies the native runtime that Netlify's bundler needs.</p>
-        </li>
-        <li>
-          <p>Create the D1 database and copy its id into the environment:</p>
-          <AgentsCodeBlock :code="STEPS.database" />
-          <p>Apply the migrations:</p>
-          <AgentsCodeBlock :code="STEPS.migrate" />
-        </li>
-        <li>
-          <p>Add the settings:</p>
-          <AgentsCodeBlock :code="STEPS.env" />
-          <p>Netlify Blobs needs no setup: the functions get their credentials from Netlify.</p>
-        </li>
-        <li>
-          <p>Build and deploy:</p>
-          <AgentsCodeBlock :code="STEPS.deploy" />
-          <p>To deploy on every push instead, link the repository in the Netlify dashboard. It builds with the same <code>netlify.toml</code>.</p>
-        </li>
-        <li>
-          <p>Run the smoke test:</p>
-          <AgentsCodeBlock :code="STEPS.smoke" />
-        </li>
+        <li><NuxtLink to="/docs/self-host#database">Create a D1 database and account API token</NuxtLink>. Keep the account id, token, database id, and database name ready.</li>
+        <li>Choose a site name and <NuxtLink to="/docs/self-host#github">create the GitHub OAuth app</NuxtLink> with callback <code>https://&lt;site&gt;.netlify.app/api/auth/callback/github</code>.</li>
+        <li>Fill the form with those settings, a generated auth secret, and your GitHub user id. If the generated site address differs, update the OAuth callback.</li>
       </ol>
     </DocsSection>
+
+    <DocsHostFacts host="netlify" />
 
     <DocsSection id="env" title="Settings">
       <DocsEnv
         :extra="[
           ['CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN', 'Cloudflare account id and an account API token with D1 edit access.'],
-          ['CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME', 'The id and name of vitehub-drop-netlify.'],
+          ['CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME', 'Your D1 database id and name.'],
           ['DROP_HOST', 'netlify. Set in netlify.toml.'],
         ]"
       />
     </DocsSection>
 
     <DocsSection id="database" title="Database">
-      <p>Cloudflare D1 over HTTPS. <code>pnpm db:migrate:d1</code> applies new migrations and skips the ones already applied; run it before you deploy a schema change.</p>
+      <p>Cloudflare D1 over HTTPS. <code>pnpm db:migrate:d1</code> skips migrations already applied. The configured Netlify build runs it after building. Disable deploy previews or give them a separate D1 database.</p>
     </DocsSection>
 
     <DocsSection id="different" title="On Netlify">

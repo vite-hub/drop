@@ -30,7 +30,7 @@ Under the hood:
 - **Database** is SQLite through `vite-hub/database`: D1 on every host, using D1's HTTP API outside Cloudflare. It holds drops, app files, and comments.
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
 - Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
-- **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. An hourly **Schedule** deletes them.
+- **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. A **Schedule** deletes them hourly on Cloudflare, Netlify, and a VPS, or daily on Vercel.
 - **MCP** is [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit): one file per tool and prompt in `server/mcp/`, both protocol revisions, and the [Skills extension](https://modelcontextprotocol.io/seps/2640-skills-extension).
 - **Skills** are defined once in `skills/` and served over MCP (`skills/list`, `skill://` resources), at `/.well-known/agent-skills/` ([Discovery v0.2.0](https://github.com/cloudflare/agent-skills-discovery-rfc)), and at the older `/.well-known/skills/`.
 - **Logs** are [evlog](https://www.evlog.dev) wide events: one structured line per request with the caller, the agent, what it did, and why it failed. Workers Logs is on, so they're queryable in the Cloudflare dashboard.
@@ -53,49 +53,13 @@ MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_ap
 
 [drop.vitehub.dev](https://drop.vitehub.dev) is one instance anyone can use; you can run your own. `DROP_HOST` picks the host at build time, and [the self-hosting docs](https://drop.vitehub.dev/docs/self-host) have the steps for each:
 
-| Host | Build | Database | Files | Guide |
-| --- | --- | --- | --- | --- |
-| Cloudflare (default) | `pnpm build` | D1 | R2 | [/docs/self-host/cloudflare](https://drop.vitehub.dev/docs/self-host/cloudflare) |
-| Vercel | `DROP_HOST=vercel pnpm build` | D1 over HTTP | Vercel Blob | [/docs/self-host/vercel](https://drop.vitehub.dev/docs/self-host/vercel) |
-| Netlify | `DROP_HOST=netlify pnpm build` | D1 over HTTP | Netlify Blobs | [/docs/self-host/netlify](https://drop.vitehub.dev/docs/self-host/netlify) |
-| Deno Deploy | `DROP_HOST=deno pnpm build` | D1 over HTTP | R2 S3 API | [/docs/self-host/deno](https://drop.vitehub.dev/docs/self-host/deno) |
-| VPS (Node) | `DROP_HOST=vps pnpm build` | D1 over HTTP | Local disk | [/docs/self-host/vps](https://drop.vitehub.dev/docs/self-host/vps) |
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop&env=GITHUB_CLIENT_ID%2CGITHUB_CLIENT_SECRET%2CBETTER_AUTH_SECRET%2CDROP_ADMINS%2CCLOUDFLARE_ACCOUNT_ID%2CCLOUDFLARE_API_TOKEN%2CCLOUDFLARE_D1_DATABASE_ID%2CCLOUDFLARE_D1_DATABASE_NAME&envDescription=GitHub+sign-in%2C+admin+user+IDs%2C+Cloudflare+D1%2C+and+a+private+Blob+store.+See+the+Drop+guide+for+each+value.&envLink=https%3A%2F%2Fdrop.vitehub.dev%2Fdocs%2Fself-host%2Fvercel&stores=%5B%7B%22type%22%3A%22blob%22%7D%5D) [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy on Deno](https://deno.com/button)](https://console.deno.com/new?clone=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [Run on a VPS](https://drop.vitehub.dev/docs/self-host/vps#steps)
 
-Only Cloudflare renders PNG code images (Browser Run) and has a distributed rate limiter; elsewhere code images are SVG and rate limits count per instance. Migrations apply with `pnpm db:migrate:remote` for Cloudflare builds, or `CLOUDFLARE_D1_DATABASE_NAME=<name> pnpm db:migrate:d1` for the other hosts.
+Cloudflare creates D1, R2, and KV for you. Vercel and Netlify prompt for settings. Deno clones the repo and reads `deno.jsonc`; the VPS guide uses Docker Compose. No button creates your GitHub OAuth app. Use `<origin>/api/auth/callback/github` as its callback, generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`, and find your admin user id with `gh api users/<login> --jq .id`.
 
-Anyone with a GitHub account can sign in and joins as a Member. The GitHub users in `DROP_ADMINS` join as Admin, and admins change roles on `/members`:
+Other hosts need a Cloudflare D1 database and an account API token with D1 edit access. Choose a private Blob store in the Vercel flow; Deno needs an S3 bucket and access keys. The provider guides cover these steps. Migrations run before deployment; existing Cloudflare Workers Builds that use `pnpm build` and `npx wrangler deploy` still need `pnpm db:migrate:remote` after schema changes.
 
-| Role | What they can do |
-| --- | --- |
-| **Admin** | Everything, plus members. |
-| **Editor** | Edit and share any drop. |
-| **Member** | Their own drops. This is the default. |
-
-On Cloudflare:
-
-1. Create a GitHub OAuth app with the callback `https://<your-domain>/api/auth/callback/github`. To use another sign-in provider, edit [server/auth.ts](./server/auth.ts).
-2. Create the Cloudflare resources.
-
-   ```sh
-   pnpm install
-   pnpm exec wrangler d1 create vitehub-drop   # copy the id into CLOUDFLARE_D1_DATABASE_ID
-   pnpm exec wrangler r2 bucket create vitehub-drop
-   pnpm build
-   ```
-
-   The KV namespace (Drop's render cache) has no ID to fill in: Wrangler creates it on the first deploy.
-
-3. Fill `.env` from [.env.example](./.env.example), with your GitHub user id (`gh api users/<login> --jq .id`) in `DROP_ADMINS`. Then deploy. Deploy applies the D1 migrations, then publishes the Worker with `.env` as its secrets:
-
-   ```sh
-   pnpm run deploy
-   ```
-
-4. Run the smoke test. It checks the public pages, the OAuth discovery documents, and that `/mcp` asks for sign-in:
-
-   ```sh
-   DROP_URL=https://<your-domain> pnpm test:e2e:deployed
-   ```
+Only Cloudflare renders PNG code images and has a distributed rate limiter. Elsewhere code images are SVG and rate limits count per instance. Anyone who signs in joins as a Member; GitHub user ids in `DROP_ADMINS` join as Admin. Admins change roles on `/members`.
 
 ### Develop locally
 
