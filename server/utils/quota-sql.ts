@@ -1,6 +1,8 @@
 import { getTableColumns, sql, type SQL } from "drizzle-orm"
 import { dropFiles } from "../databases/drops.ts"
 
+export const QUOTA_RESERVATION_TTL_MS = 15 * 60 * 1000
+
 export function bindQuotaSQL(query: string, values: unknown[]): SQL {
   const parts = query.split("?")
   return sql.join(parts.flatMap((part, index) => index < values.length ? [sql.raw(part), sql`${values[index]}`] : [sql.raw(part)]), sql.raw(""))
@@ -15,15 +17,15 @@ export function appFileChunks(rows: (typeof dropFiles.$inferInsert)[]) {
 }
 
 // The same conditional INSERT runs on D1 and in the SQLite concurrency tests.
-export const usageCTE = `WITH scope AS (SELECT ? AS owner, ? AS month), usage AS (
+export const usageCTE = `WITH scope AS (SELECT ? AS owner, ? AS month, ? AS cutoff), usage AS (
   SELECT
     (SELECT count(*) FROM drops d WHERE owner_id = (SELECT owner FROM scope) AND NOT EXISTS (SELECT 1 FROM drops p WHERE p.id = d.supersedes_id AND p.owner_id = d.owner_id))
-      + (SELECT coalesce(sum(drops), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND committed = 0) AS drops,
+      + (SELECT coalesce(sum(drops), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND committed = 0 AND created_at >= (SELECT cutoff FROM scope)) AS drops,
     (SELECT coalesce(sum(size), 0) FROM drops WHERE owner_id = (SELECT owner FROM scope) AND kind != 'app')
       + (SELECT coalesce(sum(f.size), 0) FROM drop_files f JOIN drops d ON d.id = f.drop_id WHERE d.owner_id = (SELECT owner FROM scope))
       + (SELECT coalesce(sum(size), 0) FROM quota_blobs WHERE owner_id = (SELECT owner FROM scope))
-      + (SELECT coalesce(sum(bytes), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND committed = 0) AS bytes,
-    (SELECT coalesce(sum(writes), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND month = (SELECT month FROM scope)) AS writes
+      + (SELECT coalesce(sum(bytes), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND committed = 0 AND created_at >= (SELECT cutoff FROM scope)) AS bytes,
+    (SELECT coalesce(sum(writes), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND month = (SELECT month FROM scope) AND (committed = 1 OR created_at >= (SELECT cutoff FROM scope))) AS writes
 )`
 export const usageSQL = `${usageCTE} SELECT * FROM usage`
 export const reserveSQL = `${usageCTE}

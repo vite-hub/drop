@@ -3,12 +3,13 @@ import { lte } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { codeImages } from "../databases/config"
 import { defineSchedule } from "vite-hub/schedule"
-import { cleanupQuotaBlobs, releaseQuotaBlobs } from "../utils/quotas"
+import { cleanupQuotaBlobs, cleanupQuotaReservations, releaseQuotaBlobs } from "../utils/quotas"
 import { CODE_IMAGE_PREFIX, isExpiredCodeImage } from "../utils/code-image"
 
 export default defineSchedule({
   cron: "0 * * * *",
   async handler({ scheduledAt }) {
+    await cleanupQuotaReservations(scheduledAt)
     await cleanupQuotaBlobs(scheduledAt)
     await db.delete(codeImages).where(lte(codeImages.expiresAt, scheduledAt.getTime()))
     const { cleanupUnusedOAuthClients } = await import("../utils/oauth-cleanup")

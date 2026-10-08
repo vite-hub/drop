@@ -11,7 +11,7 @@ import { H3Event, HTTPError, toResponse } from "h3"
 import { createMcpHandler, defineMcpTool } from "nitro-mcp-toolkit"
 import { MCP_LATEST, MCP_LEGACY } from "../../shared/mcp.ts"
 import { MIB, planLimits, quotaFailure, quotaToolFailure, usageNearLimit } from "../../shared/quotas.ts"
-import { appFileChunks, deletionChainSQL, reserveSQL, usageSQL } from "../../server/utils/quota-sql.ts"
+import { appFileChunks, deletionChainSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "../../server/utils/quota-sql.ts"
 
 function setup(path = ":memory:") {
   const db = new DatabaseSync(path)
@@ -22,7 +22,8 @@ function setup(path = ":memory:") {
 }
 function reserve(db, { owner = "owner", month = "2026-10", drops = 1, bytes = 10, writes = 1, target = null, limits = planLimits("free") } = {}) {
   const id = crypto.randomUUID()
-  const row = db.prepare(reserveSQL).get(owner, month, id, drops, bytes, writes, target, Date.now(),
+  const now = Date.now()
+  const row = db.prepare(reserveSQL).get(owner, month, now - QUOTA_RESERVATION_TTL_MS, id, drops, bytes, writes, target, now,
     limits.drops === null ? 0 : 1, drops, limits.drops ?? 0,
     limits.bytes === null ? 0 : 1, bytes, limits.bytes ?? 0,
     limits.writes === null ? 0 : 1, writes, limits.writes ?? 0)
@@ -40,7 +41,7 @@ function commit(db, id, operation, success = true) {
   }
   catch (error) { db.exec("ROLLBACK"); throw error }
 }
-const used = (db, owner = "owner", month = "2026-10") => ({ ...db.prepare(usageSQL).get(owner, month) })
+const used = (db, owner = "owner", month = "2026-10") => ({ ...db.prepare(usageSQL).get(owner, month, Date.now() - QUOTA_RESERVATION_TTL_MS) })
 
 test("plans, warnings, and non-retryable agent guidance", () => {
   assert.deepEqual(planLimits("free"), { drops: 3, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB })
@@ -88,6 +89,52 @@ test("storage and writes reserve exact boundaries, with per-owner and UTC month 
   commit(db, id, () => doc(db, "full", { size: 100 * MIB }))
   assert.ok(reserve(db, { month: "2026-11", drops: 0, bytes: 0 }))
   assert.equal(used(db, "owner", "2026-11").writes, 1)
+  db.close()
+})
+
+test("stale pending reservations stop consuming slots, bytes, and writes before cleanup", (t) => {
+  const now = Date.UTC(2026, 9, 8, 12)
+  t.mock.timers.enable({ apis: ["Date"], now })
+  const db = setup()
+  const stale = reserve(db, { drops: 3, bytes: 100 * MIB, writes: 1000 })
+  db.prepare("UPDATE quota_reservations SET created_at=? WHERE id=?").run(now - 15 * 60 * 1000 - 1, stale)
+  assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 0 })
+  assert.ok(db.prepare("SELECT id FROM quota_reservations WHERE id=?").get(stale), "Usage reads do not delete reservations")
+  assert.ok(reserve(db, { drops: 3, bytes: 100 * MIB, writes: 1000 }), "Atomic quota checks also ignore stale reservations")
+  db.close()
+})
+
+test("fresh pending reservations and the exact 15-minute boundary still count", (t) => {
+  const now = Date.UTC(2026, 9, 8, 12)
+  t.mock.timers.enable({ apis: ["Date"], now })
+  const db = setup()
+  const boundary = reserve(db, { drops: 2, bytes: 20, writes: 2 })
+  db.prepare("UPDATE quota_reservations SET created_at=? WHERE id=?").run(now - 15 * 60 * 1000, boundary)
+  const fresh = reserve(db)
+  assert.ok(fresh)
+  assert.deepEqual(used(db), { drops: 3, bytes: 30, writes: 3 })
+  assert.equal(reserve(db), null)
+  t.mock.timers.tick(1)
+  assert.deepEqual(used(db), { drops: 1, bytes: 10, writes: 1 })
+  assert.ok(reserve(db))
+  db.close()
+})
+
+test("expiry preserves committed monthly writes and owner and month isolation", (t) => {
+  const now = Date.UTC(2026, 9, 8, 12)
+  t.mock.timers.enable({ apis: ["Date"], now })
+  const db = setup()
+  const committed = reserve(db, { writes: 7 })
+  commit(db, committed, () => doc(db, "retained"))
+  const stale = reserve(db, { writes: 11 })
+  const lastMonth = reserve(db, { month: "2026-09", writes: 13 })
+  commit(db, lastMonth, () => doc(db, "last-month"))
+  for (const id of [committed, stale, lastMonth])
+    db.prepare("UPDATE quota_reservations SET created_at=? WHERE id=?").run(now - 15 * 60 * 1000 - 1, id)
+  assert.ok(reserve(db, { owner: "other", writes: 17 }))
+  assert.deepEqual(used(db), { drops: 2, bytes: 20, writes: 7 })
+  assert.deepEqual(used(db, "owner", "2026-09"), { drops: 2, bytes: 20, writes: 13 })
+  assert.deepEqual(used(db, "other"), { drops: 1, bytes: 10, writes: 17 })
   db.close()
 })
 
@@ -157,7 +204,8 @@ test("concurrent SQLite clients cannot reserve more than three slots or the rema
   const db = setup(path)
   const source = `const { parentPort, workerData } = require('node:worker_threads'); const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(workerData.path); db.exec('PRAGMA busy_timeout=10000'); const row = db.prepare(workerData.query).get(...workerData.values); db.close(); parentPort.postMessage(Boolean(row));`
   const race = (drops, bytes, writes, dropLimit, byteLimit, writeLimit) => Promise.all(Array.from({ length: 12 }, () => new Promise((resolve, reject) => {
-    const worker = new Worker(source, { eval: true, workerData: { path, query: reserveSQL, values: ['owner', '2026-10', crypto.randomUUID(), drops, bytes, writes, null, Date.now(), 1, drops, dropLimit, 1, bytes, byteLimit, 1, writes, writeLimit] } })
+    const now = Date.now()
+    const worker = new Worker(source, { eval: true, workerData: { path, query: reserveSQL, values: ['owner', '2026-10', now - QUOTA_RESERVATION_TTL_MS, crypto.randomUUID(), drops, bytes, writes, null, now, 1, drops, dropLimit, 1, bytes, byteLimit, 1, writes, writeLimit] } })
     worker.once('message', resolve); worker.once('error', reject)
   })))
   try {

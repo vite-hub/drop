@@ -1,5 +1,6 @@
-import { eq, inArray, lte, sql, type SQL } from "drizzle-orm"
+import { and, eq, inArray, lt, lte, sql, type SQL } from "drizzle-orm"
 import type { DrizzleD1Database } from "drizzle-orm/d1"
+import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { useRuntimeConfig } from "nitro/runtime-config"
 import { db } from "vite-hub/database/drizzle"
@@ -7,7 +8,7 @@ import { blob } from "vite-hub/blob"
 import { requirePublishBurst } from "./publish-burst"
 import { DEFAULT_PRO_LIMITS, MAX_APP_BYTES, MAX_APP_FILES, isPlan, planLimits, quotaFailure, quotaToolFailure, type Plan, type QuotaFailure, type Usage } from "#shared/quotas"
 import { dropFiles, quotaBlobs, quotaReservations, user } from "../databases/config"
-import { appFileChunks, bindQuotaSQL, reserveSQL, usageSQL } from "./quota-sql"
+import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
 const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
 type Statement = Parameters<DrizzleD1Database["batch"]>[0][number]
@@ -27,7 +28,7 @@ export function effectivePlan(value: unknown): Plan {
 }
 
 async function ownerUsage(ownerId: string, month: string) {
-  const [row] = await db.all<{ drops: number; bytes: number; writes: number }>(bindQuotaSQL(usageSQL, [ownerId, month]))
+  const [row] = await db.all<{ drops: number; bytes: number; writes: number }>(bindQuotaSQL(usageSQL, [ownerId, month, Date.now() - QUOTA_RESERVATION_TTL_MS]))
   return row ?? { drops: 0, bytes: 0, writes: 0 }
 }
 
@@ -85,15 +86,16 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   }
 
   const id = crypto.randomUUID()
+  const now = Date.now()
   let reserved: { id: string }[]
   try {
     reserved = config.enabled ? await db.all<{ id: string }>(bindQuotaSQL(reserveSQL, [
-      ownerId, usage.month, id, cost.drops, cost.bytes, cost.writes, cost.targetId ?? null, Date.now(),
+      ownerId, usage.month, now - QUOTA_RESERVATION_TTL_MS, id, cost.drops, cost.bytes, cost.writes, cost.targetId ?? null, now,
       usage.drops.limit === null ? 0 : 1, cost.drops, usage.drops.limit ?? 0,
       usage.bytes.limit === null ? 0 : 1, cost.bytes, usage.bytes.limit ?? 0,
       usage.writes.limit === null ? 0 : 1, cost.writes, usage.writes.limit ?? 0,
     ])) : await db.insert(quotaReservations).values({
-      id, ownerId, month: usage.month, drops: cost.drops, bytes: cost.bytes, writes: cost.writes, targetId: null, createdAt: Date.now(),
+      id, ownerId, month: usage.month, drops: cost.drops, bytes: cost.bytes, writes: cost.writes, targetId: null, createdAt: now,
     }).returning({ id: quotaReservations.id })
   }
   catch (error) {
@@ -139,6 +141,16 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   finally {
     if (!committed) await db.delete(quotaReservations).where(eq(quotaReservations.id, id))
   }
+}
+
+/** Release crashed publishes without deleting the committed monthly write ledger. */
+export async function cleanupQuotaReservations(now: Date) {
+  const released = await db.delete(quotaReservations).where(and(
+    eq(quotaReservations.committed, false),
+    lt(quotaReservations.createdAt, now.getTime() - QUOTA_RESERVATION_TTL_MS),
+  )).returning()
+  for (const reservation of released)
+    log.warn({ action: "quota-reservation-release", reservation, ageMs: now.getTime() - reservation.createdAt })
 }
 
 export async function releaseQuotaBlobs(keys: string[]) {
