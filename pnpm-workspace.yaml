@@ -24,6 +24,7 @@ patchedDependencies:
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
+  nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch
   nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch
 
 # Only workerd (local Workers runtime) needs its install script.

@@ -1,0 +1,15 @@
+diff --git a/dist/types/index.d.mts b/dist/types/index.d.mts
+index d00e029de397a3fbfece0d28a6fd24f866dfbe72..7b0e24bf8ded4aeed368bae8f93b30fa5494204b 100644
+--- a/dist/types/index.d.mts
++++ b/dist/types/index.d.mts
+@@ -105,7 +105,9 @@ interface AssetMeta {
+  *
+  * @see https://nitro.build/docs/cache
+  */
+-interface CachedEventHandlerOptions extends Omit<import("ocache").CachedEventHandlerOptions<HTTPEvent & import("ocache").HTTPEvent>, "toResponse" | "createResponse" | "handleCacheHeaders"> {}
++interface CachedEventHandlerOptions extends Omit<import("ocache").CachedEventHandlerOptions<HTTPEvent & import("ocache").HTTPEvent>, "toResponse" | "createResponse" | "handleCacheHeaders"> {
++	handleCacheHeaders?: typeof import("h3").handleCacheHeaders;
++}
+ /**
+  * The runtime Nitro application instance accessible via `useNitroApp()`.
+  *
