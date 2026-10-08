@@ -42,6 +42,11 @@ try {
   const app = await request("/api/apps", "POST", { files: { "index.html": "<h1>Owner</h1>" } })
   assert.equal(app.status, 200)
   drops.push(app.data.id)
+  const image = await request("/api/code", "POST", { code: "const quota = 1", format: "svg" })
+  assert.equal(image.status, 200)
+  const imageResponse = await fetch(image.data.url)
+  assert.equal(imageResponse.status, 200)
+  const imageBytes = (await imageResponse.arrayBuffer()).byteLength
   const used = (await request("/api/usage")).data
   db.prepare("INSERT INTO quota_reservations (id,owner_id,month,drops,bytes,writes,committed,created_at) VALUES (?,?,?,0,0,?,1,?)").run(crypto.randomUUID(), owner.id, used.month, 1000 - used.writes.used, Date.now())
   cookie = admin.cookie
@@ -69,7 +74,14 @@ try {
   assert.equal(pro.writes.limit, 10_000)
   assert.equal(pro.app.files, 200)
   assert.equal(pro.app.bytes, 4 * 1024 * 1024)
-  console.log("Quota admin smoke passed: plan changes, exhausted monthly budget, owner app cap, admin attribution")
+  db.prepare("UPDATE quota_blobs SET expires_at=0 WHERE owner_id=?").run(owner.id)
+  const cleanup = await fetch(`${origin}/cdn-cgi/local/scheduled`)
+  assert.equal(cleanup.status, 200)
+  const afterCleanup = (await request("/api/usage")).data
+  assert.equal(afterCleanup.bytes.used, pro.bytes.used - imageBytes)
+  assert.equal(afterCleanup.writes.used, 1001)
+  assert.equal((await fetch(image.data.url)).status, 404)
+  console.log("Quota admin smoke passed: plan changes, exhausted monthly budget, owner app cap, admin attribution, retained image cleanup")
 }
 finally {
   for (const id of drops) await request(`/api/drops/${id}`, "DELETE")
