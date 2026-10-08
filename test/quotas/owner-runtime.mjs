@@ -1,4 +1,4 @@
-// Run against local nuxt dev with DROP_QUOTAS=1, never a deployed instance.
+// Run against local Drop with DROP_QUOTAS=1 and email/password sign-in enabled.
 import assert from "node:assert/strict"
 
 const origin = process.env.DROP_QUOTA_TEST_ORIGIN || "http://localhost:3406"

@@ -4,10 +4,9 @@ import { VersionSchema } from "#shared/schemas"
 import { createDocDrop, findDrop, permissions, publishApp, toSummary } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
-
-/** Publish the next version: new text for a doc, a new file set for an app. People with edit access only. */
 import { quotaApiHandler } from "../../../utils/quotas"
 
+/** Publish the next version: new text for a doc, a new file set for an app. People with edit access only. */
 export default quotaApiHandler(defineValidatedHandler({
   validate: { body: VersionSchema },
   async handler(event) {

@@ -2,10 +2,9 @@ import { defineValidatedHandler } from "h3"
 import { AppSchema } from "#shared/schemas"
 import { dropPageUrl, publishApp } from "../utils/drops"
 import { requireIdentity } from "../utils/identity"
-
-/** Agents publish a static app: files keyed by path, with an index.html. Pass `id` to publish the next version. */
 import { quotaApiHandler } from "../utils/quotas"
 
+/** Agents publish a static app: files keyed by path, with an index.html. Pass `id` to publish the next version. */
 export default quotaApiHandler(defineValidatedHandler({
   validate: { body: AppSchema },
   async handler(event) {
