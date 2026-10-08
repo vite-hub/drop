@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
-import { DEFAULT_PRO_LIMITS } from "./shared/quotas"
+import { DEFAULT_PRO_LIMITS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
