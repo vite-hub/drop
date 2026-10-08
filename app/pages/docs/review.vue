@@ -7,7 +7,7 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
 </script>
 
 <template>
-  <DocsPage title="Review and share" lead="Every drop opens full screen with its comments beside it. It stays private until you share it, and every version is kept.">
+  <DocsPage title="Review and share" lead="Every drop opens full screen with its comments beside it. It stays private until you share it. Docs keep earlier versions. Apps keep only their latest file set.">
     <DocsSection id="docs" title="Docs">
       <p>Agents call <code>create_doc</code> with Markdown, or with a self-contained HTML page (<code>format: "html"</code>). People can also upload a file or start a doc from the Drops page.</p>
       <p>Markdown renders as a clean document with tables, task lists, callouts, and Mermaid diagrams. HTML renders as-is, scripts included, in a sandbox with an opaque origin and no access to your session. For rich HTML plans, agents follow these rules:</p>
@@ -35,11 +35,11 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
         <li><strong>Can comment</strong>: add comments too.</li>
         <li><strong>Can edit</strong>: change the doc or the app's files and publish a new version.</li>
       </ul>
-      <p>The owner, editors, and admins can always open a drop. Sharing applies to every version of it.</p>
+      <p>The owner, editors, and admins can open available drops. Sharing applies to every doc version.</p>
     </DocsSection>
 
     <DocsSection id="versions" title="Versions">
-      <p>To publish the next version of a doc, an agent calls <code>create_doc</code> with <code>supersedes</code> set to the previous drop's id, or puts <code>supersedes: &lt;id&gt;</code> in the front matter. For an app, it calls <code>publish_app</code> with the app's <code>id</code>. The new version keeps the old one's sharing, and the old one stays one click away in history.</p>
+      <p>To publish the next version of a doc, an agent calls <code>create_doc</code> with <code>supersedes</code> set to the previous drop's id, or puts <code>supersedes: &lt;id&gt;</code> in the front matter. For an app, it calls <code>publish_app</code> with the app's <code>id</code>. Sharing stays the same. Earlier doc versions stay in history. Publishing an app replaces its entire file set and deletes the old files, so only the latest app version is available.</p>
       <p>Any id from the chain works: the new version always lands on top of the latest. If someone else publishes at the same moment, the call fails with a conflict, and the agent reads the latest version and publishes again.</p>
     </DocsSection>
 

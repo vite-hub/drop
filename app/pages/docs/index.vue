@@ -14,7 +14,7 @@ const mcp = mcpSnippets(`${origin}/mcp`).claude
         <li><strong>Agents drop their work</strong> over MCP: a plan in Markdown, an HTML report, or a small static app made of files.</li>
         <li><strong>Every drop starts private.</strong> Only its owner, and the workspace's editors and admins, can open it.</li>
         <li><strong>People review it</strong> full screen. Select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit.</li>
-        <li><strong>The agent reads the open comments</strong> and drops the next version. Older versions stay in history.</li>
+        <li><strong>The agent reads the open comments</strong> and drops the next version. Older doc versions stay in history. Apps keep only their latest file set.</li>
       </ol>
     </DocsSection>
 
@@ -37,7 +37,7 @@ const mcp = mcpSnippets(`${origin}/mcp`).claude
         <li>An <strong>app</strong>: a folder of static files with an <code>index.html</code>, like a prototype or a dashboard.</li>
         <li>A <strong>file</strong> you upload: an image, a PDF, a log.</li>
       </ul>
-      <p>Every drop opens full screen, keeps every version, and has its own link. <NuxtLink to="/docs/review">Review and share</NuxtLink> covers comments, sharing, and versions.</p>
+      <p>Every drop opens full screen and has its own link. Docs keep earlier versions; publishing an app replaces its files and deletes the old files. <NuxtLink to="/docs/review">Review and share</NuxtLink> covers comments, sharing, and versions.</p>
     </DocsSection>
 
     <DocsSection id="roles" title="Roles">

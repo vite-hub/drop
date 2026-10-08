@@ -22,7 +22,7 @@
 1. **Agents drop their work** over MCP: a plan in Markdown, an HTML report, or a small static app made of files. They sign in through your browser once; there are no keys.
 2. **Every drop starts private.** Only its owner (and the workspace's editors and admins) can open it.
 3. **People review it** full screen: select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit.
-4. **The agent reads the open comments** and drops the next version. Older versions stay in history.
+4. **The agent reads the open comments** and drops the next version. Older doc versions stay in history. Apps keep only their latest file set; publishing replaces it and deletes the old files.
 
 Under the hood:
 

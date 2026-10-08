@@ -25,7 +25,7 @@ Call `create_doc` again with `supersedes` set to the previous drop's id (or put 
 
 ## Publish an app
 
-A small static app is a set of files keyed by path, with an `index.html`. Call `publish_app` with `files` (and `name`); pass `id` to publish its next version. Relative links, ES modules, and `fetch("data.json")` work like on any static host.
+A small static app is a set of files keyed by path, with an `index.html`. Call `publish_app` with `files` (and `name`); pass `id` to publish its next version. Publishing replaces the entire file set and deletes the old files. Only the latest app version is kept; include every file the app still needs in each publish. Doc version history does not apply to apps. Relative links, ES modules, and `fetch("data.json")` work like on any static host.
 
 ## Render code
 
