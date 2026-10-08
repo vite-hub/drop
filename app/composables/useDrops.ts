@@ -54,7 +54,8 @@ export function useDropActions() {
     const before = drops.value
     patch(drop.id, { visibility, ...(access ? { access } : {}) })
     try {
-      await $fetch(`/api/drops/${drop.id}`, { method: "PATCH", body: { visibility, ...(access ? { access } : {}) } })
+      const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { visibility, ...(access ? { access } : {}) } })
+      patch(drop.id, result)
       await refreshNuxtData(`drop:${drop.id}`)
       return true
     }

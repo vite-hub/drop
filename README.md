@@ -61,6 +61,12 @@ Other hosts need a Cloudflare D1 database and an account API token with D1 edit 
 
 Only Cloudflare renders PNG code images and has a distributed rate limiter. Elsewhere code images are SVG and rate limits count per instance. Anyone who signs in joins as a Member; GitHub user ids in `DROP_ADMINS` join as Admin. Admins change roles on `/members`.
 
+### Abuse handling
+
+Set `DROP_SHARE_APPROVAL=1` to require admin approval before a member shares publicly. Private use stays available. Admins and unlimited-plan members bypass approval. Review shares at `/admin/review` and reports at `/admin/reports`. Existing shared links stay shared; approve existing trusted members before enabling approval if they need to publish new versions. `DROP_ABUSE_EMAIL` optionally provides a public contact email. Reports are stored in D1 and emit high-severity evlog events; monitor those logs. No email notification is sent. Review the legal templates in `app/pages/{terms,acceptable-use,abuse}.vue` before public use, including your jurisdiction and DMCA contact requirements. Apply migration `0005_trust` before deploying.
+
+Unused OAuth clients are removed after 24 hours by the existing cleanup schedule. Deno has no schedule, so run cleanup separately there. User content is excluded from indexing; landing and docs remain indexable.
+
 ### Develop locally
 
 ```sh

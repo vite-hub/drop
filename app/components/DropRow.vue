@@ -57,7 +57,7 @@ const menu = computed(() => [
     </div>
     <label class="relative z-10 hidden items-center gap-2.5 md:flex">
       <USwitch :model-value="shared" color="neutral" :aria-label="shared ? 'Make private' : 'Share'" @update:model-value="setShared" />
-      <span class="text-[13px]" :class="shared ? 'text-highlighted' : 'text-muted'">{{ shared ? "Shared" : "Private" }}</span>
+      <span class="text-[13px]" :class="shared ? 'text-highlighted' : 'text-muted'">{{ drop.quarantinedAt ? "Quarantined" : drop.shareReview === "pending" ? "Pending review" : drop.shareReview === "rejected" ? "Rejected" : shared ? "Shared" : "Private" }}</span>
     </label>
     <div class="relative z-10 flex items-center gap-0.5">
       <USwitch class="md:hidden" :model-value="shared" color="neutral" :aria-label="shared ? 'Make private' : 'Share'" @update:model-value="setShared" />

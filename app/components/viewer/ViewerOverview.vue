@@ -10,7 +10,7 @@ const facts = computed(() => [
   formatBytes(props.drop.size),
   ...(props.drop.versions.length > 1 || props.drop.kind === "app" ? [`v${props.drop.version}`] : []),
 ])
-const access = computed(() => props.drop.visibility === "shared" ? `Anyone with the link ${ACCESS_LABELS[props.drop.access].toLowerCase()}.` : "Private. Only you can open it.")
+const access = computed(() => props.drop.shareReview === "pending" ? "Waiting for review. You can still use it privately." : props.drop.shareReview === "rejected" ? "Share rejected. You can still use it privately." : props.drop.visibility === "shared" ? `Anyone with the link ${ACCESS_LABELS[props.drop.access].toLowerCase()}.` : "Private. Only you can open it.")
 </script>
 
 <template>
