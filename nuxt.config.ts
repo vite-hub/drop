@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
+import { DEFAULT_PRO_LIMITS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
@@ -86,6 +87,16 @@ export default defineNuxtConfig({
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
   $development: {
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
+  },
+
+  runtimeConfig: {
+    quotas: {
+      enabled: process.env.DROP_QUOTAS === "1",
+      defaultPlan: process.env.DROP_DEFAULT_PLAN || "free",
+      proDrops: Number(process.env.DROP_PRO_DROPS || DEFAULT_PRO_LIMITS.drops),
+      proBytes: Number(process.env.DROP_PRO_BYTES || DEFAULT_PRO_LIMITS.bytes),
+      proWrites: Number(process.env.DROP_PRO_WRITES || DEFAULT_PRO_LIMITS.writes),
+    },
   },
 
   css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "~/assets/css/main.css"],

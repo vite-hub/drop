@@ -4,14 +4,15 @@ import { PNG_CODE_IMAGES } from "#code-image-png"
 import { CodeImageSchema } from "#shared/schemas"
 import { createCodeImage } from "../../utils/code-image-store"
 import { requireIdentity } from "../../utils/identity"
+import { quotaToolResult } from "../../utils/quotas"
 
 export default defineMcpTool({
   name: "create_code_image",
   title: "Create a code image",
   description: `Render source code as ${PNG_CODE_IMAGES ? "a PNG (the default) or SVG image" : "an SVG image (this Drop can't render PNG)"} with syntax highlighting. Returns a public URL that expires after five minutes: download it, or drop it to keep it.`,
   inputSchema: toStandardJsonSchema(CodeImageSchema),
-  handler: async (input, event) => {
+  handler: async (input, event) => quotaToolResult(async () => {
     const { url, expiresAt } = await createCodeImage(event, await requireIdentity(event), input)
     return `${url} (expires ${expiresAt})`
-  },
+  }),
 })

@@ -1,18 +1,16 @@
 import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError, requireContentType } from "h3"
-import { requireRateLimit } from "vite-hub/rate-limit"
 import { createDocDrop, dropPageUrl, MAX_FILE_BYTES } from "../utils/drops"
 import { requireIdentity } from "../utils/identity"
+import { quotaApiHandler } from "../utils/quotas"
 
 /** Agents upload one file. It becomes a private drop; `url` serves the file, `page` opens it for review. */
-export default defineHandler(async (event) => {
+export default quotaApiHandler(defineHandler(async (event) => {
   const who = await requireIdentity(event).catch(async (error) => {
     // Release the unread upload before answering, or the connection can drop mid-stream instead of a clean 401.
     await event.req.body?.cancel().catch(() => {})
     throw error
   })
-  // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
-  if (!import.meta.dev) await requireRateLimit(event, "file-upload", { failure: "deny", key: who.userId, limit: 30, window: "1m" })
   requireContentType(event, "multipart/form-data")
   // Checked from the header: h3's assertBodySize rewraps the request and drops its multipart content type.
   if (Number(event.req.headers.get("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024)
@@ -47,4 +45,4 @@ export default defineHandler(async (event) => {
     visibility: drop.visibility,
     version: drop.version,
   }
-})
+}))

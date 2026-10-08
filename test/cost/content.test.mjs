@@ -273,3 +273,53 @@ test("new code images record an owner and become unavailable when they are banne
   sql.exec("UPDATE user SET banned = 1")
   await missing(() => requireBlobAccess(event(`/f/${key}`), key))
 })
+
+
+test("quota publishing keeps share review and uses one owner burst bucket for docs, apps and images", async () => {
+  state.quotasEnabled = true
+  state.shareApproval = "1"
+  const { getUsage, quotaToolResult } = await import("../../server/utils/quotas.ts")
+  const first = await createDocDrop(who, { filename: "review.md", bytes: new TextEncoder().encode("# Review"), visibility: "shared" }, event("/mcp", "POST"))
+  assert.equal(first.shareReview, "pending")
+  assert.equal((await findDrop(first.id)).shareReview, "pending")
+  assert.equal((await getUsage(who.userId)).writes.used, 1)
+  await publishApp(who, { files: { "index.html": "app" } }, event("/mcp", "POST"))
+  await createCodeImage(event("/mcp", "POST"), who, { code: "const x = 1", format: "svg", scale: 4 })
+  assert.equal((await getUsage(who.userId)).writes.used, 3)
+  assert.equal(state.bursts.filter(call => call.bucket === "file-upload").length, 3)
+  assert.ok(state.bursts.every(call => call.key === who.userId))
+  state.failBurst = true
+  const result = await quotaToolResult(() => createDocDrop(who, { filename: "denied.md", bytes: new TextEncoder().encode("denied") }, event("/mcp", "POST")))
+  assert.equal(result.isError, true)
+  assert.equal(result.structuredContent.quota.unit, "burstPublishes")
+  assert.equal((await getUsage(who.userId)).writes.used, 3)
+})
+
+test("cleanup releases image quota only after deleting its blob and retains OAuth cleanup", async () => {
+  state.quotasEnabled = true
+  const { default: cleanup } = await import("../../server/schedules/code-image-cleanup.ts")
+  const { getUsage } = await import("../../server/utils/quotas.ts")
+  const result = await createCodeImage(event("/mcp", "POST"), who, { code: "const x = 1", format: "svg", scale: 4 })
+  const key = new URL(result.url).pathname.slice(3)
+  assert.ok((await getUsage(who.userId)).bytes.used > 0)
+  const scheduledAt = new Date(Date.now() + 60 * 60 * 1000)
+  state.failDelete = true
+  await assert.rejects(cleanup.handler({ scheduledAt }), /injected blob delete/)
+  assert.ok((await getUsage(who.userId)).bytes.used > 0)
+  assert.ok(sql.prepare("SELECT blob_key FROM code_images WHERE blob_key = ?").get(key))
+  state.failDelete = false
+  await cleanup.handler({ scheduledAt })
+  assert.equal((await getUsage(who.userId)).bytes.used, 0)
+  assert.equal((await getUsage(who.userId)).writes.used, 1)
+  assert.ok(!state.objects.has(key))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM code_images").get().n, 0)
+})
+
+test("full-history deletion tombstones every blob beyond the version display bounds", async () => {
+  for (let i = 0; i < 300; i++) insertDrop(`long${i}`, { supersedes_id: i ? `long${i - 1}` : null })
+  state.failDelete = true
+  await deleteDrop(await findDrop("long150"))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM blob_tombstones").get().n, 300)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM blob_cleanup").get().n, 300)
+})

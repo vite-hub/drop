@@ -42,17 +42,17 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
   }
 })
 
-test("Drizzle applies both merged migrations in order, including an upgrade from 0003", async () => {
+test("Drizzle applies all migrations in order, including production upgrades from 0002", async () => {
   const directory = new URL("../../server/databases/migrations/", import.meta.url)
   const journal = JSON.parse(readFileSync(new URL("meta/_journal.json", directory), "utf8"))
   const filenames = readdirSync(directory).filter(name => name.endsWith(".sql")).sort()
   assert.deepEqual(journal.entries.map(entry => `${entry.tag}.sql`), filenames)
-  for (const tag of ["0003_content_gates", "0005_trust"]) assert.ok(journal.entries.some(entry => entry.tag === tag))
+  for (const tag of ["0003_content_gates", "0004_quotas", "0005_trust"]) assert.ok(journal.entries.some(entry => entry.tag === tag))
   assert.deepEqual(journal.entries.map(entry => entry.idx), journal.entries.map((_, index) => index))
   for (let index = 1; index < journal.entries.length; index++) assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  for (const upgrade of [false, true]) {
+  for (const existing of [0, 3, 4]) {
     const database = new DatabaseSync(":memory:")
     try {
       const db = drizzle(async (query, params, method) => {
@@ -62,16 +62,17 @@ test("Drizzle applies both merged migrations in order, including an upgrade from
         return { rows: statement.all(...params) }
       })
       const apply = async statements => database.exec(`BEGIN; ${statements.join(";\n")}; COMMIT;`)
-      if (upgrade) {
+      if (existing) {
         database.exec("CREATE TABLE __drizzle_migrations (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at numeric)")
-        for (const migration of migrations.slice(0, 4)) {
+        for (const migration of migrations.slice(0, existing)) {
           database.exec(migration.sql.join(";\n"))
           database.prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)").run(migration.hash, migration.folderMillis)
         }
       }
       await migrate(db, apply, config)
+      assert.ok(database.prepare("PRAGMA table_info(user)").all().some(column => column.name === "plan"))
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
-      for (const table of ["blob_tombstones", "drop_heads", "code_images", "workspace_stats", "abuse_reports"])
+      for (const table of ["blob_tombstones", "drop_heads", "code_images", "workspace_stats", "quota_reservations", "quota_blobs", "abuse_reports"])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
       assert.ok(database.prepare("PRAGMA table_info(drops)").all().some(column => column.name === "quarantined_at"))
       await migrate(db, apply, config)

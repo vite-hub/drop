@@ -12,9 +12,11 @@ const stubs = {
   "vite-hub/database/drizzle": "export const db = globalThis.dropTest.db",
   "vite-hub/database": "export const defineDatabase = v => v",
   "vite-hub/blob": "export const blob = globalThis.dropTest.blob",
+  "nitro/runtime-config": 'export const useRuntimeConfig = () => ({ quotas: { enabled: globalThis.dropTest.quotasEnabled ?? false } })',
   "nitro/cache": "export const defineCachedFunction = fn => fn",
   "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
-  "vite-hub/rate-limit": "export const requireRateLimit = async () => {}",
+  "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
+  "vite-hub/schedule": "export const defineSchedule = value => value",
   "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0" } })',
   "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
 }
@@ -67,12 +69,19 @@ const db = drizzle(execute, async queries => {
   }
   catch (error) { sql.exec("ROLLBACK"); throw error }
 })
+// Match D1's raw all() results, which return named columns instead of proxy arrays.
+db.all = async query => {
+  const compiled = db.dialect.sqlToQuery(query)
+  queries.push({ query: compiled.sql, params: compiled.params })
+  return sql.prepare(compiled.sql).all(...compiled.params)
+}
 const objects = new Map()
 const entries = new Map()
 export const calls = { get: 0, head: 0, del: 0, writes: [] }
 export const state = globalThis.dropTest = {
-  db, who: null, objects, entries, failDelete: false, failCacheDelete: false,
+  db, who: null, objects, entries, bursts: [], failBurst: false, failDelete: false, failCacheDelete: false,
   blob: {
+    list: async () => [null, { blobs: [...objects.keys()].map(pathname => ({ pathname })) }],
     get: async key => { calls.get++; return [null, objects.get(key)?.body ?? null] },
     head: async key => { calls.head++; return [null, objects.get(key) ?? null] },
     put: async (key, body) => { objects.set(key, { body: new Blob([body]), uploadedAt: new Date() }); return [null, { url: `/f/${key}` }] },
@@ -90,7 +99,7 @@ export const state = globalThis.dropTest = {
   },
 }
 export function migrate() {
-  for (const name of ["0000_init", "0001_security_constraints", "0002_oauth_provider", "0003_content_gates", "0005_trust"])
+  for (const name of ["0000_init", "0001_security_constraints", "0002_oauth_provider", "0003_content_gates", "0004_quotas", "0005_trust"])
     sql.exec(readFileSync(new URL(`server/databases/migrations/${name}.sql`, root), "utf8"))
 }
 export function event(path, method = "GET") {
@@ -99,7 +108,9 @@ export function event(path, method = "GET") {
   return request
 }
 export function reset() {
-  sql.exec("DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM blob_tombstones; DELETE FROM code_images; DELETE FROM user")
+  sql.exec("DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM blob_tombstones; DELETE FROM code_images; DELETE FROM user")
+  state.bursts.length = 0; state.failBurst = false
+  state.quotasEnabled = false
   state.shareApproval = "0"
   state.failDelete = false; state.failCacheDelete = false; state.who = null
   objects.clear(); entries.clear(); queries.length = 0

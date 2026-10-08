@@ -16,6 +16,7 @@ useSeoMeta({
 
 <template>
   <UApp :toaster="{ position: 'bottom-center' }">
+    <QuotaNotice />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>

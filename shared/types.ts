@@ -1,4 +1,5 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
+import type { Plan } from "./quotas"
 import type { Role } from "./roles"
 
 export type DropKind = "markdown" | "html" | "image" | "file" | "app"
@@ -75,6 +76,7 @@ export interface NewComment {
 }
 
 export interface Member {
+  plan: Plan
   id: string
   name: string
   email: string
