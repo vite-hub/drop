@@ -19,6 +19,7 @@ test("template resource ids survive Nitro's array merge and D1 build variables t
     const generated = {
       ...template,
       main: "index.mjs",
+      compatibility_flags: ["nodejs_compat", "nodejs_compat"],
       assets: { directory: "../public", binding: "ASSETS" },
       d1_databases: [...template.d1_databases, ...cloudflareTemplate.d1_databases],
       kv_namespaces: [...template.kv_namespaces, ...cloudflareTemplate.kv_namespaces],
@@ -31,6 +32,7 @@ test("template resource ids survive Nitro's array merge and D1 build variables t
     syncCloudflareTemplate(directory)
     const config = JSON.parse(readFileSync(file, "utf8"))
     assert.equal(config.name, "my-drop")
+    assert.deepEqual(config.compatibility_flags, ["nodejs_compat"])
     assert.equal(config.d1_databases.length, 1)
     assert.equal(config.d1_databases[0].database_id, "provisioned-d1-id")
     assert.equal(config.kv_namespaces[0].id, "provisioned-kv-id")

@@ -11,6 +11,7 @@ interface Binding {
 }
 interface Template {
   name: string
+  compatibility_flags: string[]
   d1_databases: Binding[]
   r2_buckets: Binding[]
   kv_namespaces: Binding[]
@@ -25,6 +26,7 @@ export function syncCloudflareTemplate(serverDir: string) {
   const file = join(serverDir, "wrangler.json")
   const config = JSON.parse(readFileSync(file, "utf8")) as Template
   config.name = cloudflareTemplate.name
+  config.compatibility_flags = [...new Set(config.compatibility_flags)]
   for (const key of ["d1_databases", "r2_buckets", "kv_namespaces"] as const) {
     const bindings = new Map<string, Binding>()
     for (const binding of config[key]) {
