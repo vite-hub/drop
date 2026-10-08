@@ -126,6 +126,7 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    errorHandler: fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url)),
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.
     ...(host === "cloudflare" ? { storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } } } : {}),
@@ -190,6 +191,8 @@ export default defineNuxtConfig({
         drop: {
           // GitHub user ids (not logins, which can be renamed and reclaimed) that sign in as admins, comma-separated.
           admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
+          shareApproval: env({ source: env.source("DROP_SHARE_APPROVAL"), default: "0" }),
+          abuseEmail: env({ source: env.source("DROP_ABUSE_EMAIL"), default: "" }),
         },
       },
     },

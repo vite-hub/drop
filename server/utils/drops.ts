@@ -11,6 +11,8 @@ import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
 import { contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
+import { shareReviewFor } from "./trust"
+import type { H3Event } from "h3"
 import type { Identity } from "./identity"
 
 export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean }
@@ -23,9 +25,10 @@ const TEXT_KINDS = new Set(["markdown", "html"])
 
 /** What the caller may do with a drop. Editors and admins act on every drop in the workspace. */
 export function permissions(drop: DropRow, who: Identity | null) {
+  if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || who.role === "admin")) }
   const owner = Boolean(who && who.userId === drop.ownerId)
   const staff = Boolean(who && (who.role === "admin" || who.role === "editor"))
-  const shared = drop.visibility === "shared"
+  const shared = drop.visibility === "shared" && !drop.shareReview
   const level = ACCESS_RANK[drop.access as Access]
   const available = !drop.ownerBanned
   return {
@@ -40,21 +43,29 @@ export function permissions(drop: DropRow, who: Identity | null) {
 export function toSummary(row: DropRow, paths?: string[]): DropSummary {
   return {
     id: row.id, kind: row.kind, title: row.title, filename: row.filename, size: row.size, version: row.version,
-    visibility: row.visibility, access: row.access as Access, actorKind: row.actorKind, actorName: row.actorName,
+    shareReview: row.shareReview, quarantinedAt: row.quarantinedAt, visibility: row.visibility, access: row.access as Access, actorKind: row.actorKind, actorName: row.actorName,
     createdAt: row.createdAt, updatedAt: row.updatedAt, ...(paths ? { paths } : {}),
   }
 }
 
-export async function findDrop(id: string) {
-  const [row] = await db.select({ drop: drops, ownerId: user.id, banned: user.banned }).from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.id, id)).limit(1)
-  return row ? { ...row.drop, ownerBanned: !row.ownerId || Boolean(row.banned) } : null
+/** Reuse the joined owner for review policy so each lookup remains one query. */
+async function withOwnerAccess(row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined, event?: H3Event): Promise<DropRow | null> {
+  if (!row) return null
+  const drop = { ...row.drop, ownerBanned: !row.owner || Boolean(row.owner.banned) }
+  if (event && drop.shareReview && await shareReviewFor(drop.ownerId, event, row.owner) === null) drop.shareReview = null
+  return drop
 }
 
-export async function findDropByBlob(key: string) {
-  const [row] = await db.select({ drop: drops, ownerId: user.id, banned: user.banned }).from(drops)
+export async function findDrop(id: string, event?: H3Event) {
+  const [row] = await db.select({ drop: drops, owner: user }).from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.id, id)).limit(1)
+  return withOwnerAccess(row, event)
+}
+
+export async function findDropByBlob(key: string, event?: H3Event) {
+  const [row] = await db.select({ drop: drops, owner: user }).from(drops)
     .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.blobKey, key)).limit(1)
-  return row ? { ...row.drop, ownerBanned: !row.ownerId || Boolean(row.banned) } : null
+  return withOwnerAccess(row, event)
 }
 
 /** Your drops, newest first. Older versions of a doc hide behind their latest. */
@@ -194,7 +205,7 @@ async function deleteBlobKeys(keys: string[]) {
 }
 
 /** Stores one file as a private doc drop. Markdown and HTML must be UTF-8. */
-export async function createDocDrop(who: Identity, input: { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: "private" | "shared"; access?: Access }) {
+export async function createDocDrop(who: Identity, input: { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: "private" | "shared"; access?: Access }, event?: H3Event) {
   await drainBlobCleanup()
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   const filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
@@ -256,6 +267,8 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
     actorName: who.actorName,
     createdAt: now,
     updatedAt: now,
+    shareReview: (input.visibility ?? previous?.visibility) === "shared" ? await shareReviewFor(previous?.ownerId ?? who.userId, event) : null,
+    quarantinedAt: null,
     publishToken: null,
   }
   try {
@@ -313,6 +326,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
       id, ownerId: row?.ownerId ?? who.userId, kind: "app", title: name.slice(0, 160),
       filename: row?.filename ?? `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app"}/`,
       blobKey: null, contentType: null, size, version: (row?.version ?? 0) + 1, supersedesId: row?.supersedesId ?? null,
+      shareReview: row?.shareReview ?? null, quarantinedAt: row?.quarantinedAt ?? null,
       visibility: row?.visibility ?? "private", access: (row?.access as Access | undefined) ?? "comment",
       actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
     }

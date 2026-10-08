@@ -1,3 +1,4 @@
+import { requirePublishBurst } from "../../utils/publish-burst"
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
@@ -14,7 +15,9 @@ export default defineMcpTool({
     id: v.optional(v.pipe(v.string(), v.description("Id of the app this publishes the next version of."))),
   })),
   handler: async (input, event) => {
-    const app = await publishApp(await requireIdentity(event), input)
+    const who = await requireIdentity(event)
+    await requirePublishBurst(event, who.userId)
+    const app = await publishApp(who, input)
     return `Published v${app.version}: ${dropPageUrl(event.url.origin, app.id)} (id=${app.id})`
   },
 })

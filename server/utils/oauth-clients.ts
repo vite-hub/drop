@@ -1,3 +1,5 @@
+import { APIError } from "better-auth/api"
+import { registrationProblem } from "../../shared/oauth-registration"
 import { createAuthMiddleware } from "better-auth/api"
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"])
@@ -15,7 +17,12 @@ function isNativeRedirect(uri: unknown) {
  * native, register the client as the native app it is.
  */
 export const nativeClientRegistration = createAuthMiddleware(async (ctx) => {
+  const path = ctx.path.replace(/\/+$/, "")
+  if (path === "/oauth2/register") {
+    const problem = registrationProblem(ctx.body)
+    if (problem) throw new APIError("BAD_REQUEST", { message: problem })
+  }
   const body = ctx.body as { application_type?: string; redirect_uris?: unknown[] } | undefined
-  if (ctx.path !== "/oauth2/register" || !body || body.application_type || !body.redirect_uris?.length || !body.redirect_uris.every(isNativeRedirect)) return
+  if (path !== "/oauth2/register" || !body || body.application_type || !body.redirect_uris?.length || !body.redirect_uris.every(isNativeRedirect)) return
   return { context: { body: { ...body, application_type: "native" } } }
 })

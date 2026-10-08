@@ -13,7 +13,7 @@ import { routeId } from "../../../utils/params"
 export default defineValidatedHandler({
   validate: { body: CommentSchema },
   async handler(event) {
-    const drop = await findDrop(await routeId(event))
+    const drop = await findDrop(await routeId(event), event)
     const who = await identify(event)
     if (!drop || !permissions(drop, who).comment) throw new HTTPError({ status: 404, statusText: "You can't comment on this drop." })
     // Cloudflare Rate Limiting only exists on Workers; local dev skips it.

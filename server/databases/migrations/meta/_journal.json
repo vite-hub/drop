@@ -29,6 +29,13 @@
       "when": 1791547200000,
       "tag": "0003_content_gates",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791547200002,
+      "tag": "0005_trust",
+      "breakpoints": true
     }
   ]
 }

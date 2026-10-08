@@ -1,3 +1,4 @@
+import { requirePublishBurst } from "../../utils/publish-burst"
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
@@ -19,13 +20,15 @@ export default defineMcpTool({
   })),
   handler: async ({ markdown, format, title, shared, supersedes }, event) => {
     if (!markdown.trim()) throw new HTTPError({ status: 400, message: "markdown is required." })
-    const drop = await createDocDrop(await requireIdentity(event), {
+    const who = await requireIdentity(event)
+    await requirePublishBurst(event, who.userId)
+    const drop = await createDocDrop(who, {
       filename: format === "html" ? "doc.html" : "doc.md",
       bytes: new TextEncoder().encode(markdown),
       title,
       supersedes,
       visibility: shared ? "shared" : undefined,
-    })
-    return `Dropped${drop.version > 1 ? ` v${drop.version}` : ""} ${drop.visibility === "shared" ? "and shared" : "privately"}: ${dropPageUrl(event.url.origin, drop.id)} (id=${drop.id})`
+    }, event)
+    return `Dropped${drop.version > 1 ? ` v${drop.version}` : ""} ${drop.shareReview ? "and waiting for review" : drop.visibility === "shared" ? "and shared" : "privately"}: ${dropPageUrl(event.url.origin, drop.id)} (id=${drop.id})`
   },
 })

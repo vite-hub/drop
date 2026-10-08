@@ -9,6 +9,8 @@ export default defineSchedule({
   cron: "0 * * * *",
   async handler({ scheduledAt }) {
     await db.delete(codeImages).where(lte(codeImages.expiresAt, scheduledAt.getTime()))
+    const { cleanupUnusedOAuthClients } = await import("../utils/oauth-cleanup")
+    await cleanupUnusedOAuthClients(scheduledAt)
     let cursor: string | undefined
 
     do {

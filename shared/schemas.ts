@@ -60,3 +60,12 @@ export const CodeImageSchema = v.strictObject({
   scale: v.optional(v.picklist([2, 4, 6], "Scale must be 2, 4, or 6."), 4),
   theme: v.optional(v.string()),
 })
+
+export const ReportSchema = v.object({
+  target: v.pipe(v.string(), v.maxLength(600), v.regex(/^\/(d|f)\//)),
+  reason: v.picklist(["phishing", "malware", "spam", "copyright", "illegal/CSAM", "other"]),
+  details: v.pipe(v.string(), v.trim(), v.minLength(1, "Describe the problem."), v.maxLength(4000)),
+  email: v.optional(v.union([v.literal(""), v.pipe(v.string(), v.email(), v.maxLength(254))])),
+})
+export const ReviewSchema = v.object({ action: v.picklist(["approve", "reject"]) })
+export const ReportActionSchema = v.object({ action: v.picklist(["dismiss", "quarantine", "ban"]) })

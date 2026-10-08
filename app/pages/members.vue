@@ -42,6 +42,7 @@ function menu(member: Member): DropdownMenuItem[][] {
 
 <template>
   <PageShell id="members" title="Members" :description="description">
+    <div v-if="admin" class="mb-5 flex gap-3"><UButton to="/admin/review" label="Review shares" color="neutral" variant="outline" /><UButton to="/admin/reports" label="Reports" color="neutral" variant="outline" /></div>
     <div class="mb-6 grid grid-cols-1 divide-y divide-default rounded-lg border border-default sm:grid-cols-3 sm:divide-x sm:divide-y-0">
       <div v-for="role in ROLES" :key="role" class="px-4 py-3">
         <p class="flex items-center gap-2 text-sm font-medium text-highlighted">

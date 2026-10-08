@@ -15,6 +15,7 @@ const stubs = {
   "nitro/cache": "export const defineCachedFunction = fn => fn",
   "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
   "vite-hub/rate-limit": "export const requireRateLimit = async () => {}",
+  "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0" } })',
   "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
 }
 registerHooks({
@@ -89,7 +90,7 @@ export const state = globalThis.dropTest = {
   },
 }
 export function migrate() {
-  for (const name of ["0000_init", "0001_security_constraints", "0002_oauth_provider", "0003_content_gates"])
+  for (const name of ["0000_init", "0001_security_constraints", "0002_oauth_provider", "0003_content_gates", "0005_trust"])
     sql.exec(readFileSync(new URL(`server/databases/migrations/${name}.sql`, root), "utf8"))
 }
 export function event(path, method = "GET") {
@@ -98,7 +99,8 @@ export function event(path, method = "GET") {
   return request
 }
 export function reset() {
-  sql.exec("DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM blob_tombstones; DELETE FROM code_images; DELETE FROM user")
+  sql.exec("DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM blob_tombstones; DELETE FROM code_images; DELETE FROM user")
+  state.shareApproval = "0"
   state.failDelete = false; state.failCacheDelete = false; state.who = null
   objects.clear(); entries.clear(); queries.length = 0
   calls.get = calls.head = calls.del = 0; calls.writes.length = 0

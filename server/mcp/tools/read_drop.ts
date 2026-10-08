@@ -13,7 +13,7 @@ export default defineMcpTool({
   inputSchema: toStandardJsonSchema(v.object({ id: v.pipe(v.string(), v.description("Drop id from list_drops.")) })),
   handler: async ({ id }, event) => {
     const who = await requireIdentity(event)
-    const drop = await findDrop(id)
+    const drop = await findDrop(id, event)
     if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
     const detail = await dropDetail(drop, who, event.url.origin)
     if (detail.files) return Object.entries(detail.files).map(([path, content]) => `--- ${path}\n${content}`).join("\n\n")

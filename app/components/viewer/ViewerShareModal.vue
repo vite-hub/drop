@@ -11,10 +11,10 @@ const url = computed(() => (import.meta.client ? `${location.origin}/d/${props.d
 const levels = Object.keys(ACCESS_LABELS) as Access[]
 
 async function setShared(next: boolean) {
-  if (await setVisibility(props.drop, next ? "shared" : "private")) notify.done(next ? "Shared" : "Private again")
+  if (await setVisibility(props.drop, next ? "shared" : "private")) notify.done(next ? "Share updated" : "Private again")
 }
 async function setAccess(level: Access) {
-  if (level !== props.drop.access && await setVisibility(props.drop, "shared", level)) notify.done(`Anyone with the link ${ACCESS_LABELS[level].toLowerCase()}`)
+  if (level !== props.drop.access && await setVisibility(props.drop, "shared", level)) notify.done("Share access updated")
 }
 </script>
 
@@ -26,8 +26,8 @@ async function setAccess(level: Access) {
           <div class="flex items-center gap-3">
             <span class="grid size-8 place-items-center rounded-md bg-elevated text-muted"><UIcon :name="shared ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-4" /></span>
             <div>
-              <p class="text-sm font-medium text-highlighted">{{ shared ? "Anyone with the link" : "Only you" }}</p>
-              <p class="text-xs text-muted">{{ shared ? "No sign-in needed." : "Agents with your key can still read it." }}</p>
+              <p class="text-sm font-medium text-highlighted">{{ drop.shareReview === "pending" ? "Waiting for review" : drop.shareReview === "rejected" ? "Share rejected" : shared ? "Anyone with the link" : "Only you" }}</p>
+              <p class="text-xs text-muted">{{ drop.shareReview ? "You can still use this drop privately." : shared ? "No sign-in needed." : "Your connected agents can still read it." }}</p>
             </div>
           </div>
           <USwitch

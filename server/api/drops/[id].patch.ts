@@ -5,6 +5,7 @@ import { DropPatchSchema } from "#shared/schemas"
 import { drops } from "../../databases/config"
 import { findDrop, permissions, toSummary, versionChain } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
+import { shareReviewFor } from "../../utils/trust"
 import { routeId } from "../../utils/params"
 
 /** Share, unshare, change the link's access level, or rename. */
@@ -12,11 +13,14 @@ export default defineValidatedHandler({
   validate: { body: DropPatchSchema },
   async handler(event) {
     const who = await requireIdentity(event)
-    const drop = await findDrop(await routeId(event))
+    const drop = await findDrop(await routeId(event), event)
     if (!drop || !permissions(drop, who).manage) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
     const body = await event.req.json()
-    const share: { visibility?: "private" | "shared"; access?: "view" | "comment" | "edit" } = {}
-    if (body.visibility !== undefined) share.visibility = body.visibility
+    const share: { shareReview?: "pending" | "rejected" | null; visibility?: "private" | "shared"; access?: "view" | "comment" | "edit" } = {}
+    if (body.visibility !== undefined) {
+      share.visibility = body.visibility
+      share.shareReview = body.visibility === "shared" ? await shareReviewFor(drop.ownerId, event) : null
+    }
     if (body.access !== undefined) share.access = body.access
     const title = typeof body.title === "string" ? { title: body.title } : {}
     if (Object.keys(share).length) {

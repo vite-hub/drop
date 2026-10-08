@@ -266,12 +266,13 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           </span>
         </template>
         <template #right>
+          <UButton v-if="publicView" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" label="Report" size="sm" variant="ghost" />
           <template v-if="editing">
             <UButton color="neutral" label="Cancel" size="sm" variant="ghost" @click="cancelEdit" />
             <UButton color="neutral" label="Publish" :loading="saving" size="sm" @click="save" />
           </template>
           <template v-else>
-            <UButton v-if="owner" color="neutral" :icon="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" :label="drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'shared' ? 'outline' : 'solid'" @click="shareOpen = true" />
+            <UButton v-if="owner" color="neutral" :icon="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'shared' ? 'outline' : 'solid'" @click="shareOpen = true" />
             <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
             <span class="relative">
               <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-lucide-panel-right" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />

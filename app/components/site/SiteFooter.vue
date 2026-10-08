@@ -9,8 +9,11 @@ withDefaults(defineProps<{ wide?: boolean }>(), { wide: false })
         <ViteHubMark class="size-3.5" />Built with
         <a class="font-medium text-highlighted hover:underline" href="https://vitehub.dev" rel="noreferrer" target="_blank">ViteHub</a>
       </span>
-      <span class="flex gap-5">
+      <span class="flex flex-wrap gap-5">
         <NuxtLink class="hover:text-highlighted" to="/docs">Docs</NuxtLink>
+        <NuxtLink class="hover:text-highlighted" to="/terms">Terms</NuxtLink>
+        <NuxtLink class="hover:text-highlighted" to="/acceptable-use">Acceptable use</NuxtLink>
+        <NuxtLink class="hover:text-highlighted" to="/abuse">Copyright and abuse</NuxtLink>
         <NuxtLink class="hover:text-highlighted" to="/docs/self-host">Self-host</NuxtLink>
         <a class="hover:text-highlighted" href="https://github.com/vite-hub/drop" rel="noreferrer" target="_blank">GitHub</a>
       </span>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "node:test"
 import { readFileSync } from "node:fs"
 import { sql, queries, state, calls, migrate, reset, insertDrop, who, event } from "./harness.mjs"
-const { createDocDrop, dropDetail, findDrop, listDrops, versionChain, deleteDrop, publishApp } = await import("../../server/utils/drops.ts")
+const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionChain, deleteDrop, publishApp } = await import("../../server/utils/drops.ts")
 const { requireBlobAccess, LEGACY_UPLOAD_CUTOFF } = await import("../../server/utils/content-access.ts")
 const { default: accessMiddleware } = await import("../../server/middleware/0.drop-access.ts")
 const { default: markdownMiddleware } = await import("../../server/middleware/1.markdown-documents.ts")
@@ -110,6 +110,86 @@ test("normal shared files and code images use one owner join, and unban restores
   await missing(() => requireBlobAccess(event(`/f/${imageKey}`), imageKey))
   sql.exec("UPDATE user SET banned = 0")
   await requireBlobAccess(event(`/f/${imageKey}`), imageKey)
+})
+
+test("review policy reuses the owner join for IDs, blobs, pages and raw downloads", async () => {
+  state.shareApproval = "1"
+  insertDrop("doc", { share_review: "pending" })
+  for (const lookup of [() => findDrop("doc", event("/d/doc")), () => findDropByBlob("doc.md", event("/f/doc.md"))]) {
+    queries.length = 0
+    assert.equal((await lookup()).shareReview, "pending")
+    assert.equal(queries.length, 1)
+  }
+  await missing(() => requireBlobAccess(event("/f/doc.md?raw"), "doc.md"))
+  await assert.rejects(accessMiddleware(event("/d/doc")), error => error.status === 403)
+  for (const identity of [who, { ...who, userId: "staff", role: "editor" }, { ...who, userId: "admin", role: "admin" }]) {
+    state.who = identity
+    await requireBlobAccess(event("/f/doc.md"), "doc.md")
+    await accessMiddleware(event("/d/doc"))
+  }
+  state.who = null
+  for (const approval of ["UPDATE user SET share_approved_at = 1", "UPDATE user SET share_approved_at = NULL, role = 'admin'"]) {
+    sql.exec(approval)
+    queries.length = 0
+    await requireBlobAccess(event("/f/doc.md"), "doc.md")
+    assert.equal(queries.length, 1)
+    assert.equal((await findDrop("doc", event("/d/doc"))).shareReview, null)
+    await accessMiddleware(event("/d/doc"))
+  }
+  sql.exec("UPDATE user SET banned = 1")
+  await missing(() => accessMiddleware(event("/d/doc")))
+  await missing(() => requireBlobAccess(event("/f/doc.md"), "doc.md"))
+  sql.exec("UPDATE user SET banned = 0, role = NULL")
+  state.shareApproval = "0"
+  queries.length = 0
+  await requireBlobAccess(event("/f/doc.md"), "doc.md")
+  assert.equal(queries.length, 1)
+  state.shareApproval = "1"
+  sql.exec("UPDATE drops SET share_review = 'rejected'")
+  await missing(() => requireBlobAccess(event("/f/doc.md"), "doc.md"))
+})
+
+test("quarantine and missing owners block warm renders, raw content, apps and pages for every caller", async () => {
+  const key = "00000000-0000-4000-8000-000000000001.md"
+  insertDrop("doc", { blob_key: key })
+  insertDrop("app", { kind: "app", blob_key: null })
+  await dropDetail(await findDrop("doc"), null, "https://drop.example")
+  assert.ok(state.entries.size)
+  const reads = calls.get
+  for (const blocked of ["UPDATE drops SET quarantined_at = 1", "UPDATE drops SET quarantined_at = NULL, owner_id = 'deleted-owner'"]) {
+    sql.exec(blocked)
+    for (const identity of [null, who, { ...who, role: "editor" }, { ...who, role: "admin" }]) {
+      state.who = identity
+      for (const path of [`/f/${key}`, `/f/${key}?raw`, "/d/doc", "/d/app"])
+        for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
+      await missing(() => markdownMiddleware(event(`/f/${key}`)))
+      for (const id of ["doc", "app"]) await missing(async () => dropDetail(await findDrop(id), identity, "https://drop.example"))
+    }
+  }
+  assert.equal(calls.get, reads)
+  assert.equal(calls.head, 0)
+})
+
+test("reports quarantine legacy uploads and code images while image access stays one query", async () => {
+  const imageKey = `code-images/${Date.now() + 300000}/image.svg`
+  sql.prepare("INSERT INTO code_images VALUES (?, ?, ?)").run(imageKey, "owner", Date.now() + 300000)
+  state.objects.set("legacy.md", { uploadedAt: new Date(LEGACY_UPLOAD_CUTOFF - 1) })
+  for (const key of [imageKey, "legacy.md"]) {
+    sql.prepare("INSERT INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)").run(key, `/f/${key}`)
+    queries.length = 0
+    await missing(() => requireBlobAccess(event(`/f/${key}`), key))
+    if (key === imageKey) assert.equal(queries.length, 1)
+  }
+  assert.equal(calls.head, 0)
+})
+
+test("HTML keeps report controls outside the sandbox and HEAD emits no body", async () => {
+  const key = "00000000-0000-4000-8000-000000000001.html"
+  insertDrop("html", { kind: "html", blob_key: key })
+  const response = await markdownMiddleware(event(`/f/${key}`))
+  assert.ok(response.indexOf(">Report</a>") < response.indexOf("<iframe"))
+  assert.match(response, /sandbox="allow-scripts/)
+  assert.equal(await markdownMiddleware(event(`/f/${key}`, "HEAD")), "")
 })
 
 test("failed blob deletion never turns a private old file public, and retries remove its cache", async () => {

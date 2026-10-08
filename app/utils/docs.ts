@@ -48,6 +48,11 @@ export const DOCS_NAV: Array<{ title: string; links: DocsLink[] }> = [
       { label: "Review and share", to: "/docs/review" },
     ],
   },
+  { title: "Policies", links: [
+    { label: "Terms of service", to: "/terms" },
+    { label: "Acceptable use", to: "/acceptable-use" },
+    { label: "Copyright and abuse", to: "/abuse" },
+  ] },
   {
     title: "Self-host",
     links: [
