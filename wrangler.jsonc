@@ -1,0 +1,18 @@
+{
+  // Cloudflare's deploy button provisions these bindings and writes their ids here.
+  // ViteHub emits the deployable config in .output/server/wrangler.json at build time.
+  "name": "vitehub-drop",
+  "main": ".output/server/index.mjs",
+  "compatibility_date": "2026-07-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "binding": "ASSETS", "directory": ".output/public" },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "vitehub-drop",
+    "database_id": "00000000-0000-4000-8000-000000000000"
+  }],
+  "r2_buckets": [{ "binding": "BLOB", "bucket_name": "vitehub-drop" }],
+  "kv_namespaces": [{ "binding": "KV", "id": "00000000000000000000000000000000" }],
+  "browser": { "binding": "BROWSER" },
+  "secrets": { "required": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "BETTER_AUTH_SECRET", "DROP_ADMINS"] }
+}

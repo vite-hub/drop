@@ -10,9 +10,9 @@
     "build": "nuxt build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "mkdir -p .vitehub/data/database && drizzle-kit migrate --config .vitehub/database/drizzle.config.ts",
-    "db:migrate:d1": "node scripts/migrate-d1.mjs",
+    "db:migrate:d1": "node --env-file-if-exists=.env scripts/migrate-d1.mjs",
     "db:migrate:remote": "cp -r server/databases/migrations .output/server/ && wrangler d1 migrations apply DB --remote --config .output/server/wrangler.json",
-    "deploy": "pnpm build && pnpm db:migrate:remote && wrangler deploy --config .output/server/wrangler.json --secrets-file .env",
+    "deploy": "pnpm db:migrate:remote && node scripts/deploy-cloudflare.mjs",
     "dev": "nuxt dev",
     "postinstall": "vitehub types prepare && nuxt prepare",
     "preview": "cp -r server/databases/migrations .output/server/ && wrangler d1 migrations apply DB --local --config .output/server/wrangler.json && wrangler dev --config .output/server/wrangler.json --enable-containers=false --port 8788",
@@ -62,5 +62,33 @@
     "typescript": "^6.0.3",
     "vue-tsc": "^3.3.9",
     "wrangler": "4.148.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "Drop data and sign-in records. Migrations run before deployment."
+      },
+      "BLOB": {
+        "description": "Private files. Enable R2 in your Cloudflare account first."
+      },
+      "KV": {
+        "description": "Rendered Markdown and request cache."
+      },
+      "BROWSER": {
+        "description": "PNG code images. Enable Browser Run in your Cloudflare account first."
+      },
+      "GITHUB_CLIENT_ID": {
+        "description": "GitHub OAuth app client id. [Callback setup](https://drop.vitehub.dev/docs/self-host#github)."
+      },
+      "GITHUB_CLIENT_SECRET": {
+        "description": "Client secret from the same GitHub OAuth app."
+      },
+      "BETTER_AUTH_SECRET": {
+        "description": "Generate with `openssl rand -base64 32`."
+      },
+      "DROP_ADMINS": {
+        "description": "Your GitHub user id: `gh api users/<login> --jq .id`. Comma-separated for multiple admins."
+      }
+    }
   }
 }

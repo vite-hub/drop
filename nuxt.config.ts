@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
+import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
@@ -39,15 +40,15 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     browser: true,
     database: {
       driver: "d1",
-      databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || "vitehub-drop",
+      databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || cloudflareTemplate.d1_databases[0]!.database_name,
       // Local dev and `nuxt prepare` run against a local D1; deploys read the real id from the environment.
-      databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || "00000000-0000-4000-8000-000000000000",
+      databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || cloudflareTemplate.d1_databases[0]!.database_id,
     },
     kv: true,
     rateLimit: true,
     schedule: true,
   },
-  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and the hourly cleanup as a Vercel Cron Job.
+  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job. The deploy build sets it to daily for Hobby.
   vercel: { preset: "vercel", blob: { ...files, driver: "vercel-blob", access: "private" }, database: d1("vitehub-drop-vercel"), schedule: true },
   // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
   netlify: { preset: "netlify", blob: files, database: d1("vitehub-drop-netlify"), schedule: { providerOutput: "standalone" } },
@@ -135,6 +136,7 @@ export default defineNuxtConfig({
     })],
     cloudflare: {
       wrangler: {
+        name: cloudflareTemplate.name,
         observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } },
         // Preserve the pre-Nuxt Sandbox migration before deleting its old Durable Object class.
         migrations: [
@@ -161,6 +163,9 @@ export default defineNuxtConfig({
   ],
 
   hooks: {
+    "nitro:init"(nitro) {
+      if (host === "cloudflare") nitro.hooks.hook("compiled", () => syncCloudflareTemplate(nitro.options.output.serverDir))
+    },
     // The CLI nightly adds a dev-only socket-cleanup plugin from @nuxt/cli, which this Nuxt nightly's
     // server import protection rejects. Dev works without it.
     "nitro:config"(config) {

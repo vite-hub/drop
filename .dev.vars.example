@@ -1,0 +1,5 @@
+# Cloudflare's deploy button asks for these four secrets.
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+BETTER_AUTH_SECRET=
+DROP_ADMINS=
