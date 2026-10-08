@@ -24,10 +24,10 @@ export default defineHandler(async (event) => {
   const [drop] = await db.select().from(drops).where(eq(drops.blobKey, key)).limit(1)
   if (!drop) return
   if (drop.visibility === "shared") return
+  event.res.headers.set("Cache-Control", "private, no-store")
   // Loaded lazily: middleware lands in the Worker's entry module, and anything it imports statically would be
   // re-exported from there, which Workers rejects as extra entrypoints.
   const [{ permissions }, { identify }] = await Promise.all([import("../utils/drops"), import("../utils/identity")])
   if (!permissions(drop, await identify(event)).view) throw new HTTPError({ status: 404, statusText: "Not found" })
   event.context.dropPrivate = true
-  event.res.headers.set("Cache-Control", "private, no-store")
 })

@@ -21,7 +21,8 @@ const files = { serve: { route: "/f" } }
 const d1 = (fallback: string) => ({
   driver: "d1" as const,
   databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || fallback,
-  databaseId: env({ source: env.source("CLOUDFLARE_D1_DATABASE_ID") }),
+  // ViteHub needs the id while it generates the runtime database registry.
+  databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || "00000000-0000-4000-8000-000000000000",
   cloudflare: { http: true },
 })
 

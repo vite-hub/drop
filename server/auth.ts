@@ -4,6 +4,7 @@ import { admin, jwt } from "better-auth/plugins"
 import { eq } from "drizzle-orm"
 import { defineAuth } from "vite-hub/auth"
 import { db, schema } from "vite-hub/database/drizzle"
+import type { ServerEnv } from "#vitehub/env/server"
 import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { nativeClientRegistration } from "./utils/oauth-clients"
@@ -26,42 +27,45 @@ import { nativeClientRegistration } from "./utils/oauth-clients"
  * Local dev has no GitHub OAuth app, so email and password sign-in is on in `nuxt dev` only.
  *
  */
-export default defineAuth(({ env, requestOrigin }) => ({
-  appName: "Drop",
-  baseURL: requestOrigin,
-  database: drizzleAdapter(db, { provider: "sqlite", schema }),
-  secret: env.auth.secret.unseal(),
-  route: false,
-  disabledPaths: ["/token"],
-  access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
-  socialProviders: {
-    github: { clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal() },
-  },
-  emailAndPassword: { enabled: import.meta.dev === true },
-  account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
-  hooks: { before: nativeClientRegistration },
-  databaseHooks: {
-    account: {
-      create: {
-        after: async (account) => {
-          if (account.providerId !== "github") return
-          const admins = env.drop.admins.unseal().split(/[\s,]+/).filter(Boolean)
-          if (admins.includes(account.accountId)) await db.update(users).set({ role: "admin" }).where(eq(users.id, account.userId))
+export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
+  const env = runtimeEnv as unknown as ServerEnv
+  return {
+    appName: "Drop",
+    baseURL: requestOrigin,
+    database: drizzleAdapter(db, { provider: "sqlite", schema }),
+    secret: env.auth.secret.unseal(),
+    route: false,
+    disabledPaths: ["/token"],
+    access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
+    socialProviders: {
+      github: { clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal() },
+    },
+    emailAndPassword: { enabled: import.meta.dev === true || process.env.DROP_TEST_SIGNIN === "1" },
+    account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
+    hooks: { before: nativeClientRegistration },
+    databaseHooks: {
+      account: {
+        create: {
+          after: async (account) => {
+            if (account.providerId !== "github") return
+            const admins = env.drop.admins.unseal().split(/[\s,]+/).filter(Boolean)
+            if (admins.includes(account.accountId)) await db.update(users).set({ role: "admin" }).where(eq(users.id, account.userId))
+          },
         },
       },
     },
-  },
-  plugins: [
-    admin({ ac, roles, defaultRole: "member", adminRoles: ["admin"] }),
-    jwt(),
-    oauthProvider({
-      loginPage: "/oauth",
-      consentPage: "/oauth",
-      scopes: ["openid", "profile", "email", "offline_access"],
-      resources: [`${requestOrigin}/mcp`],
-      enforcePerClientResources: false,
-      allowDynamicClientRegistration: true,
-      allowUnauthenticatedClientRegistration: true,
-    }),
-  ],
-}))
+    plugins: [
+      admin({ ac, roles, defaultRole: "member", adminRoles: ["admin"] }),
+      jwt(),
+      oauthProvider({
+        loginPage: "/oauth",
+        consentPage: "/oauth",
+        scopes: ["openid", "profile", "email", "offline_access"],
+        resources: [`${requestOrigin}/mcp`],
+        enforcePerClientResources: false,
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
+      }),
+    ],
+  }
+})

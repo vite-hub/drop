@@ -46,7 +46,7 @@ const STEPS = {
           <AgentsCodeBlock :code="STEPS.env" />
         </li>
         <li>
-          <p>Deploy. Vercel builds with <code>DROP_HOST=vercel</code>, which writes Vercel's Build Output, the function, and the cron job:</p>
+          <p>Deploy. Vercel builds with <code>DROP_HOST=vercel</code>, which writes Vercel's Build Output, the function, and the cron job. Hobby projects accept one cron schedule per day, so the generated cleanup job runs daily there.</p>
           <AgentsCodeBlock :code="STEPS.deploy" />
         </li>
         <li>
@@ -63,7 +63,6 @@ const STEPS = {
           ['ENABLE_EXPERIMENTAL_COREPACK', '1, so Vercel installs with the pnpm version in package.json.'],
           ['CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN', 'Cloudflare account id and an account API token with D1 edit access.'],
           ['CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME', 'The id and name of vitehub-drop-vercel.'],
-          ['CLOUDFLARE_API_TOKEN', 'Cloudflare account API token with D1 edit access.'],
           ['BLOB_READ_WRITE_TOKEN', 'Added by Vercel when you connect the Blob store.'],
         ]"
       />

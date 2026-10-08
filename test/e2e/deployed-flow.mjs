@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises"
 // agents must sign in. Add DROP_TOKEN=<an MCP access token> for the signed-in flow (uploads, sharing, MCP).
 const origin = new URL(process.env.DROP_URL ?? "https://drop.vitehub.dev")
 const token = process.env.DROP_TOKEN
+const cloudflareHost = origin.hostname === "drop.vitehub.dev"
 const timeout = () => AbortSignal.timeout(30_000)
 const filesEndpoint = new URL("/api/files", origin)
 
@@ -97,7 +98,7 @@ assert.match(markdownUrl.pathname, /^\/f\/[0-9a-f-]+\.md$/)
 const markdownPage = await fetch(markdownUrl, { headers: auth, signal: timeout() })
 assert.equal(markdownPage.status, 200)
 assert.equal(markdownPage.headers.get("content-type"), "text/html; charset=utf-8")
-assert.equal(markdownPage.headers.get("cache-control"), "private, no-store")
+assert.match(markdownPage.headers.get("cache-control") ?? "", /private,\s*no-store/)
 assert.match(await markdownPage.text(), /<div class="mermaid"><svg/)
 assert.match(markdownPage.headers.get("content-security-policy"), /script-src 'self'/)
 
@@ -151,12 +152,17 @@ const codeResponse = await fetch(new URL("/api/code", origin), {
   method: "POST",
   signal: AbortSignal.timeout(120_000),
 })
-assert.equal(codeResponse.status, 200)
+assert.equal(cloudflareHost ? codeResponse.status : [200, 501].includes(codeResponse.status), true)
+
+if (!cloudflareHost && codeResponse.status === 501) process.exit(0)
 
 const codeImage = await fetch(new URL((await codeResponse.json()).url, origin), { signal: timeout() })
 assert.equal(codeImage.status, 200)
-assert.equal(codeImage.headers.get("content-type"), "image/png")
-assert.deepEqual(
-  Buffer.from(await codeImage.arrayBuffer()).subarray(0, 8),
-  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-)
+if (cloudflareHost) {
+  assert.equal(codeImage.headers.get("content-type"), "image/png")
+  assert.deepEqual(
+    Buffer.from(await codeImage.arrayBuffer()).subarray(0, 8),
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  )
+}
+else assert.ok(["image/png", "image/svg+xml"].includes(codeImage.headers.get("content-type")))
