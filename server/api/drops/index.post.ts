@@ -9,7 +9,7 @@ export default defineValidatedHandler({
   async handler(event) {
     const who = await requireIdentity(event)
     const body = await event.req.json()
-    const drop = await createDocDrop(who, { filename: body.filename, bytes: new TextEncoder().encode(body.content), title: body.title, supersedes: body.supersedes })
+    const drop = await createDocDrop(who, { filename: body.filename, bytes: new TextEncoder().encode(body.content), title: body.title, supersedes: body.supersedes }, event)
     return toSummary(drop)
   },
 })

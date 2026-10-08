@@ -8,7 +8,7 @@ export default defineValidatedHandler({
   validate: { body: AppSchema },
   async handler(event) {
     const who = await requireIdentity(event)
-    const app = await publishApp(who, await event.req.json())
+    const app = await publishApp(who, await event.req.json(), event)
     return { id: app.id, version: app.version, page: dropPageUrl(event.url.origin, app.id), visibility: app.visibility }
   },
 })

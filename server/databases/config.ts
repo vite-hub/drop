@@ -2,6 +2,7 @@
 import { defineDatabase } from 'vite-hub/database'
 import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { quotaBlobs, quotaReservations } from './quotas'
 import { blobCleanup, comments, dropFiles, drops } from './drops'
 import { jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource } from './oauth'
 
@@ -12,6 +13,7 @@ export const user = sqliteTable('user', {
   emailVerified: integer('email_verified', { mode: 'boolean' }).default(false).notNull(),
   image: text('image'),
   role: text('role'),
+  plan: text('plan', { enum: ['free', 'pro', 'unlimited'] }),
   banned: integer('banned', { mode: 'boolean' }).default(false),
   banReason: text('ban_reason'),
   banExpires: integer('ban_expires', { mode: 'timestamp_ms' }),
@@ -56,7 +58,7 @@ export const verification = sqliteTable('verification', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).$onUpdate(() => new Date()).notNull()
 }, table => [index('verification_identifier_idx').on(table.identifier)])
 
-export { blobCleanup, comments, dropFiles, drops, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
+export { quotaBlobs, quotaReservations, blobCleanup, comments, dropFiles, drops, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 export default defineDatabase({
   cloudflare: {
@@ -64,5 +66,5 @@ export default defineDatabase({
     databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || 'vitehub-drop',
     http: true,
   },
-  schema: { account, blobCleanup, comments, dropFiles, drops, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
+  schema: { quotaBlobs, quotaReservations, account, blobCleanup, comments, dropFiles, drops, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })

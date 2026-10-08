@@ -4,6 +4,7 @@ import { db } from "vite-hub/database/drizzle"
 import { drops as dropsTable, session, user } from "../../databases/config"
 import { isRole } from "#shared/roles"
 import type { Member } from "#shared/types"
+import { effectivePlan } from "../../utils/quotas"
 import { requireIdentity } from "../../utils/identity"
 
 /** Everyone in this Drop. Anyone signed in can see who's here; only admins change it. */
@@ -17,6 +18,7 @@ export default defineHandler(async (event): Promise<Member[]> => {
     name: user.name,
     email: user.email,
     image: user.image ?? null,
+    plan: effectivePlan(user.plan),
     role: isRole(user.role ?? "") ? user.role as Member["role"] : "member",
     banned: Boolean(user.banned),
     drops: drops.find(row => row.ownerId === user.id)?.total ?? 0,

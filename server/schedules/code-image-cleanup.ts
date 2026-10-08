@@ -1,10 +1,12 @@
 import { blob } from "vite-hub/blob"
 import { defineSchedule } from "vite-hub/schedule"
+import { cleanupQuotaBlobs } from "../utils/quotas"
 import { CODE_IMAGE_PREFIX, isExpiredCodeImage } from "../utils/code-image"
 
 export default defineSchedule({
   cron: "0 * * * *",
   async handler({ scheduledAt }) {
+    await cleanupQuotaBlobs(scheduledAt)
     let cursor: string | undefined
 
     do {

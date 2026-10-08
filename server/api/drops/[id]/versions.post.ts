@@ -21,9 +21,9 @@ export default defineValidatedHandler({
     const body = await event.req.json()
     if ("files" in body) {
       if (drop.kind !== "app") throw new HTTPError({ status: 400, statusText: "Only apps take files." })
-      return toSummary(await publishApp(editor, { id: drop.id, files: body.files }))
+      return toSummary(await publishApp(editor, { id: drop.id, files: body.files }, event))
     }
     if (drop.kind === "app") throw new HTTPError({ status: 400, statusText: "Apps take files, not content." })
-    return toSummary(await createDocDrop(editor, { filename: drop.filename, bytes: new TextEncoder().encode(body.content), supersedes: drop.id }))
+    return toSummary(await createDocDrop(editor, { filename: drop.filename, bytes: new TextEncoder().encode(body.content), supersedes: drop.id }, event))
   },
 })

@@ -87,6 +87,16 @@ export default defineNuxtConfig({
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
   },
 
+  runtimeConfig: {
+    quotas: {
+      enabled: process.env.DROP_QUOTAS === "1",
+      defaultPlan: process.env.DROP_DEFAULT_PLAN || "free",
+      proDrops: Number(process.env.DROP_PRO_DROPS || 100),
+      proBytes: Number(process.env.DROP_PRO_BYTES || 1073741824),
+      proWrites: Number(process.env.DROP_PRO_WRITES || 10000),
+    },
+  },
+
   css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "~/assets/css/main.css"],
   devtools: false,
   compatibilityDate: "2026-07-17",

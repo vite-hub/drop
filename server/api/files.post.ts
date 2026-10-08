@@ -37,7 +37,7 @@ export default defineHandler(async (event) => {
     bytes: new Uint8Array(await file.arrayBuffer()),
     title: typeof title === "string" ? title : undefined,
     supersedes: typeof supersedes === "string" ? supersedes : undefined,
-  })
+  }, event)
   useLogger(event).set({ drop: { id: drop.id, kind: drop.kind, size: drop.size, version: drop.version } })
   const origin = event.url.origin
   return {

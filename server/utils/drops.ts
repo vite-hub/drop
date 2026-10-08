@@ -1,6 +1,6 @@
 import { and, desc, eq, exists, inArray, isNotNull, sql } from "drizzle-orm"
 import { log } from "evlog"
-import { HTTPError } from "h3"
+import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
@@ -11,6 +11,7 @@ import { renderMarkdownCached } from "./markdown-document"
 import { contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
 import type { Identity } from "./identity"
+import { withDropQuota } from "./quotas"
 
 export type DropRow = typeof drops.$inferSelect
 
@@ -152,7 +153,7 @@ async function deleteBlobKeys(keys: string[]) {
 }
 
 /** Stores one file as a private doc drop. Markdown and HTML must be UTF-8. */
-export async function createDocDrop(who: Identity, input: { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: "private" | "shared"; access?: Access }) {
+export async function createDocDrop(who: Identity, input: { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: "private" | "shared"; access?: Access }, event?: H3Event) {
   await drainBlobCleanup()
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   const filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
@@ -179,56 +180,58 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
     if (previous) previous = (await versionChain(previous))[0] ?? previous
   }
 
-  const key = `${crypto.randomUUID()}${extension}`
-  const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
-  if (storageError) {
-    const [cleanupError] = await blob.del(key)
-    if (cleanupError) await queueBlobCleanup([key])
-    throw storageFailure(storageError)
-  }
+  return withDropQuota(previous?.ownerId ?? who.userId, { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id }, event, async (quota) => {
+    const key = `${crypto.randomUUID()}${extension}`
+    const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
+    if (storageError) {
+      const [cleanupError] = await blob.del(key)
+      if (cleanupError) await queueBlobCleanup([key])
+      throw storageFailure(storageError)
+    }
 
-  // Renders once at upload: the title comes from Comark, and the first view hits a warm cache.
-  let parsedTitle: string | undefined
-  try {
-    parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, text)).title : undefined
-  }
-  catch (error) {
-    const [cleanupError] = await blob.del(key)
-    if (cleanupError) await queueBlobCleanup([key])
-    throw error
-  }
-  const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
-  const now = Date.now()
-  const row: DropRow = {
-    id: crypto.randomUUID(),
-    ownerId: previous?.ownerId ?? who.userId,
-    kind,
-    title: (input.title?.trim() || markdownTitle || titleFromSource(text ?? "", kind, filename)).slice(0, 160),
-    filename,
-    blobKey: key,
-    contentType,
-    size: input.bytes.byteLength,
-    version: (previous?.version ?? 0) + 1,
-    supersedesId: previous?.id ?? null,
-    visibility: input.visibility ?? previous?.visibility ?? "private",
-    access: input.access ?? (previous?.access as Access | undefined) ?? "comment",
-    actorKind: who.actorKind,
-    actorName: who.actorName,
-    createdAt: now,
-    updatedAt: now,
-    publishToken: null,
-  }
-  try {
-    await db.insert(drops).values(row)
-  }
-  catch (error) {
-    const [cleanupError] = await blob.del(key)
-    if (cleanupError) await queueBlobCleanup([key])
-    if (previous && /unique|constraint/i.test(String(error)))
-      throw new HTTPError({ status: 409, statusText: "This drop was published by someone else. Retry from the latest version.", cause: error })
-    throw error
-  }
-  return row
+    // Renders once at upload: the title comes from Comark, and the first view hits a warm cache.
+    let parsedTitle: string | undefined
+    try {
+      parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, text)).title : undefined
+    }
+    catch (error) {
+      const [cleanupError] = await blob.del(key)
+      if (cleanupError) await queueBlobCleanup([key])
+      throw error
+    }
+    const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
+    const now = Date.now()
+    const row: DropRow = {
+      id: crypto.randomUUID(),
+      ownerId: previous?.ownerId ?? who.userId,
+      kind,
+      title: (input.title?.trim() || markdownTitle || titleFromSource(text ?? "", kind, filename)).slice(0, 160),
+      filename,
+      blobKey: key,
+      contentType,
+      size: input.bytes.byteLength,
+      version: (previous?.version ?? 0) + 1,
+      supersedesId: previous?.id ?? null,
+      visibility: input.visibility ?? previous?.visibility ?? "private",
+      access: input.access ?? (previous?.access as Access | undefined) ?? "comment",
+      actorKind: who.actorKind,
+      actorName: who.actorName,
+      createdAt: now,
+      updatedAt: now,
+      publishToken: null,
+    }
+    try {
+      await quota.commit([db.insert(drops).values(row)], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
+    }
+    catch (error) {
+      const [cleanupError] = await blob.del(key)
+      if (cleanupError) await queueBlobCleanup([key])
+      if (previous && /unique|constraint/i.test(String(error)))
+        throw new HTTPError({ status: 409, statusText: "This drop was published by someone else. Retry from the latest version.", cause: error })
+      throw error
+    }
+    return row
+  })
 }
 
 function cleanPath(path: string) {
@@ -238,7 +241,7 @@ function cleanPath(path: string) {
 }
 
 /** Creates an app drop, or publishes the next version of one you may edit. */
-export async function publishApp(who: Identity, input: { id?: string; name?: string; files: Record<string, string> }) {
+export async function publishApp(who: Identity, input: { id?: string; name?: string; files: Record<string, string> }, event?: H3Event) {
   const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
   if (!entries.some(([path]) => path === "index.html")) throw new HTTPError({ status: 400, statusText: "An app needs an index.html." })
@@ -259,66 +262,63 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
   const prefix = `apps/${id}/${crypto.randomUUID()}`
   const token = crypto.randomUUID()
   const old = row ? await db.select().from(dropFiles).where(eq(dropFiles.dropId, id)) : []
-  const stagedKeys: string[] = []
-  let committedPublish = false
-  try {
-    for (const [path, bytes] of encoded) {
-      const blobKey = `${prefix}/${path}`
-      stagedKeys.push(blobKey)
-      const [error] = await blob.put(blobKey, bytes, { access: "private", contentType: contentTypeOf(path) })
-      if (error) throw storageFailure(error)
-    }
-
-    const name = input.name?.trim() || row?.title || "Untitled app"
-    const next: DropRow = {
-      id, ownerId: row?.ownerId ?? who.userId, kind: "app", title: name.slice(0, 160),
-      filename: row?.filename ?? `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app"}/`,
-      blobKey: null, contentType: null, size, version: (row?.version ?? 0) + 1, supersedesId: row?.supersedesId ?? null,
-      visibility: row?.visibility ?? "private", access: (row?.access as Access | undefined) ?? "comment",
-      actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
-    }
-    const fileRows = encoded.map(([path, bytes]) => ({ dropId: id, path, blobKey: `${prefix}/${path}`, size: bytes.byteLength }))
-    if (!row) {
-      await atomic.batch([
-        db.insert(drops).values(next),
-        db.insert(dropFiles).values(fileRows),
-      ])
-      committedPublish = true
-    }
-    else {
-      const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, publishToken: token })
-        .where(and(eq(drops.id, id), eq(drops.version, row.version)))
-      // The file set changes only if the update above won: both statements check for this publish's token.
-      // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
-      const won = and(eq(drops.id, id), eq(drops.publishToken, token))
-      const replace = db.delete(dropFiles).where(and(eq(dropFiles.dropId, id), exists(db.select({ id: drops.id }).from(drops).where(won))))
-      const inserts = encoded.map(([path, bytes]) => db.insert(dropFiles).select(qb => qb.select({
-        dropId: drops.id,
-        path: sql<string>`${path}`.as("path"),
-        blobKey: sql<string>`${`${prefix}/${path}`}`.as("blob_key"),
-        size: sql<number>`${bytes.byteLength}`.as("size"),
-      }).from(drops).where(won)))
-      await atomic.batch([update, replace, ...inserts])
-      committedPublish = true
-      const [committed] = await db.select({ publishToken: drops.publishToken }).from(drops).where(eq(drops.id, id)).limit(1)
-      if (committed?.publishToken !== token) {
-        committedPublish = false
-        throw new HTTPError({ status: 409, statusText: "This app was published by someone else. Retry from the latest version." })
+  return withDropQuota(row?.ownerId ?? who.userId, { drops: row ? 0 : 1, bytes: Math.max(0, size - old.reduce((total, file) => total + file.size, 0)), writes: entries.length, targetId: row?.id, app: { files: entries.length, bytes: size } }, event, async (quota) => {
+    const stagedKeys: string[] = []
+    let committedPublish = false
+    try {
+      for (const [path, bytes] of encoded) {
+        const blobKey = `${prefix}/${path}`
+        stagedKeys.push(blobKey)
+        const [error] = await blob.put(blobKey, bytes, { access: "private", contentType: contentTypeOf(path) })
+        if (error) throw storageFailure(error)
       }
-      await deleteBlobKeys(old.map(file => file.blobKey))
+
+      const name = input.name?.trim() || row?.title || "Untitled app"
+      const next: DropRow = {
+        id, ownerId: row?.ownerId ?? who.userId, kind: "app", title: name.slice(0, 160),
+        filename: row?.filename ?? `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app"}/`,
+        blobKey: null, contentType: null, size, version: (row?.version ?? 0) + 1, supersedesId: row?.supersedesId ?? null,
+        visibility: row?.visibility ?? "private", access: (row?.access as Access | undefined) ?? "comment",
+        actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
+      }
+      const fileRows = encoded.map(([path, bytes]) => ({ dropId: id, path, blobKey: `${prefix}/${path}`, size: bytes.byteLength }))
+      if (!row) {
+        await quota.commit([
+          db.insert(drops).values(next),
+          db.insert(dropFiles).values(fileRows),
+        ])
+        committedPublish = true
+      }
+      else {
+        const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, publishToken: token })
+          .where(and(eq(drops.id, id), eq(drops.version, row.version)))
+        // The file set changes only if the update above won: both statements check for this publish's token.
+        // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
+        const won = and(eq(drops.id, id), eq(drops.publishToken, token))
+        const replace = db.delete(dropFiles).where(and(eq(dropFiles.dropId, id), exists(db.select({ id: drops.id }).from(drops).where(won))))
+        const inserts = encoded.map(([path, bytes]) => db.insert(dropFiles).select(qb => qb.select({
+          dropId: drops.id,
+          path: sql<string>`${path}`.as("path"),
+          blobKey: sql<string>`${`${prefix}/${path}`}`.as("blob_key"),
+          size: sql<number>`${bytes.byteLength}`.as("size"),
+        }).from(drops).where(won)))
+        await quota.commit([update, replace, ...inserts], exists(db.select({ id: drops.id }).from(drops).where(won)))
+        committedPublish = true
+        await deleteBlobKeys(old.map(file => file.blobKey))
+      }
+      return next
     }
-    return next
-  }
-  catch (error) {
-    if (!committedPublish) {
-      const [cleanupError] = stagedKeys.length ? await blob.del(stagedKeys) : [null]
-      if (cleanupError) await queueBlobCleanup(stagedKeys)
+    catch (error) {
+      if (!committedPublish) {
+        const [cleanupError] = stagedKeys.length ? await blob.del(stagedKeys) : [null]
+        if (cleanupError) await queueBlobCleanup(stagedKeys)
+      }
+      const status = typeof error === "object" && error ? (error as { status?: unknown }).status : undefined
+      if (row && status !== 503 && /unique|constraint/i.test(String(error)))
+        throw new HTTPError({ status: 409, statusText: "This app was published by someone else. Retry from the latest version.", cause: error })
+      throw error
     }
-    const status = typeof error === "object" && error ? (error as { status?: unknown }).status : undefined
-    if (row && status !== 503 && /unique|constraint/i.test(String(error)))
-      throw new HTTPError({ status: 409, statusText: "This app was published by someone else. Retry from the latest version.", cause: error })
-    throw error
-  }
+  })
 }
 
 /** Removes a drop, its files, and its comments. */
