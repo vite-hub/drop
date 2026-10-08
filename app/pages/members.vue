@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui"
+import { PLANS, type Plan } from "#shared/quotas"
 import type { Member } from "#shared/types"
 import { DEFAULT_ROLE, ROLE_LABELS, ROLE_SUMMARY, ROLES, type Role } from "#shared/roles"
 
@@ -8,7 +9,7 @@ useSeoMeta({ title: "Members" })
 
 // Anyone can sign in with GitHub and joins as Member; admins promote people from here.
 const { data: me } = useMe()
-const { members, status, setRole, ban, unban, remove } = useMembers()
+const { members, status, setRole, setPlan, ban, unban, remove } = useMembers()
 const admin = computed(() => me.value?.role === "admin")
 const search = ref("")
 
@@ -26,6 +27,7 @@ const rows = computed(() => {
     .sort((a, b) => Number(b.you) - Number(a.you) || ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || a.name.localeCompare(b.name))
 })
 
+const planItems = PLANS.map(value => ({ label: value === "unlimited" ? "Unlimited" : value === "pro" ? "Pro" : "Free", value }))
 const roleItems = ROLES.map(value => ({ label: ROLE_LABELS[value], value }))
 const statusOf = (member: Member) => (member.banned ? "Banned" : "Active")
 
@@ -60,6 +62,7 @@ function menu(member: Member): DropdownMenuItem[][] {
           <tr class="border-b border-default text-left text-xs text-muted">
             <th class="px-4 py-2.5 font-medium">Member</th>
             <th class="w-28 px-2 py-2.5 font-medium sm:w-36 sm:px-4">Role</th>
+            <th class="w-28 px-2 py-2.5 font-medium">Plan</th>
             <th class="hidden w-20 px-4 py-2.5 text-right font-medium md:table-cell">Drops</th>
             <th class="hidden w-24 px-4 py-2.5 font-medium sm:table-cell">Status</th>
             <th v-if="admin" class="w-11" />
@@ -67,7 +70,7 @@ function menu(member: Member): DropdownMenuItem[][] {
         </thead>
         <tbody class="divide-y divide-default">
           <tr v-if="status === 'pending' && !members.length">
-            <td class="p-4" :colspan="5"><USkeleton class="h-9 w-full" /></td>
+            <td class="p-4" :colspan="6"><USkeleton class="h-9 w-full" /></td>
           </tr>
           <tr v-for="member in rows" :key="member.id" :class="member.banned && 'text-muted'">
             <td class="px-4 py-3">
@@ -98,6 +101,10 @@ function menu(member: Member): DropdownMenuItem[][] {
                 @update:model-value="value => setRole(member, value as Role)"
               />
               <span v-else class="px-2.5">{{ ROLE_LABELS[member.role] }}</span>
+            </td>
+            <td class="px-2 py-3">
+              <USelect v-if="admin" :aria-label="`Plan for ${member.name}`" class="w-full" color="neutral" :items="planItems" :model-value="member.plan" size="sm" @update:model-value="value => setPlan(member, value as Plan)" />
+              <span v-else class="capitalize">{{ member.plan }}</span>
             </td>
             <td class="hidden px-4 py-3 text-right font-mono text-xs md:table-cell">{{ member.drops }}</td>
             <td class="hidden px-4 py-3 sm:table-cell">

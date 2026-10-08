@@ -16,7 +16,7 @@ export function useDrops() {
 export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>("drops")
   const drops = computed({ get: () => cached.value ?? [], set: value => (cached.value = value) })
-  const refresh = () => refreshNuxtData("drops")
+  const refresh = () => refreshNuxtData(["drops", "usage"])
   const notify = useNotify()
   const confirm = useConfirm()
 
@@ -32,6 +32,7 @@ export function useDropActions() {
     }
     catch (error) {
       notify.fail("Couldn't create a drop", error)
+      await refreshNuxtData("usage")
     }
   }
 
@@ -46,6 +47,7 @@ export function useDropActions() {
     }
     catch (error) {
       notify.fail("Upload failed", error)
+      await refreshNuxtData("usage")
     }
   }
 
@@ -71,6 +73,7 @@ export function useDropActions() {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
       drops.value = drops.value.filter(item => item.id !== drop.id)
       clearNuxtData([`drop:${drop.id}`, `comments:${drop.id}`])
+      await refreshNuxtData("usage")
       notify.done("Drop deleted", "Its link no longer works.")
       return true
     }

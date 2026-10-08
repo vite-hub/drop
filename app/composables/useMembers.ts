@@ -1,3 +1,4 @@
+import type { Plan } from "#shared/quotas"
 import type { Member } from "#shared/types"
 import { type Role, ROLE_LABELS, ROLE_SUMMARY } from "#shared/roles"
 
@@ -8,7 +9,7 @@ export function useMembers() {
   const confirm = useConfirm()
   const reload = () => Promise.all([refresh(), refreshNuxtData("me")])
 
-  async function update(member: Member, body: { role?: Role; banned?: boolean }, title: string, description?: string) {
+  async function update(member: Member, body: { plan?: Plan; role?: Role; banned?: boolean }, title: string, description?: string) {
     try {
       await $fetch(`/api/members/${member.id}`, { method: "PATCH", body })
       notify.done(title, description)
@@ -22,6 +23,7 @@ export function useMembers() {
   return {
     members,
     status,
+    setPlan: (member: Member, plan: Plan) => plan !== member.plan && update(member, { plan }, `${member.name} now has the ${plan} plan`),
     setRole: (member: Member, role: Role) => role !== member.role && update(member, { role }, `${member.name} is now ${ROLE_LABELS[role]}`, ROLE_SUMMARY[role]),
     ban: (member: Member) => update(member, { banned: true }, `${member.name} is banned`, "Their sessions and connected agents stop working."),
     unban: (member: Member) => update(member, { banned: false }, `${member.name} can sign in again`),

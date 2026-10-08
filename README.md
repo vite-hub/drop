@@ -47,7 +47,7 @@ Under the hood:
    The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. The `/agents` page has the setup for Codex, Cursor, VS Code, and other clients, and lists the agents you've connected.
 3. Ask your agent to drop a plan. It answers with the review link.
 
-MCP tools: `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. The `vitehub-drop` skill comes with the server (`skills/list`); it's also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. [The docs](https://drop.vitehub.dev/docs) have the details.
+MCP tools: `get_usage`, `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. The `vitehub-drop` skill comes with the server (`skills/list`); it's also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. [The docs](https://drop.vitehub.dev/docs) have the details.
 
 ## Host it yourself
 
@@ -60,6 +60,14 @@ Cloudflare creates D1, R2, and KV for you. Vercel and Netlify prompt for setting
 Other hosts need a Cloudflare D1 database and an account API token with D1 edit access. Choose a private Blob store in the Vercel flow; Deno needs an S3 bucket and access keys. The provider guides cover these steps. Migrations run before deployment; existing Cloudflare Workers Builds that use `pnpm build` and `npx wrangler deploy` still need `pnpm db:migrate:remote` after schema changes.
 
 Only Cloudflare renders PNG code images and has a distributed rate limiter. Elsewhere code images are SVG and rate limits count per instance. Anyone who signs in joins as a Member; GitHub user ids in `DROP_ADMINS` join as Admin. Admins change roles on `/members`.
+
+### Plans and limits
+
+Owner quotas are off by default. Set `DROP_QUOTAS=1` to enable them on the official instance, or `NUXT_QUOTAS_ENABLED=true` in runtime config. Free allows 3 logical drops, 100 MiB of retained storage, and 1,000 file writes per UTC calendar month. Free apps allow 50 files and 2 MiB. Pro allows 100 drops, 1 GiB, and 10,000 writes; Pro and self-host apps keep the 200-file / 4 MiB maximum. Set `DROP_PRO_DROPS`, `DROP_PRO_BYTES`, and `DROP_PRO_WRITES` at build time, or `NUXT_QUOTAS_PRO_DROPS`, `NUXT_QUOTAS_PRO_BYTES`, and `NUXT_QUOTAS_PRO_WRITES` at runtime, to configure Pro.
+
+`DROP_DEFAULT_PLAN` defaults to `free`; `NUXT_QUOTAS_DEFAULT_PLAN` overrides it at runtime. Admins set individual plans on Members, including `unlimited` for the operator. A null user plan follows the configured default. The drop's owner pays for edits by agents, guests, and admins. All document versions and current app files count toward storage. A doc version uses one write, an app publish uses one write per file, and a temporary code image uses one write without a drop slot. Its bytes count until cleanup deletes it. A shared owner burst limit allows 30 publishes per minute. Existing drops remain readable at a cap. Deleting a drop releases its slot and bytes but keeps its monthly write count.
+
+Migration `0004_quotas.sql` must run before this version. D1 conditionally reserves capacity, then commits the write ledger with metadata in one batch. Normal failures release the reservation. Pending reservations are deliberately not expired automatically: a Worker killed during a publish must not let a still-running request overshoot a cap. If a crashed publish leaves a reservation, inspect its `target_id`, `created_at`, and drop metadata before removing the pending row. Never clear committed rows for the current month.
 
 ### Develop locally
 
