@@ -1,3 +1,4 @@
+import { requirePublishBurst } from "../utils/publish-burst"
 import { defineValidatedHandler } from "h3"
 import { AppSchema } from "#shared/schemas"
 import { dropPageUrl, publishApp } from "../utils/drops"
@@ -8,6 +9,7 @@ export default defineValidatedHandler({
   validate: { body: AppSchema },
   async handler(event) {
     const who = await requireIdentity(event)
+    await requirePublishBurst(event, who.userId)
     const app = await publishApp(who, await event.req.json())
     return { id: app.id, version: app.version, page: dropPageUrl(event.url.origin, app.id), visibility: app.visibility }
   },

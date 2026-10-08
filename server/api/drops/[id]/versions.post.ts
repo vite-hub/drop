@@ -9,7 +9,7 @@ import { routeId } from "../../../utils/params"
 export default defineValidatedHandler({
   validate: { body: VersionSchema },
   async handler(event) {
-    const drop = await findDrop(await routeId(event))
+    const drop = await findDrop(await routeId(event), event)
     const who = await identify(event)
     if (!drop || !permissions(drop, who).edit) throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
     // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
@@ -24,6 +24,6 @@ export default defineValidatedHandler({
       return toSummary(await publishApp(editor, { id: drop.id, files: body.files }))
     }
     if (drop.kind === "app") throw new HTTPError({ status: 400, statusText: "Apps take files, not content." })
-    return toSummary(await createDocDrop(editor, { filename: drop.filename, bytes: new TextEncoder().encode(body.content), supersedes: drop.id }))
+    return toSummary(await createDocDrop(editor, { filename: drop.filename, bytes: new TextEncoder().encode(body.content), supersedes: drop.id }, event))
   },
 })

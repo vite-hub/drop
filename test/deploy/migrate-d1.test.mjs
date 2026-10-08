@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "node:test"
 import { migrateD1 } from "../../scripts/migrate-d1.mjs"
@@ -9,6 +10,7 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
   const previousFetch = globalThis.fetch
   const previousEnv = { ...process.env }
   const database = new DatabaseSync(":memory:")
+  const migrationCount = readdirSync(new URL("../../server/databases/migrations/", import.meta.url)).filter(name => name.endsWith(".sql")).length
   let migrations = 0
   try {
     Object.assign(process.env, settings)
@@ -22,11 +24,11 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
       return Response.json({ success: true, result: [{ success: true, results: [] }] })
     }
     await migrateD1()
-    assert.equal(migrations, 3)
-    assert.equal(database.prepare("SELECT count(*) AS count FROM d1_migrations").get().count, 3)
+    assert.equal(migrations, migrationCount)
+    assert.equal(database.prepare("SELECT count(*) AS count FROM d1_migrations").get().count, migrationCount)
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
     await migrateD1()
-    assert.equal(migrations, 3)
+    assert.equal(migrations, migrationCount)
   }
   finally {
     globalThis.fetch = previousFetch

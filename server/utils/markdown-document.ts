@@ -146,6 +146,8 @@ export async function renderMarkdownDocument(markdown: string, pathname: string,
     <a href="https://drop.vitehub.dev">Built with drop.vitehub.dev</a>
     <span aria-hidden="true">·</span>
     <a href="${escapeHtml(pathname)}?raw">Source</a>
+    <span aria-hidden="true">·</span>
+    <a href="/report?target=${encodeURIComponent(pathname)}">Report</a>
   </footer>
   <script src="/vendor/medium-zoom/medium-zoom.min.js" defer></script>
   <script src="/document-zoom.js" defer></script>

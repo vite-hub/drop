@@ -48,6 +48,12 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
         create: {
           after: async (account) => {
             if (account.providerId !== "github") return
+            // Public GitHub metadata is a review signal; a lookup failure never blocks private use.
+            const profile = await fetch(`https://api.github.com/user/${encodeURIComponent(account.accountId)}`, {
+              headers: { "User-Agent": "Drop", Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(3000),
+            }).then(response => response.ok ? response.json() as Promise<{ created_at?: string }> : null).catch(() => null)
+            const githubCreatedAt = profile?.created_at ? Date.parse(profile.created_at) : NaN
+            if (Number.isFinite(githubCreatedAt)) await db.update(users).set({ githubCreatedAt }).where(eq(users.id, account.userId))
             const admins = env.drop.admins.unseal().split(/[\s,]+/).filter(Boolean)
             if (admins.includes(account.accountId)) await db.update(users).set({ role: "admin" }).where(eq(users.id, account.userId))
           },

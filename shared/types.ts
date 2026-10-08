@@ -17,6 +17,8 @@ export interface DropSummary {
   filename: string
   size: number
   version: number
+  shareReview: "pending" | "rejected" | null
+  quarantinedAt: number | null
   visibility: Visibility
   access: Access
   actorKind: ActorKind
