@@ -24,7 +24,7 @@ export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string
   const remove = db.delete(drops).where(sql`${drops.id} IN (${chain})`)
   const pending = db.select({ key: blobCleanup.blobKey }).from(blobCleanup).where(like(blobCleanup.id, `${token}:%`))
   const [, , rows] = await atomic.batch([queue, remove, pending])
-  // Also bounds the existing cleanup helper's DELETE parameters.
-  for (let offset = 0; offset < rows.length; offset += 80)
-    await deleteKeys(rows.slice(offset, offset + 80).map(item => item.key))
+  // Cleanup's retry INSERT binds three values per key, below D1's 100-value ceiling.
+  for (let offset = 0; offset < rows.length; offset += 25)
+    await deleteKeys(rows.slice(offset, offset + 25).map(item => item.key))
 }
