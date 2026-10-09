@@ -9,6 +9,7 @@ import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
 import { account, oauthClient, user as users } from "../databases/config"
 import { githubOrganization, isGitHubMember } from "./github-membership"
+import { proxyAuth } from "./proxy-auth"
 import { isRole, type Role } from "#shared/roles"
 import { ac, roles } from "./access"
 import type { ActorKind } from "#shared/types"
@@ -27,7 +28,7 @@ export interface Identity {
 
 // ViteHub's auth type doesn't know our plugins; this never runs, it only lends `authFor` the plugin endpoints' types.
 function typedAuth() {
-  return betterAuth({ plugins: [admin({ ac, roles }), jwt(), oauthProvider({ loginPage: "/oauth", consentPage: "/oauth" })] })
+  return betterAuth({ plugins: [proxyAuth(), admin({ ac, roles }), jwt(), oauthProvider({ loginPage: "/oauth", consentPage: "/oauth" })] })
 }
 
 export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event) as unknown as ReturnType<typeof typedAuth>

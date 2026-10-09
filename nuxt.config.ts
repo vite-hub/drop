@@ -194,8 +194,8 @@ export default defineNuxtConfig({
         auth: {
           github: {
             // Declared secret so wrangler passes it through with the others (it only injects declared secrets).
-            clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID") }),
-            clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET") }),
+            clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID"), default: "" }),
+            clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET"), default: "" }),
           },
           secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
         },

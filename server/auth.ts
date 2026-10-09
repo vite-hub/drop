@@ -10,6 +10,7 @@ import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { nativeClientRegistration } from "./utils/oauth-clients"
 import { githubOrganization, isGitHubMember } from "./utils/github-membership"
+import { proxyAuth, proxyAuthentication } from "./utils/proxy-auth"
 
 /**
  * Who can sign in, and how.
@@ -32,7 +33,7 @@ import { githubOrganization, isGitHubMember } from "./utils/github-membership"
 export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
   const env = runtimeEnv as unknown as ServerEnv
   const githubOptions = {
-    clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal(),
+    clientId: proxyAuthentication ? "" : env.auth.github.clientId.unseal(), clientSecret: proxyAuthentication ? "" : env.auth.github.clientSecret.unseal(),
     scope: githubOrganization ? ["read:org"] : undefined,
   }
   return {
@@ -41,9 +42,9 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
     secret: env.auth.secret.unseal(),
     route: false,
-    disabledPaths: ["/token"],
+    disabledPaths: ["/token", ...(proxyAuthentication ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
     access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
-    socialProviders: {
+    socialProviders: proxyAuthentication ? {} : {
       github: {
         ...githubOptions,
         ...(githubOrganization ? { getUserInfo: async (token: Parameters<ReturnType<typeof github>["getUserInfo"]>[0]) =>
@@ -71,6 +72,7 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
       },
     },
     plugins: [
+      proxyAuth(),
       admin({ ac, roles, defaultRole: "member", adminRoles: ["admin"] }),
       jwt(),
       oauthProvider({
