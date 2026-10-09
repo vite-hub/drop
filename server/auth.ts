@@ -1,5 +1,6 @@
 import { oauthProvider } from "@better-auth/oauth-provider"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { github } from "better-auth/social-providers"
 import { admin, jwt } from "better-auth/plugins"
 import { eq } from "drizzle-orm"
 import { defineAuth } from "vite-hub/auth"
@@ -8,6 +9,8 @@ import type { ServerEnv } from "#vitehub/env/server"
 import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { nativeClientRegistration } from "./utils/oauth-clients"
+import { githubOrganization, isGitHubMember } from "./utils/github-membership"
+import { proxyAuth, proxyAuthentication } from "./utils/proxy-auth"
 
 /**
  * Who can sign in, and how.
@@ -29,16 +32,24 @@ import { nativeClientRegistration } from "./utils/oauth-clients"
  */
 export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
   const env = runtimeEnv as unknown as ServerEnv
+  const githubOptions = {
+    clientId: proxyAuthentication ? "" : env.auth.github.clientId.unseal(), clientSecret: proxyAuthentication ? "" : env.auth.github.clientSecret.unseal(),
+    scope: githubOrganization ? ["read:org"] : undefined,
+  }
   return {
     appName: "Drop",
     baseURL: requestOrigin,
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
     secret: env.auth.secret.unseal(),
     route: false,
-    disabledPaths: ["/token"],
+    disabledPaths: ["/token", ...(proxyAuthentication ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
     access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
-    socialProviders: {
-      github: { clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal() },
+    socialProviders: proxyAuthentication ? {} : {
+      github: {
+        ...githubOptions,
+        ...(githubOrganization ? { getUserInfo: async (token: Parameters<ReturnType<typeof github>["getUserInfo"]>[0]) =>
+          await isGitHubMember(token.accessToken) ? github(githubOptions).getUserInfo(token) : null } : {}),
+      },
     },
     emailAndPassword: { enabled: import.meta.dev === true || process.env.DROP_TEST_SIGNIN === "1" },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
@@ -61,6 +72,7 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
       },
     },
     plugins: [
+      proxyAuth(),
       admin({ ac, roles, defaultRole: "member", adminRoles: ["admin"] }),
       jwt(),
       oauthProvider({

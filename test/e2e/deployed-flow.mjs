@@ -127,7 +127,7 @@ const mcp = async (method, params = {}) => (await fetch(new URL("/mcp", origin),
   signal: timeout(),
 })).json()
 assert.ok((await mcp("server/discover")).result.capabilities.extensions["io.modelcontextprotocol/skills"])
-assert.deepEqual((await mcp("tools/list")).result.tools.map(tool => tool.name), ["list_drops", "read_drop", "list_comments", "create_doc", "publish_app", "create_code_image"])
+assert.deepEqual((await mcp("tools/list")).result.tools.map(tool => tool.name), ["get_usage", "list_drops", "read_drop", "list_comments", "create_doc", "publish_app", "create_code_image"])
 assert.match((await mcp("tools/call", { name: "create_doc", arguments: { markdown: "# From MCP" } })).result.content[0].text, /^Dropped privately: /)
 const [skill] = (await mcp("skills/list")).result.skills
 assert.equal(skill.frontmatter.name, "vitehub-drop")
@@ -152,7 +152,7 @@ const codeResponse = await fetch(new URL("/api/code", origin), {
   method: "POST",
   signal: AbortSignal.timeout(120_000),
 })
-assert.equal(cloudflareHost ? codeResponse.status : [200, 501].includes(codeResponse.status), true)
+assert.equal(cloudflareHost ? codeResponse.status === 200 : [200, 501].includes(codeResponse.status), true)
 
 if (!cloudflareHost && codeResponse.status === 501) process.exit(0)
 
