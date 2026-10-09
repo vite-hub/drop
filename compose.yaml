@@ -3,7 +3,9 @@ services:
     build:
       context: .
       args:
-        CLOUDFLARE_D1_DATABASE_ID: ${CLOUDFLARE_D1_DATABASE_ID:?Set the D1 database id in .env}
+        DROP_DATABASE: ${DROP_DATABASE:-}
+        DROP_DATABASE_URL: ${DROP_DATABASE_URL:-}
+        CLOUDFLARE_D1_DATABASE_ID: ${CLOUDFLARE_D1_DATABASE_ID:-}
         CLOUDFLARE_D1_DATABASE_NAME: ${CLOUDFLARE_D1_DATABASE_NAME:-my-drop}
     env_file: .env
     environment:

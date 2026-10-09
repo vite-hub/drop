@@ -4,18 +4,12 @@ import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
 import { DEFAULT_PRO_LIMITS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
+import { deployment, type Host } from "./scripts/deployment.ts"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
 
-/**
- * Where this build runs, picked at build time: `DROP_HOST=vercel pnpm build`. Cloudflare is the default.
- * Every host keeps a SQLite-family database, so the migrations in server/databases/migrations apply as they are.
- */
-const HOSTS = ["cloudflare", "vercel", "netlify", "deno", "vps"] as const
-type Host = typeof HOSTS[number]
-const host = (process.env.DROP_HOST || "cloudflare") as Host
-if (!HOSTS.includes(host)) throw new Error(`DROP_HOST must be one of ${HOSTS.join(", ")}; got "${host}".`)
+const { host, database } = deployment()
 
 // The blob handler also handles conditional requests; keep its policy aligned with the access gate.
 const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-store" } } }
@@ -61,12 +55,12 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     blob: { ...files, driver: "s3", bucket: process.env.S3_BUCKET || "drop", endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || "auto" },
     database: d1("vitehub-drop-deno"),
   },
-  // One Node process: D1 over HTTP and files on disk under .data/, in-memory rate limits, and the cleanup on a
+  // One Node process: local SQLite or explicit D1, files on disk under .data/, in-memory rate limits, and cleanup on a
   // timer inside the process (its run history in KV files).
   vps: {
     preset: "node",
     blob: { ...files, driver: "fs", base: ".data/blob" },
-    database: process.env.DROP_DATABASE_URL ? { connection: { url: process.env.DROP_DATABASE_URL } } : d1("vitehub-drop-vps"),
+    database: database === "sqlite" ? { connection: { url: env({ source: env.source("DROP_DATABASE_URL"), default: "file:.data/database/drop.db" }) } } : d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: true,
     schedule: { runtime: { driver: "process" } },
@@ -137,6 +131,8 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    // Drizzle applies the existing migration journal before a local Node instance serves requests.
+    plugins: database === "sqlite" ? [fileURLToPath(new URL("./server/database-migrate.ts", import.meta.url))] : [],
     errorHandler: fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url)),
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.

@@ -27,7 +27,7 @@
 Under the hood:
 
 - **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and an OAuth 2.1 provider that MCP clients sign in through (dynamic client registration, PKCE, JWT access tokens bound to `/mcp`).
-- **Database** is SQLite through `vite-hub/database`: D1 on every host, using D1's HTTP API outside Cloudflare. It holds drops, app files, and comments.
+- **Database** is SQLite through `vite-hub/database`: local SQLite on a VPS or D1, using D1's HTTP API outside Cloudflare. It holds drops, app files, and comments.
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
 - Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
 - **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. A **Schedule** deletes them hourly on Cloudflare, Netlify, and a VPS, or daily on Vercel.
@@ -51,15 +51,43 @@ MCP tools: `get_usage`, `list_drops`, `read_drop`, `list_comments`, `create_doc`
 
 ## Host it yourself
 
-[drop.vitehub.dev](https://drop.vitehub.dev) is one instance anyone can use; you can run your own. `DROP_HOST` picks the host at build time, and [the self-hosting docs](https://drop.vitehub.dev/docs/self-host) have the steps for each:
+[drop.vitehub.dev](https://drop.vitehub.dev) is one instance anyone can use; you can run your own. `DROP_HOST` overrides the host at build time, and [the self-hosting docs](https://drop.vitehub.dev/docs/self-host) have the steps for each:
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop&env=GITHUB_CLIENT_ID%2CGITHUB_CLIENT_SECRET%2CBETTER_AUTH_SECRET%2CDROP_ADMINS%2CCLOUDFLARE_ACCOUNT_ID%2CCLOUDFLARE_API_TOKEN%2CCLOUDFLARE_D1_DATABASE_ID%2CCLOUDFLARE_D1_DATABASE_NAME&envDescription=GitHub+sign-in%2C+admin+user+IDs%2C+Cloudflare+D1%2C+and+a+private+Blob+store.+See+the+Drop+guide+for+each+value.&envLink=https%3A%2F%2Fdrop.vitehub.dev%2Fdocs%2Fself-host%2Fvercel&stores=%5B%7B%22type%22%3A%22blob%22%7D%5D) [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy on Deno](https://deno.com/button)](https://console.deno.com/new?clone=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [Run on a VPS](https://drop.vitehub.dev/docs/self-host/vps#steps)
 
 Cloudflare creates D1, R2, and KV for you. Vercel and Netlify prompt for settings. Deno clones the repo and reads `deno.jsonc`; the VPS guide uses Docker Compose. No button creates your GitHub OAuth app. Use `<origin>/api/auth/callback/github` as its callback, generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`, and find your admin user id with `gh api users/<login> --jq .id`.
 
-Other hosts need a Cloudflare D1 database and an account API token with D1 edit access. Choose a private Blob store in the Vercel flow; Deno needs an S3 bucket and access keys. The provider guides cover these steps. Migrations run before deployment; existing Cloudflare Workers Builds that use `pnpm build` and `npx wrangler deploy` still need `pnpm db:migrate:remote` after schema changes.
+Docker and VPS builds use local SQLite by default, with database, files, and KV under `.data/`. Vercel, Netlify, and Deno need a Cloudflare D1 database and an account API token with D1 edit access. Choose a private Blob store in the Vercel flow; Deno needs an S3 bucket and access keys. The provider guides cover these steps. Migrations run before deployment; existing Cloudflare Workers Builds that use `pnpm build` and `npx wrangler deploy` still need `pnpm db:migrate:remote` after schema changes.
 
 Only Cloudflare renders PNG code images and has a distributed rate limiter. Elsewhere code images are SVG and rate limits count per instance. Anyone who signs in joins as a Member; GitHub user ids in `DROP_ADMINS` join as Admin. Admins change roles on `/members`.
+
+### Self-host configuration
+
+Builds detect `NITRO_PRESET` or `SERVER_PRESET`, then Vercel, Netlify, or Deno environment markers. A local `DROP_DATABASE_URL` selects the VPS preset when no host is selected. With no signal, the existing Cloudflare default remains. Set `DROP_HOST=cloudflare|vercel|netlify|deno|vps` to choose manually. Conflicting or unsupported presets fail the build.
+
+For a server with persistent disk:
+
+```sh
+cp .env.example .env
+# Fill BETTER_AUTH_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and DROP_ADMINS.
+docker compose up -d --build
+```
+
+Compose builds the Node preset and applies the existing Drizzle migrations before serving requests. Rebuilds preserve the `drop-data` volume. Run one replica and back up the volume while Drop is stopped, or use SQLite's backup API for the database and also back up the blobs.
+
+| Setting | Behavior |
+| --- | --- |
+| `DROP_DATABASE` | Build override, `sqlite` or `d1`. VPS defaults to SQLite; other hosts use D1. An existing `CLOUDFLARE_D1_DATABASE_ID` keeps a VPS on D1. |
+| `DROP_DATABASE_URL` | Runtime SQLite `file:` URL, default `file:.data/database/drop.db`. Also selects SQLite at build time when supplied. |
+| `DROP_GITHUB_ORG` | Runtime restriction to active members, including shared links, file responses, and MCP. Native login requests `read:org`. Successful membership checks expire after five minutes. |
+| `DROP_AUTH_PROXY` | Set `1` explicitly to reuse a GitHub oauth2-proxy. Requires `DROP_GITHUB_ORG`; disables native GitHub login. |
+| `DROP_AUTH_PROXY_COOKIE` | Optional proxy cookie name to clear on logout. Use a Secure, host-only cookie with `Path=/`. |
+
+The host and database driver are build choices. Changing drivers needs a rebuild and a separate data migration; it does not copy data. SQLite paths and auth settings remain runtime choices. Existing VPS users with D1 can keep their settings, or choose `DROP_DATABASE=d1` explicitly. Docker runs the existing D1 migration command for a D1 build.
+
+For a Node build outside Docker, set `DROP_HOST=vps` for installation and building, then run `node .output/server/index.mjs` from the repository root. If copying the build, copy `server/databases/migrations` alongside `.output` and persist `.data/`.
+
+To reuse an existing GitHub OAuth app through oauth2-proxy, configure its accepted callback for your Drop origin and follow the [proxy setup](https://drop.vitehub.dev/docs/self-host/vps#auth-proxy). Drop validates the forwarded GitHub token and organization membership itself. An incoming header never enables proxy mode automatically. The proxy does not replace Drop's OAuth server for MCP clients.
 
 ### Abuse handling
 

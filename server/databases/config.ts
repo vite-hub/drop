@@ -1,5 +1,7 @@
 // Better Auth tables (user, session, account, verification), its OAuth provider's (./oauth.ts), and Drop's own (./drops.ts).
 import { defineDatabase } from 'vite-hub/database'
+import { env } from 'vite-hub/env'
+import { deployment } from '../../scripts/deployment'
 import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { quotaBlobs, quotaReservations } from './quotas'
@@ -64,7 +66,7 @@ export const verification = sqliteTable('verification', {
 export { quotaBlobs, quotaReservations, abuseReports, blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 export default defineDatabase({
-  ...(process.env.DROP_DATABASE_URL ? { connection: { url: process.env.DROP_DATABASE_URL } } : { cloudflare: {
+  ...(deployment().database === 'sqlite' ? { connection: { url: env({ source: env.source('DROP_DATABASE_URL'), default: 'file:.data/database/drop.db' }) } } : { cloudflare: {
     databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || '00000000-0000-4000-8000-000000000000',
     databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || 'vitehub-drop',
     http: true,

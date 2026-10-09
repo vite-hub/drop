@@ -25,7 +25,7 @@ export const HOSTS: Host[] = [
   { id: "vercel", name: "Vercel", icon: "i-simple-icons-vercel", database: "D1 over HTTP", files: "Vercel Blob", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Vercel Cron Job" },
   { id: "netlify", name: "Netlify", icon: "i-simple-icons-netlify", database: "D1 over HTTP", files: "Netlify Blobs", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Scheduled function" },
   { id: "deno", name: "Deno Deploy", icon: "i-simple-icons-deno", database: "D1 over HTTP", files: "R2 S3 API", rateLimits: "Per instance", codeImages: "SVG", cleanup: "None" },
-  { id: "vps", name: "VPS", icon: "i-lucide-server", database: "D1 over HTTP", files: "Local disk", rateLimits: "In memory", codeImages: "SVG", cleanup: "In process" },
+  { id: "vps", name: "VPS", icon: "i-lucide-server", database: "Local SQLite or D1", files: "Local disk", rateLimits: "In memory", codeImages: "SVG", cleanup: "In process" },
 ]
 
 // Official clone flows. Deno reads its build and runtime settings from deno.jsonc.

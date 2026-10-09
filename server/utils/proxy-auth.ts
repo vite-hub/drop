@@ -6,6 +6,9 @@ import { account, user } from "../databases/config"
 import { githubOrganization, isGitHubMember } from "./github-membership"
 
 export const proxyAuthentication = process.env.DROP_AUTH_PROXY === "1"
+export const proxyCookie = process.env.DROP_AUTH_PROXY_COOKIE?.trim()
+if (proxyAuthentication && !githubOrganization) throw new Error("DROP_AUTH_PROXY=1 requires DROP_GITHUB_ORG.")
+if (proxyCookie && !/^[A-Za-z0-9_-]+$/.test(proxyCookie)) throw new Error("DROP_AUTH_PROXY_COOKIE must be a cookie name.")
 
 /** Exchange oauth2-proxy's GitHub token for Drop's session. Header names alone prove nothing. */
 export const proxyAuth = () => ({
@@ -16,7 +19,7 @@ export const proxyAuth = () => ({
       if (!proxyAuthentication || !githubOrganization || !await isGitHubMember(token))
         throw new APIError("UNAUTHORIZED", { message: "Active GitHub organization membership required." })
       const profile = await fetch("https://api.github.com/user", {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Quiver-Drop" },
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Drop" },
         signal: AbortSignal.timeout(5000),
       }).then(response => response.ok ? response.json() as Promise<{ id: number; login: string; name?: string; avatar_url?: string }> : null).catch(() => null)
       if (!profile?.id || !profile.login) throw new APIError("UNAUTHORIZED", { message: "GitHub identity unavailable." })

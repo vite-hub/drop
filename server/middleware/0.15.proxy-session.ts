@@ -4,7 +4,7 @@ import { db } from "vite-hub/database/drizzle"
 import { account } from "../databases/config"
 import { authFor } from "../utils/identity"
 import { isGitHubMember } from "../utils/github-membership"
-import { proxyAuthentication } from "../utils/proxy-auth"
+import { proxyAuthentication, proxyCookie } from "../utils/proxy-auth"
 
 /** Establish the same session Drop's browser UI and OAuth consent already use, without a second login. */
 export default defineHandler(async (event) => {
@@ -12,8 +12,8 @@ export default defineHandler(async (event) => {
   const token = event.req.headers.get("x-auth-request-access-token")
   if (!token) return // Machine OAuth requests use Drop's bearer tokens, not proxy headers.
   if (!await isGitHubMember(token)) throw new HTTPError({ status: 403, statusText: "Active organization membership required." })
-  if (event.url.pathname === "/api/auth/sign-out" && event.req.method === "POST")
-    event.res.headers.append("Set-Cookie", "__Host-quiver-drop-auth=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax")
+  if (proxyCookie && event.url.pathname === "/api/auth/sign-out" && event.req.method === "POST")
+    event.res.headers.append("Set-Cookie", `${proxyCookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
   const auth = authFor(event)
   const current = await auth.api.getSession({ headers: event.req.headers }).catch(() => null)
   if (current) {
