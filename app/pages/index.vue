@@ -64,7 +64,8 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
             <div class="mt-9 flex flex-wrap items-center gap-3">
               <UButton v-if="signedIn" color="neutral" size="lg" class="h-10 px-4" label="Open Drop" trailing-icon="i-lucide-arrow-right" to="/drops" />
               <UButton v-else color="neutral" size="lg" class="h-10 px-4" icon="i-simple-icons-github" label="Sign in with GitHub" @click="signInWithGitHub" />
-              <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="See the loop" to="#loop" />
+              <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="Read the docs" to="/docs" />
+              <UButton color="neutral" variant="ghost" size="lg" class="h-10 px-4" label="See the loop" to="#loop" />
             </div>
 
             <form v-if="devSignIn && !signedIn" class="mt-6 flex max-w-xs flex-col gap-2 rounded-lg border border-dashed border-accented bg-default p-3" @submit.prevent="signInWithEmail">
