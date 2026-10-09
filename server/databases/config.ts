@@ -64,10 +64,10 @@ export const verification = sqliteTable('verification', {
 export { quotaBlobs, quotaReservations, abuseReports, blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 export default defineDatabase({
-  cloudflare: {
+  ...(process.env.DROP_DATABASE_URL ? { connection: { url: process.env.DROP_DATABASE_URL } } : { cloudflare: {
     databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || '00000000-0000-4000-8000-000000000000',
     databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || 'vitehub-drop',
     http: true,
-  },
+  } }),
   schema: { quotaBlobs, quotaReservations, abuseReports, account, blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })

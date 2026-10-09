@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import { oauthProvider } from "@better-auth/oauth-provider"
 import { betterAuth } from "better-auth"
@@ -7,7 +7,8 @@ import { useLogger } from "evlog/nitro/v3"
 import { createLocalJWKSet, type JSONWebKeySet, jwtVerify } from "jose"
 import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
-import { oauthClient, user as users } from "../databases/config"
+import { account, oauthClient, user as users } from "../databases/config"
+import { githubOrganization, isGitHubMember } from "./github-membership"
 import { isRole, type Role } from "#shared/roles"
 import { ac, roles } from "./access"
 import type { ActorKind } from "#shared/types"
@@ -36,7 +37,12 @@ export const bearerFrom = (headers: Headers) => headers.get("authorization")?.ma
 /** Who is calling. Resolved once per request (middleware and route share it). */
 export function identify(event: H3Event): Promise<Identity | null> {
   const context = event.context as { dropIdentity?: Promise<Identity | null> }
-  return (context.dropIdentity ??= resolveIdentity(event).then((who) => {
+  return (context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
+    if (who && githubOrganization) {
+      const [githubAccount] = await db.select({ token: account.accessToken }).from(account)
+        .where(and(eq(account.userId, who.userId), eq(account.providerId, "github"))).limit(1)
+      if (!await isGitHubMember(githubAccount?.token)) return null
+    }
     // Every request's wide event says who made it, never the credential itself.
     if (who) useLogger(event).set({ user: { id: who.userId, role: who.role }, actor: { kind: who.actorKind, name: who.actorName } })
     return who

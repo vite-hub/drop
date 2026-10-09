@@ -66,7 +66,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   vps: {
     preset: "node",
     blob: { ...files, driver: "fs", base: ".data/blob" },
-    database: d1("vitehub-drop-vps"),
+    database: process.env.DROP_DATABASE_URL ? { connection: { url: process.env.DROP_DATABASE_URL } } : d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: true,
     schedule: { runtime: { driver: "process" } },
