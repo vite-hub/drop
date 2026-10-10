@@ -15,12 +15,12 @@ blockExoticSubdeps: false
 overrides:
   # Nuxt and Nuxt UI must share one Vue instance.
   vue: 3.5.41
+  # npm 0.0.4 contains the upstream nullable Blob head contract.
+  '@vite-hub/blob': 0.0.4
 
 patchedDependencies:
   # Auth's static scanner accepts comments before object options.
   '@vite-hub/auth@0.0.4': patches/@vite-hub__auth@0.0.4.patch
-  # Preserve missing HEAD results through storage and served-URL decoration.
-  '@vite-hub/blob@0.0.4': patches/@vite-hub__blob@0.0.4.patch
   '@vite-hub/database@0.0.4': patches/@vite-hub__database@0.0.4.patch
   # Keeps Nuxt's dev-only module URL out of the Workers bundle.
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
