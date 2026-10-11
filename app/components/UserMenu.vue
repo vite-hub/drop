@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui"
 
-const { signOut } = useUserSession()
+const { signOut } = useUserSession(useNuxtApp().$auth)
 // From /api/me, which SSR fetches with the session cookie; the client-side session only exists after hydration.
 const { data: me } = useMe()
-const colorMode = useColorMode()
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: "label", slot: "account" as const }],
@@ -43,21 +42,7 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
     <template #theme>
       <div class="flex w-full items-center justify-between gap-3">
         <span>Theme</span>
-        <div class="flex items-center rounded-md border border-default p-0.5" role="radiogroup" aria-label="Theme">
-          <button
-            v-for="option in [{ value: 'light', label: 'Light', icon: 'i-lucide-sun' }, { value: 'dark', label: 'Dark', icon: 'i-lucide-moon' }]"
-            :key="option.value"
-            :aria-checked="colorMode.value === option.value"
-            :aria-label="option.label"
-            class="grid h-6 w-7 cursor-pointer place-items-center rounded-[5px] transition-colors"
-            :class="colorMode.value === option.value ? 'bg-elevated text-highlighted' : 'text-muted hover:text-highlighted'"
-            role="radio"
-            type="button"
-            @click.stop="colorMode.preference = option.value"
-          >
-            <UIcon :name="option.icon" class="size-3.5" />
-          </button>
-        </div>
+        <UColorModeSwitch size="sm" @click.stop />
       </div>
     </template>
   </UDropdownMenu>

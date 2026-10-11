@@ -4,25 +4,16 @@ import type { DropComment } from "#shared/types"
 const props = defineProps<{ comments: DropComment[]; canComment: boolean; canManage: boolean }>()
 const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
 const filter = ref<"open" | "resolved">("open")
+const tabs = computed(() => [
+  { label: "Open", value: "open", badge: props.comments.filter(comment => !comment.resolved).length },
+  { label: "Resolved", value: "resolved", badge: props.comments.filter(comment => comment.resolved).length },
+])
 const visible = computed(() => props.comments.filter(comment => (filter.value === "open" ? !comment.resolved : comment.resolved)))
 </script>
 
 <template>
   <div class="flex h-full flex-col">
-    <div class="flex gap-3 px-4 py-2 text-xs" role="tablist">
-      <button
-        v-for="option in (['open', 'resolved'] as const)"
-        :key="option"
-        :aria-selected="filter === option"
-        class="cursor-pointer capitalize transition-colors"
-        :class="filter === option ? 'font-medium text-highlighted' : 'text-muted hover:text-highlighted'"
-        role="tab"
-        type="button"
-        @click="filter = option"
-      >
-        {{ option }} <span class="font-mono text-dimmed tabular-nums">{{ comments.filter(comment => (option === "open") !== comment.resolved).length }}</span>
-      </button>
-    </div>
+    <UTabs v-model="filter" class="shrink-0 px-4" color="neutral" :content="false" :items="tabs" size="sm" variant="link" />
     <ul class="min-h-0 flex-1 divide-y divide-default overflow-y-auto border-t border-default">
       <li v-if="!visible.length" class="px-4 py-10 text-center text-sm text-muted">
         {{ filter === "resolved" ? "Nothing resolved yet." : canComment ? "Select text or click an image to comment." : "No comments yet." }}

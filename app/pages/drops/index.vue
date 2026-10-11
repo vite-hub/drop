@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { MIB, usageNearLimit, type Usage } from "#shared/quotas"
+import { MIB, usageNearLimit } from "#shared/quotas"
 import type { DropSummary } from "#shared/types"
 
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
 const { drops, status, error, refresh, create, upload, remove } = useDrops()
-const { data: usage, refresh: refreshUsage } = useApi<Usage>("/api/usage", { key: "usage" })
+const { data: usage, refresh: refreshUsage } = useApi("/api/usage", { key: "usage" })
 const nearLimit = computed(() => usage.value && usageNearLimit(usage.value))
 const atLimit = computed(() => usage.value && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null && quota.used >= quota.limit))
 const storageMiB = computed(() => Math.ceil((usage.value?.bytes.used ?? 0) / MIB * 10) / 10)

@@ -84,6 +84,11 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    public: {
+      // Quiver's VPS can use oauth2-proxy instead of Drop's native GitHub flow.
+      // NUXT_PUBLIC_AUTH_PROXY overrides this at runtime for that deployment.
+      authProxy: false,
+    },
     quotas: {
       enabled: process.env.DROP_QUOTAS === "1",
       defaultPlan: process.env.DROP_DEFAULT_PLAN || "free",

@@ -26,7 +26,8 @@ const prompt = usePrompt()
 const { copy } = useCopy()
 const { remove } = useDropActions()
 const colorMode = useColorMode()
-const dark = computed(() => colorMode.value === "dark")
+const mounted = useMounted()
+const dark = computed(() => mounted.value && colorMode.value === "dark")
 const [DefineSide, ReuseSide] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
 
@@ -102,9 +103,9 @@ watch([ready, pageComments], () => {
 
 defineShortcuts({
   meta_s: { usingInput: true, handler: () => editing.value && void editor.save() },
-  escape: { usingInput: true, handler: () => (popover.value = selection.value = null) },
   c: () => !editing.value && panel.show("comments"),
 })
+onKeyStroke("Escape", () => (popover.value = selection.value = null))
 onMounted(() => {
   if (route.query.edit === "1" && drop.value.canEdit) startEdit()
 })
@@ -175,21 +176,11 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 <template>
   <DefineSide>
     <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default pr-2 pl-2">
-      <div class="flex min-w-0 items-center gap-0.5" role="tablist">
-        <button
-          v-for="item in tabs"
-          :key="item.value"
-          :aria-selected="tab === item.value"
-          class="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[13px] transition-colors"
-          :class="tab === item.value ? 'bg-elevated font-medium text-highlighted' : 'text-muted hover:text-highlighted'"
-          role="tab"
-          type="button"
-          @click="tab = item.value"
-        >
-          {{ item.label }}
+      <UTabs v-model="tab" class="min-w-0" color="neutral" :content="false" :items="tabs" size="sm">
+        <template #trailing="{ item }">
           <span v-if="item.count" class="font-mono text-[11px] text-dimmed tabular-nums">{{ item.count }}</span>
-        </button>
-      </div>
+        </template>
+      </UTabs>
       <div class="flex items-center gap-1">
         <UButton v-if="tab === 'comments' && comments.length" aria-label="Copy feedback for your agent" color="neutral" icon="i-lucide-sparkles" size="sm" title="Copy feedback for your agent" variant="ghost" @click="copyFeedback" />
         <UButton v-if="tab === 'source' && drafts" aria-label="New file" color="neutral" icon="i-lucide-plus" size="sm" variant="ghost" @click="addFile" />
@@ -313,7 +304,8 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-lucide-download" label="Download" :to="drop.url" external target="_blank" variant="outline" />
         </div>
       </div>
-      <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
+      <!-- Server and client bundlers format the embedded app resolver differently. -->
+      <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
     </template>
   </UDashboardPanel>
 

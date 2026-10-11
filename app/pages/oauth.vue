@@ -7,22 +7,21 @@
 useSeoMeta({ title: "Connect an agent", robots: "noindex" })
 
 const route = useRoute()
-const { loggedIn, user } = useUserSession()
-const mounted = useMounted()
-const ready = computed(() => mounted.value)
+const { $auth } = useNuxtApp()
+const { loggedIn, user, signIn } = useUserSession($auth)
+const ready = useMounted()
 
-// The whole signed query goes back verbatim; the provider checks its signature.
-const oauthQuery = computed(() => (import.meta.client ? location.search.slice(1) : ""))
 const clientId = computed(() => (typeof route.query.client_id === "string" ? route.query.client_id : ""))
 const valid = computed(() => Boolean(clientId.value && route.query.sig))
 
 // The agent's name, as it registered itself ("Claude Code", "Codex"…). Readable once signed in.
-const { data: client, execute: loadClient } = useApi<{ client_name?: string }>("/api/auth/oauth2/public-client", {
-  key: "oauth-client",
-  query: { client_id: clientId },
+const { data: client, execute: loadClient } = useAsyncData("oauth-client", async () => {
+  const { data, error } = await $auth.oauth2.publicClient({ query: { client_id: clientId.value } })
+  if (error) throw new Error(error.message || "Couldn't load this agent. Start the connection again.")
+  return data
+}, {
   immediate: false,
   server: false,
-  watch: false,
 })
 const agentName = computed(() => client.value?.client_name || "An agent")
 watch([ready, loggedIn], () => {
@@ -36,8 +35,8 @@ async function signInWithGitHub() {
   pending.value = "github"
   error.value = ""
   try {
-    const { url } = await $fetch<{ url: string }>("/api/auth/sign-in/social", { method: "POST", body: { provider: "github", callbackURL: "/drops", oauth_query: oauthQuery.value } })
-    window.location.href = url
+    const { error } = await signIn.social({ provider: "github", callbackURL: "/drops" })
+    if (error) throw new Error(error.message || "Couldn't start GitHub sign-in.")
   }
   catch (cause) {
     error.value = errorText(cause)
@@ -49,10 +48,9 @@ async function answer(accept: boolean) {
   pending.value = accept ? "allow" : "deny"
   error.value = ""
   try {
-    const result = await $fetch<{ redirect_uri?: string; url?: string }>("/api/auth/oauth2/consent", { method: "POST", body: { accept, oauth_query: oauthQuery.value } })
-    const next = result.redirect_uri ?? result.url
-    if (!next) throw new Error("The agent didn't get an answer. Start again from your agent.")
-    window.location.href = next
+    const { data, error } = await $auth.oauth2.consent({ accept })
+    if (error) throw new Error(error.message || "This authorization link is invalid or has expired. Start again from your agent.")
+    if (!data?.url) throw new Error("The agent didn't get an answer. Start again from your agent.")
   }
   catch (cause) {
     error.value = errorText(cause)
@@ -93,13 +91,13 @@ async function answer(accept: boolean) {
             </span>
             <h1 class="text-lg leading-snug font-semibold tracking-tight text-highlighted">Allow {{ agentName }} to use Drop?</h1>
           </div>
-          <p class="mt-3 text-sm leading-relaxed text-muted">It acts as {{ user?.name ?? "you" }}:</p>
+          <p class="mt-3 text-sm leading-relaxed text-muted">It acts as {{ user?.email ?? user?.name ?? "you" }}:</p>
           <ul class="mt-2 space-y-1.5 text-sm">
             <li v-for="item in ['Drop docs and apps, private until you share them', 'Read your drops and their comments', 'Publish new versions']" :key="item" class="flex gap-2">
               <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
             </li>
           </ul>
-          <p class="mt-4 text-xs leading-relaxed text-muted">You can disconnect it any time on the Agents page.</p>
+          <p class="mt-4 text-xs leading-relaxed text-muted">Private drops belong to this account on this Drop site. You can disconnect it any time on the Agents page.</p>
           <div class="mt-6 grid grid-cols-2 gap-2">
             <UButton block color="neutral" label="Deny" variant="outline" :disabled="pending !== null" :loading="pending === 'deny'" @click="answer(false)" />
             <UButton block color="neutral" label="Allow" :disabled="pending !== null" :loading="pending === 'allow'" @click="answer(true)" />

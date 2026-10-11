@@ -6,6 +6,7 @@ export default defineHandler(async (event) => {
     event.res.headers.set("X-Robots-Tag", "noindex, nofollow")
     event.res.headers.set("Cache-Control", "private, no-store")
   }
+  if (path === "/signin") event.res.headers.set("Cache-Control", "private, no-store")
   if (path.replace(/\/+$/, "") !== "/api/auth/oauth2/register" || event.req.method !== "POST") return
   const { requireRateLimit } = await import("vite-hub/rate-limit")
   if (!import.meta.dev) await requireRateLimit(event, "oauth-register", { failure: "deny", limit: 10, window: "1m" })

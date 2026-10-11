@@ -1,21 +1,20 @@
 <script setup lang="ts">
+import type { FormSubmitEvent } from "@nuxt/ui"
+import type { InferInput } from "valibot"
 import { ReportSchema } from "#shared/schemas"
 useSeoMeta({ title: "Report a drop", robots: "noindex, nofollow" })
 const route = useRoute()
-const state = reactive({ target: typeof route.query.target === "string" ? route.query.target : "", reason: "other" as "phishing" | "malware" | "spam" | "copyright" | "illegal/CSAM" | "other", details: "", email: "" })
-const reasons = ["phishing", "malware", "spam", "copyright", "illegal/CSAM", "other"]
-const sending = ref(false)
+const state = reactive<InferInput<typeof ReportSchema>>({ target: typeof route.query.target === "string" ? route.query.target : "", reason: "other", details: "", email: "" })
+const reasons = ReportSchema.entries.reason.options
 const sent = ref(false)
 const error = ref("")
-async function submit() {
-  sending.value = true
+async function submit(event: FormSubmitEvent<InferInput<typeof ReportSchema>>) {
   error.value = ""
   try {
-    await $fetch("/api/reports", { method: "POST", body: state })
+    await $fetch("/api/reports", { method: "POST", body: event.data })
     sent.value = true
   }
   catch (cause) { error.value = (cause as { data?: { statusText?: string } }).data?.statusText || "Could not send the report. Try again shortly." }
-  finally { sending.value = false }
 }
 </script>
 
@@ -27,10 +26,10 @@ async function submit() {
     <UForm v-else :schema="ReportSchema" :state="state" class="space-y-4" @submit="submit">
       <UFormField label="Drop or file path" name="target" required><UInput v-model="state.target" class="w-full" placeholder="/d/drop-id" :maxlength="600" /></UFormField>
       <UFormField label="Reason" name="reason" required><USelect v-model="state.reason" :items="reasons" class="w-full" /></UFormField>
-      <UFormField label="Details" name="details" required><UTextarea v-model="state.details" class="w-full" :maxlength="4000" :rows="5" /></UFormField>
+      <UFormField label="Details" name="details" help="Describe what needs review." required><UTextarea v-model="state.details" class="w-full" :maxlength="4000" :rows="5" /></UFormField>
       <UFormField label="Email (optional)" name="email"><UInput v-model="state.email" type="email" class="w-full" :maxlength="254" /></UFormField>
       <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>
-      <UButton type="submit" color="neutral" label="Send report" :loading="sending" />
+      <UButton type="submit" color="neutral" label="Send report" loading-auto />
     </UForm>
     <p class="flex flex-wrap gap-4 text-sm"><NuxtLink to="/terms" class="underline">Terms</NuxtLink><NuxtLink to="/acceptable-use" class="underline">Acceptable use</NuxtLink><NuxtLink to="/abuse" class="underline">Copyright and abuse contact</NuxtLink></p>
   </main><SiteFooter /></div>

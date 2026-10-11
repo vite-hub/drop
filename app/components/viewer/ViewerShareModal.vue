@@ -8,7 +8,7 @@ const { setVisibility } = useDropActions()
 const { copy, copied } = useCopy()
 const shared = computed(() => props.drop.visibility === "shared")
 const url = computed(() => (import.meta.client ? `${location.origin}/d/${props.drop.id}` : `/d/${props.drop.id}`))
-const levels = Object.keys(ACCESS_LABELS) as Access[]
+const levels = (Object.keys(ACCESS_LABELS) as Access[]).map(value => ({ value, label: ACCESS_LABELS[value], description: ACCESS_HINTS[value] }))
 
 async function setShared(next: boolean) {
   if (await setVisibility(props.drop, next ? "shared" : "private")) notify.done(next ? "Share updated" : "Private again")
@@ -37,26 +37,7 @@ async function setAccess(level: Access) {
             @update:model-value="setShared"
           />
         </div>
-        <div v-if="shared" class="space-y-1 p-2" role="radiogroup">
-          <button
-            v-for="level in levels"
-            :key="level"
-            :aria-checked="drop.access === level"
-            class="flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-elevated"
-            :class="drop.access === level && 'bg-elevated'"
-            role="radio"
-            type="button"
-            @click="setAccess(level)"
-          >
-            <span class="grid size-4 shrink-0 place-items-center rounded-full border" :class="drop.access === level ? 'border-(--ui-text-highlighted)' : 'border-default'">
-              <span v-if="drop.access === level" class="size-2 rounded-full bg-inverted" />
-            </span>
-            <span class="min-w-0 flex-1">
-              <span class="block text-sm font-medium text-highlighted">{{ ACCESS_LABELS[level] }}</span>
-              <span class="block text-xs text-muted">{{ ACCESS_HINTS[level] }}</span>
-            </span>
-          </button>
-        </div>
+        <URadioGroup v-if="shared" aria-label="Share access" class="p-3" color="neutral" :items="levels" :model-value="drop.access" variant="card" @update:model-value="setAccess" />
       </div>
       <div class="mt-4 flex items-center gap-1 rounded-md border border-default bg-muted py-1 pr-1 pl-3" :class="!shared && 'opacity-50'">
         <span class="min-w-0 flex-1 truncate font-mono text-xs">{{ url }}</span>

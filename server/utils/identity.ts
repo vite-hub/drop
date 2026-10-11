@@ -1,18 +1,15 @@
 import { and, eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
-import { oauthProvider } from "@better-auth/oauth-provider"
-import { betterAuth } from "better-auth"
-import { admin, jwt } from "better-auth/plugins"
+import type { Auth } from "better-auth"
 import { useLogger } from "evlog/nitro/v3"
 import { createLocalJWKSet, type JSONWebKeySet, jwtVerify } from "jose"
 import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
 import { account, oauthClient, user as users } from "../databases/config"
 import { githubOrganization, isGitHubMember } from "./github-membership"
-import { proxyAuth } from "./proxy-auth"
 import { isRole, type Role } from "#shared/roles"
-import { ac, roles } from "./access"
 import type { ActorKind } from "#shared/types"
+import type auth from "../auth"
 
 /** Who is calling and how: a person in the browser, or an agent through an MCP client they approved. */
 export interface Identity {
@@ -26,12 +23,9 @@ export interface Identity {
   actorName: string
 }
 
-// ViteHub's auth type doesn't know our plugins; this never runs, it only lends `authFor` the plugin endpoints' types.
-function typedAuth() {
-  return betterAuth({ plugins: [proxyAuth(), admin({ ac, roles }), jwt(), oauthProvider({ loginPage: "/oauth", consentPage: "/oauth" })] })
-}
+type DropAuth = Auth<ReturnType<typeof auth.options>>
 
-export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event) as unknown as ReturnType<typeof typedAuth>
+export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event) as unknown as DropAuth
 
 export const bearerFrom = (headers: Headers) => headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? null
 

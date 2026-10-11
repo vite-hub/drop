@@ -17,7 +17,7 @@ export default defineHandler(async (event) => {
   const drop = await findDrop(decodeURIComponent(page[1]!), event)
   const who = await identify(event)
   if (drop && !drop.ownerBanned && !drop.quarantinedAt && drop.visibility === "shared" && drop.shareReview === "pending" && !permissions(drop, who).view)
-    throw new HTTPError({ status: 403, statusText: "Waiting for review" })
+    throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
   if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, statusText: "Not found" })
   event.res.headers.set("Cache-Control", "private, no-store")
 })

@@ -1,11 +1,20 @@
 import type { H3Event, HTTPError } from "h3"
+import { escapeUTF8 as escapeHtml } from "entities"
+import { contentUnavailable } from "../../shared/content-unavailable.ts"
 
 /** Raw file errors need trusted chrome too. Returning nothing keeps Nitro's normal API error handler. */
-export default function contentError(error: HTTPError, event: H3Event) {
+export default async function contentError(error: HTTPError<{ shareReview?: string }>, event: H3Event) {
   const path = event.url.pathname
   if (!path.startsWith("/f/") && !path.startsWith("/d/")) return
   const status = error.status >= 400 && error.status <= 599 ? error.status : 500
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Content unavailable · Drop</title><style>body{font:16px system-ui;margin:12vh auto;padding:24px;max-width:36rem}a{color:inherit;margin-right:24px}</style></head><body><h1>This content is unavailable.</h1><p>The file may be private, removed, or waiting for review.</p><a href="/">Home</a><a href="/report?target=${encodeURIComponent(path)}">Report</a></body></html>`, {
+  // Reuse the access gate's identity when it ran. For missing files, resolve it only on this error path.
+  const identity = await (event.context.dropIdentity
+    ? event.context.dropIdentity as Promise<{ email: string } | null>
+    : import("../utils/identity").then(({ identify }) => identify(event)))
+    .catch(() => null)
+  const message = contentUnavailable(status, `${path}${event.url.search}`, identity?.email, error.data?.shareReview === "pending")
+  const account = message.email ? `<p>Signed in as <strong>${escapeHtml(message.email)}</strong>.</p>` : ""
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(message.title)} · Drop</title><style>html{color-scheme:light dark}body{font:16px system-ui;margin:0;min-height:100dvh;display:grid;place-items:center}main{max-width:28rem;padding:32px 24px;text-align:center}h1{font-size:1.3rem;line-height:1.4}p{line-height:1.6;opacity:.75;overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px}a{color:inherit;padding:10px 14px;text-decoration:none;border:1px solid currentColor;border-radius:6px}a:focus-visible{outline:2px solid currentColor;outline-offset:4px}</style></head><body><main><h1>${escapeHtml(message.title)}</h1>${account}<p>${escapeHtml(message.description)}</p><nav aria-label="Content recovery"><a href="${escapeHtml(message.action.to)}">${escapeHtml(message.action.label)}</a>${message.email ? '<a href="/drops">My drops</a>' : ""}<a href="/report?target=${encodeURIComponent(path)}">Report</a></nav></main></body></html>`, {
     status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",

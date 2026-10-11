@@ -4,10 +4,10 @@ import { type Role, ROLE_LABELS, ROLE_SUMMARY } from "#shared/roles"
 
 /** Who's in this Drop, and the admin actions on them. */
 export function useMembers() {
-  const { data: members, status, refresh } = useApi<Member[]>("/api/members", { key: "members", default: () => [] })
+  const { data: members, status } = useApi("/api/members", { key: "members", default: () => [] })
   const notify = useNotify()
   const confirm = useConfirm()
-  const reload = () => Promise.all([refresh(), refreshNuxtData("me")])
+  const reload = () => refreshNuxtData(["members", "me"])
 
   async function update(member: Member, body: { plan?: Plan; role?: Role; banned?: boolean }, title: string, description?: string) {
     try {

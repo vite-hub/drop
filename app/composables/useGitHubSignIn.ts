@@ -5,7 +5,7 @@
 export function useGitHubSignIn() {
   const route = useRoute()
   const toast = useToast()
-  const { loggedIn, signIn } = useUserSession()
+  const { loggedIn, signIn } = useUserSession(useNuxtApp().$auth)
 
   // The session loads client-side; gate on mount so the server and first client render agree.
   const mounted = useMounted()

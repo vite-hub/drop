@@ -2,7 +2,7 @@ import type { ConnectedAgent } from "#shared/types"
 
 /** The agents this person approved over MCP, and disconnecting one. */
 export function useAgents() {
-  const { data: agents, status, refresh } = useApi<ConnectedAgent[]>("/api/agents", { key: "agents", default: () => [] })
+  const { data: agents, status, refresh } = useApi("/api/agents", { key: "agents", default: () => [] })
   const notify = useNotify()
   const confirm = useConfirm()
 

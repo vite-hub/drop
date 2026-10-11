@@ -53,8 +53,7 @@ export function useAppFiles(drop: Ref<DropDetail>, drafts: Ref<Record<string, st
     file.value = "index.html"
     view.value = "preview"
   }
-  onMounted(openFromQuery)
-  watch(() => route.query.file, openFromQuery)
+  watch([() => route.query.file, () => drop.value.id], openFromQuery, { immediate: true })
 
   return { files, pages, page, view, file, treeRows, openFile }
 }

@@ -2,10 +2,6 @@
 // The public pages' header (landing and docs): marks on the left; Docs, theme, GitHub, and sign-in on the right.
 withDefaults(defineProps<{ wide?: boolean }>(), { wide: false })
 
-const colorMode = useColorMode()
-const dark = computed(() => colorMode.value === "dark")
-const toggleTheme = () => (colorMode.preference = dark.value ? "light" : "dark")
-
 const route = useRoute()
 const { signedIn, signInWithGitHub } = useGitHubSignIn()
 </script>
@@ -32,13 +28,7 @@ const { signedIn, signInWithGitHub } = useGitHubSignIn()
           :class="route.path.startsWith('/docs') ? 'text-highlighted' : 'text-muted'"
         />
         <ClientOnly>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            :icon="dark ? 'i-lucide-sun' : 'i-lucide-moon'"
-            :aria-label="dark ? 'Switch to light theme' : 'Switch to dark theme'"
-            @click="toggleTheme"
-          />
+          <UColorModeButton />
           <template #fallback><span class="size-8" /></template>
         </ClientOnly>
         <LandingGitHubStars />
