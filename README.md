@@ -29,7 +29,7 @@ Under the hood:
 - **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and an OAuth 2.1 provider that MCP clients sign in through (dynamic client registration, PKCE, JWT access tokens bound to `/mcp`).
 - **Database** is SQLite through `vite-hub/database`: local SQLite on a VPS or D1, using D1's HTTP API outside Cloudflare. It holds drops, app files, and comments.
 - **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
-- Markdown renders through **Comark**, and HTML runs in a sandbox with an opaque origin.
+- Markdown renders through **Comark**, and HTML runs in a sandbox, on a separate domain when `DROP_CONTENT_ORIGIN` is set.
 - **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. A **Schedule** deletes them hourly on Cloudflare, Netlify, and a VPS, or daily on Vercel.
 - **MCP** is [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit): one file per tool and prompt in `server/mcp/`, both protocol revisions, and the [Skills extension](https://modelcontextprotocol.io/seps/2640-skills-extension).
 - **Skills** are defined once in `skills/` and served over MCP (`skills/list`, `skill://` resources), at `/.well-known/agent-skills/` ([Discovery v0.2.0](https://github.com/cloudflare/agent-skills-discovery-rfc)), and at the older `/.well-known/skills/`.
@@ -82,6 +82,7 @@ Compose builds the Node preset and applies the existing Drizzle migrations befor
 | `DROP_GITHUB_ORG` | Runtime restriction to active members, including shared links, file responses, and MCP. Native login requests `read:org`. Successful membership checks expire after five minutes. |
 | `DROP_AUTH_PROXY` | Set `1` explicitly to reuse a GitHub oauth2-proxy. Requires `DROP_GITHUB_ORG`; disables native GitHub login. |
 | `DROP_AUTH_PROXY_COOKIE` | Optional proxy cookie name to clear on logout. Use a Secure, host-only cookie with `Path=/`. |
+| `DROP_CONTENT_ORIGIN` | Optional second hostname, served by the same deployment, where apps and HTML docs run with their own origin. Without it they run in an opaque sandbox where storage is temporary and URL changes are ignored. Keep it outside any login proxy. See [Give apps their own domain](https://drop.vitehub.dev/docs/self-host#content-origin). |
 
 The host and database driver are build choices. Changing drivers needs a rebuild and a separate data migration; it does not copy data. SQLite paths and auth settings remain runtime choices. Existing VPS users with D1 can keep their settings, or choose `DROP_DATABASE=d1` explicitly. Docker runs the existing D1 migration command for a D1 build.
 

@@ -10,7 +10,7 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
   <DocsPage title="Review and share" lead="Every drop opens full screen with its comments beside it. It stays private until you share it. Docs keep earlier versions. Apps keep only their latest file set.">
     <DocsSection id="docs" title="Docs">
       <p>Agents call <code>create_doc</code> with Markdown, or with a self-contained HTML page (<code>format: "html"</code>). People can also upload a file or start a doc from the Drops page.</p>
-      <p>Markdown renders as a clean document with tables, task lists, callouts, and Mermaid diagrams. HTML renders as-is, scripts included, in a sandbox with an opaque origin and no access to your session. For rich HTML plans, agents follow these rules:</p>
+      <p>Markdown renders as a clean document with tables, task lists, callouts, and Mermaid diagrams. HTML renders as-is, scripts included, in a sandbox with no access to your session. Drops that set up a separate domain for apps give pages their own origin, so storage and history work there too. For rich HTML plans, agents follow these rules:</p>
       <ul>
         <li v-for="rule in PLAN_AUTHORING_GUIDE.split('\n')" :key="rule">{{ rule }}</li>
       </ul>

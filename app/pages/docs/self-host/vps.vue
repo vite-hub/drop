@@ -27,6 +27,7 @@ const update = "git pull\ndocker compose up -d --build"
       <p>With <a href="https://caddyserver.com">Caddy</a>, add this to your Caddyfile and reload it:</p>
       <AgentsCodeBlock :code="caddy" />
       <p>Caddy forwards the host and HTTPS scheme. With nginx, set <code>proxy_set_header Host $host</code> and <code>proxy_set_header X-Forwarded-Proto $scheme</code>. Keep the OAuth app's homepage and callback on that HTTPS domain.</p>
+      <p>To <NuxtLink to="/docs/self-host#content-origin">give apps their own domain</NuxtLink>, proxy a second hostname to the same port, with the same headers, and set <code>DROP_CONTENT_ORIGIN</code> to it.</p>
     </DocsSection>
 
     <DocsSection id="env" title="Settings">
@@ -36,13 +37,14 @@ const update = "git pull\ndocker compose up -d --build"
         ['DROP_GITHUB_ORG', 'Optional active organization membership requirement for publishing, viewing, and MCP.'],
         ['DROP_AUTH_PROXY', 'Set 1 to reuse GitHub oauth2-proxy; requires DROP_GITHUB_ORG.'],
         ['DROP_AUTH_PROXY_COOKIE', 'Optional proxy cookie name to clear on logout. Secure, host-only, Path=/.'],
+        ['DROP_CONTENT_ORIGIN', 'Optional second hostname for apps and HTML docs, proxied to the same port.'],
       ]" />
     </DocsSection>
 
     <DocsSection id="auth-proxy" title="Reuse GitHub oauth2-proxy">
       <p>Set <code>DROP_AUTH_PROXY=1</code> and <code>DROP_GITHUB_ORG=your-org</code>. Native GitHub client credentials are unnecessary in this mode. Configure the existing OAuth app to accept <code>https://&lt;your-domain&gt;/oauth2/callback</code>.</p>
       <p>Configure oauth2-proxy with <code>--provider=github</code>, <code>--scope=user:email read:org</code>, <code>--github-org=your-org</code>, <code>--set-xauthrequest=true</code>, and <code>--pass-access-token=true</code>. Forward <code>X-Auth-Request-Access-Token</code> from its auth response to Drop. Drop checks that token against GitHub, maps its numeric user id, and creates its normal session. Do not forward client-supplied identity headers.</p>
-      <p>Use a Secure, host-only proxy cookie with <code>Path=/</code>, such as <code>__Host-drop-auth</code>, and set <code>DROP_AUTH_PROXY_COOKIE</code> to the same name for logout. Keep the Drop backend accessible only through your proxy.</p>
+      <p>Use a Secure, host-only proxy cookie with <code>Path=/</code>, such as <code>__Host-drop-auth</code>, and set <code>DROP_AUTH_PROXY_COOKIE</code> to the same name for logout. Keep the Drop backend accessible only through your proxy. Leave the <code>DROP_CONTENT_ORIGIN</code> hostname out of oauth2-proxy: it serves no drop content itself.</p>
       <p>Browser pages and shared links can require proxy authentication. Exempt <code>/oauth2</code>, <code>/.well-known</code>, <code>/mcp</code>, <code>/api/mcp</code>, and Drop's <code>/api/auth/oauth2</code> and <code>/api/auth/jwks</code> routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too.</p>
       <p>Successful membership checks expire after five minutes. Failed checks deny access. A token without <code>read:org</code> or organization access may require reauthorization.</p>
     </DocsSection>

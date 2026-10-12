@@ -205,6 +205,8 @@ export default defineNuxtConfig({
           admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
           shareApproval: env({ source: env.source("DROP_SHARE_APPROVAL"), default: "0" }),
           abuseEmail: env({ source: env.source("DROP_ABUSE_EMAIL"), default: "" }),
+          // A second hostname for apps and HTML docs, e.g. https://drop-usercontent.example.com (see server/utils/content-origin.ts).
+          contentOrigin: env({ source: env.source("DROP_CONTENT_ORIGIN"), default: "" }),
         },
       },
     },
