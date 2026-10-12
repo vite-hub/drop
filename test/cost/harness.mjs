@@ -99,8 +99,7 @@ export const state = globalThis.dropTest = {
   },
 }
 export function migrate() {
-  for (const name of ["0000_init", "0001_security_constraints", "0002_oauth_provider", "0003_content_gates", "0004_quotas", "0005_trust"])
-    sql.exec(readFileSync(new URL(`server/databases/migrations/${name}.sql`, root), "utf8"))
+  sql.exec(readFileSync(new URL("server/databases/migrations/0000_init.sql", root), "utf8"))
 }
 export function event(path, method = "GET") {
   const request = new H3Event(new Request(`https://drop.example${path}`, { method }))
@@ -108,7 +107,7 @@ export function event(path, method = "GET") {
   return request
 }
 export function reset() {
-  sql.exec("DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM blob_tombstones; DELETE FROM code_images; DELETE FROM user")
+  sql.exec("DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM user")
   state.bursts.length = 0; state.failBurst = false
   state.quotasEnabled = false
   state.shareApproval = "0"

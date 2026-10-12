@@ -3,7 +3,6 @@ import { beforeEach, test } from "node:test"
 import { H3Event } from "h3"
 import { migrate, reset, state, insertDrop, event } from "./harness.mjs"
 
-const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
 const { default: document } = await import("../../server/middleware/1.markdown-documents.ts")
 const { default: report } = await import("../../server/api/reports.post.ts")
@@ -13,7 +12,6 @@ beforeEach(reset)
 
 const key = "00000000-0000-4000-8000-000000000001.html"
 const reads = {
-  head: () => requireBlobAccess(event(`/f/${key}`), key),
   detail: async () => dropDetail(await findDrop("doc"), null, "https://drop.example"),
   document: () => document(event(`/f/${key}`)),
   report: () => {
@@ -35,7 +33,7 @@ for (const [name, read] of Object.entries(reads)) {
   ]) {
     test(`${name} returns ${status} for ${label}`, async () => {
       if (name === "detail" || name === "document") insertDrop("doc", { kind: "html", blob_key: key })
-      const method = name === "head" ? "head" : "get"
+      const method = "get"
       const original = state.blob[method]
       state.blob[method] = async () => result
       try {

@@ -28,7 +28,7 @@ Under the hood:
 
 - **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and an OAuth 2.1 provider that MCP clients sign in through (dynamic client registration, PKCE, JWT access tokens bound to `/mcp`).
 - **Database** is SQLite through `vite-hub/database`: local SQLite on a VPS or D1, using D1's HTTP API outside Cloudflare. It holds drops, app files, and comments.
-- **Blob** stores every file at `/f/<key>`. Old `/i/<key>` links redirect there.
+- **Blob** stores every file at `/f/<key>`.
 - Markdown renders through **Comark**, and HTML runs in a sandbox, on a separate domain when `DROP_CONTENT_ORIGIN` is set.
 - **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. A **Schedule** deletes them hourly on Cloudflare, Netlify, and a VPS, or daily on Vercel.
 - **MCP** is [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit): one file per tool and prompt in `server/mcp/`, both protocol revisions, and the [Skills extension](https://modelcontextprotocol.io/seps/2640-skills-extension).
@@ -84,7 +84,7 @@ Compose builds the Node preset and applies the existing Drizzle migrations befor
 | `DROP_AUTH_PROXY_COOKIE` | Optional proxy cookie name to clear on logout. Use a Secure, host-only cookie with `Path=/`. |
 | `DROP_CONTENT_ORIGIN` | Optional second hostname, served by the same deployment, where apps and HTML docs run with their own origin. Without it they run in an opaque sandbox where storage is temporary and URL changes are ignored. Keep it outside any login proxy. See [Give apps their own domain](https://drop.vitehub.dev/docs/self-host#content-origin). |
 
-The host and database driver are build choices. Changing drivers needs a rebuild and a separate data migration; it does not copy data. SQLite paths and auth settings remain runtime choices. Existing VPS users with D1 can keep their settings, or choose `DROP_DATABASE=d1` explicitly. Docker runs the existing D1 migration command for a D1 build.
+The host and database driver are build choices. Changing drivers needs a rebuild and a separate data migration; it does not copy data. SQLite paths and auth settings remain runtime choices. Docker runs the existing D1 migration command for a D1 build.
 
 For a Node build outside Docker, set `DROP_HOST=vps` for installation and building, then run `node .output/server/index.mjs` from the repository root. If copying the build, copy `server/databases/migrations` alongside `.output` and persist `.data/`.
 
@@ -92,7 +92,7 @@ To reuse an existing GitHub OAuth app through oauth2-proxy, configure its accept
 
 ### Abuse handling
 
-Set `DROP_SHARE_APPROVAL=1` to require admin approval before a member shares publicly. Private use stays available. Admins and unlimited-plan members bypass approval. Review shares at `/admin/review` and reports at `/admin/reports`. Existing shared links stay shared; approve existing trusted members before enabling approval if they need to publish new versions. `DROP_ABUSE_EMAIL` optionally provides a public contact email. Reports are stored in D1 and emit high-severity evlog events; monitor those logs. No email notification is sent. Review the legal templates in `app/pages/{terms,acceptable-use,abuse}.vue` before public use, including your jurisdiction and DMCA contact requirements. Apply migration `0005_trust` before deploying.
+Set `DROP_SHARE_APPROVAL=1` to require admin approval before a member shares publicly. Private use stays available. Admins and unlimited-plan members bypass approval. Review shares at `/admin/review` and reports at `/admin/reports`. Existing shared links stay shared; approve existing trusted members before enabling approval if they need to publish new versions. `DROP_ABUSE_EMAIL` optionally provides a public contact email. Reports are stored in D1 and emit high-severity evlog events; monitor those logs. No email notification is sent. Review the legal templates in `app/pages/{terms,acceptable-use,abuse}.vue` before public use, including your jurisdiction and DMCA contact requirements.
 
 Unused OAuth clients are removed after 24 hours by the existing cleanup schedule. Deno has no schedule, so run cleanup separately there. User content is excluded from indexing; landing and docs remain indexable.
 
@@ -102,7 +102,7 @@ Owner quotas are off by default. Set `DROP_QUOTAS=1` to enable them on the offic
 
 `DROP_DEFAULT_PLAN` defaults to `free`; `NUXT_QUOTAS_DEFAULT_PLAN` overrides it at runtime. Admins set individual plans on Members, including `unlimited` for the operator. A null user plan follows the configured default. The drop's owner pays for edits by agents, guests, and admins. All document versions and current app files count toward storage. A doc version uses one write, an app publish uses one write per file, and a temporary code image uses one write without a drop slot. Its bytes count until cleanup deletes it. A shared owner burst limit allows 30 publishes per minute. Existing drops remain readable at a cap. Deleting a drop releases its slot and bytes but keeps its monthly write count.
 
-Migration `0004_quotas.sql` must run before this version. Usage is recorded even with enforcement disabled. D1 conditionally reserves capacity when quotas are enabled, then commits the write ledger with metadata in one batch. Normal failures release the reservation. Pending reservations older than 15 minutes stop counting toward quotas. The hourly cleanup deletes them and logs evlog warnings with the owner, reservation, and released amounts so operators can investigate crashed publishes. Committed rows keep counting toward monthly writes and are never expired by this cleanup.
+Usage is recorded even with enforcement disabled. D1 conditionally reserves capacity when quotas are enabled, then commits the write ledger with metadata in one batch. Normal failures release the reservation. Pending reservations older than 15 minutes stop counting toward quotas. The hourly cleanup deletes them and logs evlog warnings with the owner, reservation, and released amounts so operators can investigate crashed publishes. Committed rows keep counting toward monthly writes and are never expired by this cleanup.
 
 ### Develop locally
 

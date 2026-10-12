@@ -154,11 +154,6 @@ export default defineNuxtConfig({
       wrangler: {
         name: cloudflareTemplate.name,
         observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } },
-        // Preserve the pre-Nuxt Sandbox migration before deleting its old Durable Object class.
-        migrations: [
-          { tag: "v1", new_sqlite_classes: ["Sandbox"] },
-          { tag: "v2", deleted_classes: ["Sandbox"] },
-        ],
       },
     },
     // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.
