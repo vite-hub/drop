@@ -5,7 +5,7 @@
 import { editorDocument, planDocument } from "#shared/documents"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
-import { buildProjectDocument } from "#shared/project-bundle"
+import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import { FilePathSchema } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
 import type { PendingComment } from "./viewer/ViewerCommentPopover.vue"
@@ -53,8 +53,9 @@ onMounted(async () => {
 // Live app preview while editing, debounced so typing doesn't reload the app on every key.
 const previewFiles = refDebounced(files, () => (drafts.value ? 450 : 0))
 
+const appDocument = (path: string) => injectRuntime(buildProjectDocument(previewFiles.value, path), dark.value)
 const srcdoc = computed(() => {
-  if (isApp.value) return injectRuntime(buildProjectDocument(previewFiles.value, page.value), dark.value)
+  if (isApp.value) return appDocument(page.value)
   if (docEdit.value?.mode === "rich") return editorDocument(editorSource.value, dark.value)
   if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value) : ""
   return planDocument(drop.value.kind as PlanKind, drop.value.content ?? "", dark.value, drop.value.html)
@@ -65,6 +66,37 @@ watch(dark, () => {
   if (docEdit.value?.mode === "rich") editorSource.value = docEdit.value.text
 }, { flush: "sync" })
 
+// With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
+// postMessage (see server/utils/content-origin.ts). Otherwise the document is the iframe's srcdoc, in an opaque origin.
+const contentOrigin = computed(() => drop.value.contentOrigin)
+const frameSrc = ref<string>()
+const frameKey = ref(0)
+/** The document the content frame shows. When the frame moves on its own, the viewer follows without a reload. */
+let frameDocument = ""
+function reloadFrame() {
+  frameSrc.value = contentOrigin.value ? contentOrigin.value + (isApp.value ? pageUrl(page.value) : "/") : undefined
+  frameKey.value++
+}
+onMounted(reloadFrame)
+
+function pageFor(path: string) {
+  let decoded = path
+  try { decoded = decodeURIComponent(path) }
+  catch {}
+  return pageAt(pages.value, decoded)
+}
+
+/** A path no page matches gets 404.html, or index.html for single-page apps, like a static host. */
+const fallbackDocument = () => appDocument("404.html" in previewFiles.value ? "404.html" : "index.html")
+
+/** The content frame navigated by itself (a link, history.pushState, a reload): show the page it landed on. */
+function followFrame(path: string) {
+  if (!isApp.value) return true
+  const target = pageFor(path)
+  if (target) page.value = target
+  return target !== null
+}
+
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const selection = ref<Selection | null>(null)
 const lightbox = ref<Lightbox | null>(null)
@@ -74,7 +106,16 @@ const shareOpen = ref(false)
 
 const pageComments = computed(() => (isApp.value ? comments.value.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : comments.value))
 
-const { ready, send } = useDropFrame(frame, (message, rect) => {
+const { ready, send } = useDropFrame(frame, contentOrigin, (message, rect) => {
+  if (message.type === "host") {
+    frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
+    send({ type: "document", html: frameDocument })
+  }
+  if (message.type === "frame-request" && isApp.value) {
+    const target = pageFor(message.path)
+    send({ type: "document", id: message.id, html: target ? appDocument(target) : fallbackDocument() })
+  }
+  if (message.type === "location" && followFrame(message.path)) frameDocument = srcdoc.value
   if (message.type === "navigate" && isApp.value) page.value = message.path
   if (message.type === "copy") void copy(message.text, "Code copied")
   if (message.type === "edit-prompt") {
@@ -96,7 +137,11 @@ const { ready, send } = useDropFrame(frame, (message, rect) => {
   if (message.type === "marker") popover.value = { type: "thread", id: message.id, x: rect.left + message.clientX, y: rect.top + message.clientY }
   if (message.type === "key" && message.key === "Escape") popover.value = selection.value = null
 })
-watch(srcdoc, () => (ready.value = false))
+watch(srcdoc, (value) => {
+  if (contentOrigin.value && value === frameDocument) return
+  ready.value = false
+  if (contentOrigin.value) reloadFrame()
+})
 watch([ready, pageComments], () => {
   if (ready.value && !docEdit.value) send({ type: "markers", markers: pageComments.value.map(({ id, n, kind, selector, ox, oy, quote, resolved }) => ({ id, n, kind, selector, ox, oy, quote, resolved })) })
 })
@@ -304,6 +349,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-lucide-download" label="Download" :to="drop.url" external target="_blank" variant="outline" />
         </div>
       </div>
+      <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
       <!-- Server and client bundlers format the embedded app resolver differently. -->
       <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
     </template>

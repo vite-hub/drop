@@ -34,6 +34,16 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
       </div>
     </DocsSection>
 
+    <DocsSection id="content-origin" title="Give apps their own domain">
+      <p>Apps and HTML docs run their own scripts. By default Drop shows them in a sandbox with no origin, so they can't reach Drop or the reader's session. That sandbox also blocks <code>localStorage</code>, cookies, and URL changes. Drop swaps in temporary storage, but an app that routes by its URL still breaks.</p>
+      <p>Set <code>DROP_CONTENT_ORIGIN</code> to a second hostname, such as <code>https://drop-usercontent.example.com</code>, and serve it from the same deployment. Drop then shows apps and HTML docs on that hostname, each page at its own path, so storage and history work as on any static host.</p>
+      <ul>
+        <li>Use a hostname that serves nothing else. A separate domain is the strongest boundary; a subdomain of yours also works. Drop's sign-in cookies use the <code>__Host-</code> prefix, so a sibling subdomain can't replace them, and API writes that carry cookies must come from Drop's own origin.</li>
+        <li>The hostname only serves a blank page. The viewer sends each document to it, so private drops never pass through it and it needs no sign-in. Keep it outside oauth2-proxy or any other login wall.</li>
+        <li>All apps on one Drop share that origin, so an app can read what another app stored in the same browser.</li>
+      </ul>
+    </DocsSection>
+
     <DocsSection id="database" title="Database and migrations">
       <p>Docker and VPS builds default to local SQLite on persistent disk. The other hosts use separate Cloudflare D1 databases, with D1's HTTP API outside Cloudflare. The same migrations in <code>server/databases/migrations</code> apply to all of them:</p>
       <p>For a deployment that uses D1 outside Cloudflare, create it from a machine with Node.js:</p>

@@ -42,6 +42,9 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
     secret: env.auth.secret.unseal(),
     route: false,
+    // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
+    // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
+    advanced: requestOrigin.startsWith("https://") ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } } : {},
     disabledPaths: ["/token", ...(proxyAuthentication ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
     access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
     socialProviders: proxyAuthentication ? {} : {

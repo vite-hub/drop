@@ -43,7 +43,7 @@ Readers comment by selecting text or clicking images, so prefer real text, lists
 These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`;
 
 /**
- * Comment layer. Runs inside the sandboxed plan (opaque origin), so it only talks to Drop via postMessage.
+ * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
  * Select text to comment on it; click an image to zoom and comment on a spot.
  * Commented text is highlighted with the CSS Custom Highlight API, so the author's DOM is never modified.
  */
@@ -384,10 +384,63 @@ try {
 }`.replaceAll("__TIPTAP__", TIPTAP).replaceAll("__VERSION__", TIPTAP_VERSION);
 
 /** Inject theme + annotator into a full HTML document without touching the author's markup. */
+/**
+ * In an opaque-origin sandbox (no content origin configured), storage, cookies, and URL changes throw a
+ * SecurityError ("The operation is insecure"), which crashes apps that never expected it. Give them in-memory
+ * storage and cookies for the page's lifetime, and let history calls keep their state without changing the URL.
+ * On a real origin it does nothing.
+ */
+export const OPAQUE_ORIGIN_SHIM = String.raw`(() => {
+  if (self.origin !== "null") return;
+  const memory = () => {
+    const data = new Map();
+    return {
+      get length() { return data.size; },
+      key: (index) => [...data.keys()][index] ?? null,
+      getItem: (key) => (data.has(String(key)) ? data.get(String(key)) : null),
+      setItem: (key, value) => { data.set(String(key), String(value)); },
+      removeItem: (key) => { data.delete(String(key)); },
+      clear: () => data.clear(),
+    };
+  };
+  for (const name of ["localStorage", "sessionStorage"]) {
+    try { window[name].length; } catch { Object.defineProperty(window, name, { value: memory(), configurable: true }); }
+  }
+  try { document.cookie; } catch {
+    const jar = new Map();
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      get: () => [...jar].map(([key, value]) => key + "=" + value).join("; "),
+      set: (cookie) => {
+        const [pair, ...attributes] = String(cookie).split(";");
+        const at = pair.indexOf("=");
+        const key = (at < 0 ? "" : pair.slice(0, at)).trim();
+        const expired = attributes.some((attribute) => /^\s*max-age\s*=\s*(-\d+|0)\s*$/i.test(attribute) || (/^\s*expires\s*=/i.test(attribute) && Date.parse(attribute.split("=").slice(1).join("=")) < Date.now()));
+        if (expired) jar.delete(key);
+        else jar.set(key, (at < 0 ? pair : pair.slice(at + 1)).trim());
+      },
+    });
+  }
+  for (const method of ["pushState", "replaceState"]) {
+    const original = history[method];
+    history[method] = function (state, title, url) {
+      try { return original.call(this, state, title, url); }
+      catch { return original.call(this, state, title); }
+    };
+  }
+})();`;
+
+/** Puts `snippet` first in the head, or after the doctype when there's no head tag, so the page keeps standards mode. */
+export function prependToHead(html: string, snippet: string): string {
+  if (/<head(\s[^>]*)?>/i.test(html)) return html.replace(/<head(\s[^>]*)?>/i, (match) => match + snippet);
+  const doctype = html.match(/^\s*<!doctype[^>]*>/i)?.[0] ?? "";
+  return doctype + snippet + html.slice(doctype.length);
+}
+
 export function injectRuntime(html: string, dark: boolean): string {
-  const head = `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`;
+  const head = `<script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`;
   const tail = `<script>${ANNOTATOR_SCRIPT}</script>`;
-  let out = /<head(\s[^>]*)?>/i.test(html) ? html.replace(/<head(\s[^>]*)?>/i, (match) => match + head) : head + html;
+  let out = prependToHead(html, head);
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail;
   return out;
 }

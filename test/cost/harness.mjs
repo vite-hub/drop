@@ -17,7 +17,7 @@ const stubs = {
   "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
   "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0" } })',
+  "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0", contentOrigin: globalThis.dropTest.contentOrigin ?? "" } })',
   "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
 }
 registerHooks({

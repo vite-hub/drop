@@ -1,4 +1,5 @@
 import { defineHandler, HTTPError } from "h3"
+import { contentOrigin } from "../../utils/content-origin"
 import { dropDetail, findDrop, permissions } from "../../utils/drops"
 import { identify } from "../../utils/identity"
 import { routeId } from "../../utils/params"
@@ -11,5 +12,7 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
   if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, statusText: "This drop is private, or it was deleted." })
   event.res.headers.set("Cache-Control", "private, no-store")
-  return dropDetail(drop, who, event.url.origin)
+  const detail = await dropDetail(drop, who, event.url.origin)
+  const frameOrigin = detail.kind === "app" || detail.kind === "html" ? contentOrigin(event) : null
+  return frameOrigin ? { ...detail, contentOrigin: frameOrigin } : detail
 })

@@ -44,6 +44,8 @@ export interface DropDetail extends DropSummary {
   url?: string
   /** App files keyed by path. */
   files?: Record<string, string>
+  /** Apps and HTML docs: the separate origin the viewer frames them on. Absent means an opaque-origin sandbox. */
+  contentOrigin?: string
   versions: DropVersion[]
 }
 
