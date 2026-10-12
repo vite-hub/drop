@@ -4,7 +4,6 @@ import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-o
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
  * file) stored as one blob, or an app stored as a folder of blobs in `drop_files`.
- * Legacy anonymous uploads need an upload timestamp before the account rebuild.
  */
 export const drops = sqliteTable("drops", {
   id: text("id").primaryKey(),
@@ -73,11 +72,6 @@ export const blobCleanup = sqliteTable("blob_cleanup", {
   id: text("id").primaryKey(),
   blobKey: text("blob_key").notNull().unique(),
   createdAt: integer("created_at").notNull(),
-})
-
-/** Permanent denial after metadata removal, even for blobs older than the legacy cutoff. */
-export const blobTombstones = sqliteTable("blob_tombstones", {
-  blobKey: text("blob_key").primaryKey(),
 })
 
 /** Temporary public images still belong to an account and follow its ban. */

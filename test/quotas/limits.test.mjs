@@ -16,8 +16,7 @@ import { appFileChunks, deletionChainSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, 
 function setup(path = ":memory:") {
   const db = new DatabaseSync(path)
   db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000")
-  for (const name of ["0000_init", "0001_security_constraints", "0002_oauth_provider", "0004_quotas"])
-    db.exec(readFileSync(new URL(`../../server/databases/migrations/${name}.sql`, import.meta.url), "utf8"))
+  db.exec(readFileSync(new URL("../../server/databases/migrations/0000_init.sql", import.meta.url), "utf8"))
   return db
 }
 function reserve(db, { owner = "owner", month = "2026-10", drops = 1, bytes = 10, writes = 1, target = null, limits = planLimits("free") } = {}) {

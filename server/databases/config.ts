@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { quotaBlobs, quotaReservations } from './quotas'
 import { abuseReports } from './trust'
-import { blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats } from './drops'
+import { blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats } from './drops'
 import { jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource } from './oauth'
 
 export const user = sqliteTable('user', {
@@ -63,7 +63,7 @@ export const verification = sqliteTable('verification', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).$onUpdate(() => new Date()).notNull()
 }, table => [index('verification_identifier_idx').on(table.identifier)])
 
-export { quotaBlobs, quotaReservations, abuseReports, blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
+export { quotaBlobs, quotaReservations, abuseReports, blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 export default defineDatabase({
   ...(deployment().database === 'sqlite' ? { connection: { url: env({ source: env.source('DROP_DATABASE_URL'), default: 'file:.data/database/drop.db' }) } } : { cloudflare: {
@@ -71,5 +71,5 @@ export default defineDatabase({
     databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || 'vitehub-drop',
     http: true,
   } }),
-  schema: { quotaBlobs, quotaReservations, abuseReports, account, blobCleanup, blobTombstones, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
+  schema: { quotaBlobs, quotaReservations, abuseReports, account, blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })

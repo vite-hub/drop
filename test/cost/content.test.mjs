@@ -3,7 +3,7 @@ import { beforeEach, test } from "node:test"
 import { readFileSync } from "node:fs"
 import { sql, queries, state, calls, migrate, reset, insertDrop, who, event } from "./harness.mjs"
 const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionChain, deleteDrop, publishApp } = await import("../../server/utils/drops.ts")
-const { requireBlobAccess, LEGACY_UPLOAD_CUTOFF } = await import("../../server/utils/content-access.ts")
+const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 const { default: accessMiddleware } = await import("../../server/middleware/0.drop-access.ts")
 const { default: markdownMiddleware } = await import("../../server/middleware/1.markdown-documents.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
@@ -170,16 +170,13 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
   assert.equal(calls.head, 0)
 })
 
-test("reports quarantine legacy uploads and code images while image access stays one query", async () => {
+test("reports quarantine code images while image access stays one query", async () => {
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
   sql.prepare("INSERT INTO code_images VALUES (?, ?, ?)").run(imageKey, "owner", Date.now() + 300000)
-  state.objects.set("legacy.md", { uploadedAt: new Date(LEGACY_UPLOAD_CUTOFF - 1) })
-  for (const key of [imageKey, "legacy.md"]) {
-    sql.prepare("INSERT INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)").run(key, `/f/${key}`)
-    queries.length = 0
-    await missing(() => requireBlobAccess(event(`/f/${key}`), key))
-    if (key === imageKey) assert.equal(queries.length, 1)
-  }
+  sql.prepare("INSERT INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)").run(imageKey, `/f/${imageKey}`)
+  queries.length = 0
+  await missing(() => requireBlobAccess(event(`/f/${imageKey}`), imageKey))
+  assert.equal(queries.length, 1)
   assert.equal(calls.head, 0)
 })
 
@@ -192,9 +189,8 @@ test("HTML keeps report controls outside the sandbox and HEAD emits no body", as
   assert.equal(await markdownMiddleware(event(`/f/${key}`, "HEAD")), "")
 })
 
-test("failed blob deletion never turns a private old file public, and retries remove its cache", async () => {
+test("failed blob deletion never turns a private file public, and retries remove its cache", async () => {
   insertDrop("doc", { visibility: "private" })
-  state.objects.get("doc.md").uploadedAt = new Date(LEGACY_UPLOAD_CUTOFF - 1)
   const row = await findDrop("doc")
   await dropDetail(row, who, "https://drop.example")
   state.entries.set("nitro:functions:markdown:doc.md.json", { value: "old html" })
@@ -209,7 +205,6 @@ test("failed blob deletion never turns a private old file public, and retries re
   await publishApp(who, { files: { "index.html": "new app" } })
   assert.ok(!state.objects.has("doc.md"))
   assert.equal(sql.prepare("SELECT count(*) AS n FROM blob_cleanup").get().n, 0)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM blob_tombstones").get().n, 1)
 })
 
 test("cache deletion failure leaves content inaccessible and retryable", async () => {
@@ -225,16 +220,13 @@ test("cache deletion failure leaves content inaccessible and retryable", async (
   assert.ok(!state.objects.has("doc.md"))
 })
 
-test("only untracked uploads before the rebuild stay public", async () => {
-  state.objects.set("legacy.md", { uploadedAt: new Date(LEGACY_UPLOAD_CUTOFF - 1) })
-  await requireBlobAccess(event("/f/legacy.md"), "legacy.md")
-  for (const uploadedAt of [new Date(LEGACY_UPLOAD_CUTOFF), new Date(), new Date(NaN), undefined]) {
+test("a blob with no drop behind it is never served, and access needs no storage read", async () => {
+  for (const uploadedAt of [new Date(0), new Date(), undefined]) {
     state.objects.set("orphan.md", { uploadedAt })
     await missing(() => requireBlobAccess(event("/f/orphan.md"), "orphan.md"))
   }
   await missing(() => requireBlobAccess(event("/f/missing.md"), "missing.md"))
-  sql.prepare("INSERT INTO blob_tombstones VALUES (?)").run("legacy.md")
-  await missing(() => requireBlobAccess(event("/f/legacy.md"), "legacy.md"))
+  assert.equal(calls.head, 0)
 })
 
 test("/api/me reads the maintained member counter after inserts and deletes", async () => {
@@ -315,11 +307,10 @@ test("cleanup releases image quota only after deleting its blob and retains OAut
   assert.equal(sql.prepare("SELECT count(*) AS n FROM code_images").get().n, 0)
 })
 
-test("full-history deletion tombstones every blob beyond the version display bounds", async () => {
+test("full-history deletion queues every blob beyond the version display bounds", async () => {
   for (let i = 0; i < 300; i++) insertDrop(`long${i}`, { supersedes_id: i ? `long${i - 1}` : null })
   state.failDelete = true
   await deleteDrop(await findDrop("long150"))
   assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM blob_tombstones").get().n, 300)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM blob_cleanup").get().n, 300)
 })

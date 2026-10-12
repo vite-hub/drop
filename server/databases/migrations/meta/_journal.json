@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1791303862137,
+      "when": 1791830947707,
       "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1791374400000,
-      "tag": "0001_security_constraints",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1791460800000,
-      "tag": "0002_oauth_provider",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1791547200000,
-      "tag": "0003_content_gates",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1791633600000,
-      "tag": "0004_quotas",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1791633600001,
-      "tag": "0005_trust",
       "breakpoints": true
     }
   ]

@@ -81,11 +81,6 @@ const share = await fetch(new URL(`/api/drops/${upload.id}`, origin), {
 assert.equal(share.status, 200)
 assert.equal((await fetch(upload.url, { signal: timeout() })).status, 200)
 
-// Old /i/ links redirect to /f/.
-const legacy = await fetch(new URL(new URL(upload.url).pathname.replace(/^\/f\//, "/i/"), origin), { redirect: "manual", signal: timeout() })
-assert.equal(legacy.status, 301)
-assert.equal(new URL(legacy.headers.get("location"), origin).pathname, new URL(upload.url).pathname)
-
 const markdownSource = "---\ntitle: Smoke-test plan\n---\n\n# Smoke-test plan\n\n```mermaid\ngraph LR\n  Upload --> Render\n```\n"
 const markdownForm = new FormData()
 markdownForm.set("file", new File([markdownSource], "plan.md", { type: "text/markdown" }))

@@ -54,9 +54,9 @@ test("HTML report chrome is outside the frame and user markup is escaped", () =>
   assert.doesNotMatch(html, /<script>/)
 })
 
-test("0005 applies on the original schema and retains reports after deletion", () => {
+test("reports keep their own status check and outlive the drops they name", () => {
   const db = new DatabaseSync(":memory:")
-  for (const name of ["0000_init", "0001_security_constraints", "0002_oauth_provider", "0005_trust"]) db.exec(readFileSync(new URL(`../../server/databases/migrations/${name}.sql`, import.meta.url), "utf8"))
+  db.exec(readFileSync(new URL("../../server/databases/migrations/0000_init.sql", import.meta.url), "utf8"))
   db.exec("INSERT INTO abuse_reports(id,target,reason,details,created_at) VALUES ('r','/d/missing','spam','details',1)")
   assert.equal(db.prepare("SELECT status FROM abuse_reports").get().status, "open")
   assert.throws(() => db.exec("UPDATE abuse_reports SET status='invalid'"))
