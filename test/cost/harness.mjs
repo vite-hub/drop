@@ -1,6 +1,6 @@
 import { registerHooks, stripTypeScriptTypes } from "node:module"
 import { execFileSync } from "node:child_process"
-import { readFileSync, existsSync } from "node:fs"
+import { readFileSync, readdirSync, existsSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
@@ -17,7 +17,7 @@ const stubs = {
   "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
   "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0", contentOrigin: globalThis.dropTest.contentOrigin ?? "" } })',
+  "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0", contentOrigin: globalThis.dropTest.contentOrigin ?? "", expiryDays: globalThis.dropTest.expiryDays ?? "30", customExpiry: globalThis.dropTest.customExpiry ?? "1" } })',
   "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
 }
 registerHooks({
@@ -38,7 +38,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier in stubs) return { url: module(stubs[specifier]), shortCircuit: true }
     if (specifier.endsWith("/utils/identity") || specifier === "./identity")
-      return { url: module("export const identify = async () => globalThis.dropTest.who"), shortCircuit: true }
+      return { url: module("export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }"), shortCircuit: true }
     if (specifier.startsWith("#shared/")) return { url: new URL(`shared/${specifier.slice(8)}.ts`, root).href, shortCircuit: true }
     if (specifier.startsWith(".")) {
       const url = new URL(specifier, context.parentURL)
@@ -75,7 +75,7 @@ db.all = async query => {
   queries.push({ query: compiled.sql, params: compiled.params })
   return sql.prepare(compiled.sql).all(...compiled.params)
 }
-const objects = new Map()
+export const objects = new Map()
 const entries = new Map()
 export const calls = { get: 0, head: 0, del: 0, writes: [] }
 export const state = globalThis.dropTest = {
@@ -99,7 +99,9 @@ export const state = globalThis.dropTest = {
   },
 }
 export function migrate() {
-  sql.exec(readFileSync(new URL("server/databases/migrations/0000_init.sql", root), "utf8"))
+  const directory = new URL("server/databases/migrations/", root)
+  for (const name of readdirSync(directory).filter(name => name.endsWith(".sql")).sort())
+    sql.exec(readFileSync(new URL(name, directory), "utf8"))
 }
 export function event(path, method = "GET") {
   const request = new H3Event(new Request(`https://drop.example${path}`, { method }))
@@ -111,6 +113,7 @@ export function reset() {
   state.bursts.length = 0; state.failBurst = false
   state.quotasEnabled = false
   state.shareApproval = "0"
+  state.expiryDays = "30"; state.customExpiry = "1"
   state.failDelete = false; state.failCacheDelete = false; state.who = null
   objects.clear(); entries.clear(); queries.length = 0
   calls.get = calls.head = calls.del = 0; calls.writes.length = 0
@@ -121,6 +124,8 @@ export function insertDrop(id, overrides = {}) {
   const values = {
     id, owner_id: "owner", kind: "markdown", title: id, filename: `${id}.md`, blob_key: `${id}.md`, size: 8,
     version: 1, visibility: "shared", access: "comment", actor_kind: "browser", actor_name: "Owner", created_at: 1, updated_at: 1,
+    // Like rows that predate expiry: 0001_expiry starts their window at migration time.
+    last_accessed_at: Date.now(),
     ...overrides,
   }
   const keys = Object.keys(values)

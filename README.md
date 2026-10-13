@@ -96,6 +96,12 @@ Set `DROP_SHARE_APPROVAL=1` to require admin approval before a member shares pub
 
 Unused OAuth clients are removed after 24 hours by the existing cleanup schedule. Deno has no schedule, so run cleanup separately there. User content is excluded from indexing; landing and docs remain indexable.
 
+### Expiry
+
+A drop expires 30 days after its last visit. A visit is a signed-in person or an agent opening it, a new version, or an anonymous reader whose browser ran the shared page or opened a raw file directly; link unfurlers, crawlers, and embedded images don't count. An expired drop stops being served, stays visible to its owner and editors for 7 days so they can renew it, and is then deleted by the hourly cleanup schedule (Deno has no schedule: expired drops stop being served but stay stored). Owners can mark a drop "Never expires"; agents can only ask for it through `keep_drop`.
+
+Set `DROP_EXPIRY_DAYS` to change the window, or to `0` to keep every drop. Set `DROP_CUSTOM_EXPIRY=0` so only admins can mark drops "Never expires".
+
 ### Plans and limits
 
 Owner quotas are off by default. Set `DROP_QUOTAS=1` to enable them on the official instance, or `NUXT_QUOTAS_ENABLED=true` in runtime config. Free allows 3 logical drops, 100 MiB of retained storage, and 1,000 file writes per UTC calendar month. Free apps allow 50 files and 2 MiB. Pro allows 100 drops, 1 GiB, and 10,000 writes; Pro and self-host apps keep the 200-file / 4 MiB maximum. Set `DROP_PRO_DROPS`, `DROP_PRO_BYTES`, and `DROP_PRO_WRITES` at build time, or `NUXT_QUOTAS_PRO_DROPS`, `NUXT_QUOTAS_PRO_BYTES`, and `NUXT_QUOTAS_PRO_WRITES` at runtime, to configure Pro.

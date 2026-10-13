@@ -4,11 +4,12 @@ import { db } from "vite-hub/database/drizzle"
 import { DropPatchSchema } from "#shared/schemas"
 import { drops } from "../../databases/config"
 import { findDrop, permissions, toSummary, versionChain } from "../../utils/drops"
+import { expiryPolicy, renewDrop } from "../../utils/expiry"
 import { requireIdentity } from "../../utils/identity"
 import { shareReviewFor } from "../../utils/trust"
 import { routeId } from "../../utils/params"
 
-/** Share, unshare, change the link's access level, or rename. */
+/** Share, unshare, change the link's access level, rename, renew, or keep forever. */
 export default defineValidatedHandler({
   validate: { body: DropPatchSchema },
   async handler(event) {
@@ -23,12 +24,25 @@ export default defineValidatedHandler({
     }
     if (body.access !== undefined) share.access = body.access
     const title = typeof body.title === "string" ? { title: body.title } : {}
-    if (Object.keys(share).length) {
-      // A link belongs to the document chain, so every version must carry the same permission state.
+    // Agents can only ask to keep a drop forever; the person behind them decides.
+    const expiry: { neverExpires?: boolean; neverExpiresRequest?: string | null } = {}
+    if (body.neverExpires === true && who.actorKind === "agent") {
+      if (!drop.neverExpires) expiry.neverExpiresRequest = who.actorName
+    }
+    else if (body.neverExpires === true) {
+      if (!expiryPolicy(event).custom && who.role !== "admin") throw new HTTPError({ status: 403, statusText: "Only admins can keep drops forever on this Drop." })
+      Object.assign(expiry, { neverExpires: true, neverExpiresRequest: null })
+    }
+    else if (body.neverExpires === false) Object.assign(expiry, { neverExpires: false, neverExpiresRequest: null })
+    const chainChange = { ...share, ...expiry }
+    if (Object.keys(chainChange).length) {
+      // A link and its lifetime belong to the document chain, so every version carries the same state.
       const ids = (await versionChain(drop)).map(item => item.id)
-      await db.update(drops).set(share).where(inArray(drops.id, ids))
+      await db.update(drops).set(chainChange).where(inArray(drops.id, ids))
     }
     if (Object.keys(title).length) await db.update(drops).set(title).where(eq(drops.id, drop.id))
-    return toSummary({ ...drop, ...share, ...title })
+    const renewed = body.renew ? { lastAccessedAt: Date.now() } : {}
+    if (body.renew) await renewDrop(drop, renewed.lastAccessedAt)
+    return toSummary({ ...drop, ...chainChange, ...title, ...renewed }, undefined, expiryPolicy(event).days)
   },
 })

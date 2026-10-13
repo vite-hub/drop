@@ -68,6 +68,20 @@ export function useDropActions() {
     }
   }
 
+  /** Renew the expiry window, or keep the drop forever. An agent's request is approved or dismissed the same way. */
+  async function setExpiry(drop: Pick<DropSummary, "id">, change: { neverExpires?: boolean; renew?: true }) {
+    try {
+      const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: change })
+      patch(drop.id, result)
+      await refreshNuxtData(`drop:${drop.id}`)
+      return true
+    }
+    catch (error) {
+      notify.fail("Couldn't change when this drop expires", error)
+      return false
+    }
+  }
+
   async function remove(drop: Pick<DropSummary, "id" | "title">) {
     if (!await confirm({ title: "Delete this drop?", description: `${drop.title}, with every version. Its link stops working and its comments go with it.`, confirmLabel: "Delete", destructive: true })) return false
     try {
@@ -84,7 +98,7 @@ export function useDropActions() {
     }
   }
 
-  return { create, upload, setVisibility, remove }
+  return { create, upload, setVisibility, setExpiry, remove }
 }
 
 export const refreshDrops = () => refreshNuxtData("drops")

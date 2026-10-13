@@ -43,6 +43,8 @@ const access = computed(() => props.drop.shareReview === "pending" ? "Waiting fo
       <UButton color="neutral" label="Change" size="sm" variant="ghost" @click="emit('share')" />
     </section>
 
+    <ViewerLifetime v-if="drop.isOwner" :drop="drop" />
+
     <section v-if="drop.versions.length > 1">
       <h3 class="label-mono">History</h3>
       <ol class="mt-3 space-y-3">

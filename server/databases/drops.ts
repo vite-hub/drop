@@ -25,6 +25,11 @@ export const drops = sqliteTable("drops", {
   actorName: text("actor_name").notNull(),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
+  /** Last real visit by a person or an agent. Expiry counts from here, falling back to `createdAt`. */
+  lastAccessedAt: integer("last_accessed_at"),
+  neverExpires: integer("never_expires", { mode: "boolean" }).notNull().default(false),
+  /** Set when an agent asks to keep the drop forever, to the agent's name. Only a person can approve it. */
+  neverExpiresRequest: text("never_expires_request"),
   /** CAS token used while replacing an app's file set. */
   publishToken: text("publish_token"),
 }, table => [
@@ -32,6 +37,7 @@ export const drops = sqliteTable("drops", {
   uniqueIndex("drops_blob_key_idx").on(table.blobKey),
   index("drops_supersedes_idx").on(table.supersedesId),
   uniqueIndex("drops_supersedes_unique").on(table.supersedesId),
+  index("drops_expiry_idx").on(table.neverExpires, table.lastAccessedAt),
 ])
 
 /** Current versions, maintained by drop insert/delete/update triggers for bounded listing reads. */

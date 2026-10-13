@@ -12,6 +12,8 @@ export default defineSchedule({
     await cleanupQuotaReservations(scheduledAt)
     await cleanupQuotaBlobs(scheduledAt)
     await db.delete(codeImages).where(lte(codeImages.expiresAt, scheduledAt.getTime()))
+    const { deleteExpiredDrops } = await import("../utils/drops")
+    await deleteExpiredDrops(scheduledAt)
     const { cleanupUnusedOAuthClients } = await import("../utils/oauth-cleanup")
     await cleanupUnusedOAuthClients(scheduledAt)
     let cursor: string | undefined

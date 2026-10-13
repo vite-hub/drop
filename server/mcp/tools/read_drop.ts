@@ -3,6 +3,7 @@ import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { dropDetail, findDrop, permissions } from "../../utils/drops"
+import { recordVisit } from "../../utils/expiry"
 import { requireIdentity } from "../../utils/identity"
 
 export default defineMcpTool({
@@ -15,7 +16,8 @@ export default defineMcpTool({
     const who = await requireIdentity(event)
     const drop = await findDrop(id, event)
     if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
-    const detail = await dropDetail(drop, who, event.url.origin)
+    await recordVisit(event, drop, who, "beacon")
+    const detail = await dropDetail(drop, who, event.url.origin, event)
     if (detail.files) return Object.entries(detail.files).map(([path, content]) => `--- ${path}\n${content}`).join("\n\n")
     return detail.content ?? `Binary file: ${detail.url}`
   },

@@ -4,6 +4,8 @@ const route = useRoute("d-id")
 const { drop, comments } = provideDrop(() => String(route.params.id))
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
+// A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.
+onMounted(() => drop.data.value && $fetch(`/api/drops/${drop.data.value.id}/visit`, { method: "POST" }).catch(() => {}))
 const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview?: string } } | undefined)?.data?.shareReview === "pending")
 </script>
 

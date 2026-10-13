@@ -43,6 +43,7 @@ const menu = computed(() => [
       <NuxtLink class="flex min-w-0 items-center gap-2 after:absolute after:inset-0" :to="`/drops/${drop.id}`">
         <span class="truncate font-medium text-highlighted">{{ drop.title }}</span>
         <UBadge v-if="drop.version > 1" class="hidden sm:inline-flex" color="neutral" icon="i-lucide-history" :label="`v${drop.version}`" size="sm" variant="outline" />
+        <ExpiryBadge class="shrink-0" :drop="drop" />
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
         <span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span>

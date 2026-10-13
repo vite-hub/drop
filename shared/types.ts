@@ -28,6 +28,11 @@ export interface DropSummary {
   updatedAt: number
   /** Apps only. */
   paths?: string[]
+  /** When the drop stops being served unless someone visits it. Null when it never expires. */
+  expiresAt: number | null
+  neverExpires: boolean
+  /** The agent that asked to keep this drop forever, waiting for a person to approve. */
+  neverExpiresRequest: string | null
 }
 
 export interface DropVersion { id: string; title: string; version: number; createdAt: number; current?: boolean }
@@ -104,6 +109,8 @@ export interface Viewer {
   email: string
   image: string | null
   role: Role
+  /** This Drop's expiry rules: days a drop lives after its last visit (0 is off), and whether owners may opt out. */
+  expiry: { days: number; custom: boolean }
   /** Personal until a second person joins. */
   team: boolean
   members: number

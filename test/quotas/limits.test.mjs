@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { DatabaseSync } from "node:sqlite"
-import { readFileSync, mkdtempSync, rmSync } from "node:fs"
+import { readFileSync, mkdtempSync, rmSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
 import { Worker } from "node:worker_threads"
@@ -16,7 +16,8 @@ import { appFileChunks, deletionChainSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, 
 function setup(path = ":memory:") {
   const db = new DatabaseSync(path)
   db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000")
-  db.exec(readFileSync(new URL("../../server/databases/migrations/0000_init.sql", import.meta.url), "utf8"))
+  const migrations = new URL("../../server/databases/migrations/", import.meta.url)
+  for (const name of readdirSync(migrations).filter(name => name.endsWith(".sql")).sort()) db.exec(readFileSync(new URL(name, migrations), "utf8"))
   return db
 }
 function reserve(db, { owner = "owner", month = "2026-10", drops = 1, bytes = 10, writes = 1, target = null, limits = planLimits("free") } = {}) {

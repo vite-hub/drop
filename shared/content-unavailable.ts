@@ -7,6 +7,12 @@ export function contentUnavailable(status: number, path: string, email?: string 
     email: null,
     action: { label: "Try again", to: path },
   }
+  if (status === 410) return {
+    title: "This drop expired.",
+    description: "Nobody opened it for a while, so it stopped being served. Its owner can still renew it for a few days.",
+    email: null,
+    action: email ? { label: "My drops", to: "/drops" } : { label: "Sign in with GitHub", to: signIn },
+  }
   if (waitingForReview) return {
     title: "Waiting for review",
     description: "This share is waiting for the instance operator to review it.",

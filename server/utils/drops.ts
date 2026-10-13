@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, inArray, sql } from "drizzle-orm"
+import { and, desc, eq, exists, inArray, lte, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
@@ -10,12 +10,14 @@ import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
 import { contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
+import { DAY_MS, EXPIRY_GRACE_DAYS, expiresAt } from "#shared/expiry"
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
 import { deleteRetainedDrop } from "./quota-deletion"
+import { expiryPolicy, isExpired, renewDrop } from "./expiry"
 
-export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean }
+export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean; expired?: boolean }
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
 import { MAX_APP_FILES } from "#shared/quotas"
@@ -24,35 +26,44 @@ export { MAX_FILE_BYTES }
 export { MAX_APP_FILES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 
-/** What the caller may do with a drop. Editors and admins act on every drop in the workspace. */
+/**
+ * What the caller may do with a drop. Editors and admins act on every drop in the workspace. An expired drop is
+ * read-only for the people who can renew it and gone for everyone else.
+ */
 export function permissions(drop: DropRow, who: Identity | null) {
   if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || who.role === "admin")) }
   const owner = Boolean(who && who.userId === drop.ownerId)
   const staff = Boolean(who && (who.role === "admin" || who.role === "editor"))
-  const shared = drop.visibility === "shared" && !drop.shareReview
+  const shared = drop.visibility === "shared" && !drop.shareReview && !drop.expired
   const level = ACCESS_RANK[drop.access as Access]
   const available = !drop.ownerBanned
+  const live = available && !drop.expired
   return {
     owner,
     view: available && (owner || staff || shared),
-    comment: available && (owner || staff || (shared && level >= ACCESS_RANK.comment)),
-    edit: available && (owner || staff || (shared && level >= ACCESS_RANK.edit)),
+    comment: live && (owner || staff || (shared && level >= ACCESS_RANK.comment)),
+    edit: live && (owner || staff || (shared && level >= ACCESS_RANK.edit)),
     manage: owner || staff,
   }
 }
 
-export function toSummary(row: DropRow, paths?: string[]): DropSummary {
+/** A shared link that worked until its drop expired. Private drops stay indistinguishable from missing ones. */
+export const expiredLink = (drop: DropRow | null, who: Identity | null) =>
+  Boolean(drop?.expired && drop.visibility === "shared" && !drop.shareReview && !drop.ownerBanned && !drop.quarantinedAt && !permissions(drop, who).view)
+
+export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().days): DropSummary {
   return {
     id: row.id, kind: row.kind, title: row.title, filename: row.filename, size: row.size, version: row.version,
     shareReview: row.shareReview, quarantinedAt: row.quarantinedAt, visibility: row.visibility, access: row.access as Access, actorKind: row.actorKind, actorName: row.actorName,
     createdAt: row.createdAt, updatedAt: row.updatedAt, ...(paths ? { paths } : {}),
+    expiresAt: expiresAt(row, days), neverExpires: row.neverExpires, neverExpiresRequest: row.neverExpiresRequest,
   }
 }
 
 /** Reuse the joined owner for review policy so each lookup remains one query. */
 async function withOwnerAccess(row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined, event?: H3Event): Promise<DropRow | null> {
   if (!row) return null
-  const drop = { ...row.drop, ownerBanned: !row.owner || Boolean(row.owner.banned) }
+  const drop = { ...row.drop, ownerBanned: !row.owner || Boolean(row.owner.banned), expired: isExpired(row.drop, Date.now(), expiryPolicy(event).days) }
   if (event && drop.shareReview && await shareReviewFor(drop.ownerId, event, row.owner) === null) drop.shareReview = null
   return drop
 }
@@ -70,13 +81,14 @@ export async function findDropByBlob(key: string, event?: H3Event) {
 }
 
 /** Your drops, newest first. Older versions of a doc hide behind their latest. */
-export async function listDrops(who: Identity): Promise<DropSummary[]> {
+export async function listDrops(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const rows = (await db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
     .where(eq(dropHeads.ownerId, who.userId)).orderBy(desc(dropHeads.updatedAt)).limit(500)).map(row => row.drop)
   const apps = rows.filter(row => row.kind === "app").map(row => row.id)
   const files = apps.length ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).where(inArray(dropFiles.dropId, apps)) : []
   const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
-  return rows.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined))
+  const { days } = expiryPolicy(event)
+  return rows.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days))
 }
 
 function storageFailure(error: Error) {
@@ -124,11 +136,11 @@ async function versionsOf(row: DropRow): Promise<DropVersion[]> {
   return (await versionChain(row)).map(item => ({ id: item.id, title: item.title, version: item.version, createdAt: item.createdAt, current: item.id === row.id }))
 }
 
-export async function dropDetail(row: DropRow, who: Identity | null, origin: string): Promise<DropDetail> {
+export async function dropDetail(row: DropRow, who: Identity | null, origin: string, event?: H3Event): Promise<DropDetail> {
   const can = permissions(row, who)
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const detail: DropDetail = {
-    ...toSummary(row),
+    ...toSummary(row, undefined, expiryPolicy(event).days),
     isOwner: can.manage,
     canComment: can.comment,
     canEdit: can.edit && (row.kind === "app" || TEXT_KINDS.has(row.kind)),
@@ -266,12 +278,16 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
       actorName: who.actorName,
       createdAt: now,
       updatedAt: now,
+      lastAccessedAt: now,
+      neverExpires: previous?.neverExpires ?? false,
+      neverExpiresRequest: previous?.neverExpiresRequest ?? null,
       shareReview: (input.visibility ?? previous?.visibility) === "shared" ? await shareReviewFor(previous?.ownerId ?? who.userId, event) : null,
       quarantinedAt: null,
       publishToken: null,
     }
     try {
-      await quota.commit([db.insert(drops).values(row)], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
+      // A new version is a visit: the older versions restart their window with it.
+      await quota.commit([db.insert(drops).values(row), ...(previous ? [renewDrop(previous, now)] : [])], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
     }
     catch (error) {
       await deleteBlobKeys([key])
@@ -330,6 +346,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
         shareReview: row?.shareReview ?? null, quarantinedAt: row?.quarantinedAt ?? null,
         visibility: row?.visibility ?? "private", access: (row?.access as Access | undefined) ?? "comment",
         actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
+        lastAccessedAt: now, neverExpires: row?.neverExpires ?? false, neverExpiresRequest: row?.neverExpiresRequest ?? null,
       }
       const fileRows = encoded.map(([path, bytes]) => ({ dropId: id, path, blobKey: `${prefix}/${path}`, size: bytes.byteLength }))
       if (!row) {
@@ -340,7 +357,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
         committedPublish = true
       }
       else {
-        const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, publishToken: token })
+        const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, lastAccessedAt: now, publishToken: token })
           .where(and(eq(drops.id, id), eq(drops.version, row.version)))
         // The file set changes only if the update above won: both statements check for this publish's token.
         // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
@@ -374,6 +391,24 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
 export async function deleteDrop(row: DropRow) {
   await drainBlobCleanup()
   await deleteRetainedDrop(row, deleteBlobKeys)
+}
+
+/**
+ * Deletes drops whose grace period ended, a bounded batch per run (the hourly schedule picks up the rest).
+ * Only current versions are scanned: deleting one removes its whole chain.
+ */
+export async function deleteExpiredDrops(now: Date, limit = 50) {
+  const { days } = expiryPolicy()
+  if (!days) return 0
+  const cutoff = now.getTime() - (days + EXPIRY_GRACE_DAYS) * DAY_MS
+  const rows = (await db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .where(and(eq(drops.neverExpires, false), lte(sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt})`, cutoff))).limit(limit)).map(row => row.drop)
+  await drainBlobCleanup()
+  for (const row of rows) {
+    await deleteRetainedDrop(row, deleteBlobKeys)
+    log.info({ action: "drop-expired", drop: row.id, owner: row.ownerId })
+  }
+  return rows.length
 }
 
 export const dropPageUrl = (origin: string, id: string) => new URL(`/d/${id}`, origin).href

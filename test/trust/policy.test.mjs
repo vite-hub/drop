@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "node:test"
 import { needsShareReview, reportTarget } from "../../shared/trust.ts"
@@ -56,7 +56,8 @@ test("HTML report chrome is outside the frame and user markup is escaped", () =>
 
 test("reports keep their own status check and outlive the drops they name", () => {
   const db = new DatabaseSync(":memory:")
-  db.exec(readFileSync(new URL("../../server/databases/migrations/0000_init.sql", import.meta.url), "utf8"))
+  const migrations = new URL("../../server/databases/migrations/", import.meta.url)
+  for (const name of readdirSync(migrations).filter(name => name.endsWith(".sql")).sort()) db.exec(readFileSync(new URL(name, migrations), "utf8"))
   db.exec("INSERT INTO abuse_reports(id,target,reason,details,created_at) VALUES ('r','/d/missing','spam','details',1)")
   assert.equal(db.prepare("SELECT status FROM abuse_reports").get().status, "open")
   assert.throws(() => db.exec("UPDATE abuse_reports SET status='invalid'"))

@@ -23,6 +23,12 @@ Call `create_doc` again with `supersedes` set to the previous drop's id (or put 
 
 `list_comments` returns the open comments on a drop, each with the text or spot it quotes. `read_drop` returns the current content. The `address_feedback` prompt chains both. Address the open comments, then publish the next version.
 
+## Keep a drop
+
+A drop expires when nobody opens it for a while (30 days on drop.vitehub.dev). Every visit by a signed-in person, by you through `read_drop`, or by someone reading a shared link starts the window again, and so does a new version. `list_drops` shows each drop's expiry. An expired drop stops being served and is deleted a week later.
+
+Call `keep_drop` with the drop's `id` to renew it, which also restores an expired drop during that week. With `forever: true` it asks the owner to keep the drop forever instead; only a person can approve that, on the drop's page. Don't ask unless the user wants the drop kept.
+
 ## Publish an app
 
 A small static app is a set of files keyed by path, with an `index.html`. Call `publish_app` with `files` (and `name`); pass `id` to publish its next version. Publishing replaces the entire file set and deletes the old files. Only the latest app version is kept; include every file the app still needs in each publish. Doc version history does not apply to apps. Relative links, ES modules, and `fetch("data.json")` work like on any static host.

@@ -5,6 +5,7 @@ import { codeImages, user } from "../databases/config"
 import { findDropByBlob, permissions } from "./drops"
 import { identify } from "./identity"
 import { isExpiredCodeImage } from "./code-image"
+import { recordVisit } from "./expiry"
 import { rawFileQuarantine } from "./trust"
 
 const notFound = () => new HTTPError({ status: 404, statusText: "Not found" })
@@ -24,5 +25,9 @@ export async function requireBlobAccess(event: H3Event, key: string) {
 
   const drop = await findDropByBlob(key, event)
   if (!drop || drop.ownerBanned || drop.quarantinedAt) throw notFound()
-  if (!permissions(drop, null).view && !permissions(drop, await identify(event)).view) throw notFound()
+  const publicView = permissions(drop, null).view
+  const who = publicView ? null : await identify(event)
+  if (!publicView && !permissions(drop, who).view) throw notFound()
+  // Opening a raw file in the browser is a visit; images embedded elsewhere are not.
+  await recordVisit(event, drop, who, "document")
 }

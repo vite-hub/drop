@@ -79,6 +79,9 @@ importers:
       h3-mcp:
         specifier: 0.2.0
         version: 0.2.0(patch_hash=300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))
+      isbot:
+        specifier: ^5.2.2
+        version: 5.2.2
       jose:
         specifier: ^6.2.12
         version: 6.2.12
@@ -5862,6 +5865,10 @@ packages:
 
   isarray@2.0.5:
     resolution: {integrity: sha512-xHjhDr3cNBK0BzdUJSPXZntQUx/mwMS5Rw4A7lPJ90XGAO6ISP/ePDNuo0vhqOZU+UD5JoodwCAAoZQd3FeAKw==}
+
+  isbot@5.2.2:
+    resolution: {integrity: sha512-iQcBXcd+Rv/pkubRyGh2utW2j1oPG5hZY6TUhVPpqK4G+o3IbxpJNx04hgksjc/N7GK5pEorUxDeg31cFgEk/w==}
+    engines: {node: '>=18'}
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
@@ -14757,6 +14764,8 @@ snapshots:
       is-inside-container: 1.0.0
 
   isarray@2.0.5: {}
+
+  isbot@5.2.2: {}
 
   isexe@2.0.0: {}
 

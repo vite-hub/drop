@@ -3,6 +3,7 @@
 // tabs (Comments, Source or Files, Details) that pushes the content. Docs and apps share it. State lives in
 // composables (useDrop, useViewerPanel, useDropEditor, useAppFiles, useDropFrame); this file wires them up.
 import { editorDocument, planDocument } from "#shared/documents"
+import { expiryLabel } from "#shared/expiry"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
@@ -24,7 +25,7 @@ const route = useRoute()
 const notify = useNotify()
 const prompt = usePrompt()
 const { copy } = useCopy()
-const { remove } = useDropActions()
+const { remove, setExpiry } = useDropActions()
 const colorMode = useColorMode()
 const mounted = useMounted()
 const dark = computed(() => mounted.value && colorMode.value === "dark")
@@ -35,6 +36,14 @@ const isApp = computed(() => drop.value.kind === "app")
 const owner = computed(() => drop.value.isOwner && !props.publicView)
 const openCount = computed(() => comments.value.filter(comment => !comment.resolved).length)
 const link = computed(() => (import.meta.client ? `${location.origin}/d/${drop.value.id}` : `/d/${drop.value.id}`))
+const now = useRelativeNow()
+const expired = computed(() => drop.value.expiresAt !== null && drop.value.expiresAt <= now.value)
+const renewing = ref(false)
+async function renew() {
+  renewing.value = true
+  if (await setExpiry(drop.value, { renew: true })) notify.done("Drop restored")
+  renewing.value = false
+}
 
 const panel = useViewerPanel({ isApp, owner, openCount, fileCount: computed(() => drop.value.paths?.length) })
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
@@ -320,6 +329,17 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
     </template>
 
     <template #body>
+      <UAlert
+        v-if="owner && expired"
+        :actions="[{ label: 'Renew', color: 'error', variant: 'outline', size: 'sm', loading: renewing, onClick: renew }]"
+        class="rounded-none border-0 border-b border-default"
+        color="error"
+        description="Nobody opened it for a while, so its link stopped working. Only you and editors can see it until you renew it."
+        icon="i-lucide-clock"
+        orientation="horizontal"
+        :title="expiryLabel(drop, now)"
+        variant="subtle"
+      />
       <div v-if="isApp && view === 'preview'" class="flex h-9 shrink-0 items-center gap-2 border-b border-default px-3">
         <span class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted">
           <UIcon :name="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-3 shrink-0" />

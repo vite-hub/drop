@@ -200,6 +200,10 @@ export default defineNuxtConfig({
           admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
           shareApproval: env({ source: env.source("DROP_SHARE_APPROVAL"), default: "0" }),
           abuseEmail: env({ source: env.source("DROP_ABUSE_EMAIL"), default: "" }),
+          // Days a drop lives after its last visit by a person or an agent; 0 keeps every drop forever.
+          expiryDays: env({ source: env.source("DROP_EXPIRY_DAYS"), default: "30" }),
+          // "0" stops owners from marking drops "Never expires"; admins still can.
+          customExpiry: env({ source: env.source("DROP_CUSTOM_EXPIRY"), default: "1" }),
           // A second hostname for apps and HTML docs, e.g. https://drop-usercontent.example.com (see server/utils/content-origin.ts).
           contentOrigin: env({ source: env.source("DROP_CONTENT_ORIGIN"), default: "" }),
         },
