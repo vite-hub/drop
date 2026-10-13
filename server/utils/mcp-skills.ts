@@ -1,15 +1,19 @@
-import { type ExtensionPlugin, invalidParamsError, mcpMethod, parseParams, requireParamString } from "h3-mcp"
+import { type ExtensionPlugin, invalidParamsError, McpJsonRpcError, mcpMethod, parseParams, requireParamString } from "h3-mcp"
 import { defineMcpResource } from "nitro-mcp-toolkit"
-import { digest, type Skill, SKILLS } from "./skills"
+import { digest, enabledSkills, findEnabledSkill, type Skill } from "./skills"
 
 /**
  * The MCP Skills extension (SEP-2640, `io.modelcontextprotocol/skills`): `skills/list` and `skills/get` describe
- * each skill (frontmatter plus every file with its digest), and the files themselves are ordinary resources
+ * each enabled skill (frontmatter plus every file with its digest), and the files themselves are resources
  * under `skill://<name>/<path>`, read with `resources/read`. h3-mcp has no skills support, so this is an
  * extension plugin; it only exists on the 2026-07-28 revision, as extensions do.
+ *
+ * Admins can switch a skill off, so nothing here is static: every call reads the enabled set, and a disabled
+ * skill is missing from lists and unreadable. The cache hint matches how long other isolates may keep serving
+ * the old set (see `disabledSkills`).
  */
 const EXTENSION = "io.modelcontextprotocol/skills"
-const CACHE = { ttlMs: 300_000, cacheScope: "public" } as const
+const CACHE = { ttlMs: 60_000, cacheScope: "public" } as const
 
 const uriOf = (skill: Skill, path: string) => `skill://${skill.name}/${path}`
 
@@ -26,10 +30,11 @@ export function mcpSkills(): ExtensionPlugin {
     id: EXTENSION,
     settings: () => ({ directoryRead: false }),
     methods: ctx => ({
-      "skills/list": (req, event) => mcpMethod(ctx, req, event, async () => ({ resultType: "complete", skills: await Promise.all(SKILLS.map(entry)), ...CACHE })),
+      "skills/list": (req, event) => mcpMethod(ctx, req, event, async () => ({ resultType: "complete", skills: await Promise.all((await enabledSkills()).map(entry)), ...CACHE })),
       "skills/get": (req, event) => mcpMethod(ctx, req, event, async () => {
         const uri = requireParamString(parseParams(req.params), "uri")
-        const skill = SKILLS.find(item => uri === uriOf(item, "SKILL.md") || uri === `skill://${item.name}`)
+        const name = uri.match(/^skill:\/\/([^/]+)(?:\/SKILL\.md)?$/)?.[1]
+        const skill = name && await findEnabledSkill(name)
         if (!skill) throw invalidParamsError(`No skill at ${uri}.`)
         return { resultType: "complete", skill: await entry(skill), ...CACHE }
       }),
@@ -37,12 +42,39 @@ export function mcpSkills(): ExtensionPlugin {
   }
 }
 
-/** Every skill file as a `skill://` resource, so `resources/read` can fetch what `skills/get` lists. */
-export const skillResources = SKILLS.flatMap(skill => skill.files.map(file => defineMcpResource({
-  name: `${skill.name}/${file.path}`,
-  title: file.path === "SKILL.md" ? `${skill.name} skill` : `${skill.name}: ${file.path}`,
-  description: file.path === "SKILL.md" ? skill.description : undefined,
-  uri: uriOf(skill, file.path),
-  mimeType: file.mimeType,
-  handler: () => file.text,
-})))
+// `-32002` is the MCP code for a resource that doesn't exist; a disabled skill's files read the same way.
+async function read(name: string, path: string) {
+  const file = (await findEnabledSkill(name))?.files.find(item => item.path === path)
+  if (!file) throw new McpJsonRpcError(-32002, `No skill file at skill://${name}/${path}.`, { status: 404 })
+  return { contents: [{ uri: `skill://${name}/${path}`, mimeType: file.mimeType, text: file.text }] }
+}
+
+/**
+ * Skill files as `skill://` resources. URI template variables can't span a `/`, so one template matches
+ * top-level files and one matches a file in a folder; the first also lists every enabled file.
+ */
+export const skillResources = [
+  defineMcpResource({
+    name: "skill-file",
+    title: "Skill file",
+    description: "A file of one of Drop's enabled Agent Skills.",
+    uriTemplate: "skill://{name}/{file}",
+    mimeType: "text/markdown",
+    list: async () => (await enabledSkills()).flatMap(skill => skill.files.map(file => ({
+      uri: uriOf(skill, file.path),
+      name: `${skill.name}/${file.path}`,
+      title: file.path === "SKILL.md" ? `${skill.name} skill` : `${skill.name}: ${file.path}`,
+      ...(file.path === "SKILL.md" ? { description: skill.description } : {}),
+      mimeType: file.mimeType,
+    }))),
+    handler: (_uri, { name, file }) => read(name!, file!),
+  }),
+  defineMcpResource({
+    name: "skill-reference",
+    title: "Skill reference",
+    description: "A file in a folder of one of Drop's enabled Agent Skills.",
+    uriTemplate: "skill://{name}/{dir}/{file}",
+    mimeType: "text/markdown",
+    handler: (_uri, { name, dir, file }) => read(name!, `${dir}/${file}`),
+  }),
+]

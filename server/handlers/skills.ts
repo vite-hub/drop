@@ -1,16 +1,17 @@
 import { defineHandler, HTTPError } from "h3"
-import { digest, findSkill, SKILLS, skillArchive } from "../utils/skills"
+import { digest, enabledSkills, findEnabledSkill, skillArchive } from "../utils/skills"
 
 const V2 = "/.well-known/agent-skills/"
 const V1 = "/.well-known/skills/"
 
-const json = (body: unknown) => new Response(JSON.stringify(body, null, 2), { headers: { "content-type": "application/json", "cache-control": "public, max-age=3600" } })
-const markdown = (text: string) => new Response(text, { headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "public, max-age=3600" } })
+const json = (body: unknown) => new Response(JSON.stringify(body, null, 2), { headers: { "content-type": "application/json", "cache-control": "public, max-age=60" } })
+const markdown = (text: string) => new Response(text, { headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "public, max-age=60" } })
 
 /**
  * Agent Skills Discovery. v0.2.0 (`/.well-known/agent-skills/`): an index with a `$schema`, and per skill a
  * `skill-md` (one file) or an `archive` (several), each with a sha256 digest. v0.1.0 (`/.well-known/skills/`):
- * the older index with a `files` list, which `npx skills add` reads.
+ * the older index with a `files` list, which `npx skills add` reads. Only enabled skills appear, and the short
+ * cache lets an admin's toggle reach clients within a minute.
  */
 export default defineHandler(async (event) => {
   const { pathname } = event.url
@@ -18,6 +19,7 @@ export default defineHandler(async (event) => {
   const path = pathname.slice((v2 ? V2 : V1).length)
 
   if (path === "index.json") {
+    const SKILLS = await enabledSkills()
     if (!v2) return json({ skills: SKILLS.map(skill => ({ name: skill.name, description: skill.description, files: skill.files.map(file => file.path) })) })
     return json({
       $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
@@ -29,12 +31,12 @@ export default defineHandler(async (event) => {
 
   const archive = v2 ? path.match(/^([a-z0-9-]+)\.tar\.gz$/)?.[1] : undefined
   if (archive) {
-    const skill = findSkill(archive)
-    if (skill) return new Response(await skillArchive(skill) as Uint8Array<ArrayBuffer>, { headers: { "content-type": "application/gzip", "cache-control": "public, max-age=3600" } })
+    const skill = await findEnabledSkill(archive)
+    if (skill) return new Response(await skillArchive(skill) as Uint8Array<ArrayBuffer>, { headers: { "content-type": "application/gzip", "cache-control": "public, max-age=60" } })
   }
 
   const [name, ...rest] = path.split("/")
-  const file = findSkill(name ?? "")?.files.find(item => item.path === rest.join("/"))
+  const file = (await findEnabledSkill(name ?? ""))?.files.find(item => item.path === rest.join("/"))
   if (file) return markdown(file.text)
   throw new HTTPError({ status: 404, statusText: "No such skill file." })
 })

@@ -1,13 +1,21 @@
 import { parseYAML } from "confbox/yaml"
+import { eq } from "drizzle-orm"
+import { db } from "vite-hub/database/drizzle"
 import { createTarGzip } from "nanotar"
+import { skillSettings } from "../databases/config"
+import handoffMd from "../../skills/handoff/SKILL.md?raw"
+import prEvidenceAnnotations from "../../skills/pr-evidence/references/annotations.md?raw"
+import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
 import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
-import skillMd from "../../skills/vitehub-drop/SKILL.md?raw"
+import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
 
 /**
- * Drop's Agent Skills, defined once (the files under skills/) and served three ways:
+ * Drop's built-in Agent Skills, defined once (the files under skills/) and served three ways:
  * - MCP: the Skills extension (SEP-2640), as `skill://` resources (server/mcp, server/utils/mcp-skills.ts)
  * - Agent Skills Discovery v0.2.0 at /.well-known/agent-skills/ (index with digests, archive for multi-file skills)
  * - Discovery v0.1.0 at /.well-known/skills/, which `npx skills add` still reads
+ *
+ * Admins switch them on and off for the whole deployment (`skill_settings`); every surface serves only the enabled set.
  */
 export interface SkillFile { path: string; text: string; bytes: Uint8Array; mimeType: string }
 export interface Skill { name: string; description: string; frontmatter: Record<string, unknown>; files: SkillFile[] }
@@ -25,11 +33,46 @@ function skill(files: SkillFile[]): Skill {
   return { name: String(frontmatter.name), description: String(frontmatter.description), frontmatter, files }
 }
 
+/** Every built-in skill, enabled or not. Only the admin UI should see the disabled ones. */
 export const SKILLS: Skill[] = [
-  skill([file("SKILL.md", skillMd), file("references/documents.md", documentsGuide)]),
+  skill([file("SKILL.md", dropMd), file("references/documents.md", documentsGuide)]),
+  skill([file("SKILL.md", handoffMd)]),
+  skill([file("SKILL.md", prEvidenceMd), file("references/annotations.md", prEvidenceAnnotations)]),
 ]
 
 export const findSkill = (name: string) => SKILLS.find(item => item.name === name)
+
+// A toggle shows up on this isolate at once; other isolates pick it up within a minute, the same window as the
+// MCP and discovery cache hints.
+const SETTINGS_TTL_MS = 60_000
+let settings: { at: number; disabled: Promise<Set<string>> } | undefined
+
+/** Names an admin switched off. A skill without a row is enabled. */
+export function disabledSkills(): Promise<Set<string>> {
+  if (settings && Date.now() - settings.at < SETTINGS_TTL_MS) return settings.disabled
+  const disabled = db.select({ name: skillSettings.name }).from(skillSettings).where(eq(skillSettings.enabled, false))
+    .then(rows => new Set(rows.map(row => row.name)))
+  // A failed read must not stick for a minute: drop it so the next request tries again.
+  disabled.catch(() => (settings = undefined))
+  settings = { at: Date.now(), disabled }
+  return disabled
+}
+
+export async function enabledSkills(): Promise<Skill[]> {
+  const disabled = await disabledSkills()
+  return SKILLS.filter(item => !disabled.has(item.name))
+}
+
+export async function findEnabledSkill(name: string): Promise<Skill | undefined> {
+  const found = findSkill(name)
+  return found && !(await disabledSkills()).has(found.name) ? found : undefined
+}
+
+export async function setSkillEnabled(name: string, enabled: boolean, userId: string) {
+  await db.insert(skillSettings).values({ name, enabled, updatedAt: Date.now(), updatedBy: userId })
+    .onConflictDoUpdate({ target: skillSettings.name, set: { enabled, updatedAt: Date.now(), updatedBy: userId } })
+  settings = undefined
+}
 
 /** `sha256:<hex>`, the digest format both the MCP Skills extension and Discovery v0.2.0 use. */
 export async function digest(bytes: Uint8Array): Promise<string> {
