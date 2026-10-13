@@ -92,6 +92,28 @@ export interface Member {
 }
 
 /** An MCP client someone approved on /oauth: it acts as them until disconnected. */
+/** A built-in Agent Skill as the catalog shows it. Members only see enabled ones; admins see all. */
+export interface SkillSummary {
+  name: string
+  description: string
+  enabled: boolean
+  /** The `SKILL.md` resource agents read over MCP. */
+  uri: string
+  files: number
+}
+
+export interface SkillFileView {
+  path: string
+  text: string
+  size: number
+  /** Rendered HTML for Markdown files, without the frontmatter. */
+  html?: string
+}
+
+export interface SkillDetail extends Omit<SkillSummary, "files"> {
+  files: SkillFileView[]
+}
+
 export interface ConnectedAgent {
   id: string
   name: string

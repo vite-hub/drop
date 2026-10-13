@@ -46,6 +46,8 @@ export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 
 export const MemberPatchSchema = v.object({ plan: v.optional(v.picklist(PLANS)), role: v.optional(v.picklist(ROLES)), banned: v.optional(v.boolean()) })
 
+export const SkillPatchSchema = v.object({ enabled: v.boolean("Say whether the skill is enabled.") })
+
 export const FilePathSchema = v.object({
   path: v.pipe(v.string(), v.trim(), v.minLength(1, "Enter a path."), v.maxLength(300), v.regex(/^(?!\/)(?!.*\.\.)/, "Use a relative path without `..`.")),
 })

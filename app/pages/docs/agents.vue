@@ -14,7 +14,7 @@ const tools = computed(() => catalog.value.map(item => ({ name: item.uri ?? item
 </script>
 
 <template>
-  <DocsPage title="Connect an agent" lead="Agents reach Drop over MCP. They sign in through your browser once; there are no keys to paste. The Drop skill comes with the server.">
+  <DocsPage title="Connect an agent" lead="Agents reach Drop over MCP. They sign in through your browser once; there are no keys to paste. Drop's skills come with the server.">
     <DocsSection id="add-the-server" title="Add the server">
       <p>Drop's MCP server is at <code>{{ server }}</code>. Add it to your client:</p>
       <template v-for="client in clients" :key="client">
