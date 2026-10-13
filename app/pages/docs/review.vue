@@ -43,6 +43,17 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
       <p>Any id from the chain works: the new version always lands on top of the latest. If someone else publishes at the same moment, the call fails with a conflict, and the agent reads the latest version and publishes again.</p>
     </DocsSection>
 
+    <DocsSection id="expiry" title="Expiry">
+      <p>A drop expires 30 days after anyone last opened it, so work nobody uses doesn't pile up. Each visit starts the 30 days again for every version:</p>
+      <ul>
+        <li>You, or anyone in the workspace, opening it while signed in.</li>
+        <li>An agent reading it with <code>read_drop</code>, or publishing a new version.</li>
+        <li>Someone reading a shared link in a browser, or opening its raw file directly. Link previews in Slack, Discord, or X, crawlers, and images embedded on other sites don't count.</li>
+      </ul>
+      <p>An expired drop stops being served: its shared link says it expired. For 7 more days its owner, editors, and admins can still open it and press <strong>Renew</strong> to bring it back. Then it's deleted with its comments and files. The Drops page flags drops with a week or less left.</p>
+      <p>To keep a drop, turn on <strong>Keep forever</strong> in its Details panel. Agents can't do that themselves: <code>keep_drop</code> renews a drop, and with <code>forever: true</code> it asks you. The request shows on the drop's page, where you keep it or dismiss it. A Drop's admin can change the 30 days, or allow only admins to keep drops forever.</p>
+    </DocsSection>
+
     <DocsSection id="edit" title="Edit in place">
       <p>People with edit access change a doc in a Notion-like editor, or an app's files in a code view, right where they review it. Saving publishes a new version.</p>
     </DocsSection>

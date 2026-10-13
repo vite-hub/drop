@@ -98,9 +98,9 @@ Unused OAuth clients are removed after 24 hours by the existing cleanup schedule
 
 ### Expiry
 
-A drop expires 30 days after its last visit. A visit is a signed-in person or an agent opening it, a new version, or an anonymous reader whose browser ran the shared page or opened a raw file directly; link unfurlers, crawlers, and embedded images don't count. An expired drop stops being served, stays visible to its owner and editors for 7 days so they can renew it, and is then deleted by the hourly cleanup schedule (Deno has no schedule: expired drops stop being served but stay stored). Owners can mark a drop "Never expires"; agents can only ask for it through `keep_drop`.
+A drop expires 30 days after its last visit. A visit is a signed-in person or an agent opening it, a new version, or an anonymous reader whose browser ran the shared page or opened a raw file directly; link unfurlers, crawlers, and embedded images don't count. An expired drop stops being served, stays visible to its owner and editors for 7 days so they can renew it, and is then deleted by the hourly cleanup schedule (Deno has no schedule: expired drops stop being served but stay stored). Owners can turn on "Keep forever" for a drop; agents can only ask for it through `keep_drop`.
 
-Set `DROP_EXPIRY_DAYS` to change the window, or to `0` to keep every drop. Set `DROP_CUSTOM_EXPIRY=0` so only admins can mark drops "Never expires".
+Set `DROP_EXPIRY_DAYS` to change the window, or to `0` to keep every drop. Set `DROP_CUSTOM_EXPIRY=0` so only admins can turn on "Keep forever".
 
 ### Plans and limits
 

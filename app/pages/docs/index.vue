@@ -37,7 +37,7 @@ const mcp = mcpSnippets(`${origin}/mcp`).claude
         <li>An <strong>app</strong>: a folder of static files with an <code>index.html</code>, like a prototype or a dashboard.</li>
         <li>A <strong>file</strong> you upload: an image, a PDF, a log.</li>
       </ul>
-      <p>Every drop opens full screen and has its own link. Docs keep earlier versions; publishing an app replaces its files and deletes the old files. <NuxtLink to="/docs/review">Review and share</NuxtLink> covers comments, sharing, and versions.</p>
+      <p>Every drop opens full screen and has its own link. Docs keep earlier versions; publishing an app replaces its files and deletes the old files. A drop nobody opens for 30 days <NuxtLink to="/docs/review#expiry">expires</NuxtLink>, unless you keep it forever. <NuxtLink to="/docs/review">Review and share</NuxtLink> covers comments, sharing, versions, and expiry.</p>
     </DocsSection>
 
     <DocsSection id="plans" title="Plans and limits">

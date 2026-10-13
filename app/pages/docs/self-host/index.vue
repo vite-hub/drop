@@ -44,6 +44,20 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
       </ul>
     </DocsSection>
 
+    <DocsSection id="expiry" title="Expiry">
+      <p>Drops expire 30 days after their last visit, stay restorable for 7 days, and are then deleted by the hourly cleanup job. <NuxtLink to="/docs/review#expiry">Review and share</NuxtLink> explains what counts as a visit.</p>
+      <div class="overflow-x-auto rounded-lg border border-default">
+        <table>
+          <thead><tr><th>Variable</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="font-mono text-xs">DROP_EXPIRY_DAYS</td><td>Days a drop lives after its last visit. Defaults to 30. Set 0 to keep every drop.</td></tr>
+            <tr><td class="font-mono text-xs">DROP_CUSTOM_EXPIRY</td><td>Set 0 so only admins can mark drops "Keep forever". Defaults to 1: owners can too.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Both are read at runtime, so changing them needs no rebuild. Shortening the window applies to existing drops at once.</p>
+    </DocsSection>
+
     <DocsSection id="database" title="Database and migrations">
       <p>Docker and VPS builds default to local SQLite on persistent disk. The other hosts use separate Cloudflare D1 databases, with D1's HTTP API outside Cloudflare. The same migrations in <code>server/databases/migrations</code> apply to all of them:</p>
       <p>For a deployment that uses D1 outside Cloudflare, create it from a machine with Node.js:</p>
@@ -88,7 +102,7 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
       <ul>
         <li><strong>Code images.</strong> PNG is a Cloudflare Browser Run screenshot of the SVG, so only Cloudflare has it. Elsewhere <code>create_code_image</code> returns SVG, and asking for PNG fails with a clear error.</li>
         <li><strong>Rate limits.</strong> Cloudflare uses its rate limiting binding. Other hosts count in memory, per server instance, so limits are looser on serverless hosts that run many instances.</li>
-        <li><strong>Expired code images.</strong> An hourly job deletes them on Cloudflare, Netlify, and a VPS. Vercel runs cleanup daily so it works on Hobby. Deno Deploy has none; expired images stop being served but stay in the bucket.</li>
+        <li><strong>Expired drops and code images.</strong> An hourly job deletes them on Cloudflare, Netlify, and a VPS. Vercel runs cleanup daily so it works on Hobby. Deno Deploy has none; expired drops and images stop being served but stay in the bucket.</li>
         <li><strong>Caching.</strong> Rendered Markdown and the file count are cached in Workers KV on Cloudflare, and in memory elsewhere.</li>
       </ul>
     </DocsSection>
