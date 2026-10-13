@@ -8,8 +8,8 @@ import annotate from "comark-annotate"
 const root = new URL("../../skills/", import.meta.url)
 const names = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name)
 
-test("ships the three built-in skills", () => {
-  assert.deepEqual(names.sort(), ["handoff", "pr-evidence", "vitehub-drop"])
+test("ships the four built-in skills", () => {
+  assert.deepEqual(names.sort(), ["handoff", "pr-evidence", "show-me", "vitehub-drop"])
 })
 
 for (const name of names) {

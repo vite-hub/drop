@@ -6,6 +6,7 @@ import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
 import prEvidenceAnnotations from "../../skills/pr-evidence/references/annotations.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
+import showMeMd from "../../skills/show-me/SKILL.md?raw"
 import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
 import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
 
@@ -38,6 +39,7 @@ export const SKILLS: Skill[] = [
   skill([file("SKILL.md", dropMd), file("references/documents.md", documentsGuide)]),
   skill([file("SKILL.md", handoffMd)]),
   skill([file("SKILL.md", prEvidenceMd), file("references/annotations.md", prEvidenceAnnotations)]),
+  skill([file("SKILL.md", showMeMd)]),
 ]
 
 export const findSkill = (name: string) => SKILLS.find(item => item.name === name)

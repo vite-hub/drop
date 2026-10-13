@@ -47,7 +47,7 @@ Under the hood:
    The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. The `/agents` page has the setup for Codex, Cursor, VS Code, and other clients, and lists the agents you've connected.
 3. Ask your agent to drop a plan. It answers with the review link.
 
-MCP tools: `get_usage`, `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. Three skills come with the server (`skills/list`): `vitehub-drop`, `handoff`, and `pr-evidence`, which renders annotated screenshots with [comark-annotate](https://comark-annotate.onmax.me). They're also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. Members read them at `/skills`; admins switch each one on or off for the whole deployment. [The docs](https://drop.vitehub.dev/docs) have the details.
+MCP tools: `get_usage`, `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. Four skills come with the server (`skills/list`): `vitehub-drop`, `handoff`, `pr-evidence`, which renders annotated screenshots with [comark-annotate](https://comark-annotate.onmax.me), and `show-me`, HumanLayer's skill for explaining with diagrams. They're also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. Members read them at `/skills`; admins switch each one on or off for the whole deployment. [The docs](https://drop.vitehub.dev/docs) have the details.
 
 ## Host it yourself
 
