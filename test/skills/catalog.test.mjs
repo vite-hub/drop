@@ -30,3 +30,11 @@ test("pr-evidence's annotation example is valid comark-annotate", async () => {
   const document = await createMarkdownParser({ plugins: [annotate()] })(example)
   assert.deepEqual(document.meta.annotateIssues, [])
 })
+
+test("show-me's annotated screenshot example is valid comark-annotate", async () => {
+  const skill = await readFile(new URL("show-me/SKILL.md", root), "utf8")
+  const example = skill.match(/```md\n([\s\S]*?)\n```/)?.[1]
+  assert.ok(example)
+  const document = await createMarkdownParser({ plugins: [annotate()] })(example)
+  assert.deepEqual(document.meta.annotateIssues, [])
+})

@@ -1,6 +1,6 @@
 ---
 name: show-me
-description: Helps the user understand the current topic visually with concise diagrams, code-shape sketches, and focused HTML pages dropped into Drop. Use when the user asks to be shown how something works or what a change looks like.
+description: Helps the user understand the current topic visually with concise diagrams, code-shape sketches, and focused Markdown docs dropped into Drop. Use when the user asks to be shown how something works or what a change looks like.
 disable-model-invocation: true
 ---
 
@@ -115,7 +115,21 @@ function expandSkill(command: string): string {
 }
 ```
 
-- For a visual UI, layout, state comparison, or concept too dense for Mermaid, write one focused HTML file — a diagram, an infographic, or a short slide deck, whichever fits the point. Match the product's colors, type, spacing, and components; use real labels and data; support desktop and mobile. Then drop it with Drop's `create_doc` tool (`format: "html"`) and give the user the link it returns. If Drop's tools aren't available, write `show-me-{description}.html` to the system's temporary directory and open it for the user.
+- When the point needs more than a chat reply holds (several views side by side, a UI state, a screenshot to point at), drop one Markdown doc with Drop's `create_doc` tool and give the user the link it returns. Drop renders Mermaid (up to four diagrams), tables, alerts, `diff` and code blocks, and annotated screenshots with comark-annotate:
+
+```md
+::screenshot{src="https://example.com/settings.png" alt="Settings page"}
+:::annotation{x=12 y=30 w=40 h=8 side="right"}
+The save button moves here.
+:::
+::
+```
+
+Marks, colors, and `::compare` for before and after are in the [comark-annotate docs](https://comark-annotate.onmax.me). Screenshots must be https URLs.
+
+- Write HTML (`format: "html"`) only when Markdown can't show the point: an interactive diagram, a custom layout, or a short slide deck. Match the product's colors, type, spacing, and components; use real labels and data; support desktop and mobile.
+
+If Drop's tools aren't available, write the file to the system's temporary directory and open it for the user.
 
 ### guidance
 
