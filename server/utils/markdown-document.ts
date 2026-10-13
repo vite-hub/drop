@@ -8,11 +8,13 @@ import frontmatter from "@comark/html/plugins/frontmatter"
 import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
+import annotate, { components as annotations } from "comark-annotate/html"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
 import { cachedMarkdown } from "./markdown-cache"
 
-const ALLOWED_TAGS = "a alert blockquote br callout code del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s span strong table tbody td th thead tip tr ul warning".split(" ")
+// screenshot, compare, and annotation are comark-annotate's: annotated screenshots for PR evidence.
+const ALLOWED_TAGS = "a alert annotation blockquote br callout code compare del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s screenshot span strong table tbody td th thead tip tr ul warning".split(" ")
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
 
@@ -22,6 +24,7 @@ const plugins = [
   taskList(),
   components(),
   mermaid({ theme: "zinc-light" }),
+  annotate(),
   security({
     allowedProtocols: ["http", "https", "mailto"],
     allowedTags: ALLOWED_TAGS,
@@ -93,13 +96,23 @@ function createMermaidRenderer(): NodeHandler {
  * The one Markdown renderer: Comark with front matter, alerts, task lists, server-rendered Mermaid SVG, and a
  * tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
  */
+/** Problems with a document's annotated screenshots, one readable sentence each. Empty when it has none. */
+export async function annotationIssues(markdown: string): Promise<string[]> {
+  return (await parseMarkdown(markdown)).meta.annotateIssues ?? []
+}
+
 export async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string }> {
   try {
     const document = await parseMarkdown(markdown)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     const revision = supersedes ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>` : ""
+    const issues = document.meta.annotateIssues ?? []
+    const problems = issues.length
+      ? `<aside class="render-error"><p>This document's annotated screenshots have ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
+      : ""
     const content = await renderHtmlFromDocument(document, {
       components: {
+        ...annotations,
         alert: renderCallout,
         callout: renderCallout,
         info: renderCallout,
@@ -109,7 +122,7 @@ export async function renderMarkdownBody(markdown: string): Promise<{ title: str
         warning: renderCallout,
       },
     })
-    return { title: documentTitle(document), html: revision + (content || '<p class="empty-document">This document is empty.</p>') }
+    return { title: documentTitle(document), html: revision + problems + (content || '<p class="empty-document">This document is empty.</p>') }
   }
   catch (error) {
     log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })

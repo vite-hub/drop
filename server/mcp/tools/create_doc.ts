@@ -4,6 +4,7 @@ import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { createDocDrop, dropPageUrl, MAX_FILE_BYTES } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
+import { annotationIssues } from "../../utils/markdown-document"
 import { quotaToolResult } from "../../utils/quotas"
 
 export default defineMcpTool({
@@ -21,6 +22,9 @@ export default defineMcpTool({
   handler: async ({ markdown, format, title, shared, supersedes }, event) => quotaToolResult(async () => {
     if (!markdown.trim()) throw new HTTPError({ status: 400, message: "markdown is required." })
     const who = await requireIdentity(event)
+    // A broken annotated screenshot would render with marks in the wrong place; send the agent back to fix it.
+    const issues = format === "html" ? [] : await annotationIssues(markdown)
+    if (issues.length) throw new HTTPError({ status: 400, message: `Fix the annotated screenshots and drop again:\n${issues.map(issue => `- ${issue}`).join("\n")}` })
     const drop = await createDocDrop(who, {
       filename: format === "html" ? "doc.html" : "doc.md",
       bytes: new TextEncoder().encode(markdown),

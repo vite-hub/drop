@@ -23,8 +23,8 @@ importers:
         specifier: 1.7.7
         version: 1.7.7(@better-auth/core@1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.7(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20261005.1)(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)(bun-types@1.4.2)(kysely@0.29.6)(sql.js@1.14.2))(react@19.3.0)(vue@3.5.41(typescript@6.0.3)))(better-call@1.4.0(zod@4.6.5))
       '@comark/html':
-        specifier: 0.6.2
-        version: 0.6.2(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+        specifier: 0.7.0
+        version: 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
       '@fontsource-variable/geist':
         specifier: ^5.3.0
         version: 5.3.0
@@ -61,6 +61,9 @@ importers:
       better-auth:
         specifier: 1.7.7
         version: 1.7.7(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20261005.1)(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)(bun-types@1.4.2)(kysely@0.29.6)(sql.js@1.14.2))(react@19.3.0)(vue@3.5.41(typescript@6.0.3))
+      comark-annotate:
+        specifier: 0.0.1
+        version: 0.0.1(@comark/html@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))
       confbox:
         specifier: ^0.3.1
         version: 0.3.1
@@ -633,20 +636,6 @@ packages:
 
   '@cloudflare/workers-types@5.20261005.1':
     resolution: {integrity: sha512-QQwZY342US72QGHso/H1CSzn9FWe6IoLZ8TsYyoMnvRHHOnucGuKZRDCyOn43HAkkRQqfRHFw8NP1xe1A7Oj8A==}
-
-  '@comark/html@0.6.2':
-    resolution: {integrity: sha512-ke1/rxpgsrRdfx/4LFURFQCqc2Bv/eVZd+Eenk8x/8IX4346HOGReiWuWWs11mpzHibkKFaPq56zWsnn7Eu8lw==}
-    peerDependencies:
-      beautiful-mermaid: '>=1.0'
-      katex: '>=0.16'
-      shiki: ^4.3.1
-    peerDependenciesMeta:
-      beautiful-mermaid:
-        optional: true
-      katex:
-        optional: true
-      shiki:
-        optional: true
 
   '@comark/html@0.7.0':
     resolution: {integrity: sha512-lTt7C2DK5gQt5BFcGD9GAfLhw8MnrZ15CKKJbqMJf2oQGZyjPe56CnL73Nj/cx+B/59t22pLRknpdbJmhNabWA==}
@@ -2177,8 +2166,8 @@ packages:
   '@nodable/entities@3.1.0':
     resolution: {integrity: sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ==}
 
-  '@nuxt/cli-nightly@4.0.0-2610061353-2f890e5':
-    resolution: {integrity: sha512-hGPI61iu0cl30k1E9+vd/frpH7dcm1pnVSBW5nFf+KgAuYtPdR0+XgfSgdwC0bnEodAEv041Ux5gOgL+S+qJbg==}
+  '@nuxt/cli-nightly@4.0.1-2610112158-6f7550e':
+    resolution: {integrity: sha512-maBgtUoRwciUdwXRaVxqFT31USjuQ3t8QDNhFOE/jh5e/OiR99Rafg32iS/T1PDY8g2bPYbBDjk3GyxV9BG4jw==}
     engines: {node: ^22.21.0 || ^24.11.0 || >=26.0.0}
     hasBin: true
     peerDependencies:
@@ -4496,6 +4485,15 @@ packages:
 
   colortranslator@5.0.0:
     resolution: {integrity: sha512-Z3UPUKasUVDFCDYAjP2fmlVRf1jFHJv1izAmPjiOa0OCIw1W7iC8PZ2GsoDa8uZv+mKyWopxxStT9q05+27h7w==}
+
+  comark-annotate@0.0.1:
+    resolution: {integrity: sha512-Y9Ve3mEmcvalGhNdD5WvNezarbZJr3vBHRTTZ3d6h/RTeSu2AkRWJGJCQBsX5a95pqdMmYDLHMSYtnUupXUIwQ==}
+    peerDependencies:
+      '@comark/html': ^0.7.0
+      comark: ^0.7.0
+    peerDependenciesMeta:
+      '@comark/html':
+        optional: true
 
   comark-content@0.4.0:
     resolution: {integrity: sha512-wUCFpDdEl9tNXcAFVMkqpQL+Aa5hcg1YL5X8r+5oAohQkofRp+We4puz6QP4XR33MPbasA41pPfIVf4j+WrT4Q==}
@@ -9120,16 +9118,6 @@ snapshots:
 
   '@cloudflare/workers-types@5.20261005.1': {}
 
-  '@comark/html@0.6.2(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)':
-    dependencies:
-      comark: 0.6.2(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
-    optionalDependencies:
-      beautiful-mermaid: 1.1.3
-      katex: 0.17.0
-      shiki: 4.5.0
-    transitivePeerDependencies:
-      - rangi
-
   '@comark/html@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)':
     dependencies:
       comark: 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
@@ -10210,7 +10198,7 @@ snapshots:
 
   '@nodable/entities@3.1.0': {}
 
-  '@nuxt/cli-nightly@4.0.0-2610061353-2f890e5(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(jiti@2.7.0)(rolldown@1.2.12)(vite@8.3.2)':
+  '@nuxt/cli-nightly@4.0.1-2610112158-6f7550e(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(jiti@2.7.0)(rolldown@1.2.12)(vite@8.3.2)':
     dependencies:
       '@clack/prompts': 1.8.1
       args-tokenizer: 0.3.0
@@ -13324,6 +13312,12 @@ snapshots:
 
   colortranslator@5.0.0: {}
 
+  comark-annotate@0.0.1(@comark/html@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)):
+    dependencies:
+      comark: 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+    optionalDependencies:
+      '@comark/html': 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+
   comark-content@0.4.0(@azure/identity@4.13.3(supports-color@8.1.1))(@azure/storage-blob@12.34.0(supports-color@8.1.1))(@vercel/functions@3.9.11(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0))(aws4fetch@1.0.20)(beautiful-mermaid@1.1.3)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20261005.1)(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)(bun-types@1.4.2)(kysely@0.29.6)(sql.js@1.14.2)))(katex@0.17.0)(shiki@4.5.0)(uploadthing@7.7.4(express@5.2.1(supports-color@8.1.1))(h3@2.0.1-rc.31(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))(tailwindcss@4.3.3)):
     dependencies:
       citty: 0.2.2
@@ -15754,7 +15748,7 @@ snapshots:
   nuxt-nightly@5.0.0-29766097.1e475df9(patch_hash=bcd24143fcf00377e7d327374a487779a871a24c60d4823333a143c2ada1517a)(813362c7793ac1ebfc11d8c7727c4999):
     dependencies:
       '@dxup/nuxt': 0.5.10(esbuild@0.28.2)(magicast@0.5.5)(rolldown@1.2.12)(vite@8.3.2)
-      '@nuxt/cli': '@nuxt/cli-nightly@4.0.0-2610061353-2f890e5(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(jiti@2.7.0)(rolldown@1.2.12)(vite@8.3.2)'
+      '@nuxt/cli': '@nuxt/cli-nightly@4.0.1-2610112158-6f7550e(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(jiti@2.7.0)(rolldown@1.2.12)(vite@8.3.2)'
       '@nuxt/devtools': 4.0.0-beta.3(6b0d157f610c22c6c4f254333746aecf)
       '@nuxt/kit': '@nuxt/kit-nightly@5.0.0-29766097.1e475df9(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(rolldown@1.2.12)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.12)(vite@8.3.2))'
       '@nuxt/nitro-server': '@nuxt/nitro-server-nightly@5.0.0-29766097.1e475df9(5dc423a5d631e377408e2fee127e9a12)'
