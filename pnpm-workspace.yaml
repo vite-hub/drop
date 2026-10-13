@@ -47,4 +47,4 @@ minimumReleaseAgeExclude:
   - nitro-mcp-toolkit@0.4.0
   - miniflare@5.20261006.0-alpha
   - wrangler@4.148.0
-  - comark-annotate@0.0.1
+  - comark-annotate@0.0.2
