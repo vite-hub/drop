@@ -99,19 +99,10 @@ export interface SkillSummary {
   enabled: boolean
   /** The `SKILL.md` resource agents read over MCP. */
   uri: string
-  files: number
-}
-
-export interface SkillFileView {
-  path: string
-  text: string
-  size: number
-  /** Rendered HTML for Markdown files, without the frontmatter. */
-  html?: string
-}
-
-export interface SkillDetail extends Omit<SkillSummary, "files"> {
-  files: SkillFileView[]
+  /** `SKILL.md` rendered for reading, without its frontmatter and title. */
+  html: string
+  /** The full skill on GitHub. */
+  source: string
 }
 
 export interface ConnectedAgent {

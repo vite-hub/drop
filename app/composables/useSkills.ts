@@ -13,7 +13,7 @@ export function useSkills() {
     catch (error) {
       notify.fail(`Couldn't change ${skill.name}`, error)
     }
-    await Promise.all([refresh(), refreshNuxtData(`skill:${skill.name}`)])
+    await refresh()
   }
 
   return { skills, status, setEnabled }

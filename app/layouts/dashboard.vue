@@ -8,7 +8,7 @@ const close = () => (open.value = false)
 
 const bottom = computed(() => [
   { label: "Agents", icon: "i-lucide-bot", to: "/agents", active: at("/agents") || at("/approve") },
-  { label: "Skills", icon: "i-lucide-puzzle", to: "/skills", active: at("/skills") },
+  { label: "Skills", icon: "i-lucide-hexagon", to: "/skills", active: at("/skills") },
   { label: "Members", icon: "i-lucide-users", to: "/members", active: at("/members") },
   { label: "Docs", icon: "i-lucide-book-open", to: "/docs", active: at("/docs") },
 ])
