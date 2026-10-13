@@ -15,6 +15,13 @@
       "when": 1791900000000,
       "tag": "0001_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791910000000,
+      "tag": "0002_skill_settings",
+      "breakpoints": true
     }
   ]
 }

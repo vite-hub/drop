@@ -35,7 +35,7 @@ const { copy } = useCopy()
       <AgentsCodeBlock class="mt-4" :code="MCP_SNIPPETS[client]" />
 
       <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
-        <span>{{ MCP_HINTS[client] }} The Drop skill comes with the server.</span>
+        <span>{{ MCP_HINTS[client] }} The <NuxtLink to="/skills" class="underline">skills</NuxtLink> come with the server.</span>
         <UButton color="neutral" icon="i-lucide-copy" label="Template" size="sm" variant="ghost" @click="copy(PLAN_TEMPLATE, 'Template copied')" />
       </div>
     </UCard>
