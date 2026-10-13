@@ -97,10 +97,6 @@ export interface SkillSummary {
   name: string
   description: string
   enabled: boolean
-  /** The `SKILL.md` resource agents read over MCP. */
-  uri: string
-  /** `SKILL.md` rendered for reading, without its frontmatter and title. */
-  html: string
   /** The full skill on GitHub. */
   source: string
 }
