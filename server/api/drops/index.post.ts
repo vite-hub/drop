@@ -4,7 +4,7 @@ import { createDocDrop, toSummary } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
 import { quotaApiHandler } from "../../utils/quotas"
 
-/** Create a doc from text: the browser's "New drop" and template uploads. */
+/** Create a doc from text, or its next version with `supersedes`. */
 export default quotaApiHandler(defineValidatedHandler({
   validate: { body: NewDocSchema },
   async handler(event) {

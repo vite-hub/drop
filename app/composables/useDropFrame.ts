@@ -3,10 +3,6 @@ export type FrameMessage =
   | { type: "ready" }
   | { type: "navigate"; path: string }
   | { type: "copy"; text: string }
-  | { type: "edit-change"; markdown: string }
-  | { type: "edit-prompt"; requestId: number; initial: string }
-  | { type: "edit-save" }
-  | { type: "edit-error"; message?: string }
   | { type: "selection"; clear?: boolean; quote: string; selector: string; label: string; rect: { left: number; top: number; right: number; bottom: number } }
   | { type: "image"; src: string; alt: string; selector: string; label: string }
   | { type: "marker"; id: string; clientX: number; clientY: number }

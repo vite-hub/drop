@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { DropPatchSchema } from "#shared/schemas"
+import type { Access } from "#shared/types"
 import { drops } from "../../databases/config"
 import { findDrop, permissions, toSummary, versionChain } from "../../utils/drops"
 import { expiryPolicy, renewDrop } from "../../utils/expiry"
@@ -17,7 +18,7 @@ export default defineValidatedHandler({
     const drop = await findDrop(await routeId(event), event)
     if (!drop || !permissions(drop, who).manage) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
     const body = await event.req.json()
-    const share: { shareReview?: "pending" | "rejected" | null; visibility?: "private" | "shared"; access?: "view" | "comment" | "edit" } = {}
+    const share: { shareReview?: "pending" | "rejected" | null; visibility?: "private" | "shared"; access?: Access } = {}
     if (body.visibility !== undefined) {
       share.visibility = body.visibility
       share.shareReview = body.visibility === "shared" ? await shareReviewFor(drop.ownerId, event) : null

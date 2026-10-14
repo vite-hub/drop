@@ -54,7 +54,7 @@ try {
   const used = (await request("/api/usage")).data
   db.prepare("INSERT INTO quota_reservations (id,owner_id,month,drops,bytes,writes,committed,created_at) VALUES (?,?,?,0,0,?,1,?)").run(crypto.randomUUID(), owner.id, used.month, 1000 - used.writes.used, Date.now())
   cookie = admin.cookie
-  const denied = await request(`/api/drops/${doc.data.id}/versions`, "POST", { content: "# Admin edit" })
+  const denied = await request("/api/drops", "POST", { filename: "doc.md", content: "# Admin edit", supersedes: doc.data.id })
   assert.equal(denied.status, 402)
   assert.deepEqual(denied.data.quota, { unit: "writes", used: 1000, limit: 1000 })
   const files = { "index.html": "", ...Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`${i}.txt`, ""])) }
@@ -64,7 +64,7 @@ try {
   assert.equal(appDenied.data.quota.limit, 50)
   assert.equal((await request("/api/usage")).data.writes.used, 0)
   assert.equal((await request(`/api/members/${owner.id}`, "PATCH", { plan: "pro" })).status, 200)
-  const revision = await request(`/api/drops/${doc.data.id}/versions`, "POST", { content: "# Admin edit" })
+  const revision = await request("/api/drops", "POST", { filename: "doc.md", content: "# Admin edit", supersedes: doc.data.id })
   assert.equal(revision.status, 200)
   drops[0] = revision.data.id
   assert.equal((await request("/api/usage")).data.writes.used, 0)

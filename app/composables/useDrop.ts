@@ -1,4 +1,4 @@
-import type { DropComment, DropDetail, DropSummary } from "#shared/types"
+import type { DropComment, DropDetail } from "#shared/types"
 import type { CommentInput } from "#shared/schemas"
 
 /**
@@ -47,20 +47,7 @@ export function useDrop(id: MaybeRefOrGetter<string>) {
     }
   }
 
-  /** New text for a doc, or a new file set for an app. Docs become a new drop id; apps keep theirs. */
-  async function publish(body: { content: string } | { files: Record<string, string> }) {
-    try {
-      const next = await $fetch<DropSummary>(`/api/drops/${toValue(id)}/versions`, { method: "POST", body })
-      await refreshNuxtData("drops")
-      if ("files" in body) await drop.refresh()
-      return next
-    }
-    catch (error) {
-      notify.fail("Couldn't publish", error)
-    }
-  }
-
-  return { drop, comments, addComment, resolveComment, removeComment, publish }
+  return { drop, comments, addComment, resolveComment, removeComment }
 }
 
 /** The drop page provides its drop; the viewer and its panels inject it instead of threading props. */

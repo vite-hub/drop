@@ -5,7 +5,7 @@ import type { DropSummary } from "#shared/types"
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
-const { drops, status, error, refresh, create, upload, remove } = useDrops()
+const { drops, status, error, refresh, upload, remove } = useDrops()
 const { data: usage, refresh: refreshUsage } = useApi("/api/usage", { key: "usage" })
 const nearLimit = computed(() => usage.value && usageNearLimit(usage.value))
 const atLimit = computed(() => usage.value && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null && quota.used >= quota.limit))
@@ -16,7 +16,6 @@ const search = ref("")
 const searchInput = useTemplateRef("searchInput")
 const picker = useFileDialog({ multiple: false, reset: true })
 picker.onChange(files => files?.[0] && void onPick(files[0]))
-const creating = ref(false)
 const now = useRelativeNow()
 
 const counts = computed(() => ({
@@ -60,13 +59,6 @@ const groups = computed(() => {
 
 defineShortcuts({ "/": () => searchInput.value?.inputRef?.focus() })
 
-async function newDrop() {
-  creating.value = true
-  const drop = await create()
-  creating.value = false
-  if (drop) await navigateTo({ path: `/drops/${drop.id}`, query: { edit: "1" } })
-}
-
 async function onPick(file: File) {
   const result = await upload(file)
   if (result) await navigateTo(`/drops/${result.id}`)
@@ -77,7 +69,6 @@ async function onPick(file: File) {
   <PageShell id="drops" title="Drops" description="Docs and apps you and your agents dropped. Private until you share them.">
     <template #actions>
       <UButton color="neutral" icon="i-lucide-upload" label="Upload" variant="outline" @click="picker.open()" />
-      <UButton color="neutral" icon="i-lucide-plus" label="New Drop" :loading="creating" @click="newDrop" />
     </template>
 
     <div v-if="usage?.enabled" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default px-4 py-3" aria-live="polite">
@@ -126,11 +117,8 @@ async function onPick(file: File) {
     <div v-else-if="!drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
       <UIcon name="i-lucide-layers" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing dropped yet</p>
-      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here. Or start one yourself.</p>
-      <div class="mt-5 flex justify-center gap-2">
-        <UButton color="neutral" label="Connect an Agent" to="/agents?tab=mcp" variant="outline" />
-        <UButton color="neutral" label="New Drop" variant="ghost" @click="newDrop" />
-      </div>
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here.</p>
+      <UButton class="mt-5" color="neutral" label="Connect an Agent" to="/agents?tab=mcp" />
     </div>
 
     <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">No drops match.</p>

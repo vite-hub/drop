@@ -9,7 +9,7 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
 <template>
   <DocsPage title="Review and share" lead="Every drop opens full screen with its comments beside it. It stays private until you share it. Docs keep earlier versions. Apps keep only their latest file set.">
     <DocsSection id="docs" title="Docs">
-      <p>Agents call <code>create_doc</code> with Markdown, or with a self-contained HTML page (<code>format: "html"</code>). People can also upload a file or start a doc from the Drops page.</p>
+      <p>Agents call <code>create_doc</code> with Markdown, or with a self-contained HTML page (<code>format: "html"</code>). People can also upload a file from the Drops page.</p>
       <p>Markdown renders as a clean document with tables, task lists, callouts, and Mermaid diagrams. HTML renders as-is, scripts included, in a sandbox with no access to your session. Drops that set up a separate domain for apps give pages their own origin, so storage and history work there too. For rich HTML plans, agents follow these rules:</p>
       <ul>
         <li v-for="rule in PLAN_AUTHORING_GUIDE.split('\n')" :key="rule">{{ rule }}</li>
@@ -29,17 +29,17 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
     </DocsSection>
 
     <DocsSection id="sharing" title="Sharing">
-      <p>A drop is private until its owner shares it. A shared link grants one level, and each includes the one before:</p>
+      <p>A drop is private until its owner shares it. A shared link grants one level:</p>
       <ul>
         <li><strong>Can view</strong>: open the drop and its versions.</li>
-        <li><strong>Can comment</strong>: add comments too.</li>
-        <li><strong>Can edit</strong>: change the doc or the app's files and publish a new version.</li>
+        <li><strong>Can comment</strong>: view and add comments.</li>
       </ul>
       <p>The owner, editors, and admins can open available drops. Sharing applies to every doc version.</p>
     </DocsSection>
 
     <DocsSection id="versions" title="Versions">
       <p>To publish the next version of a doc, an agent calls <code>create_doc</code> with <code>supersedes</code> set to the previous drop's id, or puts <code>supersedes: &lt;id&gt;</code> in the front matter. For an app, it calls <code>publish_app</code> with the app's <code>id</code>. Sharing stays the same. Earlier doc versions stay in history. Publishing an app replaces its entire file set and deletes the old files, so only the latest app version is available.</p>
+      <p>Only agents publish versions. People don't edit a drop in Drop; they comment, and the agent addresses the comments in the next version. The owner's agents can publish, and so can agents of the workspace's editors and admins.</p>
       <p>Any id from the chain works: the new version always lands on top of the latest. If someone else publishes at the same moment, the call fails with a conflict, and the agent reads the latest version and publishes again.</p>
     </DocsSection>
 
@@ -52,10 +52,6 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
       </ul>
       <p>An expired drop stops being served: its shared link says it expired. For 7 more days its owner, editors, and admins can still open it and press <strong>Renew</strong> to bring it back. Then it's deleted with its comments and files. The Drops page flags drops with a week or less left.</p>
       <p>To keep a drop, turn on <strong>Keep forever</strong> in its Details panel. Agents can't do that themselves: <code>keep_drop</code> renews a drop, and with <code>forever: true</code> it asks you. The request shows on the drop's page, where you keep it or dismiss it. A Drop's admin can change the 30 days, or allow only admins to keep drops forever.</p>
-    </DocsSection>
-
-    <DocsSection id="edit" title="Edit in place">
-      <p>People with edit access change a doc in a Notion-like editor, or an app's files in a code view, right where they review it. Saving publishes a new version.</p>
     </DocsSection>
   </DocsPage>
 </template>

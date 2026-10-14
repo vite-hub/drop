@@ -2,7 +2,7 @@
 // renderer (see server/utils/markdown-document.ts), so every Markdown drop looks the same at /f/ and in Drop.
 import { escapeUTF8 as escapeHtml } from "entities";
 import type { PlanKind } from "./plans";
-import { EDITOR_CSS, EDITOR_SCRIPT, injectRuntime, THEME_CSS } from "./plan-runtime";
+import { injectRuntime, THEME_CSS } from "./plan-runtime";
 import { CALLOUT_CSS, TYPESET_CSS } from "./typeset";
 
 const DOCUMENT_EXTRA_CSS = CALLOUT_CSS + `
@@ -12,12 +12,6 @@ main { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
 .mermaid svg { max-width: 100%; height: auto; }
 `;
-
-/** Editable Markdown document: same typeset and theme as the reader, with TipTap mounted on the article. */
-export function editorDocument(source: string, dark = false): string {
-  const json = JSON.stringify(source).replace(/</g, "\\u003c");
-  return `<!doctype html><html lang="en" class="${dark ? "dark" : ""}"><head><meta charset="utf-8"><style>${THEME_CSS}</style><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}${EDITOR_CSS}</style></head><body><main><p id="editor-loading">Loading editor...</p><article class="typeset" id="editor"></article></main><script type="application/json" id="drop-source">${json}</script><script type="module">${EDITOR_SCRIPT}</script></body></html>`;
-}
 
 /** Builds the exact document an iframe shows for a drop, with Drop's theme and annotator injected. `html` is the
  * server-rendered body for Markdown. */

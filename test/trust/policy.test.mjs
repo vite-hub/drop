@@ -21,11 +21,12 @@ test("approval is optional; admins, unlimited plans and approved members bypass 
 
 test("pending and rejected shares stay private; quarantine denies content even to owners", () => {
   const owner = { userId: "owner", role: "member" }
-  const drop = { ownerId: "owner", visibility: "shared", access: "edit", shareReview: null, quarantinedAt: null }
-  assert.equal(permissions(drop, null).edit, true)
+  const drop = { ownerId: "owner", visibility: "shared", access: "comment", shareReview: null, quarantinedAt: null }
+  assert.equal(permissions(drop, null).comment, true)
+  assert.equal(permissions(drop, null).edit, false)
   for (const shareReview of ["pending", "rejected"]) {
     assert.equal(permissions({ ...drop, shareReview }, null).view, false)
-    assert.equal(permissions({ ...drop, shareReview }, null).edit, false)
+    assert.equal(permissions({ ...drop, shareReview }, null).comment, false)
     assert.equal(permissions({ ...drop, shareReview }, owner).view, true)
   }
   for (const who of [null, owner, { userId: "admin", role: "admin" }]) assert.equal(permissions({ ...drop, quarantinedAt: 1 }, who).view, false)

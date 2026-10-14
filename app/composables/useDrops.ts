@@ -24,18 +24,6 @@ export function useDropActions() {
     drops.value = drops.value.map(drop => (drop.id === id ? { ...drop, ...change } : drop))
   }
 
-  async function create() {
-    try {
-      const drop = await $fetch<DropSummary>("/api/drops", { method: "POST", body: { filename: "untitled.md", title: "Untitled", content: "# Untitled\n\n" } })
-      await refresh()
-      return drop
-    }
-    catch (error) {
-      notify.fail("Couldn't create a drop", error)
-      await refreshNuxtData("usage")
-    }
-  }
-
   async function upload(file: File) {
     const form = new FormData()
     form.append("file", file)
@@ -98,7 +86,7 @@ export function useDropActions() {
     }
   }
 
-  return { create, upload, setVisibility, setExpiry, remove }
+  return { upload, setVisibility, setExpiry, remove }
 }
 
 export const refreshDrops = () => refreshNuxtData("drops")

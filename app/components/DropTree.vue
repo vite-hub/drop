@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Every drop, newest first. Apps are folders you can open to jump to a file.
+// Every drop, newest first. Apps are folders you can open to jump to a page.
 const emit = defineEmits<{ navigate: [] }>()
 const { drops, status } = useDrops()
 const route = useRoute()
@@ -40,7 +40,7 @@ const active = "bg-elevated text-highlighted"
           </button>
         </div>
         <ul v-if="open[drop.id] ?? here(drop.id)" class="ml-4 flex flex-col gap-px border-l border-default py-0.5 pl-1">
-          <li v-for="path in drop.paths" :key="path">
+          <li v-for="path in appPages(drop.paths ?? [])" :key="path">
             <NuxtLink
               :class="[row, 'px-2 font-mono text-xs', here(drop.id) && file === path ? active : idle]"
               :to="{ path: `/drops/${drop.id}`, query: { file: path } }"

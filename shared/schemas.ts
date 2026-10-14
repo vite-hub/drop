@@ -16,18 +16,13 @@ export const NewDocSchema = v.object({
 
 export const DropPatchSchema = v.object({
   visibility: v.optional(v.picklist(["private", "shared"])),
-  access: v.optional(v.picklist(["view", "comment", "edit"])),
+  access: v.optional(v.picklist(["view", "comment"])),
   title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
   /** People set it; an agent's true becomes a request its person approves. False also dismisses a request. */
   neverExpires: v.optional(v.boolean()),
   /** Start a fresh expiry window, which also restores an expired drop. */
   renew: v.optional(v.literal(true)),
 })
-
-export const VersionSchema = v.union([
-  v.object({ content: v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES, "The file exceeds the 4 MiB limit.")) }),
-  v.object({ files: v.record(v.string(), v.string()) }),
-])
 
 export const AppSchema = v.object({
   id: v.optional(v.string()),
@@ -51,10 +46,6 @@ export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 export const MemberPatchSchema = v.object({ plan: v.optional(v.picklist(PLANS)), role: v.optional(v.picklist(ROLES)), banned: v.optional(v.boolean()) })
 
 export const SkillPatchSchema = v.object({ enabled: v.boolean("Say whether the skill is enabled.") })
-
-export const FilePathSchema = v.object({
-  path: v.pipe(v.string(), v.trim(), v.minLength(1, "Enter a path."), v.maxLength(300), v.regex(/^(?!\/)(?!.*\.\.)/, "Use a relative path without `..`.")),
-})
 
 export type CodeImageInput = v.InferOutput<typeof CodeImageSchema>
 export type CommentInput = v.InferOutput<typeof CommentSchema>

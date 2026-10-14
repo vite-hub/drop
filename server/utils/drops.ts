@@ -27,8 +27,9 @@ export { MAX_APP_FILES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
- * What the caller may do with a drop. Editors and admins act on every drop in the workspace. An expired drop is
- * read-only for the people who can renew it and gone for everyone else.
+ * What the caller may do with a drop. Editors and admins act on every drop in the workspace. Share links can view
+ * or comment; only the owner and staff (through their agents) publish new versions. An expired drop is read-only
+ * for the people who can renew it and gone for everyone else.
  */
 export function permissions(drop: DropRow, who: Identity | null) {
   if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || who.role === "admin")) }
@@ -42,7 +43,7 @@ export function permissions(drop: DropRow, who: Identity | null) {
     owner,
     view: available && (owner || staff || shared),
     comment: live && (owner || staff || (shared && level >= ACCESS_RANK.comment)),
-    edit: live && (owner || staff || (shared && level >= ACCESS_RANK.edit)),
+    edit: live && (owner || staff),
     manage: owner || staff,
   }
 }
@@ -143,7 +144,6 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
     ...toSummary(row, undefined, expiryPolicy(event).days),
     isOwner: can.manage,
     canComment: can.comment,
-    canEdit: can.edit && (row.kind === "app" || TEXT_KINDS.has(row.kind)),
     versions: await versionsOf(row),
   }
   if (row.kind === "app") {

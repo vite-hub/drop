@@ -30,14 +30,14 @@ const LOOP = [
   { n: "01", actor: "Codex", kind: "agent" as const, title: "Drops launch-board/", body: "A live app, private by default.", icon: "i-lucide-upload" },
   { n: "02", actor: "Ana", kind: "browser" as const, title: "Comments on the CTA", body: "Pinned to the exact spot in the page.", icon: "i-lucide-message-circle" },
   { n: "03", actor: "Codex", kind: "agent" as const, title: "Reads the open comments", body: "Then drops v2 with the change.", icon: "i-lucide-refresh-cw" },
-  { n: "04", actor: "You", kind: "browser" as const, title: "Shares the link", body: "Choose view, comment, or edit.", icon: "i-lucide-share-2" },
+  { n: "04", actor: "You", kind: "browser" as const, title: "Shares the link", body: "Choose view or comment.", icon: "i-lucide-share-2" },
 ]
 
 const FEATURES = [
   { icon: "i-lucide-layers", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. All full screen, all versioned." },
   { icon: "i-lucide-message-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
-  { icon: "i-lucide-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view, comment, or edit." },
-  { icon: "i-lucide-pencil", title: "Edit in place", body: "A Notion-like editor for docs and a code view for apps, right where you review." },
+  { icon: "i-lucide-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view or comment." },
+  { icon: "i-lucide-bot", title: "Agents make the changes", body: "People comment. The agent reads the open threads and drops the next version." },
   { icon: "i-lucide-plug", title: "MCP built in", body: "Streamable HTTP on the latest spec. OAuth sign-in, the skill included, no keys to paste." },
   { icon: "i-lucide-history", title: "Every version kept", body: "Agents drop the next version of a doc or app. Older ones stay one click away." },
 ]

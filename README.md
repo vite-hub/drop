@@ -21,7 +21,7 @@
 
 1. **Agents drop their work** over MCP: a plan in Markdown, an HTML report, or a small static app made of files. They sign in through your browser once; there are no keys.
 2. **Every drop starts private.** Only its owner (and the workspace's editors and admins) can open it.
-3. **People review it** full screen: select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit.
+3. **People review it** full screen: select text or click a spot in an image to comment. The owner shares a link that can view or comment.
 4. **The agent reads the open comments** and drops the next version. Older doc versions stay in history. Apps keep only their latest file set; publishing replaces it and deletes the old files.
 
 Under the hood:
@@ -106,7 +106,7 @@ Set `DROP_EXPIRY_DAYS` to change the window, or to `0` to keep every drop. Set `
 
 Owner quotas are off by default. Set `DROP_QUOTAS=1` to enable them on the official instance, or `NUXT_QUOTAS_ENABLED=true` in runtime config. Free allows 3 logical drops, 100 MiB of retained storage, and 1,000 file writes per UTC calendar month. Free apps allow 50 files and 2 MiB. Pro allows 100 drops, 1 GiB, and 10,000 writes; Pro and self-host apps keep the 200-file / 4 MiB maximum. Set `DROP_PRO_DROPS`, `DROP_PRO_BYTES`, and `DROP_PRO_WRITES` at build time, or `NUXT_QUOTAS_PRO_DROPS`, `NUXT_QUOTAS_PRO_BYTES`, and `NUXT_QUOTAS_PRO_WRITES` at runtime, to configure Pro.
 
-`DROP_DEFAULT_PLAN` defaults to `free`; `NUXT_QUOTAS_DEFAULT_PLAN` overrides it at runtime. Admins set individual plans on Members, including `unlimited` for the operator. A null user plan follows the configured default. The drop's owner pays for edits by agents, guests, and admins. All document versions and current app files count toward storage. A doc version uses one write, an app publish uses one write per file, and a temporary code image uses one write without a drop slot. Its bytes count until cleanup deletes it. A shared owner burst limit allows 30 publishes per minute. Existing drops remain readable at a cap. Deleting a drop releases its slot and bytes but keeps its monthly write count.
+`DROP_DEFAULT_PLAN` defaults to `free`; `NUXT_QUOTAS_DEFAULT_PLAN` overrides it at runtime. Admins set individual plans on Members, including `unlimited` for the operator. A null user plan follows the configured default. The drop's owner pays for every version, including ones published by editors' and admins' agents. All document versions and current app files count toward storage. A doc version uses one write, an app publish uses one write per file, and a temporary code image uses one write without a drop slot. Its bytes count until cleanup deletes it. A shared owner burst limit allows 30 publishes per minute. Existing drops remain readable at a cap. Deleting a drop releases its slot and bytes but keeps its monthly write count.
 
 Usage is recorded even with enforcement disabled. D1 conditionally reserves capacity when quotas are enabled, then commits the write ledger with metadata in one batch. Normal failures release the reservation. Pending reservations older than 15 minutes stop counting toward quotas. The hourly cleanup deletes them and logs evlog warnings with the owner, reservation, and released amounts so operators can investigate crashed publishes. Committed rows keep counting toward monthly writes and are never expired by this cleanup.
 

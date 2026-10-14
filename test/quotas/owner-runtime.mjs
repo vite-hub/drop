@@ -37,7 +37,7 @@ try {
   assert.deepEqual(denied.data.quota, { unit: "drops", used: 3, limit: 3 })
   assert.equal(denied.data.retryable, false)
   assert.equal(denied.data.upgradeUrl, "/settings/billing")
-  const revision = await request(`/api/drops/${created[0]}/versions`, "POST", { content: "# Revised" })
+  const revision = await request("/api/drops", "POST", { filename: "doc.md", content: "# Revised", supersedes: created[0] })
   assert.equal(revision.response.status, 200)
   created[0] = revision.data.id
   const newApp = await request("/api/apps", "POST", { id: app.data.id, files: { "index.html": "<h1>New</h1>" } })
@@ -45,23 +45,12 @@ try {
   currentUsage = (await request("/api/usage")).data
   assert.equal(currentUsage.drops.used, 3)
   assert.equal(currentUsage.writes.used, 6)
-  const shared = await request(`/api/drops/${created[0]}`, "PATCH", { visibility: "shared", access: "edit" })
-  assert.equal(shared.response.status, 200)
-  const ownerCookie = cookie
-  cookie = ""
-  const guestRevision = await request(`/api/drops/${created[0]}/versions`, "POST", { content: "# Guest revision" })
-  cookie = ownerCookie
-  assert.equal(guestRevision.response.status, 200)
-  created[0] = guestRevision.data.id
-  currentUsage = (await request("/api/usage")).data
-  assert.equal(currentUsage.drops.used, 3)
-  assert.equal(currentUsage.writes.used, 7)
-  const expectedBytes = new TextEncoder().encode("# Drop 0\n# Drop 1\n# Revised# Guest revision<h1>New</h1>").byteLength
+  const expectedBytes = new TextEncoder().encode("# Drop 0\n# Drop 1\n# Revised<h1>New</h1>").byteLength
   assert.equal(currentUsage.bytes.used, expectedBytes)
   const oversizedApp = await request("/api/apps", "POST", { id: app.data.id, files: { "index.html": "", ...Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`${i}.txt`, ""])) } })
   assert.equal(oversizedApp.response.status, 402)
   assert.equal(oversizedApp.data.quota.unit, "appFiles")
-  assert.equal((await request("/api/usage")).data.writes.used, 7)
+  assert.equal((await request("/api/usage")).data.writes.used, 6)
   const oversizedBytes = await request("/api/apps", "POST", { id: app.data.id, files: { "index.html": "x".repeat(2 * 1024 * 1024 + 1) } })
   assert.equal(oversizedBytes.response.status, 402)
   assert.equal(oversizedBytes.data.quota.unit, "appBytes")
@@ -75,7 +64,7 @@ try {
   currentUsage = (await request("/api/usage")).data
   assert.equal(currentUsage.drops.used, 2)
   assert.equal(currentUsage.bytes.used, new TextEncoder().encode("# Drop 1\n<h1>New</h1>").byteLength)
-  assert.equal(currentUsage.writes.used, 7)
+  assert.equal(currentUsage.writes.used, 6)
   const uploaded = await request("/api/files", "POST", form)
   assert.equal(uploaded.response.status, 200)
   created.push(uploaded.data.id)
@@ -83,9 +72,9 @@ try {
   assert.equal(image.response.status, 200)
   currentUsage = (await request("/api/usage")).data
   assert.equal(currentUsage.drops.used, 3)
-  assert.equal(currentUsage.writes.used, 9)
+  assert.equal(currentUsage.writes.used, 8)
   assert.ok(currentUsage.bytes.used > expectedBytes)
-  console.log("Quota runtime smoke passed: REST/docs/apps/uploads/revisions/guest attribution/code images/deletion")
+  console.log("Quota runtime smoke passed: REST/docs/apps/uploads/revisions/code images/deletion")
 }
 finally {
   for (const id of created) await request(`/api/drops/${id}`, "DELETE")

@@ -84,7 +84,7 @@ test("an expired drop is gone for its link, read-only for its owner, and a visit
   const detail = await detailHandler(request("/api/drops/old", { id: "old" }))
   assert.equal(detail.isOwner, true)
   assert.equal(detail.canComment, false)
-  assert.equal(detail.canEdit, false)
+  assert.equal(permissions(await findDropByBlob("old.md"), who).edit, false)
   assert.equal(lastAccess("old"), visitedDaysAgo(31))
   assert.match(expiryLabel(detail, now), /^Expired, deleting in 6 days$/)
   const can = permissions(await findDropByBlob("old.md"), { ...who, userId: "someone", role: "member" })

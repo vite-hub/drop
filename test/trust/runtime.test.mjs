@@ -58,7 +58,7 @@ test("approval, reports, quarantine, legal pages and native OAuth work over HTTP
   const landing = await request(raw)
   assert.equal(landing.status, 200)
   assert.ok(landing.text.indexOf(">Report</a>") < landing.text.indexOf("<iframe"))
-  const version = await request(`/api/drops/${id}/versions`, { cookie: owner.cookie, body: { content: `<h1>${marker} v2</h1>` } })
+  const version = await request("/api/drops", { cookie: owner.cookie, body: { filename: "review.html", content: `<h1>${marker} v2</h1>`, supersedes: id } })
   assert.equal(version.status, 200, version.text)
   assert.equal(version.json.shareReview, null)
   const nextId = version.json.id
