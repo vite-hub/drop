@@ -12,6 +12,9 @@ import { nativeClientRegistration } from "./utils/oauth-clients"
 import { githubOrganization, isGitHubMember } from "./utils/github-membership"
 import { proxyAuth, proxyAuthentication } from "./utils/proxy-auth"
 
+// Kept out of `defineAuth()`: ViteHub's auth scanner takes minutes on generic type arguments inside it.
+type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
+
 /**
  * Who can sign in, and how.
  *
@@ -50,7 +53,7 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
     socialProviders: proxyAuthentication ? {} : {
       github: {
         ...githubOptions,
-        ...(githubOrganization ? { getUserInfo: async (token: Parameters<ReturnType<typeof github>["getUserInfo"]>[0]) =>
+        ...(githubOrganization ? { getUserInfo: async (token: GitHubToken) =>
           await isGitHubMember(token.accessToken) ? github(githubOptions).getUserInfo(token) : null } : {}),
       },
     },
