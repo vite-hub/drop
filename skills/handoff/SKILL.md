@@ -47,5 +47,3 @@ Before publishing, remove secrets and personal data: tokens, keys, passwords, co
 Drop the document with Drop's `create_doc` tool as Markdown, and give the user the review link it returns. It starts private; tell the user to share it from Drop when it's ready for someone else. If you are updating an earlier handoff, pass its id as `supersedes` so the link keeps one history.
 
 If Drop's tools aren't available, write the file to the system's temporary directory instead and give the user its path.
-
-Adapted from Matt Pocock's [handoff skill](https://github.com/mattpocock/skills/blob/main/skills/productivity/handoff/SKILL.md) (MIT).
