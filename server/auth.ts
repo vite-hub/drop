@@ -84,6 +84,9 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
       oauthProvider({
         loginPage: "/oauth",
         consentPage: "/oauth",
+        // The browser approval can involve a GitHub sign-in and a separate executor redirect.
+        // Keep the signed handoff alive long enough for that round trip to finish.
+        codeExpiresIn: 30 * 60,
         scopes: ["openid", "profile", "email", "offline_access"],
         resources: [`${requestOrigin}/mcp`],
         enforcePerClientResources: false,
