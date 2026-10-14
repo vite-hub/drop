@@ -67,7 +67,10 @@ CREATE TABLE `drops` (
 	`updated_at` integer NOT NULL,
 	`publish_token` text,
 	`share_review` text CHECK (share_review IS NULL OR share_review IN ('pending', 'rejected')),
-	`quarantined_at` integer
+	`quarantined_at` integer,
+	`last_accessed_at` integer,
+	`never_expires` integer DEFAULT 0 NOT NULL,
+	`never_expires_request` text
 );
 --> statement-breakpoint
 CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);
@@ -75,6 +78,8 @@ CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);
 CREATE UNIQUE INDEX `drops_blob_key_idx` ON `drops` (`blob_key`);
 --> statement-breakpoint
 CREATE INDEX `drops_supersedes_idx` ON `drops` (`supersedes_id`);
+--> statement-breakpoint
+CREATE INDEX `drops_expiry_idx` ON `drops` (`never_expires`,`last_accessed_at`);
 --> statement-breakpoint
 CREATE TABLE `session` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -409,3 +414,10 @@ CREATE TABLE abuse_reports (
 CREATE INDEX abuse_reports_status_idx ON abuse_reports (status, created_at);
 --> statement-breakpoint
 CREATE INDEX abuse_reports_target_idx ON abuse_reports (target);
+--> statement-breakpoint
+CREATE TABLE `skill_settings` (
+	`name` text PRIMARY KEY NOT NULL,
+	`enabled` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`updated_by` text NOT NULL
+);

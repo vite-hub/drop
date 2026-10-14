@@ -124,7 +124,7 @@ export function insertDrop(id, overrides = {}) {
   const values = {
     id, owner_id: "owner", kind: "markdown", title: id, filename: `${id}.md`, blob_key: `${id}.md`, size: 8,
     version: 1, visibility: "shared", access: "comment", actor_kind: "browser", actor_name: "Owner", created_at: 1, updated_at: 1,
-    // Like rows that predate expiry: 0001_expiry starts their window at migration time.
+    // A fresh window, as if someone opened the drop just now.
     last_accessed_at: Date.now(),
     ...overrides,
   }
