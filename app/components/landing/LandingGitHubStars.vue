@@ -1,7 +1,11 @@
 <script setup lang="ts">
-// Header GitHub link with the live star count. The count stays hidden until it loads, and on failure.
-const { data: repo } = useFetch<{ stargazers_count?: number }>("https://api.github.com/repos/vite-hub/drop", { server: false, key: "github-stars" })
-const stars = computed(() => typeof repo.value?.stargazers_count === "number" ? repo.value.stargazers_count : null)
+// The server shares a cached count across visitors. Hide it until it loads, and on failure.
+const stars = ref<number | null>(null)
+
+onMounted(async () => {
+  const response = await $fetch<{ stars: number | null }>("/api/github-stars").catch(() => ({ stars: null }))
+  stars.value = response.stars
+})
 
 const label = computed(() => (stars.value === null ? "" : stars.value >= 1000 ? `${(stars.value / 1000).toFixed(1)}k` : String(stars.value)))
 </script>

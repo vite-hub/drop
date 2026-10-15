@@ -110,6 +110,21 @@ Owner quotas are off by default. Set `DROP_QUOTAS=1` to enable them on the offic
 
 Usage is recorded even with enforcement disabled. D1 conditionally reserves capacity when quotas are enabled, then commits the write ledger with metadata in one batch. Normal failures release the reservation. Pending reservations older than 15 minutes stop counting toward quotas. The hourly cleanup deletes them and logs evlog warnings with the owner, reservation, and released amounts so operators can investigate crashed publishes. Committed rows keep counting toward monthly writes and are never expired by this cleanup.
 
+### Upgrading older instances
+
+Apply all database migrations before deploying. Migration `0003_content_gates.sql` adds blob tombstones and code-image ownership. Older code images without an owner record return 404. Untracked uploads are served only if their timestamp predates `2026-10-07T12:59:35Z`, the first account-backed deployment. Missing or invalid timestamps return 404.
+
+Instances that used the old Markdown renderer also need a one-time purge of its non-expiring KV entries after deploying the current renderer. With the Cloudflare build output available, save and review the delete list before running the final command:
+
+```sh
+mkdir -p .cache
+pnpm exec wrangler kv key list --remote --binding KV --config .output/server/wrangler.json --prefix 'nitro-cache:nitro:functions:markdown:' > .cache/old-markdown-list.json
+node scripts/markdown-cache-keys.mjs .cache/old-markdown-list.json > .cache/old-markdown-delete.json
+pnpm exec wrangler kv bulk delete .cache/old-markdown-delete.json --remote --binding KV --config .output/server/wrangler.json
+```
+
+The helper selects only the old render prefix and `.json` suffix. It preserves the current cache namespace and other KV data.
+
 ### Develop locally
 
 ```sh
