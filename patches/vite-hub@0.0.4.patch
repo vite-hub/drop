@@ -1,0 +1,31 @@
+diff --git a/dist/bin.js b/dist/bin.js
+index c119b2dcda4b1d83113b9bcc1d33f23acfebaa5d..bf23dba76d30074607a27b99ebe97fc18a5cd465 100755
+--- a/dist/bin.js
++++ b/dist/bin.js
+@@ -1020,9 +1020,25 @@ function isNamedAssertionComparison(source, index, genericEnd) {
+ 	const suffix = source.slice(genericEnd + 1).replace(/^(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*\n)*/, "");
+ 	return !/^(?:as|satisfies)\s+\S/u.test(suffix) && /^[\p{ID_Start}_$\d"'`]/u.test(suffix);
+ }
++// One token of an assertion type. A sticky match takes each token once and
++// never splits it again, so a long prefix that is not an assertion type is
++// rejected in linear time.
++const assertionTypeToken = /[\p{ID_Start}_$][\p{ID_Continue}$]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:-\s*)?(?:0[xX][\da-fA-F_]+n?|0[bB][01_]+n?|0[oO][0-7_]+n?|\d[\d_]*n|(?:\d[\d_]*(?:\.[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d[\d_]*)?)|[.\s()[\]{}&|?:]/uy;
+ function hasAssertionTypePrefix(source) {
+ 	const prefix = decodeIdentifier(maskAssertionTypeArguments(source));
+-	return /(?:^|[^\p{ID_Continue}$.])(?:as|satisfies)\s+(?:[\p{ID_Start}_$][\p{ID_Continue}$]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:-\s*)?(?:0[xX][\da-fA-F_]+n?|0[bB][01_]+n?|0[oO][0-7_]+n?|\d[\d_]*n|(?:\d[\d_]*(?:\.[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d[\d_]*)?)|[.\s()[\]{}&|?:])+$/u.test(prefix);
++	// The prefix continues an assertion when the text after an `as` or
++	// `satisfies` keyword is only type tokens up to the end.
++	for (const keyword of prefix.matchAll(/(?<![\p{ID_Continue}$.])(?:as|satisfies)\s/gu)) {
++		let index = keyword.index + keyword[0].length;
++		if (index === prefix.length) continue;
++		while (index < prefix.length) {
++			assertionTypeToken.lastIndex = index;
++			if (!assertionTypeToken.test(prefix)) break;
++			index = assertionTypeToken.lastIndex;
++		}
++		if (index === prefix.length) return true;
++	}
++	return false;
+ }
+ function maskAssertionTypeArguments(source) {
+ 	const output = source.split("");
