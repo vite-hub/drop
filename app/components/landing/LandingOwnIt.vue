@@ -1,10 +1,9 @@
 <script setup lang="ts">
 // Self-hosting, the ViteHub way: one config, your provider, your data.
 const POINTS = [
-  "Sign in with GitHub, or swap in any Better Auth provider",
+  "GitHub sign-in by default. It's Better Auth underneath, so you can switch to Google, GitLab, email, or SSO",
   "On Cloudflare, the database and file storage are created on deploy",
   "MCP server with browser sign-in for your agents",
-  "Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
 ]
 const CONFIG_FILE = "nuxt.config.ts"
 const CONFIG = `export default defineNuxtConfig({
@@ -21,7 +20,7 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
 
 <template>
   <section id="own" class="scroll-mt-14 border-y border-default bg-muted">
-    <div class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+    <div class="mx-auto grid max-w-6xl items-center gap-12 px-4 py-24 sm:px-6 lg:py-32 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
       <div>
         <p class="label-mono flex items-center gap-2"><ViteHubMark class="size-3" />Built on ViteHub</p>
         <h2 class="mt-3 text-[2rem] leading-tight font-semibold tracking-tight text-highlighted">You own it.</h2>
@@ -33,6 +32,15 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
             <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ point }}
           </li>
         </ul>
+        <p class="label-mono mt-8 mb-3">Deploys to</p>
+        <ul class="flex flex-wrap gap-1.5">
+          <li v-for="host in HOSTS" :key="host.id">
+            <NuxtLink :to="`/docs/self-host/${host.id}`" class="flex items-center gap-1.5 rounded-md border border-default bg-default px-2 py-1 text-xs text-toned transition-colors hover:text-highlighted">
+              <UIcon :name="host.icon" class="size-3.5" />{{ host.id === "vps" ? "Your server" : host.name }}
+            </NuxtLink>
+          </li>
+        </ul>
+        <p class="mt-2.5 text-xs text-dimmed">Live editing runs on Cloudflare and on your own server.</p>
         <div class="mt-8 flex flex-wrap gap-2">
           <UButton color="neutral" variant="outline" icon="i-simple-icons-github" label="Fork on GitHub" to="https://github.com/vite-hub/drop" target="_blank" />
           <UButton color="neutral" variant="ghost" label="Self-hosting guide" to="/docs/self-host" />

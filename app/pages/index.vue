@@ -54,6 +54,11 @@ const USE_CASES = [
 
 const PROMISES = ["Private until you share", "Works with any MCP agent", "Source on GitHub"]
 
+const SELF_HOSTED = [
+  "Deploy to Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
+  "GitHub sign-in by default. Switch to Google, GitLab, email, or SSO with Better Auth",
+]
+
 const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drops expire after 30 days, unless you keep them"]
 </script>
 
@@ -64,7 +69,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
     <main>
       <section class="relative overflow-hidden">
         <LandingDotGrid class="absolute inset-0 size-full [mask-image:radial-gradient(ellipse_at_50%_0%,black_10%,transparent_60%)]" />
-        <div class="relative mx-auto w-full max-w-6xl px-4 pt-16 pb-16 sm:px-6 lg:pt-24">
+        <div class="relative mx-auto w-full max-w-6xl px-4 pt-16 pb-24 sm:px-6 lg:pt-24 lg:pb-32">
           <div class="flex flex-col items-center text-center">
             <NuxtLink to="/docs/agents" class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted">
               <span class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[10px] tracking-wide text-highlighted uppercase">MCP</span>
@@ -110,8 +115,8 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
         </div>
       </section>
 
-      <section v-for="(useCase, position) in USE_CASES" :key="useCase.label" class="mx-auto max-w-6xl px-4 sm:px-6" :class="position ? 'pt-12 pb-20' : 'pt-24 pb-12'">
-        <div class="mb-8 grid items-end gap-x-12 gap-y-3 lg:grid-cols-2">
+      <section v-for="useCase in USE_CASES" :key="useCase.label" class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
+        <div class="mb-10 grid items-end gap-x-12 gap-y-3 lg:mb-12 lg:grid-cols-2">
           <div>
             <p class="label-mono mb-3">{{ useCase.label }}</p>
             <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">{{ useCase.title }}</h2>
@@ -124,8 +129,8 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
         </div>
       </section>
 
-      <section class="mx-auto max-w-6xl px-4 pt-8 pb-20 sm:px-6">
-        <div class="mb-8">
+      <section class="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+        <div class="mb-10 lg:mb-12">
           <p class="label-mono mb-3">A live page for every file</p>
           <h2 class="text-3xl font-semibold tracking-tight text-highlighted">What every drop gets.</h2>
         </div>
@@ -141,8 +146,8 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
       <!-- Below the fold: rendered on the server, hydrated only when scrolled into view. -->
       <LazyLandingOwnIt hydrate-on-visible />
 
-      <section class="mx-auto max-w-6xl px-4 pt-20 pb-12 sm:px-6">
-        <h2 class="mb-8 text-3xl font-semibold tracking-tight text-highlighted">Use it here, or run your own.</h2>
+      <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
+        <h2 class="mb-10 text-3xl font-semibold tracking-tight text-highlighted lg:mb-12">Use it here, or run your own.</h2>
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-lg border border-default p-6">
             <p class="label-mono">drop.vitehub.dev</p>
@@ -158,6 +163,11 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
             <p class="label-mono">Your own</p>
             <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Deploy your own and choose the admins.</p>
             <p class="mt-2 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. The GitHub accounts you list as admins can promote anyone.</p>
+            <ul class="mt-5 space-y-2 text-sm">
+              <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
+                <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+              </li>
+            </ul>
             <dl class="mt-5 divide-y divide-default border-y border-default text-sm">
               <div v-for="role in ROLES" :key="role" class="flex gap-4 py-2">
                 <dt class="w-16 shrink-0 font-medium text-highlighted">{{ ROLE_LABELS[role] }}</dt>
@@ -168,7 +178,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
         </div>
       </section>
 
-      <section class="mx-auto max-w-6xl px-4 pt-4 pb-20 sm:px-6">
+      <section class="mx-auto max-w-6xl px-4 pt-24 pb-24 sm:px-6 lg:pt-32 lg:pb-32">
         <div class="flex flex-col items-start justify-between gap-6 rounded-lg border border-default p-8 sm:flex-row sm:items-center">
           <div>
             <p class="text-xl font-semibold tracking-tight text-highlighted">Drop your first doc.</p>
