@@ -8,7 +8,7 @@
   </a>
 </p>
 
-<p align="center">Review what your agents plan. Agents drop docs and small apps; you comment on the exact spot and share the ones worth sharing. Built with ViteHub.</p>
+<p align="center">The shared drive for people and their agents. Agents drop docs, pages, and small apps over MCP; you comment on the exact spot, and the agent drops the next version.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·
@@ -19,23 +19,12 @@
 
 ## How it works
 
-1. **Agents drop their work** over MCP: a plan in Markdown, an HTML report, or a small static app made of files. They sign in through your browser once; there are no keys.
-2. **Every drop starts private.** Only its owner (and the workspace's editors and admins) can open it.
-3. **People review it** full screen: select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit; people with edit access change a Markdown doc together, live, and publish it as the next version.
-4. **The agent reads the open comments** and drops the next version. Older doc versions stay in history. Apps keep only their latest file set; publishing replaces it and deletes the old files.
+1. **Your agent drops its work** over MCP: a Markdown plan, an HTML page, or a small static app. It signs in through your browser once; there are no API keys.
+2. **Every drop starts private.** Switch on a link when you want others in, and pick whether it can view, comment, or edit.
+3. **People review it** full screen and comment on the exact spot, or edit a Markdown doc together, live.
+4. **The agent reads the open comments** and drops the next version.
 
-Under the hood:
-
-- **Auth** is Better Auth through `vite-hub/auth`: GitHub sign-in, admin roles, and an OAuth 2.1 provider that MCP clients sign in through (dynamic client registration, PKCE, JWT access tokens bound to `/mcp`).
-- **Database** is SQLite through `vite-hub/database`: local SQLite on a VPS or D1, using D1's HTTP API outside Cloudflare. It holds drops, app files, and comments.
-- **Blob** stores every file at `/f/<key>`.
-- Markdown renders through **Comark**, and HTML runs in a sandbox, on a separate domain when `DROP_CONTENT_ORIGIN` is set.
-- **Code images** come from Shiki as SVG; on Cloudflare, a single **Browser** screenshot action turns them into PNG. A **Schedule** deletes them hourly on Cloudflare, Netlify, and a VPS, or daily on Vercel.
-- **MCP** is [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit): one file per tool and prompt in `server/mcp/`, both protocol revisions, and the [Skills extension](https://modelcontextprotocol.io/seps/2640-skills-extension).
-- **Skills** are defined once in `skills/` and served over MCP (`skills/list`, `skill://` resources), at `/.well-known/agent-skills/` ([Discovery v0.2.0](https://github.com/cloudflare/agent-skills-discovery-rfc)), and at the older `/.well-known/skills/`.
-- **Logs** are [evlog](https://www.evlog.dev) wide events: one structured line per request with the caller, the agent, what it did, and why it failed. Workers Logs is on, so they're queryable in the Cloudflare dashboard.
-
-## Use Drop
+## Use it
 
 1. Sign in at [drop.vitehub.dev](https://drop.vitehub.dev) with GitHub.
 2. Add Drop's MCP server to your agent:
@@ -44,95 +33,23 @@ Under the hood:
    claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp
    ```
 
-   The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. The `/agents` page has the setup for Codex, Cursor, VS Code, and other clients, and lists the agents you've connected.
+   The first time it connects, Drop opens in your browser so you can sign in. [The agents page](https://drop.vitehub.dev/agents) has the setup for Codex, Cursor, VS Code, and other clients.
 3. Ask your agent to drop a plan. It answers with the review link.
 
-MCP tools: `publish` (docs, files, and apps, with a version note and a lifetime), `read_drop` (content, open comments, versions), `list_drops` (with the Trash and plan usage), `update_drop` (share, rename, lifetime, Trash), and `create_code_image`, plus the `address_feedback` prompt. Four skills come with the server (`skills/list`): `vitehub-drop`, `handoff`, `pr-evidence`, which renders annotated screenshots with [comark-annotate](https://comark-annotate.onmax.me), and `show-me`, HumanLayer's skill for explaining with diagrams. They're also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. Members read them at `/skills`; admins switch each one on or off for the whole deployment. [The docs](https://drop.vitehub.dev/docs) have the details.
-
-## Host it yourself
-
-[drop.vitehub.dev](https://drop.vitehub.dev) is one instance anyone can use; you can run your own. `DROP_HOST` overrides the host at build time, and [the self-hosting docs](https://drop.vitehub.dev/docs/self-host) have the steps for each:
+## Host your own
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop&env=GITHUB_CLIENT_ID%2CGITHUB_CLIENT_SECRET%2CBETTER_AUTH_SECRET%2CDROP_ADMINS%2CCLOUDFLARE_ACCOUNT_ID%2CCLOUDFLARE_API_TOKEN%2CCLOUDFLARE_D1_DATABASE_ID%2CCLOUDFLARE_D1_DATABASE_NAME&envDescription=GitHub+sign-in%2C+admin+user+IDs%2C+Cloudflare+D1%2C+and+a+private+Blob+store.+See+the+Drop+guide+for+each+value.&envLink=https%3A%2F%2Fdrop.vitehub.dev%2Fdocs%2Fself-host%2Fvercel&stores=%5B%7B%22type%22%3A%22blob%22%7D%5D) [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy on Deno](https://deno.com/button)](https://console.deno.com/new?clone=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [Run on a VPS](https://drop.vitehub.dev/docs/self-host/vps#steps)
 
-Cloudflare creates D1, R2, and KV for you. Vercel and Netlify prompt for settings. Deno clones the repo and reads `deno.jsonc`; the VPS guide uses Docker Compose. No button creates your GitHub OAuth app. Use `<origin>/api/auth/callback/github` as its callback, generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`, and find your admin user id with `gh api users/<login> --jq .id`.
+Cloudflare creates the database and storage for you. Every host needs a GitHub OAuth app with `<origin>/api/auth/callback/github` as its callback. The [self-hosting docs](https://drop.vitehub.dev/docs/self-host) walk through each host, and [SELF_HOSTING.md](./SELF_HOSTING.md) is the full reference: architecture, settings, abuse handling, lifetimes, quotas, and upgrades.
 
-Docker and VPS builds use local SQLite by default, with database, files, and KV under `.data/`. Vercel, Netlify, and Deno need a Cloudflare D1 database and an account API token with D1 edit access. Choose a private Blob store in the Vercel flow; Deno needs an S3 bucket and access keys. The provider guides cover these steps. Migrations run before deployment; existing Cloudflare Workers Builds that use `pnpm build` and `npx wrangler deploy` still need `pnpm db:migrate:remote` after schema changes.
-
-Only Cloudflare renders PNG code images and has a distributed rate limiter. Elsewhere code images are SVG and rate limits count per instance. Anyone who signs in joins as a Member; GitHub user ids in `DROP_ADMINS` join as Admin. Admins change roles on `/members`.
-
-### Self-host configuration
-
-Builds detect `NITRO_PRESET` or `SERVER_PRESET`, then Vercel, Netlify, or Deno environment markers. A local `DROP_DATABASE_URL` selects the VPS preset when no host is selected. With no signal, the existing Cloudflare default remains. Set `DROP_HOST=cloudflare|vercel|netlify|deno|vps` to choose manually. Conflicting or unsupported presets fail the build.
-
-For a server with persistent disk:
-
-```sh
-cp .env.example .env
-# Fill BETTER_AUTH_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and DROP_ADMINS.
-docker compose up -d --build
-```
-
-Compose builds the Node preset and applies the existing Drizzle migrations before serving requests. Rebuilds preserve the `drop-data` volume. Run one replica and back up the volume while Drop is stopped, or use SQLite's backup API for the database and also back up the blobs.
-
-| Setting | Behavior |
-| --- | --- |
-| `DROP_DATABASE` | Build override, `sqlite` or `d1`. VPS defaults to SQLite; other hosts use D1. An existing `CLOUDFLARE_D1_DATABASE_ID` keeps a VPS on D1. |
-| `DROP_DATABASE_URL` | Runtime SQLite `file:` URL, default `file:.data/database/drop.db`. Also selects SQLite at build time when supplied. |
-| `DROP_GITHUB_ORG` | Runtime restriction to active members, including shared links, file responses, and MCP. Native login requests `read:org`. Successful membership checks expire after five minutes. |
-| `DROP_AUTH_PROXY` | Set `1` explicitly to reuse a GitHub oauth2-proxy. Requires `DROP_GITHUB_ORG`; disables native GitHub login. |
-| `DROP_AUTH_PROXY_COOKIE` | Optional proxy cookie name to clear on logout. Use a Secure, host-only cookie with `Path=/`. |
-| `DROP_CONTENT_ORIGIN` | Optional second hostname, served by the same deployment, where apps and HTML docs run with their own origin. Without it they run in an opaque sandbox where storage is temporary and URL changes are ignored. Keep it outside any login proxy. See [Give apps their own domain](https://drop.vitehub.dev/docs/self-host#content-origin). |
-
-The host and database driver are build choices. Changing drivers needs a rebuild and a separate data migration; it does not copy data. SQLite paths and auth settings remain runtime choices. Docker runs the existing D1 migration command for a D1 build.
-
-For a Node build outside Docker, set `DROP_HOST=vps` for installation and building, then run `node .output/server/index.mjs` from the repository root. If copying the build, copy `server/databases/migrations` alongside `.output` and persist `.data/`.
-
-To reuse an existing GitHub OAuth app through oauth2-proxy, configure its accepted callback for your Drop origin and follow the [proxy setup](https://drop.vitehub.dev/docs/self-host/vps#auth-proxy). Drop validates the forwarded GitHub token and organization membership itself. An incoming header never enables proxy mode automatically. The proxy does not replace Drop's OAuth server for MCP clients.
-
-### Abuse handling
-
-Set `DROP_SHARE_APPROVAL=1` to require admin approval before a member shares publicly. Private use stays available. Admins and unlimited-plan members bypass approval. Review shares at `/admin/review` and reports at `/admin/reports`. Existing shared links stay shared; approve existing trusted members before enabling approval if they need to publish new versions. `DROP_ABUSE_EMAIL` optionally provides a public contact email. Reports are stored in D1 and emit high-severity evlog events; monitor those logs. No email notification is sent. Review the legal templates in `app/pages/{terms,acceptable-use,abuse}.vue` before public use, including your jurisdiction and DMCA contact requirements.
-
-Unused OAuth clients are removed after 24 hours by the existing cleanup schedule. Deno has no schedule, so run cleanup separately there. User content is excluded from indexing; landing and docs remain indexable.
-
-### Expiry
-
-Each drop has a lifetime its publisher picks: temporary (14 days after its last visit), review (30 days), or keep (never expires; an agent that keeps a drop says why). A visit is a signed-in person or an agent opening it, a new version, or an anonymous reader whose browser ran the shared page or opened a raw file directly; link unfurlers, crawlers, and embedded images don't count. An expired or deleted drop goes to the Trash, stops being served, and can be restored for 15 days before the hourly cleanup schedule deletes it (Deno has no schedule: such drops stop being served but stay stored). Only people delete for good; agents can trash and restore.
-
-Set `DROP_EXPIRY_DAYS` to change the window, or to `0` to keep every drop. Set `DROP_CUSTOM_EXPIRY=0` so only admins can turn on "Keep forever".
-
-### Plans and limits
-
-Owner quotas are off by default. Set `DROP_QUOTAS=1` to enable them on the official instance, or `NUXT_QUOTAS_ENABLED=true` in runtime config. Free allows 3 logical drops, 100 MiB of retained storage, and 1,000 file writes per UTC calendar month. Free apps allow 50 files and 2 MiB. Pro allows 100 drops, 1 GiB, and 10,000 writes; Pro and self-host apps keep the 200-file / 4 MiB maximum. Set `DROP_PRO_DROPS`, `DROP_PRO_BYTES`, and `DROP_PRO_WRITES` at build time, or `NUXT_QUOTAS_PRO_DROPS`, `NUXT_QUOTAS_PRO_BYTES`, and `NUXT_QUOTAS_PRO_WRITES` at runtime, to configure Pro.
-
-`DROP_DEFAULT_PLAN` defaults to `free`; `NUXT_QUOTAS_DEFAULT_PLAN` overrides it at runtime. Admins set individual plans on Members, including `unlimited` for the operator. A null user plan follows the configured default. The drop's owner pays for every version, including ones published by editors' and admins' agents. All document versions and current app files count toward storage. A doc version uses one write, an app publish uses one write per file, and a temporary code image uses one write without a drop slot. Its bytes count until cleanup deletes it. A shared owner burst limit allows 30 publishes per minute. Existing drops remain readable at a cap. Deleting a drop releases its slot and bytes but keeps its monthly write count.
-
-Usage is recorded even with enforcement disabled. D1 conditionally reserves capacity when quotas are enabled, then commits the write ledger with metadata in one batch. Normal failures release the reservation. Pending reservations older than 15 minutes stop counting toward quotas. The hourly cleanup deletes them and logs evlog warnings with the owner, reservation, and released amounts so operators can investigate crashed publishes. Committed rows keep counting toward monthly writes and are never expired by this cleanup.
-
-### Upgrading older instances
-
-Apply all database migrations before deploying. Migration `0003_content_gates.sql` adds blob tombstones and code-image ownership. Older code images without an owner record return 404. Untracked uploads are served only if their timestamp predates `2026-10-07T12:59:35Z`, the first account-backed deployment. Missing or invalid timestamps return 404.
-
-Instances that used the old Markdown renderer also need a one-time purge of its non-expiring KV entries after deploying the current renderer. With the Cloudflare build output available, save and review the delete list before running the final command:
-
-```sh
-mkdir -p .cache
-pnpm exec wrangler kv key list --remote --binding KV --config .output/server/wrangler.json --prefix 'nitro-cache:nitro:functions:markdown:' > .cache/old-markdown-list.json
-node scripts/markdown-cache-keys.mjs .cache/old-markdown-list.json > .cache/old-markdown-delete.json
-pnpm exec wrangler kv bulk delete .cache/old-markdown-delete.json --remote --binding KV --config .output/server/wrangler.json
-```
-
-The helper selects only the old render prefix and `.json` suffix. It preserves the current cache namespace and other KV data.
-
-### Develop locally
+## Develop
 
 ```sh
 pnpm install
-pnpm dev          # http://localhost:3000
-pnpm db:migrate   # once, and after schema changes (pnpm db:generate writes new migrations)
+pnpm db:migrate   # once, and after schema changes
+pnpm dev          # http://localhost:3000, sign in at /?signin=1
 ```
 
-Local dev has no GitHub app, so `nuxt dev` also allows email and password sign-in: open `/?signin=1`. Files go to `.vitehub/data/blob`, and rate limits are off.
+Built with [ViteHub](https://vitehub.dev) (auth, database, blob), [Comark](https://github.com/comarkdown/comark), [Shiki](https://shiki.style), [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit), and [evlog](https://www.evlog.dev).
 
 The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The `handoff` skill is adapted from Matt Pocock's [handoff skill](https://github.com/mattpocock/skills/blob/main/skills/productivity/handoff/SKILL.md), and `show-me` from HumanLayer's [show-me skill](https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md), both MIT.
