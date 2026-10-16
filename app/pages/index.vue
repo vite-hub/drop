@@ -39,12 +39,6 @@ const FEATURES = [
 
 const USE_CASES = [
   {
-    story: "edit",
-    label: "Edit together",
-    title: "Fix the doc yourself, with your team.",
-    body: "Open a Markdown drop and edit it together, live. Type / for blocks, : for emoji, and @ to bring someone in. Publish makes the next version.",
-  },
-  {
     story: "pr",
     label: "Pull requests",
     title: "Put the before and after in every pull request.",
@@ -125,8 +119,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
           <p class="max-w-[52ch] leading-relaxed text-pretty text-muted">{{ useCase.body }}</p>
         </div>
         <div class="rounded-2xl border border-default bg-muted p-3 sm:p-8 lg:p-10">
-          <LazyLandingEditStory v-if="useCase.story === 'edit'" hydrate-on-visible />
-          <LazyLandingPrStory v-else-if="useCase.story === 'pr'" hydrate-on-visible />
+          <LazyLandingPrStory v-if="useCase.story === 'pr'" hydrate-on-visible />
           <LazyLandingAppStory v-else hydrate-on-visible />
         </div>
       </section>
