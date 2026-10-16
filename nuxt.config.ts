@@ -2,7 +2,8 @@ import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
-import { DEFAULT_PRO_LIMITS } from "./shared/quotas.ts"
+import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
+import { DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
 
@@ -91,23 +92,6 @@ export default defineNuxtConfig({
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
   $development: {
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
-  },
-
-  runtimeConfig: {
-    public: {
-      // Quiver's VPS can use oauth2-proxy instead of Drop's native GitHub flow.
-      // NUXT_PUBLIC_AUTH_PROXY overrides this at runtime for that deployment.
-      authProxy: false,
-    },
-    // Live editing needs Realtime rooms, which only the Cloudflare and VPS builds configure (VITEHUB above).
-    liveEditing,
-    quotas: {
-      enabled: process.env.DROP_QUOTAS === "1",
-      defaultPlan: process.env.DROP_DEFAULT_PLAN || "free",
-      proDrops: Number(process.env.DROP_PRO_DROPS || DEFAULT_PRO_LIMITS.drops),
-      proBytes: Number(process.env.DROP_PRO_BYTES || DEFAULT_PRO_LIMITS.bytes),
-      proWrites: Number(process.env.DROP_PRO_WRITES || DEFAULT_PRO_LIMITS.writes),
-    },
   },
 
   css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "~/assets/css/main.css"],
@@ -207,17 +191,34 @@ export default defineNuxtConfig({
           },
           secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
         },
+        // Every Drop setting is read at runtime: changing one needs a restart, not a rebuild. Each also reads its
+        // canonical VITEHUB_DROP_* name first (VITEHUB_DROP_QUOTAS_ENABLED for quotas.enabled).
         drop: {
           // GitHub user ids (not logins, which can be renamed and reclaimed) that sign in as admins, comma-separated.
           admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
-          shareApproval: env({ source: env.source("DROP_SHARE_APPROVAL"), default: "0" }),
+          // Only active members of this GitHub organization may sign in, open shared links, or use MCP.
+          githubOrg: env({ source: env.source("DROP_GITHUB_ORG"), default: "" }),
+          // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
+          authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
+          authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),
+          // Email and password sign-in outside `nuxt dev`, for the runtime tests.
+          testSignin: env.boolean({ source: env.source("DROP_TEST_SIGNIN"), default: false }),
+          shareApproval: env.boolean({ source: env.source("DROP_SHARE_APPROVAL"), default: false }),
           abuseEmail: env({ source: env.source("DROP_ABUSE_EMAIL"), default: "" }),
-          // Days a drop lives after its last visit by a person or an agent; 0 keeps every drop forever.
-          expiryDays: env({ source: env.source("DROP_EXPIRY_DAYS"), default: "30" }),
-          // "0" stops owners from turning on "Keep forever"; admins still can.
-          customExpiry: env({ source: env.source("DROP_CUSTOM_EXPIRY"), default: "1" }),
+          // Days a review drop lives after its last visit (temporary ones at most 14); 0 keeps every drop.
+          expiryDays: env.number({ source: env.source("DROP_EXPIRY_DAYS"), default: DEFAULT_EXPIRY_DAYS }),
+          // false lets only admins keep drops.
+          customExpiry: env.boolean({ source: env.source("DROP_CUSTOM_EXPIRY"), default: true }),
           // A second hostname for apps and HTML docs, e.g. https://drop-usercontent.example.com (see server/utils/content-origin.ts).
           contentOrigin: env({ source: env.source("DROP_CONTENT_ORIGIN"), default: "" }),
+          // Owner quotas: one plan for everyone (shared/quotas.ts).
+          quotas: {
+            enabled: env.boolean({ source: env.source("DROP_QUOTAS"), default: false }),
+            plan: env.enum(PLANS, { source: env.source("DROP_DEFAULT_PLAN"), default: "free" }),
+            proDrops: env.number({ source: env.source("DROP_PRO_DROPS"), default: DEFAULT_PRO_LIMITS.drops }),
+            proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
+            proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
+          },
         },
       },
     },

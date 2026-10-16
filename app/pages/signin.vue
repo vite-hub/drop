@@ -4,7 +4,7 @@ useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 const { data: me } = await useMe()
 const { next, signIn } = useGitHubSignIn()
 const { signOut } = useUserSession(useNuxtApp().$auth)
-const authProxy = useRuntimeConfig().public.authProxy
+const { data: method } = await useApi("/api/sign-in", { key: "sign-in" })
 const pending = ref(false)
 const error = ref("")
 
@@ -17,7 +17,7 @@ async function connect() {
       if (result.error) throw new Error(result.error.message ?? "Couldn't sign out.")
       clearNuxtData()
     }
-    if (authProxy) {
+    if (method.value?.proxy) {
       await navigateTo(`/oauth2/start?rd=${encodeURIComponent(next.value)}`, { external: true })
       return
     }

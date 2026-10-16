@@ -9,8 +9,8 @@ import type { ServerEnv } from "#vitehub/env/server"
 import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { nativeClientRegistration } from "./utils/oauth-clients"
-import { githubOrganization, isGitHubMember } from "./utils/github-membership"
-import { proxyAuth, proxyAuthentication } from "./utils/proxy-auth"
+import { isGitHubMember } from "./utils/github-membership"
+import { authProxy, proxyAuth } from "./utils/proxy-auth"
 
 // Kept out of `defineAuth()`: ViteHub's auth scanner takes minutes on generic type arguments inside it.
 type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
@@ -35,9 +35,11 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  */
 export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
   const env = runtimeEnv as unknown as ServerEnv
+  const proxied = authProxy().enabled
+  const organization = env.drop.githubOrg.trim()
   const githubOptions = {
-    clientId: proxyAuthentication ? "" : env.auth.github.clientId.unseal(), clientSecret: proxyAuthentication ? "" : env.auth.github.clientSecret.unseal(),
-    scope: githubOrganization ? ["read:org"] : undefined,
+    clientId: proxied ? "" : env.auth.github.clientId.unseal(), clientSecret: proxied ? "" : env.auth.github.clientSecret.unseal(),
+    scope: organization ? ["read:org"] : undefined,
   }
   return {
     appName: "Drop",
@@ -48,16 +50,16 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
     // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
     // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
     advanced: requestOrigin.startsWith("https://") ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } } : {},
-    disabledPaths: ["/token", ...(proxyAuthentication ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
+    disabledPaths: ["/token", ...(proxied ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
     access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
-    socialProviders: proxyAuthentication ? {} : {
+    socialProviders: proxied ? {} : {
       github: {
         ...githubOptions,
-        ...(githubOrganization ? { getUserInfo: async (token: GitHubToken) =>
+        ...(organization ? { getUserInfo: async (token: GitHubToken) =>
           await isGitHubMember(token.accessToken) ? github(githubOptions).getUserInfo(token) : null } : {}),
       },
     },
-    emailAndPassword: { enabled: import.meta.dev === true || process.env.DROP_TEST_SIGNIN === "1" },
+    emailAndPassword: { enabled: import.meta.dev === true || env.drop.testSignin },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
     hooks: { before: nativeClientRegistration },
     databaseHooks: {

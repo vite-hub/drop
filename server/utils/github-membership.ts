@@ -1,12 +1,16 @@
-export const githubOrganization = process.env.DROP_GITHUB_ORG?.trim()
+import { useServerEnv } from "#vitehub/env/server"
+
+/** The GitHub organization this Drop is limited to (`DROP_GITHUB_ORG`), or null when anyone may sign in. */
+export const githubOrganization = () => useServerEnv().drop.githubOrg.trim() || null
 const checked = new Map<string, number>()
 
 /** A successful check lasts at most five minutes, for browser and MCP access alike. */
 export async function isGitHubMember(token: string | null | undefined): Promise<boolean> {
-  if (!githubOrganization) return true
+  const organization = githubOrganization()
+  if (!organization) return true
   if (!token) return false
   if ((checked.get(token) ?? 0) > Date.now()) return true
-  const member = await fetch(`https://api.github.com/user/memberships/orgs/${encodeURIComponent(githubOrganization)}`, {
+  const member = await fetch(`https://api.github.com/user/memberships/orgs/${encodeURIComponent(organization)}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Drop" },
     signal: AbortSignal.timeout(5000),
   }).then(async response => response.ok && (await response.json() as { state?: string }).state === "active").catch(() => false)

@@ -126,7 +126,7 @@ test("temporary drops expire after 14 days, review after 30, kept ones never", a
   assert.equal((await findDrop("temp")).expired, true)
   assert.equal((await findDrop("review")).expired, false)
   assert.equal((await findDrop("kept")).expired, false)
-  state.expiryDays = "7"
+  state.expiryDays = 7
   assert.equal((await findDrop("review")).expired, true, "a shorter Drop-wide window caps temporary and review alike")
 })
 
@@ -149,7 +149,7 @@ test("agents keep a drop when they say why; people just choose; admins can limit
   assert.equal(temporary.expiresAt, now + 14 * DAY_MS, "choosing a lifetime starts its window now")
   assert.equal((await patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "keep" } }))).keepReason, null)
 
-  state.customExpiry = "0"
+  state.customExpiry = false
   await patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "review" } }))
   await assert.rejects(patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "keep" } })), error => error.status === 403)
   state.who = { ...who, role: "admin" }
@@ -226,7 +226,7 @@ test("files a doc embeds belong to it: shared, trashed, and counted with the doc
 
 test("DROP_EXPIRY_DAYS=0 keeps every drop and hides expiry", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now })
-  state.expiryDays = "0"
+  state.expiryDays = 0
   insertDrop("ancient", { last_accessed_at: visitedDaysAgo(400) })
   await cleanup.handler({ scheduledAt: new Date(now) })
   assert.ok(exists("ancient"))

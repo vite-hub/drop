@@ -33,7 +33,7 @@ export const bearerFrom = (headers: Headers) => headers.get("authorization")?.ma
 export function identify(event: H3Event): Promise<Identity | null> {
   const context = event.context as { dropIdentity?: Promise<Identity | null> }
   return (context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
-    if (who && githubOrganization) {
+    if (who && githubOrganization()) {
       const [githubAccount] = await db.select({ token: account.accessToken }).from(account)
         .where(and(eq(account.userId, who.userId), eq(account.providerId, "github"))).limit(1)
       if (!await isGitHubMember(githubAccount?.token)) return null

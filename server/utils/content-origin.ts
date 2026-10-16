@@ -9,7 +9,7 @@ import { useServerEnv } from "#vitehub/env/server"
  * Without it, drops keep the opaque sandbox.
  */
 function configured(event: H3Event): URL | null {
-  const value = useServerEnv(event).drop.contentOrigin?.trim()
+  const value = useServerEnv(event).drop.contentOrigin.trim()
   if (!value) return null
   try {
     const url = new URL(value)

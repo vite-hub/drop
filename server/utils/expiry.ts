@@ -17,9 +17,8 @@ export interface ExpiryPolicy {
 }
 
 export function expiryPolicy(event?: H3Event): ExpiryPolicy {
-  const env = useServerEnv(event).drop
-  const days = Number(env.expiryDays)
-  return { days: Number.isFinite(days) && days >= 0 ? Math.floor(days) : DEFAULT_EXPIRY_DAYS, custom: env.customExpiry !== "0" }
+  const { expiryDays, customExpiry } = useServerEnv(event).drop
+  return { days: expiryDays >= 0 ? Math.floor(expiryDays) : DEFAULT_EXPIRY_DAYS, custom: customExpiry }
 }
 
 type ExpiryFields = Pick<typeof drops.$inferSelect, "createdAt" | "lastAccessedAt" | "lifetime">

@@ -2,13 +2,18 @@ import { APIError, createAuthEndpoint } from "better-auth/api"
 import { setSessionCookie } from "better-auth/cookies"
 import { and, eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
+import { useServerEnv } from "#vitehub/env/server"
 import { account, user } from "../databases/config"
 import { githubOrganization, isGitHubMember } from "./github-membership"
 
-export const proxyAuthentication = process.env.DROP_AUTH_PROXY === "1"
-export const proxyCookie = process.env.DROP_AUTH_PROXY_COOKIE?.trim()
-if (proxyAuthentication && !githubOrganization) throw new Error("DROP_AUTH_PROXY=1 requires DROP_GITHUB_ORG.")
-if (proxyCookie && !/^[A-Za-z0-9_-]+$/.test(proxyCookie)) throw new Error("DROP_AUTH_PROXY_COOKIE must be a cookie name.")
+/** Whether people sign in through an existing GitHub oauth2-proxy (`DROP_AUTH_PROXY`), and its cookie to clear on logout. */
+export function authProxy() {
+  const { authProxy: enabled, authProxyCookie } = useServerEnv().drop
+  const cookie = authProxyCookie.trim() || null
+  if (enabled && !githubOrganization()) throw new Error("DROP_AUTH_PROXY requires DROP_GITHUB_ORG.")
+  if (cookie && !/^[A-Za-z0-9_-]+$/.test(cookie)) throw new Error("DROP_AUTH_PROXY_COOKIE must be a cookie name.")
+  return { enabled, cookie }
+}
 
 /** Exchange oauth2-proxy's GitHub token for Drop's session. Header names alone prove nothing. */
 export const proxyAuth = () => ({
@@ -16,7 +21,7 @@ export const proxyAuth = () => ({
   endpoints: {
     proxySignIn: createAuthEndpoint("/sign-in/proxy", { method: "POST", requireHeaders: true }, async (ctx) => {
       const token = ctx.headers?.get("x-auth-request-access-token")
-      if (!proxyAuthentication || !githubOrganization || !await isGitHubMember(token))
+      if (!authProxy().enabled || !await isGitHubMember(token))
         throw new APIError("UNAUTHORIZED", { message: "Active GitHub organization membership required." })
       const profile = await fetch("https://api.github.com/user", {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Drop" },
@@ -32,7 +37,7 @@ export const proxyAuth = () => ({
         await db.insert(user).values({
           id: userId, name: profile.name || profile.login, email: `${accountId}@users.noreply.github.com`,
           emailVerified: false, image: profile.avatar_url,
-          role: (process.env.DROP_ADMINS ?? "").split(/[\s,]+/).includes(accountId) ? "admin" : "member",
+          role: useServerEnv().drop.admins.unseal().split(/[\s,]+/).includes(accountId) ? "admin" : "member",
         }).onConflictDoNothing()
         await db.insert(account).values({ id: `github-${accountId}`, userId, accountId, providerId: "github", accessToken: token }).onConflictDoNothing()
       }

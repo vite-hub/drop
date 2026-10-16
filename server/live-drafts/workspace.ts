@@ -9,6 +9,8 @@ import { draftPath } from "../utils/draft-paths"
  * Hosts without Realtime get ./unavailable.ts instead (nuxt.config.ts `#live-drafts`).
  */
 
+export const LIVE_EDITING = true
+
 const drafts = () => useWorkspace("drafts", { mode: "write" })
 
 /** Creates the draft from the published body unless one exists. Returns the Workspace path the room edits. */

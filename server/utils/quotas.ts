@@ -2,25 +2,21 @@ import { and, eq, inArray, lt, lte, sql, type SQL } from "drizzle-orm"
 import type { DrizzleD1Database } from "drizzle-orm/d1"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
-import { useRuntimeConfig } from "nitro/runtime-config"
 import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
 import { requirePublishBurst } from "./publish-burst"
-import { DEFAULT_PRO_LIMITS, MAX_APP_BYTES, MAX_APP_FILES, isPlan, planLimits, quotaFailure, quotaToolFailure, type Plan, type QuotaFailure, type Usage } from "#shared/quotas"
+import { MAX_APP_BYTES, MAX_APP_FILES, planLimits, quotaFailure, quotaToolFailure, type QuotaFailure, type Usage } from "#shared/quotas"
+import { useServerEnv } from "#vitehub/env/server"
 import { dropFiles, quotaBlobs, quotaReservations } from "../databases/config"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
 const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
 type Statement = Parameters<DrizzleD1Database["batch"]>[0][number]
 
+/** `DROP_QUOTAS`, `DROP_DEFAULT_PLAN`, and the `DROP_PRO_*` limits, typed and validated by Server Env. */
 export function quotaConfig() {
-  const config = useRuntimeConfig().quotas
-  const positive = (value: unknown, fallback: number) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : fallback
-  return {
-    enabled: process.env.DROP_QUOTAS === "1" || config.enabled === true || String(config.enabled) === "1" || String(config.enabled) === "true",
-    defaultPlan: isPlan(config.defaultPlan) ? config.defaultPlan : "free" as Plan,
-    pro: { drops: positive(config.proDrops, DEFAULT_PRO_LIMITS.drops), bytes: positive(config.proBytes, DEFAULT_PRO_LIMITS.bytes), writes: positive(config.proWrites, DEFAULT_PRO_LIMITS.writes) },
-  }
+  const { enabled, plan, proDrops, proBytes, proWrites } = useServerEnv().drop.quotas
+  return { enabled, defaultPlan: plan, pro: { drops: proDrops, bytes: proBytes, writes: proWrites } }
 }
 
 async function ownerUsage(ownerId: string, month: string) {

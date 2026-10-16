@@ -21,7 +21,7 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
         <li><strong>Homepage URL</strong>: <code>https://&lt;your-domain&gt;</code></li>
         <li><strong>Authorization callback URL</strong>: <code>https://&lt;your-domain&gt;/api/auth/callback/github</code></li>
       </ul>
-      <p>Then give the deployment these settings. Each host page says where they go.</p>
+      <p>Then give the deployment these settings. Each host page says where they go. Drop reads its settings when it runs, so changing one needs a restart, not a rebuild; only the host and database choices below are fixed at build time. Each setting also answers to a <code>VITEHUB_</code> name, such as <code>VITEHUB_DROP_GITHUB_ORG</code>, which wins when both are set. Booleans take <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>, and an invalid value stops Drop with an error naming the setting.</p>
       <DocsEnv />
       <p>By default, anyone with a GitHub account can sign in and joins as a Member. Set <code>DROP_GITHUB_ORG</code> to require active organization membership for publishing and viewing, including shared links and MCP. GitHub sign-in then requests <code>read:org</code>. The accounts in <code>DROP_ADMINS</code> join as Admin, and admins change roles on the Members page. To use another sign-in provider, change the Better Auth options in <code>server/auth.ts</code>.</p>
       <div class="overflow-x-auto rounded-lg border border-default">
@@ -51,15 +51,15 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
           <thead><tr><th>Variable</th><th>What it does</th></tr></thead>
           <tbody>
             <tr><td class="font-mono text-xs">DROP_EXPIRY_DAYS</td><td>Days a drop lives after its last visit. Defaults to 30. Set 0 to keep every drop.</td></tr>
-            <tr><td class="font-mono text-xs">DROP_CUSTOM_EXPIRY</td><td>Set 0 so only admins can keep drops. Defaults to 1: owners and their agents can too.</td></tr>
+            <tr><td class="font-mono text-xs">DROP_CUSTOM_EXPIRY</td><td>Set false so only admins can keep drops. Defaults to true: owners and their agents can too.</td></tr>
           </tbody>
         </table>
       </div>
-      <p>Both are read at runtime, so changing them needs no rebuild. Shortening the window applies to existing drops at once.</p>
+      <p>Shortening the window applies to existing drops at once.</p>
     </DocsSection>
 
     <DocsSection id="abuse" title="Abuse and moderation">
-      <p>On a Drop open to anyone with a GitHub account, set <code>DROP_SHARE_APPROVAL=1</code> so a member's public shares wait until an admin approves that member. Private use keeps working, and admins skip the wait. Approve or reject members on <code>/admin/review</code>; once approved, a member shares freely. Links shared before you turn it on stay shared, so approve trusted members first if they'll publish new versions.</p>
+      <p>On a Drop open to anyone with a GitHub account, set <code>DROP_SHARE_APPROVAL=true</code> so a member's public shares wait until an admin approves that member. Private use keeps working, and admins skip the wait. Approve or reject members on <code>/admin/review</code>; once approved, a member shares freely. Links shared before you turn it on stay shared, so approve trusted members first if they'll publish new versions.</p>
       <p>Anyone can report a shared link at <code>/report</code>. Reports land on <code>/admin/reports</code>, where admins dismiss them, quarantine the reported drop, or ban its owner, which takes down all of their drops. Each report also logs a high-severity event; Drop sends no email, so watch your logs. <code>DROP_ABUSE_EMAIL</code> adds a public contact address to the abuse page.</p>
       <p>Before opening your Drop to the public, adapt the templates in <code>app/pages/terms.vue</code>, <code>acceptable-use.vue</code>, and <code>abuse.vue</code> to your jurisdiction, including a DMCA contact if you need one. Drops and their files are kept out of search engines; the landing page and docs stay indexable.</p>
     </DocsSection>

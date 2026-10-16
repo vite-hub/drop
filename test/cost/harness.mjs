@@ -12,14 +12,13 @@ const stubs = {
   "vite-hub/database/drizzle": "export const db = globalThis.dropTest.db",
   "vite-hub/database": "export const defineDatabase = v => v",
   "vite-hub/blob": "export const blob = globalThis.dropTest.blob",
-  "nitro/runtime-config": 'export const useRuntimeConfig = () => ({ quotas: { enabled: globalThis.dropTest.quotasEnabled ?? false } })',
   "nitro/cache": "export const defineCachedFunction = fn => fn",
   "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
   "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0", contentOrigin: globalThis.dropTest.contentOrigin ?? "", expiryDays: globalThis.dropTest.expiryDays ?? "30", customExpiry: globalThis.dropTest.customExpiry ?? "1" } })',
+  "#vitehub/env/server": "export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, githubOrg: '', authProxy: false, authProxyCookie: '', testSignin: false, admins: { unseal: () => '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: 100, proBytes: 1073741824, proWrites: 10000 } } } }",
   "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
-  "#live-drafts": "export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
+  "#live-drafts": "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
 }
 registerHooks({
   load(url, context, next) {
@@ -113,8 +112,8 @@ export function reset() {
   sql.exec("DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM user")
   state.bursts.length = 0; state.failBurst = false
   state.quotasEnabled = false
-  state.shareApproval = "0"
-  state.expiryDays = "30"; state.customExpiry = "1"
+  state.shareApproval = false
+  state.expiryDays = 30; state.customExpiry = true
   state.failDelete = false; state.failCacheDelete = false; state.who = null
   objects.clear(); entries.clear(); queries.length = 0
   calls.get = calls.head = calls.del = 0; calls.writes.length = 0

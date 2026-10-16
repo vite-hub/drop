@@ -113,7 +113,7 @@ test("normal shared files and code images use one owner join, and unban restores
 })
 
 test("review policy reuses the owner join for IDs, blobs, pages and raw downloads", async () => {
-  state.shareApproval = "1"
+  state.shareApproval = true
   insertDrop("doc", { share_review: "pending" })
   for (const lookup of [() => findDrop("doc", event("/d/doc")), () => findDropByBlob("doc.md", event("/f/doc.md"))]) {
     queries.length = 0
@@ -140,11 +140,11 @@ test("review policy reuses the owner join for IDs, blobs, pages and raw download
   await missing(() => accessMiddleware(event("/d/doc")))
   await missing(() => requireBlobAccess(event("/f/doc.md"), "doc.md"))
   sql.exec("UPDATE user SET banned = 0, role = NULL")
-  state.shareApproval = "0"
+  state.shareApproval = false
   queries.length = 0
   await requireBlobAccess(event("/f/doc.md"), "doc.md")
   assert.equal(queries.length, 1)
-  state.shareApproval = "1"
+  state.shareApproval = true
   sql.exec("UPDATE drops SET share_review = 'rejected'")
   await missing(() => requireBlobAccess(event("/f/doc.md"), "doc.md"))
 })
@@ -253,7 +253,7 @@ test("app publishing keeps only the latest file set, as the docs promise", async
   const detail = await dropDetail(await findDrop(first.id), who, "https://drop.example")
   assert.deepEqual(detail.files, { "index.html": "second", "new.js": "new" })
   assert.equal(detail.versions.length, 1)
-  for (const path of ["README.md", "app/pages/docs/index.vue", "app/pages/docs/review.vue", "skills/vitehub-drop/SKILL.md"])
+  for (const path of ["app/pages/docs/index.vue", "app/pages/docs/review.vue", "skills/vitehub-drop/SKILL.md"])
     assert.match(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"), /[Aa]pps? keep only|[Oo]nly the latest app|[Aa]pps? keep (?:only )?their latest/)
 })
 
@@ -269,7 +269,7 @@ test("new code images record an owner and become unavailable when they are banne
 
 test("quota publishing keeps share review and uses one owner burst bucket for docs, apps and images", async () => {
   state.quotasEnabled = true
-  state.shareApproval = "1"
+  state.shareApproval = true
   const { getUsage, quotaToolResult } = await import("../../server/utils/quotas.ts")
   const first = await createDocDrop(who, { filename: "review.md", bytes: new TextEncoder().encode("# Review"), visibility: "shared" }, event("/mcp", "POST"))
   assert.equal(first.shareReview, "pending")

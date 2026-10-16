@@ -1,7 +1,6 @@
 import { and, desc, eq, exists, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
-import { useRuntimeConfig } from "nitro/runtime-config"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
@@ -15,7 +14,7 @@ import { DAY_MS, expiresAt, type Lifetime, MAX_KEEP_REASON, TEMPORARY_DAYS, TRAS
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
-import { deleteDrafts } from "#live-drafts"
+import { deleteDrafts, LIVE_EDITING } from "#live-drafts"
 import { deleteRetainedDrop } from "./quota-deletion"
 import { chainOf, expiryPolicy, isExpired, renewDrop } from "./expiry"
 
@@ -161,7 +160,7 @@ export async function versionChain(row: DropRow) {
  * continues the latest text.
  */
 export function liveEditable(row: DropRow, who: Identity | null, versions: DropVersion[]) {
-  return Boolean(useRuntimeConfig().liveEditing) && who?.actorKind === "browser" && permissions(row, who).edit
+  return LIVE_EDITING && who?.actorKind === "browser" && permissions(row, who).edit
     && row.kind === "markdown" && versions[0]?.id === row.id
 }
 
