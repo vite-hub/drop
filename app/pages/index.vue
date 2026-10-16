@@ -52,8 +52,6 @@ const USE_CASES = [
   },
 ] as const
 
-const PROMISES = ["Private until you share", "Works with any MCP agent", "Source on GitHub"]
-
 const SELF_HOSTED = [
   "Deploy to Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
   "GitHub sign-in by default. Switch to Google, GitLab, email, or SSO with Better Auth",
@@ -87,9 +85,6 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
               <UButton v-else color="neutral" size="lg" class="h-10 px-4" icon="i-simple-icons-github" label="Sign in with GitHub" @click="signInWithGitHub" />
               <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="Read the docs" to="/docs" />
             </div>
-            <p class="label-mono mt-5 flex flex-wrap justify-center gap-x-4 gap-y-1 text-dimmed">
-              <span v-for="item in PROMISES" :key="item">{{ item }}</span>
-            </p>
 
             <form v-if="devSignIn && !signedIn" class="mt-6 flex w-full max-w-xs flex-col gap-2 rounded-lg border border-dashed border-accented bg-default p-3 text-left" @submit.prevent="signInWithEmail">
               <p class="label-mono">Dev sign-in</p>
