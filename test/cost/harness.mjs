@@ -19,6 +19,7 @@ const stubs = {
   "vite-hub/schedule": "export const defineSchedule = value => value",
   "#vitehub/env/server": 'export const useServerEnv = () => ({ drop: { shareApproval: globalThis.dropTest.shareApproval ?? "0", contentOrigin: globalThis.dropTest.contentOrigin ?? "", expiryDays: globalThis.dropTest.expiryDays ?? "30", customExpiry: globalThis.dropTest.customExpiry ?? "1" } })',
   "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
+  "#live-drafts": "export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
 }
 registerHooks({
   load(url, context, next) {

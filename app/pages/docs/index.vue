@@ -13,7 +13,7 @@ const mcp = mcpSnippets(`${origin}/mcp`).claude
       <ol>
         <li><strong>Agents drop their work</strong> over MCP: a plan in Markdown, an HTML report, or a small static app made of files.</li>
         <li><strong>Every drop starts private.</strong> Only its owner, and the workspace's editors and admins, can open it.</li>
-        <li><strong>People review it</strong> full screen. Select text or click a spot in an image to comment. The owner shares a link that can view or comment.</li>
+        <li><strong>People review it</strong> full screen. Select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit a Markdown doc together.</li>
         <li><strong>The agent reads the open comments</strong> and drops the next version. Older doc versions stay in history. Apps keep only their latest file set.</li>
       </ol>
     </DocsSection>

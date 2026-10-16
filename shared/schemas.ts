@@ -16,7 +16,7 @@ export const NewDocSchema = v.object({
 
 export const DropPatchSchema = v.object({
   visibility: v.optional(v.picklist(["private", "shared"])),
-  access: v.optional(v.picklist(["view", "comment"])),
+  access: v.optional(v.picklist(["view", "comment", "edit"])),
   title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
   /** People set it; an agent's true becomes a request its person approves. False also dismisses a request. */
   neverExpires: v.optional(v.boolean()),

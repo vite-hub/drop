@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+/* The reader's typography, for the live editor (.drop-doc below). */
+@import "../../../shared/typeset.css";
 
 /*
  * Executor's grayscale system (UsefulSoftwareCo/executor): near-neutral surfaces, hairlines over shadows,
@@ -89,3 +91,49 @@
   @keyframes word-in { from { opacity: 0 } }
   @keyframes pop-in { from { opacity: 0 } }
 }
+
+/*
+ * The live editor (ViewerEditor.vue) renders Markdown with the reader's typeset, outside the reader's iframe. Its
+ * shadcn tokens map to this app's, and its size matches the iframe's 15px root (shared/plan-runtime.ts THEME_CSS).
+ */
+.drop-doc {
+  --background: var(--ui-bg);
+  --foreground: var(--ui-text);
+  --muted: var(--ui-bg-elevated);
+  --muted-foreground: var(--ui-text-muted);
+  --border: var(--ui-border);
+  --primary: var(--ui-primary);
+  --primary-foreground: var(--ui-bg);
+  --radius: 0.5rem;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.6;
+
+  & .ProseMirror { outline: none; min-height: 60vh; }
+  & .ProseMirror > :first-child { margin-block-start: 0; }
+  & .ProseMirror .is-empty::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--ui-text-dimmed); }
+  & .ProseMirror-selectednode { outline: 2px solid var(--ui-border-accented); outline-offset: 2px; border-radius: 4px; }
+}
+
+/* Other people in the room: a caret line and name pill in their presence color, and a tint over their selection. */
+.live-caret {
+  position: relative;
+  margin: 0 -1px;
+  border-left: 1.5px solid var(--caret);
+  pointer-events: none;
+  word-break: normal;
+}
+.live-caret-label {
+  position: absolute;
+  bottom: 100%;
+  left: -1.5px;
+  padding: 1px 5px;
+  border-radius: 4px 4px 4px 0;
+  background: var(--caret);
+  color: #fff;
+  font: 500 11px/1.4 var(--font-mono);
+  white-space: nowrap;
+  user-select: none;
+}
+.live-selection { background: color-mix(in oklab, var(--caret) 18%, transparent); }

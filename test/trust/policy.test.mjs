@@ -32,6 +32,19 @@ test("pending and rejected shares stay private; quarantine denies content even t
   for (const who of [null, owner, { userId: "admin", role: "admin" }]) assert.equal(permissions({ ...drop, quarantinedAt: 1 }, who).view, false)
 })
 
+test("a Can edit link lets signed-in people edit in the browser, not guests or their agents", () => {
+  const drop = { ownerId: "owner", visibility: "shared", access: "edit", shareReview: null, quarantinedAt: null }
+  const person = { userId: "reader", role: "member", actorKind: "browser" }
+  assert.equal(permissions(drop, person).edit, true)
+  assert.equal(permissions(drop, { ...person, actorKind: "agent" }).edit, false)
+  assert.equal(permissions(drop, null).edit, false)
+  assert.equal(permissions(drop, null).comment, true)
+  assert.equal(permissions({ ...drop, access: "comment" }, person).edit, false)
+  assert.equal(permissions({ ...drop, visibility: "private" }, person).edit, false)
+  assert.equal(permissions({ ...drop, expired: true }, person).edit, false)
+  assert.equal(permissions(drop, { userId: "owner", role: "member", actorKind: "agent" }).edit, true)
+})
+
 test("OAuth bounds preserve desktop MCP redirects", () => {
   for (const redirect of ["http://localhost:1234/callback", "http://127.0.0.1:8765/callback", "com.cursor:/callback", "com.microsoft.vscode:/callback", "https://claude.ai/api/mcp/auth_callback"]) assert.equal(registrationProblem({ client_name: "MCP", redirect_uris: [redirect] }), null)
   assert.ok(registrationProblem({ redirect_uris: Array(6).fill("http://localhost/cb") }))

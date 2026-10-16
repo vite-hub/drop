@@ -4,12 +4,12 @@ import type { Role } from "./roles"
 
 export type DropKind = "markdown" | "html" | "image" | "file" | "app"
 export type Visibility = "private" | "shared"
-export type Access = "view" | "comment"
+export type Access = "view" | "comment" | "edit"
 export type ActorKind = "agent" | "browser"
 
-export const ACCESS_RANK: Record<Access, number> = { view: 0, comment: 1 }
-export const ACCESS_LABELS: Record<Access, string> = { view: "Can view", comment: "Can comment" }
-export const ACCESS_HINTS: Record<Access, string> = { view: "Read only.", comment: "View and leave comments." }
+export const ACCESS_RANK: Record<Access, number> = { view: 0, comment: 1, edit: 2 }
+export const ACCESS_LABELS: Record<Access, string> = { view: "Can view", comment: "Can comment", edit: "Can edit" }
+export const ACCESS_HINTS: Record<Access, string> = { view: "Read only.", comment: "View and leave comments.", edit: "Comment, and edit Markdown together after signing in." }
 
 export interface DropSummary {
   id: string
@@ -40,6 +40,10 @@ export interface DropVersion { id: string; title: string; version: number; creat
 export interface DropDetail extends DropSummary {
   isOwner: boolean
   canComment: boolean
+  /** Live editing: a Markdown drop's current version, for people who may edit it, on a host with Realtime. */
+  canEdit: boolean
+  /** Why someone who may edit can't open this doc in the live editor. */
+  editNote?: string
   /** Text source for Markdown and HTML docs. */
   content?: string
   /** Markdown docs, rendered by the server's Comark renderer: the viewer shows exactly what /f/ shows. */

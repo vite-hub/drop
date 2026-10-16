@@ -8,7 +8,10 @@ const { setVisibility } = useDropActions()
 const { copy, copied } = useCopy()
 const shared = computed(() => props.drop.visibility === "shared")
 const url = computed(() => (import.meta.client ? `${location.origin}/d/${props.drop.id}` : `/d/${props.drop.id}`))
-const levels = (Object.keys(ACCESS_LABELS) as Access[]).map(value => ({ value, label: ACCESS_LABELS[value], description: ACCESS_HINTS[value] }))
+// Only Markdown docs have the live editor, so only they offer "Can edit".
+const levels = computed(() => (Object.keys(ACCESS_LABELS) as Access[])
+  .filter(value => value !== "edit" || props.drop.kind === "markdown" || props.drop.access === "edit")
+  .map(value => ({ value, label: ACCESS_LABELS[value], description: ACCESS_HINTS[value] })))
 
 async function setShared(next: boolean) {
   if (await setVisibility(props.drop, next ? "shared" : "private")) notify.done(next ? "Share updated" : "Private again")

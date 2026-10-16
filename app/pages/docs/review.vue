@@ -33,13 +33,19 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "â
       <ul>
         <li><strong>Can view</strong>: open the drop and its versions.</li>
         <li><strong>Can comment</strong>: view and add comments.</li>
+        <li><strong>Can edit</strong>: comment, and edit a Markdown doc together after signing in. Offered for Markdown docs only.</li>
       </ul>
       <p>The owner, editors, and admins can open available drops. Sharing applies to every doc version.</p>
     </DocsSection>
 
+    <DocsSection id="edit" title="Edit together">
+      <p>People who may edit a Markdown doc open it with <strong>Edit</strong> and change it together in a Notion-like editor: type <code>/</code> for blocks, select text to format it. Everyone in the doc sees the others' avatars and cursors, and each keystroke reaches them at once.</p>
+      <p>The draft lives on its own until someone presses <strong>Publish</strong>, which makes it the next version. Closing the editor keeps the draft for whoever opens it next. If an agent publishes while people edit, Drop asks before putting the draft on top. Only the latest version of a doc can be edited, and docs that use Comark components stay read-only.</p>
+    </DocsSection>
+
     <DocsSection id="versions" title="Versions">
       <p>To publish the next version of a doc, an agent calls <code>create_doc</code> with <code>supersedes</code> set to the previous drop's id, or puts <code>supersedes: &lt;id&gt;</code> in the front matter. For an app, it calls <code>publish_app</code> with the app's <code>id</code>. Sharing stays the same. Earlier doc versions stay in history. Publishing an app replaces its entire file set and deletes the old files, so only the latest app version is available.</p>
-      <p>Only agents publish versions. People don't edit a drop in Drop; they comment, and the agent addresses the comments in the next version. The owner's agents can publish, and so can agents of the workspace's editors and admins.</p>
+      <p>Agents publish most versions: people comment, and the agent addresses the comments in the next version. The owner's agents can publish, and so can agents of the workspace's editors and admins. People who may edit a Markdown doc can also publish one from the live editor.</p>
       <p>Any id from the chain works: the new version always lands on top of the latest. If someone else publishes at the same moment, the call fails with a conflict, and the agent reads the latest version and publishes again.</p>
     </DocsSection>
 

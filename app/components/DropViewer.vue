@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // The drop viewer (T3 Code's layout): a main column with its own header, and one full-height side panel with
-// tabs (Comments, Details) that pushes the content. Docs and apps share it. People review and comment; agents
-// publish new versions. State lives in composables (useDrop, useViewerPanel, useAppFiles, useDropFrame); this
-// file wires them up.
+// tabs (Comments, Details) that pushes the content. Docs and apps share it. People review and comment, agents
+// publish new versions, and people who may edit a Markdown doc edit it together live (useLiveEditor). State lives in
+// composables (useDrop, useViewerPanel, useAppFiles, useDropFrame, useLiveEditor); this file wires them up.
 import { planDocument } from "#shared/documents"
 import { expiryLabel } from "#shared/expiry"
 import { injectRuntime } from "#shared/plan-runtime"
@@ -21,6 +21,7 @@ const state = injectDrop()!
 const drop = computed(() => state.drop.data.value!)
 const comments = computed(() => state.comments.data.value)
 
+const route = useRoute()
 const notify = useNotify()
 const { copy } = useCopy()
 const { remove, setExpiry } = useDropActions()
@@ -46,6 +47,32 @@ async function renew() {
 const panel = useViewerPanel({ owner, openCount })
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const { files, pages, page } = useAppFiles(drop)
+
+const live = useLiveEditor(drop, { publicView: props.publicView })
+const editing = live.editing
+/** One avatar per person, even with the doc open in two tabs. */
+const editors = computed(() => [...new Map(live.people.value.map(person => [person.id, person])).values()])
+// A dropped socket usually comes back within a second, and Yjs keeps the edits meanwhile: say so only if it doesn't.
+const offline = refDebounced(computed(() => live.editing.value && live.status.value !== "connected"), 1500)
+const joined = ref(false)
+watch([live.editing, live.synced], ([editing, synced]) => (joined.value = editing && (joined.value || synced)))
+const liveStatus = computed(() => {
+  if (live.publishing.value) return "Publishing"
+  if (!joined.value) return "Connecting"
+  return offline.value && live.status.value !== "connected" ? "Reconnecting" : "Live"
+})
+function startEdit() {
+  popover.value = selection.value = null
+  void live.open()
+}
+onMounted(() => {
+  if (route.query.edit === "1" && drop.value.canEdit) startEdit()
+})
+// The router reuses this page for another version (a teammate's "Open", the sidebar): leave the old draft's room.
+watch(() => drop.value.id, () => {
+  live.close()
+  if (route.query.edit === "1" && drop.value.canEdit) startEdit()
+})
 
 // Images load into the sandbox as data URLs: the opaque-origin frame can't send your session cookie.
 const imageBlob = shallowRef<Blob>()
@@ -114,7 +141,7 @@ const { ready, send } = useDropFrame(frame, contentOrigin, (message, rect) => {
   if (message.type === "location" && followFrame(message.path)) frameDocument = srcdoc.value
   if (message.type === "navigate" && isApp.value) page.value = message.path
   if (message.type === "copy") void copy(message.text, "Code copied")
-  if (message.type === "selection" && drop.value.canComment) {
+  if (message.type === "selection" && drop.value.canComment && !editing.value) {
     selection.value = message.clear ? null : {
       quote: message.quote, selector: message.selector, label: message.label,
       rect: { left: rect.left + message.rect.left, top: rect.top + message.rect.top, right: rect.left + message.rect.right, bottom: rect.top + message.rect.bottom },
@@ -133,7 +160,11 @@ watch([ready, pageComments], () => {
   if (ready.value) send({ type: "markers", markers: pageComments.value.map(({ id, n, kind, selector, ox, oy, quote, resolved }) => ({ id, n, kind, selector, ox, oy, quote, resolved })) })
 })
 
-defineShortcuts({ c: () => panel.show("comments") })
+defineShortcuts({
+  c: () => !editing.value && panel.show("comments"),
+  e: () => !editing.value && drop.value.canEdit && startEdit(),
+  meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
+})
 onKeyStroke("Escape", () => (popover.value = selection.value = null))
 
 const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value), "Feedback copied as Markdown")
@@ -204,6 +235,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
+          <ViewerAction v-if="drop.canEdit" icon="i-lucide-pencil" label="Edit together" @click="startEdit" />
           <ViewerAction icon="i-lucide-sparkles" label="Copy feedback for your agent" @click="copyFeedback" />
           <ViewerAction icon="i-lucide-link" label="Copy link" @click="copyLink" />
           <ViewerAction v-if="drop.url" icon="i-lucide-download" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
@@ -221,9 +253,25 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UButton v-else aria-label="Back to drops" color="neutral" icon="i-lucide-arrow-left" variant="ghost" to="/drops" />
         </template>
         <template #title>
-          <span class="truncate text-sm font-medium">{{ drop.title }}</span>
+          <span class="flex min-w-0 items-center gap-2">
+            <span class="truncate text-sm font-medium">{{ drop.title }}</span>
+            <span v-if="editing" class="label-mono shrink-0" :class="liveStatus === 'Reconnecting' ? 'text-error' : ''" aria-live="polite">{{ liveStatus }}</span>
+          </span>
         </template>
-        <template #right>
+        <template v-if="editing" #right>
+          <div v-if="editors.length" class="mr-1 flex items-center -space-x-1.5">
+            <UTooltip v-for="person in editors.slice(0, 4)" :key="person.id" :text="person.name">
+              <UAvatar :alt="person.name" class="ring-2" size="2xs" :src="person.image" :style="{ '--tw-ring-color': person.color }" />
+            </UTooltip>
+            <span v-if="editors.length > 4" class="grid size-5 place-items-center rounded-full bg-elevated font-mono text-[10px] text-muted ring-2 ring-(--ui-bg)">+{{ editors.length - 4 }}</span>
+          </div>
+          <UButton color="neutral" label="Close" size="sm" variant="ghost" @click="live.close" />
+          <UButton color="neutral" :disabled="!live.synced.value" label="Publish" :loading="live.publishing.value" size="sm" @click="live.publish()" />
+        </template>
+        <template v-else #right>
+          <UTooltip v-if="drop.canEdit || drop.editNote" :text="drop.editNote ?? 'Edit with others, live (E)'">
+            <UButton color="neutral" :disabled="!drop.canEdit" icon="i-lucide-pencil" label="Edit" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
+          </UTooltip>
           <UButton v-if="publicView" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" label="Report" size="sm" variant="ghost" />
           <UButton v-if="owner" color="neutral" :icon="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'shared' ? 'outline' : 'solid'" @click="shareOpen = true" />
           <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
@@ -255,7 +303,8 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <div v-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
+      <ViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
+      <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
         <div>
           <UIcon name="i-lucide-file" class="size-8 text-dimmed" />
           <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
@@ -269,12 +318,12 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
     </template>
   </UDashboardPanel>
 
-  <UDashboardPanel v-if="sideOpen && wide" id="drop-side" :default-size="24" :max-size="40" :min-size="18" resizable :ui="{ root: 'border-l border-default', body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
+  <UDashboardPanel v-if="sideOpen && wide && !editing" id="drop-side" :default-size="24" :max-size="40" :min-size="18" resizable :ui="{ root: 'border-l border-default', body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
     <template #body>
       <div class="flex h-full flex-col"><ReuseSide /></div>
     </template>
   </UDashboardPanel>
-  <USlideover v-if="!wide" v-model:open="mobileSide" side="right" :ui="{ content: 'max-w-md' }" title="Drop panel">
+  <USlideover v-if="!wide && !editing" v-model:open="mobileSide" side="right" :ui="{ content: 'max-w-md' }" title="Drop panel">
     <template #content>
       <div class="flex h-full flex-col"><ReuseSide /></div>
     </template>

@@ -1,6 +1,7 @@
 import { and, desc, eq, exists, inArray, lte, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
+import { useRuntimeConfig } from "nitro/runtime-config"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
@@ -14,12 +15,14 @@ import { DAY_MS, EXPIRY_GRACE_DAYS, expiresAt } from "#shared/expiry"
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
+import { deleteDrafts } from "#live-drafts"
 import { deleteRetainedDrop } from "./quota-deletion"
 import { expiryPolicy, isExpired, renewDrop } from "./expiry"
 
 export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean; expired?: boolean }
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
+import { hasBlockComponents } from "#shared/frontmatter"
 import { MAX_APP_FILES } from "#shared/quotas"
 
 export { MAX_FILE_BYTES }
@@ -27,9 +30,10 @@ export { MAX_APP_FILES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
- * What the caller may do with a drop. Editors and admins act on every drop in the workspace. Share links can view
- * or comment; only the owner and staff (through their agents) publish new versions. An expired drop is read-only
- * for the people who can renew it and gone for everyone else.
+ * What the caller may do with a drop. Editors and admins act on every drop in the workspace. Share links can view,
+ * comment, or edit; a "Can edit" link lets signed-in people edit in the browser, not their agents, so only the owner
+ * and staff publish through agents. An expired drop is read-only for the people who can renew it and gone for
+ * everyone else.
  */
 export function permissions(drop: DropRow, who: Identity | null) {
   if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || who.role === "admin")) }
@@ -43,7 +47,7 @@ export function permissions(drop: DropRow, who: Identity | null) {
     owner,
     view: available && (owner || staff || shared),
     comment: live && (owner || staff || (shared && level >= ACCESS_RANK.comment)),
-    edit: live && (owner || staff),
+    edit: live && (owner || staff || (shared && level >= ACCESS_RANK.edit && who?.actorKind === "browser")),
     manage: owner || staff,
   }
 }
@@ -97,7 +101,7 @@ function storageFailure(error: Error) {
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 
-async function readText(key: string) {
+export async function readText(key: string) {
   const [error, file] = await blob.get(key)
   if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
   if (error) throw storageFailure(error)
@@ -132,8 +136,16 @@ export async function versionChain(row: DropRow) {
   return chain
 }
 
+/**
+ * Whether people may open this drop in the live editor: the current version of a Markdown drop, for someone who may
+ * edit it, on a host with Realtime rooms. Older versions stay read-only so a draft always continues the latest text.
+ */
+export function liveEditable(row: DropRow, can: ReturnType<typeof permissions>, versions: DropVersion[]) {
+  return Boolean(useRuntimeConfig().liveEditing) && can.edit && row.kind === "markdown" && versions[0]?.id === row.id
+}
+
 /** The version chain, newest first. */
-async function versionsOf(row: DropRow): Promise<DropVersion[]> {
+export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
   return (await versionChain(row)).map(item => ({ id: item.id, title: item.title, version: item.version, createdAt: item.createdAt, current: item.id === row.id }))
 }
 
@@ -144,8 +156,10 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
     ...toSummary(row, undefined, expiryPolicy(event).days),
     isOwner: can.manage,
     canComment: can.comment,
+    canEdit: false,
     versions: await versionsOf(row),
   }
+  detail.canEdit = liveEditable(row, can, detail.versions)
   if (row.kind === "app") {
     const files = await db.select().from(dropFiles).where(eq(dropFiles.dropId, row.id))
     detail.files = Object.fromEntries(await Promise.all(files.map(async file => [file.path, await readText(file.blobKey)] as const)))
@@ -156,6 +170,10 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!))
       detail.content = rendered.source
       detail.html = rendered.html
+      if (detail.canEdit && hasBlockComponents(rendered.source)) {
+        detail.canEdit = false
+        detail.editNote = "This doc uses Comark components, which the editor can't keep yet."
+      }
     }
     else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
@@ -390,7 +408,9 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
 /** Removes a drop, its files, and its comments. */
 export async function deleteDrop(row: DropRow) {
   await drainBlobCleanup()
+  const ids = row.kind === "markdown" ? (await versionChain(row)).map(item => item.id) : []
   await deleteRetainedDrop(row, deleteBlobKeys)
+  await deleteDrafts(ids)
 }
 
 /**
@@ -405,7 +425,9 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
     .where(and(eq(drops.neverExpires, false), lte(sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt})`, cutoff))).limit(limit)).map(row => row.drop)
   await drainBlobCleanup()
   for (const row of rows) {
+    const ids = row.kind === "markdown" ? (await versionChain(row)).map(item => item.id) : []
     await deleteRetainedDrop(row, deleteBlobKeys)
+    await deleteDrafts(ids)
     log.info({ action: "drop-expired", drop: row.id, owner: row.ownerId })
   }
   return rows.length
