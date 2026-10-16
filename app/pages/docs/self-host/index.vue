@@ -58,6 +58,16 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
       <p>Both are read at runtime, so changing them needs no rebuild. Shortening the window applies to existing drops at once.</p>
     </DocsSection>
 
+    <DocsSection id="abuse" title="Abuse and moderation">
+      <p>On a Drop open to anyone with a GitHub account, set <code>DROP_SHARE_APPROVAL=1</code> so a member's public shares wait until an admin approves that member. Private use keeps working, and admins skip the wait. Approve or reject members on <code>/admin/review</code>; once approved, a member shares freely. Links shared before you turn it on stay shared, so approve trusted members first if they'll publish new versions.</p>
+      <p>Anyone can report a shared link at <code>/report</code>. Reports land on <code>/admin/reports</code>, where admins dismiss them, quarantine the reported drop, or ban its owner, which takes down all of their drops. Each report also logs a high-severity event; Drop sends no email, so watch your logs. <code>DROP_ABUSE_EMAIL</code> adds a public contact address to the abuse page.</p>
+      <p>Before opening your Drop to the public, adapt the templates in <code>app/pages/terms.vue</code>, <code>acceptable-use.vue</code>, and <code>abuse.vue</code> to your jurisdiction, including a DMCA contact if you need one. Drops and their files are kept out of search engines; the landing page and docs stay indexable.</p>
+    </DocsSection>
+
+    <DocsSection id="logs" title="Logs">
+      <p>Drop writes one structured <a href="https://www.evlog.dev">evlog</a> event per request: who called, which agent, what it did, and why it failed. MCP tool calls, purges from the Trash, and abuse reports land there too. On Cloudflare they're in Workers Logs; elsewhere they go to the host's log output.</p>
+    </DocsSection>
+
     <DocsSection id="database" title="Database and migrations">
       <p>Docker and VPS builds default to local SQLite on persistent disk. The other hosts use separate Cloudflare D1 databases, with D1's HTTP API outside Cloudflare. The same migrations in <code>server/databases/migrations</code> apply to all of them:</p>
       <p>For a deployment that uses D1 outside Cloudflare, create it from a machine with Node.js:</p>
@@ -102,7 +112,7 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
       <ul>
         <li><strong>Code images.</strong> PNG is a Cloudflare Browser Run screenshot of the SVG, so only Cloudflare has it. Elsewhere <code>create_code_image</code> returns SVG, and asking for PNG fails with a clear error.</li>
         <li><strong>Rate limits.</strong> Cloudflare uses its rate limiting binding. Other hosts count in memory, per server instance, so limits are looser on serverless hosts that run many instances.</li>
-        <li><strong>Expired drops and code images.</strong> An hourly job deletes them on Cloudflare, Netlify, and a VPS. Vercel runs cleanup daily so it works on Hobby. Deno Deploy has none; expired drops and images stop being served but stay in the bucket.</li>
+        <li><strong>Cleanup.</strong> An hourly job moves expired drops to the Trash, deletes what has been there 15 days, and removes expired code images and OAuth clients unused for a day. Vercel runs it daily so it works on Hobby. Deno Deploy has none; trashed drops and expired images stop being served but stay in the bucket.</li>
         <li><strong>Caching.</strong> Rendered Markdown and the file count are cached in Workers KV on Cloudflare, and in memory elsewhere.</li>
       </ul>
     </DocsSection>
