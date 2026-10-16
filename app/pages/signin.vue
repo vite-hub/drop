@@ -12,14 +12,17 @@ async function connect() {
   pending.value = true
   error.value = ""
   try {
+    if (method.value?.proxy) {
+      // One navigation: oauth2-proxy clears its cookie, then starts a fresh login. Signing out over fetch first
+      // let the session refetch start a second login that overwrote this one's CSRF cookie.
+      const start = `/oauth2/start?rd=${encodeURIComponent(next.value)}`
+      await navigateTo(me.value ? `/oauth2/sign_out?rd=${encodeURIComponent(start)}` : start, { external: true })
+      return
+    }
     if (me.value) {
       const result = await signOut()
       if (result.error) throw new Error(result.error.message ?? "Couldn't sign out.")
       clearNuxtData()
-    }
-    if (method.value?.proxy) {
-      await navigateTo(`/oauth2/start?rd=${encodeURIComponent(next.value)}`, { external: true })
-      return
     }
     const result = await signIn.social({ provider: "github", callbackURL: next.value, additionalParams: { prompt: "select_account" } })
     if (result.error) throw new Error(result.error.message ?? "Couldn't start GitHub sign-in.")

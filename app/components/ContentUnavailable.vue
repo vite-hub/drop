@@ -4,7 +4,9 @@ import { contentUnavailable } from "#shared/content-unavailable"
 const props = defineProps<{ status: number; path: string; waitingForReview?: boolean }>()
 // Only failed views need the account lookup; successful shared views stay on their existing request path.
 const { data: me } = await useMe()
-const message = computed(() => contentUnavailable(props.status, props.path, me.value?.email, props.waitingForReview))
+// Behind an auth proxy (read at runtime, as on /signin) signing in again only returns the same account.
+const { data: method } = await useApi("/api/sign-in", { key: "sign-in" })
+const message = computed(() => contentUnavailable(props.status, props.path, me.value?.email, props.waitingForReview, Boolean(method.value?.proxy)))
 const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\/([^/]+)\/?$/, "/d/$1"))
 </script>
 
@@ -17,7 +19,7 @@ const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\
       <p class="mt-2 text-sm leading-relaxed text-muted">{{ message.description }}</p>
       <div class="mt-6 flex flex-wrap justify-center gap-2">
         <UButton color="neutral" :label="message.action.label" :to="message.action.to" :external="message.action.to === path" />
-        <UButton v-if="message.email" color="neutral" label="My drops" to="/drops" variant="outline" />
+        <UButton v-if="message.email && message.action.to !== '/drops'" color="neutral" label="My drops" to="/drops" variant="outline" />
         <UButton :to="{ path: '/report', query: { target: reportTarget } }" label="Report" color="neutral" variant="ghost" />
       </div>
     </div>
