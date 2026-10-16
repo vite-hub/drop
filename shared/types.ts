@@ -93,7 +93,8 @@ export interface DropComment {
 export interface Member {
   id: string
   name: string
-  email: string
+  /** Only admins see other people's emails; GitHub may have handed over one its owner keeps private. */
+  email: string | null
   image: string | null
   role: Role
   banned: boolean

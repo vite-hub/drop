@@ -6,7 +6,7 @@ import { isRole } from "#shared/roles"
 import type { Member } from "#shared/types"
 import { requireIdentity } from "../../utils/identity"
 
-/** Everyone in this Drop. Anyone signed in can see who's here; only admins change it. */
+/** Everyone in this Drop. Anyone signed in can see who's here; only admins see emails and change it. */
 export default defineHandler(async (event): Promise<Member[]> => {
   const who = await requireIdentity(event)
   const users = await db.select().from(user).orderBy(desc(user.createdAt)).limit(500)
@@ -17,7 +17,7 @@ export default defineHandler(async (event): Promise<Member[]> => {
   return users.map(user => ({
     id: user.id,
     name: user.name,
-    email: user.email,
+    email: who.role === "admin" || user.id === who.userId ? user.email : null,
     image: user.image ?? null,
     role: isRole(user.role ?? "") ? user.role as Member["role"] : "member",
     banned: Boolean(user.banned),

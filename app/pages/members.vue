@@ -22,7 +22,7 @@ const description = computed(() => {
 const rows = computed(() => {
   const needle = search.value.trim().toLowerCase()
   return members.value
-    .filter(member => `${member.name} ${member.email}`.toLowerCase().includes(needle))
+    .filter(member => `${member.name} ${member.email ?? ""}`.toLowerCase().includes(needle))
     .sort((a, b) => Number(b.you) - Number(a.you) || ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || a.name.localeCompare(b.name))
 })
 
@@ -79,7 +79,7 @@ function menu(member: Member): DropdownMenuItem[][] {
                     {{ member.name }}<span v-if="member.you" class="ml-1.5 font-normal text-muted">(you)</span>
                   </p>
                   <p class="truncate font-mono text-xs text-muted">
-                    {{ member.email }}<template v-if="member.lastActiveAt && !member.you"> · <TimeAgo :at="member.lastActiveAt" /></template>
+                    {{ member.email }}<template v-if="member.lastActiveAt && !member.you">{{ member.email ? " · " : "" }}<TimeAgo :at="member.lastActiveAt" /></template>
                   </p>
                   <p class="mt-1 sm:hidden">
                     <UBadge :color="member.banned ? 'error' : 'neutral'" :label="statusOf(member)" size="sm" :variant="member.banned ? 'subtle' : 'outline'" />

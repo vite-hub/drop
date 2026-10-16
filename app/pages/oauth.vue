@@ -24,6 +24,17 @@ const { data: client, execute: loadClient } = useAsyncData("oauth-client", async
   server: false,
 })
 const agentName = computed(() => client.value?.client_name || "An agent")
+
+// Where Allow sends the agent's access. Anyone can register an agent under any name, so the name proves nothing; the
+// redirect is part of this signed link, so it is where the code really goes.
+const destination = computed(() => {
+  const uri = typeof route.query.redirect_uri === "string" ? route.query.redirect_uri : ""
+  if (!URL.canParse(uri)) return null
+  const url = new URL(uri)
+  if (url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return { local: true, label: "an app on this computer" }
+  if (!["http:", "https:"].includes(url.protocol)) return { local: true, label: `the app that opens ${url.protocol} links` }
+  return { local: false, label: url.host }
+})
 watch([ready, loggedIn], () => {
   if (ready.value && loggedIn.value && valid.value && !client.value) void loadClient()
 }, { immediate: true })
@@ -97,6 +108,10 @@ async function answer(accept: boolean) {
               <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
             </li>
           </ul>
+          <p v-if="destination?.local" class="mt-4 text-xs leading-relaxed text-muted">Allow returns to {{ destination.label }}.</p>
+          <p v-else-if="destination" class="mt-4 text-xs leading-relaxed text-warning">
+            Allow gives this access to <span class="font-mono font-medium">{{ destination.label }}</span>. Only allow it if you started this connection from an agent that runs there.
+          </p>
           <p class="mt-4 text-xs leading-relaxed text-muted">Private drops belong to this account on this Drop site. You can disconnect it any time on the Agents page.</p>
           <div class="mt-6 grid grid-cols-2 gap-2">
             <UButton block color="neutral" label="Deny" variant="outline" :disabled="pending !== null" :loading="pending === 'deny'" @click="answer(false)" />
