@@ -4,7 +4,7 @@
  */
 export function useGitHubSignIn() {
   const route = useRoute()
-  const toast = useToast()
+  const notify = useNotify()
   const { loggedIn, signIn } = useUserSession(useNuxtApp().$auth)
 
   // The session loads client-side; gate on mount so the server and first client render agree.
@@ -27,7 +27,7 @@ export function useGitHubSignIn() {
 
   async function signInWithGitHub() {
     const { error } = await signIn.social({ provider: "github", callbackURL: next.value })
-    if (error) toast.add({ title: error.message ?? "Couldn't start GitHub sign-in.", color: "error" })
+    if (error) notify.fail("Couldn't start GitHub sign-in", error)
   }
 
   return { signedIn, next, signIn, signInWithGitHub }

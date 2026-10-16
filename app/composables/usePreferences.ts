@@ -15,24 +15,32 @@ export function useSidePanel() {
 /** Which app folders are expanded in the sidebar tree. Shared state, so it survives navigation. */
 export const useTreeOpen = () => useState<Record<string, boolean>>("drop-tree-open", () => ({}))
 
+// One timer for every relative time on the page, alive while any of them is mounted. It catches up first, since
+// `now` may have sat still while nothing showed a time.
+const tick = createSharedComposable(() => {
+  const now = useState<number>("now")
+  now.value = Date.now()
+  useIntervalFn(() => (now.value = Date.now()), 30_000)
+})
+
 /**
  * "Now" for relative times ("3m ago"). Taken once on the server and reused on hydration, so server and
  * client print the same text; then it ticks every 30 seconds in the browser.
  */
 export function useRelativeNow() {
   const now = useState("now", () => Date.now())
-  useIntervalFn(() => (now.value = Date.now()), 30_000, { immediate: import.meta.client })
+  // Client only: on the server a shared composable would be shared across requests.
+  if (import.meta.client) onMounted(tick)
   return now
 }
 
 /** Copy with a toast; `copied` flips for a moment so buttons can show a check. */
 export function useCopy() {
   const toast = useToast()
-  const { copy, copied, isSupported } = useClipboard({ copiedDuring: 1400, legacy: true })
+  const { copy, copied } = useClipboard({ copiedDuring: 1400, legacy: true })
   return {
     copied,
     async copy(text: string, title = "Copied") {
-      if (!isSupported.value) return toast.add({ title: "Couldn't copy", description: "Your browser blocked clipboard access." })
       await copy(text)
       toast.add({ title })
     },

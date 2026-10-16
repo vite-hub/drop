@@ -1,3 +1,4 @@
+import { promiseTimeout } from "@vueuse/core"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { Editor } from "@tiptap/vue-3"
 import { RealtimeCaret, useRealtimeTiptap } from "vite-hub/realtime/vue"
@@ -20,7 +21,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const realtime = useRealtimeTiptap("drops", documentId, { enabled: () => Boolean(documentId.value), carets: false })
   const editor = shallowRef<Editor>()
   const editing = computed(() => Boolean(documentId.value))
-  const people = computed(() => realtime.people.value)
+  const people = realtime.people
 
   const url = (id: string, edit = false) => `${options.publicView ? "/d" : "/drops"}/${id}${edit ? "?edit=1" : ""}`
 
@@ -98,9 +99,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       const me = people.value.find(person => person.clientId === realtime.provider.value?.awareness.clientID)
       realtime.provider.value?.awareness.setLocalStateField("published", { id: next.id, version: next.version, name: me?.name ?? "Someone" } satisfies Published)
       notify.done(`Published v${next.version}`, "The previous version stays in history.")
-      await refreshNuxtData("drops")
+      // A new version adds bytes and a write, so the plan usage moves too.
+      await refreshNuxtData(["drops", "usage"])
       // Let the announcement reach the room before this client leaves it.
-      await new Promise(resolve => setTimeout(resolve, 300))
+      await promiseTimeout(300)
       close()
       await navigateTo(url(next.id))
     }
@@ -114,7 +116,8 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         confirmLabel: "Publish anyway",
         destructive: true,
       })
-      if (replace) return publish(true)
+      // Awaited, or this call's `finally` would release the lock while the forced publish still runs.
+      if (replace) return await publish(true)
       notify.info({
         title: `v${head.version} is the latest version`,
         description: "Your draft stays here until you publish it.",

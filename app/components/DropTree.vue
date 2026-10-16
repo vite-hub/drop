@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Every drop, newest first. Apps are folders you can open to jump to a page.
 const emit = defineEmits<{ navigate: [] }>()
-const { drops, status } = useDrops()
+const { data: drops, status } = useDrops()
 const route = useRoute()
 const open = useTreeOpen()
 const file = computed(() => (typeof route.query.file === "string" ? route.query.file : null))

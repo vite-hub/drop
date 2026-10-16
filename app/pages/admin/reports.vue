@@ -20,7 +20,7 @@ async function act(id: string, action: "dismiss" | "quarantine" | "ban") {
       <h2 class="font-medium">{{ report.reason }} · {{ report.status }}</h2>
       <p class="break-all font-mono text-xs">{{ report.target }}</p>
       <p class="whitespace-pre-wrap break-words text-sm">{{ report.details }}</p>
-      <p class="text-xs text-muted">{{ new Date(report.createdAt).toLocaleString() }} · {{ report.email || "No contact email" }}</p>
+      <p class="text-xs text-muted"><NuxtTime :datetime="report.createdAt" locale="en" date-style="medium" time-style="short" time-zone="UTC" /> UTC · {{ report.email || "No contact email" }}</p>
       <div class="flex flex-wrap gap-2"><UButton v-if="report.status === 'open'" :disabled="busy" color="neutral" variant="outline" label="Dismiss" @click="act(report.id, 'dismiss')" /><UButton :disabled="busy" color="error" variant="outline" label="Quarantine drop" @click="act(report.id, 'quarantine')" /><UButton v-if="report.ownerId" :disabled="busy" color="error" label="Ban owner" @click="act(report.id, 'ban')" /></div>
     </div>
   </PageShell>

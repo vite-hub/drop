@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const route = useRoute()
-const active = (to: string) => route.path === to || route.path === `${to}/`
+const active = (to: string) => isActivePath(route.path, to)
 </script>
 
 <template>

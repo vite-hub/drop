@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { QuotaFailure } from "#shared/quotas"
-
-const notice = useState<QuotaFailure | null>("quota-notice", () => null)
+const notice = useQuotaNotice()
 const open = computed({ get: () => Boolean(notice.value), set: value => { if (!value) notice.value = null } })
 </script>
 

@@ -14,7 +14,7 @@ async function submit(event: FormSubmitEvent<InferInput<typeof ReportSchema>>) {
     await $fetch("/api/reports", { method: "POST", body: event.data })
     sent.value = true
   }
-  catch (cause) { error.value = (cause as { data?: { statusText?: string } }).data?.statusText || "Could not send the report. Try again shortly." }
+  catch (cause) { error.value = errorText(cause, "Could not send the report. Try again shortly.") }
 }
 </script>
 

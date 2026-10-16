@@ -9,7 +9,7 @@ const snippets = mcpSnippets(server)
 const clients = Object.keys(MCP_CLIENTS) as McpClient[]
 
 // The MCP server's own catalog (tools, prompts, skill resources), so the docs never drift from it.
-const { data: catalog } = await useFetch("/api/mcp", { key: "mcp-catalog", default: () => [] })
+const { data: catalog } = await useApi("/api/mcp", { key: "mcp-catalog", default: () => [] })
 const tools = computed(() => catalog.value.map(item => ({ name: item.uri ?? item.name, description: item.description ?? item.title ?? "", kind: item.kind })))
 </script>
 

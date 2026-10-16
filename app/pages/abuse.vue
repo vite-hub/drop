@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Legal template. The instance owner must review this source, contact details, and DMCA procedures before public use.
 useSeoMeta({ title: "Copyright and abuse contact" })
-const { data: contact } = await useFetch("/api/abuse-contact")
+const { data: contact } = await useApi("/api/abuse-contact")
 </script>
 <template>
   <div><SiteHeader /><main class="mx-auto max-w-2xl space-y-5 px-6 py-12">

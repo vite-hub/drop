@@ -9,6 +9,7 @@ import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment } from "#shared/types"
+import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
 import type { FrameMessage } from "~/composables/useDropFrame"
@@ -39,7 +40,7 @@ const { width: windowWidth } = useWindowSize()
 const isApp = computed(() => drop.value.kind === "app")
 const owner = computed(() => drop.value.isOwner && !props.publicView)
 const openCount = computed(() => comments.value.filter(comment => !comment.resolved).length)
-const link = computed(() => (import.meta.client ? `${location.origin}/d/${drop.value.id}` : `/d/${drop.value.id}`))
+const link = useShareUrl(() => drop.value.id)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
 const restoring = ref(false)
@@ -63,12 +64,9 @@ function startEdit() {
   popover.value = selection.value = null
   void live.open()
 }
+// Both pages key this viewer by the drop's id, so another version (a teammate's "Open", the sidebar) mounts a new one;
+// the old one leaves its draft's room as it unmounts (useLiveEditor).
 onMounted(() => {
-  if (route.query.edit === "1" && drop.value.canEdit) startEdit()
-})
-// The router reuses this page for another version (a teammate's "Open", the sidebar): leave the old draft's room.
-watch(() => drop.value.id, () => {
-  live.close()
   if (route.query.edit === "1" && drop.value.canEdit) startEdit()
 })
 
@@ -198,10 +196,10 @@ defineShortcuts({
   e: () => !editing.value && drop.value.canEdit && startEdit(),
   r: toggleArea,
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
-})
-onKeyStroke("Escape", () => {
-  popover.value = selection.value = null
-  areaMode.value = false
+  escape: () => {
+    popover.value = selection.value = null
+    areaMode.value = false
+  },
 })
 
 const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value), "Feedback copied as Markdown")
@@ -238,12 +236,16 @@ async function removeComment(id: string) {
   await state.removeComment(id)
 }
 
-function focusComment(comment: DropComment) {
+async function focusComment(comment: DropComment) {
   if (!isApp.value) return send({ type: "focus", id: comment.id })
-  const move = comment.page && comment.page !== page.value
-  if (move) page.value = comment.page!
-  useTimeoutFn(() => send({ type: "focus", id: comment.id }), move ? 600 : 0)
   if (!wide.value) mobileSide.value = false
+  if (comment.page && comment.page !== page.value) {
+    page.value = comment.page
+    // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
+    await nextTick()
+    await until(ready).toBe(true, { timeout: 5000 })
+  }
+  send({ type: "focus", id: comment.id })
 }
 
 async function deleteDrop() {

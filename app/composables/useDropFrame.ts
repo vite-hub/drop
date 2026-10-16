@@ -20,7 +20,7 @@ export type FrameMessage =
  */
 export function useDropFrame(frame: Readonly<Ref<HTMLIFrameElement | null | undefined>>, origin: MaybeRefOrGetter<string | undefined>, onMessage: (message: FrameMessage, rect: DOMRect) => void) {
   const ready = ref(false)
-  useEventListener(import.meta.client ? window : undefined, "message", (event: MessageEvent) => {
+  useEventListener("message", (event: MessageEvent) => {
     const message = event.data as (FrameMessage & { __drop?: boolean }) | null
     if (!message?.__drop || !frame.value || event.source !== frame.value.contentWindow) return
     if (toValue(origin) && event.origin !== toValue(origin)) return

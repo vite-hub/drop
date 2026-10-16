@@ -2,17 +2,20 @@ import { type Lifetime, TRASH_DAYS } from "#shared/expiry"
 import type { Access, DropSummary, Visibility } from "#shared/types"
 
 /**
- * Your drops and what you can do to them. The list is one keyed cache ("drops") shared by the sidebar tree
- * and the Drops page; actions patch it after the server agrees, or refresh it when the server computes fields.
+ * Your drops. The list is one keyed cache ("drops") shared by the sidebar tree and the Drops page; the actions
+ * (useDropActions) patch it after the server agrees, or refresh it when the server computes fields.
  */
-export function useDrops() {
-  const { data: drops, status, error, refresh } = useApi("/api/drops", { key: "drops", default: () => [] })
-  return { drops, status, error, refresh, ...useDropActions() }
+export const useDrops = () => useApi("/api/drops", { key: "drops", default: () => [] })
+
+/** A drop's share link, absolute on the server too, so SSR and hydration print the same URL. */
+export function useShareUrl(id: MaybeRefOrGetter<string>) {
+  const origin = useRequestURL().origin
+  return computed(() => `${origin}/d/${toValue(id)}`)
 }
 
 /**
- * The actions alone, for rows, modals and the viewer: they patch the shared "drops" cache through
- * useNuxtData instead of starting another fetch.
+ * What you can do to drops, for the page, rows, modals and the viewer: actions patch the shared "drops" cache
+ * through useNuxtData instead of starting another fetch.
  */
 export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>("drops")
@@ -130,5 +133,3 @@ export function useDropActions() {
 
   return { upload, setVisibility, setLifetime, remove, restore, deleteForever, emptyTrash }
 }
-
-export const refreshDrops = () => refreshNuxtData("drops")

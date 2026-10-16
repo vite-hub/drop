@@ -4,22 +4,22 @@ import type { DropSummary } from "#shared/types"
 const props = defineProps<{ drop: DropSummary }>()
 const emit = defineEmits<{ delete: []; restore: []; deleteForever: [] }>()
 const trashed = computed(() => props.drop.trashedAt !== null)
-const toast = useToast()
+const notify = useNotify()
 const { copy } = useCopy()
 const { setVisibility } = useDropActions()
 const shared = computed(() => props.drop.visibility === "shared")
 
-const link = computed(() => (import.meta.client ? `${location.origin}/d/${props.drop.id}` : `/d/${props.drop.id}`))
+const link = useShareUrl(() => props.drop.id)
 const detail = computed(() => props.drop.kind === "app" ? `${props.drop.filename} · ${props.drop.paths?.length ?? 0} files` : props.drop.filename)
 
 async function setShared(next: boolean) {
   if (await setVisibility(props.drop, next ? "shared" : "private"))
-    toast.add({ title: next ? "Shared" : "Private again", description: next ? "Anyone with the link can comment." : "Only you can open it." })
+    notify.done(next ? "Shared" : "Private again", next ? "Anyone with the link can open it." : "Only you can open it.")
 }
 
 async function copyLink() {
   if (!shared.value) {
-    toast.add({ title: "This drop is private", description: "Share it first so the link works for others.", actions: [{ label: "Share & copy", color: "neutral", variant: "outline", onClick: () => void setShared(true).then(copyLink) }] })
+    notify.info({ title: "This drop is private", description: "Share it first so the link works for others.", actions: [{ label: "Share & copy", color: "neutral", variant: "outline", onClick: () => void setShared(true).then(copyLink) }] })
     return
   }
   await copy(link.value, "Link copied")

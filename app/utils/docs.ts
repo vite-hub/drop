@@ -63,3 +63,6 @@ export const DOCS_NAV: Array<{ title: string; links: DocsLink[] }> = [
 ]
 
 export const DOCS_PAGES = DOCS_NAV.flatMap(group => group.links)
+
+/** Whether `path` is the docs page `to`, with or without a trailing slash. */
+export const isActivePath = (path: string, to: string) => path === to || path === `${to}/`

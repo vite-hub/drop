@@ -4,7 +4,7 @@
 import DashboardLayout from "./dashboard.vue"
 
 const route = useRoute()
-const active = (to: string) => route.path === to || route.path === `${to}/`
+const active = (to: string) => isActivePath(route.path, to)
 const current = computed(() => DOCS_PAGES.find(page => active(page.to)))
 const menuOpen = ref(false)
 watch(() => route.path, () => (menuOpen.value = false))

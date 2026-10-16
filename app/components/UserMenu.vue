@@ -12,8 +12,9 @@ const items = computed<DropdownMenuItem[][]>(() => [
 ])
 async function leave() {
   await signOut()
-  clearNuxtData()
+  // Leave first: cleared data would flash the dashboard's empty defaults for a frame.
   await navigateTo("/")
+  clearNuxtData()
 }
 const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "Member" })[me.value?.role ?? "member"])
 </script>
