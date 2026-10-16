@@ -93,8 +93,12 @@ export async function requireIdentity(event: H3Event): Promise<Identity> {
   throw new HTTPError({ status: 401, statusText: "Sign in with GitHub, or connect your agent through Drop's MCP server." })
 }
 
+/**
+ * An admin, in the browser. An agent an admin connected is not enough: what it reads (a guest's comment, say) can
+ * steer it, so it never approves shares, reads reports, quarantines, or changes members and skills.
+ */
 export async function requireAdmin(event: H3Event): Promise<Identity> {
   const who = await requireIdentity(event)
-  if (who.role !== "admin") throw new HTTPError({ status: 403, statusText: "Only admins can do that." })
+  if (who.role !== "admin" || who.actorKind !== "browser") throw new HTTPError({ status: 403, statusText: "Only admins, in the browser, can do that." })
   return who
 }

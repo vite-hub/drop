@@ -55,8 +55,6 @@ const THEMES = {
 } as const
 
 export type CodeTheme = keyof typeof THEMES
-export const CODE_THEMES = Object.keys(THEMES) as CodeTheme[]
-export const CODE_LANGUAGES = Object.keys(LANGUAGES)
 export const DEFAULT_CODE_THEME: CodeTheme = "github-dark"
 
 /** Theme names agents learned from the old Ray.so renderer keep working. */

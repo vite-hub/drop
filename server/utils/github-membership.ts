@@ -14,6 +14,10 @@ export async function isGitHubMember(token: string | null | undefined): Promise<
     headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Drop" },
     signal: AbortSignal.timeout(5000),
   }).then(async response => response.ok && (await response.json() as { state?: string }).state === "active").catch(() => false)
-  if (member) checked.set(token, Date.now() + 300_000)
+  if (member) {
+    // Long-lived Node servers would otherwise keep every token they ever checked.
+    for (const [key, until] of checked) if (until <= Date.now()) checked.delete(key)
+    checked.set(token, Date.now() + 300_000)
+  }
   return member
 }

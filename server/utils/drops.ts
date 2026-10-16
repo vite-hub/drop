@@ -22,11 +22,10 @@ import { chainOf, expiryPolicy, isExpired, renewDrop } from "./expiry"
 export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean; expired?: boolean }
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
-import { hasBlockComponents } from "#shared/frontmatter"
+import { hasBlockComponents, splitFrontmatter } from "#shared/frontmatter"
 import { MAX_APP_FILES } from "#shared/quotas"
 
 export { MAX_FILE_BYTES }
-export { MAX_APP_FILES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
@@ -77,8 +76,8 @@ async function withOwnerAccess(row: { drop: typeof drops.$inferSelect; owner: ty
   if (fields.parentId) {
     const [parent] = await db.select().from(drops).where(and(eq(drops.id, fields.parentId), eq(drops.ownerId, fields.ownerId))).limit(1)
     if (parent) {
-      const { visibility, access, shareReview, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt, createdAt } = parent
-      fields = { ...fields, visibility, access, shareReview, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt: lastAccessedAt ?? createdAt }
+      const { visibility, access, shareReview, quarantinedAt, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt, createdAt } = parent
+      fields = { ...fields, visibility, access, shareReview, quarantinedAt: fields.quarantinedAt ?? quarantinedAt, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt: lastAccessedAt ?? createdAt }
     }
   }
   const drop = { ...fields, ownerBanned: !row.owner || Boolean(row.owner.banned), expired: Boolean(fields.trashedAt) || isExpired(fields, Date.now(), expiryPolicy(event).days) }
@@ -108,8 +107,10 @@ export async function listDrops(who: Identity, event?: H3Event, options: { trash
   const { days } = expiryPolicy(event)
   const now = Date.now()
   const listed = rows.map(row => ({ ...row, expired: Boolean(row.trashedAt) || isExpired(row, now, days) })).filter(row => row.expired === Boolean(options.trash))
-  const apps = listed.filter(row => row.kind === "app").map(row => row.id)
-  const files = apps.length ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).where(inArray(dropFiles.dropId, apps)) : []
+  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
+  const files = listed.some(row => row.kind === "app")
+    ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).innerJoin(dropHeads, eq(dropHeads.dropId, dropFiles.dropId)).where(eq(dropHeads.ownerId, who.userId))
+    : []
   const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
   return listed.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days))
 }
@@ -203,9 +204,8 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
 }
 
 /** Files a doc embeds from this Drop, across every version of the doc. */
-export async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachment[]> {
-  const ids = (await versionChain(row)).map(item => item.id)
-  const rows = await db.select().from(drops).where(and(inArray(drops.parentId, ids), isNotNull(drops.blobKey))).limit(100)
+async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachment[]> {
+  const rows = await db.select().from(drops).where(and(sql`${drops.parentId} IN (${chainOf(row)})`, isNotNull(drops.blobKey))).limit(100)
   return rows.map(item => ({ id: item.id, kind: item.kind, title: item.title, filename: item.filename, size: item.size, url: new URL(`/f/${item.blobKey}`, origin).href }))
 }
 
@@ -218,7 +218,8 @@ const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
  * another doc stays with that one, unless it's an older version of this doc.
  */
 async function adoptAttachments(doc: DropRow, source: string, previous: DropRow | null) {
-  const keys = [...new Set([...source.matchAll(FILE_LINK)].map(match => match[1]!))].slice(0, 100)
+  // 90 keys and the other parameters stay under D1's 100 bound parameters per query.
+  const keys = [...new Set([...source.matchAll(FILE_LINK)].map(match => match[1]!))].slice(0, 90)
   if (!keys.length) return
   const chain = previous ? (await versionChain(previous)).map(item => item.id) : []
   const owned = await db.select({ id: drops.id, parentId: drops.parentId }).from(drops)
@@ -257,18 +258,9 @@ async function queueBlobCleanup(keys: string[]) {
   }
 }
 
-/** Retries cleanup left by an earlier metadata operation. */
+/** Retries cleanup left by an earlier metadata operation, in one batch. */
 async function drainBlobCleanup() {
-  const pending = await db.select().from(blobCleanup).limit(20)
-  for (const item of pending) {
-    try {
-      await deleteMarkdownCache(item.blobKey)
-    }
-    catch { continue }
-    const [error] = await blob.del(item.blobKey)
-    if (error) continue
-    await db.delete(blobCleanup).where(eq(blobCleanup.id, item.id))
-  }
+  await deleteBlobKeys((await db.select({ key: blobCleanup.blobKey }).from(blobCleanup).limit(20)).map(item => item.key))
 }
 
 /**
@@ -310,20 +302,25 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       text = new TextDecoder("utf-8", { fatal: true }).decode(input.bytes)
     }
     catch {
-      throw new HTTPError({ status: 400, statusText: `${extension === ".html" ? "HTML" : "Markdown"} files must contain valid UTF-8.` })
+      throw new HTTPError({ status: 400, statusText: `${kind === "html" ? "HTML" : "Text"} files must contain valid UTF-8.` })
     }
     contentType = kind === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8"
   }
   if (kind === "file" && contentType.startsWith("image/")) kind = "image"
 
   let previous: DropRow | null = null
-  const supersedes = input.supersedes ?? (text ? text.match(/^---\n[\s\S]*?^supersedes:\s*["']?(?:\S*\/)?([0-9a-f-]{36})(?:\.\w+)?["']?\s*$/m)?.[1] : undefined)
+  const supersedes = input.supersedes ?? (text ? splitFrontmatter(text).frontmatter?.match(/^supersedes:\s*["']?(?:\S*\/)?([0-9a-f-]{36})(?:\.\w+)?["']?\s*$/m)?.[1] : undefined)
   if (supersedes) {
-    previous = await findDrop(supersedes) ?? await findDropByBlob(supersedes)
-    if (previous && !permissions(previous, who).edit) previous = null
-    if (previous) previous = (await versionChain(previous))[0] ?? previous
+    const found = await findDrop(supersedes) ?? await findDropByBlob(supersedes)
+    const can = found && permissions(found, who)
+    // An expired drop is read-only even for its owner, so check the Trash before the edit right.
+    if (found?.expired && can && can.manage) throw new HTTPError({ status: 409, statusText: "That drop is in the Trash. Restore it first, or publish a new drop." })
+    if (found && can && can.edit) {
+      if (found.kind === "app") throw new HTTPError({ status: 400, statusText: "That drop is an app; publish its next version with files." })
+      if (!can.manage && kind !== found.kind) throw new HTTPError({ status: 403, statusText: "Only the drop's owner can change what kind of file it is." })
+      previous = (await versionChain(found))[0] ?? found
+    }
   }
-  if (previous?.trashedAt) throw new HTTPError({ status: 409, statusText: "That drop is in the Trash. Restore it first, or publish a new drop." })
   const life = lifetimeFields(who, input, previous, event)
 
   return withDropQuota(previous?.ownerId ?? who.userId, { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id }, event, async (quota) => {
@@ -409,9 +406,9 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   const now = Date.now()
   let row: DropRow | null = input.id ? await findDrop(input.id) : null
   if (input.id && (!row || row.kind !== "app")) throw new HTTPError({ status: 404, statusText: "No app with that id." })
+  // An expired app is read-only even for its owner, so check the Trash before the edit right. Apps have no version chain.
+  if (row?.expired && permissions(row, who).manage) throw new HTTPError({ status: 409, statusText: "That app is in the Trash. Restore it first, or publish a new app." })
   if (row && !permissions(row, who).edit) throw new HTTPError({ status: 403, statusText: "You can't edit this app." })
-  if (row) row = (await versionChain(row))[0] ?? row
-  if (row?.trashedAt) throw new HTTPError({ status: 409, statusText: "That app is in the Trash. Restore it first, or publish a new app." })
   const life = lifetimeFields(who, input, row, event)
   const note = input.note?.trim() || null
   const visibility = input.visibility ?? row?.visibility ?? "private"
@@ -420,7 +417,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   const id = row?.id ?? crypto.randomUUID()
   const prefix = `apps/${id}/${crypto.randomUUID()}`
   const token = crypto.randomUUID()
-  const old = row ? await db.select().from(dropFiles).where(eq(dropFiles.dropId, id)) : []
+  const old = row ? await db.select({ blobKey: dropFiles.blobKey, size: dropFiles.size }).from(dropFiles).where(eq(dropFiles.dropId, id)) : []
   return withDropQuota(row?.ownerId ?? who.userId, { drops: row ? 0 : 1, bytes: Math.max(0, size - old.reduce((total, file) => total + file.size, 0)), writes: entries.length, targetId: row?.id, app: { files: entries.length, bytes: size } }, event, async (quota) => {
     const stagedKeys: string[] = []
     let committedPublish = false
@@ -494,9 +491,8 @@ export async function restoreDrop(row: DropRow, now = Date.now()) {
 /** Removes a drop for good: every version, its files, its comments, and the files it embeds. */
 export async function deleteDrop(row: DropRow) {
   await drainBlobCleanup()
-  const chain = await versionChain(row)
-  const ids = chain.map(item => item.id)
-  const attached = await db.select().from(drops).where(inArray(drops.parentId, ids))
+  const ids = (await db.select({ id: drops.id }).from(drops).where(sql`${drops.id} IN (${chainOf(row)})`)).map(item => item.id)
+  const attached = await db.select().from(drops).where(sql`${drops.parentId} IN (${chainOf(row)})`)
   await deleteRetainedDrop(row, deleteBlobKeys)
   for (const file of attached) await deleteRetainedDrop(file, deleteBlobKeys)
   if (row.kind === "markdown") await deleteDrafts(ids)

@@ -1,10 +1,11 @@
-import { eq, inArray } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { useLogger } from "evlog/nitro/v3"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { ReportActionSchema } from "#shared/schemas"
 import { abuseReports, drops } from "../../../databases/config"
-import { findDrop, versionChain } from "../../../utils/drops"
+import { findDrop } from "../../../utils/drops"
+import { chainOf } from "../../../utils/expiry"
 import { authFor, requireAdmin } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 export default defineValidatedHandler({
@@ -22,7 +23,7 @@ export default defineValidatedHandler({
     }
     if (action === "quarantine" && report.dropId) {
       const drop = await findDrop(report.dropId, event)
-      if (drop) await db.update(drops).set({ quarantinedAt: Date.now() }).where(inArray(drops.id, (await versionChain(drop)).map(row => row.id)))
+      if (drop) await db.update(drops).set({ quarantinedAt: Date.now() }).where(sql`${drops.id} IN (${chainOf(drop)})`)
     }
     // Dismissing a report must never undo a quarantine.
     if (report.status === "quarantined" || report.status === "banned") {

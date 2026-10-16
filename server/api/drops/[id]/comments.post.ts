@@ -1,4 +1,4 @@
-import { eq, max } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
@@ -19,29 +19,20 @@ export default defineValidatedHandler({
     // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
     if (!import.meta.dev) await requireRateLimit(event, "comment", { failure: "deny", key: who?.userId, limit: 20, window: "1m" })
     const body = await event.req.json()
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const [last] = await db.select({ n: max(comments.n) }).from(comments).where(eq(comments.dropId, drop.id))
-      const row = {
-        id: crypto.randomUUID(),
-        dropId: drop.id,
-        n: (last?.n ?? 0) + 1,
-        ...body,
-        quote: body.quote ?? null,
-        label: body.label ?? null,
-        page: body.page ?? null,
-        authorId: who?.userId ?? null,
-        authorName: who?.name ?? "Guest",
-        resolved: false,
-        createdAt: Date.now(),
-      }
-      try {
-        await db.insert(comments).values(row)
-        return toComment(row, who)
-      }
-      catch (error) {
-        if (attempt === 4) throw error
-      }
-    }
-    throw new HTTPError({ status: 409, statusText: "Could not allocate a comment number. Retry." })
+    // The next number comes from the same statement as the insert, so two comments can't take the same one.
+    const [row] = await db.insert(comments).values({
+      id: crypto.randomUUID(),
+      dropId: drop.id,
+      n: sql`(SELECT coalesce(max(n), 0) + 1 FROM comments WHERE drop_id = ${drop.id})`,
+      ...body,
+      quote: body.quote ?? null,
+      label: body.label ?? null,
+      page: body.page ?? null,
+      authorId: who?.userId ?? null,
+      authorName: who?.name ?? "Guest",
+      resolved: false,
+      createdAt: Date.now(),
+    }).returning()
+    return toComment(row!, who)
   },
 })

@@ -61,7 +61,7 @@
     "ufo": "^1.6.4",
     "valibot": "^1.4.2",
     "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@78dcd0d1f18f553ea94293c03e2942da49262003",
-    "vue": "3.5.41",
+    "vue": "3.5.44",
     "vue-router": "5.2.0",
     "yjs": "13.6.33"
   },

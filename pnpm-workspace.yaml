@@ -13,8 +13,10 @@ supportedArchitectures:
 blockExoticSubdeps: false
 
 overrides:
-  # Nuxt and Nuxt UI must share one Vue instance.
-  vue: 3.5.41
+  # Nuxt and Nuxt UI must share one Vue instance. 3.5.42+ fixes an SSR attribute-name XSS (@vue/server-renderer).
+  vue: 3.5.44
+  # Nuxt's payload serializer; 5.9.3+ fixes several uneval/stringify advisories.
+  devalue: ^5.9.4
 
 patchedDependencies:
   # Keeps Nuxt's dev-only module URL out of the Workers bundle.

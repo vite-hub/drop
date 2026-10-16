@@ -1,12 +1,12 @@
-import { eq, inArray } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import type * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import type { DropPatchSchema } from "#shared/schemas"
 import type { Access } from "#shared/types"
 import { drops } from "../databases/config"
-import { type DropRow, lifetimeFields, permissions, restoreDrop, toSummary, trashDrop, versionChain } from "./drops"
-import { expiryPolicy, renewDrop } from "./expiry"
+import { type DropRow, lifetimeFields, permissions, restoreDrop, toSummary, trashDrop } from "./drops"
+import { chainOf, expiryPolicy, renewDrop } from "./expiry"
 import type { Identity } from "./identity"
 import { shareReviewFor } from "./trust"
 
@@ -44,8 +44,7 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   const chainChange = { ...share, ...life }
   if (Object.keys(chainChange).length) {
     // A link and its lifetime belong to the document chain, so every version carries the same state.
-    const ids = (await versionChain(drop)).map(item => item.id)
-    await db.update(drops).set(chainChange).where(inArray(drops.id, ids))
+    await db.update(drops).set(chainChange).where(sql`${drops.id} IN (${chainOf(drop)})`)
   }
   if (Object.keys(title).length) await db.update(drops).set(title).where(eq(drops.id, drop.id))
   // Choosing a lifetime starts its window now, so turning a kept drop temporary doesn't expire it on the spot.

@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm"
 import { useLogger } from "evlog/nitro/v3"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
@@ -6,7 +5,8 @@ import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { ReportSchema } from "#shared/schemas"
 import { reportTarget } from "#shared/trust"
-import { abuseReports, drops } from "../databases/config"
+import { abuseReports } from "../databases/config"
+import { findDrop, findDropByBlob } from "../utils/drops"
 
 export default defineValidatedHandler({
   validate: { body: ReportSchema },
@@ -15,7 +15,8 @@ export default defineValidatedHandler({
     const body = await event.req.json()
     const target = reportTarget(body.target)
     if (!target) throw new HTTPError({ status: 400, statusText: "Use a Drop share or file link." })
-    const [drop] = await db.select().from(drops).where(target.startsWith("/d/") ? eq(drops.id, target.slice(3)) : eq(drops.blobKey, decodeURIComponent(target.slice(3)))).limit(1)
+    // Attachments take their doc's sharing here, so an image in a shared doc can be reported (and quarantined).
+    const drop = target.startsWith("/d/") ? await findDrop(target.slice(3)) : await findDropByBlob(decodeURIComponent(target.slice(3)))
     if (drop && drop.visibility !== "shared") throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
     if (!drop) {
       if (decodeURIComponent(target.slice(3)).startsWith("apps/")) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
