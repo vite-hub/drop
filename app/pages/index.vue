@@ -78,7 +78,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
               The shared drive for people and their agents.
             </h1>
             <p class="mt-6 max-w-[56ch] text-lg leading-relaxed text-pretty text-muted">
-              Claude Code, Codex, or any MCP agent drops a doc, a page, or a small app. You comment on the exact spot, and the agent drops the next version.
+              <LandingMention name="Claude Code" icon="i-simple-icons-claude" color="#D97757" href="https://claude.com/claude-code" />, <LandingMention name="Codex" icon="i-simple-icons-openai" href="https://openai.com/codex" />, or any <LandingMention name="MCP" icon="i-simple-icons-modelcontextprotocol" href="https://modelcontextprotocol.io" /> agent drops a doc, a page, or a small app. You comment on the exact spot, and the agent drops the next version.
             </p>
             <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
               <UButton v-if="signedIn" color="neutral" size="lg" class="h-10 px-4" label="Open Drop" trailing-icon="i-lucide-arrow-right" to="/drops" />
