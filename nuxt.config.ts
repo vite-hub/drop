@@ -54,7 +54,8 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
   netlify: { preset: "netlify", blob: files, database: d1("vitehub-drop-netlify"), schedule: { providerOutput: "standalone" } },
   // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). ViteHub's
-  // Deno preset has no schedule: expired code images stop being served but stay in the bucket.
+  // Deno preset has no schedule, so none of the hourly cleanup runs: expired drops and code images stop being served
+  // but stay stored, the Trash is never purged, and unused OAuth clients stay registered.
   deno: {
     preset: "deno",
     blob: { ...files, driver: "s3", bucket: process.env.S3_BUCKET || "drop", endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || "auto" },

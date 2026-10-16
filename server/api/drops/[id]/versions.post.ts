@@ -21,8 +21,7 @@ export default quotaApiHandler(defineValidatedHandler({
     const who = await identify(event)
     if (!drop || !who || who.actorKind !== "browser" || drop.kind !== "markdown" || !drop.blobKey || !permissions(drop, who).edit)
       throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
-    // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
-    if (!import.meta.dev) await requireRateLimit(event, "drop-version", { failure: "deny", key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
+    await requireRateLimit(event, "drop-version", { key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
     const { force } = await event.req.json() as { force?: boolean }
     const head = (await versionsOf(drop))[0]!
     if (head.id !== drop.id && !force)

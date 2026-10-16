@@ -9,7 +9,7 @@ export default defineHandler(async (event) => {
   if (path === "/signin") event.res.headers.set("Cache-Control", "private, no-store")
   if (path.replace(/\/+$/, "") !== "/api/auth/oauth2/register" || event.req.method !== "POST") return
   const { requireRateLimit } = await import("vite-hub/rate-limit")
-  if (!import.meta.dev) await requireRateLimit(event, "oauth-register", { failure: "deny", limit: 10, window: "1m" })
+  await requireRateLimit(event, "oauth-register", { limit: 10, window: "1m" })
   const reader = event.req.clone().body?.getReader()
   let bytes = 0
   if (reader) {

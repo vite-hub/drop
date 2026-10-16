@@ -11,7 +11,7 @@ import { abuseReports, drops } from "../databases/config"
 export default defineValidatedHandler({
   validate: { body: ReportSchema },
   async handler(event) {
-    if (!import.meta.dev) await requireRateLimit(event, "abuse-report", { failure: "deny", limit: 5, window: "1m" })
+    await requireRateLimit(event, "abuse-report", { limit: 5, window: "1m" })
     const body = await event.req.json()
     const target = reportTarget(body.target)
     if (!target) throw new HTTPError({ status: 400, statusText: "Use a Drop share or file link." })
@@ -20,7 +20,8 @@ export default defineValidatedHandler({
     if (!drop) {
       if (decodeURIComponent(target.slice(3)).startsWith("apps/")) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
       if (!target.startsWith("/f/")) throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
-      const [error, file] = await blob.get(decodeURIComponent(target.slice(3)))
+      // Metadata only: reporting must not download the file.
+      const [error, file] = await blob.head(decodeURIComponent(target.slice(3)))
       if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "No public file with that link." })
       if (error) {
         useLogger(event).error(error, { action: "storage" })

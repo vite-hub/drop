@@ -15,8 +15,8 @@ import { withDropQuota } from "./quotas"
  * SVG, so only Drops on Cloudflare have it (and default to it). The URL is public and lasts five minutes.
  */
 export async function createCodeImage(event: H3Event, who: Identity, input: CodeImageInput) {
-  // Cloudflare Rate Limiting on Workers, ViteHub's in-memory limiter elsewhere; local dev skips it.
-  if (!import.meta.dev) await requireRateLimit(event, "code-image", { failure: "deny", key: who.userId, limit: 10, window: "1m" })
+  // Cloudflare Rate Limiting on Workers, ViteHub's in-memory limiter elsewhere (local dev included).
+  await requireRateLimit(event, "code-image", { key: who.userId, limit: 10, window: "1m" })
   const format = input.format ?? (PNG_CODE_IMAGES ? "png" : "svg")
   const { svg, width, height } = await renderCodeSvg(input)
   useLogger(event).set({ codeImage: { format, language: input.language, theme: input.theme, characters: input.code.length } })

@@ -33,7 +33,8 @@ for (const [name, read] of Object.entries(reads)) {
   ]) {
     test(`${name} returns ${status} for ${label}`, async () => {
       if (name === "detail" || name === "document") insertDrop("doc", { kind: "html", blob_key: key })
-      const method = "get"
+      // Reports check that a file exists from its metadata; the rest read it.
+      const method = name === "report" ? "head" : "get"
       const original = state.blob[method]
       state.blob[method] = async () => result
       try {
