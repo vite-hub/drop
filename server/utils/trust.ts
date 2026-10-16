@@ -8,7 +8,7 @@ import { needsShareReview, reportTarget } from "../../shared/trust"
 export async function shareReviewFor(ownerId: string, event?: H3Event, joinedOwner?: typeof user.$inferSelect | null) {
   if (useServerEnv(event).drop.shareApproval !== "1") return null
   const owner = joinedOwner !== undefined ? joinedOwner : (await db.select().from(user).where(eq(user.id, ownerId)).limit(1))[0]
-  return needsShareReview(true, owner as typeof owner & { plan?: string }) ? "pending" as const : null
+  return needsShareReview(true, owner ?? undefined) ? "pending" as const : null
 }
 
 /** Code images have no drop row to quarantine, so their owner lookup checks for a report on the file itself. */

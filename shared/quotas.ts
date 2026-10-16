@@ -32,7 +32,6 @@ export interface Usage {
   bytes: { used: number; limit: number | null }
   writes: { used: number; limit: number | null }
   app: { files: number; bytes: number }
-  upgradeUrl: string
   selfHostUrl: string
 }
 
@@ -41,21 +40,19 @@ export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
   quota: { unit: QuotaUnit; used: number; limit: number }
   retryable: false
-  upgradeUrl: string
   selfHostUrl: string
   message: string
 }
 
 export function quotaFailure(unit: QuotaUnit, used: number, limit: number): QuotaFailure {
-  const upgradeUrl = "/settings/billing"
   const selfHostUrl = "/docs/self-host"
   const label = { drops: "drops", bytes: "storage", writes: "monthly file writes", appFiles: "app files", appBytes: "app size", burstPublishes: "publishes this minute" }[unit]
   const amount = unit === "bytes" || unit === "appBytes"
     ? `${Math.ceil(used / MIB * 10) / 10}/${limit / MIB} MiB`
     : `${used}/${limit}`
   return {
-    code: "DROP_LIMIT_REACHED", quota: { unit, used, limit }, retryable: false, upgradeUrl, selfHostUrl,
-    message: `Nothing was created or changed. Plan limit for ${label}: ${amount}. Upgrade at ${upgradeUrl} or deploy your own at ${selfHostUrl}.`,
+    code: "DROP_LIMIT_REACHED", quota: { unit, used, limit }, retryable: false, selfHostUrl,
+    message: `Nothing was created or changed. Plan limit for ${label}: ${amount}. Deploy your own at ${selfHostUrl} for other limits.`,
   }
 }
 

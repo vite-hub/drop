@@ -41,10 +41,10 @@ const mcp = mcpSnippets(`${origin}/mcp`).claude
     </DocsSection>
 
     <DocsSection id="plans" title="Plans and limits">
-      <p>On instances with quotas enabled, Free includes 3 drops, 100 MiB of storage, and 1,000 file writes per calendar month. An app can contain up to 50 files and 2 MiB. Pro includes 100 drops, 1 GiB, and 10,000 writes per month, with apps up to 200 files and 4 MiB. Operators can configure Pro limits.</p>
+      <p>Quotas are off unless the operator turns them on. When they're on, everyone in the Drop gets the same plan, set in the environment. Free includes 3 drops, 100 MiB of storage, and 1,000 file writes per calendar month. An app can contain up to 50 files and 2 MiB. Pro includes 100 drops, 1 GiB, and 10,000 writes per month, with apps up to 200 files and 4 MiB. Unlimited has no owner limits.</p>
       <p>A drop is one doc, app, or uploaded file with its version chain. Every retained document version and app file counts toward storage. A document version uses one write; an app publish uses one per file. Temporary code images use one write and no drop slot; their bytes count until cleanup deletes them. The owner's plan applies even when someone else edits.</p>
       <p>At a limit, your existing drops and shared links keep working. Revisions are allowed while storage and writes remain available. Deleting a drop frees its slot and storage, but does not refund monthly writes. Monthly budgets reset at the start of each UTC calendar month. Publishing also has a short burst limit.</p>
-      <p><NuxtLink to="/settings/billing">Upgrade</NuxtLink> or <NuxtLink to="/docs/self-host">deploy your own</NuxtLink>. Self-hosted instances have owner quotas off by default.</p>
+      <p>Operators set <code>DROP_QUOTAS=1</code> to turn quotas on and <code>DROP_DEFAULT_PLAN</code> to <code>free</code>, <code>pro</code>, or <code>unlimited</code>; <code>DROP_PRO_DROPS</code>, <code>DROP_PRO_BYTES</code>, and <code>DROP_PRO_WRITES</code> change the Pro limits. For other limits, <NuxtLink to="/docs/self-host">deploy your own</NuxtLink>.</p>
     </DocsSection>
 
     <DocsSection id="roles" title="Roles">

@@ -7,7 +7,7 @@ import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
 import { requirePublishBurst } from "./publish-burst"
 import { DEFAULT_PRO_LIMITS, MAX_APP_BYTES, MAX_APP_FILES, isPlan, planLimits, quotaFailure, quotaToolFailure, type Plan, type QuotaFailure, type Usage } from "#shared/quotas"
-import { dropFiles, quotaBlobs, quotaReservations, user } from "../databases/config"
+import { dropFiles, quotaBlobs, quotaReservations } from "../databases/config"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
 const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
@@ -23,10 +23,6 @@ export function quotaConfig() {
   }
 }
 
-export function effectivePlan(value: unknown): Plan {
-  return isPlan(value) ? value : quotaConfig().defaultPlan
-}
-
 async function ownerUsage(ownerId: string, month: string) {
   const [row] = await db.all<{ drops: number; bytes: number; writes: number }>(bindQuotaSQL(usageSQL, [ownerId, month, Date.now() - QUOTA_RESERVATION_TTL_MS]))
   return row ?? { drops: 0, bytes: 0, writes: 0 }
@@ -34,15 +30,15 @@ async function ownerUsage(ownerId: string, month: string) {
 
 export async function getUsage(ownerId: string): Promise<Usage> {
   const config = quotaConfig()
-  const [owner] = await db.select({ plan: user.plan }).from(user).where(eq(user.id, ownerId)).limit(1)
-  const plan = effectivePlan(owner?.plan)
+  // One plan for everyone, from DROP_DEFAULT_PLAN. Operators change limits in env, not per member.
+  const plan = config.defaultPlan
   const limits = planLimits(config.enabled ? plan : "unlimited", config.pro)
   const month = new Date().toISOString().slice(0, 7)
   const used = await ownerUsage(ownerId, month)
   return {
     enabled: config.enabled, plan, month,
     drops: { used: used.drops, limit: limits.drops }, bytes: { used: used.bytes, limit: limits.bytes }, writes: { used: used.writes, limit: limits.writes },
-    app: { files: limits.appFiles, bytes: limits.appBytes }, upgradeUrl: "/settings/billing", selfHostUrl: "/docs/self-host",
+    app: { files: limits.appFiles, bytes: limits.appBytes }, selfHostUrl: "/docs/self-host",
   }
 }
 

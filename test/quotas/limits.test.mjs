@@ -53,7 +53,7 @@ test("plans, warnings, and non-retryable agent guidance", () => {
   assert.match(body.message, /Nothing was created or changed/)
   assert.match(quotaToolFailure(body).content[0].text, /Ask the user/)
   assert.match(quotaToolFailure(body).content[0].text, /Do not retry or delete/)
-  assert.equal(body.upgradeUrl, "/settings/billing")
+  assert.equal("upgradeUrl" in body, false)
   assert.equal(body.selfHostUrl, "/docs/self-host")
   const usage = { enabled: true, drops: { used: 2, limit: 3 }, bytes: { used: 0, limit: 100 * MIB }, writes: { used: 0, limit: 1000 } }
   assert.equal(usageNearLimit(usage), true)

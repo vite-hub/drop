@@ -36,7 +36,7 @@ try {
   assert.equal(denied.data.code, "DROP_LIMIT_REACHED", JSON.stringify(denied.data))
   assert.deepEqual(denied.data.quota, { unit: "drops", used: 3, limit: 3 })
   assert.equal(denied.data.retryable, false)
-  assert.equal(denied.data.upgradeUrl, "/settings/billing")
+  assert.equal(denied.data.selfHostUrl, "/docs/self-host")
   const revision = await request("/api/drops", "POST", { filename: "doc.md", content: "# Revised", supersedes: created[0] })
   assert.equal(revision.response.status, 200)
   created[0] = revision.data.id

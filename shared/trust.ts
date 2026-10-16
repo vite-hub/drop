@@ -1,6 +1,6 @@
-export function needsShareReview(enabled: boolean, owner?: { role?: string | null; plan?: string | null; shareApprovedAt?: number | null; banned?: boolean | null }) {
+export function needsShareReview(enabled: boolean, owner?: { role?: string | null; shareApprovedAt?: number | null; banned?: boolean | null }) {
   if (!enabled) return false
-  return !owner || Boolean(owner.banned) || !(owner.role === "admin" || owner.plan === "unlimited" || owner.shareApprovedAt != null)
+  return !owner || Boolean(owner.banned) || !(owner.role === "admin" || owner.shareApprovedAt != null)
 }
 
 export function reportTarget(value: string) {

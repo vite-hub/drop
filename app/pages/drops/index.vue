@@ -7,6 +7,7 @@ useSeoMeta({ title: "Drops" })
 
 const { drops, status, error, refresh, upload, remove } = useDrops()
 const { data: usage, refresh: refreshUsage } = useApi("/api/usage", { key: "usage" })
+const limited = computed(() => usage.value?.enabled && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null))
 const nearLimit = computed(() => usage.value && usageNearLimit(usage.value))
 const atLimit = computed(() => usage.value && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null && quota.used >= quota.limit))
 const storageMiB = computed(() => Math.ceil((usage.value?.bytes.used ?? 0) / MIB * 10) / 10)
@@ -71,7 +72,7 @@ async function onPick(file: File) {
       <UButton color="neutral" icon="i-lucide-upload" label="Upload" variant="outline" @click="picker.open()" />
     </template>
 
-    <div v-if="usage?.enabled" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default px-4 py-3" aria-live="polite">
+    <div v-if="usage && limited" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default px-4 py-3" aria-live="polite">
       <div>
         <p class="text-sm tabular-nums text-highlighted">
           {{ usage.drops.used }}/{{ usage.drops.limit ?? '∞' }} drops · {{ storageMiB }}/{{ usage.bytes.limit === null ? '∞' : usage.bytes.limit / MIB }} MiB
@@ -81,7 +82,6 @@ async function onPick(file: File) {
         </p>
       </div>
       <div v-if="nearLimit" class="flex flex-wrap gap-2">
-        <UButton color="neutral" label="Upgrade" size="sm" :to="usage.upgradeUrl" variant="outline" />
         <UButton color="neutral" label="Deploy your own" size="sm" :to="usage.selfHostUrl" variant="outline" />
       </div>
     </div>

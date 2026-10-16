@@ -12,10 +12,10 @@ const permissionSource = dropsSource.match(/export function permissions\([\s\S]*
   .replace(/: DropRow|: Identity \| null| as Access/g, "")
 const { permissions } = await import(`data:text/javascript,${encodeURIComponent('const ACCESS_RANK={view:0,comment:1,edit:2};\n' + permissionSource)}`)
 
-test("approval is optional; admins, unlimited plans and approved members bypass it", () => {
+test("approval is optional; admins and approved members bypass it", () => {
   assert.equal(needsShareReview(false), false)
   assert.equal(needsShareReview(true, { role: "member" }), true)
-  for (const owner of [{ role: "admin" }, { plan: "unlimited" }, { shareApprovedAt: 1 }]) assert.equal(needsShareReview(true, owner), false)
+  for (const owner of [{ role: "admin" }, { shareApprovedAt: 1 }]) assert.equal(needsShareReview(true, owner), false)
   assert.equal(needsShareReview(true, { role: "admin", banned: true }), true)
 })
 
