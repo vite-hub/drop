@@ -29,3 +29,243 @@ index c119b2dcda4b1d83113b9bcc1d33f23acfebaa5d..bf23dba76d30074607a27b99ebe97fc1
  }
  function maskAssertionTypeArguments(source) {
  	const output = source.split("");
+diff --git a/dist/package-BCgKNp3n.js b/dist/package-BCgKNp3n.js
+index a224526dd0accca7d3308f07d2929a312493e99d..f3d100c29404d7a617034030cac908b0653408d2 100644
+--- a/dist/package-BCgKNp3n.js
++++ b/dist/package-BCgKNp3n.js
+@@ -165,6 +165,9 @@ var exports = {
+ 	"./ui/agent-tool-list": "./dist/ui/agent-tool-list.js",
+ 	"./ui/agent-trace": "./dist/ui/agent-trace.js",
+ 	"./ui/agent-unresolved-file": "./dist/ui/agent-unresolved-file.js",
++	"./ui/avatar-stack": "./dist/ui/avatar-stack.js",
++	"./ui/connection-status": "./dist/ui/connection-status.js",
++	"./ui/sync-status": "./dist/ui/sync-status.js",
+ 	"./ui/headless": "./dist/ui/headless.js",
+ 	"./ui/nuxt": "./dist/ui/nuxt.js",
+ 	"./ui/vite": "./dist/ui/vite.js",
+diff --git a/dist/src-DRgpO5zw.js b/dist/src-DRgpO5zw.js
+index 37189897a40c7444c42a45ee872669677f70730a..aab128a32ad0e24357ca3cca40a03c3ce8f99bd2 100644
+--- a/dist/src-DRgpO5zw.js
++++ b/dist/src-DRgpO5zw.js
+@@ -5668,7 +5668,10 @@ function frameworkDependencyResolver(options, envPlugin, providerImportAliases,
+ 		config() {
+ 			const aliases = { ...frameworkProviderImportAliases };
+ 			if (!blobEnabled) delete aliases["vite-hub/blob"];
+-			return { resolve: { alias: aliases } };
++			return { resolve: { alias: Object.entries(aliases).map(([specifier, replacement]) => ({
++				find: new RegExp(`^${specifier.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}$`),
++				replacement
++			})) } };
+ 		},
+ 		configResolved(config) {
+ 			if (envPlugin && config.root) {
+diff --git a/dist/ui/avatar-stack.d.ts b/dist/ui/avatar-stack.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..63af139145058ec044c932da8826c6f70c2d4195
+--- /dev/null
++++ b/dist/ui/avatar-stack.d.ts
+@@ -0,0 +1 @@
++export * from "@vite-hub/ui/avatar-stack";
+\ No newline at end of file
+diff --git a/dist/ui/avatar-stack.js b/dist/ui/avatar-stack.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..8340d8abc77ccb5c8c532a2cf3d5ae1a2ed654ec
+--- /dev/null
++++ b/dist/ui/avatar-stack.js
+@@ -0,0 +1 @@
++export * from "@vite-hub/ui/avatar-stack";
+diff --git a/dist/ui/connection-status.d.ts b/dist/ui/connection-status.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e678de786da5579d2f2a091eb985bd0fd14f2e22
+--- /dev/null
++++ b/dist/ui/connection-status.d.ts
+@@ -0,0 +1 @@
++export * from "@vite-hub/ui/connection-status";
+\ No newline at end of file
+diff --git a/dist/ui/connection-status.js b/dist/ui/connection-status.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..b245347b1e9a91ec46478e4c82b5448d69d9cc60
+--- /dev/null
++++ b/dist/ui/connection-status.js
+@@ -0,0 +1 @@
++export * from "@vite-hub/ui/connection-status";
+diff --git a/dist/ui/styles.css b/dist/ui/styles.css
+index 4e7d1b8a7aa65e8f88bb7f0b484f460af31c9da5..1cb2495a752292ccb2e3e90c48ef291a5fd5145e 100644
+--- a/dist/ui/styles.css
++++ b/dist/ui/styles.css
+@@ -3692,3 +3692,146 @@ button.vh-agent-tool-list__count:focus-visible {
+ .vh-primitive-icon[data-icon="workspace"] {
+   --vh-primitive-icon-motion: translateY(-1px);
+ }
++
++/* Collaboration: AvatarStack, ConnectionStatus, SyncStatus, and the carets of TipTap's CollaborationCaret. */
++@layer components {
++  [data-slot="avatar-stack"] {
++    --vh-avatar-size: 2rem;
++    align-items: center;
++    display: inline-flex;
++    isolation: isolate;
++  }
++
++  [data-slot="avatar-stack"][data-size="sm"] {
++    --vh-avatar-size: 1.5rem;
++  }
++
++  [data-slot="avatar-stack"][data-size="lg"] {
++    --vh-avatar-size: 2.5rem;
++  }
++
++  :is([data-slot="avatar-stack-item"], [data-slot="avatar-stack-count"]) {
++    align-items: center;
++    background: var(--vh-ui-bg-accented);
++    border-radius: 9999px;
++    box-shadow: 0 0 0 2px var(--vh-ui-bg);
++    color: var(--vh-ui-highlighted);
++    display: inline-flex;
++    flex: none;
++    font-size: calc(var(--vh-avatar-size) * 0.4);
++    font-weight: 500;
++    height: var(--vh-avatar-size);
++    justify-content: center;
++    line-height: 1;
++    overflow: hidden;
++    user-select: none;
++    width: var(--vh-avatar-size);
++  }
++
++  :is([data-slot="avatar-stack-item"], [data-slot="avatar-stack-count"]) + :is([data-slot="avatar-stack-item"], [data-slot="avatar-stack-count"]) {
++    margin-inline-start: calc(var(--vh-avatar-size) * -0.15);
++  }
++
++  [data-slot="avatar-stack-count"] {
++    color: var(--vh-ui-muted);
++    font-size: calc(var(--vh-avatar-size) * 0.34);
++  }
++
++  /* The outline ring takes the person's presence color, so each face matches its caret. */
++  [data-slot="avatar-stack"][data-variant="outline"] [data-slot="avatar-stack-item"] {
++    box-shadow: 0 0 0 2px var(--vh-ui-bg), 0 0 0 4px var(--vh-avatar-color, var(--vh-ui-border));
++  }
++
++  [data-slot="avatar-stack"][data-variant="outline"] :is([data-slot="avatar-stack-item"], [data-slot="avatar-stack-count"]) + :is([data-slot="avatar-stack-item"], [data-slot="avatar-stack-count"]) {
++    margin-inline-start: calc(var(--vh-avatar-size) * 0.05);
++  }
++
++  [data-slot="avatar-stack-image"] {
++    height: 100%;
++    object-fit: cover;
++    width: 100%;
++  }
++
++  :is([data-slot="connection-status"], [data-slot="sync-status"]) {
++    align-items: center;
++    color: var(--vh-ui-muted);
++    display: inline-flex;
++    font-size: 0.75rem;
++    gap: 0.375rem;
++    line-height: 1rem;
++    white-space: nowrap;
++  }
++
++  :is([data-slot="connection-status-indicator"], [data-slot="sync-status-indicator"]) {
++    background: var(--vh-ui-dimmed);
++    border-radius: 9999px;
++    flex: none;
++    height: 0.5rem;
++    position: relative;
++    width: 0.5rem;
++  }
++
++  :is([data-slot="connection-status-indicator"][data-status="connected"], [data-slot="sync-status-indicator"][data-status="synchronized"]) {
++    background: var(--vh-ui-success);
++  }
++
++  :is([data-slot="connection-status-indicator"][data-status="reconnecting"], [data-slot="sync-status-indicator"][data-status="synchronizing"]) {
++    background: var(--vh-ui-warning);
++  }
++
++  [data-slot="sync-status-indicator"][data-status="error"] {
++    background: var(--vh-ui-error);
++  }
++
++  :is([data-slot="connection-status"][data-status="reconnecting"], [data-slot="sync-status"][data-status="error"]) {
++    color: var(--vh-ui-highlighted);
++  }
++
++  /* A pending state pings, as Kibo UI's StatusIndicator does. */
++  :is([data-slot="connection-status-indicator"]:not([data-status="connected"]), [data-slot="sync-status-indicator"]:is([data-status="loading"], [data-status="synchronizing"]))::after {
++    animation: vh-status-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
++    background: inherit;
++    border-radius: inherit;
++    content: "";
++    inset: 0;
++    position: absolute;
++  }
++
++  @keyframes vh-status-ping {
++    75%,
++    100% {
++      opacity: 0;
++      transform: scale(2.25);
++    }
++  }
++
++  @media (prefers-reduced-motion: reduce) {
++    :is([data-slot="connection-status-indicator"], [data-slot="sync-status-indicator"])::after {
++      animation: none;
++    }
++  }
++
++  /* TipTap's CollaborationCaret markup, which Realtime's RealtimeCaret also renders. The inline style sets the color. */
++  .collaboration-carets__caret {
++    border-inline: 1px solid;
++    margin-inline: -1px;
++    pointer-events: none;
++    position: relative;
++    word-break: normal;
++  }
++
++  .collaboration-carets__label {
++    border-radius: 0.25rem 0.25rem 0.25rem 0;
++    color: #fff;
++    font-size: 0.75rem;
++    font-style: normal;
++    font-weight: 600;
++    inset-inline-start: -1px;
++    line-height: 1.25;
++    padding: 0.0625rem 0.375rem;
++    position: absolute;
++    top: -1.4em;
++    user-select: none;
++    white-space: nowrap;
++  }
++}
+diff --git a/dist/ui/sync-status.d.ts b/dist/ui/sync-status.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..64fd6606c3805389079b99bd1a4e800ecf2614db
+--- /dev/null
++++ b/dist/ui/sync-status.d.ts
+@@ -0,0 +1 @@
++export * from "@vite-hub/ui/sync-status";
+\ No newline at end of file
+diff --git a/dist/ui/sync-status.js b/dist/ui/sync-status.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8a1e768919492c344398850c23c20086b1ae89d
+--- /dev/null
++++ b/dist/ui/sync-status.js
+@@ -0,0 +1 @@
++export * from "@vite-hub/ui/sync-status";
+diff --git a/package.json b/package.json
+index f117b823789005a7067b8240774832234cbf9c03..a897d1f77f330285c763b55b5b93ed988d484156 100644
+--- a/package.json
++++ b/package.json
+@@ -197,6 +197,9 @@
+     "./ui/agent-tool-list": "./dist/ui/agent-tool-list.js",
+     "./ui/agent-trace": "./dist/ui/agent-trace.js",
+     "./ui/agent-unresolved-file": "./dist/ui/agent-unresolved-file.js",
++    "./ui/avatar-stack": "./dist/ui/avatar-stack.js",
++    "./ui/connection-status": "./dist/ui/connection-status.js",
++    "./ui/sync-status": "./dist/ui/sync-status.js",
+     "./ui/headless": "./dist/ui/headless.js",
+     "./ui/nuxt": "./dist/ui/nuxt.js",
+     "./ui/vite": "./dist/ui/vite.js",

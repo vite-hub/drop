@@ -3,6 +3,8 @@
 // like reading it. Nuxt UI's bubble toolbar, "/" block menu, and drag handle sit on top; app.config.ts restyles them.
 import type { EditorSuggestionMenuItem, EditorToolbarItem } from "@nuxt/ui"
 import { type Editor, EditorContent } from "@tiptap/vue-3"
+// AvatarStack, ConnectionStatus, and the carets. The viewer loads this component only while someone edits.
+import "vite-hub/ui/styles.css"
 
 const props = defineProps<{ editor?: Editor; synced: boolean }>()
 const prompt = usePrompt()

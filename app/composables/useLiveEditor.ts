@@ -1,8 +1,7 @@
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { Editor } from "@tiptap/vue-3"
-import { useRealtimeTiptap } from "vite-hub/realtime/vue"
+import { RealtimeCaret, useRealtimeTiptap } from "vite-hub/realtime/vue"
 import type { DropDetail, DropSummary } from "#shared/types"
-import { type CaretProvider, LiveCarets } from "~/utils/live-carets"
 
 type Published = { id: string; version: number; name: string }
 
@@ -17,7 +16,8 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const documentId = ref<string>()
   const opening = ref(false)
   const publishing = ref(false)
-  const realtime = useRealtimeTiptap("drops", documentId, { enabled: () => Boolean(documentId.value) })
+  // Carets come from RealtimeCaret below, with a lighter selection tint than its default.
+  const realtime = useRealtimeTiptap("drops", documentId, { enabled: () => Boolean(documentId.value), carets: false })
   const editor = shallowRef<Editor>()
   const editing = computed(() => Boolean(documentId.value))
   const people = computed(() => realtime.people.value)
@@ -35,7 +35,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       extensions: [
         ...extensions,
         Placeholder.configure({ placeholder: "Write, or type / for blocks" }),
-        LiveCarets.configure({ provider: realtime.provider.value as unknown as CaretProvider }),
+        RealtimeCaret.configure({
+          awareness: markRaw(realtime.provider.value.awareness),
+          selectionRender: user => ({ class: "ProseMirror-yjs-selection", style: `background-color: color-mix(in oklab, ${user.color} 18%, transparent)` }),
+        }),
       ],
       autofocus: "end",
     })

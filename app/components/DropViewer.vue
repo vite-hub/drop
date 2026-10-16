@@ -9,6 +9,8 @@ import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment } from "#shared/types"
+import { AvatarStack } from "vite-hub/ui/avatar-stack"
+import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
 import type { PendingComment } from "./viewer/ViewerCommentPopover.vue"
 
 type Selection = { quote: string; selector: string; label: string; rect: { left: number; top: number; right: number; bottom: number } }
@@ -50,17 +52,10 @@ const { files, pages, page } = useAppFiles(drop)
 
 const live = useLiveEditor(drop, { publicView: props.publicView })
 const editing = live.editing
-/** One avatar per person, even with the doc open in two tabs. */
-const editors = computed(() => [...new Map(live.people.value.map(person => [person.id, person])).values()])
-// A dropped socket usually comes back within a second, and Yjs keeps the edits meanwhile: say so only if it doesn't.
-const offline = refDebounced(computed(() => live.editing.value && live.status.value !== "connected"), 1500)
-const joined = ref(false)
-watch([live.editing, live.synced], ([editing, synced]) => (joined.value = editing && (joined.value || synced)))
-const liveStatus = computed(() => {
-  if (live.publishing.value) return "Publishing"
-  if (!joined.value) return "Connecting"
-  return offline.value && live.status.value !== "connected" ? "Reconnecting" : "Live"
-})
+// ConnectionStatus waits 1.5 s before it says Reconnecting: a dropped socket usually comes back sooner, and Yjs keeps
+// the edits meanwhile.
+const liveLabels = { connecting: "Connecting", connected: "Live", reconnecting: "Reconnecting" } as const
+const liveLabel = (state: ConnectionStatusState) => (live.publishing.value && state === "connected" ? "Publishing" : liveLabels[state])
 function startEdit() {
   popover.value = selection.value = null
   void live.open()
@@ -255,16 +250,13 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <template #title>
           <span class="flex min-w-0 items-center gap-2">
             <span class="truncate text-sm font-medium">{{ drop.title }}</span>
-            <span v-if="editing" class="label-mono shrink-0" :class="liveStatus === 'Reconnecting' ? 'text-error' : ''" aria-live="polite">{{ liveStatus }}</span>
+            <ConnectionStatus v-if="editing" class="label-mono shrink-0 data-[status=reconnecting]:text-error" :status="live.status.value">
+              <ConnectionStatusLabel v-slot="{ state }">{{ liveLabel(state) }}</ConnectionStatusLabel>
+            </ConnectionStatus>
           </span>
         </template>
         <template v-if="editing" #right>
-          <div v-if="editors.length" class="mr-1 flex items-center -space-x-1.5">
-            <UTooltip v-for="person in editors.slice(0, 4)" :key="person.id" :text="person.name">
-              <UAvatar :alt="person.name" class="ring-2" size="2xs" :src="person.image" :style="{ '--tw-ring-color': person.color }" />
-            </UTooltip>
-            <span v-if="editors.length > 4" class="grid size-5 place-items-center rounded-full bg-elevated font-mono text-[10px] text-muted ring-2 ring-(--ui-bg)">+{{ editors.length - 4 }}</span>
-          </div>
+          <AvatarStack v-if="live.people.value.length" class="mr-1" :max="5" :people="live.people.value" :style="{ '--vh-avatar-size': '1.25rem' }" variant="outline" />
           <UButton color="neutral" label="Close" size="sm" variant="ghost" @click="live.close" />
           <UButton color="neutral" :disabled="!live.synced.value" label="Publish" :loading="live.publishing.value" size="sm" @click="live.publish()" />
         </template>
@@ -303,7 +295,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <ViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
+      <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
       <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
         <div>
           <UIcon name="i-lucide-file" class="size-8 text-dimmed" />

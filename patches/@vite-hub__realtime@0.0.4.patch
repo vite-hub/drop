@@ -200,3 +200,249 @@ index d1bac96bf32a7c23466726d23120daa511922167..402d1d1eba0cfca0f08b2422606b1f34
    document: {
      workspace: string;
    };
+diff --git a/dist/caret.js b/dist/caret.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..78bba0a2b4c0e905dc5f438a75f022a154dc82fe
+--- /dev/null
++++ b/dist/caret.js
+@@ -0,0 +1,168 @@
++import { g as relativePositionToAbsolutePosition, p as absolutePositionToRelativePosition, x as ySyncPluginKey } from "./editor-extensions-vb7KhpSG.js";
++import { Extension } from "@tiptap/core";
++import * as Y from "yjs";
++import { Plugin, PluginKey } from "prosemirror-state";
++import { ReplaceStep } from "prosemirror-transform";
++import { Decoration, DecorationSet } from "prosemirror-view";
++//#region src/caret.ts
++// Backport of vite-hub/vitehub#2459: y-tiptap's cursor plugin, bound to Realtime's bundled sync plugin.
++const yCursorPluginKey = new PluginKey("yjs-cursor");
++const rxValidColor = /^#[0-9a-fA-F]{6}$/;
++const isStructuralTransaction = (tr, oldDoc) => {
++	if (!tr.docChanged) return false;
++	if (tr.doc.childCount !== oldDoc.childCount) return true;
++	for (const step of tr.steps) if (step instanceof ReplaceStep) {
++		if (step.from === 0 && step.to === oldDoc.content.size) return true;
++		if (step.slice.content.size > 0) {
++			let hasBlock = false;
++			step.slice.content.forEach((node) => {
++				if (node.isBlock) hasBlock = true;
++			});
++			if (hasBlock) return true;
++		} else if (step.to > step.from) {
++			const $from = oldDoc.resolve(step.from);
++			const $to = oldDoc.resolve(step.to);
++			if ($from.depth === 0 && $to.depth === 0 && $from.index() !== $to.index()) return true;
++		}
++	}
++	return false;
++};
++const createDecorations = (state, awareness, createCursor, createSelection) => {
++	const ystate = ySyncPluginKey.getState(state);
++	if (ystate == null || ystate.doc == null || ystate.binding == null) return DecorationSet.create(state.doc, []);
++	const y = ystate.doc;
++	const decorations = [];
++	if (ystate.snapshot != null || ystate.prevSnapshot != null || ystate.binding.mapping.size === 0) return DecorationSet.create(state.doc, []);
++	awareness.getStates().forEach((aw, clientId) => {
++		if (clientId === y.clientID) return;
++		if (aw && aw.cursor != null) {
++			const user = aw.user || {};
++			if (user.color == null) user.color = "#ffa500";
++			if (user.name == null) user.name = `User: ${clientId}`;
++			let anchor = relativePositionToAbsolutePosition(y, ystate.type, Y.createRelativePositionFromJSON(aw.cursor.anchor), ystate.binding.mapping);
++			let head = relativePositionToAbsolutePosition(y, ystate.type, Y.createRelativePositionFromJSON(aw.cursor.head), ystate.binding.mapping);
++			if (anchor !== null && head !== null) {
++				const maxsize = Math.max(state.doc.content.size - 1, 0);
++				anchor = Math.min(anchor, maxsize);
++				head = Math.min(head, maxsize);
++				decorations.push(Decoration.widget(head, () => createCursor(user, clientId), {
++					key: clientId + "",
++					side: 10
++				}));
++				const from = Math.min(anchor, head);
++				const to = Math.max(anchor, head);
++				decorations.push(Decoration.inline(from, to, createSelection(user, clientId), {
++					inclusiveEnd: true,
++					inclusiveStart: false
++				}));
++			}
++		}
++	});
++	return DecorationSet.create(state.doc, decorations);
++};
++const yCursorPlugin = (awareness, { cursorBuilder, selectionBuilder }) => new Plugin({
++	key: yCursorPluginKey,
++	state: {
++		init(_, state) {
++			return createDecorations(state, awareness, cursorBuilder, selectionBuilder);
++		},
++		apply(tr, prevState, oldState, newState) {
++			const ystate = ySyncPluginKey.getState(newState);
++			const yCursorState = tr.getMeta(yCursorPluginKey);
++			const isRemoteChange = ystate && ystate.isChangeOrigin;
++			if (tr.docChanged && !isRemoteChange && isStructuralTransaction(tr, oldState.doc)) return DecorationSet.empty;
++			if (isRemoteChange || yCursorState && yCursorState.awarenessUpdated) return createDecorations(newState, awareness, cursorBuilder, selectionBuilder);
++			if (tr.docChanged) return prevState.map(tr.mapping, tr.doc);
++			return prevState;
++		}
++	},
++	props: { decorations: (state) => yCursorPluginKey.getState(state) },
++	view: (view) => {
++		let timer;
++		const awarenessListener = () => {
++			clearTimeout(timer);
++			timer = setTimeout(() => {
++				if (view.docView && !view.isDestroyed) view.dispatch(view.state.tr.setMeta(yCursorPluginKey, { awarenessUpdated: true }));
++			}, 0);
++		};
++		const updateCursorInfo = (editorView, opts = {}) => {
++			const ystate = ySyncPluginKey.getState(editorView.state);
++			if (!ystate || !ystate.binding) return;
++			const current = awareness.getLocalState() || {};
++			if (editorView.hasFocus()) {
++				const selection = editorView.state.selection;
++				const anchor = absolutePositionToRelativePosition(selection.anchor, ystate.type, ystate.binding.mapping);
++				const head = absolutePositionToRelativePosition(selection.head, ystate.type, ystate.binding.mapping);
++				if (opts.force || current.cursor == null || !Y.compareRelativePositions(Y.createRelativePositionFromJSON(current.cursor.anchor), anchor) || !Y.compareRelativePositions(Y.createRelativePositionFromJSON(current.cursor.head), head)) awareness.setLocalStateField("cursor", {
++					anchor,
++					head
++				});
++			} else if (current.cursor != null && relativePositionToAbsolutePosition(ystate.doc, ystate.type, Y.createRelativePositionFromJSON(current.cursor.anchor), ystate.binding.mapping) !== null) awareness.setLocalStateField("cursor", null);
++		};
++		const onFocusChange = () => updateCursorInfo(view);
++		awareness.on("change", awarenessListener);
++		view.dom.addEventListener("focusin", onFocusChange);
++		view.dom.addEventListener("focusout", onFocusChange);
++		return {
++			update: (editorView, prevState) => {
++				const forceAwarenessUpdate = !!(ySyncPluginKey.getState(editorView.state)?.isChangeOrigin && prevState?.doc && !prevState.doc.eq(editorView.state.doc));
++				updateCursorInfo(editorView, { force: forceAwarenessUpdate });
++			},
++			destroy: () => {
++				clearTimeout(timer);
++				view.dom.removeEventListener("focusin", onFocusChange);
++				view.dom.removeEventListener("focusout", onFocusChange);
++				awareness.off("change", awarenessListener);
++				awareness.setLocalStateField("cursor", null);
++			}
++		};
++	}
++});
++const validColor = /^#[0-9a-f]{6}$/i;
++/**
++* Other people's carets and selections, drawn from the room's awareness. It renders what TipTap's CollaborationCaret
++* renders, under the same extension name, but it uses Realtime's bundled y-tiptap: CollaborationCaret installed next to
++* Realtime has its own copy, cannot find Realtime's sync plugin, and draws nothing. Presence identity stays Realtime's.
++*/
++const RealtimeCaret = Extension.create({
++	name: "collaborationCaret",
++	priority: 999,
++	addOptions() {
++		return {
++			awareness: null,
++			render: (user) => {
++				const caret = document.createElement("span");
++				caret.classList.add("collaboration-carets__caret");
++				caret.style.borderColor = user.color;
++				const label = document.createElement("div");
++				label.classList.add("collaboration-carets__label");
++				label.style.backgroundColor = user.color;
++				label.append(document.createTextNode(user.name));
++				caret.append(label);
++				return caret;
++			},
++			selectionRender: (user) => ({
++				style: `background-color: ${user.color}70`,
++				class: "ProseMirror-yjs-selection"
++			})
++		};
++	},
++	addProseMirrorPlugins() {
++		const { awareness, render, selectionRender } = this.options;
++		if (!awareness) return [];
++		const person = (user) => ({
++			...user,
++			color: typeof user.color === "string" && validColor.test(user.color) ? user.color : "transparent",
++			name: typeof user.name === "string" ? user.name : ""
++		});
++		return [yCursorPlugin(awareness, {
++			cursorBuilder: (user) => render(person(user)),
++			selectionBuilder: (user) => {
++				const current = person(user);
++				return current.color === "transparent" ? {} : selectionRender(current);
++			}
++		})];
++	}
++});
++//#endregion
++export { RealtimeCaret };
+diff --git a/dist/vue.d.ts b/dist/vue.d.ts
+index f4c8501400abf339ac261302da2926b7ff571439..2f9e401c3f42acfe68d673b30d539f2e0fcef17d 100644
+--- a/dist/vue.d.ts
++++ b/dist/vue.d.ts
+@@ -3,7 +3,8 @@ import { Extension, MappablePosition } from "@tiptap/core";
+ import * as Y from "yjs";
+ import { Doc, XmlFragment } from "yjs";
+ import { Plugin, PluginKey } from "prosemirror-state";
+-import "y-protocols/awareness";
++import { Awareness } from "y-protocols/awareness";
++import { DecorationAttrs } from "prosemirror-view";
+ import * as PModel from "prosemirror-model";
+ import { Node as Node$1 } from "prosemirror-model";
+ import "@tiptap/pm/state";
+@@ -112,10 +113,30 @@ interface CollaborationOptions {
+ export type RealtimeStatus = "connected" | "connecting" | "disconnected";
+ export interface UseRealtimeTiptapOptions {
+   enabled?: MaybeRefOrGetter<boolean>;
++  /**
++   * Other people's carets and selections, in their presence color. Defaults to `true`. They use TipTap's
++   * CollaborationCaret classes (`collaboration-carets__caret`, `collaboration-carets__label`, `ProseMirror-yjs-selection`).
++   */
++  carets?: boolean;
++}
++/** A remote person as the caret sees them: the presence identity from awareness. */
++export interface RealtimeCaretUser {
++  color: string;
++  name: string;
++  [key: string]: unknown;
++}
++export interface RealtimeCaretOptions {
++  awareness: Awareness | null;
++  /** Builds a remote caret. Defaults to TipTap's `collaboration-carets__caret` and `collaboration-carets__label`. */
++  render: (user: RealtimeCaretUser) => HTMLElement;
++  /** Decoration attributes for a remote selection. Defaults to `ProseMirror-yjs-selection` in the person's color. */
++  selectionRender: (user: RealtimeCaretUser) => DecorationAttrs;
+ }
++/** Other people's carets and selections, drawn from the room's awareness, under TipTap's CollaborationCaret name. */
++export declare const RealtimeCaret: Extension<RealtimeCaretOptions, any>;
+ export declare function useRealtimeTiptap(definition: string, documentId: MaybeRefOrGetter<string | undefined>, options?: UseRealtimeTiptapOptions): {
+   document: import("vue").ShallowRef<Y.Doc | undefined, Y.Doc | undefined>;
+-  extensions: import("vue").ComputedRef<(import("@tiptap/core").Extension<import("@tiptap/starter-kit").StarterKitOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Node<import("@tiptap/extension-image").ImageOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-table").TableKitOptions, any> | import("@tiptap/core").Extension<import("@tiptap/markdown").MarkdownExtensionOptions, import("@tiptap/markdown").MarkdownExtensionStorage> | import("vue").Raw<import("@tiptap/core").Extension<CollaborationOptions, CollaborationStorage>>)[]>;
++  extensions: import("vue").ComputedRef<(import("@tiptap/core").Extension<import("@tiptap/starter-kit").StarterKitOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Node<import("@tiptap/extension-image").ImageOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-table").TableKitOptions, any> | import("@tiptap/core").Extension<import("@tiptap/markdown").MarkdownExtensionOptions, import("@tiptap/markdown").MarkdownExtensionStorage> | import("vue").Raw<import("@tiptap/core").Extension<CollaborationOptions, CollaborationStorage>> | import("vue").Raw<import("@tiptap/core").Extension<RealtimeCaretOptions, any>>)[]>;
+   people: import("vue").ShallowRef<RealtimePerson[], RealtimePerson[]>;
+   provider: import("vue").ShallowRef<WebsocketProvider | undefined, WebsocketProvider | undefined>;
+   status: import("vue").Ref<RealtimeStatus, RealtimeStatus>;
+diff --git a/dist/vue.js b/dist/vue.js
+index 42c267693ca4a098a7035b3a229175deeca993ca..d12ddb3eae705619fe8293ac49e4c9a864e74dbd 100644
+--- a/dist/vue.js
++++ b/dist/vue.js
+@@ -1,5 +1,6 @@
+ import { C as yUndoPluginKey, S as yUndoPlugin, _ as undo, b as ySyncPlugin, d as getRealtimePeople, g as relativePositionToAbsolutePosition, h as redo, i as isRetryableRealtimeCheckpointCode, l as workspaceRoomId, n as decodeWorkspaceChangePayload, p as absolutePositionToRelativePosition, r as encodeWorkspaceChange, t as createRealtimeEditorExtensions, u as createRealtimeIdentity, x as ySyncPluginKey } from "./editor-extensions-vb7KhpSG.js";
+ import { t as realtimeErrorDiagnostics } from "./error-diagnostics-DWskrTZ6.js";
++import { RealtimeCaret } from "./caret.js";
+ import { Extension, MappablePosition, getUpdatedPosition } from "@tiptap/core";
+ import * as Y from "yjs";
+ import "lib0/decoding";
+@@ -382,7 +383,7 @@ function useRealtimeTiptap(definition, documentId, options = {}) {
+ 	onScopeDispose(destroy);
+ 	return {
+ 		document,
+-		extensions: computed(() => document.value && provider.value ? [...createRealtimeEditorExtensions(), markRaw(src_default.configure({ fragment: markRaw(document.value.getXmlFragment("default")) }))] : []),
++		extensions: computed(() => document.value && provider.value ? [...createRealtimeEditorExtensions(), markRaw(src_default.configure({ fragment: markRaw(document.value.getXmlFragment("default")) })), ...options.carets === false ? [] : [markRaw(RealtimeCaret.configure({ awareness: markRaw(provider.value.awareness) }))]] : []),
+ 		people,
+ 		provider,
+ 		status,
+@@ -399,4 +400,4 @@ function useRealtimeTiptap(definition, documentId, options = {}) {
+ 	};
+ }
+ //#endregion
+-export { useRealtimeTiptap };
++export { RealtimeCaret, useRealtimeTiptap };

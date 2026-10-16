@@ -127,24 +127,8 @@
   & .ProseMirror-selectednode { outline: 2px solid var(--ui-border-accented); outline-offset: 2px; border-radius: 4px; }
 }
 
-/* Other people in the room: a caret line and name pill in their presence color, and a tint over their selection. */
-.live-caret {
-  position: relative;
-  margin: 0 -1px;
-  border-left: 1.5px solid var(--caret);
-  pointer-events: none;
-  word-break: normal;
-}
-.live-caret-label {
-  position: absolute;
-  bottom: 100%;
-  left: -1.5px;
-  padding: 1px 5px;
-  border-radius: 4px 4px 4px 0;
-  background: var(--caret);
-  color: #fff;
+/* Other people's carets come from vite-hub/ui/styles.css. Drop sets their name pill in its mono face. */
+.drop-doc .collaboration-carets__label {
   font: 500 11px/1.4 var(--font-mono);
-  white-space: nowrap;
-  user-select: none;
+  padding: 1px 5px;
 }
-.live-selection { background: color-mix(in oklab, var(--caret) 18%, transparent); }
