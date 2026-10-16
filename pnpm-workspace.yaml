@@ -44,3 +44,12 @@ minimumReleaseAgeExclude:
   - miniflare@5.20261006.0-alpha
   - wrangler@4.148.0
   - comark-annotate@0.0.2
+  - '@better-auth/core@1.7.10'
+  - '@better-auth/drizzle-adapter@1.7.10'
+  - '@better-auth/kysely-adapter@1.7.10'
+  - '@better-auth/memory-adapter@1.7.10'
+  - '@better-auth/mongo-adapter@1.7.10'
+  - '@better-auth/oauth-provider@1.7.10'
+  - '@better-auth/prisma-adapter@1.7.10'
+  - '@better-auth/telemetry@1.7.10'
+  - better-auth@1.7.10
