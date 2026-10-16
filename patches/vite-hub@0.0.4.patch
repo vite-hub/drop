@@ -44,21 +44,32 @@ index a224526dd0accca7d3308f07d2929a312493e99d..f3d100c29404d7a617034030cac908b0
  	"./ui/nuxt": "./dist/ui/nuxt.js",
  	"./ui/vite": "./dist/ui/vite.js",
 diff --git a/dist/src-DRgpO5zw.js b/dist/src-DRgpO5zw.js
-index 37189897a40c7444c42a45ee872669677f70730a..aab128a32ad0e24357ca3cca40a03c3ce8f99bd2 100644
+index 37189897a40c7444c42a45ee872669677f70730a..48f21174a2c569d1b77856912e8ef5b7e4dd935b 100644
 --- a/dist/src-DRgpO5zw.js
 +++ b/dist/src-DRgpO5zw.js
-@@ -5668,7 +5668,10 @@ function frameworkDependencyResolver(options, envPlugin, providerImportAliases,
+@@ -5648,6 +5648,10 @@ const frameworkProviderImportAliases = Object.fromEntries(Object.entries(exports
+ 	const specifier = `${frameworkPackageName}/${subpath.slice(2)}`;
+ 	return [specifier, fileURLToPath(import.meta.resolve(specifier))];
+ }).sort(([left], [right]) => right.length - left.length));
++const frameworkAssetImportAliases = Object.fromEntries(Object.entries(exports).filter(([subpath, target]) => subpath.startsWith("./") && typeof target === "string" && !target.endsWith(".js")).map(([subpath]) => {
++	const specifier = `${frameworkPackageName}/${subpath.slice(2)}`;
++	return [specifier, fileURLToPath(import.meta.resolve(specifier))];
++}));
+ function isGeneratedImporter(importer) {
+ 	const normalized = importer?.replace(/\\/g, "/");
+ 	return Boolean(normalized && (/(?:^|\/)\.vitehub(?:\/|$)/.test(normalized) || frameworkVirtualImporters.has(normalized)));
+@@ -5666,7 +5670,10 @@ function frameworkDependencyResolver(options, envPlugin, providerImportAliases,
+ 		vitehub: { providerOutput: { getImportAliases: getGeneratedOwnerProviderImportAliases } },
+ 		enforce: "pre",
  		config() {
- 			const aliases = { ...frameworkProviderImportAliases };
+-			const aliases = { ...frameworkProviderImportAliases };
++			const aliases = Object.fromEntries(Object.entries({
++				...frameworkProviderImportAliases,
++				...frameworkAssetImportAliases
++			}).sort(([left], [right]) => right.length - left.length));
  			if (!blobEnabled) delete aliases["vite-hub/blob"];
--			return { resolve: { alias: aliases } };
-+			return { resolve: { alias: Object.entries(aliases).map(([specifier, replacement]) => ({
-+				find: new RegExp(`^${specifier.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}$`),
-+				replacement
-+			})) } };
+ 			return { resolve: { alias: aliases } };
  		},
- 		configResolved(config) {
- 			if (envPlugin && config.root) {
 diff --git a/dist/ui/avatar-stack.d.ts b/dist/ui/avatar-stack.d.ts
 new file mode 100644
 index 0000000000000000000000000000000000000000..63af139145058ec044c932da8826c6f70c2d4195
