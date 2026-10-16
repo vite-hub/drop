@@ -278,9 +278,6 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
-          <ViewerAction v-if="drop.canEdit" icon="i-lucide-pencil" label="Edit together" @click="startEdit" />
-          <ViewerAction v-if="canDrawArea" icon="i-lucide-square-dashed-mouse-pointer" label="Comment on an area" @click="toggleArea" />
-          <ViewerAction icon="i-lucide-sparkles" label="Copy feedback for your agent" @click="copyFeedback" />
           <ViewerAction icon="i-lucide-link" label="Copy link" @click="copyLink" />
           <ViewerAction v-if="drop.url" icon="i-lucide-download" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
           <ViewerAction destructive icon="i-lucide-trash" label="Move to Trash" @click="deleteDrop" />
@@ -309,20 +306,24 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UButton color="neutral" label="Close" size="sm" variant="ghost" @click="live.close" />
           <UButton color="neutral" :disabled="!live.synced.value" label="Publish" :loading="live.publishing.value" size="sm" @click="live.publish()" />
         </template>
+        <!-- One row of same-size tools: icons only, the pressed state shows the mode, shortcuts live in the tooltips. -->
         <template v-else #right>
-          <UTooltip v-if="canDrawArea" text="Comment on an area (R)">
-            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-lucide-square-dashed-mouse-pointer" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
+          <UTooltip v-if="canDrawArea" :kbds="['R']" text="Comment on an area">
+            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-lucide-square-dashed-mouse-pointer" size="sm" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
           </UTooltip>
-          <UTooltip v-if="drop.canEdit || drop.editNote" :text="drop.editNote ?? 'Edit with others, live (E)'">
-            <UButton color="neutral" :disabled="!drop.canEdit" icon="i-lucide-pencil" label="Edit" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
+          <UTooltip v-if="drop.canEdit || drop.editNote" :kbds="drop.canEdit ? ['E'] : undefined" :text="drop.editNote ?? 'Edit together'">
+            <UButton aria-label="Edit together" color="neutral" :disabled="!drop.canEdit" icon="i-lucide-pencil" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
           </UTooltip>
+          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote" class="mx-1 h-4" orientation="vertical" />
           <UButton v-if="publicView" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" label="Report" size="sm" variant="ghost" />
-          <UButton v-if="owner" color="neutral" :icon="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'shared' ? 'outline' : 'solid'" @click="shareOpen = true" />
+          <UButton v-if="owner" color="neutral" :icon="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'shared' ? 'ghost' : 'solid'" @click="shareOpen = true" />
           <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
-          <span class="relative">
-            <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-lucide-panel-right" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />
-            <span v-if="openCount && !panelOpen" class="pointer-events-none absolute top-1.5 right-1.5 size-1.5 rounded-full bg-inverted ring-2 ring-(--ui-bg)" />
-          </span>
+          <UTooltip :text="panelOpen ? 'Hide panel' : 'Show panel'">
+            <span class="relative">
+              <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-lucide-panel-right" size="sm" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />
+              <span v-if="openCount && !panelOpen" class="pointer-events-none absolute top-1 right-1 size-1.5 rounded-full bg-inverted ring-2 ring-(--ui-bg)" />
+            </span>
+          </UTooltip>
         </template>
       </UDashboardNavbar>
     </template>

@@ -1,47 +1,55 @@
 <script setup lang="ts">
-// Details as a short story instead of a table: who dropped it, what it is, who can see it, its history.
-import { ACCESS_LABELS, type DropDetail } from "#shared/types"
+// Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how long it lives,
+// its history. Each row's action sits at its end.
+import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
 const emit = defineEmits<{ share: [] }>()
-const facts = computed(() => [
+const type = computed(() => [
   KIND_LABELS[props.drop.kind] ?? "File",
   ...(props.drop.kind === "app" ? [`${props.drop.paths?.length ?? 0} files`] : []),
   formatBytes(props.drop.size),
-  ...(props.drop.versions.length > 1 || props.drop.kind === "app" ? [`v${props.drop.version}`] : []),
-])
-const access = computed(() => props.drop.shareReview === "pending" ? "Waiting for review. You can still use it privately." : props.drop.shareReview === "rejected" ? "Share rejected. You can still use it privately." : props.drop.visibility === "shared" ? `Anyone with the link ${ACCESS_LABELS[props.drop.access].toLowerCase()}.` : "Private. Only you can open it.")
+].join(" · "))
+const access = computed(() => {
+  if (props.drop.shareReview === "pending") return "Waiting for review"
+  if (props.drop.shareReview === "rejected") return "Share rejected"
+  if (props.drop.visibility !== "shared") return "Only you"
+  return { view: "Anyone can view", comment: "Anyone can comment", edit: "Anyone can edit" }[props.drop.access]
+})
 </script>
 
 <template>
   <div class="space-y-6 p-4">
-    <section class="flex items-start gap-3">
-      <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-elevated ring-1 ring-inset ring-default">
-        <AgentIcon class="size-5" :kind="drop.actorKind" :name="drop.actorName" />
-      </span>
-      <div class="min-w-0 pt-0.5">
-        <p class="text-sm"><span class="font-medium text-highlighted">{{ drop.actorName }}</span> <span class="text-muted">dropped this</span></p>
-        <p class="mt-0.5 text-xs text-muted"><TimeAgo :at="drop.updatedAt" /> · via {{ VIA_LABELS[drop.actorKind] }}</p>
+    <dl class="space-y-2.5 text-[13px]">
+      <div class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Dropped by</dt>
+        <dd class="flex min-w-0 items-center gap-1.5">
+          <AgentIcon class="size-3.5 shrink-0 text-muted" :kind="drop.actorKind" :name="drop.actorName" />
+          <span class="truncate text-highlighted">{{ drop.actorName }}</span>
+          <span class="shrink-0 text-muted">via {{ VIA_LABELS[drop.actorKind] }}</span>
+        </dd>
       </div>
-    </section>
-
-    <section class="rounded-lg border border-default p-3">
-      <p class="flex min-w-0 items-center gap-2 font-mono text-xs">
-        <UIcon :name="KIND_ICONS[drop.kind]!" class="size-3.5 shrink-0 text-dimmed" />
-        <span class="truncate">{{ drop.filename }}</span>
-      </p>
-      <div class="mt-2.5 flex flex-wrap gap-1.5">
-        <span v-for="fact in facts" :key="fact" class="rounded-md bg-elevated px-1.5 py-0.5 text-[11px] text-muted">{{ fact }}</span>
+      <div class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Updated</dt>
+        <dd class="text-highlighted"><TimeAgo :at="drop.updatedAt" /></dd>
       </div>
-    </section>
-
-    <section v-if="drop.isOwner" class="flex items-center gap-3">
-      <span class="grid size-8 shrink-0 place-items-center rounded-full bg-elevated text-muted">
-        <UIcon :name="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-4" />
-      </span>
-      <p class="min-w-0 flex-1 text-sm">{{ access }}</p>
-      <UButton color="neutral" label="Change" size="sm" variant="ghost" @click="emit('share')" />
-    </section>
+      <div class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">File</dt>
+        <dd class="min-w-0 truncate font-mono text-xs text-highlighted">{{ drop.filename }}</dd>
+      </div>
+      <div class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Type</dt>
+        <dd class="text-highlighted tabular-nums">{{ type }}</dd>
+      </div>
+      <div v-if="drop.isOwner" class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Access</dt>
+        <dd class="flex min-w-0 flex-1 items-center gap-1.5 text-highlighted">
+          <UIcon :name="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-3.5 shrink-0 text-muted" />
+          <span class="truncate">{{ access }}</span>
+        </dd>
+        <UButton class="-my-1" color="neutral" label="Change" size="xs" variant="ghost" @click="emit('share')" />
+      </div>
+    </dl>
 
     <ViewerLifetime v-if="drop.isOwner" :drop="drop" />
 

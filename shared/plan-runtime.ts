@@ -62,7 +62,6 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.a{position:absolute;box-sizing:border-box;border:1.5px solid var(--foreground);border-radius:3px;background:color-mix(in oklab,var(--foreground) 6%,transparent);pointer-events:none;transition:background 120ms}' +
     '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}' +
-    '.hint{position:fixed;left:50%;top:12px;transform:translateX(-50%);padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--popover);color:var(--muted-foreground);font:500 11px var(--font-mono);letter-spacing:.04em;box-shadow:0 1px 4px rgb(0 0 0/.1);pointer-events:none;white-space:nowrap}' +
     '</style><div class="marks"></div><div class="draft"></div>';
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
   const pageStyle = document.createElement("style");
@@ -228,7 +227,6 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     lastQuote = "";
     drawing = document.createElement("div");
     drawing.className = "draw";
-    drawing.innerHTML = '<div class="hint">Drag to comment on an area · Esc to cancel</div>';
     let start = null, box = null;
     drawing.onpointerdown = (e) => {
       if (e.button !== 0) return;
