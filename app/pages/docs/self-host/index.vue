@@ -45,13 +45,13 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
     </DocsSection>
 
     <DocsSection id="expiry" title="Expiry">
-      <p>Drops expire 30 days after their last visit, stay restorable for 7 days, and are then deleted by the hourly cleanup job. <NuxtLink to="/docs/review#expiry">Review and share</NuxtLink> explains what counts as a visit.</p>
+      <p>Drops expire 30 days after their last visit (14 for temporary ones) into the Trash, stay restorable for 15 days, and are then deleted by the hourly cleanup job. <NuxtLink to="/docs/review#expiry">Review and share</NuxtLink> explains what counts as a visit.</p>
       <div class="overflow-x-auto rounded-lg border border-default">
         <table>
           <thead><tr><th>Variable</th><th>What it does</th></tr></thead>
           <tbody>
             <tr><td class="font-mono text-xs">DROP_EXPIRY_DAYS</td><td>Days a drop lives after its last visit. Defaults to 30. Set 0 to keep every drop.</td></tr>
-            <tr><td class="font-mono text-xs">DROP_CUSTOM_EXPIRY</td><td>Set 0 so only admins can mark drops "Keep forever". Defaults to 1: owners can too.</td></tr>
+            <tr><td class="font-mono text-xs">DROP_CUSTOM_EXPIRY</td><td>Set 0 so only admins can keep drops. Defaults to 1: owners and their agents can too.</td></tr>
           </tbody>
         </table>
       </div>

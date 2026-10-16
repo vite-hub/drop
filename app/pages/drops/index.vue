@@ -1,18 +1,20 @@
 <script setup lang="ts">
+import { TRASH_DAYS } from "#shared/expiry"
 import { MIB, usageNearLimit } from "#shared/quotas"
 import type { DropSummary } from "#shared/types"
 
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
-const { drops, status, error, refresh, upload, remove } = useDrops()
+const { drops, status, error, refresh, upload, remove, restore, deleteForever, emptyTrash } = useDrops()
+const { data: trash } = useApi("/api/drops", { key: "trash", query: { trash: 1 }, default: () => [] })
 const { data: usage, refresh: refreshUsage } = useApi("/api/usage", { key: "usage" })
 const limited = computed(() => usage.value?.enabled && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null))
 const nearLimit = computed(() => usage.value && usageNearLimit(usage.value))
 const atLimit = computed(() => usage.value && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null && quota.used >= quota.limit))
 const storageMiB = computed(() => Math.ceil((usage.value?.bytes.used ?? 0) / MIB * 10) / 10)
 watch(drops, () => refreshUsage())
-const filter = ref<"all" | "private" | "shared">("all")
+const filter = ref<"all" | "private" | "shared" | "trash">("all")
 const search = ref("")
 const searchInput = useTemplateRef("searchInput")
 const picker = useFileDialog({ multiple: false, reset: true })
@@ -23,12 +25,13 @@ const counts = computed(() => ({
   all: drops.value.length,
   private: drops.value.filter(drop => drop.visibility === "private").length,
   shared: drops.value.filter(drop => drop.visibility === "shared").length,
+  trash: trash.value.length,
 }))
 
 const visible = computed(() => {
   const query = search.value.trim().toLowerCase()
-  return drops.value
-    .filter(drop => filter.value === "all" || drop.visibility === filter.value)
+  return (filter.value === "trash" ? trash.value : drops.value)
+    .filter(drop => filter.value === "all" || filter.value === "trash" || drop.visibility === filter.value)
     .filter(drop => !query || `${drop.title} ${drop.filename} ${drop.actorName}`.toLowerCase().includes(query))
 })
 
@@ -50,7 +53,8 @@ const groups = computed(() => {
   }
   const out: Array<{ label: string; drops: DropSummary[] }> = []
   for (const drop of visible.value) {
-    const name = label(drop.updatedAt)
+    // The Trash groups by when things went there, which is also what sets when they're deleted.
+    const name = label(filter.value === "trash" ? drop.trashedAt ?? drop.updatedAt : drop.updatedAt)
     const last = out.at(-1)
     if (last?.label === name) last.drops.push(drop)
     else out.push({ label: name, drops: [drop] })
@@ -94,6 +98,7 @@ async function onPick(file: File) {
           { label: `All ${counts.all}`, value: 'all' },
           { label: `Private ${counts.private}`, value: 'private', icon: 'i-lucide-lock' },
           { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-lucide-globe' },
+          { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-lucide-trash' },
         ]"
         size="sm"
         color="neutral"
@@ -114,7 +119,13 @@ async function onPick(file: File) {
       <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh()" />
     </div>
 
-    <div v-else-if="!drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+    <div v-else-if="filter === 'trash' && !trash.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+      <UIcon name="i-lucide-trash" class="size-6 text-dimmed" />
+      <p class="mt-3 font-medium text-highlighted">The Trash is empty</p>
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Deleted and expired drops stay here for {{ TRASH_DAYS }} days, then they're gone for good.</p>
+    </div>
+
+    <div v-else-if="filter !== 'trash' && !drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
       <UIcon name="i-lucide-layers" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing dropped yet</p>
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here.</p>
@@ -123,11 +134,16 @@ async function onPick(file: File) {
 
     <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">No drops match.</p>
 
-    <div v-else class="overflow-hidden rounded-lg border border-default">
+    <div v-if="filter === 'trash' && trash.length" class="mb-3 flex items-center justify-between gap-3 text-sm text-muted">
+      <p>Drops in the Trash are deleted for good {{ TRASH_DAYS }} days after they got here.</p>
+      <UButton color="error" label="Empty Trash" size="sm" variant="outline" @click="emptyTrash(trash.length)" />
+    </div>
+
+    <div v-if="visible.length" class="overflow-hidden rounded-lg border border-default">
       <template v-for="group in groups" :key="group.label">
         <p class="label-mono border-b border-default bg-muted px-4 py-2">{{ group.label }}</p>
         <ul class="divide-y divide-default border-b border-default last:border-b-0">
-          <DropRow v-for="drop in group.drops" :key="drop.id" :drop="drop" @delete="remove(drop)" />
+          <DropRow v-for="drop in group.drops" :key="drop.id" :drop="drop" @delete="remove(drop)" @restore="restore(drop)" @delete-forever="deleteForever(drop)" />
         </ul>
       </template>
     </div>

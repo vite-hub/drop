@@ -18,7 +18,7 @@ Show reviewers what changed on screen, marked up so they don't have to hunt for 
    [(r.x / innerWidth) * 100, (r.y / innerHeight) * 100, (r.width / innerWidth) * 100, (r.height / innerHeight) * 100].map((v) => +v.toFixed(1));
    ```
 
-4. Screenshots need an `https` URL Drop can load. Use images you already host with the pull request, or ask the user where to put them.
+4. Publish each screenshot to Drop with `publish` and `file` (`lifetime: "keep"`, `keepReason` naming the pull request, `share: "view"`), then use the `fileUrl` it returns. Images already hosted elsewhere over `https` work too.
 
 ## Write
 
@@ -34,8 +34,8 @@ Start the document with the pull request link, the two preview URLs, and the exa
 
 ## Publish
 
-1. Drop the Markdown with `create_doc` and open the returned page.
-2. Take a screenshot of it and check that every mark sits on its target and every number matches its note. Fix and publish again with `supersedes` until it does. If a mark can't be verified, say so in the report.
+1. Publish the Markdown with `publish`: `lifetime: "keep"`, a `keepReason` naming the pull request, `share: "view"`, and a `note`. Open the returned page.
+2. Take a screenshot of it and check that every mark sits on its target and every number matches its note. Fix and publish again with `previous` until it does. If a mark can't be verified, say so in the report.
 3. Give the user the link and a snippet for the pull request body:
 
    ```md

@@ -39,13 +39,14 @@ code, kbd, pre, samp { font-family: var(--font-mono); }`;
 export const PLAN_AUTHORING_GUIDE = `Write one self-contained HTML document with inline <style> and <script>. Load libraries from a CDN (Chart.js, Mermaid, D3, KaTeX); they run as-is.
 Drop shows the page full screen, so center a readable column (max-width ~760px) with its own padding.
 Drop injects its theme as CSS custom properties on :root and follows the reader's light/dark mode: --background, --foreground, --muted, --muted-foreground, --card, --border, --primary, --primary-foreground, --destructive, --code-background, --chart-1 … --chart-8 (use in order), --positive, --caution, --negative, --radius, --font-sans, --font-mono. Use them instead of fixed colors. Grayscale first: color only for chart series and status.
-Readers comment by selecting text or clicking images, so prefer real text, lists, and tables over text baked into images.
+Readers comment by selecting text, clicking images, or drawing a rectangle over any part of the page, so prefer real text, lists, and tables over text baked into images.
 These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`;
 
 /**
  * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
- * Select text to comment on it; click an image to zoom and comment on a spot.
- * Commented text is highlighted with the CSS Custom Highlight API, so the author's DOM is never modified.
+ * Select text to comment on it; click an image to zoom and comment on a spot; in area mode (Drop's R), drag a rectangle.
+ * Commented text is highlighted with the CSS Custom Highlight API and everything else draws in a shadow root, so the
+ * author's DOM is never modified.
  */
 export const ANNOTATOR_SCRIPT = String.raw`(() => {
   const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
@@ -58,8 +59,12 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.m.pulse{animation:p 900ms ease-out 2}@keyframes p{50%{transform:scale(1.4)}}' +
     '.cp{position:absolute;display:flex;gap:6px;align-items:center;height:22px;padding:0 7px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--muted-foreground);font:500 11px var(--font-mono);cursor:pointer}' +
     '.cp:hover{color:var(--foreground)}.cp b{font-weight:500;text-transform:uppercase;letter-spacing:.06em;opacity:.7}' +
-    '</style><div class="marks"></div>';
-  const marks = shadow.querySelector(".marks");
+    '.a{position:absolute;box-sizing:border-box;border:1.5px solid var(--foreground);border-radius:3px;background:color-mix(in oklab,var(--foreground) 6%,transparent);pointer-events:none;transition:background 120ms}' +
+    '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
+    '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}' +
+    '.hint{position:fixed;left:50%;top:12px;transform:translateX(-50%);padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--popover);color:var(--muted-foreground);font:500 11px var(--font-mono);letter-spacing:.04em;box-shadow:0 1px 4px rgb(0 0 0/.1);pointer-events:none;white-space:nowrap}' +
+    '</style><div class="marks"></div><div class="draft"></div>';
+  const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
   const pageStyle = document.createElement("style");
   pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}img{cursor:zoom-in}";
   let markers = [], active = null;
@@ -108,16 +113,28 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     return null;
   }
 
+  /** An outlined rectangle at page coordinates, for saved areas and the one being commented on. */
+  function areaBox(parentEl, left, top, width, height, className) {
+    const box = document.createElement("div");
+    box.className = "a" + (className || "");
+    box.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + width + "px;height:" + height + "px";
+    parentEl.appendChild(box);
+    return box;
+  }
+
   function render() {
     marks.innerHTML = "";
     const open = [], done = [], act = [];
     for (const m of markers) {
       let x, y;
-      if (m.kind === "image") {
-        const img = query(m.selector);
-        if (!img) continue;
-        const r = img.getBoundingClientRect();
+      if (m.kind === "image" || m.kind === "area") {
+        // Placed from the anchor's current box, so areas and pins follow reflow.
+        const el = query(m.selector);
+        if (!el) continue;
+        resized.observe(el);
+        const r = el.getBoundingClientRect();
         x = r.left + scrollX + (m.ox / 1000) * r.width; y = r.top + scrollY + (m.oy / 1000) * r.height;
+        if (m.ow || m.oh) areaBox(marks, x, y, (m.ow / 1000) * r.width, (m.oh / 1000) * r.height, (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
       } else {
         const range = m.quote ? findRange(m.selector, m.quote) : null;
         if (!range) continue;
@@ -127,7 +144,7 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
       const dot = document.createElement("div");
-      dot.className = "m" + (m.kind === "image" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "");
+      dot.className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "");
       dot.textContent = String(m.n);
       dot.style.left = x + "px"; dot.style.top = y + "px";
       dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
@@ -177,14 +194,75 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     const img = e.target && e.target.closest ? e.target.closest("img") : null;
     if (!img || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
     e.preventDefault(); e.stopPropagation();
-    post({ type: "image", src: img.currentSrc || img.src, alt: img.alt || "", selector: pathOf(img), label: labelOf(img) });
+    // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
+    const r = img.getBoundingClientRect();
+    post({ type: "image", src: img.currentSrc || img.src, alt: img.alt || "", selector: pathOf(img), label: labelOf(img), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }, true);
+
+  // Area mode: a crosshair layer over the page. Drag a rectangle; it anchors to the smallest element that holds it.
+  let drawing = null;
+  function anchorFor(left, top, right, bottom) {
+    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== host && el !== document.documentElement);
+    let best = null, bestArea = Infinity;
+    for (const el of under) {
+      const r = el.getBoundingClientRect(), area = r.width * r.height;
+      if (r.width < 1 || r.height < 1 || r.left > left + 1 || r.top > top + 1 || r.right < right - 1 || r.bottom < bottom - 1) continue;
+      if (area < bestArea) { best = el; bestArea = area; }
+    }
+    return best || under[0] || document.body;
+  }
+  function finishArea(left, top, right, bottom) {
+    const el = anchorFor(left, top, right, bottom), r = el.getBoundingClientRect();
+    const at = (value, start, size) => Math.min(1000, Math.max(0, Math.round(((value - start) / (size || 1)) * 1000)));
+    const ox = at(left, r.left, r.width), oy = at(top, r.top, r.height);
+    // Keep the drawn rectangle on the page while the comment is written; Drop clears it.
+    draft.innerHTML = "";
+    areaBox(draft, left + scrollX, top + scrollY, right - left, bottom - top);
+    post({ type: "area", selector: pathOf(el), label: labelOf(el), ox, oy, ow: at(right, r.left, r.width) - ox, oh: at(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
+  }
+  function setAreaMode(on) {
+    if (on === Boolean(drawing)) return;
+    if (!on) { drawing.remove(); drawing = null; return; }
+    getSelection().removeAllRanges();
+    if (lastQuote) post({ type: "selection", clear: true });
+    lastQuote = "";
+    drawing = document.createElement("div");
+    drawing.className = "draw";
+    drawing.innerHTML = '<div class="hint">Drag to comment on an area · Esc to cancel</div>';
+    let start = null, box = null;
+    drawing.onpointerdown = (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      drawing.setPointerCapture(e.pointerId);
+      start = { x: e.clientX, y: e.clientY };
+    };
+    drawing.onpointermove = (e) => {
+      if (!start) return;
+      const left = Math.min(start.x, e.clientX), top = Math.min(start.y, e.clientY), width = Math.abs(e.clientX - start.x), height = Math.abs(e.clientY - start.y);
+      if (!box && Math.max(width, height) < 6) return;
+      if (!box) box = areaBox(drawing, 0, 0, 0, 0);
+      box.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + width + "px;height:" + height + "px";
+    };
+    drawing.onpointerup = (e) => {
+      if (!start) return;
+      const s = start; start = null;
+      // A click or a tiny drag draws nothing: stay in area mode.
+      if (!box) return;
+      box.remove(); box = null;
+      setAreaMode(false);
+      finishArea(Math.min(s.x, e.clientX), Math.min(s.y, e.clientY), Math.max(s.x, e.clientX), Math.max(s.y, e.clientY));
+    };
+    drawing.onpointercancel = () => { start = null; if (box) { box.remove(); box = null; } };
+    shadow.appendChild(drawing);
+  }
 
   window.addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; }
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; }
+    if (m.type === "area-mode") setAreaMode(Boolean(m.on));
+    if (m.type === "clear-area") draft.innerHTML = "";
     if (m.type === "focus") {
       active = m.id; render();
       const dot = Array.from(marks.children).find((d) => d.classList.contains("pulse"));
@@ -192,9 +270,17 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
       setTimeout(() => { active = null; render(); }, 2200);
     }
   });
-  window.addEventListener("keydown", (e) => { if (e.key === "Escape") post({ type: "key", key: "Escape" }); });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { setAreaMode(false); post({ type: "key", key: "Escape" }); }
+    // Drop's area shortcut, for when the page has focus. Never while typing, and never once the page used the key.
+    const t = e.target;
+    const typing = t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
+    if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey && !e.altKey && !typing && !e.defaultPrevented) post({ type: "key", key: "r" });
+  });
   window.addEventListener("resize", render);
-  new ResizeObserver(render).observe(document.documentElement);
+  // The page and every anchor: an area must follow its element even when the page keeps its size.
+  const resized = new ResizeObserver(render);
+  resized.observe(document.documentElement);
   document.documentElement.appendChild(host);
   document.head.appendChild(pageStyle);
   post({ type: "ready" });

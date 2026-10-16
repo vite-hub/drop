@@ -16,10 +16,11 @@ export function appFileChunks(rows: (typeof dropFiles.$inferInsert)[]) {
   return chunks
 }
 
-// The same conditional INSERT runs on D1 and in the SQLite concurrency tests.
+// The same conditional INSERT runs on D1 and in the SQLite concurrency tests. Drops in the Trash and files a doc
+// embeds don't count as drops; their bytes still count until they're deleted.
 export const usageCTE = `WITH scope AS (SELECT ? AS owner, ? AS month, ? AS cutoff), usage AS (
   SELECT
-    (SELECT count(*) FROM drops d WHERE owner_id = (SELECT owner FROM scope) AND NOT EXISTS (SELECT 1 FROM drops p WHERE p.id = d.supersedes_id AND p.owner_id = d.owner_id))
+    (SELECT count(*) FROM drops d WHERE owner_id = (SELECT owner FROM scope) AND parent_id IS NULL AND trashed_at IS NULL AND NOT EXISTS (SELECT 1 FROM drops p WHERE p.id = d.supersedes_id AND p.owner_id = d.owner_id))
       + (SELECT coalesce(sum(drops), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND committed = 0 AND created_at >= (SELECT cutoff FROM scope)) AS drops,
     (SELECT coalesce(sum(size), 0) FROM drops WHERE owner_id = (SELECT owner FROM scope) AND kind != 'app')
       + (SELECT coalesce(sum(f.size), 0) FROM drop_files f JOIN drops d ON d.id = f.drop_id WHERE d.owner_id = (SELECT owner FROM scope))

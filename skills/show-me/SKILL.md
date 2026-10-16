@@ -115,7 +115,7 @@ function expandSkill(command: string): string {
 }
 ```
 
-- When the point needs more than a chat reply holds (several views side by side, a UI state, a screenshot to point at), drop one Markdown doc with Drop's `create_doc` tool and give the user the link it returns. Drop renders Mermaid (up to four diagrams), tables, alerts, `diff` and code blocks, and annotated screenshots with comark-annotate:
+- When the point needs more than a chat reply holds (several views side by side, a UI state, a screenshot to point at), publish one Markdown doc with Drop's `publish` tool (`lifetime: "temporary"` unless the user wants to keep it) and give the user the link it returns. Drop renders Mermaid (up to four diagrams), tables, alerts, `diff` and code blocks, and annotated screenshots with comark-annotate:
 
 ```md
 ::screenshot{src="https://example.com/settings.png" alt="Settings page"}
@@ -125,7 +125,7 @@ The save button moves here.
 ::
 ```
 
-Marks, colors, and `::compare` for before and after are in the [comark-annotate docs](https://comark-annotate.onmax.me). Screenshots must be https URLs.
+Marks, colors, and `::compare` for before and after are in the [comark-annotate docs](https://comark-annotate.onmax.me). Screenshots must be https URLs; publish a local one to Drop with `publish` and `file`, and use the `fileUrl` it returns.
 
 - Write HTML (`format: "html"`) only when Markdown can't show the point: an interactive diagram, a custom layout, or a short slide deck. Match the product's colors, type, spacing, and components; use real labels and data; support desktop and mobile.
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, inArray, lte, sql } from "drizzle-orm"
+import { and, desc, eq, exists, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { useRuntimeConfig } from "nitro/runtime-config"
@@ -10,15 +10,16 @@ import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
 import { contentTypeOf } from "#shared/project-bundle"
-import { ACCESS_RANK, type Access, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
-import { DAY_MS, EXPIRY_GRACE_DAYS, expiresAt } from "#shared/expiry"
+import { ACCESS_RANK, type Access, type DropAttachment, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
+import { DAY_MS, expiresAt, type Lifetime, MAX_KEEP_REASON, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
 import { deleteDrafts } from "#live-drafts"
 import { deleteRetainedDrop } from "./quota-deletion"
-import { expiryPolicy, isExpired, renewDrop } from "./expiry"
+import { chainOf, expiryPolicy, isExpired, renewDrop } from "./expiry"
 
+/** `expired` means gone for its links: in the Trash, or past its window and waiting for the hourly move there. */
 export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean; expired?: boolean }
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
@@ -57,18 +58,31 @@ export const expiredLink = (drop: DropRow | null, who: Identity | null) =>
   Boolean(drop?.expired && drop.visibility === "shared" && !drop.shareReview && !drop.ownerBanned && !drop.quarantinedAt && !permissions(drop, who).view)
 
 export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().days): DropSummary {
+  const expires = expiresAt(row, days)
   return {
     id: row.id, kind: row.kind, title: row.title, filename: row.filename, size: row.size, version: row.version,
     shareReview: row.shareReview, quarantinedAt: row.quarantinedAt, visibility: row.visibility, access: row.access as Access, actorKind: row.actorKind, actorName: row.actorName,
     createdAt: row.createdAt, updatedAt: row.updatedAt, ...(paths ? { paths } : {}),
-    expiresAt: expiresAt(row, days), neverExpires: row.neverExpires, neverExpiresRequest: row.neverExpiresRequest,
+    expiresAt: expires, lifetime: row.lifetime, keepReason: row.keepReason, note: row.note, parentId: row.parentId,
+    // Past its window but not yet moved by the hourly cleanup: it's in the Trash already, as of when it expired.
+    trashedAt: row.trashedAt ?? (row.expired && expires !== null ? expires : null),
+    trashReason: row.trashReason ?? (row.expired ? "expired" : null),
   }
 }
 
 /** Reuse the joined owner for review policy so each lookup remains one query. */
 async function withOwnerAccess(row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined, event?: H3Event): Promise<DropRow | null> {
   if (!row) return null
-  const drop = { ...row.drop, ownerBanned: !row.owner || Boolean(row.owner.banned), expired: isExpired(row.drop, Date.now(), expiryPolicy(event).days) }
+  let fields = row.drop
+  // An attachment is shared, kept, and trashed with the doc it belongs to.
+  if (fields.parentId) {
+    const [parent] = await db.select().from(drops).where(and(eq(drops.id, fields.parentId), eq(drops.ownerId, fields.ownerId))).limit(1)
+    if (parent) {
+      const { visibility, access, shareReview, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt, createdAt } = parent
+      fields = { ...fields, visibility, access, shareReview, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt: lastAccessedAt ?? createdAt }
+    }
+  }
+  const drop = { ...fields, ownerBanned: !row.owner || Boolean(row.owner.banned), expired: Boolean(fields.trashedAt) || isExpired(fields, Date.now(), expiryPolicy(event).days) }
   if (event && drop.shareReview && await shareReviewFor(drop.ownerId, event, row.owner) === null) drop.shareReview = null
   return drop
 }
@@ -85,15 +99,20 @@ export async function findDropByBlob(key: string, event?: H3Event) {
   return withOwnerAccess(row, event)
 }
 
-/** Your drops, newest first. Older versions of a doc hide behind their latest. */
-export async function listDrops(who: Identity, event?: H3Event): Promise<DropSummary[]> {
+/**
+ * Your drops, newest first, or the ones in your Trash. Older versions of a doc hide behind their latest, and files a
+ * doc embeds hide behind the doc.
+ */
+export async function listDrops(who: Identity, event?: H3Event, options: { trash?: boolean } = {}): Promise<DropSummary[]> {
   const rows = (await db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
-    .where(eq(dropHeads.ownerId, who.userId)).orderBy(desc(dropHeads.updatedAt)).limit(500)).map(row => row.drop)
-  const apps = rows.filter(row => row.kind === "app").map(row => row.id)
+    .where(and(eq(dropHeads.ownerId, who.userId), isNull(drops.parentId))).orderBy(desc(dropHeads.updatedAt)).limit(500)).map(row => row.drop)
+  const { days } = expiryPolicy(event)
+  const now = Date.now()
+  const listed = rows.map(row => ({ ...row, expired: Boolean(row.trashedAt) || isExpired(row, now, days) })).filter(row => row.expired === Boolean(options.trash))
+  const apps = listed.filter(row => row.kind === "app").map(row => row.id)
   const files = apps.length ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).where(inArray(dropFiles.dropId, apps)) : []
   const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
-  const { days } = expiryPolicy(event)
-  return rows.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days))
+  return listed.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days))
 }
 
 function storageFailure(error: Error) {
@@ -148,7 +167,7 @@ export function liveEditable(row: DropRow, who: Identity | null, versions: DropV
 
 /** The version chain, newest first. */
 export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
-  return (await versionChain(row)).map(item => ({ id: item.id, title: item.title, version: item.version, createdAt: item.createdAt, current: item.id === row.id }))
+  return (await versionChain(row)).map(item => ({ id: item.id, title: item.title, version: item.version, createdAt: item.createdAt, note: item.note, actorName: item.actorName, current: item.id === row.id }))
 }
 
 export async function dropDetail(row: DropRow, who: Identity | null, origin: string, event?: H3Event): Promise<DropDetail> {
@@ -180,7 +199,51 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
     else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
+  if (TEXT_KINDS.has(row.kind)) detail.attachments = await attachmentsOf(row, origin)
   return detail
+}
+
+/** Files a doc embeds from this Drop, across every version of the doc. */
+export async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachment[]> {
+  const ids = (await versionChain(row)).map(item => item.id)
+  const rows = await db.select().from(drops).where(and(inArray(drops.parentId, ids), isNotNull(drops.blobKey))).limit(100)
+  return rows.map(item => ({ id: item.id, kind: item.kind, title: item.title, filename: item.filename, size: item.size, url: new URL(`/f/${item.blobKey}`, origin).href }))
+}
+
+/** `/f/<key>` links in a doc's source, absolute or relative, with or without `?raw`. */
+const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,16})/gi
+
+/**
+ * Makes the files a doc embeds its attachments, so they share its sharing, lifetime, and Trash. Only the doc owner's
+ * own files that aren't docs themselves: embedding never exposes someone else's file. A file already attached to
+ * another doc stays with that one, unless it's an older version of this doc.
+ */
+async function adoptAttachments(doc: DropRow, source: string, previous: DropRow | null) {
+  const keys = [...new Set([...source.matchAll(FILE_LINK)].map(match => match[1]!))].slice(0, 100)
+  if (!keys.length) return
+  const chain = previous ? (await versionChain(previous)).map(item => item.id) : []
+  const owned = await db.select({ id: drops.id, parentId: drops.parentId }).from(drops)
+    .where(and(inArray(drops.blobKey, keys), eq(drops.ownerId, doc.ownerId), inArray(drops.kind, ["image", "file"])))
+  const ids = owned.filter(item => !item.parentId || chain.includes(item.parentId)).map(item => item.id)
+  if (ids.length) await db.update(drops).set({ parentId: doc.id }).where(inArray(drops.id, ids))
+}
+
+/** What the publisher says about a drop's life. Later versions inherit it unless they say otherwise. */
+export interface LifetimeInput { lifetime?: Lifetime; keepReason?: string; note?: string }
+
+/**
+ * Agents may keep a drop when they say why; people just choose. On a Drop that turned keeping off, only admins keep.
+ * Returns the columns to store.
+ */
+export function lifetimeFields(who: Identity, input: LifetimeInput, previous: Pick<DropRow, "lifetime" | "keepReason"> | null, event?: H3Event) {
+  const lifetime = input.lifetime ?? previous?.lifetime ?? "review"
+  if (lifetime !== "keep") return { lifetime, keepReason: null }
+  if (!input.lifetime) return { lifetime, keepReason: previous?.keepReason ?? null }
+  if (!expiryPolicy(event).custom && who.role !== "admin") throw new HTTPError({ status: 403, statusText: "Only admins can keep drops on this Drop. Use review instead." })
+  const reason = input.keepReason?.trim().replace(/\s+/g, " ")
+  if (who.actorKind === "agent" && !reason) throw new HTTPError({ status: 400, statusText: "Say why this drop should be kept (keepReason), for example the pull request it belongs to." })
+  if (reason && reason.length > MAX_KEEP_REASON) throw new HTTPError({ status: 400, statusText: `Keep the reason under ${MAX_KEEP_REASON} characters.` })
+  return { lifetime, keepReason: who.actorKind === "agent" ? reason! : null }
 }
 
 async function queueBlobCleanup(keys: string[]) {
@@ -235,7 +298,7 @@ async function deleteBlobKeys(keys: string[]) {
 }
 
 /** Stores one file as a private doc drop. Markdown and HTML must be UTF-8. */
-export async function createDocDrop(who: Identity, input: { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: "private" | "shared"; access?: Access }, event?: H3Event) {
+export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: "private" | "shared"; access?: Access }, event?: H3Event) {
   await drainBlobCleanup()
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   const filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
@@ -261,6 +324,8 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
     if (previous && !permissions(previous, who).edit) previous = null
     if (previous) previous = (await versionChain(previous))[0] ?? previous
   }
+  if (previous?.trashedAt) throw new HTTPError({ status: 409, statusText: "That drop is in the Trash. Restore it first, or publish a new drop." })
+  const life = lifetimeFields(who, input, previous, event)
 
   return withDropQuota(previous?.ownerId ?? who.userId, { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id }, event, async (quota) => {
     const key = `${crypto.randomUUID()}${extension}`
@@ -299,15 +364,19 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
-      neverExpires: previous?.neverExpires ?? false,
-      neverExpiresRequest: previous?.neverExpiresRequest ?? null,
+      ...life,
+      note: input.note?.trim() || null,
+      trashedAt: null,
+      trashReason: null,
+      parentId: null,
       shareReview: (input.visibility ?? previous?.visibility) === "shared" ? await shareReviewFor(previous?.ownerId ?? who.userId, event) : null,
       quarantinedAt: null,
       publishToken: null,
     }
     try {
-      // A new version is a visit: the older versions restart their window with it.
-      await quota.commit([db.insert(drops).values(row), ...(previous ? [renewDrop(previous, now)] : [])], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
+      // A new version is a visit: the older versions restart their window with it, and take its lifetime.
+      const chain = previous ? [renewDrop(previous, now), db.update(drops).set(life).where(sql`${drops.id} IN (${chainOf(previous)})`)] : []
+      await quota.commit([db.insert(drops).values(row), ...chain], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
     }
     catch (error) {
       await deleteBlobKeys([key])
@@ -315,6 +384,7 @@ export async function createDocDrop(who: Identity, input: { filename: string; by
         throw new HTTPError({ status: 409, statusText: "This drop was published by someone else. Retry from the latest version.", cause: error })
       throw error
     }
+    if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text, previous)
     return row
   })
 }
@@ -326,7 +396,7 @@ function cleanPath(path: string) {
 }
 
 /** Creates an app drop, or publishes the next version of one you may edit. */
-export async function publishApp(who: Identity, input: { id?: string; name?: string; files: Record<string, string> }, event?: H3Event) {
+export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; files: Record<string, string>; visibility?: "private" | "shared"; access?: Access }, event?: H3Event) {
   const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
   if (!entries.some(([path]) => path === "index.html")) throw new HTTPError({ status: 400, statusText: "An app needs an index.html." })
@@ -342,6 +412,11 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
   if (input.id && (!row || row.kind !== "app")) throw new HTTPError({ status: 404, statusText: "No app with that id." })
   if (row && !permissions(row, who).edit) throw new HTTPError({ status: 403, statusText: "You can't edit this app." })
   if (row) row = (await versionChain(row))[0] ?? row
+  if (row?.trashedAt) throw new HTTPError({ status: 409, statusText: "That app is in the Trash. Restore it first, or publish a new app." })
+  const life = lifetimeFields(who, input, row, event)
+  const note = input.note?.trim() || null
+  const visibility = input.visibility ?? row?.visibility ?? "private"
+  const shareReview = input.visibility === "shared" && row?.visibility !== "shared" ? await shareReviewFor(row?.ownerId ?? who.userId, event) : (row?.shareReview ?? null)
 
   const id = row?.id ?? crypto.randomUUID()
   const prefix = `apps/${id}/${crypto.randomUUID()}`
@@ -363,10 +438,10 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
         id, ownerId: row?.ownerId ?? who.userId, kind: "app", title: name.slice(0, 160),
         filename: row?.filename ?? `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app"}/`,
         blobKey: null, contentType: null, size, version: (row?.version ?? 0) + 1, supersedesId: row?.supersedesId ?? null,
-        shareReview: row?.shareReview ?? null, quarantinedAt: row?.quarantinedAt ?? null,
-        visibility: row?.visibility ?? "private", access: (row?.access as Access | undefined) ?? "comment",
+        shareReview, quarantinedAt: row?.quarantinedAt ?? null,
+        visibility, access: input.access ?? (row?.access as Access | undefined) ?? "comment",
         actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
-        lastAccessedAt: now, neverExpires: row?.neverExpires ?? false, neverExpiresRequest: row?.neverExpiresRequest ?? null,
+        lastAccessedAt: now, ...life, note, trashedAt: null, trashReason: null, parentId: null,
       }
       const fileRows = encoded.map(([path, bytes]) => ({ dropId: id, path, blobKey: `${prefix}/${path}`, size: bytes.byteLength }))
       if (!row) {
@@ -377,7 +452,7 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
         committedPublish = true
       }
       else {
-        const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, lastAccessedAt: now, publishToken: token })
+        const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, lastAccessedAt: now, publishToken: token, ...life, note, visibility, access: next.access, shareReview })
           .where(and(eq(drops.id, id), eq(drops.version, row.version)))
         // The file set changes only if the update above won: both statements check for this publish's token.
         // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
@@ -407,32 +482,61 @@ export async function publishApp(who: Identity, input: { id?: string; name?: str
   })
 }
 
-/** Removes a drop, its files, and its comments. */
+/** Moves a drop (every version) to the Trash. Its links stop working; it's purged after 15 days. */
+export async function trashDrop(row: DropRow, now = Date.now()) {
+  await db.update(drops).set({ trashedAt: now, trashReason: "deleted" }).where(sql`${drops.id} IN (${chainOf(row)})`)
+}
+
+/** Brings a drop back from the Trash with a fresh window, whether it was deleted or expired. */
+export async function restoreDrop(row: DropRow, now = Date.now()) {
+  await db.update(drops).set({ trashedAt: null, trashReason: null, lastAccessedAt: now }).where(sql`${drops.id} IN (${chainOf(row)})`)
+}
+
+/** Removes a drop for good: every version, its files, its comments, and the files it embeds. */
 export async function deleteDrop(row: DropRow) {
   await drainBlobCleanup()
-  const ids = row.kind === "markdown" ? (await versionChain(row)).map(item => item.id) : []
+  const chain = await versionChain(row)
+  const ids = chain.map(item => item.id)
+  const attached = await db.select().from(drops).where(inArray(drops.parentId, ids))
   await deleteRetainedDrop(row, deleteBlobKeys)
-  await deleteDrafts(ids)
+  for (const file of attached) await deleteRetainedDrop(file, deleteBlobKeys)
+  if (row.kind === "markdown") await deleteDrafts(ids)
+}
+
+/** Every drop in someone's Trash, for "Empty Trash". */
+export async function emptyTrash(who: Identity, event?: H3Event) {
+  const trashed = await listDrops(who, event, { trash: true })
+  for (const summary of trashed) {
+    const row = await findDrop(summary.id, event)
+    if (row) await deleteDrop(row)
+  }
+  return trashed.length
 }
 
 /**
- * Deletes drops whose grace period ended, a bounded batch per run (the hourly schedule picks up the rest).
- * Only current versions are scanned: deleting one removes its whole chain.
+ * The hourly cleanup, in bounded batches (the next run picks up the rest). Drops past their window move to the
+ * Trash as of when they expired; drops 15 days into the Trash, and attachments whose doc is gone, are deleted.
  */
 export async function deleteExpiredDrops(now: Date, limit = 50) {
+  const at = now.getTime()
   const { days } = expiryPolicy()
-  if (!days) return 0
-  const cutoff = now.getTime() - (days + EXPIRY_GRACE_DAYS) * DAY_MS
-  const rows = (await db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
-    .where(and(eq(drops.neverExpires, false), lte(sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt})`, cutoff))).limit(limit)).map(row => row.drop)
-  await drainBlobCleanup()
-  for (const row of rows) {
-    const ids = row.kind === "markdown" ? (await versionChain(row)).map(item => item.id) : []
-    await deleteRetainedDrop(row, deleteBlobKeys)
-    await deleteDrafts(ids)
-    log.info({ action: "drop-expired", drop: row.id, owner: row.ownerId })
+  if (days) {
+    const temporary = Math.min(TEMPORARY_DAYS, days)
+    const lastSeen = sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt})`
+    await db.update(drops).set({ trashedAt: sql`${lastSeen} + (CASE ${drops.lifetime} WHEN 'temporary' THEN ${temporary} ELSE ${days} END) * ${DAY_MS}`, trashReason: "expired" })
+      .where(and(isNull(drops.trashedAt), isNull(drops.parentId), sql`${drops.lifetime} != 'keep'`, sql`${lastSeen} <= ${at} - (CASE ${drops.lifetime} WHEN 'temporary' THEN ${temporary} ELSE ${days} END) * ${DAY_MS}`))
   }
-  return rows.length
+  const due = (await db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .where(lte(drops.trashedAt, at - TRASH_DAYS * DAY_MS)).limit(limit)).map(row => row.drop)
+  const orphans = await db.select().from(drops)
+    .where(and(isNotNull(drops.parentId), sql`NOT EXISTS (SELECT 1 FROM drops p WHERE p.id = ${drops.parentId})`)).limit(limit)
+  await drainBlobCleanup()
+  for (const row of due) {
+    await deleteDrop(row)
+    log.info({ action: "drop-purged", drop: row.id, owner: row.ownerId, reason: row.trashReason })
+  }
+  for (const row of orphans) await deleteRetainedDrop(row, deleteBlobKeys)
+  return due.length + orphans.length
 }
 
 export const dropPageUrl = (origin: string, id: string) => new URL(`/d/${id}`, origin).href

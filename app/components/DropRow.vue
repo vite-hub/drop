@@ -2,7 +2,8 @@
 import type { DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropSummary }>()
-const emit = defineEmits<{ delete: [] }>()
+const emit = defineEmits<{ delete: []; restore: []; deleteForever: [] }>()
+const trashed = computed(() => props.drop.trashedAt !== null)
 const toast = useToast()
 const { copy } = useCopy()
 const { setVisibility } = useDropActions()
@@ -30,7 +31,7 @@ const menu = computed(() => [
     { label: "Open Public Page", icon: "i-lucide-external-link", to: `/d/${props.drop.id}`, target: "_blank", disabled: !shared.value },
     { label: "Copy Link", icon: "i-lucide-link", onSelect: copyLink },
   ],
-  [{ label: "Delete Drop", icon: "i-lucide-trash", color: "error" as const, onSelect: () => emit("delete") }],
+  [{ label: "Move to Trash", icon: "i-lucide-trash", onSelect: () => emit("delete") }],
 ])
 </script>
 
@@ -56,11 +57,16 @@ const menu = computed(() => [
       </span>
       <span class="mt-0.5 block text-xs text-muted tabular-nums"><TimeAgo :at="drop.updatedAt" /></span>
     </div>
-    <label class="relative z-10 hidden items-center gap-2.5 md:flex">
+    <span v-if="trashed" class="hidden text-[13px] text-muted md:block">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
+    <label v-else class="relative z-10 hidden items-center gap-2.5 md:flex">
       <USwitch :model-value="shared" color="neutral" :aria-label="shared ? 'Make private' : 'Share'" @update:model-value="setShared" />
       <span class="text-[13px]" :class="shared ? 'text-highlighted' : 'text-muted'">{{ drop.quarantinedAt ? "Quarantined" : drop.shareReview === "pending" ? "Pending review" : drop.shareReview === "rejected" ? "Rejected" : shared ? "Shared" : "Private" }}</span>
     </label>
-    <div class="relative z-10 flex items-center gap-0.5">
+    <div v-if="trashed" class="relative z-10 flex items-center gap-1">
+      <UButton color="neutral" icon="i-lucide-undo-2" label="Restore" size="sm" variant="outline" @click="emit('restore')" />
+      <UButton :aria-label="`Delete ${drop.title} for good`" color="error" icon="i-lucide-trash-2" size="sm" variant="ghost" @click="emit('deleteForever')" />
+    </div>
+    <div v-else class="relative z-10 flex items-center gap-0.5">
       <USwitch class="md:hidden" :model-value="shared" color="neutral" :aria-label="shared ? 'Make private' : 'Share'" @update:model-value="setShared" />
       <UButton aria-label="Copy link" class="hidden sm:inline-flex" color="neutral" icon="i-lucide-link" variant="ghost" @click="copyLink" />
       <UDropdownMenu :items="menu" :content="{ align: 'end' }">

@@ -122,8 +122,10 @@ const mcp = async (method, params = {}) => (await fetch(new URL("/mcp", origin),
   signal: timeout(),
 })).json()
 assert.ok((await mcp("server/discover")).result.capabilities.extensions["io.modelcontextprotocol/skills"])
-assert.deepEqual((await mcp("tools/list")).result.tools.map(tool => tool.name), ["get_usage", "list_drops", "read_drop", "list_comments", "create_doc", "publish_app", "create_code_image"])
-assert.match((await mcp("tools/call", { name: "create_doc", arguments: { markdown: "# From MCP" } })).result.content[0].text, /^Dropped privately: /)
+assert.deepEqual((await mcp("tools/list")).result.tools.map(tool => tool.name), ["publish", "read_drop", "list_drops", "update_drop", "create_code_image"])
+const mcpDrop = (await mcp("tools/call", { name: "publish", arguments: { markdown: "# From MCP", note: "e2e", lifetime: "temporary" } })).result.structuredContent
+assert.equal(mcpDrop.share, "private")
+assert.equal((await mcp("tools/call", { name: "update_drop", arguments: { id: mcpDrop.id, trash: true } })).result.structuredContent.status.startsWith("In the Trash"), true)
 const [skill] = (await mcp("skills/list")).result.skills
 assert.equal(skill.frontmatter.name, "vitehub-drop")
 assert.match((await mcp("resources/read", { uri: skill.uri })).result.contents[0].text, /^---\nname: vitehub-drop/)

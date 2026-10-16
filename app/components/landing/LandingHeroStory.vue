@@ -104,12 +104,12 @@ function pick(item: (typeof CHAPTERS)[number]) {
                 <BrainlessClaudeThinking v-if="beat === 'a.think'" verb="Drafting" />
                 <template v-if="at('a.drop')">
                   <BrainlessClaudeMessage>Drafted it from the roadmap notes.</BrainlessClaudeMessage>
-                  <BrainlessClaudeToolCall tool="drop - create_doc (MCP)" arg='title: "Launch plan", markdown: "# Launch plan…"' result="Dropped privately: drop.vitehub.dev/d/k3x9 (id=k3x9)" />
+                  <BrainlessClaudeToolCall tool="drop - publish (MCP)" arg='markdown: "# Launch plan…", lifetime: "review", note: "First draft"' result="Published: drop.vitehub.dev/d/k3x9 (id=k3x9)" />
                   <BrainlessClaudeMessage>Ready for review: drop.vitehub.dev/d/k3x9</BrainlessClaudeMessage>
                 </template>
                 <template v-if="at('c.read')">
                   <BrainlessClaudeMessage role="user">address the comments on the launch plan</BrainlessClaudeMessage>
-                  <BrainlessClaudeToolCall tool="drop - list_comments (MCP)" arg='id: "k3x9"' result="1. > We ship on Oct 17, … Legal needs a week. Make it Oct 24. (You)" />
+                  <BrainlessClaudeToolCall tool="drop - read_drop (MCP)" arg='id: "k3x9"' result="1. > We ship on Oct 17, … Legal needs a week. Make it Oct 24. (You)" />
                 </template>
                 <BrainlessClaudeDiff
                   v-if="at('c.diff')"
@@ -121,7 +121,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                     { type: 'add', n: 4, text: 'We ship on Oct 24, with the email that morning.' },
                   ]"
                 />
-                <BrainlessClaudeToolCall v-if="at('c.drop')" tool="drop - create_doc (MCP)" arg='supersedes: "k3x9", …' result="Dropped v2 privately: drop.vitehub.dev/d/m8r2 (id=m8r2)" />
+                <BrainlessClaudeToolCall v-if="at('c.drop')" tool="drop - publish (MCP)" arg='previous: "k3x9", resolves: [1], note: "Ship on Oct 24", …' result="Published v2, resolved #1: drop.vitehub.dev/d/m8r2 (id=m8r2)" />
               </div>
               <BrainlessClaudePrompt>
                 <LandingTyped v-if="beat === 'a.prompt'" text="write the launch plan and drop it for review" :delay="300" />

@@ -12,7 +12,7 @@ import { quotaApiHandler } from "../../../utils/quotas"
  * Publishes a Markdown drop's live draft as its next version. The text comes from the draft the room last
  * checkpointed, with the published front matter put back. If someone (often an agent) published a newer version
  * meanwhile, this is a 409 naming it, unless `force` puts the draft on top of it. People only: agents publish with
- * create_doc.
+ * publish.
  */
 export default quotaApiHandler(defineValidatedHandler({
   validate: { body: v.object({ force: v.optional(v.boolean()) }) },

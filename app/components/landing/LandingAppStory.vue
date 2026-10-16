@@ -37,7 +37,7 @@ function play() {
                 <BrainlessClaudeToolCall tool="Write" arg="catch/game.js" result="Wrote 96 lines" />
               </template>
               <template v-if="at('g.publish')">
-                <BrainlessClaudeToolCall tool="drop - publish_app (MCP)" arg='files: { "index.html", "game.js" }' result="Published v1: drop.vitehub.dev/d/c4tc (id=c4tc)" />
+                <BrainlessClaudeToolCall tool="drop - publish (MCP)" arg='files: { "index.html", "game.js" }, lifetime: "temporary"' result="Published: drop.vitehub.dev/d/c4tc (id=c4tc)" />
                 <BrainlessClaudeMessage>It's live. Switch sharing on and anyone with the link can play.</BrainlessClaudeMessage>
               </template>
             </div>

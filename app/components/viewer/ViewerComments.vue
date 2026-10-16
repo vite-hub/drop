@@ -16,7 +16,7 @@ const visible = computed(() => props.comments.filter(comment => (filter.value ==
     <UTabs v-model="filter" class="shrink-0 px-4" color="neutral" :content="false" :items="tabs" size="sm" variant="link" />
     <ul class="min-h-0 flex-1 divide-y divide-default overflow-y-auto border-t border-default">
       <li v-if="!visible.length" class="px-4 py-10 text-center text-sm text-muted">
-        {{ filter === "resolved" ? "Nothing resolved yet." : canComment ? "Select text or click an image to comment." : "No comments yet." }}
+        {{ filter === "resolved" ? "Nothing resolved yet." : canComment ? "Select text, click an image, or press R to comment on an area." : "No comments yet." }}
       </li>
       <li v-for="comment in visible" :key="comment.id" class="space-y-2 px-4 py-3">
         <button class="w-full cursor-pointer space-y-2 text-left" type="button" @click="emit('focus', comment)">

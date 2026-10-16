@@ -10,9 +10,9 @@ import type { Identity } from "./identity"
 import { bindQuotaSQL, deletionChainSQL } from "./quota-sql"
 
 export interface ExpiryPolicy {
-  /** Days a drop lives after its last visit. 0 turns expiry off. */
+  /** Days a `review` drop lives after its last visit (`temporary` ones get at most 14). 0 turns expiry off. */
   days: number
-  /** Whether owners may mark drops "Never expires". Admins always may. */
+  /** Whether owners and their agents may keep drops. Admins always may. */
   custom: boolean
 }
 
@@ -22,7 +22,7 @@ export function expiryPolicy(event?: H3Event): ExpiryPolicy {
   return { days: Number.isFinite(days) && days >= 0 ? Math.floor(days) : DEFAULT_EXPIRY_DAYS, custom: env.customExpiry !== "0" }
 }
 
-type ExpiryFields = Pick<typeof drops.$inferSelect, "createdAt" | "lastAccessedAt" | "neverExpires">
+type ExpiryFields = Pick<typeof drops.$inferSelect, "createdAt" | "lastAccessedAt" | "lifetime">
 
 export function isExpired(row: ExpiryFields, now: number, days: number) {
   const at = expiresAt(row, days)
@@ -50,10 +50,11 @@ export function isHumanVisit(headers: Headers, kind: "beacon" | "document") {
  * count when they pass `isHumanVisit`. Writes at most once a day per drop, and never revives an expired drop:
  * that takes an explicit renew.
  */
-export async function recordVisit(event: H3Event, row: ExpiryFields & { id: string; ownerId: string; quarantinedAt: number | null }, who: Identity | null, kind: "beacon" | "document") {
+export async function recordVisit(event: H3Event, row: ExpiryFields & { id: string; ownerId: string; quarantinedAt: number | null; trashedAt: number | null; parentId: string | null }, who: Identity | null, kind: "beacon" | "document") {
   const now = Date.now()
   const { days } = expiryPolicy(event)
-  if (!days || row.neverExpires || row.quarantinedAt || isExpired(row, now, days)) return
+  // An attachment lives as long as its doc, so visiting the doc is what counts.
+  if (!days || row.lifetime === "keep" || row.parentId || row.trashedAt || row.quarantinedAt || isExpired(row, now, days)) return
   if ((row.lastAccessedAt ?? row.createdAt) > now - DAY_MS) return
   if (!who && !isHumanVisit(event.req.headers, kind)) return
   try {

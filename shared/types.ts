@@ -1,4 +1,5 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
+import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
 
 export type DropKind = "markdown" | "html" | "image" | "file" | "app"
@@ -29,12 +30,22 @@ export interface DropSummary {
   paths?: string[]
   /** When the drop stops being served unless someone visits it. Null when it never expires. */
   expiresAt: number | null
-  neverExpires: boolean
-  /** The agent that asked to keep this drop forever, waiting for a person to approve. */
-  neverExpiresRequest: string | null
+  lifetime: Lifetime
+  /** Why an agent kept this drop. Null when a person chose to keep it. */
+  keepReason: string | null
+  /** What changed in this version. */
+  note: string | null
+  /** When it went to the Trash (or expired into it). Null while it's live. */
+  trashedAt: number | null
+  trashReason: "deleted" | "expired" | null
+  /** The doc this file belongs to: it shares that doc's sharing, lifetime, and Trash. */
+  parentId: string | null
 }
 
-export interface DropVersion { id: string; title: string; version: number; createdAt: number; current?: boolean }
+export interface DropVersion { id: string; title: string; version: number; createdAt: number; note: string | null; actorName: string; current?: boolean }
+
+/** A file a doc embeds from this Drop (an image, usually). It belongs to the doc. */
+export interface DropAttachment { id: string; kind: DropKind; title: string; filename: string; size: number; url: string }
 
 export interface DropDetail extends DropSummary {
   isOwner: boolean
@@ -54,15 +65,21 @@ export interface DropDetail extends DropSummary {
   /** Apps and HTML docs: the separate origin the viewer frames them on. Absent means an opaque-origin sandbox. */
   contentOrigin?: string
   versions: DropVersion[]
+  /** Docs: the files they embed from this Drop. */
+  attachments?: DropAttachment[]
 }
 
 export interface DropComment {
   id: string
   n: number
-  kind: "text" | "image"
+  /** `text` quotes a selection, `image` marks a spot or area of an image, `area` a rectangle of a page. */
+  kind: "text" | "image" | "area"
   selector: string
+  /** Position and size in thousandths of the anchor's box. A point has `ow` = `oh` = 0. */
   ox: number
   oy: number
+  ow: number
+  oh: number
   quote: string | null
   label: string | null
   page: string | null
@@ -71,17 +88,6 @@ export interface DropComment {
   resolved: boolean
   createdAt: number
   mine: boolean
-}
-
-export interface NewComment {
-  kind: "text" | "image"
-  selector: string
-  ox: number
-  oy: number
-  quote?: string
-  label?: string
-  page?: string
-  body: string
 }
 
 export interface Member {

@@ -3,13 +3,14 @@ import { PLAN_AUTHORING_GUIDE } from "#shared/plan-runtime"
 
 definePageMeta({ layout: "docs" })
 
-const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "…", "app.js": "…", "data.json": "[…]" }\n})`
+const app = `publish({\n  title: "Launch board",\n  files: { "index.html": "…", "app.js": "…", "data.json": "[…]" },\n  note: "First board with the launch checklist",\n  lifetime: "temporary"\n})`
 </script>
 
 <template>
   <DocsPage title="Review and share" lead="Every drop opens full screen with its comments beside it. It stays private until you share it. Docs keep earlier versions. Apps keep only their latest file set.">
     <DocsSection id="docs" title="Docs">
-      <p>Agents call <code>create_doc</code> with Markdown, or with a self-contained HTML page (<code>format: "html"</code>). People can also upload a file from the Drops page.</p>
+      <p>Agents call <code>publish</code> with <code>markdown</code>, a self-contained HTML page (<code>html</code>), or any file up to 4 MiB (<code>file</code>), such as a screenshot. People can also upload a file from the Drops page.</p>
+      <p>Images a doc embeds from Drop belong to the doc: whoever can open the doc sees them, and they live and go to the Trash with it.</p>
       <p>Markdown renders as a clean document with tables, task lists, callouts, and Mermaid diagrams. HTML renders as-is, scripts included, in a sandbox with no access to your session. Drops that set up a separate domain for apps give pages their own origin, so storage and history work there too. For rich HTML plans, agents follow these rules:</p>
       <ul>
         <li v-for="rule in PLAN_AUTHORING_GUIDE.split('\n')" :key="rule">{{ rule }}</li>
@@ -18,14 +19,14 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "�
     </DocsSection>
 
     <DocsSection id="apps" title="Apps">
-      <p>Agents publish apps with <code>publish_app</code>: files keyed by path, with an <code>index.html</code>. Relative links, stylesheets, ES modules, and <code>fetch("data.json")</code> resolve like on any static host.</p>
+      <p>Agents publish apps with <code>publish</code> and <code>files</code>: files keyed by path, with an <code>index.html</code>. Relative links, stylesheets, ES modules, and <code>fetch("data.json")</code> resolve like on any static host.</p>
       <AgentsCodeBlock :code="app" />
       <p>An app holds up to 200 files and 4 MiB.</p>
     </DocsSection>
 
     <DocsSection id="comments" title="Comments">
-      <p>Select text, or click an image to zoom and pick a spot. Comments stay anchored to what they quote, per page for apps. A comment's author, the drop's owner, editors, and admins can resolve it once it's addressed.</p>
-      <p>Agents read the open comments with <code>list_comments</code>, or with the <code>address_feedback</code> prompt, which reads the drop and its comments together. People can copy them as Markdown with <strong>Copy feedback for your agent</strong>.</p>
+      <p>Select text, or click an image to zoom and click a spot or drag an area. To mark part of a page, choose <strong>Comment on an area</strong> (or press <kbd>R</kbd>) and drag a rectangle. Comments stay anchored to what they point at, per page for apps. A comment's author, the drop's owner, editors, and admins can resolve it once it's addressed.</p>
+      <p>Agents read the open comments with <code>read_drop</code>, or with the <code>address_feedback</code> prompt, and mark the ones they addressed resolved when they publish the next version. People can copy them as Markdown with <strong>Copy feedback for your agent</strong>.</p>
     </DocsSection>
 
     <DocsSection id="sharing" title="Sharing">
@@ -44,20 +45,26 @@ const app = `publish_app({\n  name: "Launch board",\n  files: { "index.html": "�
     </DocsSection>
 
     <DocsSection id="versions" title="Versions">
-      <p>To publish the next version of a doc, an agent calls <code>create_doc</code> with <code>supersedes</code> set to the previous drop's id, or puts <code>supersedes: &lt;id&gt;</code> in the front matter. For an app, it calls <code>publish_app</code> with the app's <code>id</code>. Sharing stays the same. Earlier doc versions stay in history. Publishing an app replaces its entire file set and deletes the old files, so only the latest app version is available.</p>
+      <p>To publish the next version, an agent calls <code>publish</code> with <code>previous</code> set to the drop's id, or puts <code>supersedes: &lt;id&gt;</code> in a doc's front matter. Every version an agent publishes carries a note saying what changed, shown in the version history. Sharing and lifetime stay the same unless the agent changes them. Earlier doc versions stay in history. Publishing an app replaces its entire file set and deletes the old files, so only the latest app version is available.</p>
       <p>Agents publish most versions: people comment, and the agent addresses the comments in the next version. The owner's agents can publish, and so can agents of the workspace's editors and admins. People who may edit a Markdown doc can also publish one from the live editor.</p>
       <p>Any id from the chain works: the new version always lands on top of the latest. If someone else publishes at the same moment, the call fails with a conflict, and the agent reads the latest version and publishes again.</p>
     </DocsSection>
 
-    <DocsSection id="expiry" title="Expiry">
-      <p>A drop expires 30 days after anyone last opened it, so work nobody uses doesn't pile up. Each visit starts the 30 days again for every version:</p>
+    <DocsSection id="expiry" title="Lifetime and Trash">
+      <p>Whoever publishes a drop says how long it should live. Agents choose when they publish; you can change it in the drop's Details panel.</p>
+      <ul>
+        <li><strong>Temporary</strong>: prototypes, spikes, one-off answers. Lives 14 days after anyone last opened it.</li>
+        <li><strong>Review</strong>: plans and docs going through feedback. Lives 30 days after anyone last opened it.</li>
+        <li><strong>Keep</strong>: pull request assets and anything linked from somewhere that lasts. Never expires. An agent that keeps a drop has to say why, and you see the reason.</li>
+      </ul>
+      <p>Each visit starts the window again for every version:</p>
       <ul>
         <li>You, or anyone in the workspace, opening it while signed in.</li>
         <li>An agent reading it with <code>read_drop</code>, or publishing a new version.</li>
         <li>Someone reading a shared link in a browser, or opening its raw file directly. Link previews in Slack, Discord, or X, crawlers, and images embedded on other sites don't count.</li>
       </ul>
-      <p>An expired drop stops being served: its shared link says it expired. For 7 more days its owner, editors, and admins can still open it and press <strong>Renew</strong> to bring it back. Then it's deleted with its comments and files. The Drops page flags drops with a week or less left.</p>
-      <p>To keep a drop, turn on <strong>Keep forever</strong> in its Details panel. Agents can't do that themselves: <code>keep_drop</code> renews a drop, and with <code>forever: true</code> it asks you. The request shows on the drop's page, where you keep it or dismiss it. A Drop's admin can change the 30 days, or allow only admins to keep drops forever.</p>
+      <p>A drop that expires, or that you or your agent delete, goes to the <strong>Trash</strong>. Its links stop working. For 15 days you can restore it from the Trash on the Drops page; then it's deleted with its comments and files. You can also delete it for good, or empty the Trash, yourself. Agents can move drops to the Trash and restore them, but only people delete for good.</p>
+      <p>Images and files a doc embeds from Drop belong to that doc: whoever can open the doc can see them, and they live and go to the Trash with it. A Drop's admin can change the 30 days, or allow only admins to keep drops.</p>
     </DocsSection>
   </DocsPage>
 </template>

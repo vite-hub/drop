@@ -5,13 +5,10 @@ import { identify } from "../utils/identity"
 import { mcpSkills, skillResources } from "../utils/mcp-skills"
 import addressFeedback from "./prompts/address_feedback"
 import createCodeImage from "./tools/create_code_image"
-import createDoc from "./tools/create_doc"
-import getUsage from "./tools/get_usage"
-import keepDrop from "./tools/keep_drop"
-import listComments from "./tools/list_comments"
 import listDrops from "./tools/list_drops"
-import publishApp from "./tools/publish_app"
+import publish from "./tools/publish"
 import readDrop from "./tools/read_drop"
+import updateDrop from "./tools/update_drop"
 
 /**
  * Drop's MCP server (nitro-mcp-toolkit on h3-mcp): the 2026-07-28 revision plus the 2025 ones, one file per
@@ -39,7 +36,7 @@ export function mcpFor(origin: string) {
   })
   const mcp = createMcpHandler({
     ...MCP_SERVER_INFO,
-    description: "Agents drop plans, docs, and small apps for review, read the comments, and publish the next version.",
+    description: "Agents publish plans, docs, screenshots, and small apps for review, read the comments, and publish the next version.",
     websiteUrl: origin,
     icons: [
       { src: `${origin}/favicon.svg`, mimeType: "image/svg+xml", sizes: ["any"] },
@@ -49,7 +46,7 @@ export function mcpFor(origin: string) {
     // MCP clients send no Origin; the access token, not the origin, is the boundary.
     origin: false,
     auth: oauth.auth,
-    tools: [getUsage, listDrops, readDrop, listComments, createDoc, publishApp, keepDrop, createCodeImage],
+    tools: [publish, readDrop, listDrops, updateDrop, createCodeImage],
     prompts: [addressFeedback],
     resources: skillResources,
     // Every tool call lands on the request's wide event.

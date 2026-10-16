@@ -47,7 +47,7 @@ Under the hood:
    The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. The `/agents` page has the setup for Codex, Cursor, VS Code, and other clients, and lists the agents you've connected.
 3. Ask your agent to drop a plan. It answers with the review link.
 
-MCP tools: `get_usage`, `list_drops`, `read_drop`, `list_comments`, `create_doc`, `publish_app`, `create_code_image`, plus the `address_feedback` prompt. Four skills come with the server (`skills/list`): `vitehub-drop`, `handoff`, `pr-evidence`, which renders annotated screenshots with [comark-annotate](https://comark-annotate.onmax.me), and `show-me`, HumanLayer's skill for explaining with diagrams. They're also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. Members read them at `/skills`; admins switch each one on or off for the whole deployment. [The docs](https://drop.vitehub.dev/docs) have the details.
+MCP tools: `publish` (docs, files, and apps, with a version note and a lifetime), `read_drop` (content, open comments, versions), `list_drops` (with the Trash and plan usage), `update_drop` (share, rename, lifetime, Trash), and `create_code_image`, plus the `address_feedback` prompt. Four skills come with the server (`skills/list`): `vitehub-drop`, `handoff`, `pr-evidence`, which renders annotated screenshots with [comark-annotate](https://comark-annotate.onmax.me), and `show-me`, HumanLayer's skill for explaining with diagrams. They're also published at `/.well-known/agent-skills/` for agents that discover skills over HTTP. Members read them at `/skills`; admins switch each one on or off for the whole deployment. [The docs](https://drop.vitehub.dev/docs) have the details.
 
 ## Host it yourself
 
@@ -98,7 +98,7 @@ Unused OAuth clients are removed after 24 hours by the existing cleanup schedule
 
 ### Expiry
 
-A drop expires 30 days after its last visit. A visit is a signed-in person or an agent opening it, a new version, or an anonymous reader whose browser ran the shared page or opened a raw file directly; link unfurlers, crawlers, and embedded images don't count. An expired drop stops being served, stays visible to its owner and editors for 7 days so they can renew it, and is then deleted by the hourly cleanup schedule (Deno has no schedule: expired drops stop being served but stay stored). Owners can turn on "Keep forever" for a drop; agents can only ask for it through `keep_drop`.
+Each drop has a lifetime its publisher picks: temporary (14 days after its last visit), review (30 days), or keep (never expires; an agent that keeps a drop says why). A visit is a signed-in person or an agent opening it, a new version, or an anonymous reader whose browser ran the shared page or opened a raw file directly; link unfurlers, crawlers, and embedded images don't count. An expired or deleted drop goes to the Trash, stops being served, and can be restored for 15 days before the hourly cleanup schedule deletes it (Deno has no schedule: such drops stop being served but stay stored). Only people delete for good; agents can trash and restore.
 
 Set `DROP_EXPIRY_DAYS` to change the window, or to `0` to keep every drop. Set `DROP_CUSTOM_EXPIRY=0` so only admins can turn on "Keep forever".
 

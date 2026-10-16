@@ -1,26 +1,36 @@
 <script setup lang="ts">
-// How long the drop lives, for the people who manage it: renew it, keep it forever, or answer an agent that asked to.
-import { expiryLabel } from "#shared/expiry"
+// How long the drop lives, for the people who manage it: pick a lifetime, renew it, or restore it from the Trash.
+import { expiryLabel, type Lifetime, lifetimeDays } from "#shared/expiry"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
 const { data: me } = useMe()
-const { setExpiry } = useDropActions()
+const { setLifetime, restore } = useDropActions()
 const notify = useNotify()
 const now = useRelativeNow()
 const days = computed(() => me.value?.expiry.days ?? 0)
 const status = computed(() => expiryLabel(props.drop, now.value))
-const expired = computed(() => props.drop.expiresAt !== null && props.drop.expiresAt <= now.value)
-const hint = computed(() => props.drop.neverExpires ? "Kept until you delete it." : expired.value ? "Renew it to bring the link back." : `Any visit restarts the ${days.value} days.`)
-/** Owners may opt out unless the admin turned that off; admins always may. */
-const canKeepForever = computed(() => Boolean(me.value && (me.value.expiry.custom || me.value.role === "admin")))
+const trashed = computed(() => props.drop.trashedAt !== null)
+/** Owners keep drops unless the admin turned that off; admins always may. */
+const canKeep = computed(() => Boolean(me.value && (me.value.expiry.custom || me.value.role === "admin")))
+const options = computed(() => [
+  { label: "Temporary", value: "temporary", description: `${lifetimeDays("temporary", days.value)} days after the last visit` },
+  { label: "Review", value: "review", description: `${days.value} days after the last visit` },
+  { label: "Keep", value: "keep", description: "Until you delete it", disabled: !canKeep.value && props.drop.lifetime !== "keep" },
+])
+const hint = computed(() => {
+  if (trashed.value) return props.drop.trashReason === "expired" ? "Nobody opened it for a while. Restore it to bring the link back." : "Restore it to bring the link back."
+  if (props.drop.lifetime === "keep") return props.drop.keepReason ? `Kept by an agent: ${props.drop.keepReason}` : "Kept until you delete it."
+  return `Any visit restarts the ${lifetimeDays(props.drop.lifetime, days.value)} days.`
+})
 const busy = ref(false)
 
-async function run(change: { neverExpires?: boolean; renew?: true }, done: string) {
+async function run(action: () => Promise<boolean>, done?: string) {
   busy.value = true
-  if (await setExpiry(props.drop, change)) notify.done(done)
+  if (await action() && done) notify.done(done)
   busy.value = false
 }
+const choose = (lifetime: Lifetime) => run(() => setLifetime(props.drop, { lifetime }), `Lifetime: ${lifetime}`)
 </script>
 
 <template>
@@ -28,32 +38,25 @@ async function run(change: { neverExpires?: boolean; renew?: true }, done: strin
     <h3 class="label-mono">Lifetime</h3>
     <div class="flex items-center gap-3">
       <span class="grid size-8 shrink-0 place-items-center rounded-full bg-elevated text-muted">
-        <UIcon :name="drop.neverExpires ? 'i-lucide-infinity' : 'i-lucide-clock'" class="size-4" />
+        <UIcon :name="trashed ? 'i-lucide-trash' : drop.lifetime === 'keep' ? 'i-lucide-infinity' : 'i-lucide-clock'" class="size-4" />
       </span>
       <div class="min-w-0 flex-1">
         <p class="text-sm text-highlighted">{{ status }}</p>
         <p class="text-xs text-muted">{{ hint }}</p>
       </div>
-      <UButton v-if="!drop.neverExpires" color="neutral" label="Renew" :loading="busy" size="sm" variant="ghost" @click="run({ renew: true }, `Renewed for ${days} days`)" />
+      <UButton v-if="trashed" color="neutral" label="Restore" :loading="busy" size="sm" variant="outline" @click="run(() => restore(drop))" />
+      <UButton v-else-if="drop.lifetime !== 'keep'" color="neutral" label="Renew" :loading="busy" size="sm" variant="ghost" @click="run(() => setLifetime(drop, { renew: true }), 'Renewed')" />
     </div>
-
-    <div v-if="drop.neverExpiresRequest && !drop.neverExpires" class="rounded-lg border border-default p-3">
-      <p class="text-sm"><span class="font-medium text-highlighted">{{ drop.neverExpiresRequest }}</span> <span class="text-muted">asked to keep this drop forever.</span></p>
-      <div class="mt-2.5 flex gap-2">
-        <UButton v-if="canKeepForever" color="neutral" label="Keep Forever" :loading="busy" size="sm" @click="run({ neverExpires: true }, 'Kept forever')" />
-        <UButton color="neutral" label="Dismiss" size="sm" variant="outline" :disabled="busy" @click="run({ neverExpires: false }, 'Request dismissed')" />
-      </div>
-      <p v-if="!canKeepForever" class="mt-2 text-xs text-muted">Only an admin can keep drops forever on this Drop.</p>
-    </div>
-
-    <label v-if="canKeepForever" class="flex items-center justify-between gap-3">
-      <span class="text-[13px]" :class="drop.neverExpires ? 'text-highlighted' : 'text-muted'">Keep forever</span>
-      <USwitch
-        color="neutral"
-        :disabled="busy"
-        :model-value="drop.neverExpires"
-        @update:model-value="value => run({ neverExpires: value }, value ? 'Kept forever' : `Expires after ${days} days without visits`)"
-      />
-    </label>
+    <URadioGroup
+      v-if="!trashed"
+      color="neutral"
+      :disabled="busy"
+      indicator="hidden"
+      :items="options"
+      :model-value="drop.lifetime"
+      size="sm"
+      variant="card"
+      @update:model-value="value => choose(value as Lifetime)"
+    />
   </section>
 </template>

@@ -7,31 +7,44 @@ description: Drops plans, docs, and small static apps into Drop for review, read
 
 Drop keeps what you publish private until the user shares it. People comment on the exact spot; you read the open comments and drop the next version.
 
-You work through Drop's MCP server at `https://drop.vitehub.dev/mcp`. There is no key to ask for: the user approved your MCP client once in the browser, and its tools act as them. If the Drop tools (`create_doc`, `list_drops`, …) aren't available, ask the user to add the server, for example `claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp`, and sign in when the client asks.
+You work through Drop's MCP server at `https://drop.vitehub.dev/mcp`. There is no key to ask for: the user approved your MCP client once in the browser, and its tools act as them. If the Drop tools (`publish`, `read_drop`, …) aren't available, ask the user to add the server, for example `claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp`, and sign in when the client asks.
 
-## Drop a doc
+## Publish
 
-Call `create_doc` with the Markdown in `markdown` (or a self-contained HTML page with `format: "html"`). It answers with the review page link; give the user that link. New drops are private until the user shares them.
+`publish` takes exactly one of:
 
-Do not repeat a successful call: every success creates another drop. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
+- `markdown`: a doc. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
+- `html`: a self-contained HTML page.
+- `files`: a small static app, files keyed by path with an `index.html`. Relative links, ES modules, and `fetch("data.json")` work like on any static host.
+- `file`: any other file up to 4 MiB, as `{ name, base64 }`. Use it for screenshots: people pin comments on an image or drag an area on it.
 
-## Publish the next version
+Every publish needs a `note`: what this is, or for a new version what changed, like a commit message. People read it in the version history.
 
-Call `create_doc` again with `supersedes` set to the previous drop's id (or put `supersedes: <id>` in the front matter). The new version keeps the old one's sharing, and the old one stays in history. Any id from the chain works: the new version always lands on top of the latest. If someone else publishes at the same moment, the call fails with a conflict; read the latest version with `read_drop` and publish again. Docs are limited to 4 MiB.
+A new drop also needs a `lifetime`. Pick it from what the drop is for:
 
-## Read feedback
+- `temporary`: prototypes, spikes, one-off answers. It goes to the Trash 14 days after anyone last opened it.
+- `review`: plans and docs going through feedback. 30 days after the last visit.
+- `keep`: pull request assets, docs linked from an issue, a README, or anything else that lasts. It never expires. Pass `keepReason`, a sentence or two the owner reads, such as the pull request it belongs to.
 
-`list_comments` returns the open comments on a drop, each with the text or spot it quotes. `read_drop` returns the current content. The `address_feedback` prompt chains both. Address the open comments, then publish the next version.
+Drops start private. Pass `share` (`view`, `comment`, or `edit`) when the user asked to share, or when the drop is clearly meant for others, like a screenshot embedded in a pull request. `edit` lets signed-in people edit a Markdown doc together.
 
-## Keep a drop
+`publish` answers with the review page link (`url`); give the user that link. Do not repeat a successful call: every success creates another drop or version. Docs and apps are limited to 4 MiB.
 
-A drop expires when nobody opens it for a while (30 days on drop.vitehub.dev). Every visit by a signed-in person, by you through `read_drop`, or by someone reading a shared link starts the window again, and so does a new version. `list_drops` shows each drop's expiry. An expired drop stops being served and is deleted a week later.
+## Images in a doc
 
-Call `keep_drop` with the drop's `id` to renew it, which also restores an expired drop during that week. With `forever: true` it asks the owner to keep the drop forever instead; only a person can approve that, on the drop's page. Don't ask unless the user wants the drop kept.
+Publish each image with `file` first, then embed its `fileUrl` in the doc (`![alt](fileUrl)` or `::screenshot{src="fileUrl"}`). An embedded image belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the image. When people comment on it inside the doc, the comment lands on the doc.
 
-## Publish an app
+## Read feedback and publish the next version
 
-A small static app is a set of files keyed by path, with an `index.html`. Call `publish_app` with `files` (and `name`); pass `id` to publish its next version. Publishing replaces the entire file set and deletes the old files. Only the latest app version is kept; include every file the app still needs in each publish. Doc version history does not apply to apps. Relative links, ES modules, and `fetch("data.json")` work like on any static host.
+`read_drop` returns the content, the open comments (each with the text it quotes, or the spot or area it marks on an image or element), the versions with their notes, and the files the doc embeds. The `address_feedback` prompt starts from it.
+
+Address the open comments, then call `publish` with `previous` set to the drop's id, a `note`, and `resolves` listing the numbers of the comments you addressed; they're marked resolved. The new version keeps the drop's sharing and lifetime unless you pass new ones. Any id from the chain works: the new version lands on top of the latest. If someone else publishes at the same moment, the call fails with a conflict; read the latest version and publish again. Apps keep only their latest version, so include every file the app still needs in each publish.
+
+## Manage drops
+
+`list_drops` lists the user's drops (filter with `query`, `kind`, `shared`), or their Trash with `trash: true`, plus plan usage.
+
+`update_drop` changes `share`, `title`, or `lifetime`; `renew: true` starts a fresh window; `trash: true` moves a drop to the Trash, where it stays restorable for 15 days, and `trash: false` restores it, also after it expired. Trash only what the user asked to remove, or what you made and no longer need. Only people delete for good.
 
 ## Render code
 

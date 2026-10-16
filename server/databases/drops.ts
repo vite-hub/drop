@@ -27,9 +27,20 @@ export const drops = sqliteTable("drops", {
   updatedAt: integer("updated_at").notNull(),
   /** Last real visit by a person or an agent. Expiry counts from here, falling back to `createdAt`. */
   lastAccessedAt: integer("last_accessed_at"),
-  neverExpires: integer("never_expires", { mode: "boolean" }).notNull().default(false),
-  /** Set when an agent asks to keep the drop forever, to the agent's name. Only a person can approve it. */
-  neverExpiresRequest: text("never_expires_request"),
+  /**
+   * How long the drop should live, picked by whoever publishes it: `temporary` (prototypes, one-off answers),
+   * `review` (docs going through feedback), or `keep` (PR assets, anything linked from somewhere lasting).
+   */
+  lifetime: text("lifetime", { enum: ["temporary", "review", "keep"] }).notNull().default("review"),
+  /** Why an agent kept the drop, shown to its owner. Null when a person chose `keep`. */
+  keepReason: text("keep_reason"),
+  /** What changed in this version, like a commit message. Agents write one for every version they publish. */
+  note: text("note"),
+  /** When the drop went to the Trash; it's purged 15 days later. Set on every version of the chain. */
+  trashedAt: integer("trashed_at"),
+  trashReason: text("trash_reason", { enum: ["deleted", "expired"] }),
+  /** The doc an image belongs to. Attachments share the doc's sharing, lifetime, and Trash, and don't count as drops. */
+  parentId: text("parent_id"),
   /** CAS token used while replacing an app's file set. */
   publishToken: text("publish_token"),
 }, table => [
@@ -37,7 +48,9 @@ export const drops = sqliteTable("drops", {
   uniqueIndex("drops_blob_key_idx").on(table.blobKey),
   index("drops_supersedes_idx").on(table.supersedesId),
   uniqueIndex("drops_supersedes_unique").on(table.supersedesId),
-  index("drops_expiry_idx").on(table.neverExpires, table.lastAccessedAt),
+  index("drops_expiry_idx").on(table.lifetime, table.lastAccessedAt),
+  index("drops_trash_idx").on(table.trashedAt),
+  index("drops_parent_idx").on(table.parentId),
 ])
 
 /** Current versions, maintained by drop insert/delete/update triggers for bounded listing reads. */
@@ -59,10 +72,14 @@ export const comments = sqliteTable("comments", {
   id: text("id").primaryKey(),
   dropId: text("drop_id").notNull().references(() => drops.id, { onDelete: "cascade" }),
   n: integer("n").notNull(),
-  kind: text("kind", { enum: ["text", "image"] }).notNull(),
+  /** `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of an HTML page. */
+  kind: text("kind", { enum: ["text", "image", "area"] }).notNull(),
   selector: text("selector").notNull(),
   ox: integer("ox").notNull().default(0),
   oy: integer("oy").notNull().default(0),
+  /** An area's size, in thousandths of the anchor's box like `ox`/`oy`. Zero for a point. */
+  ow: integer("ow").notNull().default(0),
+  oh: integer("oh").notNull().default(0),
   quote: text("quote"),
   label: text("label"),
   page: text("page"),

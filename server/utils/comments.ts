@@ -7,7 +7,7 @@ import type { Identity } from "./identity"
 export type CommentRow = typeof comments.$inferSelect
 
 export const toComment = (row: CommentRow, who: Identity | null): DropComment => ({
-  id: row.id, n: row.n, kind: row.kind, selector: row.selector, ox: row.ox, oy: row.oy, quote: row.quote, label: row.label,
+  id: row.id, n: row.n, kind: row.kind, selector: row.selector, ox: row.ox, oy: row.oy, ow: row.ow, oh: row.oh, quote: row.quote, label: row.label,
   page: row.page, body: row.body, authorName: row.authorName, resolved: row.resolved, createdAt: row.createdAt,
   mine: Boolean(who && row.authorId === who.userId),
 })

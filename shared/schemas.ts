@@ -1,6 +1,7 @@
 // Request bodies, defined once. Server routes validate with them (readValidatedBody) and forms reuse them
 // (UForm :schema), so a field's rules and messages are the same on both sides.
 import * as v from "valibot"
+import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_APP_BYTES } from "./quotas"
 import { ROLES } from "./roles"
 
@@ -18,10 +19,13 @@ export const DropPatchSchema = v.object({
   visibility: v.optional(v.picklist(["private", "shared"])),
   access: v.optional(v.picklist(["view", "comment", "edit"])),
   title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
-  /** People set it; an agent's true becomes a request its person approves. False also dismisses a request. */
-  neverExpires: v.optional(v.boolean()),
-  /** Start a fresh expiry window, which also restores an expired drop. */
+  lifetime: v.optional(v.picklist(LIFETIMES)),
+  /** Required when an agent keeps a drop. */
+  keepReason: v.optional(v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON, `Keep the reason under ${MAX_KEEP_REASON} characters.`))),
+  /** Start a fresh expiry window. */
   renew: v.optional(v.literal(true)),
+  /** True moves the drop to the Trash; false restores it with a fresh window. */
+  trashed: v.optional(v.boolean()),
 })
 
 export const AppSchema = v.object({
@@ -30,16 +34,25 @@ export const AppSchema = v.object({
   files: v.record(v.string(), v.string()),
 })
 
-export const CommentSchema = v.object({
-  kind: v.picklist(["text", "image"]),
-  selector: v.pipe(v.string(), v.maxLength(2000)),
-  ox: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000)),
-  oy: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000)),
-  quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
-  label: v.optional(v.pipe(v.string(), v.maxLength(200))),
-  page: v.optional(v.pipe(v.string(), v.maxLength(300))),
-  body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
-})
+const thousandths = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000))
+
+/** Positions are thousandths of the anchor's box; `ow`/`oh` size an area and default to 0, a point. */
+export const CommentSchema = v.pipe(
+  v.object({
+    kind: v.picklist(["text", "image", "area"]),
+    selector: v.pipe(v.string(), v.maxLength(2000)),
+    ox: thousandths,
+    oy: thousandths,
+    ow: v.optional(thousandths, 0),
+    oh: v.optional(thousandths, 0),
+    quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
+    label: v.optional(v.pipe(v.string(), v.maxLength(200))),
+    page: v.optional(v.pipe(v.string(), v.maxLength(300))),
+    body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
+  }),
+  v.check(input => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000, "The area must stay inside its anchor."),
+  v.check(input => input.kind !== "area" || (input.ow > 0 && input.oh > 0), "An area needs a width and a height."),
+)
 
 export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 

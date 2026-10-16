@@ -20,7 +20,9 @@ function setup(path = ":memory:") {
   for (const name of readdirSync(migrations).filter(name => name.endsWith(".sql")).sort()) db.exec(readFileSync(new URL(name, migrations), "utf8"))
   return db
 }
-function reserve(db, { owner = "owner", month = "2026-10", drops = 1, bytes = 10, writes = 1, target = null, limits = planLimits("free") } = {}) {
+// Free allows 50 drops; three keep the slot arithmetic below readable.
+const SMALL = { ...planLimits("free"), drops: 3 }
+function reserve(db, { owner = "owner", month = "2026-10", drops = 1, bytes = 10, writes = 1, target = null, limits = SMALL } = {}) {
   const id = crypto.randomUUID()
   const now = Date.now()
   const row = db.prepare(reserveSQL).get(owner, month, now - QUOTA_RESERVATION_TTL_MS, id, drops, bytes, writes, target, now,
@@ -44,7 +46,7 @@ function commit(db, id, operation, success = true) {
 const used = (db, owner = "owner", month = "2026-10") => ({ ...db.prepare(usageSQL).get(owner, month, Date.now() - QUOTA_RESERVATION_TTL_MS) })
 
 test("plans, warnings, and non-retryable agent guidance", () => {
-  assert.deepEqual(planLimits("free"), { drops: 3, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB })
+  assert.deepEqual(planLimits("free"), { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB })
   assert.equal(planLimits("pro").bytes, 1024 * MIB)
   assert.equal(planLimits("pro", { writes: 234 }).writes, 234)
   assert.equal(planLimits("unlimited").drops, null)
@@ -76,6 +78,17 @@ test("three logical drops allow revisions, count all retained versions, and dele
   db.exec("DELETE FROM drops WHERE id IN ('doc0', 'revision')")
   assert.deepEqual(used(db), { drops: 2, bytes: 20, writes: 4 })
   assert.ok(reserve(db))
+  db.close()
+})
+
+test("drops in the Trash and files a doc embeds keep their bytes but free their slot", () => {
+  const db = setup()
+  doc(db, "doc0")
+  doc(db, "doc1")
+  doc(db, "shot", { kind: "image" })
+  assert.deepEqual(used(db), { drops: 3, bytes: 30, writes: 0 })
+  db.exec("UPDATE drops SET trashed_at = 1, trash_reason = 'deleted' WHERE id = 'doc1'; UPDATE drops SET parent_id = 'doc0' WHERE id = 'shot'")
+  assert.deepEqual(used(db), { drops: 1, bytes: 30, writes: 0 })
   db.close()
 })
 

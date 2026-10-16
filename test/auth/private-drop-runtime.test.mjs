@@ -48,7 +48,7 @@ test("MCP-created private drops belong to the authorizing browser account", { sk
 
   const marker = `private-content-${crypto.randomUUID()}`
   const published = await request("/mcp", { headers: { ...auth, accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-03-26" }, body: {
-    jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "publish_app", arguments: { name: "Private regression", files: { "index.html": `<h1>${marker}</h1>` } } },
+    jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "publish", arguments: { title: "Private regression", files: { "index.html": `<h1>${marker}</h1>` }, note: "Regression check", lifetime: "temporary" } },
   } })
   assert.equal(published.status, 200, "MCP publish failed")
   const result = published.json ?? JSON.parse(published.text.match(/^data: (.+)$/m)[1])

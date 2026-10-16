@@ -1,3 +1,4 @@
+import { type Lifetime, TRASH_DAYS } from "#shared/expiry"
 import type { Access, DropSummary, Visibility } from "#shared/types"
 
 /**
@@ -56,8 +57,8 @@ export function useDropActions() {
     }
   }
 
-  /** Renew the expiry window, or keep the drop forever. An agent's request is approved or dismissed the same way. */
-  async function setExpiry(drop: Pick<DropSummary, "id">, change: { neverExpires?: boolean; renew?: true }) {
+  /** Change how long the drop lives, or renew its window. */
+  async function setLifetime(drop: Pick<DropSummary, "id">, change: { lifetime?: Lifetime; renew?: true }) {
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: change })
       patch(drop.id, result)
@@ -65,19 +66,46 @@ export function useDropActions() {
       return true
     }
     catch (error) {
-      notify.fail("Couldn't change when this drop expires", error)
+      notify.fail("Couldn't change this drop's lifetime", error)
       return false
     }
   }
 
+  /** Moves a drop to the Trash at once, with an undo: nothing is lost for 15 days. */
   async function remove(drop: Pick<DropSummary, "id" | "title">) {
-    if (!await confirm({ title: "Delete this drop?", description: `${drop.title}, with every version. Its link stops working and its comments go with it.`, confirmLabel: "Delete", destructive: true })) return false
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
       drops.value = drops.value.filter(item => item.id !== drop.id)
+      await refreshNuxtData(["usage", "trash", `drop:${drop.id}`])
+      notify.info({ title: "Moved to the Trash", description: `${drop.title} can be restored for ${TRASH_DAYS} days.`, icon: "i-lucide-trash", actions: [{ label: "Undo", color: "neutral", variant: "outline", onClick: () => void restore(drop) }] })
+      return true
+    }
+    catch (error) {
+      notify.fail("Couldn't move it to the Trash", error)
+      return false
+    }
+  }
+
+  async function restore(drop: Pick<DropSummary, "id" | "title">) {
+    try {
+      await $fetch(`/api/drops/${drop.id}`, { method: "PATCH", body: { trashed: false } })
+      await refreshNuxtData(["drops", "trash", "usage", `drop:${drop.id}`])
+      notify.done("Restored", drop.title)
+      return true
+    }
+    catch (error) {
+      notify.fail("Couldn't restore", error)
+      return false
+    }
+  }
+
+  async function deleteForever(drop: Pick<DropSummary, "id" | "title">) {
+    if (!await confirm({ title: "Delete this drop for good?", description: `${drop.title}, with every version, its comments, and the files it embeds. This can't be undone.`, confirmLabel: "Delete", destructive: true })) return false
+    try {
+      await $fetch(`/api/drops/${drop.id}?forever`, { method: "DELETE" })
       clearNuxtData([`drop:${drop.id}`, `comments:${drop.id}`])
-      await refreshNuxtData("usage")
-      notify.done("Drop deleted", "Its link no longer works.")
+      await refreshNuxtData(["trash", "usage"])
+      notify.done("Deleted", drop.title)
       return true
     }
     catch (error) {
@@ -86,7 +114,21 @@ export function useDropActions() {
     }
   }
 
-  return { upload, setVisibility, setExpiry, remove }
+  async function emptyTrash(count: number) {
+    if (!await confirm({ title: "Empty the Trash?", description: `${count} ${count === 1 ? "drop" : "drops"}, with every version, comment, and embedded file. This can't be undone.`, confirmLabel: "Empty Trash", destructive: true })) return false
+    try {
+      await $fetch("/api/trash", { method: "DELETE" })
+      await refreshNuxtData(["trash", "usage"])
+      notify.done("Trash emptied")
+      return true
+    }
+    catch (error) {
+      notify.fail("Couldn't empty the Trash", error)
+      return false
+    }
+  }
+
+  return { upload, setVisibility, setLifetime, remove, restore, deleteForever, emptyTrash }
 }
 
 export const refreshDrops = () => refreshNuxtData("drops")

@@ -73,7 +73,7 @@ Write HTML as a document, not as a landing page.
 
 Drop renders HTML in a browser sandbox. Inline and HTTPS scripts, styles, fonts, and images work, and `fetch` can reach HTTPS APIs. Requests to Drop itself are blocked. Drops with a separate content domain give each page a real origin, so `localStorage`, cookies, and `history.pushState` work. Elsewhere storage lasts only until the page reloads, and URL changes are ignored.
 
-Keep one local path while drafting. Publish each finished revision with `supersedes`, so reviewers see the history. Open the document in a browser when the user asks to inspect it.
+Keep one local path while drafting. Publish each finished revision with `previous`, so reviewers see the history. Open the document in a browser when the user asks to inspect it.
 
 ## Markdown and Comark
 

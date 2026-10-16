@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // New comments: a one-line composer (Enter sends, Shift+Enter breaks). The selection stays highlighted
 // in the document, so the composer doesn't repeat it. Existing comments: the thread with resolve/delete.
-import type { DropComment, NewComment } from "#shared/types"
+import type { CommentInput } from "#shared/schemas"
+import type { DropComment } from "#shared/types"
 
-export type PendingComment = Omit<NewComment, "body">
+export type PendingComment = Omit<CommentInput, "body">
 
 const props = defineProps<{ x: number; y: number; pending?: PendingComment; comment?: DropComment; canManage: boolean }>()
 const emit = defineEmits<{ submit: [body: string]; cancel: []; resolve: [id: string, resolved: boolean]; delete: [id: string] }>()
@@ -40,7 +41,7 @@ defineExpose({ fail: () => (busy.value = false) })
         autoresize
         class="flex-1"
         :maxrows="6"
-        :placeholder="pending.quote ? 'Comment on the selection' : 'Comment on this spot'"
+        :placeholder="pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'"
         :rows="1"
         :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
         variant="none"

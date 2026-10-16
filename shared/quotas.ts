@@ -15,7 +15,7 @@ export interface PlanLimits {
 
 /** Global app safety limits also apply when owner quotas are disabled. */
 export function planLimits(plan: Plan, pro: { drops?: number; bytes?: number; writes?: number } = {}): PlanLimits {
-  if (plan === "free") return { drops: 3, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB }
+  if (plan === "free") return { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB }
   if (plan === "pro") return { drops: pro.drops ?? DEFAULT_PRO_LIMITS.drops, bytes: pro.bytes ?? DEFAULT_PRO_LIMITS.bytes, writes: pro.writes ?? DEFAULT_PRO_LIMITS.writes, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
   return { drops: null, bytes: null, writes: null, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
 }

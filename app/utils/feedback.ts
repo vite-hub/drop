@@ -12,6 +12,14 @@ export const CONTENT_SANDBOX = `${PREVIEW_SANDBOX} allow-same-origin`
 /** Open comments as Markdown, ready to paste back to the agent. */
 export function feedbackMarkdown(title: string, url: string, comments: DropComment[]) {
   const open = comments.filter(comment => !comment.resolved).sort((a, b) => a.n - b.n)
-  const lines = open.map(comment => `${comment.n}. ${comment.quote ? `> ${comment.quote}` : `Image \`${comment.selector}\` at ${(comment.ox / 10).toFixed(0)}%, ${(comment.oy / 10).toFixed(0)}%`}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName})`)
+  const pct = (n: number) => `${(n / 10).toFixed(0)}%`
+  const target = (comment: DropComment) => {
+    if (comment.quote) return `> ${comment.quote}`
+    const what = `${comment.kind === "image" ? "Image" : "Element"} \`${comment.selector}\``
+    return comment.ow || comment.oh
+      ? `${what}, area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
+      : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
+  }
+  const lines = open.map(comment => `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName})`.replace(/^/, `${comment.n}. `))
   return `## Feedback on "${title}"\n\n${url}\n\n${lines.join("\n") || "No open comments."}\n\nDrop a new version that addresses these.`
 }

@@ -4,7 +4,8 @@ export type FrameMessage =
   | { type: "navigate"; path: string }
   | { type: "copy"; text: string }
   | { type: "selection"; clear?: boolean; quote: string; selector: string; label: string; rect: { left: number; top: number; right: number; bottom: number } }
-  | { type: "image"; src: string; alt: string; selector: string; label: string }
+  | { type: "image"; src: string; alt: string; selector: string; label: string; rect?: { left: number; top: number; right: number; bottom: number } }
+  | { type: "area"; selector: string; label: string; ox: number; oy: number; ow: number; oh: number; rect: { left: number; top: number; right: number; bottom: number } }
   | { type: "marker"; id: string; clientX: number; clientY: number }
   | { type: "key"; key: string }
   | { type: "host"; path: string }

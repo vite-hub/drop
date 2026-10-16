@@ -11,10 +11,13 @@ import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment } from "#shared/types"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
+import type { FrameMessage } from "~/composables/useDropFrame"
 import type { PendingComment } from "./viewer/ViewerCommentPopover.vue"
+import type { Area } from "./viewer/ViewerLightbox.vue"
 
-type Selection = { quote: string; selector: string; label: string; rect: { left: number; top: number; right: number; bottom: number } }
-type Lightbox = { src: string; alt: string; selector: string; label: string }
+type Rect = { left: number; top: number; right: number; bottom: number }
+type Selection = { quote: string; selector: string; label: string; rect: Rect }
+type Lightbox = { src: string; alt: string; selector: string; label: string; from?: { left: number; top: number; width: number; height: number } }
 type Popover = { x: number; y: number } & ({ type: "new"; pending: PendingComment } | { type: "thread"; id: string })
 
 const props = withDefaults(defineProps<{ publicView?: boolean }>(), { publicView: false })
@@ -26,7 +29,7 @@ const comments = computed(() => state.comments.data.value)
 const route = useRoute()
 const notify = useNotify()
 const { copy } = useCopy()
-const { remove, setExpiry } = useDropActions()
+const { remove, restore } = useDropActions()
 const colorMode = useColorMode()
 const mounted = useMounted()
 const dark = computed(() => mounted.value && colorMode.value === "dark")
@@ -38,12 +41,12 @@ const owner = computed(() => drop.value.isOwner && !props.publicView)
 const openCount = computed(() => comments.value.filter(comment => !comment.resolved).length)
 const link = computed(() => (import.meta.client ? `${location.origin}/d/${drop.value.id}` : `/d/${drop.value.id}`))
 const now = useRelativeNow()
-const expired = computed(() => drop.value.expiresAt !== null && drop.value.expiresAt <= now.value)
-const renewing = ref(false)
-async function renew() {
-  renewing.value = true
-  if (await setExpiry(drop.value, { renew: true })) notify.done("Drop restored")
-  renewing.value = false
+const trashed = computed(() => drop.value.trashedAt !== null)
+const restoring = ref(false)
+async function restoreDrop() {
+  restoring.value = true
+  await restore(drop.value)
+  restoring.value = false
 }
 
 const panel = useViewerPanel({ owner, openCount })
@@ -77,11 +80,14 @@ onMounted(async () => {
   imageBlob.value = await $fetch<Blob>(drop.value.url, { responseType: "blob" }).catch(() => undefined)
 })
 
+const attached = useAttachmentData(drop)
+
 const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value)
 const srcdoc = computed(() => {
   if (isApp.value) return appDocument(page.value)
   if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value) : ""
-  return planDocument(drop.value.kind as PlanKind, drop.value.content ?? "", dark.value, drop.value.html)
+  if (!attached.ready.value) return ""
+  return planDocument(drop.value.kind as PlanKind, attached.inline(drop.value.content ?? ""), dark.value, attached.inline(drop.value.html ?? ""))
 })
 
 // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
@@ -124,7 +130,8 @@ const shareOpen = ref(false)
 
 const pageComments = computed(() => (isApp.value ? comments.value.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : comments.value))
 
-const { ready, send } = useDropFrame(frame, contentOrigin, (message, rect) => {
+const { ready, send } = useDropFrame(frame, contentOrigin, (frameMessage, rect) => {
+  const message = frameMessage
   if (message.type === "host") {
     frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
     send({ type: "document", html: frameDocument })
@@ -142,9 +149,25 @@ const { ready, send } = useDropFrame(frame, contentOrigin, (message, rect) => {
       rect: { left: rect.left + message.rect.left, top: rect.top + message.rect.top, right: rect.left + message.rect.right, bottom: rect.top + message.rect.bottom },
     }
   }
-  if (message.type === "image") lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label }
+  if (message.type === "image") {
+    const from = message.rect && { left: rect.left + message.rect.left, top: rect.top + message.rect.top, width: message.rect.right - message.rect.left, height: message.rect.bottom - message.rect.top }
+    areaMode.value = false
+    lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
+  }
+  if (message.type === "area") {
+    areaMode.value = false
+    if (drop.value.canComment && !editing.value) {
+      const { selector, label, ox, oy, ow, oh } = message
+      popover.value = { type: "new", pending: { kind: "area", selector, label, ox, oy, ow, oh }, x: rect.left + message.rect.left, y: rect.top + message.rect.bottom }
+    }
+  }
   if (message.type === "marker") popover.value = { type: "thread", id: message.id, x: rect.left + message.clientX, y: rect.top + message.clientY }
-  if (message.type === "key" && message.key === "Escape") popover.value = selection.value = null
+  if (message.type === "key" && message.key === "Escape") {
+    popover.value = selection.value = null
+    areaMode.value = false
+  }
+  // Apps may use R themselves, so only docs forward it.
+  if (message.type === "key" && message.key === "r" && !isApp.value) toggleArea()
 })
 watch(srcdoc, (value) => {
   if (contentOrigin.value && value === frameDocument) return
@@ -152,15 +175,34 @@ watch(srcdoc, (value) => {
   if (contentOrigin.value) reloadFrame()
 })
 watch([ready, pageComments], () => {
-  if (ready.value) send({ type: "markers", markers: pageComments.value.map(({ id, n, kind, selector, ox, oy, quote, resolved }) => ({ id, n, kind, selector, ox, oy, quote, resolved })) })
+  if (ready.value) send({ type: "markers", markers: pageComments.value.map(({ id, n, kind, selector, ox, oy, ow, oh, quote, resolved }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, resolved })) })
 })
+
+/** Area mode: the frame lays a crosshair over the page, and the next rectangle drawn there becomes a comment. */
+const areaMode = ref(false)
+const canDrawArea = computed(() => drop.value.canComment && !editing.value && !lightbox.value && drop.value.kind !== "file")
+function toggleArea() {
+  if (!canDrawArea.value) return
+  popover.value = selection.value = null
+  areaMode.value = !areaMode.value
+  if (areaMode.value && !wide.value) mobileSide.value = false
+}
+watch(canDrawArea, value => !value && (areaMode.value = false))
+watch([ready, areaMode], () => ready.value && send({ type: "area-mode", on: areaMode.value }))
+// The frame keeps the drawn rectangle while its comment is written; drop it once the popover goes.
+const draftingArea = computed(() => popover.value?.type === "new" && popover.value.pending.kind === "area")
+watch(draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
 
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
   e: () => !editing.value && drop.value.canEdit && startEdit(),
+  r: toggleArea,
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
 })
-onKeyStroke("Escape", () => (popover.value = selection.value = null))
+onKeyStroke("Escape", () => {
+  popover.value = selection.value = null
+  areaMode.value = false
+})
 
 const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value), "Feedback copied as Markdown")
 function copyLink() {
@@ -174,7 +216,7 @@ const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value
 function commentOnSelection() {
   if (!selection.value) return
   const { selector, quote, label, rect } = selection.value
-  popover.value = { type: "new", pending: { kind: "text", selector, ox: 0, oy: 0, quote, label }, x: rect.left, y: rect.bottom }
+  popover.value = { type: "new", pending: { kind: "text", selector, ox: 0, oy: 0, ow: 0, oh: 0, quote, label }, x: rect.left, y: rect.bottom }
   selection.value = null
 }
 
@@ -208,7 +250,13 @@ async function deleteDrop() {
   if (await remove(drop.value)) await navigateTo("/drops")
 }
 
-const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind === "image" && comment.selector === lightbox.value!.selector) : []))
+// Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
+const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector) : []))
+function pickImage(area: Area, x: number, y: number) {
+  if (!lightbox.value) return
+  popover.value = { type: "new", pending: { kind: "image", selector: lightbox.value.selector, ...area, label: lightbox.value.alt || "image" }, x, y }
+}
+const imageDraft = computed(() => (popover.value?.type === "new" && popover.value.pending.kind === "image" && popover.value.pending.ow ? popover.value.pending : undefined))
 const threadComment = computed(() => (popover.value?.type === "thread" ? comments.value.find(comment => comment.id === (popover.value as { id: string }).id) : undefined))
 </script>
 
@@ -231,10 +279,11 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
           <ViewerAction v-if="drop.canEdit" icon="i-lucide-pencil" label="Edit together" @click="startEdit" />
+          <ViewerAction v-if="canDrawArea" icon="i-lucide-square-dashed-mouse-pointer" label="Comment on an area" @click="toggleArea" />
           <ViewerAction icon="i-lucide-sparkles" label="Copy feedback for your agent" @click="copyFeedback" />
           <ViewerAction icon="i-lucide-link" label="Copy link" @click="copyLink" />
           <ViewerAction v-if="drop.url" icon="i-lucide-download" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
-          <ViewerAction destructive icon="i-lucide-trash" label="Delete drop" @click="deleteDrop" />
+          <ViewerAction destructive icon="i-lucide-trash" label="Move to Trash" @click="deleteDrop" />
         </template>
       </ViewerOverview>
     </div>
@@ -261,6 +310,9 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UButton color="neutral" :disabled="!live.synced.value" label="Publish" :loading="live.publishing.value" size="sm" @click="live.publish()" />
         </template>
         <template v-else #right>
+          <UTooltip v-if="canDrawArea" text="Comment on an area (R)">
+            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-lucide-square-dashed-mouse-pointer" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
+          </UTooltip>
           <UTooltip v-if="drop.canEdit || drop.editNote" :text="drop.editNote ?? 'Edit with others, live (E)'">
             <UButton color="neutral" :disabled="!drop.canEdit" icon="i-lucide-pencil" label="Edit" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
           </UTooltip>
@@ -277,12 +329,12 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 
     <template #body>
       <UAlert
-        v-if="owner && expired"
-        :actions="[{ label: 'Renew', color: 'error', variant: 'outline', size: 'sm', loading: renewing, onClick: renew }]"
+        v-if="owner && trashed"
+        :actions="[{ label: 'Restore', color: 'error', variant: 'outline', size: 'sm', loading: restoring, onClick: restoreDrop }]"
         class="rounded-none border-0 border-b border-default"
         color="error"
-        description="Nobody opened it for a while, so its link stopped working. Only you and editors can see it until you renew it."
-        icon="i-lucide-clock"
+        :description="drop.trashReason === 'expired' ? 'Nobody opened it for a while, so its link stopped working. Only you and editors can see it until you restore it.' : 'Its link stopped working. Only you and editors can see it until you restore it.'"
+        icon="i-lucide-trash"
         orientation="horizontal"
         :title="expiryLabel(drop, now)"
         variant="subtle"
@@ -336,9 +388,11 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
     :alt="lightbox.alt"
     :can-comment="drop.canComment"
     :comments="imageComments"
+    :draft="imageDraft"
+    :from="lightbox.from"
     :src="lightbox.src"
     @close="lightbox = null; popover = null"
-    @pick="(ox, oy, x, y) => (popover = { type: 'new', pending: { kind: 'image', selector: lightbox!.selector, ox, oy, label: lightbox!.alt || 'image' }, x, y })"
+    @pick="pickImage"
     @thread="(id, x, y) => (popover = { type: 'thread', id, x, y })"
   />
 
