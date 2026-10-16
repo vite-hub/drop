@@ -26,13 +26,6 @@ async function signInWithEmail() {
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
-const LOOP = [
-  { n: "01", actor: "Codex", kind: "agent" as const, title: "Drops launch-board/", body: "A live app, private by default.", icon: "i-lucide-upload" },
-  { n: "02", actor: "Ana", kind: "browser" as const, title: "Comments on the CTA", body: "Pinned to the exact spot in the page.", icon: "i-lucide-message-circle" },
-  { n: "03", actor: "Codex", kind: "agent" as const, title: "Reads the open comments", body: "Then drops v2 with the change.", icon: "i-lucide-refresh-cw" },
-  { n: "04", actor: "You", kind: "browser" as const, title: "Shares the link", body: "Choose view, comment, or edit.", icon: "i-lucide-share-2" },
-]
-
 const FEATURES = [
   { icon: "i-lucide-layers", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. All full screen, all versioned." },
   { icon: "i-lucide-message-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
@@ -43,6 +36,8 @@ const FEATURES = [
   { icon: "i-lucide-history", title: "Every version kept", body: "Agents drop the next version of a doc or app. Older ones stay one click away." },
 ]
 
+const PROMISES = ["Free and open source", "Private until shared", "Every version kept"]
+
 const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect over MCP"]
 </script>
 
@@ -52,24 +47,30 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
 
     <main>
       <section class="relative overflow-hidden">
-        <LandingDotGrid class="absolute inset-0 size-full [mask-image:radial-gradient(ellipse_at_70%_45%,black_20%,transparent_75%)]" />
-        <div class="relative mx-auto grid w-full max-w-5xl items-center gap-12 px-4 pt-14 pb-20 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:pt-20">
-          <div>
-            <p class="label-mono mb-4 flex items-center gap-2 text-muted"><span class="size-1.5 rounded-full bg-inverted" /> People + agents, same drop</p>
-            <h1 class="max-w-[13ch] text-[clamp(2.5rem,5.5vw,4rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-highlighted">
+        <LandingDotGrid class="absolute inset-0 size-full [mask-image:radial-gradient(ellipse_at_50%_0%,black_10%,transparent_60%)]" />
+        <div class="relative mx-auto w-full max-w-5xl px-4 pt-16 pb-16 sm:px-6 lg:pt-24">
+          <div class="flex flex-col items-center text-center">
+            <NuxtLink to="/docs" class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted">
+              <span class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[10px] tracking-wide text-highlighted uppercase">MCP</span>
+              Connect Claude Code, Codex, or any agent
+              <UIcon name="i-lucide-arrow-right" class="size-3" />
+            </NuxtLink>
+            <h1 class="max-w-[17ch] text-[clamp(2.5rem,6vw,4.25rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted">
               The shared drive for work you make together.
             </h1>
-            <p class="mt-6 max-w-[46ch] text-lg leading-relaxed text-muted">
+            <p class="mt-6 max-w-[52ch] text-lg leading-relaxed text-pretty text-muted">
               Drop docs, sites, and small apps. Review the live page, comment on the exact spot, and keep every version as the work moves back and forth.
             </p>
-            <div class="mt-9 flex flex-wrap items-center gap-3">
+            <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
               <UButton v-if="signedIn" color="neutral" size="lg" class="h-10 px-4" label="Open Drop" trailing-icon="i-lucide-arrow-right" to="/drops" />
               <UButton v-else color="neutral" size="lg" class="h-10 px-4" icon="i-simple-icons-github" label="Sign in with GitHub" @click="signInWithGitHub" />
               <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="Read the docs" to="/docs" />
-              <UButton color="neutral" variant="ghost" size="lg" class="h-10 px-4" label="See the loop" to="#loop" />
             </div>
+            <p class="label-mono mt-5 flex flex-wrap justify-center gap-x-4 gap-y-1 text-dimmed">
+              <span v-for="item in PROMISES" :key="item">{{ item }}</span>
+            </p>
 
-            <form v-if="devSignIn && !signedIn" class="mt-6 flex max-w-xs flex-col gap-2 rounded-lg border border-dashed border-accented bg-default p-3" @submit.prevent="signInWithEmail">
+            <form v-if="devSignIn && !signedIn" class="mt-6 flex w-full max-w-xs flex-col gap-2 rounded-lg border border-dashed border-accented bg-default p-3 text-left" @submit.prevent="signInWithEmail">
               <p class="label-mono">Dev sign-in</p>
               <UInput v-model="dev.email" autocomplete="email" placeholder="Email" size="sm" type="email" required />
               <UInput v-model="dev.password" autocomplete="current-password" placeholder="Password" size="sm" type="password" required />
@@ -77,7 +78,7 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
               <p v-if="dev.error" class="text-xs text-error" role="alert">{{ dev.error }}</p>
             </form>
           </div>
-          <LandingDropFeed />
+          <LandingHeroStory class="mt-14" />
         </div>
       </section>
 
@@ -93,30 +94,22 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
         </div>
       </section>
 
-      <section id="loop" class="scroll-mt-14 mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <div class="mb-6 max-w-xl">
-          <p class="label-mono mb-2">One drop, back and forth</p>
-          <h2 class="text-2xl font-semibold tracking-tight text-highlighted">The work keeps moving in the same place.</h2>
-          <p class="mt-2 text-sm leading-relaxed text-muted">People and agents both add to the thread. Nothing gets lost in a second tool or an old link.</p>
+      <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+        <div class="mb-8 max-w-xl">
+          <p class="label-mono mb-2">Pull requests</p>
+          <h2 class="text-2xl font-semibold tracking-tight text-highlighted">Review the change, not only the diff.</h2>
+          <p class="mt-2 text-sm leading-relaxed text-muted">Claude Code drops before and after screenshots with its notes and links them from the pull request. Reviewers see what changed and comment on the exact spot.</p>
         </div>
-        <ol class="grid gap-px overflow-hidden rounded-lg border border-default bg-(--ui-border) sm:grid-cols-2 lg:grid-cols-4">
-          <li v-for="(step, index) in LOOP" :key="step.n" class="flex">
-            <LazyLandingSpotlightCard class="relative flex-1 p-5" hydrate-on-interaction="pointerenter">
-              <span class="font-mono text-xs text-muted">{{ step.n }}</span>
-              <div class="mt-4 flex items-center gap-2">
-                <span class="grid size-7 place-items-center rounded-full bg-elevated ring-1 ring-inset ring-(--ui-border)">
-                  <AgentIcon v-if="step.kind === 'agent'" :name="step.actor" kind="agent" class="size-3.5" />
-                  <span v-else class="text-[10px] font-semibold text-highlighted">{{ step.actor.slice(0, 1) }}</span>
-                </span>
-                <span class="text-xs text-muted">{{ step.actor }}</span>
-              </div>
-              <UIcon :name="step.icon" class="mt-4 size-4 text-muted" />
-              <p class="mt-3 font-medium text-highlighted">{{ step.title }}</p>
-              <p class="mt-1.5 text-sm leading-relaxed text-muted">{{ step.body }}</p>
-              <UIcon v-if="index < LOOP.length - 1" name="i-lucide-arrow-right" class="absolute top-1/2 -right-2 z-10 hidden size-4 rounded-full bg-default text-muted lg:block" />
-            </LazyLandingSpotlightCard>
-          </li>
-        </ol>
+        <LazyLandingPrStory hydrate-on-visible />
+      </section>
+
+      <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+        <div class="mb-8 max-w-xl">
+          <p class="label-mono mb-2">Vibe-coded apps</p>
+          <h2 class="text-2xl font-semibold tracking-tight text-highlighted">Ship the thing you just made.</h2>
+          <p class="mt-2 text-sm leading-relaxed text-muted">Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.</p>
+        </div>
+        <LazyLandingAppStory hydrate-on-visible />
       </section>
 
       <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6">
