@@ -2,7 +2,7 @@
 // Self-hosting, the ViteHub way: one config, your provider, your data.
 const POINTS = [
   "Sign in with GitHub, or swap in any Better Auth provider",
-  "Database and file storage provisioned on deploy",
+  "On Cloudflare, the database and file storage are created on deploy",
   "MCP server with browser sign-in for your agents",
   "Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
 ]
@@ -21,12 +21,12 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
 
 <template>
   <section id="own" class="scroll-mt-14 border-y border-default bg-muted">
-    <div class="mx-auto grid max-w-5xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+    <div class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
       <div>
         <p class="label-mono flex items-center gap-2"><ViteHubMark class="size-3" />Built on ViteHub</p>
         <h2 class="mt-3 text-[2rem] leading-tight font-semibold tracking-tight text-highlighted">You own it.</h2>
         <p class="mt-3 max-w-[44ch] leading-relaxed text-muted">
-          Drop is a ViteHub template. Fork it, deploy it to your own account, and every drop, comment, and key stays there.
+          Drop is a ViteHub template. Fork it, deploy it to your own account, and every drop and comment stays in your account.
         </p>
         <ul class="mt-6 space-y-2.5 text-sm">
           <li v-for="point in POINTS" :key="point" class="flex gap-2.5">

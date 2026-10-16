@@ -1,26 +1,27 @@
 <script setup lang="ts">
 // The hero: one Markdown drop going around the loop. Claude Code drops it, you comment in the browser,
 // Claude Code addresses the comment, you switch sharing on and post the link, and the team joins in.
+// Your pointer switches apps from the dock, so every hop between tools is visible.
 // The stage is decorative; the chapter buttons under it tell the same story and jump to each part.
 import type { Beat } from "~/composables/useStoryboard"
 
 const BEATS = [
-  ["a.prompt", 2300], ["a.think", 1500], ["a.drop", 2600],
-  ["b.open", 1300], ["b.select", 1300], ["b.type", 2100], ["b.press", 900], ["b.post", 1500],
-  ["c.prompt", 2000], ["c.read", 1500], ["c.diff", 2000], ["c.drop", 1900],
-  ["d.open", 1800], ["d.share", 1000], ["d.modal", 1200], ["d.switch", 1400], ["d.copy", 1500],
-  ["e.open", 1900], ["e.post", 1500], ["e.replies", 2400],
+  ["a.prompt", 2300], ["a.think", 1500], ["a.drop", 2200], ["a.dock", 1500],
+  ["b.open", 1300], ["b.select", 1400], ["b.type", 2100], ["b.press", 1200], ["b.post", 1300], ["b.dock", 1500],
+  ["c.prompt", 2000], ["c.read", 1500], ["c.diff", 2000], ["c.drop", 1700], ["c.dock", 1500],
+  ["d.open", 1500], ["d.share", 1300], ["d.modal", 1300], ["d.switch", 1100], ["d.copy", 1300], ["d.dock", 1600],
+  ["e.open", 1900], ["e.post", 1500], ["e.replies", 2200], ["e.dock", 1500],
   ["f.join", 1500], ["f.comments", 2800], ["f.hold", 2200],
 ] as const satisfies readonly Beat[]
 type Name = (typeof BEATS)[number][0]
 
 const CHAPTERS: { label: string; from: Name; to: Name }[] = [
-  { label: "Claude Code drops a doc", from: "a.prompt", to: "a.drop" },
-  { label: "You comment on a line", from: "b.open", to: "b.post" },
-  { label: "Claude Code addresses it", from: "c.prompt", to: "c.drop" },
-  { label: "You switch sharing on", from: "d.open", to: "d.copy" },
-  { label: "You post it to the team", from: "e.open", to: "e.replies" },
-  { label: "The team jumps in", from: "f.join", to: "f.hold" },
+  { label: "Claude Code drops a doc", from: "a.prompt", to: "a.dock" },
+  { label: "You comment on a line", from: "b.open", to: "b.dock" },
+  { label: "Claude Code drops v2", from: "c.prompt", to: "c.dock" },
+  { label: "You switch sharing on", from: "d.open", to: "d.dock" },
+  { label: "You post the link in Slack", from: "e.open", to: "e.dock" },
+  { label: "The team comments", from: "f.join", to: "f.hold" },
 ]
 
 const TEAM = [
@@ -29,6 +30,12 @@ const TEAM = [
   { n: 4, name: "Ana", target: "migration", body: "Link the Teams FAQ here." },
 ]
 
+const APPS = [
+  { id: "terminal", label: "Claude Code" },
+  { id: "browser", label: "Browser" },
+  { id: "chat", label: "Slack" },
+] as const
+
 const FRAMES = {
   terminal: { x: 0, y: 64, w: 540, h: 420 },
   browser: { x: 330, y: 0, w: 670, h: 492 },
@@ -36,7 +43,7 @@ const FRAMES = {
 }
 
 const stage = useTemplateRef<HTMLElement>("stage")
-const page = useTemplateRef<HTMLElement>("page")
+const canvas = useTemplateRef<HTMLElement>("canvas")
 const { beat, index, at, go, indexOf, playing, reduced } = useStoryboard(stage, BEATS, { still: "f.hold" })
 
 const scene = computed(() => beat.value[0] as "a" | "b" | "c" | "d" | "e" | "f")
@@ -47,15 +54,28 @@ const windows = computed(() => ({
 } as const))
 
 const v2 = computed(() => at("d.open"))
-const modal = computed(() => at("d.modal") && !at("e.open"))
+const modal = computed(() => at("d.modal") && !at("d.dock"))
 const shared = computed(() => at("d.switch"))
+const copied = computed(() => at("d.dock"))
+const front = computed(() => (Object.keys(windows.value) as (keyof typeof FRAMES)[]).find(id => windows.value[id] === "front"))
 
-// Your pointer in the browser; the team's arrive in the last scene.
-const you = useCursorTarget(page, () => ({
-  "b.open": "title", "b.select": "sentence", "b.type": "sentence", "b.press": "post", "b.post": "post",
-  "d.open": "sentence", "d.share": "share", "d.modal": "switch", "d.switch": "switch", "d.copy": "copy",
-} as Partial<Record<Name, string>>)[beat.value])
-const teamCursors = TEAM.map(member => reactive({ ...member, at: useCursorTarget(page, () => (scene.value === "f" ? member.target : null), { x: 0.3, y: 1.2 }) }))
+// Apps that have been opened this loop get a dot under their dock icon, like a running app.
+const running = computed(() => ({ terminal: true, browser: at("b.open"), chat: at("e.open") }))
+
+// Your pointer: where it heads in each beat, and the beats that end in a click there.
+const TARGETS: Partial<Record<Name, string>> = {
+  "a.dock": "dock-browser",
+  "b.open": "title", "b.select": "sentence", "b.type": "sentence", "b.press": "post", "b.post": "post", "b.dock": "dock-terminal",
+  "c.prompt": "dock-terminal", "c.read": "dock-terminal", "c.diff": "dock-terminal", "c.drop": "dock-terminal", "c.dock": "dock-browser",
+  "d.open": "sentence", "d.share": "share", "d.modal": "switch", "d.switch": "switch", "d.copy": "copy", "d.dock": "dock-chat",
+  "e.open": "composer", "e.post": "composer", "e.replies": "composer", "e.dock": "dock-browser",
+}
+const CLICKS: Partial<Record<Name, true>> = { "a.dock": true, "b.press": true, "b.dock": true, "c.dock": true, "d.share": true, "d.modal": true, "d.copy": true, "d.dock": true, "e.dock": true }
+const you = useCursorTarget(canvas, () => TARGETS[beat.value])
+const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 : null))
+// The app the pointer is about to open shows its name over the dock.
+const hovered = computed(() => (beat.value.endsWith(".dock") ? TARGETS[beat.value]!.replace("dock-", "") : null))
+const teamCursors = TEAM.map(member => reactive({ ...member, at: useCursorTarget(canvas, () => (scene.value === "f" ? member.target : null), { x: 0.3, y: 1.2 }) }))
 
 const chapter = computed(() => CHAPTERS.findLastIndex(item => index.value >= indexOf(item.from)))
 const chapterMs = (item: (typeof CHAPTERS)[number]) => BEATS.slice(indexOf(item.from), indexOf(item.to) + 1).reduce((sum, [, ms]) => sum + ms, 0)
@@ -70,26 +90,26 @@ function pick(item: (typeof CHAPTERS)[number]) {
 <template>
   <div>
     <div ref="stage" aria-hidden="true">
-      <LandingStage :size="[1000, 492]" :compact-size="[670, 492]">
-        <template #default="{ compact }">
+      <LandingStage :size="[1000, 566]" :compact-size="[670, 566]" :grow="1.1">
+        <template #default>
+          <div ref="canvas" class="absolute inset-0">
           <!-- Claude Code -->
-          <LandingWindow title="claude — ~/acme/launch" :frame="FRAMES.terminal" :state="windows.terminal" :compact="compact" dark>
+          <LandingWindow title="claude — ~/acme/launch" :frame="FRAMES.terminal" :state="windows.terminal" dark>
             <template #icon><BrainlessClaudeLogo class="h-2.5" /></template>
             <div class="flex h-full flex-col gap-3 p-4">
               <div class="flex min-h-0 flex-1 flex-col justify-end gap-2.5 overflow-hidden [&>*]:shrink-0 [&>*]:[animation:pop-in_320ms_var(--ease-out)]">
-                <div class="mb-auto text-[12px] text-[#565f89]">Claude Code · ~/acme/launch · drop connected over MCP</div>
                 <template v-if="at('a.think')">
                   <BrainlessClaudeMessage role="user">write the launch plan and drop it for review</BrainlessClaudeMessage>
                 </template>
                 <BrainlessClaudeThinking v-if="beat === 'a.think'" verb="Drafting" />
                 <template v-if="at('a.drop')">
                   <BrainlessClaudeMessage>Drafted it from the roadmap notes.</BrainlessClaudeMessage>
-                  <BrainlessClaudeToolCall tool="drop - create_doc (MCP)" arg='title: "Launch plan", markdown: "# Launch plan…"' result="Dropped launch-plan.md · v1 · private" />
+                  <BrainlessClaudeToolCall tool="drop - create_doc (MCP)" arg='title: "Launch plan", markdown: "# Launch plan…"' result="Dropped privately: drop.vitehub.dev/d/k3x9 (id=k3x9)" />
                   <BrainlessClaudeMessage>Ready for review: drop.vitehub.dev/d/k3x9</BrainlessClaudeMessage>
                 </template>
                 <template v-if="at('c.read')">
                   <BrainlessClaudeMessage role="user">address the comments on the launch plan</BrainlessClaudeMessage>
-                  <BrainlessClaudeToolCall tool="drop - list_comments (MCP)" arg='id: "k3x9"' result="1 open comment · You: “Legal needs a week…”" />
+                  <BrainlessClaudeToolCall tool="drop - list_comments (MCP)" arg='id: "k3x9"' result="1. > We ship on Oct 17, … Legal needs a week. Make it Oct 24. (You)" />
                 </template>
                 <BrainlessClaudeDiff
                   v-if="at('c.diff')"
@@ -101,7 +121,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                     { type: 'add', n: 4, text: 'We ship on Oct 24, with the email that morning.' },
                   ]"
                 />
-                <BrainlessClaudeToolCall v-if="at('c.drop')" tool="drop - create_doc (MCP)" arg='supersedes: "k3x9", …' result="Dropped launch-plan.md · v2 · 1 comment addressed" />
+                <BrainlessClaudeToolCall v-if="at('c.drop')" tool="drop - create_doc (MCP)" arg='supersedes: "k3x9", …' result="Dropped v2 privately: drop.vitehub.dev/d/m8r2 (id=m8r2)" />
               </div>
               <BrainlessClaudePrompt>
                 <LandingTyped v-if="beat === 'a.prompt'" text="write the launch plan and drop it for review" :delay="300" />
@@ -111,8 +131,8 @@ function pick(item: (typeof CHAPTERS)[number]) {
           </LandingWindow>
 
           <!-- The drop in the browser -->
-          <LandingWindow title="drop.vitehub.dev/d/k3x9" :frame="FRAMES.browser" :state="windows.browser" :compact="compact" url>
-            <div ref="page" class="relative flex h-full flex-col">
+          <LandingWindow :title="`drop.vitehub.dev/d/${v2 ? 'm8r2' : 'k3x9'}`" :frame="FRAMES.browser" :state="windows.browser" url>
+            <div class="relative flex h-full flex-col">
               <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm">
                 <DropMark class="h-3.5 shrink-0" />
                 <UIcon name="i-lucide-file-text" class="size-4 text-muted" />
@@ -214,19 +234,18 @@ function pick(item: (typeof CHAPTERS)[number]) {
                     </div>
                   </div>
                   <div class="mt-3 flex items-center gap-1 rounded-md border border-default bg-muted py-1 pr-1 pl-3 transition-opacity" :class="!shared && 'opacity-50'">
-                    <span class="min-w-0 flex-1 truncate font-mono text-xs">drop.vitehub.dev/d/k3x9</span>
-                    <span data-cursor="copy" class="grid size-6 place-items-center rounded text-highlighted"><UIcon :name="at('d.copy') ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" /></span>
+                    <span class="min-w-0 flex-1 truncate font-mono text-xs">drop.vitehub.dev/d/m8r2</span>
+                    <span data-cursor="copy" class="grid size-6 place-items-center rounded text-highlighted"><UIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" /></span>
                   </div>
                 </div>
               </div>
 
-              <LandingCursor :x="you.x" :y="you.y" :shown="you.shown && windows.browser === 'front'" />
-              <LandingCursor v-for="member in teamCursors" :key="member.name" :x="member.at.x" :y="member.at.y" :shown="member.at.shown && windows.browser === 'front'" :label="member.name" />
             </div>
           </LandingWindow>
 
           <!-- Team chat -->
-          <LandingWindow title="Team chat" :frame="FRAMES.chat" :state="windows.chat" :compact="compact">
+          <LandingWindow title="Slack · Acme" :frame="FRAMES.chat" :state="windows.chat">
+            <template #icon><UIcon name="i-simple-icons-slack" class="size-3" /></template>
             <div class="grid h-full grid-cols-[8.5rem_minmax(0,1fr)] text-xs">
               <div class="border-r border-default bg-muted p-3">
                 <p class="font-semibold text-highlighted">Acme</p>
@@ -255,13 +274,40 @@ function pick(item: (typeof CHAPTERS)[number]) {
                     <LandingChatMessage name="Lea" time="10:15" class="[animation:pop-in_360ms_var(--ease-out)_800ms_both]">Adding notes on the risks</LandingChatMessage>
                   </template>
                 </div>
-                <div class="m-3 mt-0 rounded-lg border border-default px-3 py-2 text-muted">
-                  <LandingTyped v-if="beat === 'e.open'" class="text-highlighted" text="Here it is, comments are open. drop.vitehub.dev/d/k3x9" :cps="36" :delay="400" />
+                <div data-cursor="composer" class="m-3 mt-0 rounded-lg border border-default px-3 py-2 text-muted">
+                  <LandingTyped v-if="beat === 'e.open'" class="text-highlighted" text="Here it is, comments are open. drop.vitehub.dev/d/m8r2" :cps="36" :delay="400" />
                   <span v-else>Message #launch</span>
                 </div>
               </div>
             </div>
           </LandingWindow>
+
+          <!-- The dock: how you move between apps. -->
+          <div class="absolute bottom-1 left-1/2 z-40 flex -translate-x-1/2 items-end gap-2 rounded-2xl border border-default bg-default/85 p-2 shadow-xl shadow-black/10 backdrop-blur dark:shadow-black/50">
+            <div v-for="app in APPS" :key="app.id" :data-cursor="`dock-${app.id}`" class="relative flex flex-col items-center">
+              <span
+                class="absolute -top-9 rounded-md bg-inverted px-2 py-1 text-[11px] font-medium whitespace-nowrap text-inverted shadow-md transition-[opacity,transform] duration-300"
+                :class="hovered === app.id ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'"
+              >{{ app.label }}</span>
+              <span
+                :key="front === app.id ? `open-${scene}` : 'idle'"
+                class="grid size-11 place-items-center rounded-xl border shadow-sm"
+                :class="[
+                  app.id === 'terminal' ? 'border-white/10 bg-[#0f0f10]' : 'border-default bg-elevated',
+                  front === app.id && '[animation:dock-bounce_700ms_var(--ease-out)]',
+                ]"
+              >
+                <BrainlessClaudeLogo v-if="app.id === 'terminal'" class="h-3.5" />
+                <UIcon v-else-if="app.id === 'browser'" name="i-lucide-compass" class="size-5 text-highlighted" />
+                <UIcon v-else name="i-simple-icons-slack" class="size-5 text-highlighted" />
+              </span>
+              <span class="mt-1 size-1 rounded-full transition-colors" :class="running[app.id] ? 'bg-(--ui-text-muted)' : 'bg-transparent'" />
+            </div>
+          </div>
+
+          <LandingCursor :x="you.x" :y="you.y" :shown="you.shown" label="You" :click="click" :beat="beat" />
+          <LandingCursor v-for="member in teamCursors" :key="member.name" :x="member.at.x" :y="member.at.y" :shown="member.at.shown" :label="member.name" />
+          </div>
         </template>
       </LandingStage>
     </div>

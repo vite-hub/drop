@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
-/* The reader's typography, for the live editor (.drop-doc below). */
+/* The reader's typography, for the live editor (.drop-doc below). Only the .typeset rules: never shared/document-shell.css. */
 @import "../../../shared/typeset.css";
 
 /*
@@ -91,6 +91,9 @@
 @keyframes grow { from { transform: scaleX(0) } }
 @keyframes wipe { from { clip-path: inset(0 100% 0 0) } }
 @keyframes wipe-handle { from { left: 0 } to { left: 100%; opacity: 0 } }
+@keyframes click-ring { 0% { opacity: 0.7; transform: scale(0.4) } 100% { opacity: 0; transform: scale(1.4) } }
+@keyframes click-press { 50% { transform: scale(0.82) } }
+@keyframes dock-bounce { 30% { transform: translateY(-10px) } 55% { transform: translateY(0) } 70% { transform: translateY(-4px) } }
 @keyframes float-up { to { opacity: 0; transform: translateY(-16px) } }
 @keyframes flash { from { background-color: var(--ui-bg-accented); box-shadow: 0 0 0 3px var(--ui-bg-accented) } }
 
@@ -111,6 +114,7 @@
   --border: var(--ui-border);
   --primary: var(--ui-primary);
   --primary-foreground: var(--ui-bg);
+  --font-heading: var(--font-sans);
   --radius: 0.5rem;
   background: var(--background);
   color: var(--foreground);

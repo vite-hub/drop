@@ -112,6 +112,6 @@ function key(event: KeyboardEvent) {
       :style="{ left: `${pop.x * width}px`, bottom: '64px' }"
     >+1</span>
     <DropMark class="absolute bottom-6 left-0 h-10" :style="{ width: `${HAND}px`, transform: `translateX(${hand * width - HAND / 2}px)` }" />
-    <p v-if="!manual" class="label-mono absolute inset-x-0 bottom-1.5 text-center text-[10px] text-dimmed">Move here to play</p>
+    <p v-if="!manual" class="label-mono absolute inset-x-0 bottom-1.5 text-center text-[10px] text-dimmed">Hover or tap to play</p>
   </div>
 </template>

@@ -1,16 +1,17 @@
 <script setup lang="ts">
 // A window on a stage: in front, behind, or gone. A compact stage centers the front one and hides the rest.
 type Frame = { x: number; y: number; w: number; h: number }
-const props = defineProps<{ title: string; frame: Frame; state: "front" | "back" | "hidden"; compact?: boolean; dark?: boolean; url?: boolean }>()
+const props = defineProps<{ title: string; frame: Frame; state: "front" | "back" | "hidden"; dark?: boolean; url?: boolean }>()
+const compact = inject(STAGE_COMPACT, ref(false))
 defineSlots<{ default(): unknown; icon?(): unknown }>()
 
 const style = computed(() => ({
-  left: props.compact ? `calc(50% - ${props.frame.w / 2}px)` : `${props.frame.x}px`,
-  top: props.compact ? "0px" : `${props.frame.y}px`,
+  left: compact.value ? `calc(50% - ${props.frame.w / 2}px)` : `${props.frame.x}px`,
+  top: compact.value ? "0px" : `${props.frame.y}px`,
   width: `${props.frame.w}px`,
   height: `${props.frame.h}px`,
 }))
-const shown = computed(() => props.state === "front" || (props.state === "back" && !props.compact))
+const shown = computed(() => props.state === "front" || (props.state === "back" && !compact.value))
 </script>
 
 <template>

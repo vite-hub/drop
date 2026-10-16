@@ -1,4 +1,8 @@
 import type { MaybeElementRef } from "@vueuse/core"
+import type { InjectionKey, Ref } from "vue"
+
+/** Whether the surrounding LandingStage is the phone layout, where only the front window shows. */
+export const STAGE_COMPACT: InjectionKey<Readonly<Ref<boolean>>> = Symbol("stage-compact")
 
 export type Beat<Name extends string = string> = readonly [name: Name, ms: number]
 
@@ -40,9 +44,8 @@ export function useStoryboard<Name extends string>(target: MaybeElementRef, beat
  */
 export function useCursorTarget(root: Readonly<Ref<HTMLElement | null>>, name: () => string | null | undefined, anchor = { x: 0.6, y: 0.65 }) {
   const position = reactive({ x: 0, y: 0, shown: false })
-  watch(name, async (next) => {
-    await nextTick()
-    const element = next ? root.value?.querySelector<HTMLElement>(`[data-cursor="${next}"]`) : null
+  function measure(target: string | null | undefined) {
+    const element = target ? root.value?.querySelector<HTMLElement>(`[data-cursor="${target}"]`) : null
     if (!root.value || !element) return void (position.shown = false)
     const frame = root.value.getBoundingClientRect()
     const box = element.getBoundingClientRect()
@@ -50,6 +53,13 @@ export function useCursorTarget(root: Readonly<Ref<HTMLElement | null>>, name: (
     position.x = (box.left - frame.left + box.width * anchor.x) / scale
     position.y = (box.top - frame.top + box.height * anchor.y) / scale
     position.shown = true
+  }
+  // Windows animate into place as the target appears, so measure again once they've settled.
+  const { start } = useTimeoutFn(() => measure(name()), 760, { immediate: false })
+  watch(name, async (next) => {
+    await nextTick()
+    measure(next)
+    start()
   }, { immediate: true, flush: "post" })
   return position
 }

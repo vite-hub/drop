@@ -24,9 +24,9 @@ function play() {
 
 <template>
   <div ref="stage">
-    <LandingStage :size="[1000, 452]" :compact-size="[630, 452]">
-      <template #default="{ compact }">
-        <LandingWindow title="claude — ~/play/catch" :frame="FRAMES.terminal" :state="live ? 'back' : 'front'" :compact="compact" dark aria-hidden="true">
+    <LandingStage :size="[1000, 452]" :compact-size="[630, 452]" :grow="1.06">
+      <template #default>
+        <LandingWindow title="claude — ~/play/catch" :frame="FRAMES.terminal" :state="live ? 'back' : 'front'" dark aria-hidden="true">
           <template #icon><BrainlessClaudeLogo class="h-2.5" /></template>
           <div class="flex h-full flex-col gap-3 p-4">
             <div class="flex min-h-0 flex-1 flex-col justify-end gap-2.5 overflow-hidden [&>*]:shrink-0 [&>*]:[animation:pop-in_320ms_var(--ease-out)]">
@@ -37,7 +37,7 @@ function play() {
                 <BrainlessClaudeToolCall tool="Write" arg="catch/game.js" result="Wrote 96 lines" />
               </template>
               <template v-if="at('g.publish')">
-                <BrainlessClaudeToolCall tool="drop - publish_app (MCP)" arg='files: { "index.html", "game.js" }' result="Published catch/ · v1 · drop.vitehub.dev/d/c4tc" />
+                <BrainlessClaudeToolCall tool="drop - publish_app (MCP)" arg='files: { "index.html", "game.js" }' result="Published v1: drop.vitehub.dev/d/c4tc (id=c4tc)" />
                 <BrainlessClaudeMessage>It's live. Switch sharing on and anyone with the link can play.</BrainlessClaudeMessage>
               </template>
             </div>
@@ -47,7 +47,7 @@ function play() {
           </div>
         </LandingWindow>
 
-        <LandingWindow title="drop.vitehub.dev/d/c4tc" :frame="FRAMES.browser" :state="live ? 'front' : at('g.publish') ? 'back' : 'hidden'" :compact="compact" url>
+        <LandingWindow title="drop.vitehub.dev/d/c4tc" :frame="FRAMES.browser" :state="live ? 'front' : at('g.publish') ? 'back' : 'hidden'" url>
           <div class="flex h-full flex-col">
             <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm" aria-hidden="true">
               <DropMark class="h-3.5 shrink-0" />

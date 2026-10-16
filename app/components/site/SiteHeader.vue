@@ -33,7 +33,7 @@ const { signedIn, signInWithGitHub } = useGitHubSignIn()
         </ClientOnly>
         <LandingGitHubStars />
         <UButton v-if="signedIn" class="ml-1" color="neutral" variant="outline" label="Open Drop" to="/drops" />
-        <UButton v-else class="ml-1" color="neutral" variant="outline" label="Sign In" @click="signInWithGitHub" />
+        <UButton v-else class="ml-1" color="neutral" variant="outline" label="Sign in" @click="signInWithGitHub" />
       </div>
     </div>
   </header>

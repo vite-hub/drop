@@ -1,7 +1,9 @@
-// shadcn/typeset, one copy shared by the /f/ document pages and the viewer's sandboxed documents.
+// shadcn/typeset and the page around it, one copy shared by the /f/ document pages and the viewer's sandboxed documents.
+// The app imports only typeset.css (for the live editor); document-shell.css would restyle every app page.
+import shell from "./document-shell.css?raw"
 import css from "./typeset.css?raw"
 
-export const TYPESET_CSS = css
+export const TYPESET_CSS = css + shell
 
 /** Comark's alerts (`> [!NOTE]`) render as `<blockquote as="note">`; both the /f/ pages and the viewer style them. */
 export const CALLOUT_CSS = `

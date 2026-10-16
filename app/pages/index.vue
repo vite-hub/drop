@@ -2,8 +2,8 @@
 import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 
 useSeoMeta({
-  title: "The shared drive for people and agents",
-  description: "Drop docs, sites, and small apps. People and agents review, comment, revise, and share every version in one place.",
+  title: "The shared drive for people and their agents",
+  description: "Agents drop docs, pages, and small apps. People comment on the exact spot, and the agent drops the next version.",
 })
 
 const route = useRoute()
@@ -26,40 +26,56 @@ async function signInWithEmail() {
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
+// The first card is the point of Drop, so it gets two columns.
 const FEATURES = [
-  { icon: "i-lucide-layers", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. All full screen, all versioned." },
+  { icon: "i-lucide-bot", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand." },
+  { icon: "i-lucide-layers", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link." },
   { icon: "i-lucide-message-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
   { icon: "i-lucide-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view, comment, or edit." },
-  { icon: "i-lucide-bot", title: "Agents make the changes", body: "People comment. The agent reads the open threads and drops the next version." },
   { icon: "i-lucide-users", title: "Edit together", body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version." },
-  { icon: "i-lucide-plug", title: "MCP built in", body: "Streamable HTTP on the latest spec. OAuth sign-in, the skill included, no keys to paste." },
-  { icon: "i-lucide-history", title: "Every version kept", body: "Agents drop the next version of a doc or app. Older ones stay one click away." },
+  { icon: "i-lucide-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys. The Drop skill comes with it." },
+  { icon: "i-lucide-history", title: "Older versions one click back", body: "Each new version of a doc gets a number. Drops nobody opens for 30 days expire unless you keep them." },
 ]
 
-const PROMISES = ["Free and open source", "Private until shared", "Every version kept"]
+const USE_CASES = [
+  {
+    story: "pr",
+    label: "Pull requests",
+    title: "Put the before and after in every pull request.",
+    body: "Claude Code drops the screenshots with its notes and links them from the PR. Reviewers see what changed, then read the diff.",
+  },
+  {
+    story: "app",
+    label: "Vibe-coded apps",
+    title: "Ship the thing you just made.",
+    body: "Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.",
+  },
+] as const
 
-const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect over MCP"]
+const PROMISES = ["Private until you share", "Works with any MCP agent", "Source on GitHub"]
+
+const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drops expire after 30 days, unless you keep them"]
 </script>
 
 <template>
   <div class="min-h-dvh bg-default text-default">
-    <SiteHeader />
+    <SiteHeader wide />
 
     <main>
       <section class="relative overflow-hidden">
         <LandingDotGrid class="absolute inset-0 size-full [mask-image:radial-gradient(ellipse_at_50%_0%,black_10%,transparent_60%)]" />
-        <div class="relative mx-auto w-full max-w-5xl px-4 pt-16 pb-16 sm:px-6 lg:pt-24">
+        <div class="relative mx-auto w-full max-w-6xl px-4 pt-16 pb-16 sm:px-6 lg:pt-24">
           <div class="flex flex-col items-center text-center">
-            <NuxtLink to="/docs" class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted">
+            <NuxtLink to="/docs/agents" class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted">
               <span class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[10px] tracking-wide text-highlighted uppercase">MCP</span>
               Connect Claude Code, Codex, or any agent
               <UIcon name="i-lucide-arrow-right" class="size-3" />
             </NuxtLink>
-            <h1 class="max-w-[17ch] text-[clamp(2.5rem,6vw,4.25rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted">
-              The shared drive for work you make together.
+            <h1 class="max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted">
+              The shared drive for people and their agents.
             </h1>
-            <p class="mt-6 max-w-[52ch] text-lg leading-relaxed text-pretty text-muted">
-              Drop docs, sites, and small apps. Review the live page, comment on the exact spot, and keep every version as the work moves back and forth.
+            <p class="mt-6 max-w-[56ch] text-lg leading-relaxed text-pretty text-muted">
+              Claude Code, Codex, or any MCP agent drops a doc, a page, or a small app. You comment on the exact spot, and the agent drops the next version.
             </p>
             <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
               <UButton v-if="signedIn" color="neutral" size="lg" class="h-10 px-4" label="Open Drop" trailing-icon="i-lucide-arrow-right" to="/drops" />
@@ -83,7 +99,7 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
       </section>
 
       <section class="border-y border-default">
-        <div class="mx-auto flex max-w-5xl items-center gap-6 px-4 py-5 sm:px-6">
+        <div class="mx-auto flex max-w-6xl items-center gap-6 px-4 py-5 sm:px-6">
           <span class="label-mono shrink-0">Works with</span>
           <LazyLandingLogoLoop class="min-w-0 flex-1" hydrate-on-visible>
             <span v-for="name in AGENTS" :key="name" class="flex shrink-0 items-center gap-2 text-sm text-muted">
@@ -94,31 +110,27 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
         </div>
       </section>
 
-      <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-        <div class="mb-8 max-w-xl">
-          <p class="label-mono mb-2">Pull requests</p>
-          <h2 class="text-2xl font-semibold tracking-tight text-highlighted">Review the change, not only the diff.</h2>
-          <p class="mt-2 text-sm leading-relaxed text-muted">Claude Code drops before and after screenshots with its notes and links them from the pull request. Reviewers see what changed and comment on the exact spot.</p>
+      <section v-for="(useCase, position) in USE_CASES" :key="useCase.label" class="mx-auto max-w-6xl px-4 sm:px-6" :class="position ? 'pt-12 pb-20' : 'pt-24 pb-12'">
+        <div class="mb-8 grid items-end gap-x-12 gap-y-3 lg:grid-cols-2">
+          <div>
+            <p class="label-mono mb-3">{{ useCase.label }}</p>
+            <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">{{ useCase.title }}</h2>
+          </div>
+          <p class="max-w-[52ch] leading-relaxed text-pretty text-muted">{{ useCase.body }}</p>
         </div>
-        <LazyLandingPrStory hydrate-on-visible />
+        <div class="rounded-2xl border border-default bg-muted p-3 sm:p-8 lg:p-10">
+          <LazyLandingPrStory v-if="useCase.story === 'pr'" hydrate-on-visible />
+          <LazyLandingAppStory v-else hydrate-on-visible />
+        </div>
       </section>
 
-      <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-        <div class="mb-8 max-w-xl">
-          <p class="label-mono mb-2">Vibe-coded apps</p>
-          <h2 class="text-2xl font-semibold tracking-tight text-highlighted">Ship the thing you just made.</h2>
-          <p class="mt-2 text-sm leading-relaxed text-muted">Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.</p>
+      <section class="mx-auto max-w-6xl px-4 pt-8 pb-20 sm:px-6">
+        <div class="mb-8">
+          <p class="label-mono mb-3">A live page for every file</p>
+          <h2 class="text-3xl font-semibold tracking-tight text-highlighted">What every drop gets.</h2>
         </div>
-        <LazyLandingAppStory hydrate-on-visible />
-      </section>
-
-      <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <div class="mb-6 max-w-xl">
-          <p class="label-mono mb-2">A live page for every file</p>
-          <h2 class="text-2xl font-semibold tracking-tight text-highlighted">Everything around the review.</h2>
-        </div>
-        <div class="grid gap-px overflow-hidden rounded-lg border border-default bg-(--ui-border) sm:grid-cols-2 lg:grid-cols-3">
-          <LazyLandingSpotlightCard v-for="feature in FEATURES" :key="feature.title" class="p-6" hydrate-on-interaction="pointerenter">
+        <div class="grid gap-px overflow-hidden rounded-xl border border-default bg-(--ui-border) sm:grid-cols-2 lg:grid-cols-4">
+          <LazyLandingSpotlightCard v-for="(feature, position) in FEATURES" :key="feature.title" class="p-6" :class="position === 0 && 'sm:col-span-2'" hydrate-on-interaction="pointerenter">
             <UIcon :name="feature.icon" class="size-4 text-muted" />
             <p class="mt-3 font-medium text-highlighted">{{ feature.title }}</p>
             <p class="mt-1.5 text-sm leading-relaxed text-muted">{{ feature.body }}</p>
@@ -129,8 +141,8 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
       <!-- Below the fold: rendered on the server, hydrated only when scrolled into view. -->
       <LazyLandingOwnIt hydrate-on-visible />
 
-      <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <h2 class="mb-6 text-2xl font-semibold tracking-tight text-highlighted">Use it here, or run your own</h2>
+      <section class="mx-auto max-w-6xl px-4 pt-20 pb-12 sm:px-6">
+        <h2 class="mb-8 text-3xl font-semibold tracking-tight text-highlighted">Use it here, or run your own.</h2>
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-lg border border-default p-6">
             <p class="label-mono">drop.vitehub.dev</p>
@@ -144,7 +156,7 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
           </div>
           <div class="rounded-lg border border-default p-6">
             <p class="label-mono">Your own</p>
-            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Deploy it, name the admins. Three roles.</p>
+            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Deploy your own and choose the admins.</p>
             <p class="mt-2 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. The GitHub accounts you list as admins can promote anyone.</p>
             <dl class="mt-5 divide-y divide-default border-y border-default text-sm">
               <div v-for="role in ROLES" :key="role" class="flex gap-4 py-2">
@@ -156,20 +168,21 @@ const HOSTED = ["Sign in with GitHub", "Private by default", "Agents connect ove
         </div>
       </section>
 
-      <section class="mx-auto max-w-5xl px-4 pt-4 pb-20 sm:px-6">
+      <section class="mx-auto max-w-6xl px-4 pt-4 pb-20 sm:px-6">
         <div class="flex flex-col items-start justify-between gap-6 rounded-lg border border-default p-8 sm:flex-row sm:items-center">
           <div>
-            <p class="text-xl font-semibold tracking-tight text-highlighted">Keep the loop in one place.</p>
-            <p class="mt-1 text-sm text-muted">Free and open source. Let people and agents work in the same drop.</p>
+            <p class="text-xl font-semibold tracking-tight text-highlighted">Drop your first doc.</p>
+            <p class="mt-1 text-sm text-muted">Sign in with GitHub, connect your agent, and ask it to drop something for review.</p>
           </div>
           <div class="flex flex-wrap gap-2">
             <UButton color="neutral" variant="ghost" label="Read the source" to="https://github.com/vite-hub/drop" target="_blank" />
-            <UButton color="neutral" variant="outline" label="Open Drop" to="/drops" />
+            <UButton v-if="signedIn" color="neutral" label="Open Drop" to="/drops" />
+            <UButton v-else color="neutral" icon="i-simple-icons-github" label="Sign in with GitHub" @click="signInWithGitHub" />
           </div>
         </div>
       </section>
     </main>
 
-    <SiteFooter />
+    <SiteFooter wide />
   </div>
 </template>
