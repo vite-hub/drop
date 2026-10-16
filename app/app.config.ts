@@ -15,6 +15,12 @@ export default defineAppConfig({
         label: "font-mono text-[11px] font-normal uppercase tracking-[0.08em] text-muted",
       },
     },
+    editorEmojiMenu: {
+      slots: { content: `min-w-56 max-w-64 max-h-80 ${surface} ring-0 flex flex-col overflow-hidden` },
+    },
+    editorMentionMenu: {
+      slots: { content: `min-w-56 max-w-64 max-h-80 ${surface} ring-0 flex flex-col overflow-hidden` },
+    },
     editorDragHandle: {
       slots: { handle: "cursor-grab px-0.5 text-dimmed hover:text-muted" },
     },

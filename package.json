@@ -30,6 +30,7 @@
     "@shikijs/langs": "4.5.0",
     "@shikijs/themes": "4.5.0",
     "@tiptap/core": "3.31.4",
+    "@tiptap/extension-emoji": "3.31.4",
     "@tiptap/extension-placeholder": "3.31.4",
     "@tiptap/pm": "3.31.4",
     "@tiptap/vue-3": "3.31.4",

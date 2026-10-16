@@ -34,7 +34,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     editor.value = new Editor({
       extensions: [
         ...extensions,
-        Placeholder.configure({ placeholder: "Write, or type / for blocks" }),
+        Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
         RealtimeCaret.configure({
           awareness: markRaw(realtime.provider.value.awareness),
           selectionRender: user => ({ class: "ProseMirror-yjs-selection", style: `background-color: color-mix(in oklab, ${user.color} 18%, transparent)` }),

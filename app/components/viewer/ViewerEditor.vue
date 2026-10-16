@@ -1,13 +1,25 @@
 <script setup lang="ts">
 // The live editor's page: the same column and typeset as the reader (shared/documents.ts), so editing a doc looks
-// like reading it. Nuxt UI's bubble toolbar, "/" block menu, and drag handle sit on top; app.config.ts restyles them.
-import type { EditorSuggestionMenuItem, EditorToolbarItem } from "@nuxt/ui"
+// like reading it. Nuxt UI's bubble toolbar, "/" block menu, ":" emoji menu, "@" people menu, and drag handle sit on top;
+// app.config.ts restyles them. Emoji and names go in as plain text, so the Markdown stays plain.
+import type { EditorEmojiMenuItem, EditorSuggestionMenuItem, EditorToolbarItem } from "@nuxt/ui"
+import type { Member } from "#shared/types"
 import { type Editor, EditorContent } from "@tiptap/vue-3"
 // AvatarStack, ConnectionStatus, and the carets. The viewer loads this component only while someone edits.
 import "vite-hub/ui/styles.css"
 
 const props = defineProps<{ editor?: Editor; synced: boolean }>()
 const prompt = usePrompt()
+
+// Everyone in this Drop, for "@". Editors are always signed in, and any signed-in person may list members.
+const { data: members } = useFetch<Member[]>("/api/members", { key: "editor-members", server: false, lazy: true, default: () => [] })
+const people = computed(() => members.value.filter(member => !member.banned).map(member => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })))
+
+// GitHub's emoji set, loaded with the editor rather than with the page. Custom GitHub images have no character to insert.
+const emojis = shallowRef<EditorEmojiMenuItem[]>([])
+onMounted(async () => {
+  emojis.value = (await import("@tiptap/extension-emoji")).gitHubEmojis.filter(emoji => emoji.emoji)
+})
 
 async function editLink() {
   const editor = props.editor
@@ -69,6 +81,8 @@ const blocks: EditorSuggestionMenuItem[][] = [[
     <template v-if="editor">
       <UEditorToolbar :editor="editor" :items="toolbar" layout="bubble" />
       <UEditorSuggestionMenu :editor="editor" :items="blocks" />
+      <UEditorEmojiMenu :editor="editor" :items="emojis" :limit="24" />
+      <ViewerMentionMenu :editor="editor" :people="people" />
       <UEditorDragHandle :editor="editor" icon="i-lucide-grip-vertical" />
     </template>
   </div>
