@@ -3,7 +3,6 @@ import { Editor } from "@tiptap/vue-3"
 import { useRealtimeTiptap } from "vite-hub/realtime/vue"
 import type { DropDetail, DropSummary } from "#shared/types"
 import { type CaretProvider, LiveCarets } from "~/utils/live-carets"
-import { type PatchableProvider, patchRealtimeProvider } from "~/utils/realtime-provider"
 
 type Published = { id: string; version: number; name: string }
 
@@ -34,8 +33,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     if (!extensions.length || !realtime.provider.value) return
     editor.value = new Editor({
       extensions: [
-        // Every peer's trailingNode appends its own empty paragraph, and the room keeps them all.
-        ...extensions.map(extension => (extension.name === "starterKit" ? extension.configure({ trailingNode: false }) : extension)),
+        ...extensions,
         Placeholder.configure({ placeholder: "Write, or type / for blocks" }),
         LiveCarets.configure({ provider: realtime.provider.value as unknown as CaretProvider }),
       ],
@@ -47,7 +45,6 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   let announced = ""
   watch(realtime.provider, (provider, _, onCleanup) => {
     if (!provider) return
-    patchRealtimeProvider(provider as unknown as PatchableProvider)
     const check = () => {
       for (const [clientId, state] of provider.awareness.getStates()) {
         const published = (state as { published?: Published }).published

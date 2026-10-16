@@ -1,0 +1,202 @@
+diff --git a/dist/editor-extensions-vb7KhpSG.js b/dist/editor-extensions-vb7KhpSG.js
+index bda67500de6a21ba03587ffc1e85d634a44119f0..c7c680e99b74fed9f5e92f0be9088243fef2fafb 100644
+--- a/dist/editor-extensions-vb7KhpSG.js
++++ b/dist/editor-extensions-vb7KhpSG.js
+@@ -1800,7 +1800,9 @@ function createRealtimeEditorExtensions() {
+ 	return [
+ 		StarterKit.configure({
+ 			document: false,
+-			undoRedo: false
++			undoRedo: false,
++			// Every peer's trailing node appends its own empty paragraph, and the room keeps them all.
++			trailingNode: false
+ 		}),
+ 		RealtimeDocument,
+ 		Image,
+diff --git a/dist/server.js b/dist/server.js
+index aadd840838d9a98f26ffcf253b631215d93507a1..7e103de8ea8d6c442a1255753c9cc710f628fe37 100644
+--- a/dist/server.js
++++ b/dist/server.js
+@@ -91,6 +91,9 @@ function createRealtimeAwarenessOwners(options = {}) {
+ 				throw error;
+ 			}
+ 		},
++		ownerOf(client) {
++			return owners.get(client);
++		},
+ 		release(peer) {
+ 			const clients = [...peerClients.get(peer) || []];
+ 			peerClients.delete(peer);
+@@ -341,8 +344,8 @@ function parseRoomPath(url) {
+ 		workspaceEvents: parsed.searchParams.get("workspace") === "events"
+ 	};
+ }
+-async function authorize(request, required, event) {
+-	if (!required) return;
++async function authorize(request, definition, event, room) {
++	if (!definition.auth) return;
+ 	let auth;
+ 	try {
+ 		auth = await assertAuthOrigin(request, event);
+@@ -351,8 +354,29 @@ async function authorize(request, required, event) {
+ 	}
+ 	const session = await auth.api.getSession({ headers: request.headers });
+ 	if (!session?.user) throw new HTTPError({ status: 401 });
++	if (definition.authorize && !await definition.authorize({ event, documentId: room.documentId, workspaceEvents: room.workspaceEvents, user: session.user })) throw new HTTPError({ status: 404 });
+ 	return createRealtimeIdentity(session.user);
+ }
++/** Awareness entries for `keep` clients only: y-websocket relays every state it hears, other peers' too. */
++function filterAwarenessUpdate(update, keep) {
++	const decoder = decoding.createDecoder(update);
++	const entries = [];
++	const length = decoding.readVarUint(decoder);
++	for (let index = 0; index < length; index++) {
++		const clientId = decoding.readVarUint(decoder);
++		const clock = decoding.readVarUint(decoder);
++		const state = decoding.readVarString(decoder);
++		if (keep(clientId)) entries.push([clientId, clock, state]);
++	}
++	const encoder = encoding.createEncoder();
++	encoding.writeVarUint(encoder, entries.length);
++	for (const [clientId, clock, state] of entries) {
++		encoding.writeVarUint(encoder, clientId);
++		encoding.writeVarUint(encoder, clock);
++		encoding.writeVarString(encoder, state);
++	}
++	return encoding.toUint8Array(encoder);
++}
+ function createRealtimeHandler(registry) {
+ 	const inactiveMemoryRoomKeys = /* @__PURE__ */ new Set();
+ 	const memoryRoomKeys = /* @__PURE__ */ new Set();
+@@ -363,6 +387,7 @@ function createRealtimeHandler(registry) {
+ 	const peerWorkspaceChanges = /* @__PURE__ */ new WeakMap();
+ 	const peerInitialSyncStep2 = /* @__PURE__ */ new WeakSet();
+ 	const peerSyncUpdateAt = /* @__PURE__ */ new WeakMap();
++	const peerPendingUpdates = /* @__PURE__ */ new WeakMap();
+ 	const workspaceCheckpointQueues = /* @__PURE__ */ new Map();
+ 	async function serializeWorkspaceCheckpoint(workspaceName, operation) {
+ 		const previous = workspaceCheckpointQueues.get(workspaceName) || Promise.resolve();
+@@ -399,9 +424,9 @@ function createRealtimeHandler(registry) {
+ 		const context = cloudflare?.context;
+ 		const binding = (cloudflare?.env)?.$DurableObject;
+ 		if (!binding || typeof context === "object" && context !== null && "storage" in context) return;
+-		const { definitionName, documentId, workspaceEvents } = parseRoomPath(event.req.url);
+-		const key = workspaceEvents ? JSON.stringify([definitionName, { workspaceEvents: true }]) : realtimeRoomKey(definitionName, documentId);
+-		return await binding.get(binding.idFromName(key)).fetch(event.req);
++		// Nitro's cloudflare-durable entry hands every WebSocket upgrade to its one instance, `server`, before the app
++		// runs, so the rooms live there. Checkpoints must reach the same instance to see a room's peers and state.
++		return await binding.get(binding.idFromName("server")).fetch(event.req);
+ 	}
+ 	function resolveRealtimeRoomSql(event) {
+ 		return (resolveCloudflare(event)?.context)?.storage?.sql;
+@@ -713,7 +738,7 @@ function createRealtimeHandler(registry) {
+ 			message: "Workspace events cannot be checkpointed."
+ 		});
+ 		const definition = await getDefinition(definitionName);
+-		await authorize(event.req, definition.auth, event);
++		await authorize(event.req, definition, event, { documentId, workspaceEvents });
+ 		if (!definition.history?.checkpoint) throw new HTTPError({ status: 404 });
+ 		const workspace = useWorkspace(definition.document.workspace, { mode: "write" });
+ 		if (!(await workspace.capabilities()).conditionalWrites) throw new HTTPError({
+@@ -741,12 +766,23 @@ function createRealtimeHandler(registry) {
+ 		}
+ 		return await checkpointRoom(documentId, definition, room, state);
+ 	});
++	// A hooks factory that throws leaves crossws with no hooks, and it upgrades anyway into a silent socket. Refuse the
++	// upgrade with the error's status instead.
+ 	const websocketHandler = defineWebSocketHandler(async (event) => {
++		try {
++			return await createWebSocketHooks(event);
++		} catch (error) {
++			const status = Number(error?.status ?? error?.statusCode) || 500;
++			return { upgrade: () => new Response(null, { status }) };
++		}
++	});
++	async function createWebSocketHooks(event) {
+ 		const { definitionName, documentId, workspaceEvents } = parseRoomPath(event.req.url);
+ 		const definition = await getDefinition(definitionName);
+-		const identity = await authorize(event.req, definition.auth, event);
++		const identity = await authorize(event.req, definition, event, { documentId, workspaceEvents });
+ 		const room = await getRoom(definitionName, documentId, definition, resolveRealtimeRoomSql(event), workspaceEvents);
+ 		function leave(peer) {
++			flushUpdates(peer);
+ 			if (!room.peers.delete(peer)) return;
+ 			const pendingAwareness = peerPendingAwareness.get(peer);
+ 			if (pendingAwareness) clearTimeout(pendingAwareness.timer);
+@@ -763,12 +799,30 @@ function createRealtimeHandler(registry) {
+ 		function applyAwareness(peer, input) {
+ 			let clients;
+ 			try {
+-				clients = room.awarenessOwners.apply(room.awareness, peer, input, identity);
++				const update = filterAwarenessUpdate(input, (client) => room.awarenessOwners.ownerOf(client) === void 0 || room.awarenessOwners.ownerOf(client) === peer);
++				clients = room.awarenessOwners.apply(room.awareness, peer, update, identity);
+ 			} catch (error) {
+ 				peer.close(error instanceof AwarenessOwnershipConflict ? 4500 : 4400, "Invalid awareness update.");
+ 				return;
+ 			}
+-			peer.publish(room.channel, encodeAwarenessState(room.awareness, clients));
++			if (clients.length) peer.publish(room.channel, encodeAwarenessState(room.awareness, clients));
++		}
++		/** Updates that arrive faster than the interval wait, merged, instead of closing the peer. */
++		function applyUpdate(peer, update) {
++			const response = applyRealtimeSyncMessage(encodeSyncUpdate(update), room.document, peer);
++			if (response) peer.send(response);
++		}
++		function flushUpdates(peer) {
++			const pending = peerPendingUpdates.get(peer);
++			if (!pending) return;
++			clearTimeout(pending.timer);
++			peerPendingUpdates.delete(peer);
++			peerSyncUpdateAt.set(peer, Date.now());
++			try {
++				applyUpdate(peer, pending.updates.length === 1 ? pending.updates[0] : Y.mergeUpdates(pending.updates));
++			} catch {
++				peer.close(4400, "Realtime document exceeds its 8 MiB room quota.");
++			}
+ 		}
+ 		return {
+ 			open(peer) {
+@@ -878,8 +932,11 @@ function createRealtimeHandler(registry) {
+ 					else if (syncType === syncProtocol.messageYjsSyncStep2 || syncType === syncProtocol.messageYjsUpdate) {
+ 						const now = Date.now();
+ 						const previous = peerSyncUpdateAt.get(peer);
+-						if (previous !== void 0 && now - previous < syncUpdateIntervalMs) {
+-							peer.close(1013, "Realtime updates are arriving too quickly.");
++						const pending = peerPendingUpdates.get(peer);
++						if (pending || previous !== void 0 && now - previous < syncUpdateIntervalMs) {
++							const update = decoding.readVarUint8Array(decoder);
++							if (pending) pending.updates.push(update);
++							else peerPendingUpdates.set(peer, { updates: [update], timer: setTimeout(() => flushUpdates(peer), syncUpdateIntervalMs - (now - (previous ?? now))) });
+ 							return;
+ 						}
+ 						peerSyncUpdateAt.set(peer, now);
+@@ -897,7 +954,7 @@ function createRealtimeHandler(registry) {
+ 				leave(peer);
+ 			}
+ 		};
+-	});
++	}
+ 	return defineEventHandler(async (event) => {
+ 		const forwarded = await forwardToCloudflareDurableObject(event);
+ 		if (forwarded) return forwarded;
+diff --git a/dist/types-DSOSrTCt.d.ts b/dist/types-DSOSrTCt.d.ts
+index d1bac96bf32a7c23466726d23120daa511922167..402d1d1eba0cfca0f08b2422606b1f3478d0f9d9 100644
+--- a/dist/types-DSOSrTCt.d.ts
++++ b/dist/types-DSOSrTCt.d.ts
+@@ -1,7 +1,16 @@
+ import { WorkspaceSnapshot } from "@vite-hub/workspace";
+ //#region src/types.d.ts
++interface RealtimeAuthorizeContext {
++  event: import("h3").H3Event;
++  /** The room's Workspace path, or `@workspace` for the Workspace events channel. */
++  documentId: string;
++  workspaceEvents: boolean;
++  user: Record<string, unknown> & { id: string };
++}
+ interface RealtimeDefinition {
+   auth?: boolean;
++  /** With `auth`, decides per room whether the signed-in user may join it and checkpoint it. False is a 404. */
++  authorize?: (context: RealtimeAuthorizeContext) => boolean | Promise<boolean>;
+   document: {
+     workspace: string;
+   };

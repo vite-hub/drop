@@ -1,0 +1,10 @@
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -47,4 +47,5 @@
+     "./blob-database": {
+       "types": "./dist/blob-database.d.ts",
+-      "import": "./dist/blob-database.js"
++      "import": "./dist/blob-database.js",
++      "default": "./dist/blob-database.js"
+     },

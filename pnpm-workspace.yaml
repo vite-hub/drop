@@ -20,6 +20,12 @@ patchedDependencies:
   # Keeps Nuxt's dev-only module URL out of the Workers bundle.
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
+  # Realtime: an authorize() hook per room, refused upgrades instead of silent sockets, checkpoints routed to the
+  # Durable Object that holds the rooms, relayed awareness ignored (not 4500), fast updates merged (not 1013), and no
+  # trailingNode (each peer added its own empty paragraph).
+  '@vite-hub/realtime@0.0.4': patches/@vite-hub__realtime@0.0.4.patch
+  # Lets drizzle-kit (which requires) load blob-database's workspaceHistorySchema.
+  '@vite-hub/workspace@0.0.4': patches/@vite-hub__workspace@0.0.4.patch
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
   nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch
   nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch

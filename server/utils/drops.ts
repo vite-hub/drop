@@ -137,11 +137,13 @@ export async function versionChain(row: DropRow) {
 }
 
 /**
- * Whether people may open this drop in the live editor: the current version of a Markdown drop, for someone who may
- * edit it, on a host with Realtime rooms. Older versions stay read-only so a draft always continues the latest text.
+ * Whether someone may open this drop in the live editor: a person in the browser (never an agent) who may edit the
+ * current version of a Markdown drop, on a host with Realtime rooms. Older versions stay read-only so a draft always
+ * continues the latest text.
  */
-export function liveEditable(row: DropRow, can: ReturnType<typeof permissions>, versions: DropVersion[]) {
-  return Boolean(useRuntimeConfig().liveEditing) && can.edit && row.kind === "markdown" && versions[0]?.id === row.id
+export function liveEditable(row: DropRow, who: Identity | null, versions: DropVersion[]) {
+  return Boolean(useRuntimeConfig().liveEditing) && who?.actorKind === "browser" && permissions(row, who).edit
+    && row.kind === "markdown" && versions[0]?.id === row.id
 }
 
 /** The version chain, newest first. */
@@ -159,7 +161,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
     canEdit: false,
     versions: await versionsOf(row),
   }
-  detail.canEdit = liveEditable(row, can, detail.versions)
+  detail.canEdit = liveEditable(row, who, detail.versions)
   if (row.kind === "app") {
     const files = await db.select().from(dropFiles).where(eq(dropFiles.dropId, row.id))
     detail.files = Object.fromEntries(await Promise.all(files.map(async file => [file.path, await readText(file.blobKey)] as const)))

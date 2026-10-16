@@ -11,14 +11,15 @@ import { quotaApiHandler } from "../../../utils/quotas"
 /**
  * Publishes a Markdown drop's live draft as its next version. The text comes from the draft the room last
  * checkpointed, with the published front matter put back. If someone (often an agent) published a newer version
- * meanwhile, this is a 409 naming it, unless `force` puts the draft on top of it.
+ * meanwhile, this is a 409 naming it, unless `force` puts the draft on top of it. People only: agents publish with
+ * create_doc.
  */
 export default quotaApiHandler(defineValidatedHandler({
   validate: { body: v.object({ force: v.optional(v.boolean()) }) },
   async handler(event) {
     const drop = await findDrop(await routeId(event), event)
     const who = await identify(event)
-    if (!drop || !who || drop.kind !== "markdown" || !drop.blobKey || !permissions(drop, who).edit)
+    if (!drop || !who || who.actorKind !== "browser" || drop.kind !== "markdown" || !drop.blobKey || !permissions(drop, who).edit)
       throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
     // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
     if (!import.meta.dev) await requireRateLimit(event, "drop-version", { failure: "deny", key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
