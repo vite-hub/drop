@@ -10,8 +10,10 @@ const bottom = computed(() => [
   { label: "Agents", icon: "i-lucide-bot", to: "/agents", active: at("/agents") || at("/approve") },
   { label: "Skills", icon: "i-lucide-puzzle", to: "/skills", active: at("/skills") },
   { label: "Members", icon: "i-lucide-users", to: "/members", active: at("/members") },
-  { label: "Docs", icon: "i-lucide-book-open", to: "/docs", active: at("/docs") },
 ])
+// Docs folds open into its sections, like an app in the Drops tree: open on any docs page unless toggled shut.
+const docsToggled = ref<boolean>()
+const docsOpen = computed(() => docsToggled.value ?? at("/docs"))
 const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors"
 </script>
 
@@ -53,6 +55,23 @@ const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transit
         >
           <UIcon :name="link.icon" class="size-4" />{{ link.label }}
         </NuxtLink>
+        <div :class="['flex items-center rounded-md pr-1 text-sm transition-colors', at('/docs') ? 'font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted']">
+          <NuxtLink class="flex flex-1 items-center gap-2.5 py-1.5 pl-2.5" to="/docs" @click="close">
+            <UIcon name="i-lucide-book-open" class="size-4" />Docs
+          </NuxtLink>
+          <button
+            :aria-expanded="docsOpen"
+            :aria-label="docsOpen ? 'Collapse docs' : 'Expand docs'"
+            class="grid size-6 shrink-0 cursor-pointer place-items-center rounded text-dimmed hover:bg-accented hover:text-highlighted"
+            type="button"
+            @click="docsToggled = !docsOpen"
+          >
+            <UIcon name="i-lucide-chevron-right" class="size-3.5 transition-transform duration-150" :class="docsOpen && 'rotate-90'" />
+          </button>
+        </div>
+        <div v-if="docsOpen" class="ml-[1.0625rem] border-l border-default pl-1.5">
+          <DocsTree @navigate="close" />
+        </div>
       </div>
 
       <template #footer>
