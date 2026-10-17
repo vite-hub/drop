@@ -14,7 +14,7 @@ export default defineMcpTool({
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(v.object({
     query: v.optional(v.pipe(v.string(), v.description("Words to find in the title or file name."))),
-    kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app"])),
+    kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "site"])),
     shared: v.optional(v.pipe(v.boolean(), v.description("true for shared drops only, false for private ones only."))),
     trash: v.optional(v.pipe(v.boolean(), v.description("List the Trash instead."))),
     sharedWithMe: v.optional(v.pipe(v.boolean(), v.description("List other people's drops instead: everything shared with the team, and links the user opened."))),

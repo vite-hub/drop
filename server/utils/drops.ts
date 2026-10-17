@@ -259,6 +259,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
   if (TEXT_KINDS.has(row.kind)) detail.attachments = await attachmentsOf(row, origin)
+  if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
   return detail
 }
 

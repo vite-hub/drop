@@ -4,6 +4,7 @@ import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_SLUG, slugify } from "./links"
 import { MAX_APP_BYTES } from "./quotas"
+import { MAX_REVIEW_PAGE } from "./review"
 import { ROLES } from "./roles"
 
 /** 4 MiB: the most one file (or one app) may weigh. */
@@ -62,6 +63,35 @@ export const CommentSchema = v.pipe(
   v.check(input => input.kind !== "area" || (input.ow > 0 && input.oh > 0), "An area needs a width and a height."),
 )
 
+/**
+ * What a site's review script sends with a comment. All of it comes from someone else's page, so every field is
+ * bounded. The box is in thousandths of the viewport, which is also the screenshot.
+ */
+export const ReviewCommentSchema = v.pipe(
+  v.object({
+    body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
+    page: v.pipe(v.string(), v.startsWith("/"), v.maxLength(MAX_REVIEW_PAGE)),
+    selector: v.optional(v.pipe(v.string(), v.maxLength(2000)), ""),
+    label: v.optional(v.pipe(v.string(), v.maxLength(200))),
+    ox: thousandths,
+    oy: thousandths,
+    ow: thousandths,
+    oh: thousandths,
+    viewport: v.object({
+      width: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20_000)),
+      height: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20_000)),
+    }),
+  }),
+  v.check(input => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000, "The area must stay inside the page."),
+  v.check(input => input.ow > 0 && input.oh > 0, "An area needs a width and a height."),
+)
+
+/** The connect popup asks for a review token for the page that opened it. Guests may give a name. */
+export const ReviewTokenSchema = v.object({
+  origin: v.pipe(v.string(), v.maxLength(300)),
+  name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
+})
+
 export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 
 export const MemberPatchSchema = v.object({ role: v.optional(v.picklist(ROLES)), banned: v.optional(v.boolean()) })
@@ -70,6 +100,7 @@ export const SkillPatchSchema = v.object({ enabled: v.boolean("Say whether the s
 
 export type CodeImageInput = v.InferOutput<typeof CodeImageSchema>
 export type CommentInput = v.InferOutput<typeof CommentSchema>
+export type ReviewCommentInput = v.InferOutput<typeof ReviewCommentSchema>
 
 export const CodeImageSchema = v.strictObject({
   code: v.pipe(v.string(), v.minLength(1, "Send some code."), v.maxLength(20_000, "Code images take at most 20,000 characters.")),

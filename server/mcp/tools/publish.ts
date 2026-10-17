@@ -1,19 +1,18 @@
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
-import { and, eq, inArray, sql } from "drizzle-orm"
 import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
-import { db } from "vite-hub/database/drizzle"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues } from "#shared/project-bundle"
-import { comments } from "../../databases/config"
+import { reviewSnippet } from "#shared/review"
+import { resolveComments } from "../../utils/comments"
 import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "../../utils/drops"
 import { shareChange, updateDrop } from "../../utils/drop-update"
-import { chainOf } from "../../utils/expiry"
 import { requireIdentity } from "../../utils/identity"
 import { annotationIssues } from "../../utils/markdown-document"
 import { quotaToolResult } from "../../utils/quotas"
+import { createSiteDrop } from "../../utils/review"
 import { dropLine, mcpDrop } from "../format"
 
 // No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
@@ -26,6 +25,9 @@ const Input = v.object({
     name: v.pipe(v.string(), v.description("File name with its extension, e.g. before.png.")),
     base64: v.pipe(v.string(), v.maxLength(Math.ceil(MAX_FILE_BYTES / 3) * 4 + 1024), v.description("The file's bytes, base64-encoded.")),
   }), v.description("Any other file up to 4 MiB: a screenshot, a PDF. Images get pin and area comments. Embed its fileUrl in a doc to make it part of that doc."))),
+  site: v.optional(v.pipe(v.object({
+    url: v.pipe(v.string(), v.maxLength(300), v.description("The website's address, like https://pr123.preview.example.com. Its origin is the only one the review script may send from: https, or http on localhost.")),
+  }), v.description("A live website to review in place, such as a preview deploy, staging, or a dev server. People comment on its pages through a script tag; their comments arrive here with screenshots."))),
   title: v.optional(v.string()),
   slug: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_SLUG), v.description("The readable part of the drop's link, like hipoteca-madrid: a few lowercase words and dashes that say what it is. Pick one for every new drop. Later versions keep it unless you pass another; old links keep working."))),
   previous: v.optional(v.pipe(v.string(), v.description("Id or link of the drop this publishes the next version of. It keeps that drop's sharing, lifetime and link unless you pass them. Its link then opens the new version."))),
@@ -40,17 +42,29 @@ const Input = v.object({
 export default defineMcpTool({
   name: "publish",
   title: "Publish a drop",
-  description: "Publish one thing for review: a doc (markdown or html), a static app (files), or a file such as a screenshot (file). Pass previous to publish its next version. Every call creates a drop or a version, so don't repeat a call that succeeded.",
+  description: "Publish one thing for review: a doc (markdown or html), a static app (files), a file such as a screenshot (file), or a live website reviewed in place (site). Pass previous to publish a doc's or app's next version. Every call creates a drop or a version, so don't repeat a call that succeeded.",
   inputSchema: toStandardJsonSchema(Input),
   handler: async (input, event) => quotaToolResult(async () => {
     const who = await requireIdentity(event)
-    const given = (["markdown", "html", "files", "file"] as const).filter(key => input[key] !== undefined)
-    if (given.length !== 1) throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, or file." })
+    const given = (["markdown", "html", "files", "file", "site"] as const).filter(key => input[key] !== undefined)
+    if (given.length !== 1) throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, file, or site." })
     if (!input.previous && !input.lifetime) throw new HTTPError({ status: 400, message: "Say how long this drop should live: lifetime temporary, review, or keep." })
     if (input.slug !== undefined && !slugify(input.slug)) throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
+    if (input.site) {
+      if (input.previous || input.resolves || input.removes) throw new HTTPError({ status: 400, message: "A site has no versions. Change it with update_drop, and resolve its comments there." })
+      const share = input.share ? shareChange(input.share, input.audience) : {}
+      const row = await createSiteDrop(who, { url: input.site.url, title: input.title, slug: input.slug, ...share, lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }, event)
+      const drop = mcpDrop(toSummary(await findDrop(row.id, event) ?? row), event.url.origin)
+      const script = reviewSnippet(event.url.origin, row.link!)
+      return {
+        content: [{ type: "text" as const, text: `Created a site review:\n${dropLine(drop)}\n\nAdd this tag to the site's preview builds only, never production:\n${script}\n\nComments sent from ${row.siteUrl} land on the drop; read them with read_drop.` }],
+        structuredContent: { ...drop, siteUrl: row.siteUrl!, script },
+      }
+    }
     let previous = input.previous ? await findDropByRef(input.previous, event) : null
     if (previous?.expired && permissions(previous, who).manage) throw new HTTPError({ status: 409, message: `${input.previous} is in the Trash. Restore it with update_drop first, or publish a new drop.` })
     if (input.previous && (!previous || !permissions(previous, who).edit)) throw new HTTPError({ status: 404, message: `No drop you can publish to with id ${input.previous}.` })
+    if (previous?.kind === "site") throw new HTTPError({ status: 400, message: "previous is a site, which has no versions. Change it with update_drop." })
     if (previous) previous = (await versionChain(previous))[0] ?? previous
     const share = input.share ? shareChange(input.share, input.audience, previous?.visibility) : {}
     const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
@@ -88,14 +102,8 @@ export default defineMcpTool({
       if (previous && (input.share || input.slug)) await updateDrop({ ...row, expired: false }, who, { ...share, ...(input.slug ? { slug: input.slug } : {}) }, event)
     }
 
-    let resolved: number[] = []
-    if (previous && input.resolves?.length) {
-      // Comments carry over from earlier versions (listComments), so look across the whole chain.
-      const chain = sql`${comments.dropId} IN (${chainOf(previous)})`
-      const open = await db.select({ n: comments.n }).from(comments).where(and(chain, inArray(comments.n, input.resolves), eq(comments.resolved, false)))
-      resolved = [...new Set(open.map(comment => comment.n))].sort((a, b) => a - b)
-      if (resolved.length) await db.update(comments).set({ resolved: true }).where(and(chain, inArray(comments.n, resolved)))
-    }
+    // Comments carry over from earlier versions (listComments), so this looks across the whole chain.
+    const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves) : []
 
     const fresh = await findDrop(row.id, event) ?? row
     const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)

@@ -79,6 +79,8 @@ export interface DropDetail extends DropSummary {
   versions: DropVersion[]
   /** Docs: the files they embed from this Drop. */
   attachments?: DropAttachment[]
+  /** Sites: the origin of the website under review. */
+  siteUrl?: string
 }
 
 export interface DropComment {
@@ -102,6 +104,15 @@ export interface DropComment {
   /** The version it was written on. Open comments carry over to later versions until someone resolves them. */
   version: number
   mine: boolean
+}
+
+/**
+ * A comment someone sent from a site under review, with the screenshot it came with. Its box is in thousandths of
+ * the screenshot (the viewport they saw); `page` is the address they were on.
+ */
+export interface SiteReviewItem extends DropComment {
+  /** The screenshot's own drop, which shows the box and takes replies. Null when the page couldn't take one. */
+  screenshot: { id: string; link: string; slug: string; url: string } | null
 }
 
 export interface Member {
