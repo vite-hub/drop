@@ -37,6 +37,7 @@ export type DropRow = typeof drops.$inferSelect & {
 }
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
+import { MAX_DEPTH } from "#shared/nodes"
 import { hasBlockComponents, splitFrontmatter } from "#shared/frontmatter"
 import { MAX_APP_FILES } from "#shared/quotas"
 
@@ -244,6 +245,50 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
     .filter(node => !node.expired && !node.quarantinedAt && !node.shareReview
       && !node.ancestors!.some(above => listed.has(above.id) || (above.visibility === "team" && !above.shareReview)))
   return (await summarize(nodes, days)).map(summary => ({ ...summary, owner: owners.get(summary.id)! }))
+}
+
+/**
+ * Other people's drops you can open that match a search: what Shared with me lists, and everything inside the folders
+ * it lists, at any depth. The same rules hold: nothing waiting for review, quarantined, in the Trash, or from a banned
+ * owner, and staff find no one's private drops here. A path shows only the folders you may open.
+ */
+async function searchShared(who: Identity, words: string[], limit: number, event?: H3Event): Promise<DropSummary[]> {
+  // Shared with the team, or by link and opened by you. `node` is a table alias in the query.
+  const reachable = (node: string) => sql`(${sql.raw(node)}.visibility = 'team' OR (${sql.raw(node)}.visibility = 'shared'
+    AND EXISTS (SELECT 1 FROM drop_visits v WHERE v.user_id = ${who.userId} AND v.drop_id = ${sql.raw(node)}.id)))`
+  const openFolders = sql`(
+    WITH RECURSIVE open(id, depth) AS (
+      SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND d.owner_id != ${who.userId} AND ${reachable("d")}
+        AND d.trashed_at IS NULL AND d.quarantined_at IS NULL AND d.share_review IS NULL
+      UNION ALL SELECT d.id, open.depth + 1 FROM drops d JOIN open ON d.parent_id = open.id WHERE d.kind = 'folder' AND open.depth < ${MAX_DEPTH}
+    ) SELECT id FROM open
+  )`
+  const found = await searchHeads(and(
+    ne(dropHeads.ownerId, who.userId), listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt), isNull(drops.shareReview),
+    or(reachable(`"drops"`), inArray(drops.parentId, openFolders)),
+    sql`EXISTS (SELECT 1 FROM user u WHERE u.id = ${drops.ownerId} AND coalesce(u.banned, 0) = 0)`,
+  ), words, limit)
+  const { days } = expiryPolicy(event)
+  // Review, quarantine and the Trash anywhere above hold a drop too: resolving its path says.
+  const nodes = (await resolveRows(found.map(item => item.drop), days)).filter(node => !node.expired && !node.quarantinedAt && !node.shareReview)
+  const ownerIds = [...new Set(nodes.map(node => node.ownerId))]
+  const owners = new Map<string, { name: string; image: string | null }>()
+  for (let offset = 0; offset < ownerIds.length; offset += 90)
+    for (const row of await db.select({ id: user.id, name: user.name, image: user.image }).from(user).where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
+      owners.set(row.id, { name: row.name, image: row.image })
+  const byId = new Map(nodes.map(node => [node.id, node]))
+  const summaries = await summarize(nodes, days, { snippets: new Map(found.map(item => [item.drop.id, item.snippet])) })
+  return summaries.map(summary => ({ ...summary, path: openableAncestors(byId.get(summary.id)!, who, days), owner: owners.get(byId.get(summary.id)!.ownerId)! }))
+}
+
+/**
+ * Everything you can open that matches a search, for the search palette: your drops at any depth first, then other
+ * people's (see `searchShared`). Each list keeps its newest `limit`.
+ */
+export async function searchEverything(who: Identity, query: string, event?: H3Event, limit = 30): Promise<DropSummary[]> {
+  const words = searchWords(query)
+  if (!words.length) return []
+  return [...await listDrops(who, event, { query, limit }), ...await searchShared(who, words, limit, event)]
 }
 
 /** Remembers a link-shared drop a signed-in person opened, at most once a day per drop. */
