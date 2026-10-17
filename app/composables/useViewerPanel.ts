@@ -2,8 +2,8 @@ import { breakpointsTailwind } from "@vueuse/core"
 import type { SideTab } from "~/utils/viewer"
 
 /**
- * The viewer's side panel: a pushed column on wide screens, a slideover below `lg`. Open state and tab come
- * from cookies (useSidePanel) so SSR renders the same layout; the server assumes a laptop width.
+ * The viewer's side panel: a card floating over the content on wide screens, a slideover below `lg`. Open state and
+ * tab come from cookies (useSidePanel) so SSR renders the same layout; the server assumes a laptop width.
  */
 export function useViewerPanel(options: { owner: Ref<boolean>; openCount: Ref<number> }) {
   const wide = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 }).greaterOrEqual("lg")

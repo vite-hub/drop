@@ -261,6 +261,8 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; }
     if (m.type === "area-mode") setAreaMode(Boolean(m.on));
     if (m.type === "clear-area") draft.innerHTML = "";
+    // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
+    if (m.type === "inset") { document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px"); render(); }
     if (m.type === "focus") {
       active = m.id; render();
       const dot = Array.from(marks.children).find((d) => d.classList.contains("pulse"));

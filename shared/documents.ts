@@ -6,7 +6,10 @@ import { injectRuntime, THEME_CSS } from "./plan-runtime";
 import { CALLOUT_CSS, TYPESET_CSS } from "./typeset";
 
 const DOCUMENT_EXTRA_CSS = CALLOUT_CSS + `
-body { margin: 0; background: var(--background); color: var(--foreground); }
+/* The text moves left only as far as it must to clear the viewer's floating panel (--drop-inset). Once the column
+   can't fit beside it, the column narrows: the panel never covers the text. */
+body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out;
+  padding-right: clamp(0px, calc(2 * var(--drop-inset, 0px) + 46rem - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem))); }
 main { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 .task-list-item { list-style: none; margin-left: -1.25rem; }
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }

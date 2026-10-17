@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The drop viewer (T3 Code's layout): a main column with its own header, and one full-height side panel with
-// tabs (Comments, Details) that pushes the content. Docs and apps share it. People review and comment, agents
+// The drop viewer (T3 Code's layout): a main column with its own header, and one panel with tabs (Comments,
+// Details) that floats over the content, Mesurer-style. Docs and apps share it. People review and comment, agents
 // publish new versions, and people who may edit a Markdown doc edit it together live (useLiveEditor). State lives in
 // composables (useDrop, useViewerPanel, useAppFiles, useDropFrame, useLiveEditor); this file wires them up.
 import { planDocument } from "#shared/documents"
@@ -210,6 +210,10 @@ function copyLink() {
 
 const togglePanel = panel.toggle
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
+const floating = computed(() => sideOpen.value && wide.value && !editing.value)
+/** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
+const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
+watch([ready, floating], () => ready.value && send({ type: "inset", right: floating.value ? FLOATING_INSET : 0 }))
 
 function commentOnSelection() {
   if (!selection.value) return
@@ -350,24 +354,28 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
-      <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
-        <div>
-          <UIcon name="i-lucide-file" class="size-8 text-dimmed" />
-          <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
-          <p class="mt-1 text-sm text-muted">No preview for this file type.</p>
-          <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-lucide-download" label="Download" :to="drop.url" external target="_blank" variant="outline" />
+      <div class="relative flex min-h-0 flex-1 flex-col">
+        <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
+        <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
+          <div>
+            <UIcon name="i-lucide-file" class="size-8 text-dimmed" />
+            <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
+            <p class="mt-1 text-sm text-muted">No preview for this file type.</p>
+            <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-lucide-download" label="Download" :to="drop.url" external target="_blank" variant="outline" />
+          </div>
         </div>
-      </div>
-      <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
-      <!-- Server and client bundlers format the embedded app resolver differently. -->
-      <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
-    </template>
-  </UDashboardPanel>
+        <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
+        <!-- Server and client bundlers format the embedded app resolver differently. -->
+        <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
 
-  <UDashboardPanel v-if="sideOpen && wide && !editing" id="drop-side" :default-size="24" :max-size="40" :min-size="18" resizable :ui="{ root: 'border-l border-default', body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
-    <template #body>
-      <div class="flex h-full flex-col"><ReuseSide /></div>
+        <!-- As tall as its content, so a quiet drop gets a small card. Markdown docs make room for it (FLOATING_INSET). -->
+        <aside
+          v-if="floating"
+          class="absolute top-3 right-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[22.5rem] origin-top-right flex-col overflow-hidden rounded-xl border border-default bg-default shadow-lg shadow-black/5 [animation:pop-in_160ms_var(--ease-out)]"
+        >
+          <ReuseSide />
+        </aside>
+      </div>
     </template>
   </UDashboardPanel>
   <USlideover v-if="!wide && !editing" v-model:open="mobileSide" side="right" :ui="{ content: 'max-w-md' }" title="Drop panel">
