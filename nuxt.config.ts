@@ -120,7 +120,7 @@ export default defineNuxtConfig({
     clientBundle: {
       scan: true,
       icons: [
-        "ph:file-text", "ph:code", "ph:image", "ph:file", "ph:folder", "ph:app-window", "ph:sparkle", "ph:key", "ph:user",
+        "ph:file-text", "ph:code", "ph:image", "ph:file", "ph:folder", "ph:app-window", "ph:globe", "ph:sparkle", "ph:key", "ph:user",
         "simple-icons:claude", "simple-icons:openai", "simple-icons:cursor", "simple-icons:githubcopilot", "simple-icons:googlegemini",
         "simple-icons:windsurf", "simple-icons:zedindustries", "simple-icons:opencode", "simple-icons:githubactions",
         // Host icons in the docs (app/utils/docs.ts).

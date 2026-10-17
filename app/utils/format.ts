@@ -9,9 +9,10 @@ export const KIND_ICONS: Record<string, string> = {
   file: "i-ph-file",
   app: "i-ph-app-window",
   folder: "i-ph-folder",
+  site: "i-ph-globe",
 }
 
-export const KIND_LABELS: Record<string, string> = { markdown: "Markdown", html: "HTML", image: "Image", file: "File", app: "App", folder: "Folder" }
+export const KIND_LABELS: Record<string, string> = { markdown: "Markdown", html: "HTML", image: "Image", file: "File", app: "App", folder: "Folder", site: "Site" }
 
 export const VIA_LABELS: Record<string, string> = { agent: "MCP", browser: "the browser" }
 

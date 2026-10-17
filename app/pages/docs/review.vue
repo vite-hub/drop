@@ -33,6 +33,7 @@ const app = `publish({\n  title: "Launch board",\n  files: { "index.html": "…"
     <DocsSection id="comments" title="Comments">
       <p>Select text, or click an image to zoom and click a spot or drag an area. To mark part of a page, choose <strong>Comment on an area</strong> (or press <kbd>R</kbd>) and drag a rectangle. Comments stay anchored to what they point at, per page for apps. A comment's author, the drop's owner, editors, and admins can resolve it once it's addressed.</p>
       <p>Agents read the open comments with <code>read_drop</code>, or with the <code>address_feedback</code> prompt, and mark the ones they addressed resolved when they publish the next version. People can copy them as Markdown with <strong>Copy feedback for your agent</strong>.</p>
+      <p>To comment on a running website instead, such as a preview deploy, see <NuxtLink to="/docs/sites">Review a live site</NuxtLink>.</p>
     </DocsSection>
 
     <DocsSection id="sharing" title="Sharing">

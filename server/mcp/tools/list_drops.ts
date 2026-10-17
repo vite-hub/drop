@@ -16,7 +16,7 @@ export default defineMcpTool({
   inputSchema: toStandardJsonSchema(v.object({
     query: v.optional(v.pipe(v.string(), v.description("Words to find in the title, file name, or slug."))),
     folder: v.optional(v.pipe(v.string(), v.description("Id or link of a folder: list or search only what's inside it, subfolders included."))),
-    kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "folder"])),
+    kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "folder", "site"])),
     shared: v.optional(v.pipe(v.boolean(), v.description("true for shared drops only, false for private ones only."))),
     trash: v.optional(v.pipe(v.boolean(), v.description("List the Trash instead."))),
     sharedWithMe: v.optional(v.pipe(v.boolean(), v.description("List other people's drops instead: everything shared with the team, and links the user opened."))),

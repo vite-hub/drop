@@ -22,6 +22,40 @@ Readers comment by selecting text, clicking images, or drawing a rectangle over 
 These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`;
 
 /**
+ * How a comment names an element of someone's page: a CSS path to it, a label (its tag and first words), and the
+ * smallest element that holds a rectangle drawn over it. Shared by the frame's comment layer and the site review script.
+ */
+export const ELEMENT_NAMING = String.raw`function pathOf(el) {
+    const parts = [];
+    while (el && el.nodeType === 1 && el !== document.documentElement && parts.length < 10) {
+      let part = el.tagName.toLowerCase();
+      if (el.id && /^[a-z][\w-]*$/i.test(el.id)) { parts.unshift("#" + el.id); break; }
+      const same = el.parentElement ? Array.from(el.parentElement.children).filter((c) => c.tagName === el.tagName) : [];
+      if (same.length > 1) part += ":nth-of-type(" + (same.indexOf(el) + 1) + ")";
+      parts.unshift(part);
+      el = el.parentElement;
+    }
+    return parts.join(" > ");
+  }
+  function labelOf(el) {
+    const text = (el.innerText || el.getAttribute("alt") || "").trim().replace(/\s+/g, " ");
+    const name = el.tagName.toLowerCase();
+    return text ? name + ' "' + (text.length > 40 ? text.slice(0, 40) + "…" : text) + '"' : name;
+  }
+
+  // A rectangle anchors to the smallest element that holds it, never the script's own root (skip).
+  function anchorFor(left, top, right, bottom, skip) {
+    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement);
+    let best = null, bestArea = Infinity;
+    for (const el of under) {
+      const r = el.getBoundingClientRect(), area = r.width * r.height;
+      if (r.width < 1 || r.height < 1 || r.left > left + 1 || r.top > top + 1 || r.right < right - 1 || r.bottom < bottom - 1) continue;
+      if (area < bestArea) { best = el; bestArea = area; }
+    }
+    return best || under[0] || document.body;
+  }`;
+
+/**
  * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
  * Select text to comment on it; click an image to zoom and comment on a spot; in area mode (Drop's R), drag a rectangle.
  * Commented text is highlighted with the CSS Custom Highlight API and everything else draws in a shadow root, so the
@@ -48,23 +82,7 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
   let markers = [], active = null;
   const highlights = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
 
-  function pathOf(el) {
-    const parts = [];
-    while (el && el.nodeType === 1 && el !== document.documentElement && parts.length < 10) {
-      let part = el.tagName.toLowerCase();
-      if (el.id && /^[a-z][\w-]*$/i.test(el.id)) { parts.unshift("#" + el.id); break; }
-      const same = el.parentElement ? Array.from(el.parentElement.children).filter((c) => c.tagName === el.tagName) : [];
-      if (same.length > 1) part += ":nth-of-type(" + (same.indexOf(el) + 1) + ")";
-      parts.unshift(part);
-      el = el.parentElement;
-    }
-    return parts.join(" > ");
-  }
-  function labelOf(el) {
-    const text = (el.innerText || el.getAttribute("alt") || "").trim().replace(/\s+/g, " ");
-    const name = el.tagName.toLowerCase();
-    return text ? name + ' "' + (text.length > 40 ? text.slice(0, 40) + "…" : text) + '"' : name;
-  }
+  ${ELEMENT_NAMING}
   const query = (selector) => { try { return (selector && document.querySelector(selector)) || null; } catch (e) { return null; } };
   const BLOCK = /^(p|li|td|th|h[1-6]|blockquote|pre|figcaption|dd|dt|label|section|article|main|div)$/i;
   function blockOf(node) {
@@ -192,18 +210,8 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // Area mode: a crosshair layer over the page. Drag a rectangle; it anchors to the smallest element that holds it.
   let drawing = null;
-  function anchorFor(left, top, right, bottom) {
-    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== host && el !== document.documentElement);
-    let best = null, bestArea = Infinity;
-    for (const el of under) {
-      const r = el.getBoundingClientRect(), area = r.width * r.height;
-      if (r.width < 1 || r.height < 1 || r.left > left + 1 || r.top > top + 1 || r.right < right - 1 || r.bottom < bottom - 1) continue;
-      if (area < bestArea) { best = el; bestArea = area; }
-    }
-    return best || under[0] || document.body;
-  }
   function finishArea(left, top, right, bottom) {
-    const el = anchorFor(left, top, right, bottom), r = el.getBoundingClientRect();
+    const el = anchorFor(left, top, right, bottom, host), r = el.getBoundingClientRect();
     const at = (value, start, size) => Math.min(1000, Math.max(0, Math.round(((value - start) / (size || 1)) * 1000)));
     const ox = at(left, r.left, r.width), oy = at(top, r.top, r.height);
     // Keep the drawn rectangle on the page while the comment is written; Drop clears it.
