@@ -14,7 +14,7 @@ const update = "git pull\ndocker compose up -d --build"
 
     <DocsSection id="need" title="Before you start">
       <p>You need a server with Git, Docker Compose, and a domain pointing at it. SQLite, files, and KV stay on your server.</p>
-      <p><NuxtLink to="/docs/self-host#github">Create a GitHub OAuth app</NuxtLink> with callback <code>https://&lt;your-domain&gt;/api/auth/callback/github</code>. Find your admin user id with <code>gh api users/&lt;login&gt; --jq .id</code> and generate <code>BETTER_AUTH_SECRET</code> with <code>openssl rand -base64 32</code>.</p>
+      <p><NuxtLink to="/docs/self-host#github">Create a GitHub OAuth app</NuxtLink> with callback <code>https://&lt;your-domain&gt;/api/auth/callback/github</code>. Find your admin user id with <code>gh api users/&lt;login&gt; --jq .id</code> and generate <code>VITEHUB_SECRET</code> with <code>openssl rand -base64 32</code>.</p>
     </DocsSection>
 
     <DocsSection id="steps" title="Run Drop">

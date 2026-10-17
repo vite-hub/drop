@@ -1,5 +1,7 @@
+import { createHmac } from "node:crypto"
 import type { H3Event } from "h3"
 import { useServerEnv } from "#vitehub/env/server"
+import { deriveSecret } from "./secrets"
 
 /**
  * Apps and HTML docs run real code, and real apps need a real origin: storage, cookies, and history.pushState all
@@ -10,7 +12,7 @@ import { useServerEnv } from "#vitehub/env/server"
  * With a wildcard every drop gets an origin of its own, like an app on its own subdomain, so one drop can't read
  * another's localStorage, IndexedDB, or caches. The `*` stands for part of the first label: `https://*.usercontent.example`
  * gives `<label>.usercontent.example`, and `https://*-drop.example.com` gives `<label>-drop.example.com`, one level under
- * the zone, where a free certificate still reaches. The label is a keyed hash of the drop's id, not the id, because
+ * the zone, where a free certificate still reaches. The label is a keyed hash of the drop's id (keyed from VITEHUB_SECRET), not the id, because
  * hostnames travel in clear text (DNS, TLS SNI) and a shared drop's id is the key to its link. A plain hostname puts
  * every drop on that one origin, sharing storage. Without either, drops keep the opaque sandbox.
  */
@@ -39,11 +41,9 @@ function configured(event: H3Event): ContentConfig | null {
 
 const LABEL = "[a-z2-7]{26}"
 
-/** A DNS label for `dropId`: 26 base32 characters of an HMAC under the auth secret. Stable, and says nothing about the id. */
-export async function contentLabel(event: H3Event, dropId: string): Promise<string> {
-  const secret = (useServerEnv(event) as { auth?: { secret?: { unseal: () => string } } }).auth?.secret?.unseal() || "drop-content-origin"
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(`content-origin:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
-  const bytes = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(dropId)))
+/** A DNS label for `dropId`: 26 base32 characters of an HMAC under a key derived from VITEHUB_SECRET. Stable, and says nothing about the id. */
+export function contentLabel(event: H3Event, dropId: string): string {
+  const bytes = createHmac("sha256", deriveSecret(useServerEnv(event), "content-origin")).update(dropId).digest()
   let bits = 0, value = 0, label = ""
   for (const byte of bytes) {
     value = (value << 8) | byte
@@ -57,10 +57,10 @@ export async function contentLabel(event: H3Event, dropId: string): Promise<stri
 }
 
 /** Where the viewer frames `dropId` (an app or HTML doc), or null for the opaque sandbox. Never Drop's own origin. */
-export async function contentOrigin(event: H3Event, dropId: string): Promise<string | null> {
+export function contentOrigin(event: H3Event, dropId: string): string | null {
   const config = configured(event)
   if (!config) return null
-  const name = config.perDrop ? `${config.perDrop.prefix}${await contentLabel(event, dropId)}${config.perDrop.suffix}` : config.host
+  const name = config.perDrop ? `${config.perDrop.prefix}${contentLabel(event, dropId)}${config.perDrop.suffix}` : config.host
   const host = `${name}${config.port ? `:${config.port}` : ""}`
   return host === event.url.host ? null : `${config.protocol}//${host}`
 }

@@ -181,13 +181,17 @@ export default defineNuxtConfig({
   vite: {
     env: {
       server: {
+        // Drop's one secret, VITEHUB_SECRET. Every key Drop needs is derived from it (server/utils/secrets.ts).
+        secret: env({ secret: true, source: env.source("VITEHUB_SECRET"), default: "" }),
         auth: {
           github: {
             // Declared secret so wrangler passes it through with the others (it only injects declared secrets).
             clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID"), default: "" }),
             clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET"), default: "" }),
           },
-          secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
+          // Optional. Overrides the auth key derived from VITEHUB_SECRET, so a deployment that started with it keeps its
+          // sessions, agent tokens, and stored signing keys. Without VITEHUB_SECRET it's the root secret too.
+          secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET"), default: "" }),
         },
         // Every Drop setting is read at runtime: changing one needs a restart, not a rebuild. Each also reads its
         // canonical VITEHUB_DROP_* name first (VITEHUB_DROP_QUOTAS_ENABLED for quotas.enabled).

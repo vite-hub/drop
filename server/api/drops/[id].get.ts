@@ -18,6 +18,6 @@ export default defineHandler(async (event) => {
   // Signed-in people and agents count here; anonymous visitors count through the page's visit beacon.
   if (who) await Promise.all([recordVisit(event, drop, who, "beacon"), recordSharedVisit(drop, who)])
   const detail = await dropDetail(drop, who, event.url.origin, event)
-  const frameOrigin = detail.kind === "app" || detail.kind === "html" ? await contentOrigin(event, drop.id) : null
+  const frameOrigin = detail.kind === "app" || detail.kind === "html" ? contentOrigin(event, drop.id) : null
   return frameOrigin ? { ...detail, contentOrigin: frameOrigin } : detail
 })
