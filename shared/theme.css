@@ -1,0 +1,98 @@
+/*
+ * Drop's colors, in shadcn's token names and its Neutral ramp (ui.shadcn.com/docs/theming), for both places that
+ * draw Drop: the app (app/assets/css/main.css maps Nuxt UI's --ui-* onto these) and every drop's document
+ * (THEME_CSS in shared/plan-runtime.ts, the same names T3 Code injects into HTML renders). Grayscale first: status
+ * and chart colors are the only hues. Fonts are set where each is loaded, not here.
+ */
+:root {
+  color-scheme: light;
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --accent-surface: oklch(0.97 0 0);
+  --accent-surface-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --destructive-surface: oklch(0.971 0.013 17.38);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --warning: #92400e;
+  --warning-foreground: #ffffff;
+  --warning-surface: #fff7ed;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --info: #3b82f6;
+  --info-foreground: #ffffff;
+  --code-background: oklch(0.985 0 0);
+  --code-foreground: oklch(0.145 0 0);
+  --chart-1: #64748b;
+  --chart-2: #3b82f6;
+  --chart-3: #b4795a;
+  --chart-4: #14b8a6;
+  --chart-5: #8b5cf6;
+  --chart-6: #c2603d;
+  --chart-7: #6b8e4e;
+  --chart-8: #a3708f;
+  --positive: #16a34a;
+  --caution: #d97706;
+  --negative: #dc2626;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --accent-surface: oklch(0.269 0 0);
+  --accent-surface-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.145 0 0);
+  --destructive-surface: oklch(0.258 0.092 26.042);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --warning: #fbbf24;
+  --warning-foreground: #0a0a0a;
+  --warning-surface: #2a2009;
+  --success: #34d399;
+  --success-foreground: #052e1c;
+  --info: #60a5fa;
+  --info-foreground: #0b1b33;
+  --code-background: oklch(0.205 0 0);
+  --code-foreground: oklch(0.985 0 0);
+  --chart-1: #94a3b8;
+  --chart-2: #60a5fa;
+  --chart-3: #d4a088;
+  --chart-4: #2dd4bf;
+  --chart-5: #a78bfa;
+  --chart-6: #e0866a;
+  --chart-7: #93b874;
+  --chart-8: #c99bb7;
+  --positive: #4ade80;
+  --caution: #fbbf24;
+  --negative: #f87171;
+}

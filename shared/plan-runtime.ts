@@ -1,36 +1,15 @@
 // What Drop injects into every plan document.
 // The theme contract matches T3 Code's HTML renders (same shadcn token names, --chart-1…6, base stylesheet),
 // so a page an agent built for T3 renders the same way in Drop.
+import THEME from "./theme.css?raw";
 
-const LIGHT = `
-  --background: #ffffff; --foreground: #111111; --card: #ffffff; --card-foreground: #111111; --popover: #ffffff; --popover-foreground: #111111;
-  --muted: #f5f5f5; --muted-foreground: #666666; --secondary: #fafafa; --secondary-foreground: #111111;
-  --border: #eaeaea; --input: #d4d4d4; --ring: #888888; --primary: #0a0a0a; --primary-foreground: #ffffff;
-  --accent: #f5f5f5; --accent-foreground: #111111; --accent-surface: #f5f5f5; --accent-surface-foreground: #111111;
-  --destructive: #b4261a; --destructive-foreground: #ffffff; --destructive-surface: #fdf0ef;
-  --warning: #92400e; --warning-foreground: #ffffff; --warning-surface: #fff7ed;
-  --success: #10b981; --success-foreground: #ffffff; --info: #3b82f6; --info-foreground: #ffffff;
-  --code-background: #fafafa; --code-foreground: #111111;
-  --chart-1: #64748b; --chart-2: #3b82f6; --chart-3: #b4795a; --chart-4: #14b8a6; --chart-5: #8b5cf6; --chart-6: #c2603d; --chart-7: #6b8e4e; --chart-8: #a3708f;
-  --positive: #16a34a; --caution: #d97706; --negative: #dc2626;`;
+const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`;
 
-const DARK = `
-  --background: #0a0a0a; --foreground: #ededed; --card: #0f0f0f; --card-foreground: #ededed; --popover: #141414; --popover-foreground: #ededed;
-  --muted: #1a1a1a; --muted-foreground: #9a9a9a; --secondary: #141414; --secondary-foreground: #ededed;
-  --border: #1f1f1f; --input: #333333; --ring: #777777; --primary: #ffffff; --primary-foreground: #0a0a0a;
-  --accent: #1a1a1a; --accent-foreground: #ededed; --accent-surface: #1a1a1a; --accent-surface-foreground: #ededed;
-  --destructive: #e0726a; --destructive-foreground: #0a0a0a; --destructive-surface: #2a1513;
-  --warning: #fbbf24; --warning-foreground: #0a0a0a; --warning-surface: #2a2009;
-  --success: #34d399; --success-foreground: #052e1c; --info: #60a5fa; --info-foreground: #0b1b33;
-  --code-background: #141414; --code-foreground: #ededed;
-  --chart-1: #94a3b8; --chart-2: #60a5fa; --chart-3: #d4a088; --chart-4: #2dd4bf; --chart-5: #a78bfa; --chart-6: #e0866a; --chart-7: #93b874; --chart-8: #c99bb7;
-  --positive: #4ade80; --caution: #fbbf24; --negative: #f87171;`;
-
-const SHARED = `--radius: 0.5rem; --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`;
-
+// The frame runs on another origin than Drop's assets, so Geist comes from Google Fonts here. The colors are the
+// app's own (shared/theme.css).
 export const THEME_CSS = `@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap");
-:root { color-scheme: light; ${SHARED} ${LIGHT} }
-:root.dark { color-scheme: dark; ${DARK} }
+${THEME}
+:root { ${FONTS} }
 html { background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 body { margin: 0; }
 code, kbd, pre, samp { font-family: var(--font-mono); }`;
