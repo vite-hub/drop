@@ -244,17 +244,36 @@ test("/api/me reads the maintained member counter after inserts and deletes", as
 })
 
 test("app publishing keeps only the latest file set, as the docs promise", async () => {
-  const first = await publishApp(who, { files: { "index.html": "first", "old.js": "old" } })
-  const oldKeys = [...state.objects.keys()]
-  const next = await publishApp(who, { id: first.id, files: { "index.html": "second", "new.js": "new" } })
+  const first = await publishApp(who, { files: { "index.html": "first", "old.js": "old", "keep.css": "a{}" } })
+  const keys = () => [...state.objects.keys()]
+  const firstKeys = keys()
+  const keepKey = firstKeys.find(key => key.endsWith("/keep.css"))
+  const next = await publishApp(who, { id: first.id, files: { "index.html": "second", "new.js": "new" }, removes: ["old.js"] })
   assert.equal(next.id, first.id)
   assert.equal(next.version, 2)
-  assert.ok(oldKeys.every(key => !state.objects.has(key)))
+  // Replaced and removed files lose their blobs; the untouched one keeps its blob and isn't written again.
+  assert.ok(firstKeys.filter(key => key !== keepKey).every(key => !state.objects.has(key)))
+  assert.ok(state.objects.has(keepKey))
   const detail = await dropDetail(await findDrop(first.id), who, "https://drop.example")
-  assert.deepEqual(detail.files, { "index.html": "second", "new.js": "new" })
+  assert.deepEqual(detail.files, { "index.html": "second", "keep.css": "a{}", "new.js": "new" })
   assert.equal(detail.versions.length, 1)
   for (const path of ["app/pages/docs/index.vue", "app/pages/docs/review.vue", "skills/vitehub-drop/SKILL.md"])
     assert.match(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"), /[Aa]pps? keep only|[Oo]nly the latest app|[Aa]pps? keep (?:only )?their latest/)
+})
+
+test("an app's next version deletes a file only when removes names it", async () => {
+  const app = await publishApp(who, { files: { "index.html": "one", "data.json": "{}" } })
+  const before = [...state.objects.keys()]
+  await assert.rejects(publishApp(who, { id: app.id, files: {}, removes: ["gone.js"] }), /gone\.js, which isn't in v1/)
+  await assert.rejects(publishApp(who, { id: app.id, files: { "data.json": "[]" }, removes: ["data.json"] }), /removes and files both name data\.json/)
+  await assert.rejects(publishApp(who, { id: app.id, files: {}, removes: ["index.html"] }), /without an index\.html/)
+  await assert.rejects(publishApp(who, { id: app.id, files: {} }), /Send the files that changed/)
+  assert.deepEqual([...state.objects.keys()], before)
+  const v2 = await publishApp(who, { id: app.id, files: { "index.html": "two" } })
+  assert.equal(v2.version, 2)
+  assert.deepEqual((await dropDetail(await findDrop(app.id), who, "https://drop.example")).files, { "data.json": "{}", "index.html": "two" })
+  await publishApp(who, { id: app.id, files: {}, removes: ["data.json"] })
+  assert.deepEqual((await dropDetail(await findDrop(app.id), who, "https://drop.example")).files, { "index.html": "two" })
 })
 
 test("new code images record an owner and become unavailable when they are banned", async () => {

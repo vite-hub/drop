@@ -36,11 +36,12 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
 
     <DocsSection id="content-origin" title="Give apps their own domain">
       <p>Apps and HTML docs run their own scripts. By default Drop shows them in a sandbox with no origin, so they can't reach Drop or the reader's session. That sandbox also blocks <code>localStorage</code>, cookies, and URL changes. Drop swaps in temporary storage, but an app that routes by its URL still breaks.</p>
-      <p>Set <code>DROP_CONTENT_ORIGIN</code> to a second hostname, such as <code>https://drop-usercontent.example.com</code>, and serve it from the same deployment. Drop then shows apps and HTML docs on that hostname, each page at its own path, so storage and history work as on any static host.</p>
+      <p>Set <code>DROP_CONTENT_ORIGIN</code> to a wildcard such as <code>https://*.drop-usercontent.example.com</code> and serve every hostname under it from the same deployment. Each drop then runs on a subdomain of its own, the way each app on a static host gets its own site: storage and history work, and one app can't read what another stored. The subdomain is a hash of the drop's id, never the id itself, because hostnames are visible on the network and a shared drop's id opens its link.</p>
       <ul>
-        <li>Use a hostname that serves nothing else. A separate domain is the strongest boundary; a subdomain of yours also works. Drop's sign-in cookies use the <code>__Host-</code> prefix, so a sibling subdomain can't replace them, and API writes that carry cookies must come from Drop's own origin.</li>
-        <li>The hostname only serves a blank page. The viewer sends each document to it, so private drops never pass through it and it needs no sign-in. Keep it outside oauth2-proxy or any other login wall.</li>
-        <li>All apps on one Drop share that origin, so an app can read what another app stored in the same browser.</li>
+        <li>Use a domain that serves nothing else. A separate registrable domain is the strongest boundary, because a page can set cookies for its parent domain: under <code>example.com</code>, apps could set cookies that reach <code>example.com</code> and every other drop. Drop's sign-in cookies use the <code>__Host-</code> prefix, so no subdomain can replace them, and API writes that carry cookies must come from Drop's own origin.</li>
+        <li>The wildcard needs a wildcard DNS record and a certificate that covers it. On Cloudflare's free plan, a certificate covers one level, so put the wildcard right under the zone (<code>*.drop-usercontent.dev</code>), not under a subdomain of it.</li>
+        <li>The hostnames only serve a blank page. The viewer sends each document to it, so private drops never pass through them and they need no sign-in. Keep them outside oauth2-proxy or any other login wall.</li>
+        <li>A plain hostname (<code>https://drop-usercontent.example.com</code>) also works, but then every drop shares that one origin, so an app can read what another app stored in the same browser.</li>
       </ul>
     </DocsSection>
 

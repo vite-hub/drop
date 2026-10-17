@@ -63,8 +63,8 @@ const STEPS = {
     </DocsSection>
 
     <DocsSection id="env" title="Settings">
-      <DocsEnv :extra="[['CLOUDFLARE_D1_DATABASE_ID', 'The id wrangler d1 create printed. Read at build time.'], ['CLOUDFLARE_D1_DATABASE_NAME', 'The D1 database name, vitehub-drop by default.'], ['DROP_CONTENT_ORIGIN', 'Optional. A second custom domain on the same Worker for apps and HTML docs.']]" />
-      <p>To <NuxtLink to="/docs/self-host#content-origin">give apps their own domain</NuxtLink>, add a second custom domain to the Worker and set <code>DROP_CONTENT_ORIGIN</code> to it.</p>
+      <DocsEnv :extra="[['CLOUDFLARE_D1_DATABASE_ID', 'The id wrangler d1 create printed. Read at build time.'], ['CLOUDFLARE_D1_DATABASE_NAME', 'The D1 database name, vitehub-drop by default.'], ['DROP_CONTENT_ORIGIN', 'Optional. Where apps and HTML docs run, such as https://*.drop-usercontent.dev: one subdomain per drop, served by the same Worker.']]" />
+      <p>To <NuxtLink to="/docs/self-host#content-origin">give apps their own domain</NuxtLink>, add a zone for it, a proxied wildcard DNS record (<code>*</code>, <code>AAAA 100::</code>), and a Worker route <code>*.drop-usercontent.dev/*</code>; custom domains don't take wildcards. Then set <code>DROP_CONTENT_ORIGIN</code> to <code>https://*.drop-usercontent.dev</code>.</p>
     </DocsSection>
 
     <DocsSection id="database" title="Database">

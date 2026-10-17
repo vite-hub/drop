@@ -8,7 +8,7 @@ import { blobCleanup, dropFiles, dropHeads, drops, dropVisits, user } from "../d
 import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
-import { contentTypeOf } from "#shared/project-bundle"
+import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
 import { ACCESS_RANK, type Access, type DropAttachment, type DropDetail, type DropSummary, type DropVersion, type Visibility } from "#shared/types"
 import { DAY_MS, expiresAt, type Lifetime, MAX_KEEP_REASON, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { shareReviewFor } from "./trust"
@@ -432,16 +432,22 @@ function cleanPath(path: string) {
   return clean
 }
 
-/** Creates an app drop, or publishes the next version of one you may edit. */
-export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; files: Record<string, string>; visibility?: Visibility; access?: Access }, event?: H3Event) {
+/**
+ * Creates an app drop, or publishes the next version of one you may edit. A next version starts from the previous
+ * one's files: `files` adds or replaces paths, and a path leaves the app only when `removes` names it, so an agent
+ * that sends just the files it changed can't delete the rest by accident.
+ */
+export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; files: Record<string, string>; removes?: string[]; visibility?: Visibility; access?: Access }, event?: H3Event) {
   const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
-  if (!entries.some(([path]) => path === "index.html")) throw new HTTPError({ status: 400, statusText: "An app needs an index.html." })
-  if (entries.length > MAX_APP_FILES) throw new HTTPError({ status: 413, statusText: `An app can have at most ${MAX_APP_FILES} files.` })
+  const removes = [...new Set((input.removes ?? []).map(cleanPath))]
+  const clash = removes.filter(path => entries.some(([sent]) => sent === path))
+  if (clash.length) throw new HTTPError({ status: 400, statusText: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.` })
   const encoder = new TextEncoder()
   const encoded = entries.map(([path, content]) => [path, encoder.encode(content)] as const)
-  const size = encoded.reduce((total, [, bytes]) => total + bytes.byteLength, 0)
-  if (size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "An app can be at most 4 MiB." })
+  if (entries.length > MAX_APP_FILES) throw new HTTPError({ status: 413, statusText: `An app can have at most ${MAX_APP_FILES} files.` })
+  if (encoded.reduce((total, [, bytes]) => total + bytes.byteLength, 0) > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "An app can be at most 4 MiB." })
+  if (input.id && !entries.length && !removes.length) throw new HTTPError({ status: 400, statusText: "Send the files that changed, or name files in removes." })
 
   await drainBlobCleanup()
   const now = Date.now()
@@ -460,8 +466,18 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   const id = row?.id ?? crypto.randomUUID()
   const prefix = `apps/${id}/${crypto.randomUUID()}`
   const token = crypto.randomUUID()
-  const old = row ? await db.select({ blobKey: dropFiles.blobKey, size: dropFiles.size }).from(dropFiles).where(eq(dropFiles.dropId, id)) : []
-  return withDropQuota(row?.ownerId ?? who.userId, { drops: row ? 0 : 1, bytes: Math.max(0, size - old.reduce((total, file) => total + file.size, 0)), writes: entries.length, targetId: row?.id, app: { files: entries.length, bytes: size } }, event, async (quota) => {
+  const old = row ? await db.select({ path: dropFiles.path, blobKey: dropFiles.blobKey, size: dropFiles.size }).from(dropFiles).where(eq(dropFiles.dropId, id)) : []
+  const stale = removes.filter(path => !old.some(file => file.path === path))
+  if (stale.length) throw new HTTPError({ status: 400, statusText: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.` })
+  // Files the agent neither sent nor removed carry over, blob and all: no new write, no new bytes.
+  const kept = old.filter(file => !removes.includes(file.path) && !entries.some(([path]) => path === file.path))
+  const paths = [...kept.map(file => file.path), ...entries.map(([path]) => path)]
+  if (!paths.includes("index.html")) throw new HTTPError({ status: 400, statusText: row ? "That would leave the app without an index.html." : "An app needs an index.html." })
+  if (paths.length > MAX_APP_FILES) throw new HTTPError({ status: 413, statusText: `An app can have at most ${MAX_APP_FILES} files.` })
+  const size = kept.reduce((total, file) => total + file.size, 0) + encoded.reduce((total, [, bytes]) => total + bytes.byteLength, 0)
+  if (size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "An app can be at most 4 MiB." })
+  const oldSize = old.reduce((total, file) => total + file.size, 0)
+  return withDropQuota(row?.ownerId ?? who.userId, { drops: row ? 0 : 1, bytes: Math.max(0, size - oldSize), writes: entries.length, targetId: row?.id, app: { files: paths.length, bytes: size } }, event, async (quota) => {
     const stagedKeys: string[] = []
     let committedPublish = false
     try {
@@ -482,7 +498,10 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
         actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
         lastAccessedAt: now, ...life, note, trashedAt: null, trashReason: null, parentId: null,
       }
-      const fileRows = encoded.map(([path, bytes]) => ({ dropId: id, path, blobKey: `${prefix}/${path}`, size: bytes.byteLength }))
+      const fileRows = [
+        ...kept.map(file => ({ dropId: id, path: file.path, blobKey: file.blobKey, size: file.size })),
+        ...encoded.map(([path, bytes]) => ({ dropId: id, path, blobKey: `${prefix}/${path}`, size: bytes.byteLength })),
+      ]
       if (!row) {
         await quota.commit([
           db.insert(drops).values(next),
@@ -497,17 +516,17 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
         // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
         const won = and(eq(drops.id, id), eq(drops.publishToken, token))
         const replace = db.delete(dropFiles).where(and(eq(dropFiles.dropId, id), exists(db.select({ id: drops.id }).from(drops).where(won))))
-        const inserts = encoded.map(([path, bytes]) => db.insert(dropFiles).select(qb => qb.select({
+        const inserts = fileRows.map(file => db.insert(dropFiles).select(qb => qb.select({
           dropId: drops.id,
-          path: sql<string>`${path}`.as("path"),
-          blobKey: sql<string>`${`${prefix}/${path}`}`.as("blob_key"),
-          size: sql<number>`${bytes.byteLength}`.as("size"),
+          path: sql<string>`${file.path}`.as("path"),
+          blobKey: sql<string>`${file.blobKey}`.as("blob_key"),
+          size: sql<number>`${file.size}`.as("size"),
         }).from(drops).where(won)))
         await quota.commit([update, replace, ...inserts], exists(db.select({ id: drops.id }).from(drops).where(won)))
         committedPublish = true
-        await deleteBlobKeys(old.map(file => file.blobKey))
+        await deleteBlobKeys(old.filter(file => !kept.includes(file)).map(file => file.blobKey))
       }
-      return next
+      return Object.assign(next, { warnings: appLinkIssues(Object.fromEntries(entries), paths) })
     }
     catch (error) {
       if (!committedPublish) {

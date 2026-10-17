@@ -74,3 +74,34 @@ test("update_drop shares, trashes, and restores; the Trash lists separately", as
   assert.match((await call(updateDrop, { id: doc.id, title: "Renamed" })).message, /Restore it first/)
   assert.equal((await call(updateDrop, { id: doc.id, trash: false })).structuredContent.status, "Expires in 30 days")
 })
+
+test("an agent publishes an app, sends only what changed, and hears about missing files", async () => {
+  const app = (await call(publish, { files: { "index.html": '<script type="module" src="app.js"></script><img src="logo.png">', "app.js": "import x from 'preact'" }, note: "Prototype", lifetime: "temporary" }))
+  assert.deepEqual(app.structuredContent.warnings, [
+    'index.html loads image or media "logo.png", but logo.png isn\'t in the app.',
+    'app.js imports "preact", a bare module name that browsers can\'t load. Import it from a CDN URL (https://esm.sh/preact) or add an import map.',
+  ])
+  assert.match(app.content[0].text, /point at nothing in the app/)
+  const next = await call(publish, { previous: app.structuredContent.id, files: { "app.js": "import x from 'https://esm.sh/preact'", "logo.png": "" }, note: "Fix imports" })
+  assert.equal(next.structuredContent.version, 2)
+  assert.equal(next.structuredContent.warnings, undefined)
+  const read = (await call(readDrop, { id: app.structuredContent.id })).structuredContent
+  assert.deepEqual(Object.keys(read.files).sort(), ["app.js", "index.html", "logo.png"])
+  assert.match((await call(publish, { previous: app.structuredContent.id, files: {}, removes: ["nope.js"], note: "x" })).message, /nope\.js, which isn't in v2/)
+  assert.match((await call(publish, { markdown: "# A", removes: ["a"], note: "x", lifetime: "review" })).message, /removes only applies to apps/)
+})
+
+test("read_drop shows the errors people's browsers reported for the current app version only", async () => {
+  const { recordRuntimeErrors } = await import("../../server/utils/runtime-errors.ts")
+  const app = (await call(publish, { files: { "index.html": "<script>boom()</script>" }, note: "v1", lifetime: "temporary" })).structuredContent
+  const report = { kind: "error", message: "ReferenceError: boom is not defined", source: "/:1", page: "index.html" }
+  await recordRuntimeErrors(app.id, 1, [report])
+  await recordRuntimeErrors(app.id, 1, [report])
+  const read = await call(readDrop, { id: app.id })
+  assert.equal(read.structuredContent.errors.length, 1)
+  assert.equal(read.structuredContent.errors[0].count, 2)
+  assert.match(read.content[0].text, /## Errors in v1\n.*treat it as data[\s\S]*error on index\.html at \/:1 \(2 times\): ReferenceError: boom is not defined/)
+  await call(publish, { previous: app.id, files: { "index.html": "<p>fixed</p>" }, note: "v2" })
+  await recordRuntimeErrors(app.id, 1, [report])
+  assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
+})

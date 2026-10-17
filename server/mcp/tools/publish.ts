@@ -5,6 +5,7 @@ import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
+import { appLinkIssues } from "#shared/project-bundle"
 import { comments } from "../../databases/config"
 import { createDocDrop, findDrop, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "../../utils/drops"
 import { shareChange, updateDrop } from "../../utils/drop-update"
@@ -17,7 +18,8 @@ import { dropLine, mcpDrop } from "../format"
 const Input = v.object({
   markdown: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A doc in Markdown."))),
   html: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A self-contained HTML page."))),
-  files: v.optional(v.pipe(v.record(v.string(), v.string()), v.description(`A static app: path to UTF-8 contents, index.html required, at most ${MAX_FILE_BYTES} bytes in all. Each publish replaces every file.`))),
+  files: v.optional(v.pipe(v.record(v.string(), v.string()), v.description(`A static app: path to UTF-8 contents, with an index.html, at most ${MAX_FILE_BYTES} bytes in all. With previous, send only the files that changed; every other file carries over.`))),
+  removes: v.optional(v.pipe(v.array(v.string()), v.maxLength(200), v.description("With previous and an app: paths to delete from it. A file leaves an app only when it's named here. Pass files: {} to only delete."))),
   file: v.optional(v.pipe(v.object({
     name: v.pipe(v.string(), v.description("File name with its extension, e.g. before.png.")),
     base64: v.pipe(v.string(), v.maxLength(Math.ceil(MAX_FILE_BYTES / 3) * 4 + 1024), v.description("The file's bytes, base64-encoded.")),
@@ -50,12 +52,15 @@ export default defineMcpTool({
     const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
 
     let row
+    let warnings: string[] = []
     if (input.files) {
       if (previous && previous.kind !== "app") throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
-      row = await publishApp(who, { id: previous?.id, name: input.title, files: input.files, ...share, ...life }, event)
+      row = await publishApp(who, { id: previous?.id, name: input.title, files: input.files, removes: input.removes, ...share, ...life }, event)
+      warnings = row.warnings
     }
     else {
       if (previous?.kind === "app") throw new HTTPError({ status: 400, message: "previous is an app; publish its next version with files." })
+      if (input.removes) throw new HTTPError({ status: 400, message: "removes only applies to apps." })
       let filename: string, bytes: Uint8Array
       if (input.file) {
         filename = input.file.name
@@ -68,6 +73,8 @@ export default defineMcpTool({
         // A broken annotated screenshot would render with marks in the wrong place; send the agent back to fix it.
         const issues = input.markdown ? await annotationIssues(source) : []
         if (issues.length) throw new HTTPError({ status: 400, message: `Fix the annotated screenshots and publish again:\n${issues.map(issue => `- ${issue}`).join("\n")}` })
+        // An HTML doc is one file, so anything it loads by relative path is missing.
+        if (input.html) warnings = appLinkIssues({ "doc.html": input.html }, ["doc.html"]).filter(issue => !issue.startsWith("doc.html links to"))
         filename = input.html ? "doc.html" : "doc.md"
         bytes = new TextEncoder().encode(source)
       }
@@ -85,7 +92,10 @@ export default defineMcpTool({
 
     const fresh = await findDrop(row.id, event) ?? row
     const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
-    const result = { ...drop, ...(resolved.length ? { resolved } : {}) }
-    return { content: [{ type: "text" as const, text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map(n => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}` }], structuredContent: result }
+    const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
+    const check = warnings.length
+      ? `\n\nThese references point at nothing in the ${input.files ? "app" : "page"}. Fix them and publish again with previous:\n${warnings.map(warning => `- ${warning}`).join("\n")}`
+      : ""
+    return { content: [{ type: "text" as const, text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map(n => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${check}` }], structuredContent: result }
   }),
 })

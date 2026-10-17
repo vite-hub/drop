@@ -11,6 +11,7 @@ export type FrameMessage =
   | { type: "host"; path: string }
   | { type: "location"; path: string }
   | { type: "frame-request"; id: string; path: string }
+  | { type: "runtime-error"; kind: "error" | "rejection" | "console" | "load"; message: string; source?: string }
 
 /**
  * The postMessage bridge to the sandboxed iframe. Messages are matched by source window. An opaque-origin frame

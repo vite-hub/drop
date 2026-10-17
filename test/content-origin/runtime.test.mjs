@@ -23,17 +23,37 @@ function request(url, { method = "GET", headers = {} } = {}) {
   return event
 }
 
-test("the content origin is a second host, never Drop's own, and ignored when unset or invalid", () => {
-  assert.equal(contentOrigin(request("https://drop.example/d/x")), "https://drop-usercontent.example")
+test("the content origin is a second host, never Drop's own, and ignored when unset or invalid", async () => {
+  assert.equal(await contentOrigin(request("https://drop.example/d/x"), "x"), "https://drop-usercontent.example")
   assert.equal(isContentRequest(request("https://drop.example/d/x")), false)
   assert.equal(isContentRequest(request("https://drop-usercontent.example/")), true)
+  assert.equal(isContentRequest(request("https://drop-usercontent.example:8443/")), false)
   state.contentOrigin = "https://drop.example"
-  assert.equal(contentOrigin(request("https://drop.example/d/x")), null)
-  for (const value of ["", "not a url", "javascript:alert(1)"]) {
+  assert.equal(await contentOrigin(request("https://drop.example/d/x"), "x"), null)
+  state.contentOrigin = "http://localhost:3001"
+  assert.equal(await contentOrigin(request("http://localhost:3000/d/x"), "x"), "http://localhost:3001")
+  for (const value of ["", "not a url", "javascript:alert(1)", "javascript://*.x"]) {
     state.contentOrigin = value
-    assert.equal(contentOrigin(request("https://drop.example/d/x")), null)
+    assert.equal(await contentOrigin(request("https://drop.example/d/x"), "x"), null)
     assert.equal(isContentRequest(request("https://drop-usercontent.example/")), false)
   }
+})
+
+test("a wildcard content origin gives every drop its own origin, named by a hash rather than its id", async () => {
+  state.contentOrigin = "https://*.drop-usercontent.example"
+  const id = "8f14e45f-ceea-4672-8e3b-6b1c2b0d5a11"
+  const first = await contentOrigin(request("https://drop.example/d/x"), id)
+  assert.match(first, /^https:\/\/[a-z2-7]{26}\.drop-usercontent\.example$/)
+  assert.equal(await contentOrigin(request("https://drop.example/d/y"), id), first)
+  assert.notEqual(await contentOrigin(request("https://drop.example/d/x"), "another-id"), first)
+  assert.doesNotMatch(first, /8f14e45f/)
+  assert.equal(isContentRequest(request(`${first}/index.html`)), true)
+  for (const host of ["drop-usercontent.example", "evil.drop-usercontent.example", "a.b.drop-usercontent.example", "drop.example"])
+    assert.equal(isContentRequest(request(`https://${host}/`)), false, host)
+  const response = await contentMiddleware(request(`${first}/about/`, { headers: { "sec-fetch-dest": "iframe" } }))
+  assert.equal(response.status, 200)
+  state.contentOrigin = "http://*.localhost:3000"
+  assert.match(await contentOrigin(request("http://localhost:3000/d/x"), id), /^http:\/\/[a-z2-7]{26}\.localhost:3000$/)
 })
 
 test("the content origin serves only the frame host, at any path, and nothing of Drop", async () => {

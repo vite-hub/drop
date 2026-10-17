@@ -333,6 +333,38 @@ export const OPAQUE_ORIGIN_SHIM = String.raw`(() => {
   }
 })();`;
 
+/**
+ * Reports the page's own failures to Drop so the agent that published it can read them: uncaught errors, rejected
+ * promises nobody handled, console.error calls, and files that failed to load. Runs before the page's scripts.
+ * At most 20 distinct reports per page load, each cut to 500 characters.
+ */
+export const ERROR_REPORTER = String.raw`(() => {
+  const seen = new Set();
+  const text = (value) => {
+    if (value instanceof Error) return value.name + ": " + value.message;
+    if (typeof value === "string") return value;
+    try { return JSON.stringify(value); } catch { return String(value); }
+  };
+  const report = (kind, message, source) => {
+    message = String(message || "").slice(0, 500);
+    const key = kind + message + (source || "");
+    if (!message || seen.has(key) || seen.size >= 20) return;
+    seen.add(key);
+    parent.postMessage({ __drop: true, type: "runtime-error", kind, message, source: source ? String(source).slice(0, 300) : undefined }, "*");
+  };
+  addEventListener("error", (event) => {
+    const target = event.target;
+    if (target && target !== window && (target.src || target.href)) return report("load", "Failed to load " + String(target.src || target.href).replace(location.origin, ""), target.tagName && target.tagName.toLowerCase());
+    report("error", event.error ? text(event.error) : event.message, event.filename ? event.filename.replace(location.origin, "") + ":" + event.lineno : undefined);
+  }, true);
+  addEventListener("unhandledrejection", (event) => report("rejection", "Unhandled rejection: " + text(event.reason)));
+  const original = console.error;
+  console.error = function (...args) {
+    report("console", args.map(text).join(" "));
+    return original.apply(this, args);
+  };
+})();`;
+
 /** Puts `snippet` first in the head, or after the doctype when there's no head tag, so the page keeps standards mode. */
 export function prependToHead(html: string, snippet: string): string {
   if (/<head(\s[^>]*)?>/i.test(html)) return html.replace(/<head(\s[^>]*)?>/i, (match) => match + snippet);
@@ -341,7 +373,7 @@ export function prependToHead(html: string, snippet: string): string {
 }
 
 export function injectRuntime(html: string, dark: boolean): string {
-  const head = `<script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`;
+  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`;
   const tail = `<script>${ANNOTATOR_SCRIPT}</script>`;
   let out = prependToHead(html, head);
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail;

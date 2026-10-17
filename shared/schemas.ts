@@ -31,7 +31,10 @@ export const DropPatchSchema = v.object({
 export const AppSchema = v.object({
   id: v.optional(v.string()),
   name: v.optional(v.pipe(v.string(), v.maxLength(160))),
+  /** With `id`, only the files that changed: the rest carry over from the previous version. */
   files: v.record(v.string(), v.string()),
+  /** Paths to delete from the previous version. A file leaves an app only when it's named here. */
+  removes: v.optional(v.pipe(v.array(v.string()), v.maxLength(200))),
 })
 
 const thousandths = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000))

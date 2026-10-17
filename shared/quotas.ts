@@ -39,20 +39,45 @@ export type QuotaUnit = "drops" | "bytes" | "writes" | "appFiles" | "appBytes" |
 export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
   quota: { unit: QuotaUnit; used: number; limit: number }
-  retryable: false
+  /** Only the per-minute publish limit clears by waiting; every other limit needs the user. */
+  retryable: boolean
+  /** Seconds until a retryable limit clears. */
+  retryAfterSeconds?: number
+  /** When the counter resets: the next minute for publishes, the next month (UTC) for file writes. Absent for limits that never reset on their own. */
+  resetAt?: string
   selfHostUrl: string
   message: string
 }
 
-export function quotaFailure(unit: QuotaUnit, used: number, limit: number): QuotaFailure {
+/** The first instant of next month, UTC, when monthly file writes start over. */
+export function nextMonthStart(now = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+}
+
+export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retryAfterSeconds = 60): QuotaFailure {
   const selfHostUrl = "/docs/self-host"
-  const label = { drops: "drops", bytes: "storage", writes: "monthly file writes", appFiles: "app files", appBytes: "app size", burstPublishes: "publishes this minute" }[unit]
+  if (unit === "burstPublishes") {
+    return {
+      code: "DROP_LIMIT_REACHED", quota: { unit, used, limit }, retryable: true, retryAfterSeconds,
+      resetAt: new Date(Date.now() + retryAfterSeconds * 1000).toISOString(), selfHostUrl,
+      message: `Nothing was created or changed. That's ${limit} publishes in a minute; wait ${retryAfterSeconds} seconds, then publish again.`,
+    }
+  }
+  const label = { drops: "drops", bytes: "storage", writes: "monthly file writes", appFiles: "app files", appBytes: "app size" }[unit]
   const amount = unit === "bytes" || unit === "appBytes"
     ? `${Math.ceil(used / MIB * 10) / 10}/${limit / MIB} MiB`
     : `${used}/${limit}`
+  const resetAt = unit === "writes" ? nextMonthStart().toISOString() : undefined
+  const fix = {
+    drops: "Trash drops you no longer need, or ask the user.",
+    bytes: "Trash large drops you no longer need, or ask the user.",
+    writes: `It resets on ${resetAt?.slice(0, 10)}.`,
+    appFiles: "Publish fewer files: bundle scripts and styles together.",
+    appBytes: "Publish a smaller app: compress images or load large libraries from a CDN.",
+  }[unit]
   return {
-    code: "DROP_LIMIT_REACHED", quota: { unit, used, limit }, retryable: false, selfHostUrl,
-    message: `Nothing was created or changed. Plan limit for ${label}: ${amount}. Deploy your own at ${selfHostUrl} for other limits.`,
+    code: "DROP_LIMIT_REACHED", quota: { unit, used, limit }, retryable: false, ...(resetAt ? { resetAt } : {}), selfHostUrl,
+    message: `Nothing was created or changed. Plan limit for ${label}: ${amount}. ${fix} Deploy your own at ${selfHostUrl} for other limits.`,
   }
 }
 
@@ -63,9 +88,12 @@ export function usageNearLimit(usage: Usage): boolean {
 }
 
 export function quotaToolFailure(body: QuotaFailure) {
+  const next = body.retryable
+    ? `Wait ${body.retryAfterSeconds ?? 60} seconds, then make the same call once more.`
+    : "Ask the user what to do. Do not retry or delete their work; list_drops shows plan usage."
   return {
     isError: true as const,
-    content: [{ type: "text" as const, text: `${body.message} Ask the user what to do. Do not retry or delete their work.` }],
+    content: [{ type: "text" as const, text: `${body.message} ${next}` }],
     structuredContent: { ...body },
   }
 }

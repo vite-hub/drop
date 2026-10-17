@@ -39,6 +39,7 @@ const tools = computed(() => catalog.value.map(item => ({ name: item.uri ?? item
     <DocsSection id="skill" title="The skill">
       <p>The <code>vitehub-drop</code> skill tells agents how to drop docs, publish apps, read feedback, and write documents people can review. It comes with the server through the MCP Skills extension (<code>skills/list</code> and <code>skill://</code> resources), so connected clients that support skills load it on their own.</p>
       <p>Agents that discover skills over HTTP find it at <code>/.well-known/agent-skills/index.json</code>, which follows <a href="https://github.com/cloudflare/agent-skills-discovery-rfc">Agent Skills Discovery</a> v0.2.0, and at the older <code>/.well-known/skills/</code>. Fetching Drop's home page with <code>Accept: text/markdown</code> returns the skill too.</p>
+      <p>Agents that start from the web read <code>/llms.txt</code>, an index of everything below, and <code>/agents.md</code>, a start guide with this Drop's limits and the skill. Every docs page is also Markdown at its path plus <code>.md</code>, such as <code>/docs/agents.md</code>.</p>
     </DocsSection>
 
     <DocsSection id="tools" title="Tools and prompts">

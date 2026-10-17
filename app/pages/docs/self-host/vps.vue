@@ -27,7 +27,7 @@ const update = "git pull\ndocker compose up -d --build"
       <p>With <a href="https://caddyserver.com">Caddy</a>, add this to your Caddyfile and reload it:</p>
       <AgentsCodeBlock :code="caddy" />
       <p>Caddy forwards the host and HTTPS scheme. With nginx, set <code>proxy_set_header Host $host</code> and <code>proxy_set_header X-Forwarded-Proto $scheme</code>. Keep the OAuth app's homepage and callback on that HTTPS domain.</p>
-      <p>To <NuxtLink to="/docs/self-host#content-origin">give apps their own domain</NuxtLink>, proxy a second hostname to the same port, with the same headers, and set <code>DROP_CONTENT_ORIGIN</code> to it.</p>
+      <p>To <NuxtLink to="/docs/self-host#content-origin">give apps their own domain</NuxtLink>, proxy a wildcard hostname (with a wildcard certificate) to the same port, with the same headers, and set <code>DROP_CONTENT_ORIGIN</code> to it, such as <code>https://*.drop-usercontent.example.com</code>.</p>
     </DocsSection>
 
     <DocsSection id="env" title="Settings">
@@ -37,7 +37,7 @@ const update = "git pull\ndocker compose up -d --build"
         ['DROP_GITHUB_ORG', 'Optional active organization membership requirement for publishing, viewing, and MCP.'],
         ['DROP_AUTH_PROXY', 'Set true to reuse GitHub oauth2-proxy; requires DROP_GITHUB_ORG.'],
         ['DROP_AUTH_PROXY_COOKIE', 'Optional proxy cookie name to clear on logout. Secure, host-only, Path=/.'],
-        ['DROP_CONTENT_ORIGIN', 'Optional second hostname for apps and HTML docs, proxied to the same port.'],
+        ['DROP_CONTENT_ORIGIN', 'Optional wildcard origin for apps and HTML docs, one subdomain per drop, proxied to the same port.'],
       ]" />
     </DocsSection>
 

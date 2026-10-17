@@ -4,7 +4,7 @@ import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
-import { requirePublishBurst } from "./publish-burst"
+import { PUBLISH_BURST, requirePublishBurst } from "./publish-burst"
 import { MAX_APP_BYTES, MAX_APP_FILES, planLimits, quotaFailure, quotaToolFailure, type QuotaFailure, type Usage } from "#shared/quotas"
 import { useServerEnv } from "#vitehub/env/server"
 import { dropFiles, quotaBlobs, quotaReservations } from "../databases/config"
@@ -40,7 +40,7 @@ export async function getUsage(ownerId: string): Promise<Usage> {
 export class DropQuotaError extends HTTPError {
   readonly quotaBody: QuotaFailure
   constructor(body: QuotaFailure) {
-    super({ status: 402, message: body.message, data: body, body: { ...body } })
+    super({ status: body.retryable ? 429 : 402, message: body.message, data: body, body: { ...body }, headers: body.retryAfterSeconds ? { "Retry-After": String(body.retryAfterSeconds) } : undefined })
     this.quotaBody = body
   }
 }
@@ -70,8 +70,11 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   if (event) {
     try { await requirePublishBurst(event, ownerId) }
     catch (error) {
-      if ((error as { status?: number; statusCode?: number }).status === 429 || (error as { statusCode?: number }).statusCode === 429)
-        throw new DropQuotaError(quotaFailure("burstPublishes", 30, 30))
+      const failure = error as { status?: number; statusCode?: number; headers?: HeadersInit }
+      if (failure.status === 429 || failure.statusCode === 429) {
+        const retryAfter = Number(new Headers(failure.headers).get("retry-after"))
+        throw new DropQuotaError(quotaFailure("burstPublishes", PUBLISH_BURST, PUBLISH_BURST, retryAfter > 0 ? Math.ceil(retryAfter) : 60))
+      }
       throw error
     }
   }
@@ -168,7 +171,7 @@ export function quotaApiHandler<Args extends unknown[], Result>(handler: (...arg
     try { return await handler(...args) }
     catch (error) {
       if (!(error instanceof DropQuotaError)) throw error
-      return Response.json(error.quotaBody, { status: 402 })
+      return Response.json(error.quotaBody, { status: error.status, headers: error.quotaBody.retryAfterSeconds ? { "Retry-After": String(error.quotaBody.retryAfterSeconds) } : undefined })
     }
   }
 }

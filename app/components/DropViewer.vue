@@ -128,8 +128,25 @@ const shareOpen = ref(false)
 
 const pageComments = computed(() => (isApp.value ? comments.value.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : comments.value))
 
+// What the page reports going wrong goes to the server in batches, for the agent's read_drop. Only apps and HTML pages
+// run their own code; a Markdown doc's errors would be Drop's.
+type RuntimeReport = { kind: string; message: string; source?: string; page?: string }
+let runtimeReports: RuntimeReport[] = []
+const flushRuntimeReports = useDebounceFn(() => {
+  const errors = runtimeReports.splice(0, 20)
+  runtimeReports = []
+  if (errors.length) $fetch(`/api/drops/${drop.value.id}/errors`, { method: "POST", body: { version: drop.value.version, errors } }).catch(() => {})
+}, 2000)
+
 const { ready, send } = useDropFrame(frame, contentOrigin, (frameMessage, rect) => {
   const message = frameMessage
+  if (message.type === "runtime-error") {
+    if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
+      runtimeReports.push({ kind: message.kind, message: String(message.message).slice(0, 500), source: message.source?.slice(0, 300), ...(isApp.value ? { page: page.value } : {}) })
+      void flushRuntimeReports()
+    }
+    return
+  }
   if (message.type === "host") {
     frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
     send({ type: "document", html: frameDocument })

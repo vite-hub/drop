@@ -100,6 +100,7 @@ function pageRuntime(files: ProjectFiles, page: string): string {
         waiting.delete(message.id);
         frame.postMessage({ __drop: true, type: "document", id, html: message.html }, location.origin);
       }
+      else if (event.source !== parent && event.origin === location.origin && message.type === "runtime-error") post(message);
       else if (event.source !== parent && event.origin === location.origin && (message.type === "host" || message.type === "frame-request")) {
         const id = Math.random().toString(36).slice(2);
         waiting.set(id, [event.source, message.id]);
@@ -145,4 +146,52 @@ export function buildProjectDocument(files: ProjectFiles, page: string): string 
       return target && files[target] !== undefined ? `${lead}${quote}${dataUrl(target, files[target]!)}${quote}` : match;
     });
   return prependToHead(html, pageRuntime(files, page));
+}
+
+const LINK_TAGS: [RegExp, string][] = [
+  [/<script\b[^>]*\bsrc=["']([^"']+)["']/gi, "script"],
+  [/<link\b[^>]*\bhref=["']([^"']+)["']/gi, "stylesheet or icon"],
+  [/<(?:img|source|image|use|video|audio|iframe)\b[^>]*?\s(?:src|href)=["']([^"']+)["']/gi, "image or media"],
+];
+
+/**
+ * References in the sent files that point at nothing in the app, the way the viewer resolves them: a script,
+ * stylesheet, image, CSS url(), module import, fetch() of a literal path, or a link to a page. Also bare module
+ * imports ("react") without an import map, which no browser can load. Template-built paths are skipped. Each issue
+ * is one sentence an agent can act on.
+ */
+export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
+  const all = new Set(paths);
+  const pages = paths.filter((path) => path.endsWith(".html"));
+  const importMap = Object.entries(sent).some(([path, text]) => path.endsWith(".html") && /<script\b[^>]*type=["']?importmap/i.test(text));
+  const issues = new Set<string>();
+  const check = (from: string, ref: string, what: string, page = false) => {
+    if (/[`$]|\{\{/.test(ref)) return;
+    const target = resolvePath(from, ref.trim());
+    if (target === null || target === "" && !page) return;
+    if (all.has(target) || (page && pageAt(pages, `/${target}`) !== null)) return;
+    issues.add(`${from} ${page ? "links to" : `loads ${what}`} "${ref}", but ${target || "index.html"} isn't in the app.`);
+  };
+  for (const [path, text] of Object.entries(sent)) {
+    if (path.endsWith(".html") || path.endsWith(".htm")) {
+      const html = text.replace(/<!--[\s\S]*?-->/g, "");
+      for (const [pattern, what] of LINK_TAGS) for (const match of html.matchAll(pattern)) check(path, match[1]!, what);
+      for (const match of html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["']/gi)) check(path, match[1]!, "", true);
+      for (const match of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) scanScript(path, match[1]!);
+    }
+    else if (path.endsWith(".css")) {
+      for (const match of text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) if (!match[2]!.startsWith("data:")) check(path, match[2]!, "a file");
+    }
+    else if (/\.m?js$/.test(path)) scanScript(path, text);
+  }
+  function scanScript(path: string, code: string) {
+    for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"]+)\1/g)) {
+      const specifier = match[2]!;
+      if (/^(?:\.{1,2}\/|\/)/.test(specifier)) check(path, specifier, "a module");
+      else if (!importMap && !/^[a-z][a-z0-9+.-]*:/i.test(specifier))
+        issues.add(`${path} imports "${specifier}", a bare module name that browsers can't load. Import it from a CDN URL (https://esm.sh/${specifier}) or add an import map.`);
+    }
+    for (const match of code.matchAll(/\bfetch\(\s*(['"])([^'"]+)\1/g)) check(path, match[2]!, "data from");
+  }
+  return [...issues].slice(0, 20);
 }
