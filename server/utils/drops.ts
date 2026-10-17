@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm"
+import { and, desc, eq, exists, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
@@ -10,7 +10,7 @@ import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
-import { ACCESS_RANK, type Access, type DropAttachment, type DropDetail, type DropSummary, type DropVersion, type Visibility } from "#shared/types"
+import { ACCESS_RANK, type Access, type DropAttachment, type DropCrumb, type DropDetail, type DropSummary, type DropVersion, type Visibility } from "#shared/types"
 import { DAY_MS, expiresAt, type Lifetime, MAX_KEEP_REASON, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
@@ -18,10 +18,22 @@ import { withDropQuota } from "./quotas"
 import { LIVE_EDITING } from "#live-drafts"
 import { draftPath } from "./draft-paths"
 import { deleteRetainedDrop } from "./quota-deletion"
-import { chainOf, expiryPolicy, isExpired, renewDrop } from "./expiry"
+import { chainOf, expiryPolicy, renewDrop } from "./expiry"
+import { ancestorsOf, foldersUnder, type Grant, isAttachment, itemCounts, listedNode, parentNode, resolveNode, touchFolder, uniqueSlug } from "./nodes"
 
-/** `expired` means gone for its links: in the Trash, or past its window and waiting for the hourly move there. */
-export type DropRow = typeof drops.$inferSelect & { ownerBanned?: boolean; expired?: boolean }
+/**
+ * `expired` means gone for its links: in the Trash, or past its window and waiting for the hourly move there. Rows
+ * found through `findDrop` and the lists carry what their ancestors give them (see ./nodes): `raw` is the row as stored,
+ * `ancestors` the nodes above it, nearest first, and `grants` every share on the way.
+ */
+export type DropRow = typeof drops.$inferSelect & {
+  ownerBanned?: boolean
+  expired?: boolean
+  raw?: typeof drops.$inferSelect
+  ancestors?: (typeof drops.$inferSelect)[]
+  grants?: Grant[]
+  sharedFrom?: { id: string; title: string }
+}
 
 import { MAX_FILE_BYTES } from "#shared/schemas"
 import { hasBlockComponents, splitFrontmatter } from "#shared/frontmatter"
@@ -34,14 +46,16 @@ const TEXT_KINDS = new Set(["markdown", "html"])
  * What the caller may do with a drop. Editors and admins act on every drop in the workspace. A share reaches the team
  * (everyone signed in to this Drop, and their agents) or anyone with the link, and lets them view, comment, or edit; "Can
  * edit" lets signed-in people edit in the browser, not their agents, so only the owner and staff publish through agents.
- * An expired drop is read-only for the people who can renew it and gone for everyone else.
+ * An expired drop is read-only for the people who can renew it and gone for everyone else. A drop in a folder counts
+ * every share on its path, and the widest one that reaches the caller sets the level.
  */
 export function permissions(drop: DropRow, who: Identity | null) {
   if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || who.role === "admin")) }
   const owner = Boolean(who && who.userId === drop.ownerId)
   const staff = Boolean(who && (who.role === "admin" || who.role === "editor"))
-  const shared = reaches(drop, who) && !drop.shareReview && !drop.expired
-  const level = ACCESS_RANK[drop.access as Access]
+  const reaching = (drop.grants ?? [drop]).filter(grant => reachesGrant(grant, who))
+  const shared = reaching.length > 0 && !drop.shareReview && !drop.expired
+  const level = Math.max(-1, ...reaching.map(grant => ACCESS_RANK[grant.access as Access]))
   const available = !drop.ownerBanned
   const live = available && !drop.expired
   return {
@@ -53,9 +67,12 @@ export function permissions(drop: DropRow, who: Identity | null) {
   }
 }
 
-/** Whether the drop's share includes the caller, review and expiry aside. Team drops need a signed-in caller. */
-export const reaches = (drop: Pick<DropRow, "visibility">, who: Identity | null) =>
-  drop.visibility === "shared" || (drop.visibility === "team" && who !== null)
+const reachesGrant = (grant: Pick<Grant, "visibility">, who: Identity | null) =>
+  grant.visibility === "shared" || (grant.visibility === "team" && who !== null)
+
+/** Whether a share on the drop's path includes the caller, review and expiry aside. Team shares need a signed-in caller. */
+export const reaches = (drop: Pick<DropRow, "visibility" | "grants">, who: Identity | null) =>
+  (drop.grants ?? [drop]).some(grant => reachesGrant(grant, who))
 
 /** A share that worked until its drop expired. Private drops stay indistinguishable from missing ones. */
 export const expiredLink = (drop: DropRow | null, who: Identity | null) =>
@@ -75,25 +92,63 @@ export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().
     // Past its window but not yet moved by the hourly cleanup: it's in the Trash already, as of when it expired.
     trashedAt: row.trashedAt ?? (row.expired && expires !== null ? expires : null),
     trashReason: row.trashReason ?? (row.expired ? "expired" : null),
+    ...(row.sharedFrom && row.raw ? { sharedFrom: row.sharedFrom, ownShare: { visibility: row.raw.visibility, access: row.raw.access as Access } } : {}),
   }
 }
 
-/** Reuse the joined owner for review policy so each lookup remains one query. */
+/** A node as a breadcrumb. */
+export const toCrumb = (row: typeof drops.$inferSelect): DropCrumb =>
+  ({ id: row.id, kind: row.kind, title: row.title, link: row.link ?? row.id, slug: row.slug ?? slugify(row.title) })
+
+/**
+ * Reuse the joined owner for review policy so each lookup remains one query, plus one for the ancestors of a drop in a
+ * folder or a file a doc embeds: it is shared, kept, and trashed with them (see ./nodes).
+ */
 async function withOwnerAccess(row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined, event?: H3Event): Promise<DropRow | null> {
   if (!row) return null
-  let fields = row.drop
-  // An attachment is shared, kept, and trashed with the doc it belongs to.
-  if (fields.parentId) {
-    const [parent] = await db.select().from(drops).where(and(eq(drops.id, fields.parentId), eq(drops.ownerId, fields.ownerId))).limit(1)
-    if (parent) {
-      const { visibility, access, shareReview, quarantinedAt, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt, createdAt } = parent
-      fields = { ...fields, visibility, access, shareReview, quarantinedAt: fields.quarantinedAt ?? quarantinedAt, lifetime, keepReason, trashedAt, trashReason, lastAccessedAt: lastAccessedAt ?? createdAt }
-    }
-  }
-  const drop = { ...fields, ownerBanned: !row.owner || Boolean(row.owner.banned), expired: Boolean(fields.trashedAt) || isExpired(fields, Date.now(), expiryPolicy(event).days) }
+  const ancestors = row.drop.parentId ? (await ancestorsOf([row.drop])).get(row.drop.id)! : []
+  const drop: DropRow = { ...resolveNode(row.drop, ancestors, expiryPolicy(event).days), ownerBanned: !row.owner || Boolean(row.owner.banned) }
   if (event && drop.shareReview && await shareReviewFor(drop.ownerId, event, row.owner) === null) drop.shareReview = null
   return drop
 }
+
+/** Rows as their ancestors make them, with one ancestor query per 90 rows. */
+async function resolveRows(rows: (typeof drops.$inferSelect)[], days: number) {
+  const ancestors = await ancestorsOf(rows)
+  return rows.map(row => resolveNode(row, ancestors.get(row.id) ?? [], days))
+}
+
+/** Search words, matched against the title, the file name, and the slug. */
+const searchWords = (query?: string) => query?.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 10) ?? []
+const matching = (words: string[]) => words.map(word =>
+  sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coalesce(${drops.slug}, '')) LIKE ${`%${word.replace(/[\\%_]/g, "\\$&")}%`} ESCAPE '\\'`)
+
+/**
+ * Listed rows as summaries: app paths for the owner's apps, how many drops each folder holds, image thumbnails, and with
+ * `path` the folders each one sits in, up to (not including) `below`.
+ */
+async function summarize(rows: DropRow[], days: number, options: { ownerId?: string; path?: boolean; below?: string } = {}) {
+  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
+  const files = options.ownerId && rows.some(row => row.kind === "app")
+    ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).innerJoin(dropHeads, eq(dropHeads.dropId, dropFiles.dropId)).where(eq(dropHeads.ownerId, options.ownerId))
+    : []
+  const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
+  const counts = await itemCounts(rows.filter(row => row.kind === "folder").map(row => row.id))
+  const pathOf = (row: DropRow) => {
+    const above = row.ancestors ?? []
+    const stop = options.below ? above.findIndex(node => node.id === options.below) : -1
+    return (stop === -1 ? above : above.slice(0, stop)).map(toCrumb).reverse()
+  }
+  return rows.map(row => ({
+    ...toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days),
+    ...(row.kind === "folder" ? { items: counts.get(row.id) ?? 0 } : {}),
+    ...(row.kind === "image" && row.blobKey ? { thumbnail: `/f/${row.blobKey}` } : {}),
+    ...(options.path ? { path: pathOf(row) } : {}),
+  }))
+}
+
+const heads = (where: SQL | undefined, limit: number) => db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
+  .where(where).orderBy(desc(dropHeads.updatedAt)).limit(limit).then(rows => rows.map(row => row.drop))
 
 /** A drop by its id, or by its share link's key: the doc's latest version. */
 export async function findDrop(id: string, event?: H3Event) {
@@ -125,26 +180,47 @@ export async function findDropByBlob(key: string, event?: H3Event) {
 }
 
 /**
- * Your drops, newest first, or the ones in your Trash. Older versions of a doc hide behind their latest, and files a
- * doc embeds hide behind the doc.
+ * Your drops, newest first: the ones at the top (folders hold the rest), the ones in your Trash, or with `query` the
+ * matches at any depth. Older versions of a doc hide behind their latest, and files a doc embeds hide behind the doc.
+ * A folder in the Trash takes its drops along, so only the top-most node in the Trash lists.
  */
-export async function listDrops(who: Identity, event?: H3Event, options: { trash?: boolean } = {}): Promise<DropSummary[]> {
-  const rows = (await db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
-    .where(and(eq(dropHeads.ownerId, who.userId), isNull(drops.parentId))).orderBy(desc(dropHeads.updatedAt)).limit(500)).map(row => row.drop)
+export async function listDrops(who: Identity, event?: H3Event, options: { trash?: boolean; query?: string } = {}): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
-  const now = Date.now()
-  const listed = rows.map(row => ({ ...row, expired: Boolean(row.trashedAt) || isExpired(row, now, days) })).filter(row => row.expired === Boolean(options.trash))
-  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
-  const files = listed.some(row => row.kind === "app")
-    ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).innerJoin(dropHeads, eq(dropHeads.dropId, dropFiles.dropId)).where(eq(dropHeads.ownerId, who.userId))
-    : []
-  const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
-  return listed.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days))
+  const words = searchWords(options.query)
+  const scope = options.trash ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt))) : words.length ? listedNode : isNull(drops.parentId)
+  const rows = await resolveRows(await heads(and(eq(dropHeads.ownerId, who.userId), scope, ...matching(words)), 500), days)
+  const listed = rows.filter(row => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
+  return summarize(listed, days, { ownerId: who.userId, path: words.length > 0 })
+}
+
+/**
+ * A folder's drops, newest first: the ones directly inside, or with `query` the matches anywhere below it. Drops someone
+ * moved to the Trash on their own list there instead. Anyone who may open the folder may open what it holds.
+ */
+export async function listFolder(folder: DropRow, event?: H3Event, options: { query?: string } = {}): Promise<DropSummary[]> {
+  const { days } = expiryPolicy(event)
+  const words = searchWords(options.query)
+  const inside = words.length ? inArray(drops.parentId, foldersUnder(folder.id)) : eq(drops.parentId, folder.id)
+  const found = await heads(and(eq(dropHeads.ownerId, folder.ownerId), inside, isNull(drops.trashedAt), ...matching(words)), words.length ? 200 : 500)
+  // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
+  const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
+  const rows = words.length ? await resolveRows(found, days) : found.map(row => resolveNode(row, above, days))
+  // The owner may open a folder in the Trash, and sees what it holds as it was.
+  const listed = rows.filter(row => folder.expired || !row.expired).map(row => ({ ...row, ownerBanned: folder.ownerBanned }))
+  return summarize(listed, days, { ownerId: folder.ownerId, path: words.length > 0, below: folder.id })
+}
+
+/** Every folder you have, for picking where a drop goes. Folders in the Trash stay out. */
+export async function listFolders(who: Identity, event?: H3Event): Promise<DropSummary[]> {
+  const { days } = expiryPolicy(event)
+  const rows = await resolveRows(await heads(and(eq(dropHeads.ownerId, who.userId), eq(drops.kind, "folder")), 500), days)
+  return summarize(rows.filter(row => !row.expired), days, { path: true })
 }
 
 /**
  * Other people's drops you can open: everything shared with the team, plus links you opened while signed in. Newest
- * first; drops waiting for review, in the Trash, or from banned owners stay out.
+ * first; drops waiting for review, in the Trash, or from banned owners stay out. A folder shared with you lists once:
+ * the drops inside open from it.
  */
 export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const visited = exists(db.select({ at: dropVisits.at }).from(dropVisits).where(and(eq(dropVisits.userId, who.userId), eq(dropVisits.dropId, drops.id))))
@@ -152,18 +228,22 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
     .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id)).innerJoin(user, eq(user.id, drops.ownerId))
     .where(and(
       or(eq(drops.visibility, "team"), and(eq(drops.visibility, "shared"), visited)),
-      ne(drops.ownerId, who.userId), isNull(drops.parentId), isNull(drops.trashedAt), isNull(drops.quarantinedAt), isNull(drops.shareReview),
+      ne(drops.ownerId, who.userId), listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt), isNull(drops.shareReview),
       sql`coalesce(${user.banned}, 0) = 0`,
     )).orderBy(desc(drops.updatedAt)).limit(200)
   const { days } = expiryPolicy(event)
-  const now = Date.now()
-  return rows.filter(row => !isExpired(row.drop, now, days))
-    .map(row => ({ ...toSummary({ ...row.drop, expired: false }, undefined, days), owner: { name: row.ownerName, image: row.ownerImage } }))
+  const ancestors = await ancestorsOf(rows.map(row => row.drop))
+  const listed = new Set(rows.map(row => row.drop.id))
+  const owners = new Map(rows.map(row => [row.drop.id, { name: row.ownerName, image: row.ownerImage }]))
+  const nodes = rows.map(row => resolveNode(row.drop, ancestors.get(row.drop.id) ?? [], days))
+    .filter(node => !node.expired && !node.quarantinedAt && !node.shareReview
+      && !node.ancestors!.some(above => listed.has(above.id) || (above.visibility === "team" && !above.shareReview)))
+  return (await summarize(nodes, days)).map(summary => ({ ...summary, owner: owners.get(summary.id)! }))
 }
 
 /** Remembers a link-shared drop a signed-in person opened, at most once a day per drop. */
 export async function recordSharedVisit(drop: DropRow, who: Identity | null) {
-  if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || drop.visibility !== "shared" || drop.parentId) return
+  if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || drop.visibility !== "shared" || isAttachment(drop)) return
   const at = Date.now()
   try {
     await db.insert(dropVisits).values({ userId: who.userId, dropId: drop.id, at })
@@ -232,14 +312,20 @@ export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
 export async function dropDetail(row: DropRow, who: Identity | null, origin: string, event?: H3Event): Promise<DropDetail> {
   const can = permissions(row, who)
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
+  const { days } = expiryPolicy(event)
   const detail: DropDetail = {
-    ...toSummary(row, undefined, expiryPolicy(event).days),
+    ...toSummary(row, undefined, days),
     isOwner: can.manage,
     canComment: can.comment,
     canEdit: false,
     versions: await versionsOf(row),
+    ancestors: openableAncestors(row, who, days),
   }
   detail.canEdit = liveEditable(row, who, detail.versions)
+  if (row.kind === "folder") {
+    detail.children = await listFolder(row, event)
+    detail.items = detail.children.length
+  }
   if (row.kind === "app") {
     const files = await db.select().from(dropFiles).where(eq(dropFiles.dropId, row.id))
     detail.files = Object.fromEntries(await Promise.all(files.map(async file => [file.path, await readText(file.blobKey)] as const)))
@@ -260,6 +346,16 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
   }
   if (TEXT_KINDS.has(row.kind)) detail.attachments = await attachmentsOf(row, origin)
   return detail
+}
+
+/**
+ * The nodes above a drop that the caller may open, top-most first. A share widens going down, so the ones the caller
+ * can't open are always the top-most: someone sent one drop from a private folder sees no folder names.
+ */
+function openableAncestors(row: DropRow, who: Identity | null, days: number): DropCrumb[] {
+  const above = row.ancestors ?? []
+  return above.filter((node, index) => permissions({ ...resolveNode(node, above.slice(index + 1), days), ownerBanned: row.ownerBanned }, who).view)
+    .map(toCrumb).reverse()
 }
 
 /** Files a doc embeds from this Drop, across every version of the doc. */
@@ -350,8 +446,10 @@ async function deleteBlobKeys(keys: string[]) {
 /**
  * Stores one file as a private doc drop. Markdown and HTML must be UTF-8. `slug` names the link (the previous
  * version's, or the title's, otherwise); with `nameFromSlug` the file is called after it too, keeping the extension.
+ * `folder` (checked by `requireFolder`) places a new drop in it. A drop in a folder lives as long as the folder, so it
+ * takes no lifetime of its own, and its slug gets a number when another drop in the folder has it.
  */
-export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; slug?: string; nameFromSlug?: boolean; supersedes?: string; visibility?: Visibility; access?: Access }, event?: H3Event) {
+export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; slug?: string; nameFromSlug?: boolean; supersedes?: string; visibility?: Visibility; access?: Access; folder?: DropRow }, event?: H3Event) {
   await drainBlobCleanup()
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   let filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
@@ -383,9 +481,12 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       previous = (await versionChain(found))[0] ?? found
     }
   }
-  const life = lifetimeFields(who, input, previous, event)
+  const folder = previous ? null : input.folder ?? null
+  const parentId = previous?.parentId ?? folder?.id ?? null
+  const ownerId = previous?.ownerId ?? folder?.ownerId ?? who.userId
+  const life = parentId ? lifetimeFields(who, {}, previous ?? folder, event) : lifetimeFields(who, input, previous, event)
 
-  return withDropQuota(previous?.ownerId ?? who.userId, { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id }, event, async (quota) => {
+  return withDropQuota(ownerId, { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id }, event, async (quota) => {
     const key = `${crypto.randomUUID()}${extension}`
     const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
     if (storageError) {
@@ -405,11 +506,12 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
     const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
     const now = Date.now()
     const title = (input.title?.trim() || markdownTitle || titleFromSource(text ?? "", kind, filename)).slice(0, 160)
-    const slug = (input.slug && slugify(input.slug)) || previous?.slug || slugify(title)
+    const named = (input.slug && slugify(input.slug)) || previous?.slug || slugify(title)
+    const slug = named === previous?.slug ? named : await uniqueSlug(parentId, named, previous?.link)
     if (input.nameFromSlug) filename = `${slug || "doc"}${extension}`
     const row: DropRow = {
       id: crypto.randomUUID(),
-      ownerId: previous?.ownerId ?? who.userId,
+      ownerId,
       kind,
       title,
       filename,
@@ -431,8 +533,8 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       note: input.note?.trim() || null,
       trashedAt: null,
       trashReason: null,
-      parentId: null,
-      shareReview: (input.visibility ?? previous?.visibility ?? "private") !== "private" ? await shareReviewFor(previous?.ownerId ?? who.userId, event) : null,
+      parentId,
+      shareReview: (input.visibility ?? previous?.visibility ?? "private") !== "private" ? await shareReviewFor(ownerId, event) : null,
       quarantinedAt: null,
       publishToken: null,
       siteUrl: null,
@@ -440,7 +542,7 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
     try {
       // A new version is a visit: the older versions restart their window with it, and take its lifetime.
       const chain = previous ? [renewDrop(previous, now), db.update(drops).set(life).where(sql`${drops.id} IN (${chainOf(previous)})`)] : []
-      await quota.commit([db.insert(drops).values(row), ...chain], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
+      await quota.commit([db.insert(drops).values(row), ...chain, ...(folder ? [touchFolder(folder.id, now)] : [])], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
     }
     catch (error) {
       await deleteBlobKeys([key])
@@ -471,9 +573,10 @@ function cleanPath(path: string) {
  *
  * Creates an app drop, or publishes the next version of one you may edit. A next version starts from the previous
  * one's files: `files` adds or replaces paths, and a path leaves the app only when `removes` names it, so an agent
- * that sends just the files it changed can't delete the rest by accident.
+ * that sends just the files it changed can't delete the rest by accident. `folder` places a new app in it, as in
+ * `createDocDrop`.
  */
-export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; slug?: string; files: Record<string, string>; removes?: string[]; visibility?: Visibility; access?: Access }, event?: H3Event) {
+export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; slug?: string; files: Record<string, string>; removes?: string[]; visibility?: Visibility; access?: Access; folder?: DropRow }, event?: H3Event) {
   const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
   const removes = [...new Set((input.removes ?? []).map(cleanPath))]
@@ -492,12 +595,17 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   // An expired app is read-only even for its owner, so check the Trash before the edit right. Apps have no version chain.
   if (row?.expired && permissions(row, who).manage) throw new HTTPError({ status: 409, statusText: "That app is in the Trash. Restore it first, or publish a new app." })
   if (row && !permissions(row, who).edit) throw new HTTPError({ status: 403, statusText: "You can't edit this app." })
-  const life = lifetimeFields(who, input, row, event)
+  // The app's own share, not the one a folder gives it: this writes the row.
+  const own = row?.raw ?? row
+  const folder = row ? null : input.folder ?? null
+  const parentId = row?.parentId ?? folder?.id ?? null
+  const ownerId = row?.ownerId ?? folder?.ownerId ?? who.userId
+  const life = parentId ? lifetimeFields(who, {}, own ?? folder, event) : lifetimeFields(who, input, row, event)
   const note = input.note?.trim() || null
-  const visibility = input.visibility ?? row?.visibility ?? "private"
-  const shareReview = input.visibility === undefined || input.visibility === row?.visibility
-    ? row?.shareReview ?? null
-    : input.visibility === "private" ? null : await shareReviewFor(row?.ownerId ?? who.userId, event)
+  const visibility = input.visibility ?? own?.visibility ?? "private"
+  const shareReview = input.visibility === undefined || input.visibility === own?.visibility
+    ? own?.shareReview ?? null
+    : input.visibility === "private" ? null : await shareReviewFor(ownerId, event)
 
   const id = row?.id ?? crypto.randomUUID()
   const prefix = `apps/${id}/${crypto.randomUUID()}`
@@ -513,7 +621,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   const size = kept.reduce((total, file) => total + file.size, 0) + encoded.reduce((total, [, bytes]) => total + bytes.byteLength, 0)
   if (size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "An app can be at most 4 MiB." })
   const oldSize = old.reduce((total, file) => total + file.size, 0)
-  return withDropQuota(row?.ownerId ?? who.userId, { drops: row ? 0 : 1, bytes: Math.max(0, size - oldSize), writes: entries.length, targetId: row?.id, app: { files: paths.length, bytes: size } }, event, async (quota) => {
+  return withDropQuota(ownerId, { drops: row ? 0 : 1, bytes: Math.max(0, size - oldSize), writes: entries.length, targetId: row?.id, app: { files: paths.length, bytes: size } }, event, async (quota) => {
     const stagedKeys: string[] = []
     let committedPublish = false
     try {
@@ -525,16 +633,17 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
       }
 
       const name = input.name?.trim() || row?.title || "Untitled app"
-      const slug = (input.slug && slugify(input.slug)) || row?.slug || slugify(name)
+      const named = (input.slug && slugify(input.slug)) || row?.slug || slugify(name)
+      const slug = named === row?.slug ? named : await uniqueSlug(parentId, named, row?.link)
       const next: DropRow = {
-        id, ownerId: row?.ownerId ?? who.userId, kind: "app", title: name.slice(0, 160),
+        id, ownerId, kind: "app", title: name.slice(0, 160),
         filename: row?.filename ?? `${slug || "app"}/`,
         blobKey: null, contentType: null, size, version: (row?.version ?? 0) + 1, supersedesId: row?.supersedesId ?? null,
         link: row?.link ?? newLink(), slug,
-        shareReview, quarantinedAt: row?.quarantinedAt ?? null,
-        visibility, access: input.access ?? (row?.access as Access | undefined) ?? "comment",
+        shareReview, quarantinedAt: own?.quarantinedAt ?? null,
+        visibility, access: input.access ?? (own?.access as Access | undefined) ?? "comment",
         actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
-        lastAccessedAt: now, ...life, note, trashedAt: null, trashReason: null, parentId: null, siteUrl: null,
+        lastAccessedAt: now, ...life, note, trashedAt: null, trashReason: null, parentId, siteUrl: null,
       }
       const fileRows = [
         ...kept.map(file => ({ dropId: id, path: file.path, blobKey: file.blobKey, size: file.size })),
@@ -544,6 +653,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
         await quota.commit([
           db.insert(drops).values(next),
           ...quota.fileInserts(fileRows),
+          ...(folder ? [touchFolder(folder.id, now)] : []),
         ])
         committedPublish = true
       }
@@ -578,23 +688,30 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   })
 }
 
-/** Moves a drop (every version) to the Trash. Its links stop working; it's purged after 15 days. */
+/**
+ * Moves a drop (every version) to the Trash. Its links stop working; it's purged after 15 days. Everything below it goes
+ * with it: the drops below read the Trash from their ancestors, so a folder takes one write.
+ */
 export async function trashDrop(row: DropRow, now = Date.now()) {
   await db.update(drops).set({ trashedAt: now, trashReason: "deleted" }).where(sql`${drops.id} IN (${chainOf(row)})`)
 }
 
-/** Brings a drop back from the Trash with a fresh window, whether it was deleted or expired. */
+/** Brings a drop back from the Trash with a fresh window, whether it was deleted or expired, and everything below it. */
 export async function restoreDrop(row: DropRow, now = Date.now()) {
   await db.update(drops).set({ trashedAt: null, trashReason: null, lastAccessedAt: now }).where(sql`${drops.id} IN (${chainOf(row)})`)
 }
 
-/** Removes a drop for good: every version, its files, its comments, and the files it embeds. */
-export async function deleteDrop(row: DropRow) {
+/**
+ * Removes a drop for good: every version, its files, its comments, the files it embeds, and for a folder everything
+ * in it, depth first. `gone` collects the deleted ids, so a chain is deleted once however many of its versions point here.
+ */
+export async function deleteDrop(row: DropRow, gone = new Set<string>()) {
   await drainBlobCleanup()
   const ids = (await db.select({ id: drops.id }).from(drops).where(sql`${drops.id} IN (${chainOf(row)})`)).map(item => item.id)
-  const attached = await db.select().from(drops).where(sql`${drops.parentId} IN (${chainOf(row)})`)
+  for (const id of ids) gone.add(id)
+  const children = await db.select().from(drops).where(sql`${drops.parentId} IN (${chainOf(row)})`)
+  for (const child of children) if (!gone.has(child.id)) await deleteDrop(child, gone)
   await deleteRetainedDrop(row, deleteBlobKeys)
-  for (const file of attached) await deleteRetainedDrop(file, deleteBlobKeys)
   // Live drafts are Blob files too (#live-drafts), one per version anyone opened in the editor.
   if (row.kind === "markdown" && LIVE_EDITING) await deleteBlobKeys(ids.map(draftPath))
 }
@@ -610,8 +727,9 @@ export async function emptyTrash(who: Identity, event?: H3Event) {
 }
 
 /**
- * The hourly cleanup, in bounded batches (the next run picks up the rest). Drops past their window move to the
- * Trash as of when they expired; drops 15 days into the Trash, and attachments whose doc is gone, are deleted.
+ * The hourly cleanup, in bounded batches (the next run picks up the rest). Drops at the top past their window move to
+ * the Trash as of when they expired (the drops below follow them); drops 15 days into the Trash, with everything below
+ * them, and nodes whose parent is gone, are deleted.
  */
 export async function deleteExpiredDrops(now: Date, limit = 50) {
   const at = now.getTime()
@@ -631,7 +749,7 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
     await deleteDrop(row)
     log.info({ action: "drop-purged", drop: row.id, owner: row.ownerId, reason: row.trashReason })
   }
-  for (const row of orphans) await deleteRetainedDrop(row, deleteBlobKeys)
+  for (const row of orphans) await deleteDrop(row)
   return due.length + orphans.length
 }
 

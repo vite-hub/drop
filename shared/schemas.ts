@@ -29,6 +29,14 @@ export const DropPatchSchema = v.object({
   renew: v.optional(v.literal(true)),
   /** True moves the drop to the Trash; false restores it with a fresh window. */
   trashed: v.optional(v.boolean()),
+  /** The folder to move the drop into (its id or link), or null to move it to the top. */
+  folder: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(600)))),
+})
+
+export const FolderSchema = v.object({
+  title: v.pipe(v.string(), v.trim(), v.minLength(1, "Name the folder."), v.maxLength(160)),
+  /** The folder to create it in, by id or link. */
+  folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
 
 export const AppSchema = v.object({

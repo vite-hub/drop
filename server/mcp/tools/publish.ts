@@ -11,6 +11,7 @@ import { comments } from "../../databases/config"
 import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "../../utils/drops"
 import { shareChange, updateDrop } from "../../utils/drop-update"
 import { chainOf } from "../../utils/expiry"
+import { requireFolder } from "../../utils/folders"
 import { requireIdentity } from "../../utils/identity"
 import { annotationIssues } from "../../utils/markdown-document"
 import { quotaToolResult } from "../../utils/quotas"
@@ -35,18 +36,20 @@ const Input = v.object({
   share: v.optional(v.pipe(v.picklist(["private", "view", "comment", "edit"]), v.description("private (default for new drops), or what people it's shared with can do: view, comment, or edit (signed-in people only). Share when the user asked to, or when the drop is clearly meant for others, such as a PR asset."))),
   audience: v.optional(v.pipe(v.picklist(["team", "link"]), v.description("Who the share reaches: team (everyone signed in to this Drop, who find it under Shared with me) or link (anyone with the link, no sign-in). Defaults to the drop's current audience, or link."))),
   resolves: v.optional(v.pipe(v.array(v.pipe(v.number(), v.integer())), v.maxLength(90), v.description("Numbers of the open comments this version addresses, from read_drop on previous. Comments written on earlier versions count too. They're marked resolved."))),
+  folder: v.optional(v.pipe(v.string(), v.description("Id or link of a folder (create_folder) to put the drop in. It then shares and lives with the folder, so it needs no lifetime. With previous, moves the drop there."))),
 })
 
 export default defineMcpTool({
   name: "publish",
   title: "Publish a drop",
-  description: "Publish one thing for review: a doc (markdown or html), a static app (files), or a file such as a screenshot (file). Pass previous to publish its next version. Every call creates a drop or a version, so don't repeat a call that succeeded.",
+  description: "Publish one thing for review: a doc (markdown or html), a static app (files), or a file such as a screenshot (file). Pass previous to publish its next version, and folder to put it in a folder. Every call creates a drop or a version, so don't repeat a call that succeeded.",
   inputSchema: toStandardJsonSchema(Input),
   handler: async (input, event) => quotaToolResult(async () => {
     const who = await requireIdentity(event)
     const given = (["markdown", "html", "files", "file"] as const).filter(key => input[key] !== undefined)
     if (given.length !== 1) throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, or file." })
-    if (!input.previous && !input.lifetime) throw new HTTPError({ status: 400, message: "Say how long this drop should live: lifetime temporary, review, or keep." })
+    if (!input.previous && !input.folder && !input.lifetime) throw new HTTPError({ status: 400, message: "Say how long this drop should live: lifetime temporary, review, or keep." })
+    const folder = input.folder && !input.previous ? await requireFolder(input.folder, who, event) : undefined
     if (input.slug !== undefined && !slugify(input.slug)) throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
     let previous = input.previous ? await findDropByRef(input.previous, event) : null
     if (previous?.expired && permissions(previous, who).manage) throw new HTTPError({ status: 409, message: `${input.previous} is in the Trash. Restore it with update_drop first, or publish a new drop.` })
@@ -59,7 +62,7 @@ export default defineMcpTool({
     let warnings: string[] = []
     if (input.files) {
       if (previous && previous.kind !== "app") throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
-      row = await publishApp(who, { id: previous?.id, name: input.title, slug: input.slug, files: input.files, removes: input.removes, ...share, ...life }, event)
+      row = await publishApp(who, { id: previous?.id, name: input.title, slug: input.slug, files: input.files, removes: input.removes, folder, ...share, ...life }, event)
       warnings = row.warnings
     }
     else {
@@ -83,10 +86,11 @@ export default defineMcpTool({
         bytes = new TextEncoder().encode(source)
       }
       // Markdown and HTML sent as text are named after the link's slug; a file keeps its own name.
-      row = await createDocDrop(who, { filename, bytes, title: input.title, slug: input.slug, nameFromSlug: !input.file, supersedes: previous?.id, ...share, ...life }, event)
+      row = await createDocDrop(who, { filename, bytes, title: input.title, slug: input.slug, nameFromSlug: !input.file, supersedes: previous?.id, folder, ...share, ...life }, event)
       // The share and the slug apply to every version, like a change on the drop's page.
-      if (previous && (input.share || input.slug)) await updateDrop({ ...row, expired: false }, who, { ...share, ...(input.slug ? { slug: input.slug } : {}) }, event)
+      if (previous && (input.share || input.slug)) await updateDrop((await findDrop(row.id, event))!, who, { ...share, ...(input.slug ? { slug: input.slug } : {}) }, event)
     }
+    if (previous && input.folder) await updateDrop((await findDrop(row.id, event))!, who, { folder: input.folder }, event)
 
     let resolved: number[] = []
     if (previous && input.resolves?.length) {

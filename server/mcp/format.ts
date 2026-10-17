@@ -6,6 +6,7 @@ import type { Share } from "../utils/drop-update"
 /** What agents get back for a drop: enough to link it, embed its file, and know who can open it and for how long. */
 export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "blobKey">) {
   const share: Share = drop.visibility === "private" ? "private" : drop.access
+  const file = row?.blobKey ? `/f/${row.blobKey}` : drop.thumbnail
   return {
     id: drop.id,
     title: drop.title,
@@ -13,9 +14,14 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     version: drop.version,
     url: dropPageUrl(origin, drop),
     // Embed this in a doc (Markdown image, ::screenshot src) to make the file part of that doc.
-    ...(row?.blobKey && (drop.kind === "image" || drop.kind === "file") ? { fileUrl: new URL(`/f/${row.blobKey}`, origin).href } : {}),
+    ...(file && (drop.kind === "image" || drop.kind === "file") ? { fileUrl: new URL(file, origin).href } : {}),
+    // Search results say where a drop sits.
+    ...(drop.path?.length ? { folder: drop.path.map(crumb => crumb.title).join(" / ") } : {}),
+    ...(drop.items !== undefined ? { items: drop.items } : {}),
     share,
     ...(drop.visibility !== "private" ? { sharedWith: drop.visibility === "team" ? "team" as const : "link" as const } : {}),
+    // The share comes from a folder above, wider than the drop's own.
+    ...(drop.sharedFrom ? { sharedThrough: drop.sharedFrom.title } : {}),
     ...(drop.owner ? { owner: drop.owner.name } : {}),
     ...(drop.shareReview === "pending" ? { waitingForReview: true } : {}),
     lifetime: drop.lifetime,
@@ -29,7 +35,7 @@ export type McpDrop = ReturnType<typeof mcpDrop>
 
 /** One line per drop for clients that only read text. */
 export const dropLine = (drop: McpDrop) =>
-  `- ${drop.title} (${drop.kind} v${drop.version}, ${drop.share}${drop.sharedWith ? ` with the ${drop.sharedWith}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
+  `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : `${drop.kind} v${drop.version}`}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.sharedWith ? ` with the ${drop.sharedWith}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
 
 /** Where a comment points, in words: the quoted text, or a spot or area as percentages of an image or element. */
 export function commentTarget(comment: Pick<DropComment, "kind" | "quote" | "label" | "ox" | "oy" | "ow" | "oh">) {

@@ -1,0 +1,150 @@
+import { and, eq, inArray, isNull, like, or, sql } from "drizzle-orm"
+import { db } from "vite-hub/database/drizzle"
+import { MAX_SLUG } from "#shared/links"
+import { MAX_DEPTH, VISIBILITY_RANK } from "#shared/nodes"
+import { ACCESS_RANK, type Access, type Visibility } from "#shared/types"
+import { dropHeads, drops } from "../databases/config"
+import type { DropRow } from "./drops"
+import { isExpired } from "./expiry"
+
+// Every drop is a node: it may sit in a folder, and the files a doc embeds hang off the doc. A node takes the widest
+// share on its path, the strictest review and quarantine, and the lifetime and Trash of the top-most node. Reads work
+// this out from the ancestors, found in one recursive query, so sharing, moving or trashing a folder writes one row.
+
+type Row = typeof drops.$inferSelect
+export interface Grant { visibility: Visibility; access: Access }
+
+/** The most steps a walk up takes: a full folder path, then a doc, then a file it embeds. */
+const MAX_WALK = MAX_DEPTH + 2
+
+/** Each row's ancestors, nearest first, keyed by the row's id. One query per 90 rows: D1 binds at most 100 values. */
+export async function ancestorsOf(rows: Pick<Row, "id" | "parentId" | "ownerId">[]) {
+  const parents = [...new Set(rows.flatMap(row => (row.parentId ? [row.parentId] : [])))]
+  const byId = new Map<string, Row>()
+  for (let offset = 0; offset < parents.length; offset += 90) {
+    const seeds = sql.join(parents.slice(offset, offset + 90).map(id => sql`${id}`), sql`, `)
+    const found = await db.select().from(drops).where(inArray(drops.id, sql`(
+      WITH RECURSIVE up(id, depth) AS (
+        SELECT id, 1 FROM drops WHERE id IN (${seeds})
+        UNION ALL SELECT d.parent_id, up.depth + 1 FROM drops d JOIN up ON d.id = up.id WHERE d.parent_id IS NOT NULL AND up.depth < ${MAX_WALK}
+      ) SELECT id FROM up
+    )`))
+    for (const row of found) byId.set(row.id, row)
+  }
+  const result = new Map<string, Row[]>()
+  for (const row of rows) {
+    const path: Row[] = []
+    // A node only sits under its owner's nodes. Nothing writes a cycle, but one would end the walk here too.
+    for (let id = row.parentId; id && path.length < MAX_WALK;) {
+      const parent = byId.get(id)
+      if (!parent || parent.ownerId !== row.ownerId || parent.id === row.id || path.includes(parent)) break
+      path.push(parent)
+      id = parent.parentId
+    }
+    result.set(row.id, path)
+  }
+  return result
+}
+
+/** Private shares reach nobody; otherwise the audience counts first, then the access level. */
+const shareRank = (node: Grant) => (node.visibility === "private" ? -1 : VISIBILITY_RANK[node.visibility] * 3 + ACCESS_RANK[node.access])
+
+/**
+ * A row as its ancestors make it. `visibility` and `access` become the widest share on the path, and `grants` keeps every
+ * share for `permissions`, which picks the ones that reach the caller. Review and quarantine anywhere above hold the
+ * whole subtree. Lifetime and the expiry window come from the top-most node; the nearest node in the Trash puts
+ * everything below it there. `raw` keeps the row's own values, which is what changing it edits.
+ */
+export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date.now()): DropRow {
+  if (!ancestors.length) return { ...row, ancestors, expired: Boolean(row.trashedAt) || isExpired(row, now, days) }
+  const path = [row, ...ancestors]
+  const root = ancestors.at(-1)!
+  const widest = path.reduce((best, node) => (shareRank(node as Grant) > shareRank(best as Grant) ? node : best), row)
+  const trashed = path.find(node => node.trashedAt)
+  const fields: Row = {
+    ...row,
+    visibility: widest.visibility,
+    access: widest.access,
+    shareReview: path.find(node => node.shareReview === "rejected")?.shareReview ?? path.find(node => node.shareReview)?.shareReview ?? null,
+    quarantinedAt: path.find(node => node.quarantinedAt)?.quarantinedAt ?? null,
+    lifetime: root.lifetime,
+    keepReason: root.keepReason,
+    lastAccessedAt: root.lastAccessedAt ?? root.createdAt,
+    trashedAt: trashed?.trashedAt ?? null,
+    trashReason: trashed?.trashReason ?? null,
+  }
+  return {
+    ...fields,
+    raw: row,
+    ancestors,
+    grants: path.filter(node => node.visibility !== "private").map(node => ({ visibility: node.visibility, access: node.access as Access })),
+    ...(widest !== row ? { sharedFrom: { id: widest.id, title: widest.title } } : {}),
+    expired: Boolean(fields.trashedAt) || isExpired(fields, now, days),
+  }
+}
+
+/** A file a doc embeds (or a site's screenshot): it hangs off a node that isn't a folder. Unknown ancestors count too. */
+export const isAttachment = (row: Pick<DropRow, "parentId" | "ancestors">) => row.parentId !== null && row.ancestors?.[0]?.kind !== "folder"
+
+/** The node directly above, as its own ancestors make it. Null at the top. */
+export const parentNode = (row: Pick<DropRow, "ancestors">, days: number) =>
+  row.ancestors?.length ? resolveNode(row.ancestors[0]!, row.ancestors.slice(1), days) : null
+
+/** The top-most node, whose lifetime and window the subtree lives by. */
+export const rootOf = (row: DropRow) => row.ancestors?.at(-1) ?? row
+
+/** How deep a node sits: 1 at the top. Embedded files don't count. */
+export const depthOf = (row: Pick<DropRow, "ancestors" | "kind">) => 1 + (row.ancestors?.filter(node => node.kind === "folder").length ?? 0)
+
+/** The levels a node takes up, itself included: 1, or for a folder its deepest drop's depth below it. */
+export async function heightOf(row: Pick<Row, "id" | "kind">) {
+  if (row.kind !== "folder") return 1
+  const [deepest] = await db.all<{ depth: number }>(sql`WITH RECURSIVE down(id, kind, depth) AS (
+    SELECT id, kind, 1 FROM drops WHERE id = ${row.id}
+    UNION ALL SELECT d.id, d.kind, down.depth + 1 FROM drops d JOIN down ON d.parent_id = down.id WHERE down.kind = 'folder' AND down.depth <= ${MAX_DEPTH}
+  ) SELECT max(depth) AS depth FROM down`)
+  return Number(deepest?.depth ?? 1)
+}
+
+/** A folder and every folder below it, for searching a subtree. */
+export const foldersUnder = (id: string) => sql`(
+  WITH RECURSIVE down(id, depth) AS (
+    SELECT ${id}, 0
+    UNION ALL SELECT d.id, down.depth + 1 FROM drops d JOIN down ON d.parent_id = down.id WHERE d.kind = 'folder' AND down.depth < ${MAX_DEPTH}
+  ) SELECT id FROM down
+)`
+
+/** Drops people list and count: at the top or in a folder, not files a doc embeds. Written for queries on `drops` unaliased. */
+export const listedNode = sql`("drops"."parent_id" IS NULL OR EXISTS (SELECT 1 FROM drops p WHERE p.id = "drops"."parent_id" AND p.kind = 'folder'))`
+
+/**
+ * `slug`, or `slug-2`, `slug-3` and so on when another drop in the same folder has it, like file names in a directory.
+ * Drops at the top need no unique slug: their links tell them apart. `link` is the drop being named, which may keep its own.
+ */
+export async function uniqueSlug(parentId: string | null, slug: string, link?: string | null) {
+  if (!parentId || !slug) return slug
+  const siblings = await db.select({ slug: drops.slug }).from(drops).innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
+    .where(and(eq(drops.parentId, parentId), isNull(drops.trashedAt), link ? sql`coalesce(${drops.link}, '') != ${link}` : sql`1`, or(eq(drops.slug, slug), like(drops.slug, `${slug}-%`))))
+  const taken = new Set(siblings.map(row => row.slug))
+  if (!taken.has(slug)) return slug
+  for (let n = 2; ; n++) {
+    const suffix = `-${n}`
+    const next = `${slug.slice(0, MAX_SLUG - suffix.length).replace(/-+$/, "")}${suffix}`
+    if (!taken.has(next)) return next
+  }
+}
+
+/** A folder's time is its latest change, like a directory's: a drop added to it or moved in. */
+export const touchFolder = (id: string, now = Date.now()) => db.update(drops).set({ updatedAt: now }).where(eq(drops.id, id))
+
+/** How many drops sit directly in each folder, Trash aside. */
+export async function itemCounts(ids: string[]) {
+  const counts = new Map<string, number>()
+  for (let offset = 0; offset < ids.length; offset += 90) {
+    const rows = await db.select({ parentId: drops.parentId, count: sql<number>`count(*)`.mapWith(Number) }).from(drops)
+      .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
+      .where(and(inArray(drops.parentId, ids.slice(offset, offset + 90)), isNull(drops.trashedAt))).groupBy(drops.parentId)
+    for (const row of rows) counts.set(row.parentId!, row.count)
+  }
+  return counts
+}

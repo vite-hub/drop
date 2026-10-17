@@ -47,17 +47,17 @@ export function isHumanVisit(headers: Headers, kind: "beacon" | "document") {
 /**
  * Restarts the drop's expiry window. People and agents who identify themselves always count; anonymous visitors
  * count when they pass `isHumanVisit`. Writes at most once a day per drop, and never revives an expired drop:
- * that takes an explicit renew.
+ * that takes an explicit renew. A drop in a folder, or a file a doc embeds, lives as long as the node at the top, so
+ * the visit renews that one (its window is the one `row` carries, see ./nodes).
  */
-export async function recordVisit(event: H3Event, row: ExpiryFields & { id: string; ownerId: string; quarantinedAt: number | null; trashedAt: number | null; parentId: string | null }, who: Identity | null, kind: "beacon" | "document") {
+export async function recordVisit(event: H3Event, row: ExpiryFields & { id: string; ownerId: string; quarantinedAt: number | null; trashedAt: number | null; ancestors?: { id: string; ownerId: string }[] }, who: Identity | null, kind: "beacon" | "document") {
   const now = Date.now()
   const { days } = expiryPolicy(event)
-  // An attachment lives as long as its doc, so visiting the doc is what counts.
-  if (!days || row.lifetime === "keep" || row.parentId || row.trashedAt || row.quarantinedAt || isExpired(row, now, days)) return
+  if (!days || row.lifetime === "keep" || row.trashedAt || row.quarantinedAt || isExpired(row, now, days)) return
   if ((row.lastAccessedAt ?? row.createdAt) > now - DAY_MS) return
   if (!who && !isHumanVisit(event.req.headers, kind)) return
   try {
-    await renewDrop(row, now, sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt}) <= ${now - DAY_MS}`)
+    await renewDrop(row.ancestors?.at(-1) ?? row, now, sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt}) <= ${now - DAY_MS}`)
   }
   catch (error) {
     log.error({ action: "drop-visit", error: String(error) })

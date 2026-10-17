@@ -48,11 +48,27 @@ export interface DropSummary {
   /** When it went to the Trash (or expired into it). Null while it's live. */
   trashedAt: number | null
   trashReason: "deleted" | "expired" | null
-  /** The doc this file belongs to: it shares that doc's sharing, lifetime, and Trash. */
+  /**
+   * The node this drop sits in: a folder, or the doc an embedded file belongs to. A drop takes the widest share on its
+   * path, and the lifetime and Trash of the top-most node (see server/utils/nodes.ts).
+   */
   parentId: string | null
+  /** The node above whose share reaches wider than this drop's own. `visibility` and `access` then say the widest. */
+  sharedFrom?: { id: string; title: string }
+  /** This drop's own share, when a node above shares it wider. The share controls change this one. */
+  ownShare?: { visibility: Visibility; access: Access }
+  /** Folders: how many drops are directly inside. */
+  items?: number
+  /** Images in a folder or a search: where the file is served, for a thumbnail. */
+  thumbnail?: string
+  /** Search results: the folders it sits in, top-most first. */
+  path?: DropCrumb[]
   /** "Shared with me" only: whose drop it is. */
   owner?: { name: string; image: string | null }
 }
+
+/** A node on the way to a drop, for breadcrumbs. */
+export interface DropCrumb { id: string; kind: DropKind; title: string; link: string; slug: string }
 
 export interface DropVersion { id: string; title: string; version: number; createdAt: number; note: string | null; actorName: string; current?: boolean }
 
@@ -79,6 +95,10 @@ export interface DropDetail extends DropSummary {
   versions: DropVersion[]
   /** Docs: the files they embed from this Drop. */
   attachments?: DropAttachment[]
+  /** The nodes above this one that the reader may open, top-most first. */
+  ancestors: DropCrumb[]
+  /** Folders: the drops directly inside, newest first. */
+  children?: DropSummary[]
 }
 
 export interface DropComment {
