@@ -64,7 +64,9 @@ export default defineAppConfig({
         variant: "pill",
         class: {
           indicator: "bg-default dark:bg-accented shadow-xs",
-          trigger: "data-[state=active]:text-highlighted",
+          // Until hydration there is no indicator, and Nuxt UI paints the active tab with `before:bg-inverted`: a solid
+          // black pill with dark text. Paint that fallback like the indicator.
+          trigger: "data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-accented",
         },
       }],
     },
