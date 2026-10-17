@@ -20,7 +20,7 @@
 [template.environment]
   GITHUB_CLIENT_ID = "GitHub OAuth app client id. Callback: https://<site>.netlify.app/api/auth/callback/github"
   GITHUB_CLIENT_SECRET = "Client secret from that GitHub OAuth app"
-  VITEHUB_SECRET = "Drop's one secret. Generate with openssl rand -base64 32"
+  BETTER_AUTH_SECRET = "Generate with openssl rand -base64 32"
   DROP_ADMINS = "Your GitHub user id: gh api users/<login> --jq .id. Comma-separated for multiple admins"
   CLOUDFLARE_ACCOUNT_ID = "Account id from the Cloudflare dashboard"
   CLOUDFLARE_API_TOKEN = "Account API token with Account, D1, Edit permission"

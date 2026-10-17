@@ -5,7 +5,7 @@ const props = withDefaults(defineProps<{ extra?: Array<[name: string, what: stri
 const COMMON: Array<[string, string]> = [
   ["GITHUB_CLIENT_ID", "Your GitHub OAuth app's client ID."],
   ["GITHUB_CLIENT_SECRET", "A client secret from the same app."],
-  ["VITEHUB_SECRET", "Drop's one secret: it derives the keys for sessions, agent tokens, and drop origins. One per deployment: openssl rand -base64 32"],
+  ["BETTER_AUTH_SECRET", "Signs sessions and agent tokens. One per deployment: openssl rand -base64 32"],
   ["DROP_ADMINS", "GitHub user ids that join as Admin, comma-separated: gh api users/<login> --jq .id"],
 ]
 const rows = computed(() => [...COMMON, ...props.extra])

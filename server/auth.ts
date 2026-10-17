@@ -8,7 +8,6 @@ import { db, schema } from "vite-hub/database/drizzle"
 import type { ServerEnv } from "#vitehub/env/server"
 import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
-import { authSecret } from "./utils/secrets"
 import { nativeClientRegistration } from "./utils/oauth-clients"
 import { isGitHubMember } from "./utils/github-membership"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
@@ -46,7 +45,7 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
     appName: "Drop",
     baseURL: requestOrigin,
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
-    secret: authSecret(env),
+    secret: env.auth.secret.unseal(),
     route: false,
     // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
     // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.

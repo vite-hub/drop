@@ -14,5 +14,5 @@
   "r2_buckets": [{ "binding": "BLOB", "bucket_name": "vitehub-drop" }],
   "kv_namespaces": [{ "binding": "KV", "id": "00000000000000000000000000000000" }],
   "browser": { "binding": "BROWSER" },
-  "secrets": { "required": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "VITEHUB_SECRET", "DROP_ADMINS"] }
+  "secrets": { "required": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "BETTER_AUTH_SECRET", "DROP_ADMINS"] }
 }

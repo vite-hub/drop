@@ -93,8 +93,8 @@
       "GITHUB_CLIENT_SECRET": {
         "description": "Client secret from the same GitHub OAuth app."
       },
-      "VITEHUB_SECRET": {
-        "description": "Drop's one secret; every key it needs is derived from it. Generate with `openssl rand -base64 32`."
+      "BETTER_AUTH_SECRET": {
+        "description": "Generate with `openssl rand -base64 32`."
       },
       "DROP_ADMINS": {
         "description": "Your GitHub user id: `gh api users/<login> --jq .id`. Comma-separated for multiple admins."
