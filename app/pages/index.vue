@@ -41,13 +41,13 @@ const USE_CASES = [
   {
     story: "pr",
     label: "Pull requests",
-    title: "Put the before and after in every pull request.",
+    title: ["Put the before and after in every ", "pull request", "."],
     body: "Claude Code drops the screenshots with its notes and links them from the PR. Reviewers see what changed, then read the diff.",
   },
   {
     story: "app",
     label: "Vibe-coded apps",
-    title: "Ship the thing you just made.",
+    title: ["Ship the thing you ", "just made", "."],
     body: "Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.",
   },
 ] as const
@@ -70,12 +70,12 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
         <div class="relative mx-auto w-full max-w-6xl px-4 pt-16 pb-24 sm:px-6 lg:pt-24 lg:pb-32">
           <div class="flex flex-col items-center text-center">
             <NuxtLink to="/docs/agents" class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted">
-              <span class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[10px] tracking-wide text-highlighted uppercase">MCP</span>
+              <span class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[11px] tracking-wide text-highlighted uppercase">MCP</span>
               Connect Claude Code, Codex, or any agent
               <UIcon name="i-ph-arrow-right" class="size-3" />
             </NuxtLink>
             <h1 class="max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted">
-              The shared drive for people and their agents.
+              The shared drive for people and <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">their agents</em>.
             </h1>
             <p class="mt-6 max-w-[56ch] text-lg leading-relaxed text-pretty text-muted">
               <LandingMention name="Claude Code" icon="i-simple-icons-claude" color="#D97757" href="https://claude.com/claude-code" />, <LandingMention name="Codex" icon="i-simple-icons-openai" href="https://openai.com/codex" />, or any <LandingMention name="MCP" icon="i-simple-icons-modelcontextprotocol" href="https://modelcontextprotocol.io" /> agent drops a doc, a page, or a small app. You comment on the exact spot, and the agent drops the next version.
@@ -114,11 +114,11 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
         <div class="mb-10 grid items-end gap-x-12 gap-y-3 lg:mb-12 lg:grid-cols-2">
           <div>
             <p class="label-mono mb-3">{{ useCase.label }}</p>
-            <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">{{ useCase.title }}</h2>
+            <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">{{ useCase.title[0] }}<em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">{{ useCase.title[1] }}</em>{{ useCase.title[2] }}</h2>
           </div>
           <p class="max-w-[52ch] leading-relaxed text-pretty text-muted">{{ useCase.body }}</p>
         </div>
-        <div class="rounded-2xl border border-default bg-muted p-3 sm:p-8 lg:p-10">
+        <div class="rounded-xl border border-default bg-muted p-3 sm:p-8 lg:p-10">
           <LazyLandingPrStory v-if="useCase.story === 'pr'" hydrate-on-visible />
           <LazyLandingAppStory v-else hydrate-on-visible />
         </div>
@@ -127,7 +127,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
       <section class="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
         <div class="mb-10 lg:mb-12">
           <p class="label-mono mb-3">A live page for every file</p>
-          <h2 class="text-3xl font-semibold tracking-tight text-highlighted">What every drop gets.</h2>
+          <h2 class="text-3xl font-semibold tracking-tight text-highlighted">What every <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">drop</em> gets.</h2>
         </div>
         <div class="grid gap-px overflow-hidden rounded-xl border border-default bg-(--ui-border) sm:grid-cols-2 lg:grid-cols-4">
           <LazyLandingSpotlightCard v-for="(feature, position) in FEATURES" :key="feature.title" class="p-6" :class="position === 0 && 'sm:col-span-2'" hydrate-on-interaction="pointerenter">
@@ -142,9 +142,9 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
       <LazyLandingOwnIt hydrate-on-visible />
 
       <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
-        <h2 class="mb-10 text-3xl font-semibold tracking-tight text-highlighted lg:mb-12">Use it here, or run your own.</h2>
+        <h2 class="mb-10 text-3xl font-semibold tracking-tight text-highlighted lg:mb-12">Use it here, or <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">run your own</em>.</h2>
         <div class="grid gap-4 md:grid-cols-2">
-          <div class="rounded-lg border border-default p-6">
+          <div class="rounded-xl border border-default bg-default p-6">
             <p class="label-mono">drop.vitehub.dev</p>
             <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Sign in and start dropping.</p>
             <p class="mt-2 text-sm leading-relaxed text-muted">Anyone with a GitHub account can use it. Drops start private, and a link shares them only when you say so.</p>
@@ -154,7 +154,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
               </li>
             </ul>
           </div>
-          <div class="rounded-lg border border-default p-6">
+          <div class="rounded-xl border border-default bg-default p-6">
             <p class="label-mono">Your own</p>
             <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Deploy your own and choose the admins.</p>
             <p class="mt-2 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. The GitHub accounts you list as admins can promote anyone.</p>
@@ -174,9 +174,9 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
       </section>
 
       <section class="mx-auto max-w-6xl px-4 pt-24 pb-24 sm:px-6 lg:pt-32 lg:pb-32">
-        <div class="flex flex-col items-start justify-between gap-6 rounded-lg border border-default p-8 sm:flex-row sm:items-center">
+        <div class="flex flex-col items-start justify-between gap-6 rounded-xl border border-default p-8 sm:flex-row sm:items-center">
           <div>
-            <p class="text-xl font-semibold tracking-tight text-highlighted">Drop your first doc.</p>
+            <p class="text-xl font-semibold tracking-tight text-highlighted">Drop your <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">first</em> doc.</p>
             <p class="mt-1 text-sm text-muted">Sign in with GitHub, connect your agent, and ask it to drop something for review.</p>
           </div>
           <div class="flex flex-wrap gap-2">

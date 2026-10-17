@@ -92,7 +92,7 @@ export default defineNuxtConfig({
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
   },
 
-  css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "~/assets/css/main.css"],
+  css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "@fontsource/instrument-serif/latin-400-italic.css", "~/assets/css/main.css"],
   devtools: false,
   compatibilityDate: "2026-07-17",
 

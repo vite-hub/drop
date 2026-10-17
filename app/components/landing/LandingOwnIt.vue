@@ -18,7 +18,7 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
     <div class="mx-auto grid max-w-6xl items-center gap-12 px-4 py-24 sm:px-6 lg:py-32 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
       <div>
         <p class="label-mono flex items-center gap-2"><ViteHubMark class="size-3" />Built on ViteHub</p>
-        <h2 class="mt-3 text-[2rem] leading-tight font-semibold tracking-tight text-highlighted">You own it.</h2>
+        <h2 class="mt-3 text-3xl leading-tight font-semibold tracking-tight text-highlighted">You <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">own</em> it.</h2>
         <p class="mt-3 max-w-[44ch] leading-relaxed text-muted">
           Fork Drop and deploy it to your own account. Every drop and comment stays there.
         </p>
@@ -26,7 +26,7 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
           <UIcon name="i-simple-icons-betterauth" class="mt-0.5 size-4 shrink-0 text-highlighted" />
           <p class="text-toned">
             Sign-in runs on Better Auth. GitHub is on by default; switch to Google, GitLab, email, or SSO in
-            <code class="font-mono text-[13px] text-highlighted">server/auth.ts</code>.
+            <code class="font-mono text-sm text-highlighted">server/auth.ts</code>.
           </p>
         </div>
         <p class="label-mono mt-8 mb-3">Deploys to</p>
