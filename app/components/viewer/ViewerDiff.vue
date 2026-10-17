@@ -36,7 +36,7 @@ const counts = computed(() => ({ add: hunks.value.filter(line => line.type === "
       <span class="flex-1" />
       <UButton v-if="!version.current" class="shrink-0" color="neutral" :label="`Open v${version.version}`" size="xs" :to="`/drops/${version.id}`" variant="ghost" />
       <UTooltip :kbds="['Esc']" text="Back to the document">
-        <UButton aria-label="Back to the document" color="neutral" icon="i-lucide-x" size="xs" variant="ghost" @click="emit('close')" />
+        <UButton aria-label="Back to the document" color="neutral" icon="i-ph-x" size="xs" variant="ghost" @click="emit('close')" />
       </UTooltip>
     </div>
 
@@ -71,7 +71,7 @@ const counts = computed(() => ({ add: hunks.value.filter(line => line.type === "
           <span class="label-mono w-8">v{{ side.version }}</span>
           <span class="min-w-0 flex-1 truncate font-mono text-xs">{{ side.filename }}</span>
           <span class="text-muted tabular-nums">{{ formatBytes(side.size) }}</span>
-          <UButton v-if="side.url" aria-label="Download" color="neutral" icon="i-lucide-download" size="xs" :to="side.url" external target="_blank" variant="ghost" />
+          <UButton v-if="side.url" aria-label="Download" color="neutral" icon="i-ph-download-simple" size="xs" :to="side.url" external target="_blank" variant="ghost" />
         </li>
       </ul>
     </div>

@@ -20,7 +20,7 @@ const idle = "text-muted hover:bg-elevated hover:text-highlighted"
         @click="open[group.title] = !expanded(group)"
       >
         <span class="flex-1 truncate text-left">{{ group.title }}</span>
-        <UIcon name="i-lucide-chevron-right" class="size-3.5 shrink-0 text-dimmed transition-transform duration-150" :class="expanded(group) && 'rotate-90'" />
+        <UIcon name="i-ph-caret-right" class="size-3.5 shrink-0 text-dimmed transition-transform duration-150" :class="expanded(group) && 'rotate-90'" />
       </button>
       <ul v-if="expanded(group)" class="ml-4 flex flex-col gap-px border-l border-default py-0.5 pl-1">
         <li v-for="link in group.links" :key="link.to">

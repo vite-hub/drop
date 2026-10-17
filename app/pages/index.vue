@@ -28,13 +28,13 @@ const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Wind
 
 // The first card is the point of Drop, so it gets two columns.
 const FEATURES = [
-  { icon: "i-lucide-bot", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand." },
-  { icon: "i-lucide-layers", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link." },
-  { icon: "i-lucide-message-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
-  { icon: "i-lucide-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view, comment, or edit." },
-  { icon: "i-lucide-users", title: "Edit together", body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version." },
-  { icon: "i-lucide-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys. The Drop skill comes with it." },
-  { icon: "i-lucide-history", title: "Older versions one click back", body: "Each new version of a doc gets a number. Drops nobody opens for 30 days expire unless you keep them." },
+  { icon: "i-ph-robot", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand." },
+  { icon: "i-ph-stack", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link." },
+  { icon: "i-ph-chat-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
+  { icon: "i-ph-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view, comment, or edit." },
+  { icon: "i-ph-users", title: "Edit together", body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version." },
+  { icon: "i-ph-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys. The Drop skill comes with it." },
+  { icon: "i-ph-clock-counter-clockwise", title: "Older versions one click back", body: "Each new version of a doc gets a number. Drops nobody opens for 30 days expire unless you keep them." },
 ]
 
 const USE_CASES = [
@@ -72,7 +72,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
             <NuxtLink to="/docs/agents" class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted">
               <span class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[10px] tracking-wide text-highlighted uppercase">MCP</span>
               Connect Claude Code, Codex, or any agent
-              <UIcon name="i-lucide-arrow-right" class="size-3" />
+              <UIcon name="i-ph-arrow-right" class="size-3" />
             </NuxtLink>
             <h1 class="max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted">
               The shared drive for people and their agents.
@@ -81,7 +81,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
               <LandingMention name="Claude Code" icon="i-simple-icons-claude" color="#D97757" href="https://claude.com/claude-code" />, <LandingMention name="Codex" icon="i-simple-icons-openai" href="https://openai.com/codex" />, or any <LandingMention name="MCP" icon="i-simple-icons-modelcontextprotocol" href="https://modelcontextprotocol.io" /> agent drops a doc, a page, or a small app. You comment on the exact spot, and the agent drops the next version.
             </p>
             <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <UButton v-if="signedIn" color="neutral" size="lg" class="h-10 px-4" label="Open Drop" trailing-icon="i-lucide-arrow-right" to="/drops" />
+              <UButton v-if="signedIn" color="neutral" size="lg" class="h-10 px-4" label="Open Drop" trailing-icon="i-ph-arrow-right" to="/drops" />
               <UButton v-else color="neutral" size="lg" class="h-10 px-4" icon="i-simple-icons-github" label="Sign in with GitHub" @click="signInWithGitHub" />
               <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="Read the docs" to="/docs" />
             </div>
@@ -150,7 +150,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
             <p class="mt-2 text-sm leading-relaxed text-muted">Anyone with a GitHub account can use it. Drops start private, and a link shares them only when you say so.</p>
             <ul class="mt-5 space-y-2 text-sm">
               <li v-for="item in HOSTED" :key="item" class="flex items-center gap-2">
-                <UIcon name="i-lucide-check" class="size-4 text-muted" />{{ item }}
+                <UIcon name="i-ph-check" class="size-4 text-muted" />{{ item }}
               </li>
             </ul>
           </div>
@@ -160,7 +160,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
             <p class="mt-2 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. The GitHub accounts you list as admins can promote anyone.</p>
             <ul class="mt-5 space-y-2 text-sm">
               <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
-                <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+                <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
               </li>
             </ul>
             <dl class="mt-5 divide-y divide-default border-y border-default text-sm">

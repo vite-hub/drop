@@ -25,7 +25,7 @@ const { skills, status, setEnabled } = useSkills()
           </h2>
           <p class="mt-1.5 max-w-xl text-sm leading-relaxed text-toned">{{ skill.description }}</p>
           <a class="mt-3 inline-flex items-center gap-1 text-sm font-medium text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 transition-colors hover:decoration-(--ui-text-highlighted)" :href="skill.source" target="_blank" rel="noreferrer">
-            Read on GitHub<UIcon name="i-lucide-arrow-up-right" class="size-3.5" />
+            Read on GitHub<UIcon name="i-ph-arrow-up-right" class="size-3.5" />
           </a>
         </div>
         <USwitch

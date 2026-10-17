@@ -32,9 +32,9 @@ const statusOf = (member: Member) => (member.banned ? "Banned" : "Active")
 function menu(member: Member): DropdownMenuItem[][] {
   return [[
     member.banned
-      ? { label: "Unban", icon: "i-lucide-rotate-ccw", onSelect: () => unban(member) }
-      : { label: "Ban", icon: "i-lucide-ban", color: "error", onSelect: () => ban(member) },
-    { label: "Remove", icon: "i-lucide-trash-2", color: "error", onSelect: () => remove(member) },
+      ? { label: "Unban", icon: "i-ph-arrow-counter-clockwise", onSelect: () => unban(member) }
+      : { label: "Ban", icon: "i-ph-prohibit", color: "error", onSelect: () => ban(member) },
+    { label: "Remove", icon: "i-ph-trash", color: "error", onSelect: () => remove(member) },
   ]]
 }
 
@@ -53,7 +53,7 @@ function menu(member: Member): DropdownMenuItem[][] {
       </div>
     </div>
 
-    <UInput v-if="members.length > 8" v-model="search" class="mb-3 w-full max-w-xs" icon="i-lucide-search" placeholder="Search members" size="sm" />
+    <UInput v-if="members.length > 8" v-model="search" class="mb-3 w-full max-w-xs" icon="i-ph-magnifying-glass" placeholder="Search members" size="sm" />
 
     <div class="overflow-hidden rounded-lg border border-default">
       <table class="w-full table-fixed text-sm">
@@ -106,7 +106,7 @@ function menu(member: Member): DropdownMenuItem[][] {
             </td>
             <td v-if="admin" class="py-3 pr-2">
               <UDropdownMenu v-if="!member.you" :items="menu(member)" :content="{ align: 'end' }">
-                <UButton :aria-label="`Actions for ${member.name}`" color="neutral" icon="i-lucide-ellipsis" size="sm" variant="ghost" />
+                <UButton :aria-label="`Actions for ${member.name}`" color="neutral" icon="i-ph-dots-three" size="sm" variant="ghost" />
               </UDropdownMenu>
             </td>
           </tr>

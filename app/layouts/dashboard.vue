@@ -7,10 +7,10 @@ const at = (path: string) => route.path === path || route.path.startsWith(`${pat
 const close = () => (open.value = false)
 
 const bottom = computed(() => [
-  { label: "Shared with me", icon: "i-lucide-inbox", to: "/drops?tab=with-me", active: route.path === "/drops" && route.query.tab === "with-me" },
-  { label: "Agents", icon: "i-lucide-bot", to: "/agents", active: at("/agents") || at("/approve") },
-  { label: "Skills", icon: "i-lucide-puzzle", to: "/skills", active: at("/skills") },
-  { label: "Members", icon: "i-lucide-users", to: "/members", active: at("/members") },
+  { label: "Shared with me", icon: "i-ph-tray", to: "/drops?tab=with-me", active: route.path === "/drops" && route.query.tab === "with-me" },
+  { label: "Agents", icon: "i-ph-robot", to: "/agents", active: at("/agents") || at("/approve") },
+  { label: "Skills", icon: "i-ph-puzzle-piece", to: "/skills", active: at("/skills") },
+  { label: "Members", icon: "i-ph-users", to: "/members", active: at("/members") },
 ])
 // Docs folds open into its sections, like an app in the Drops tree: open on any docs page unless toggled shut.
 const docsToggled = ref<boolean>()
@@ -38,7 +38,7 @@ const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transit
       </template>
 
       <NuxtLink :class="[item, route.path === '/drops' && route.query.tab !== 'with-me' ? 'bg-elevated font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted']" to="/drops" @click="close">
-        <UIcon name="i-lucide-layers" class="size-4" />Drops
+        <UIcon name="i-ph-stack" class="size-4" />Drops
       </NuxtLink>
       <!-- Drops live under the Drops item: a guide line ties them to it, like folders in a file tree. -->
       <div class="-mx-2 mt-0.5 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
@@ -58,7 +58,7 @@ const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transit
         </NuxtLink>
         <div :class="['flex items-center rounded-md pr-1 text-sm transition-colors', at('/docs') ? 'font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted']">
           <NuxtLink class="flex flex-1 items-center gap-2.5 py-1.5 pl-2.5" to="/docs" @click="close">
-            <UIcon name="i-lucide-book-open" class="size-4" />Docs
+            <UIcon name="i-ph-book-open" class="size-4" />Docs
           </NuxtLink>
           <button
             :aria-expanded="docsOpen"
@@ -67,7 +67,7 @@ const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transit
             type="button"
             @click="docsToggled = !docsOpen"
           >
-            <UIcon name="i-lucide-chevron-right" class="size-3.5 transition-transform duration-150" :class="docsOpen && 'rotate-90'" />
+            <UIcon name="i-ph-caret-right" class="size-3.5 transition-transform duration-150" :class="docsOpen && 'rotate-90'" />
           </button>
         </div>
         <div v-if="docsOpen" class="ml-[1.0625rem] border-l border-default pl-1.5">

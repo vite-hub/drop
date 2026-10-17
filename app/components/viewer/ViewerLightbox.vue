@@ -81,7 +81,7 @@ const shownDraft = computed(() => drag.value?.area ?? props.draft)
 <template>
   <div ref="root" class="fixed inset-0 z-30 flex flex-col">
     <div ref="header" class="flex h-12 shrink-0 items-center gap-3 border-b border-default bg-default px-3">
-      <UButton aria-label="Close image" color="neutral" icon="i-lucide-x" variant="ghost" @click="close" />
+      <UButton aria-label="Close image" color="neutral" icon="i-ph-x" variant="ghost" @click="close" />
       <span class="truncate text-sm font-medium">{{ alt || "Image" }}</span>
       <span v-if="canComment" class="label-mono ml-auto">Click a spot or drag an area to comment</span>
     </div>

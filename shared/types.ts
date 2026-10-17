@@ -14,7 +14,7 @@ export const ACCESS_HINTS: Record<Access, string> = { view: "Read only.", commen
 
 export const VISIBILITY_LABELS: Record<Visibility, string> = { private: "Only you", team: "Your team", shared: "Anyone with the link" }
 export const VISIBILITY_HINTS: Record<Visibility, string> = { private: "Your connected agents can still read it.", team: "Everyone signed in to this Drop can find it.", shared: "No sign-in needed." }
-export const VISIBILITY_ICONS: Record<Visibility, string> = { private: "i-lucide-lock", team: "i-lucide-users", shared: "i-lucide-globe" }
+export const VISIBILITY_ICONS: Record<Visibility, string> = { private: "i-ph-lock", team: "i-ph-users", shared: "i-ph-globe" }
 
 export interface DropSummary {
   id: string

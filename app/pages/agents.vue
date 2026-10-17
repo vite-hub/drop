@@ -26,7 +26,7 @@ const { copy } = useCopy()
         <div class="flex items-center gap-2 rounded-md border border-default bg-muted py-1 pr-1 pl-3">
           <span class="label-mono">Server</span>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-highlighted">{{ server }}</span>
-          <UButton aria-label="Copy server URL" color="neutral" icon="i-lucide-copy" size="xs" variant="ghost" @click="copy(server, 'Server URL copied')" />
+          <UButton aria-label="Copy server URL" color="neutral" icon="i-ph-copy" size="xs" variant="ghost" @click="copy(server, 'Server URL copied')" />
         </div>
         <div class="-mx-1 overflow-x-auto px-1">
           <UTabs v-model="client" :items="clients" :content="false" color="neutral" size="sm" :ui="{ ...tabsUi, root: 'w-max' }" />
@@ -36,7 +36,7 @@ const { copy } = useCopy()
 
       <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
         <span>{{ MCP_HINTS[client] }} The <NuxtLink to="/skills" class="underline">skills</NuxtLink> come with the server.</span>
-        <UButton color="neutral" icon="i-lucide-copy" label="Template" size="sm" variant="ghost" @click="copy(PLAN_TEMPLATE, 'Template copied')" />
+        <UButton color="neutral" icon="i-ph-copy" label="Template" size="sm" variant="ghost" @click="copy(PLAN_TEMPLATE, 'Template copied')" />
       </div>
     </UCard>
 

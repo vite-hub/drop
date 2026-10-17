@@ -105,7 +105,7 @@ async function answer(accept: boolean) {
           <p class="mt-3 text-sm leading-relaxed text-muted">It acts as {{ user?.email ?? user?.name ?? "you" }}:</p>
           <ul class="mt-2 space-y-1.5 text-sm">
             <li v-for="item in ['Drop docs and apps, private until you share them', 'Read your drops and their comments', 'Publish new versions']" :key="item" class="flex gap-2">
-              <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+              <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
             </li>
           </ul>
           <p v-if="destination?.local" class="mt-4 text-xs leading-relaxed text-muted">Allow returns to {{ destination.label }}.</p>

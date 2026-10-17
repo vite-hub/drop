@@ -83,7 +83,7 @@ export function useDropActions() {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
       drops.value = drops.value.filter(item => item.id !== drop.id)
       await refreshNuxtData(["usage", "trash", `drop:${drop.id}`])
-      notify.info({ title: "Moved to the Trash", description: `${drop.title} can be restored for ${TRASH_DAYS} days.`, icon: "i-lucide-trash", actions: [{ label: "Undo", color: "neutral", variant: "outline", onClick: () => void restore(drop) }] })
+      notify.info({ title: "Moved to the Trash", description: `${drop.title} can be restored for ${TRASH_DAYS} days.`, icon: "i-ph-trash", actions: [{ label: "Undo", color: "neutral", variant: "outline", onClick: () => void restore(drop) }] })
       return true
     }
     catch (error) {

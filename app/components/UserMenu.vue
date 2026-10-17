@@ -8,7 +8,7 @@ const { data: me } = useMe()
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: "label", slot: "account" as const }],
   [{ label: "Theme", slot: "theme" as const, onSelect: (event: Event) => event.preventDefault() }],
-  [{ label: "Sign Out", icon: "i-lucide-log-out", onSelect: () => void leave() }],
+  [{ label: "Sign Out", icon: "i-ph-sign-out", onSelect: () => void leave() }],
 ])
 async function leave() {
   await signOut()
@@ -27,7 +27,7 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
         <span class="block truncate text-xs font-medium text-highlighted">{{ me?.name ?? "You" }}</span>
         <span class="block truncate text-xs text-muted">{{ roleLabel }}</span>
       </span>
-      <UIcon name="i-lucide-chevrons-up-down" class="size-3.5 shrink-0 text-dimmed" />
+      <UIcon name="i-ph-caret-up-down" class="size-3.5 shrink-0 text-dimmed" />
     </button>
 
     <template #account>

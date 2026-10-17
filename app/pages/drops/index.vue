@@ -84,7 +84,7 @@ async function onPick(file: File) {
 <template>
   <PageShell id="drops" title="Drops" description="Docs and apps you and your agents dropped. Private until you share them.">
     <template #actions>
-      <UButton color="neutral" icon="i-lucide-upload" label="Upload" variant="outline" @click="picker.open()" />
+      <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" variant="outline" @click="picker.open()" />
     </template>
 
     <div v-if="usage && limited" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default px-4 py-3" aria-live="polite">
@@ -107,15 +107,15 @@ async function onPick(file: File) {
         :content="false"
         :items="[
           { label: `All ${counts.all}`, value: 'all' },
-          { label: `Private ${counts.private}`, value: 'private', icon: 'i-lucide-lock' },
-          { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-lucide-globe' },
-          { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-lucide-inbox' },
-          { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-lucide-trash' },
+          { label: `Private ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
+          { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-globe' },
+          { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
+          { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-ph-trash' },
         ]"
         size="sm"
         color="neutral"
       />
-      <UInput ref="searchInput" v-model="search" class="w-full sm:w-72" icon="i-lucide-search" placeholder="Search drops">
+      <UInput ref="searchInput" v-model="search" class="w-full sm:w-72" icon="i-ph-magnifying-glass" placeholder="Search drops">
         <template #trailing><UKbd value="/" /></template>
       </UInput>
     </div>
@@ -125,26 +125,26 @@ async function onPick(file: File) {
     </div>
 
     <div v-else-if="error" class="rounded-lg border border-dashed border-default px-6 py-16 text-center" role="alert">
-      <UIcon name="i-lucide-circle-alert" class="size-6 text-error" />
+      <UIcon name="i-ph-warning-circle" class="size-6 text-error" />
       <p class="mt-3 font-medium text-highlighted">Couldn't load your drops</p>
       <p class="mt-1 text-sm text-muted">Try again in a moment.</p>
       <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh()" />
     </div>
 
     <div v-else-if="filter === 'trash' && !trash.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
-      <UIcon name="i-lucide-trash" class="size-6 text-dimmed" />
+      <UIcon name="i-ph-trash" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">The Trash is empty</p>
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Deleted and expired drops stay here for {{ TRASH_DAYS }} days, then they're gone for good.</p>
     </div>
 
     <div v-else-if="filter === 'with-me' && !withMe.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
-      <UIcon name="i-lucide-inbox" class="size-6 text-dimmed" />
+      <UIcon name="i-ph-tray" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing shared with you yet</p>
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Drops your teammates share with the team show up here, and so do links you open while signed in.</p>
     </div>
 
     <div v-else-if="filter !== 'trash' && filter !== 'with-me' && !drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
-      <UIcon name="i-lucide-layers" class="size-6 text-dimmed" />
+      <UIcon name="i-ph-stack" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing dropped yet</p>
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here.</p>
       <UButton class="mt-5" color="neutral" label="Connect an Agent" to="/agents?tab=mcp" />

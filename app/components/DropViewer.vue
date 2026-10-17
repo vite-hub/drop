@@ -316,8 +316,8 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         </template>
       </UTabs>
       <div class="flex items-center gap-1">
-        <UButton v-if="tab === 'comments' && comments.length" aria-label="Copy feedback for your agent" color="neutral" icon="i-lucide-sparkles" size="sm" title="Copy feedback for your agent" variant="ghost" @click="copyFeedback" />
-        <UButton aria-label="Close panel" color="neutral" icon="i-lucide-x" size="sm" variant="ghost" @click="panel.close" />
+        <UButton v-if="tab === 'comments' && comments.length" aria-label="Copy feedback for your agent" color="neutral" icon="i-ph-sparkle" size="sm" title="Copy feedback for your agent" variant="ghost" @click="copyFeedback" />
+        <UButton aria-label="Close panel" color="neutral" icon="i-ph-x" size="sm" variant="ghost" @click="panel.close" />
       </div>
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto">
@@ -336,9 +336,9 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
-          <ViewerAction icon="i-lucide-link" label="Copy link" @click="copyLink" />
-          <ViewerAction v-if="drop.url" icon="i-lucide-download" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
-          <ViewerAction destructive icon="i-lucide-trash" label="Move to Trash" @click="deleteDrop" />
+          <ViewerAction icon="i-ph-link" label="Copy link" @click="copyLink" />
+          <ViewerAction v-if="drop.url" icon="i-ph-download-simple" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
+          <ViewerAction destructive icon="i-ph-trash" label="Move to Trash" @click="deleteDrop" />
         </template>
       </ViewerOverview>
     </div>
@@ -349,7 +349,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
       <UDashboardNavbar :toggle="!publicView" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
           <NuxtLink v-if="publicView" aria-label="Drop" class="grid size-8 place-items-center" to="/"><DropMark class="h-4 w-6" /></NuxtLink>
-          <UButton v-else aria-label="Back to drops" color="neutral" icon="i-lucide-arrow-left" variant="ghost" to="/drops" />
+          <UButton v-else aria-label="Back to drops" color="neutral" icon="i-ph-arrow-left" variant="ghost" to="/drops" />
         </template>
         <template #title>
           <span class="flex min-w-0 items-center gap-2">
@@ -367,13 +367,13 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <!-- One row of same-size tools: icons only, the pressed state shows the mode, shortcuts live in the tooltips. -->
         <template v-else #right>
           <UTooltip v-if="canDrawArea" :kbds="['R']" text="Comment on an area">
-            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-lucide-square-dashed-mouse-pointer" size="sm" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
+            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-ph-selection-plus" size="sm" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
           </UTooltip>
           <UTooltip v-if="drop.canEdit || drop.editNote" :kbds="drop.canEdit ? ['E'] : undefined" :text="drop.editNote ?? 'Edit together'">
-            <UButton aria-label="Edit together" color="neutral" :disabled="!drop.canEdit" icon="i-lucide-pencil" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
+            <UButton aria-label="Edit together" color="neutral" :disabled="!drop.canEdit" icon="i-ph-pencil-simple" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
           </UTooltip>
           <UTooltip v-if="drop.versions.length > 1" text="History">
-            <UButton aria-label="History" :aria-pressed="panelOpen && tab === 'history'" color="neutral" icon="i-lucide-history" size="sm" :variant="panelOpen && tab === 'history' ? 'soft' : 'ghost'" @click="panel.show('history')" />
+            <UButton aria-label="History" :aria-pressed="panelOpen && tab === 'history'" color="neutral" icon="i-ph-clock-counter-clockwise" size="sm" :variant="panelOpen && tab === 'history' ? 'soft' : 'ghost'" @click="panel.show('history')" />
           </UTooltip>
           <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || drop.versions.length > 1" class="mx-1 h-4" orientation="vertical" />
           <UButton v-if="publicView" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" label="Report" size="sm" variant="ghost" />
@@ -381,7 +381,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
           <UTooltip :text="panelOpen ? 'Hide panel' : 'Show panel'">
             <span class="relative">
-              <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-lucide-panel-right" size="sm" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />
+              <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-ph-sidebar-simple" size="sm" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />
               <span v-if="openCount && !panelOpen" class="pointer-events-none absolute top-1 right-1 size-1.5 rounded-full bg-inverted ring-2 ring-(--ui-bg)" />
             </span>
           </UTooltip>
@@ -396,7 +396,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         class="rounded-none border-0 border-b border-default"
         color="error"
         :description="drop.trashReason === 'expired' ? 'Nobody opened it for a while, so its link stopped working. Only you and editors can see it until you restore it.' : 'Its link stopped working. Only you and editors can see it until you restore it.'"
-        icon="i-lucide-trash"
+        icon="i-ph-trash"
         orientation="horizontal"
         :title="expiryLabel(drop, now)"
         variant="subtle"
@@ -413,10 +413,10 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
         <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
           <div>
-            <UIcon name="i-lucide-file" class="size-8 text-dimmed" />
+            <UIcon name="i-ph-file" class="size-8 text-dimmed" />
             <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
             <p class="mt-1 text-sm text-muted">No preview for this file type.</p>
-            <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-lucide-download" label="Download" :to="drop.url" external target="_blank" variant="outline" />
+            <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-ph-download-simple" label="Download" :to="drop.url" external target="_blank" variant="outline" />
           </div>
         </div>
         <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
@@ -447,7 +447,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
     :style="{ left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`, top: `${Math.max(56, selection.rect.top - 8)}px` }"
   >
     <div class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]">
-      <UButton color="neutral" icon="i-lucide-message-circle" label="Comment" size="sm" variant="ghost" @click="commentOnSelection" @mousedown.prevent />
+      <UButton color="neutral" icon="i-ph-chat-circle" label="Comment" size="sm" variant="ghost" @click="commentOnSelection" @mousedown.prevent />
     </div>
   </div>
 

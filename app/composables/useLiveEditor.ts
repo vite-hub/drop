@@ -57,7 +57,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         notify.info({
           title: `${published.name} published v${published.version}`,
           description: "Keep editing the new version.",
-          icon: "i-lucide-arrow-up-right",
+          icon: "i-ph-arrow-up-right",
           actions: [{ label: "Open", color: "neutral", variant: "outline", onClick: () => void navigateTo(url(published.id, true)) }],
         })
       }
@@ -121,7 +121,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       notify.info({
         title: `v${head.version} is the latest version`,
         description: "Your draft stays here until you publish it.",
-        icon: "i-lucide-history",
+        icon: "i-ph-clock-counter-clockwise",
         actions: [{ label: `Open v${head.version}`, color: "neutral", variant: "outline", onClick: () => { close(); void navigateTo(url(head.id)) } }],
       })
     }

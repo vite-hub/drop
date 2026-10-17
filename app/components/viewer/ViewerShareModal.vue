@@ -51,7 +51,7 @@ async function setAccess(level: Access) {
       </div>
       <div class="mt-4 flex items-center gap-1 rounded-md border border-default bg-muted py-1 pr-1 pl-3" :class="!shared && 'opacity-50'">
         <span class="min-w-0 flex-1 truncate font-mono text-xs">{{ url }}</span>
-        <UButton aria-label="Copy link" color="neutral" :disabled="!shared" :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'" size="sm" variant="ghost" @click="copy(url, 'Link copied')" />
+        <UButton aria-label="Copy link" color="neutral" :disabled="!shared" :icon="copied ? 'i-ph-check' : 'i-ph-copy'" size="sm" variant="ghost" @click="copy(url, 'Link copied')" />
       </div>
       <p v-if="drop.visibility === 'team'" class="mt-2 text-xs text-muted">Teammates find it under Shared with me. The link asks them to sign in.</p>
     </template>

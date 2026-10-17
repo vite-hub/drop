@@ -135,7 +135,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
             <div class="relative flex h-full flex-col">
               <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm">
                 <DropMark class="h-3.5 shrink-0" />
-                <UIcon name="i-lucide-file-text" class="size-4 text-muted" />
+                <UIcon name="i-ph-file-text" class="size-4 text-muted" />
                 <span class="font-medium text-highlighted">launch-plan.md</span>
                 <span :key="String(v2)" class="rounded-md border border-default px-1.5 py-0.5 font-mono text-[11px] text-muted [animation:pop-in_400ms_var(--ease-out)]">{{ v2 ? "v2" : "v1" }}</span>
                 <div class="ml-auto flex items-center gap-3">
@@ -144,7 +144,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                     <span class="grid size-6 place-items-center rounded-full bg-inverted text-[10px] font-semibold text-inverted ring-2 ring-(--ui-bg)">Y</span>
                   </div>
                   <span data-cursor="share" class="flex items-center gap-1.5 rounded-md border border-default px-2 py-1 text-xs text-highlighted">
-                    <UIcon :name="shared ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-3.5" /> Share
+                    <UIcon :name="shared ? 'i-ph-globe' : 'i-ph-lock'" class="size-3.5" /> Share
                   </span>
                 </div>
               </div>
@@ -214,7 +214,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                   <p class="text-xs text-muted">Launch plan</p>
                   <div class="mt-3 divide-y divide-default rounded-lg border border-default">
                     <div class="flex items-center gap-3 p-3">
-                      <span class="grid size-8 place-items-center rounded-md bg-elevated text-muted"><UIcon :name="shared ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-4" /></span>
+                      <span class="grid size-8 place-items-center rounded-md bg-elevated text-muted"><UIcon :name="shared ? 'i-ph-globe' : 'i-ph-lock'" class="size-4" /></span>
                       <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium text-highlighted">{{ shared ? "Anyone with the link" : "Only you" }}</p>
                         <p class="text-xs text-muted">{{ shared ? "No sign-in needed." : "Your connected agents can still read it." }}</p>
@@ -235,7 +235,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                   </div>
                   <div class="mt-3 flex items-center gap-1 rounded-md border border-default bg-muted py-1 pr-1 pl-3 transition-opacity" :class="!shared && 'opacity-50'">
                     <span class="min-w-0 flex-1 truncate font-mono text-xs">drop.vitehub.dev/d/m8r2</span>
-                    <span data-cursor="copy" class="grid size-6 place-items-center rounded text-highlighted"><UIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" /></span>
+                    <span data-cursor="copy" class="grid size-6 place-items-center rounded text-highlighted"><UIcon :name="copied ? 'i-ph-check' : 'i-ph-copy'" class="size-3.5" /></span>
                   </div>
                 </div>
               </div>
@@ -298,7 +298,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                 ]"
               >
                 <BrainlessClaudeLogo v-if="app.id === 'terminal'" class="h-3.5" />
-                <UIcon v-else-if="app.id === 'browser'" name="i-lucide-compass" class="size-5 text-highlighted" />
+                <UIcon v-else-if="app.id === 'browser'" name="i-ph-compass" class="size-5 text-highlighted" />
                 <UIcon v-else name="i-simple-icons-slack" class="size-5 text-highlighted" />
               </span>
               <span class="mt-1 size-1 rounded-full transition-colors" :class="running[app.id] ? 'bg-(--ui-text-muted)' : 'bg-transparent'" />

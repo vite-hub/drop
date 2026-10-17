@@ -37,7 +37,7 @@ function talk(version: DropVersion) {
           <span v-if="version.note || index === drop.versions.length - 1" class="block text-highlighted">{{ version.note ?? "First version" }}</span>
           <span class="block text-xs text-muted">{{ version.actorName }} · <TimeAgo :at="version.createdAt" /><template v-if="talk(version)"> · {{ talk(version) }}</template></span>
         </span>
-        <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-lucide-chevron-right" />
+        <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-ph-caret-right" />
       </button>
     </li>
   </ol>

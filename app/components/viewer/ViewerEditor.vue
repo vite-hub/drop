@@ -32,36 +32,36 @@ async function editLink() {
 
 const toolbar = computed<EditorToolbarItem[][]>(() => [
   [
-    { kind: "mark", mark: "bold", icon: "i-lucide-bold", "aria-label": "Bold" },
-    { kind: "mark", mark: "italic", icon: "i-lucide-italic", "aria-label": "Italic" },
-    { kind: "mark", mark: "strike", icon: "i-lucide-strikethrough", "aria-label": "Strikethrough" },
-    { kind: "mark", mark: "code", icon: "i-lucide-code", "aria-label": "Code" },
-    { icon: "i-lucide-link", "aria-label": "Link", active: props.editor?.isActive("link"), onClick: editLink },
+    { kind: "mark", mark: "bold", icon: "i-ph-text-b", "aria-label": "Bold" },
+    { kind: "mark", mark: "italic", icon: "i-ph-text-italic", "aria-label": "Italic" },
+    { kind: "mark", mark: "strike", icon: "i-ph-text-strikethrough", "aria-label": "Strikethrough" },
+    { kind: "mark", mark: "code", icon: "i-ph-code", "aria-label": "Code" },
+    { icon: "i-ph-link", "aria-label": "Link", active: props.editor?.isActive("link"), onClick: editLink },
   ],
   [
-    { kind: "heading", level: 1, icon: "i-lucide-heading-1", "aria-label": "Heading 1" },
-    { kind: "heading", level: 2, icon: "i-lucide-heading-2", "aria-label": "Heading 2" },
-    { kind: "heading", level: 3, icon: "i-lucide-heading-3", "aria-label": "Heading 3" },
+    { kind: "heading", level: 1, icon: "i-ph-text-h-one", "aria-label": "Heading 1" },
+    { kind: "heading", level: 2, icon: "i-ph-text-h-two", "aria-label": "Heading 2" },
+    { kind: "heading", level: 3, icon: "i-ph-text-h-three", "aria-label": "Heading 3" },
   ],
   [
-    { kind: "bulletList", icon: "i-lucide-list", "aria-label": "Bulleted list" },
-    { kind: "orderedList", icon: "i-lucide-list-ordered", "aria-label": "Numbered list" },
-    { kind: "blockquote", icon: "i-lucide-text-quote", "aria-label": "Quote" },
+    { kind: "bulletList", icon: "i-ph-list-bullets", "aria-label": "Bulleted list" },
+    { kind: "orderedList", icon: "i-ph-list-numbers", "aria-label": "Numbered list" },
+    { kind: "blockquote", icon: "i-ph-quotes", "aria-label": "Quote" },
   ],
 ])
 
 // Only blocks the Realtime schema has (StarterKit, image, table): a block it lacks would vanish on the next checkpoint.
 const blocks: EditorSuggestionMenuItem[][] = [[
   { type: "label", label: "Blocks" },
-  { kind: "paragraph", label: "Text", icon: "i-lucide-type" },
-  { kind: "heading", level: 1, label: "Heading 1", icon: "i-lucide-heading-1" },
-  { kind: "heading", level: 2, label: "Heading 2", icon: "i-lucide-heading-2" },
-  { kind: "heading", level: 3, label: "Heading 3", icon: "i-lucide-heading-3" },
-  { kind: "bulletList", label: "Bulleted list", icon: "i-lucide-list" },
-  { kind: "orderedList", label: "Numbered list", icon: "i-lucide-list-ordered" },
-  { kind: "blockquote", label: "Quote", icon: "i-lucide-text-quote" },
-  { kind: "codeBlock", label: "Code block", icon: "i-lucide-square-code" },
-  { kind: "horizontalRule", label: "Divider", icon: "i-lucide-minus" },
+  { kind: "paragraph", label: "Text", icon: "i-ph-text-t" },
+  { kind: "heading", level: 1, label: "Heading 1", icon: "i-ph-text-h-one" },
+  { kind: "heading", level: 2, label: "Heading 2", icon: "i-ph-text-h-two" },
+  { kind: "heading", level: 3, label: "Heading 3", icon: "i-ph-text-h-three" },
+  { kind: "bulletList", label: "Bulleted list", icon: "i-ph-list-bullets" },
+  { kind: "orderedList", label: "Numbered list", icon: "i-ph-list-numbers" },
+  { kind: "blockquote", label: "Quote", icon: "i-ph-quotes" },
+  { kind: "codeBlock", label: "Code block", icon: "i-ph-code-block" },
+  { kind: "horizontalRule", label: "Divider", icon: "i-ph-minus" },
 ]]
 </script>
 
@@ -82,7 +82,7 @@ const blocks: EditorSuggestionMenuItem[][] = [[
       <UEditorSuggestionMenu :editor="editor" :items="blocks" />
       <UEditorEmojiMenu :editor="editor" :items="emojis" :limit="24" />
       <ViewerMentionMenu :editor="editor" :people="people" />
-      <UEditorDragHandle :editor="editor" icon="i-lucide-grip-vertical" />
+      <UEditorDragHandle :editor="editor" icon="i-ph-dots-six-vertical" />
     </template>
   </div>
 </template>

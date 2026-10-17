@@ -6,7 +6,7 @@ const props = defineProps<{ running: boolean }>()
 const emit = defineEmits<{ play: [] }>()
 
 type Item = { id: number; x: number; y: number; speed: number; icon: string }
-const ICONS = ["i-lucide-file-text", "i-lucide-image", "i-lucide-code", "i-lucide-folder"]
+const ICONS = ["i-ph-file-text", "i-ph-image", "i-ph-code", "i-ph-folder"]
 const HAND = 56
 const CATCH = 34
 

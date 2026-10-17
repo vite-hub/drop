@@ -35,7 +35,7 @@ const { data: me } = await useMe()
       <div class="border-b border-default py-3 lg:hidden">
         <button class="flex w-full items-center justify-between text-sm text-muted" type="button" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
           <span>{{ current?.label ?? "Docs" }}</span>
-          <UIcon :name="menuOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" />
+          <UIcon :name="menuOpen ? 'i-ph-caret-up' : 'i-ph-caret-down'" class="size-4" />
         </button>
         <DocsNav v-if="menuOpen" class="pt-4 pb-2" />
       </div>

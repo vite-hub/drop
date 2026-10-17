@@ -48,17 +48,17 @@ defineExpose({ fail: () => (busy.value = false) })
         @keydown.enter.exact.prevent="send"
         @keydown.esc="emit('cancel')"
       />
-      <UButton aria-label="Send comment" class="size-8 justify-center rounded-full" color="neutral" :disabled="!body.trim()" icon="i-lucide-arrow-up" :loading="busy" @click="send" />
+      <UButton aria-label="Send comment" class="size-8 justify-center rounded-full" color="neutral" :disabled="!body.trim()" icon="i-ph-arrow-up" :loading="busy" @click="send" />
     </div>
     <template v-else-if="comment">
       <ViewerCommentHeader :comment="comment" />
       <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-[13px] text-muted">{{ comment.quote }}</p>
       <p class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
       <div v-if="canManage || comment.mine" class="flex justify-end gap-1.5">
-        <UButton aria-label="Delete comment" color="neutral" icon="i-lucide-trash" size="sm" variant="ghost" @click="emit('delete', comment.id)" />
+        <UButton aria-label="Delete comment" color="neutral" icon="i-ph-trash" size="sm" variant="ghost" @click="emit('delete', comment.id)" />
         <UButton
           color="neutral"
-          :icon="comment.resolved ? 'i-lucide-undo-2' : 'i-lucide-check'"
+          :icon="comment.resolved ? 'i-ph-arrow-u-up-left' : 'i-ph-check'"
           :label="comment.resolved ? 'Reopen' : 'Resolve'"
           size="sm"
           variant="outline"

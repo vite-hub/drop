@@ -35,11 +35,11 @@ async function copyLink() {
 
 const menu = computed(() => [
   [
-    { label: "Open", icon: "i-lucide-eye", to: `/drops/${props.drop.id}` },
-    { label: "Open Public Page", icon: "i-lucide-external-link", to: `/d/${props.drop.id}`, target: "_blank", disabled: !shared.value },
-    { label: "Copy Link", icon: "i-lucide-link", onSelect: copyLink },
+    { label: "Open", icon: "i-ph-eye", to: `/drops/${props.drop.id}` },
+    { label: "Open Public Page", icon: "i-ph-arrow-square-out", to: `/d/${props.drop.id}`, target: "_blank", disabled: !shared.value },
+    { label: "Copy Link", icon: "i-ph-link", onSelect: copyLink },
   ],
-  ...(theirs.value ? [] : [[{ label: "Move to Trash", icon: "i-lucide-trash", onSelect: () => emit("delete") }]]),
+  ...(theirs.value ? [] : [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]]),
 ])
 </script>
 
@@ -51,7 +51,7 @@ const menu = computed(() => [
     <div class="min-w-0">
       <NuxtLink class="flex min-w-0 items-center gap-2 after:absolute after:inset-0" :to="`/drops/${drop.id}`">
         <span class="truncate font-medium text-highlighted">{{ drop.title }}</span>
-        <UBadge v-if="drop.version > 1" class="hidden sm:inline-flex" color="neutral" icon="i-lucide-history" :label="`v${drop.version}`" size="sm" variant="outline" />
+        <UBadge v-if="drop.version > 1" class="hidden sm:inline-flex" color="neutral" icon="i-ph-clock-counter-clockwise" :label="`v${drop.version}`" size="sm" variant="outline" />
         <ExpiryBadge class="shrink-0" :drop="drop" />
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
@@ -89,13 +89,13 @@ const menu = computed(() => [
       <template #default>{{ status }}</template>
     </USelect>
     <div v-if="trashed" class="relative z-10 flex items-center gap-1">
-      <UButton color="neutral" icon="i-lucide-undo-2" label="Restore" size="sm" variant="outline" @click="emit('restore')" />
-      <UButton :aria-label="`Delete ${drop.title} for good`" color="error" icon="i-lucide-trash-2" size="sm" variant="ghost" @click="emit('deleteForever')" />
+      <UButton color="neutral" icon="i-ph-arrow-u-up-left" label="Restore" size="sm" variant="outline" @click="emit('restore')" />
+      <UButton :aria-label="`Delete ${drop.title} for good`" color="error" icon="i-ph-trash" size="sm" variant="ghost" @click="emit('deleteForever')" />
     </div>
     <div v-else class="relative z-10 flex items-center gap-0.5">
-      <UButton aria-label="Copy link" class="hidden sm:inline-flex" color="neutral" icon="i-lucide-link" variant="ghost" @click="copyLink" />
+      <UButton aria-label="Copy link" class="hidden sm:inline-flex" color="neutral" icon="i-ph-link" variant="ghost" @click="copyLink" />
       <UDropdownMenu :items="menu" :content="{ align: 'end' }">
-        <UButton :aria-label="`Actions for ${drop.title}`" color="neutral" icon="i-lucide-ellipsis" variant="ghost" />
+        <UButton :aria-label="`Actions for ${drop.title}`" color="neutral" icon="i-ph-dots-three" variant="ghost" />
       </UDropdownMenu>
     </div>
   </li>
