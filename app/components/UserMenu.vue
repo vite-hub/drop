@@ -8,7 +8,7 @@ const { data: me } = useMe()
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: "label", slot: "account" as const }],
   [{ label: "Theme", slot: "theme" as const, onSelect: (event: Event) => event.preventDefault() }],
-  [{ label: "Sign Out", icon: "i-ph-sign-out", onSelect: () => void leave() }],
+  [{ label: "Sign out", icon: "i-ph-sign-out", onSelect: () => void leave() }],
 ])
 async function leave() {
   await signOut()

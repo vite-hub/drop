@@ -45,11 +45,11 @@ async function copyLink() {
 const menu = computed(() => [
   [
     { label: "Open", icon: "i-ph-eye", to: `/drops/${props.drop.id}` },
-    { label: "Open Public Page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
-    { label: "Copy Link", icon: "i-ph-link", onSelect: copyLink },
+    { label: "Open public page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
+    { label: "Copy link", icon: "i-ph-link", onSelect: copyLink },
   ],
   ...(theirs.value ? [] : [[
-    { label: "Move to Folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: props.drop }) },
+    { label: "Move to folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: props.drop }) },
     { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") },
   ]]),
 ])
