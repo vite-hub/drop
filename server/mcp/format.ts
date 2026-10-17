@@ -17,6 +17,8 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     ...(file && (drop.kind === "image" || drop.kind === "file") ? { fileUrl: new URL(file, origin).href } : {}),
     // Search results say where a drop sits.
     ...(drop.path?.length ? { folder: drop.path.map(crumb => crumb.title).join(" / ") } : {}),
+    // A doc found by its text: the words around the match.
+    ...(drop.snippet ? { match: drop.snippet } : {}),
     ...(drop.items !== undefined ? { items: drop.items } : {}),
     share,
     ...(drop.visibility !== "private" ? { sharedWith: drop.visibility === "team" ? "team" as const : "link" as const } : {}),

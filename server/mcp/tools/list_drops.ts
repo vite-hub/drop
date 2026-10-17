@@ -14,7 +14,7 @@ export default defineMcpTool({
   description: "Your drops, newest first, with who can open each, its lifetime, and its link: the ones at the top (folders hold the rest), or with query the matches in any folder. With folder, the drops in that folder, or with query the matches anywhere inside it. Also the ones in your Trash, or other people's drops shared with you, and your plan usage.",
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(v.object({
-    query: v.optional(v.pipe(v.string(), v.description("Words to find in the title, file name, or slug."))),
+    query: v.optional(v.pipe(v.string(), v.description("Words to find in the title, file name, slug, or a doc's text."))),
     folder: v.optional(v.pipe(v.string(), v.description("Id or link of a folder: list or search only what's inside it, subfolders included."))),
     kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "folder", "site"])),
     shared: v.optional(v.pipe(v.boolean(), v.description("true for shared drops only, false for private ones only."))),
@@ -31,7 +31,8 @@ export default defineMcpTool({
     const [all, usage] = await Promise.all([list, getUsage(who.userId)])
     const matched = all.filter(drop => (!kind || drop.kind === kind)
       && (shared === undefined || (drop.visibility !== "private") === shared)
-      && words.every(word => `${drop.title} ${drop.filename} ${drop.slug}`.toLowerCase().includes(word)))
+      // Your drops and a folder's searched on the server, text included; the Trash and Shared with me filter here.
+      && (inside || !(trash || sharedWithMe) || words.every(word => `${drop.title} ${drop.filename} ${drop.slug}`.toLowerCase().includes(word))))
     const drops = matched.slice(0, limit).map(drop => mcpDrop(drop, event.url.origin))
     const quota = (name: string, used: number, max: number | null, unit = (n: number) => String(n)) => `${name} ${unit(used)}${max === null ? "" : `/${unit(max)}`}`
     const mib = (n: number) => `${Math.ceil(n / MIB * 10) / 10} MiB`
