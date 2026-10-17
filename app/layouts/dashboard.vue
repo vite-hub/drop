@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // shadcn's sidebar (sidebar-07) on Executor's flat console: one background, a hairline between sidebar and page, your
-// drops on top with their tree under a section label (apps are folders), the workspace pages and Docs at the bottom,
-// and the account menu (NavUser) opening upward.
+// search above the drops, the drops with their tree under a section label (apps are folders), the workspace pages and
+// Docs at the bottom, and the account menu (NavUser) opening upward.
 const route = useRoute()
 const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
@@ -40,6 +40,9 @@ const docsOpen = computed(() => docsToggled.value ?? at("/docs"))
         </NuxtLink>
       </template>
 
+      <!-- Opens the ⌘K palette (SearchPalette), which every dashboard page mounts below. -->
+      <UDashboardSearchButton class="mb-2 w-full text-muted" label="Search" size="sm" />
+
       <nav aria-label="Main" class="flex flex-col gap-0.5">
         <SidebarItem v-for="link in nav" :key="link.to" v-bind="link" @navigate="close" />
       </nav>
@@ -74,5 +77,7 @@ const docsOpen = computed(() => docsToggled.value ?? at("/docs"))
     </UDashboardSidebar>
 
     <slot />
+
+    <SearchPalette />
   </UDashboardGroup>
 </template>
