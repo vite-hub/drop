@@ -207,7 +207,7 @@ export default defineNuxtConfig({
           expiryDays: env.number({ source: env.source("DROP_EXPIRY_DAYS"), default: DEFAULT_EXPIRY_DAYS }),
           // false lets only admins keep drops.
           customExpiry: env.boolean({ source: env.source("DROP_CUSTOM_EXPIRY"), default: true }),
-          // Where apps and HTML docs run: https://*.drop-usercontent.example.com gives each drop its own subdomain (see server/utils/content-origin.ts).
+          // Where apps and HTML docs run: https://*-drop.example.com gives each drop its own subdomain (see server/utils/content-origin.ts).
           contentOrigin: env({ source: env.source("DROP_CONTENT_ORIGIN"), default: "" }),
           // Owner quotas: one plan for everyone (shared/quotas.ts).
           quotas: {

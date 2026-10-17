@@ -7,25 +7,37 @@ import { useServerEnv } from "#vitehub/env/server"
  * viewer frames, so drops never run on Drop's origin: they can't read Drop's session or call its API (auth cookies
  * are `__Host-`, and cookie-carrying API writes must come from Drop's origin).
  *
- * With a wildcard (`https://*.drop-usercontent.example.com`) every drop gets an origin of its own, like an app on
- * its own subdomain, so one drop can't read another's localStorage, IndexedDB, or caches. The label is a keyed hash
- * of the drop's id, not the id, because hostnames travel in clear text (DNS, TLS SNI) and a shared drop's id is the
- * key to its link. A plain hostname puts every drop on that one origin, sharing storage. Without either, drops keep
- * the opaque sandbox.
+ * With a wildcard every drop gets an origin of its own, like an app on its own subdomain, so one drop can't read
+ * another's localStorage, IndexedDB, or caches. The `*` stands for part of the first label: `https://*.usercontent.example`
+ * gives `<label>.usercontent.example`, and `https://*-drop.example.com` gives `<label>-drop.example.com`, one level under
+ * the zone, where a free certificate still reaches. The label is a keyed hash of the drop's id, not the id, because
+ * hostnames travel in clear text (DNS, TLS SNI) and a shared drop's id is the key to its link. A plain hostname puts
+ * every drop on that one origin, sharing storage. Without either, drops keep the opaque sandbox.
  */
-function configured(event: H3Event): { protocol: string; base: string; port: string; perDrop: boolean } | null {
+interface ContentConfig { protocol: string; port: string; host: string; perDrop?: { prefix: string; suffix: string } }
+
+function configured(event: H3Event): ContentConfig | null {
   const value = useServerEnv(event).drop.contentOrigin.trim()
-  if (!value) return null
-  const perDrop = /^[a-z]+:\/\/\*\./i.test(value)
-  try {
-    const url = new URL(perDrop ? value.replace("*.", "drop.") : value)
-    if (!["https:", "http:"].includes(url.protocol)) return null
-    return { protocol: url.protocol, base: perDrop ? url.hostname.slice("drop.".length) : url.hostname, port: url.port, perDrop }
+  const match = value.match(/^(https?):\/\/([^/:?#]+)(?::(\d+))?\/?$/i)
+  if (!match) return null
+  const [, scheme, host, port = ""] = match
+  const protocol = `${scheme!.toLowerCase()}:`
+  const name = host!.toLowerCase()
+  if (!name.includes("*")) {
+    try { return { protocol, port, host: new URL(`${protocol}//${name}`).hostname } }
+    catch { return null }
   }
+  // One `*`, inside the first label, with a domain after it.
+  const at = name.indexOf("*")
+  const firstDot = name.indexOf(".")
+  if (name.indexOf("*", at + 1) !== -1 || firstDot === -1 || at > firstDot) return null
+  const prefix = name.slice(0, at), suffix = name.slice(at + 1)
+  try { new URL(`${protocol}//${prefix}a${suffix}`) }
   catch { return null }
+  return { protocol, port, host: name, perDrop: { prefix, suffix } }
 }
 
-const LABEL = /^[a-z2-7]{26}$/
+const LABEL = "[a-z2-7]{26}"
 
 /** A DNS label for `dropId`: 26 base32 characters of an HMAC under the auth secret. Stable, and says nothing about the id. */
 export async function contentLabel(event: H3Event, dropId: string): Promise<string> {
@@ -48,9 +60,12 @@ export async function contentLabel(event: H3Event, dropId: string): Promise<stri
 export async function contentOrigin(event: H3Event, dropId: string): Promise<string | null> {
   const config = configured(event)
   if (!config) return null
-  const host = `${config.perDrop ? `${await contentLabel(event, dropId)}.` : ""}${config.base}${config.port ? `:${config.port}` : ""}`
+  const name = config.perDrop ? `${config.perDrop.prefix}${await contentLabel(event, dropId)}${config.perDrop.suffix}` : config.host
+  const host = `${name}${config.port ? `:${config.port}` : ""}`
   return host === event.url.host ? null : `${config.protocol}//${host}`
 }
+
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
 /** Whether this request came in on a content origin rather than Drop itself. */
 export function isContentRequest(event: H3Event) {
@@ -58,8 +73,8 @@ export function isContentRequest(event: H3Event) {
   if (!config) return false
   const { hostname, port } = event.url
   if (port !== config.port) return false
-  if (!config.perDrop) return hostname === config.base
-  return hostname.endsWith(`.${config.base}`) && LABEL.test(hostname.slice(0, -config.base.length - 1))
+  if (!config.perDrop) return hostname === config.host
+  return new RegExp(`^${escape(config.perDrop.prefix)}${LABEL}${escape(config.perDrop.suffix)}$`).test(hostname)
 }
 
 /**

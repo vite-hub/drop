@@ -56,6 +56,21 @@ test("a wildcard content origin gives every drop its own origin, named by a hash
   assert.match(await contentOrigin(request("http://localhost:3000/d/x"), id), /^http:\/\/[a-z2-7]{26}\.localhost:3000$/)
 })
 
+test("a wildcard can sit inside the first label, one level under the zone, and matches nothing else there", async () => {
+  state.contentOrigin = "https://*-drop.vitehub.dev"
+  const id = "8f14e45f-ceea-4672-8e3b-6b1c2b0d5a11"
+  const origin = await contentOrigin(request("https://drop.vitehub.dev/d/x"), id)
+  assert.match(origin, /^https:\/\/[a-z2-7]{26}-drop\.vitehub\.dev$/)
+  assert.equal(isContentRequest(request(`${origin}/`)), true)
+  for (const host of ["drop.vitehub.dev", "vitehub.dev", "babysitter.vitehub.dev", "x-drop.vitehub.dev", "drop-usercontent.vitehub.dev", `${origin.slice(8, 34)}.vitehub.dev`])
+    assert.equal(isContentRequest(request(`https://${host}/`)), false, host)
+  assert.equal(await contentMiddleware(request("https://drop.vitehub.dev/", { headers: { "sec-fetch-dest": "document" } })), undefined)
+  for (const value of ["https://*.*.x.dev", "https://x.*.dev", "https://*", "ftp://*.x.dev", "https://*.x.dev/path"]) {
+    state.contentOrigin = value
+    assert.equal(await contentOrigin(request("https://drop.vitehub.dev/d/x"), id), null, value)
+  }
+})
+
 test("the content origin serves only the frame host, at any path, and nothing of Drop", async () => {
   for (const path of ["/", "/product/", "/api/me", "/d/abc", "/f/key.html"]) {
     const response = await contentMiddleware(request(`https://drop-usercontent.example${path}`, { headers: { "sec-fetch-dest": "iframe" } }))
