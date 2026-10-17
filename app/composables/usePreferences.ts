@@ -12,6 +12,9 @@ export function useSidePanel() {
   return { open, tab }
 }
 
+/** Whether the Drops page's Get started checklist was dismissed. A cookie, so a dismissed checklist never flashes in. */
+export const useGetStartedHidden = () => useCookie<boolean>("drop-get-started-hidden", { default: () => false, maxAge: year, sameSite: "lax" })
+
 /** Which folders and apps are expanded in the sidebar tree. Shared state, so it survives navigation. */
 export const useTreeOpen = () => useState<Record<string, boolean>>("drop-tree-open", () => ({}))
 

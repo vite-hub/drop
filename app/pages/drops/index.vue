@@ -31,6 +31,14 @@ const searchInput = useTemplateRef("searchInput")
 const picker = useFileDialog({ multiple: false, reset: true })
 picker.onChange(files => files?.[0] && void onPick(files[0]))
 const now = useRelativeNow()
+const getStartedHidden = useGetStartedHidden()
+
+// The header says what the tab lists: Shared with me and the Trash aren't drops you made.
+const DESCRIPTIONS: Partial<Record<Filter, string>> = {
+  "with-me": "Drops your teammates shared with the team, and share links you opened while signed in.",
+  "trash": `Deleted and expired drops. Restore one within ${TRASH_DAYS} days, or it's gone for good.`,
+}
+const description = computed(() => DESCRIPTIONS[filter.value] ?? "Docs and apps you and your agents dropped. Private until you share them.")
 
 const counts = computed(() => ({
   all: drops.value.length,
@@ -101,7 +109,7 @@ async function newSite() {
 </script>
 
 <template>
-  <PageShell id="drops" title="Drops" description="Docs and apps you and your agents dropped. Private until you share them.">
+  <PageShell id="drops" title="Drops" :description="description">
     <template #actions>
       <UButton color="neutral" icon="i-ph-folder-simple-plus" label="New Folder" size="sm" variant="ghost" @click="newFolder" />
       <UButton color="neutral" icon="i-ph-globe-simple" label="New Site Review" size="sm" variant="ghost" @click="newSite" />
@@ -164,11 +172,17 @@ async function newSite() {
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Drops your teammates share with the team show up here, and so do links you open while signed in.</p>
     </div>
 
+    <!-- A first run gets the checklist instead; once it's dismissed, the empty page still says what goes here. -->
+    <GetStarted v-else-if="filter === 'all' && !drops.length && !getStartedHidden" :drops="drops" @site="newSite" @upload="picker.open()" />
+
     <div v-else-if="filter !== 'trash' && filter !== 'with-me' && !drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
       <UIcon name="i-ph-stack" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing dropped yet</p>
-      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here.</p>
-      <UButton class="mt-5" color="neutral" label="Connect an Agent" to="/agents?tab=mcp" />
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here. You can upload a file yourself too.</p>
+      <div class="mt-5 flex justify-center gap-2">
+        <UButton color="neutral" label="Connect an Agent" to="/agents" />
+        <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" variant="outline" @click="picker.open()" />
+      </div>
     </div>
 
     <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">{{ deep && searching === 'pending' ? "Searching…" : "No drops match." }}</p>
@@ -177,6 +191,8 @@ async function newSite() {
       <p>Drops in the Trash are deleted for good {{ TRASH_DAYS }} days after they got here.</p>
       <UButton color="error" label="Empty Trash" size="sm" variant="outline" @click="emptyTrash(trash.length)" />
     </div>
+
+    <GetStarted v-if="filter === 'all' && drops.length && !search" :drops="drops" @site="newSite" @upload="picker.open()" />
 
     <div v-if="visible.length" class="overflow-hidden rounded-lg border border-default">
       <template v-for="group in groups" :key="group.label">
