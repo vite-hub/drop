@@ -24,6 +24,12 @@ const app = `publish({\n  title: "Launch board",\n  files: { "index.html": "…"
       <p>An app holds up to 200 files and 4 MiB.</p>
     </DocsSection>
 
+    <DocsSection id="folders" title="Folders">
+      <p>A folder keeps drops that belong together, like the screenshots of one change and the doc about them. Create one with <strong>New Folder</strong> on the Drops page, or an agent calls <code>create_folder</code> and then <code>publish</code> with <code>folder</code>. Folders hold any drop, other folders included, up to 8 levels deep. Move a drop with <strong>Move to Folder</strong> in its menu or its Details panel.</p>
+      <p>A folder works like one drop for sharing and lifetime. Sharing it shares everything inside, and one drop inside can still be shared wider on its own. Everything in it lives as long as the folder, and goes to the Trash and comes back with it. Folders don't count toward your plan's drops; the drops in them do.</p>
+      <p>Searching on the Drops page looks inside every folder. Agents search one folder and everything below it with <code>list_drops</code> and <code>folder</code>.</p>
+    </DocsSection>
+
     <DocsSection id="comments" title="Comments">
       <p>Select text, or click an image to zoom and click a spot or drag an area. To mark part of a page, choose <strong>Comment on an area</strong> (or press <kbd>R</kbd>) and drag a rectangle. Comments stay anchored to what they point at, per page for apps. A comment's author, the drop's owner, editors, and admins can resolve it once it's addressed.</p>
       <p>Agents read the open comments with <code>read_drop</code>, or with the <code>address_feedback</code> prompt, and mark the ones they addressed resolved when they publish the next version. People can copy them as Markdown with <strong>Copy feedback for your agent</strong>.</p>

@@ -40,6 +40,14 @@ If the call fails with `DROP_LIMIT_REACHED` and `retryable: true`, you hit the p
 
 Publish each image with `file` first, then embed its `fileUrl` in the doc (`![alt](fileUrl)` or `::screenshot{src="fileUrl"}`). An embedded image belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the image. When people comment on it inside the doc, the comment lands on the doc.
 
+## Folders
+
+Keep drops that belong together in a folder, such as the before and after screenshots of one change and the doc that explains it. `create_folder` takes a `title`, a `slug`, a `lifetime` (with `keepReason` for `keep`), and optionally `share`, `audience`, and a parent `folder`. Then `publish` with `folder` set to the folder's id or link puts the new drop in it. Folders nest up to 8 levels.
+
+Everything in a folder lives as long as the folder, so a drop you publish into one needs no `lifetime`, and trashing or restoring the folder trashes or restores all of it. Sharing a folder shares everything in it; one drop inside can still be shared wider on its own. Two drops in the same folder never share a slug: a second `notes` becomes `notes-2`.
+
+`read_drop` on a folder lists the drops in it. `list_drops` with `folder` lists one folder, and with `query` searches everything below it, subfolders included. `update_drop` with `folder` moves a drop into a folder, or out to the top with an empty string. A file a doc embeds stays with the doc, unless it was already in a folder.
+
 ## Read feedback and publish the next version
 
 `read_drop` returns the content, the open comments (each with the text it quotes, or the spot or area it marks on an image or element), the versions with their notes, and the files the doc embeds. The `address_feedback` prompt starts from it.
@@ -50,9 +58,9 @@ Address the open comments and errors, then call `publish` with `previous` set to
 
 ## Manage drops
 
-`list_drops` lists the user's drops (filter with `query`, `kind`, `shared`), their Trash with `trash: true`, or other people's drops shared with them with `sharedWithMe: true`, plus plan usage.
+`list_drops` lists the user's drops at the top (filter with `kind`, `shared`; `query` searches inside folders too), one folder with `folder`, their Trash with `trash: true`, or other people's drops shared with them with `sharedWithMe: true`, plus plan usage.
 
-`update_drop` changes `share`, `audience`, `title`, `slug`, or `lifetime`; `renew: true` starts a fresh window; `trash: true` moves a drop to the Trash, where it stays restorable for 15 days, and `trash: false` restores it, also after it expired. Trash only what the user asked to remove, or what you made and no longer need. Only people delete for good.
+`update_drop` changes `share`, `audience`, `title`, `slug`, `lifetime`, or `folder`; `renew: true` starts a fresh window; `trash: true` moves a drop to the Trash, where it stays restorable for 15 days, and `trash: false` restores it, also after it expired. Trash only what the user asked to remove, or what you made and no longer need. Only people delete for good.
 
 ## Render code
 
