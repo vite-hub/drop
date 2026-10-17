@@ -299,3 +299,28 @@ test("a site's screenshots hang off it like a doc's embedded files", async () =>
   state.quotasEnabled = true
   assert.equal((await getUsage("owner")).drops.used, 1)
 })
+
+test("an upload goes into a folder, where it shares and lives with the folder", async () => {
+  const { default: filesHandler } = await import("../../server/api/files.post.ts")
+  const upload = async (form) => {
+    const event = new H3Event(new Request("https://drop.example/api/files", { method: "POST", body: form }))
+    event.context.log = { set() {}, error() {}, warn() {} }
+    try { return await filesHandler(event) }
+    catch (error) { return { status: error.status, message: error.message } }
+  }
+  const box = await folder("Screenshots", { share: "comment" })
+  state.who = { ...who }
+  const form = new FormData()
+  form.append("file", new File(["# Notes"], "notes.md", { type: "text/markdown" }))
+  form.append("folder", box.id)
+  const uploaded = await upload(form)
+  assert.ok(uploaded.id, uploaded.message)
+  const row = sql.prepare("SELECT parent_id FROM drops WHERE id = ?").get(uploaded.id)
+  assert.equal(row.parent_id, box.id)
+  assert.equal((await findDrop(uploaded.id)).visibility, "shared", "it takes the folder's share")
+
+  const elsewhere = new FormData()
+  elsewhere.append("file", new File(["# x"], "x.md", { type: "text/markdown" }))
+  elsewhere.append("folder", "nope")
+  assert.equal((await upload(elsewhere)).status, 404)
+})

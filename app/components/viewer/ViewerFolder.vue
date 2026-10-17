@@ -5,7 +5,7 @@ import { dropPath } from "#shared/links"
 import type { DropDetail, DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView?: boolean }>()
-const { createFolder, createSite } = useDropActions()
+const { createFolder, createSite, upload } = useDropActions()
 const prompt = usePrompt()
 const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
@@ -16,6 +16,12 @@ async function newFolder() {
   const title = await prompt({ title: "New folder", label: "Name", placeholder: "Screenshots", confirmLabel: "Create" })
   if (title && await createFolder(title, props.drop)) await refreshNuxtData(`drop:${props.drop.id}`)
 }
+
+const picker = useFileDialog({ multiple: false, reset: true })
+picker.onChange(async (files) => {
+  const result = files?.[0] && await upload(files[0], props.drop)
+  if (result) await navigateTo(`/drops/${result.id}`)
+})
 
 async function newSite() {
   const input = await siteDialog()
@@ -30,14 +36,16 @@ async function newSite() {
       <div class="mb-4 flex h-8 items-center justify-between gap-3">
         <p class="label-mono">{{ itemCount(children.length) }}</p>
         <div v-if="drop.isOwner && !drop.trashedAt" class="flex items-center gap-1">
-          <UButton color="neutral" icon="i-ph-folder-simple-plus" label="New Folder" size="sm" variant="ghost" @click="newFolder" />
-          <UButton color="neutral" icon="i-ph-globe-simple" label="New Site Review" size="sm" variant="ghost" @click="newSite" />
+          <!-- Like the Drops page: on a phone the ghost buttons keep only their icon. -->
+          <UButton aria-label="New Folder" color="neutral" icon="i-ph-folder-simple-plus" size="sm" variant="ghost" @click="newFolder"><span class="max-sm:hidden">New Folder</span></UButton>
+          <UButton aria-label="New Site Review" color="neutral" icon="i-ph-globe-simple" size="sm" variant="ghost" @click="newSite"><span class="max-sm:hidden">New Site Review</span></UButton>
+          <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
         </div>
       </div>
       <div v-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
         <UIcon name="i-ph-folder-open" class="size-6 text-dimmed" />
         <p class="mt-3 font-medium text-highlighted">Nothing in this folder yet</p>
-        <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Ask your agent to publish into {{ drop.title }}, or move a drop here with Move to folder in its menu.</p>
+        <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Upload a file, ask your agent to publish into {{ drop.title }}, or move a drop here with Move to folder in its menu.</p>
       </div>
       <ul v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <li v-for="child in children" :key="child.id">

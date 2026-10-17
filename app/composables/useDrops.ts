@@ -42,13 +42,15 @@ export function useDropActions() {
     drops.value = drops.value.map(drop => (drop.id === id ? { ...drop, ...change } : drop))
   }
 
-  async function upload(file: File) {
+  /** Uploads one file as a private drop, or into `folder`, where it shares and lives with the folder. */
+  async function upload(file: File, folder?: Pick<DropSummary, "id" | "title">) {
     const form = new FormData()
     form.append("file", file)
+    if (folder) form.append("folder", folder.id)
     try {
       const result = await $fetch<{ id: string }>("/api/files", { method: "POST", body: form })
-      await refresh()
-      notify.done("Dropped privately", file.name)
+      await (folder ? refreshNuxtData(["drops", "usage", `folder:${folder.id}`, `drop:${folder.id}`]) : refresh())
+      notify.done(folder ? `Dropped into ${folder.title}` : "Dropped privately", file.name)
       return result
     }
     catch (error) {
