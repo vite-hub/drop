@@ -11,12 +11,14 @@ const { data: me } = useMe()
 const { members, status, setRole, ban, unban, remove } = useMembers()
 const admin = computed(() => me.value?.role === "admin")
 const search = ref("")
+const host = useRequestURL().host
 
 const description = computed(() => {
   const total = members.value.length || me.value?.members || 1
   return total > 1
     ? `${total} people. Anyone can sign in with GitHub and joins as ${ROLE_LABELS[DEFAULT_ROLE]}; their drops stay private to them.`
-    : `Just you so far. Anyone can sign in with GitHub and joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
+    // There's no invite flow: say how a teammate gets in, since that's the first thing a new owner looks for here.
+    : `Just you so far. To bring your team in, send them ${host}: anyone who signs in with GitHub joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
 })
 
 const rows = computed(() => {
