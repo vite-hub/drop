@@ -9,7 +9,7 @@ import { dropPath } from "#shared/links"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
-import { type DropComment, type DropVersion, VISIBILITY_ICONS } from "#shared/types"
+import { type DropComment, type DropVersion, VISIBILITY_ICONS, VISIBILITY_LABELS } from "#shared/types"
 import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
@@ -409,10 +409,11 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UTooltip v-if="!owner" text="Copy link">
             <UButton aria-label="Copy link" color="neutral" icon="i-ph-link" size="sm" variant="ghost" @click="copy(link, 'Link copied')" />
           </UTooltip>
-          <UTooltip v-if="publicView && !owner" text="Report">
+          <!-- Strangers report through the abuse queue; teammates can talk to the owner, so they don't get a flag. -->
+          <UTooltip v-if="visitor" text="Report">
             <UButton aria-label="Report" :to="{ path: '/report', query: { target: `/d/${drop.link}` } }" color="neutral" icon="i-ph-flag" size="sm" variant="ghost" />
           </UTooltip>
-          <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'team' ? 'Team' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
+          <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'private' ? 'Share' : VISIBILITY_LABELS[drop.visibility]" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
           <UTooltip v-if="tabs.length" :text="panelOpen ? 'Hide panel' : 'Show panel'">
             <span class="relative">
