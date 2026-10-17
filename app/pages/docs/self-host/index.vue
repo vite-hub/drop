@@ -81,7 +81,7 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
         <li>Deno runs it as a pre-deploy command. Docker Compose uses Drizzle for SQLite, or this command for an explicit D1 build, before starting Drop.</li>
       </ul>
       <p>Use a separate D1 database for previews, or disable preview deployments. A build with production D1 credentials migrates that database.</p>
-      <p>After you change the schema in <code>server/databases/</code>, <code>pnpm db:generate</code> writes the next migration.</p>
+      <p>Drop keeps its whole schema in one file, <code>0000_init.sql</code>, which creates a new database. A database created from an earlier release doesn't pick up later schema changes on its own: apply them by hand. After you change the schema in <code>server/databases/</code>, <code>pnpm db:generate</code> writes the next migration.</p>
     </DocsSection>
 
     <DocsSection id="hosts" title="Pick a host">

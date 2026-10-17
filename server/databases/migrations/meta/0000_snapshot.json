@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c6688a34-a5e7-46b3-952c-782f74787db2",
+  "id": "8755df6a-ddab-45da-be59-437633b31829",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "abuse_reports": {
@@ -364,6 +364,22 @@
           "autoincrement": false,
           "default": 0
         },
+        "ow": {
+          "name": "ow",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "oh": {
+          "name": "oh",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "quote": {
           "name": "quote",
           "type": "text",
@@ -574,6 +590,53 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "drop_visits": {
+      "name": "drop_visits",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "drop_id": {
+          "name": "drop_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "at": {
+          "name": "at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "drop_visits_drop_idx": {
+          "name": "drop_visits_drop_idx",
+          "columns": [
+            "drop_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "drop_visits_user_id_drop_id_pk": {
+          "columns": [
+            "user_id",
+            "drop_id"
+          ],
+          "name": "drop_visits_user_id_drop_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "drops": {
       "name": "drops",
       "columns": {
@@ -714,16 +777,44 @@
           "notNull": false,
           "autoincrement": false
         },
-        "never_expires": {
-          "name": "never_expires",
-          "type": "integer",
+        "lifetime": {
+          "name": "lifetime",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": false
+          "default": "'review'"
         },
-        "never_expires_request": {
-          "name": "never_expires_request",
+        "keep_reason": {
+          "name": "keep_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trashed_at": {
+          "name": "trashed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trash_reason": {
+          "name": "trash_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parent_id": {
+          "name": "parent_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -770,8 +861,30 @@
         "drops_expiry_idx": {
           "name": "drops_expiry_idx",
           "columns": [
-            "never_expires",
+            "lifetime",
             "last_accessed_at"
+          ],
+          "isUnique": false
+        },
+        "drops_trash_idx": {
+          "name": "drops_trash_idx",
+          "columns": [
+            "trashed_at"
+          ],
+          "isUnique": false
+        },
+        "drops_parent_idx": {
+          "name": "drops_parent_idx",
+          "columns": [
+            "parent_id"
+          ],
+          "isUnique": false
+        },
+        "drops_visibility_idx": {
+          "name": "drops_visibility_idx",
+          "columns": [
+            "visibility",
+            "updated_at"
           ],
           "isUnique": false
         }
@@ -1941,230 +2054,6 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "workspace_history_metadata": {
-      "name": "workspace_history_metadata",
-      "columns": {
-        "workspace": {
-          "name": "workspace",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "value": {
-          "name": "value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "workspace_history_metadata_workspace_key_pk": {
-          "columns": [
-            "workspace",
-            "key"
-          ],
-          "name": "workspace_history_metadata_workspace_key_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "workspace_history_objects": {
-      "name": "workspace_history_objects",
-      "columns": {
-        "workspace": {
-          "name": "workspace",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "digest": {
-          "name": "digest",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "workspace_history_objects_workspace_digest_pk": {
-          "columns": [
-            "workspace",
-            "digest"
-          ],
-          "name": "workspace_history_objects_workspace_digest_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "workspace_history_refs": {
-      "name": "workspace_history_refs",
-      "columns": {
-        "workspace": {
-          "name": "workspace",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "head": {
-          "name": "head",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sequence": {
-          "name": "sequence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "deleted": {
-          "name": "deleted",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "workspace_history_revisions": {
-      "name": "workspace_history_revisions",
-      "columns": {
-        "workspace": {
-          "name": "workspace",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "parent_id": {
-          "name": "parent_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sequence": {
-          "name": "sequence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "message": {
-          "name": "message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "files": {
-          "name": "files",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "bytes": {
-          "name": "bytes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "entries": {
-          "name": "entries",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "published": {
-          "name": "published",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        }
-      },
-      "indexes": {
-        "workspace_history_timeline": {
-          "name": "workspace_history_timeline",
-          "columns": [
-            "workspace",
-            "published",
-            "sequence"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "workspace_history_revisions_workspace_id_pk": {
-          "columns": [
-            "workspace",
-            "id"
-          ],
-          "name": "workspace_history_revisions_workspace_id_pk"
-        }
-      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

@@ -33,6 +33,8 @@ CREATE TABLE `comments` (
 	`author_name` text NOT NULL,
 	`resolved` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
+	`ow` integer DEFAULT 0 NOT NULL,
+	`oh` integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -69,8 +71,12 @@ CREATE TABLE `drops` (
 	`share_review` text CHECK (share_review IS NULL OR share_review IN ('pending', 'rejected')),
 	`quarantined_at` integer,
 	`last_accessed_at` integer,
-	`never_expires` integer DEFAULT 0 NOT NULL,
-	`never_expires_request` text
+	`lifetime` text DEFAULT 'review' NOT NULL,
+	`keep_reason` text,
+	`note` text,
+	`trashed_at` integer,
+	`trash_reason` text,
+	`parent_id` text
 );
 --> statement-breakpoint
 CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);
@@ -79,7 +85,13 @@ CREATE UNIQUE INDEX `drops_blob_key_idx` ON `drops` (`blob_key`);
 --> statement-breakpoint
 CREATE INDEX `drops_supersedes_idx` ON `drops` (`supersedes_id`);
 --> statement-breakpoint
-CREATE INDEX `drops_expiry_idx` ON `drops` (`never_expires`,`last_accessed_at`);
+CREATE INDEX `drops_expiry_idx` ON `drops` (`lifetime`,`last_accessed_at`);
+--> statement-breakpoint
+CREATE INDEX `drops_trash_idx` ON `drops` (`trashed_at`);
+--> statement-breakpoint
+CREATE INDEX `drops_parent_idx` ON `drops` (`parent_id`);
+--> statement-breakpoint
+CREATE INDEX `drops_visibility_idx` ON `drops` (`visibility`,`updated_at`);
 --> statement-breakpoint
 CREATE TABLE `session` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -421,3 +433,26 @@ CREATE TABLE `skill_settings` (
 	`updated_at` integer NOT NULL,
 	`updated_by` text NOT NULL
 );
+--> statement-breakpoint
+CREATE TABLE `drop_visits` (
+	`user_id` text NOT NULL,
+	`drop_id` text NOT NULL,
+	`at` integer NOT NULL,
+	PRIMARY KEY(`user_id`, `drop_id`)
+);
+--> statement-breakpoint
+CREATE INDEX `drop_visits_drop_idx` ON `drop_visits` (`drop_id`);--> statement-breakpoint
+-- "Shared with me" follows a drop to its newest version and forgets it with the last one.
+CREATE TRIGGER `drop_visits_new_version` AFTER INSERT ON `drops` WHEN NEW.supersedes_id IS NOT NULL BEGIN
+  UPDATE OR REPLACE `drop_visits` SET `drop_id` = NEW.id WHERE `drop_id` = NEW.supersedes_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER `drop_visits_drop_delete` AFTER DELETE ON `drops` BEGIN
+  UPDATE OR REPLACE `drop_visits` SET `drop_id` = OLD.supersedes_id
+  WHERE `drop_id` = OLD.id AND EXISTS (SELECT 1 FROM drops d WHERE d.id = OLD.supersedes_id);
+  DELETE FROM `drop_visits` WHERE `drop_id` = OLD.id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER `drop_visits_user_delete` AFTER DELETE ON `user` BEGIN
+  DELETE FROM `drop_visits` WHERE `user_id` = OLD.id;
+END;

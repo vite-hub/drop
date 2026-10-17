@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1791830947707,
+      "when": 1792221635566,
       "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1792162792821,
-      "tag": "0001_live_drafts",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1792178891784,
-      "tag": "0002_lifetime_trash",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1792178892784,
-      "tag": "0003_drop_never_expires",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1792219940967,
-      "tag": "0004_team_sharing",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1792221482465,
-      "tag": "0005_drop_workspace_history",
       "breakpoints": true
     }
   ]
