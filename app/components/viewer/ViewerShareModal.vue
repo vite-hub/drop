@@ -60,6 +60,8 @@ async function setAccess(level: Access) {
         <UButton aria-label="Copy link" color="neutral" :disabled="!shared" :icon="copied ? 'i-ph-check' : 'i-ph-copy'" size="sm" variant="ghost" @click="copy(url, 'Link copied')" />
       </div>
       <p v-if="drop.visibility === 'team'" class="mt-2 text-xs text-muted">Teammates find it under Shared with me. The link asks them to sign in.</p>
+      <!-- The link stays greyed out while private; say why instead of leaving a dead button. -->
+      <p v-else-if="!shared" class="mt-2 text-xs text-muted">Choose who can open it to turn the link on.</p>
     </template>
     <template #footer>
       <div class="flex w-full justify-end"><UButton color="neutral" label="Done" @click="open = false" /></div>
