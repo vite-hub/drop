@@ -19,6 +19,9 @@ overrides:
   devalue: ^5.9.4
 
 patchedDependencies:
+  # Keeps the Server Env resolver in Auth's global state. In dev, editing anything server/auth.ts imports re-ran the
+  # module and dropped it, so signed-in requests failed on `env.drop` until /api/auth ran again.
+  '@vite-hub/auth@0.0.4': patches/@vite-hub__auth@0.0.4.patch
   # Under `nuxt dev` (cloudflare-dev), the Blob plugin stored unenv's process.env proxy as globalThis.__env__, which
   # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings.
   '@vite-hub/blob@0.0.4': patches/@vite-hub__blob@0.0.4.patch
