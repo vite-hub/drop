@@ -5,8 +5,9 @@ import { dropPath } from "#shared/links"
 import type { DropDetail, DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView?: boolean }>()
-const { createFolder } = useDropActions()
+const { createFolder, createSite } = useDropActions()
 const prompt = usePrompt()
+const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
 const to = (child: DropSummary) => (props.publicView ? dropPath(child) : `/drops/${child.id}`)
 const meta = (child: DropSummary) => (child.kind === "folder" ? itemCount(child.items ?? 0) : KIND_LABELS[child.kind] ?? "File")
@@ -15,6 +16,12 @@ async function newFolder() {
   const title = await prompt({ title: "New folder", label: "Name", placeholder: "Screenshots", confirmLabel: "Create" })
   if (title && await createFolder(title, props.drop)) await refreshNuxtData(`drop:${props.drop.id}`)
 }
+
+async function newSite() {
+  const input = await siteDialog()
+  const site = input && await createSite(input, props.drop)
+  if (site) await navigateTo(`/drops/${site.id}`)
+}
 </script>
 
 <template>
@@ -22,7 +29,10 @@ async function newFolder() {
     <div class="mx-auto w-full max-w-5xl p-4 sm:p-6">
       <div class="mb-4 flex h-8 items-center justify-between gap-3">
         <p class="label-mono">{{ itemCount(children.length) }}</p>
-        <UButton v-if="drop.isOwner && !drop.trashedAt" color="neutral" icon="i-ph-folder-simple-plus" label="New Folder" size="sm" variant="ghost" @click="newFolder" />
+        <div v-if="drop.isOwner && !drop.trashedAt" class="flex items-center gap-1">
+          <UButton color="neutral" icon="i-ph-folder-simple-plus" label="New Folder" size="sm" variant="ghost" @click="newFolder" />
+          <UButton color="neutral" icon="i-ph-globe-simple" label="New Site Review" size="sm" variant="ghost" @click="newSite" />
+        </div>
       </div>
       <div v-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
         <UIcon name="i-ph-folder-open" class="size-6 text-dimmed" />

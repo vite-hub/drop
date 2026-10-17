@@ -7,8 +7,9 @@ definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
 const { data: drops, status, error, refresh } = useDrops()
-const { upload, remove, restore, deleteForever, emptyTrash, createFolder } = useDropActions()
+const { upload, remove, restore, deleteForever, emptyTrash, createFolder, createSite } = useDropActions()
 const prompt = usePrompt()
+const siteDialog = useSiteDialog()
 const open = useRowsOpen()
 const { data: trash } = useApi("/api/drops", { key: "trash", query: { trash: 1 }, default: () => [] })
 const { data: withMe } = useSharedWithMe()
@@ -91,12 +92,19 @@ async function newFolder() {
   const title = await prompt({ title: "New folder", label: "Name", placeholder: "Login review", confirmLabel: "Create" })
   if (title) await createFolder(title)
 }
+
+async function newSite() {
+  const input = await siteDialog()
+  const site = input && await createSite(input)
+  if (site) await navigateTo(`/drops/${site.id}`)
+}
 </script>
 
 <template>
   <PageShell id="drops" title="Drops" description="Docs and apps you and your agents dropped. Private until you share them.">
     <template #actions>
       <UButton color="neutral" icon="i-ph-folder-simple-plus" label="New Folder" size="sm" variant="ghost" @click="newFolder" />
+      <UButton color="neutral" icon="i-ph-globe-simple" label="New Site Review" size="sm" variant="ghost" @click="newSite" />
       <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
     </template>
 

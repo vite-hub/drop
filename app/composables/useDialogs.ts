@@ -1,5 +1,5 @@
 import type { Component } from "vue"
-import { ConfirmModal, MoveModal, PromptModal } from "#components"
+import { ConfirmModal, MoveModal, PromptModal, SiteModal } from "#components"
 
 function useDialog<T extends Component>(component: T) {
   const overlay = useOverlay()
@@ -25,6 +25,12 @@ export function useConfirm() {
 export function usePrompt() {
   const open = useDialog(PromptModal)
   return async (props: Parameters<typeof open>[0]) => await open(props) ?? null
+}
+
+/** `await siteDialog()`: the address and name of a new site review, or null when cancelled. */
+export function useSiteDialog() {
+  const open = useDialog(SiteModal)
+  return async () => await open({}) ?? null
 }
 
 /** `await moveTo({ drop })`: pick a folder for the drop, or the top. Resolves true once it moved. */

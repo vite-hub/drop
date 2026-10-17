@@ -159,6 +159,19 @@ export function useDropActions() {
     }
   }
 
+  /** A new site review at the top, or inside `parent`, where it lives with the folder. */
+  async function createSite(input: { url: string; title?: string }, parent?: Pick<DropSummary, "id">) {
+    try {
+      const site = await $fetch<DropSummary>("/api/sites", { method: "POST", body: { ...input, ...(parent ? { folder: parent.id } : {}) } })
+      await refreshNuxtData(["drops", "usage", ...(parent ? [`folder:${parent.id}`, `drop:${parent.id}`] : [])])
+      notify.done("Site review created", site.title)
+      return site
+    }
+    catch (error) {
+      notify.fail("Couldn't create the site review", error)
+    }
+  }
+
   /** Moves a drop into a folder, or to the top with null. It then shares and lives with the folder. */
   async function move(drop: Pick<DropSummary, "id" | "title" | "parentId">, folder: Pick<DropSummary, "id" | "title"> | null) {
     try {
@@ -174,5 +187,5 @@ export function useDropActions() {
     }
   }
 
-  return { upload, setVisibility, setLifetime, remove, restore, deleteForever, emptyTrash, createFolder, move }
+  return { upload, setVisibility, setLifetime, remove, restore, deleteForever, emptyTrash, createFolder, createSite, move }
 }
