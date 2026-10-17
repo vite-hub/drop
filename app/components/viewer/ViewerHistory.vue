@@ -1,38 +1,42 @@
 <script setup lang="ts">
-// A doc's versions as a timeline, newest first: what each one changed (its note), who published it, and the comments
-// written on it. Any other version opens, or compares with this one.
+// A doc's versions one after the other, newest first, like a commit log: what each one changed (its note), who
+// published it, and the comments written on it. A version opens what it changed (ViewerDiff).
 import type { DropComment, DropDetail, DropVersion } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; comments: DropComment[] }>()
-const emit = defineEmits<{ compare: [version: DropVersion] }>()
+const emit = defineEmits<{ open: [version: DropVersion] }>()
 
 // Comments come up to the version being viewed (listComments), so later versions have none to count here.
 function talk(version: DropVersion) {
   if (version.version > props.drop.version) return ""
-  const written = props.comments.filter(comment => comment.version === version.version)
-  if (!written.length) return ""
-  const open = written.filter(comment => !comment.resolved).length
-  return `${written.length} ${written.length === 1 ? "comment" : "comments"}${open ? `, ${open} open` : ""}`
+  const written = props.comments.filter(comment => comment.version === version.version).length
+  return written ? `${written} ${written === 1 ? "comment" : "comments"}` : ""
 }
 </script>
 
 <template>
   <!-- TODO(repo-mirror): once versions also go to a repo the owner picks (@vite-hub/forge, see server/utils/drops.ts),
        link each version to its commit here. -->
-  <ol class="space-y-4 p-4">
-    <li v-for="(version, index) in drop.versions" :key="version.id" class="relative flex gap-3 text-[13px]">
-      <span v-if="index < drop.versions.length - 1" class="absolute top-4 left-[4.5px] h-[calc(100%+0.5rem)] w-px bg-(--ui-border)" />
-      <span class="mt-1.5 size-2.5 shrink-0 rounded-full" :class="version.current ? 'bg-inverted' : 'bg-accented'" />
-      <div class="min-w-0 flex-1 space-y-0.5">
-        <div class="flex items-center gap-2">
-          <p v-if="version.current" class="font-medium text-highlighted">v{{ version.version }} · This version</p>
-          <NuxtLink v-else class="truncate hover:underline" :to="`/drops/${version.id}`">v{{ version.version }}</NuxtLink>
-          <UButton v-if="!version.current" class="-my-1 ml-auto" color="neutral" label="Compare" size="xs" variant="ghost" @click="emit('compare', version)" />
-        </div>
-        <p v-if="version.note" class="text-highlighted">{{ version.note }}</p>
-        <p class="text-xs text-muted">{{ version.actorName }} · <TimeAgo :at="version.createdAt" /></p>
-        <p v-if="talk(version)" class="text-xs text-muted">{{ talk(version) }}</p>
-      </div>
+  <ol class="p-2">
+    <li v-for="(version, index) in drop.versions" :key="version.id" class="relative">
+      <span v-if="index < drop.versions.length - 1" class="absolute top-6 bottom-0 left-[19.5px] w-px translate-y-1.5 bg-(--ui-border)" aria-hidden="true" />
+      <button
+        :aria-label="`What changed in v${version.version}`"
+        class="group relative flex w-full cursor-pointer gap-3 rounded-md px-3 py-2.5 text-left text-[13px] outline-none hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
+        type="button"
+        @click="emit('open', version)"
+      >
+        <span class="mt-1.5 size-2.5 shrink-0 rounded-full ring-4 ring-(--ui-bg) group-hover:ring-(--ui-bg-elevated)" :class="version.current ? 'bg-inverted' : 'bg-accented'" />
+        <span class="min-w-0 flex-1 space-y-0.5">
+          <span class="flex items-center gap-2">
+            <span class="font-mono text-xs text-muted">v{{ version.version }}</span>
+            <UBadge v-if="version.current" color="neutral" label="Viewing" size="sm" variant="soft" />
+          </span>
+          <span v-if="version.note || index === drop.versions.length - 1" class="block text-highlighted">{{ version.note ?? "First version" }}</span>
+          <span class="block text-xs text-muted">{{ version.actorName }} · <TimeAgo :at="version.createdAt" /><template v-if="talk(version)"> · {{ talk(version) }}</template></span>
+        </span>
+        <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-lucide-chevron-right" />
+      </button>
     </li>
   </ol>
 </template>

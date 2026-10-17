@@ -136,7 +136,9 @@ const pageComments = computed(() => (isApp.value ? comments.value.filter(comment
 const unplaced = ref(new Set<string>())
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
 const outdated = computed(() => new Set(comments.value.filter(comment => comment.version < drop.value.version && (replaced(comment) || unplaced.value.has(comment.id))).map(comment => comment.id)))
-const compareWith = ref<DropVersion | null>(null)
+/** The version whose changes are open (ViewerDiff), and the one before it. */
+const shownVersion = ref<DropVersion | null>(null)
+const previousVersion = computed(() => (shownVersion.value ? drop.value.versions[drop.value.versions.findIndex(item => item.id === shownVersion.value!.id) + 1] ?? null : null))
 
 // What the page reports going wrong goes to the server in batches, for the agent's read_drop. Only apps and HTML pages
 // run their own code; a Markdown doc's errors would be Drop's.
@@ -322,7 +324,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         @focus="focusComment"
         @resolve="resolve"
       />
-      <ViewerHistory v-else-if="tab === 'history'" :comments="comments" :drop="drop" @compare="version => (compareWith = version)" />
+      <ViewerHistory v-else-if="tab === 'history'" :comments="comments" :drop="drop" @open="version => (shownVersion = version)" />
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
@@ -467,5 +469,5 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
   />
 
   <ViewerShareModal v-if="owner" v-model:open="shareOpen" :drop="drop" />
-  <ViewerDiff v-if="compareWith" :drop="drop" :open="true" :other="compareWith" @update:open="open => !open && (compareWith = null)" />
+  <ViewerDiff v-if="shownVersion" :key="shownVersion.id" :open="true" :previous="previousVersion" :version="shownVersion" @update:open="open => !open && (shownVersion = null)" />
 </template>
