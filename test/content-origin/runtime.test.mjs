@@ -65,6 +65,12 @@ test("a wildcard can sit inside the first label, one level under the zone, and m
   for (const host of ["drop.vitehub.dev", "vitehub.dev", "babysitter.vitehub.dev", "x-drop.vitehub.dev", "drop-usercontent.vitehub.dev", `${origin.slice(8, 34)}.vitehub.dev`])
     assert.equal(isContentRequest(request(`https://${host}/`)), false, host)
   assert.equal(await contentMiddleware(request("https://drop.vitehub.dev/", { headers: { "sec-fetch-dest": "document" } })), undefined)
+  for (const host of ["evil-drop.vitehub.dev", "x-drop.vitehub.dev", `${origin.slice(8, 20)}-drop.vitehub.dev`]) {
+    const response = await contentMiddleware(request(`https://${host}/`, { headers: { "sec-fetch-dest": "document" } }))
+    assert.equal(response?.status, 404, host)
+  }
+  state.contentOrigin = "https://*.usercontent.vitehub.dev"
+  assert.equal(await contentMiddleware(request("https://evil.usercontent.vitehub.dev/", { headers: { "sec-fetch-dest": "document" } })), undefined)
   for (const value of ["https://*.*.x.dev", "https://x.*.dev", "https://*", "ftp://*.x.dev", "https://*.x.dev/path"]) {
     state.contentOrigin = value
     assert.equal(await contentOrigin(request("https://drop.vitehub.dev/d/x"), id), null, value)

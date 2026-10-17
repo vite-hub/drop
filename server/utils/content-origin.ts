@@ -67,15 +67,26 @@ export async function contentOrigin(event: H3Event, dropId: string): Promise<str
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-/** Whether this request came in on a content origin rather than Drop itself. */
-export function isContentRequest(event: H3Event) {
+/**
+ * How this request's host relates to the content origin: `content` for a drop's own host, `stray` for a host that has
+ * the wildcard's shape but no valid label (evil-drop.example.com), which a `*-drop.example.com/*` route also sends
+ * here and which must not serve a copy of Drop, and `false` for anything else, such as Drop itself.
+ */
+export function contentHost(event: H3Event): "content" | "stray" | false {
   const config = configured(event)
   if (!config) return false
   const { hostname, port } = event.url
   if (port !== config.port) return false
-  if (!config.perDrop) return hostname === config.host
-  return new RegExp(`^${escape(config.perDrop.prefix)}${LABEL}${escape(config.perDrop.suffix)}$`).test(hostname)
+  if (!config.perDrop) return hostname === config.host && "content"
+  const { prefix, suffix } = config.perDrop
+  if (new RegExp(`^${escape(prefix)}${LABEL}${escape(suffix)}$`).test(hostname)) return "content"
+  // Only when the `*` shares its label with fixed text (`*-drop`): a whole level (`*.example.com`) may also hold Drop.
+  if (!prefix && suffix.startsWith(".")) return false
+  return hostname.length > prefix.length + suffix.length && hostname.startsWith(prefix) && hostname.endsWith(suffix) && !hostname.slice(prefix.length, -suffix.length).includes(".") && "stray"
 }
+
+/** Whether this request came in on a content origin rather than Drop itself. */
+export const isContentRequest = (event: H3Event) => contentHost(event) === "content"
 
 /**
  * The only page the content origin serves, at every path so an app sees the URL it was built for. The viewer sends
