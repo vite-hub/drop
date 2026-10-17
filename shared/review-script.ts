@@ -172,6 +172,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     start = null;
     // A click or a tiny drag draws nothing: keep drawing.
     if (r.width < 6 || r.height < 6) { box.hidden = true; return; }
+    place(box, r);
     draw.hidden = true;
     const el = anchorFor(r.left, r.top, r.right, r.bottom, host);
     area = { rect: r, selector: pathOf(el), label: labelOf(el) };
