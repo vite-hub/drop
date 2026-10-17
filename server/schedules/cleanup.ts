@@ -4,7 +4,7 @@ import { codeImages } from "../databases/config"
 import { defineSchedule } from "vite-hub/schedule"
 import { cleanupQuotaBlobs, cleanupQuotaReservations } from "../utils/quotas"
 
-/** The hourly cleanup: expired reservations and code images, the Trash, and unused OAuth clients. */
+/** The hourly cleanup: expired reservations and code images, the Trash, unused OAuth clients, and the search index's backlog. */
 export default defineSchedule({
   cron: "0 * * * *",
   async handler({ scheduledAt }) {
@@ -19,6 +19,8 @@ export default defineSchedule({
       },
       async () => (await import("../utils/drops")).deleteExpiredDrops(scheduledAt),
       async () => (await import("../utils/oauth-cleanup")).cleanupUnusedOAuthClients(scheduledAt),
+      // Text docs published before search read their words, a batch an hour.
+      async () => (await import("../utils/search")).indexMissingTexts(),
     ]
     for (const step of steps) await step().catch(error => errors.push(error))
     if (errors.length === 1) throw errors[0]

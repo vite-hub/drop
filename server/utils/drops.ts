@@ -20,6 +20,7 @@ import { draftPath } from "./draft-paths"
 import { deleteRetainedDrop } from "./quota-deletion"
 import { chainOf, expiryPolicy, renewDrop } from "./expiry"
 import { ancestorsOf, foldersUnder, type Grant, isAttachment, itemCounts, listedNode, parentNode, resolveNode, touchFolder, uniqueSlug } from "./nodes"
+import { searchHeads, searchWords, textStatements } from "./search"
 
 /**
  * `expired` means gone for its links: in the Trash, or past its window and waiting for the hourly move there. Rows
@@ -118,16 +119,11 @@ async function resolveRows(rows: (typeof drops.$inferSelect)[], days: number) {
   return rows.map(row => resolveNode(row, ancestors.get(row.id) ?? [], days))
 }
 
-/** Search words, matched against the title, the file name, and the slug. */
-const searchWords = (query?: string) => query?.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 10) ?? []
-const matching = (words: string[]) => words.map(word =>
-  sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coalesce(${drops.slug}, '')) LIKE ${`%${word.replace(/[\\%_]/g, "\\$&")}%`} ESCAPE '\\'`)
-
 /**
- * Listed rows as summaries: app paths for the owner's apps, how many drops each folder holds, image thumbnails, and with
- * `path` the folders each one sits in, up to (not including) `below`.
+ * Listed rows as summaries: app paths for the owner's apps, how many drops each folder holds, image thumbnails, with
+ * `path` the folders each one sits in, up to (not including) `below`, and a search's snippets.
  */
-async function summarize(rows: DropRow[], days: number, options: { ownerId?: string; path?: boolean; below?: string } = {}) {
+async function summarize(rows: DropRow[], days: number, options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {}) {
   // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
   const files = options.ownerId && rows.some(row => row.kind === "app")
     ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).innerJoin(dropHeads, eq(dropHeads.dropId, dropFiles.dropId)).where(eq(dropHeads.ownerId, options.ownerId))
@@ -144,11 +140,19 @@ async function summarize(rows: DropRow[], days: number, options: { ownerId?: str
     ...(row.kind === "folder" ? { items: counts.get(row.id) ?? 0 } : {}),
     ...(row.kind === "image" && row.blobKey ? { thumbnail: `/f/${row.blobKey}` } : {}),
     ...(options.path ? { path: pathOf(row) } : {}),
+    ...(options.snippets?.get(row.id) ? { snippet: options.snippets.get(row.id) } : {}),
   }))
 }
 
 const heads = (where: SQL | undefined, limit: number) => db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
   .where(where).orderBy(desc(dropHeads.updatedAt)).limit(limit).then(rows => rows.map(row => row.drop))
+
+/** Latest versions in `where`, or with words the ones matching them (name or text), and each match's snippet. */
+async function headsMatching(where: SQL | undefined, words: string[], limit: number) {
+  if (!words.length) return { rows: await heads(where, limit), snippets: undefined }
+  const found = await searchHeads(where, words, limit)
+  return { rows: found.map(item => item.drop), snippets: new Map(found.map(item => [item.drop.id, item.snippet])) }
+}
 
 /** A drop by its id, or by its share link's key: the doc's latest version. */
 export async function findDrop(id: string, event?: H3Event) {
@@ -184,13 +188,14 @@ export async function findDropByBlob(key: string, event?: H3Event) {
  * matches at any depth. Older versions of a doc hide behind their latest, and files a doc embeds hide behind the doc.
  * A folder in the Trash takes its drops along, so only the top-most node in the Trash lists.
  */
-export async function listDrops(who: Identity, event?: H3Event, options: { trash?: boolean; query?: string } = {}): Promise<DropSummary[]> {
+export async function listDrops(who: Identity, event?: H3Event, options: { trash?: boolean; query?: string; limit?: number } = {}): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
   const scope = options.trash ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt))) : words.length ? listedNode : isNull(drops.parentId)
-  const rows = await resolveRows(await heads(and(eq(dropHeads.ownerId, who.userId), scope, ...matching(words)), 500), days)
+  const found = await headsMatching(and(eq(dropHeads.ownerId, who.userId), scope), words, options.limit ?? 500)
+  const rows = await resolveRows(found.rows, days)
   const listed = rows.filter(row => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
-  return summarize(listed, days, { ownerId: who.userId, path: words.length > 0 })
+  return summarize(listed, days, { ownerId: who.userId, path: words.length > 0, snippets: found.snippets })
 }
 
 /**
@@ -201,13 +206,13 @@ export async function listFolder(folder: DropRow, event?: H3Event, options: { qu
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
   const inside = words.length ? inArray(drops.parentId, foldersUnder(folder.id)) : eq(drops.parentId, folder.id)
-  const found = await heads(and(eq(dropHeads.ownerId, folder.ownerId), inside, isNull(drops.trashedAt), ...matching(words)), words.length ? 200 : 500)
+  const found = await headsMatching(and(eq(dropHeads.ownerId, folder.ownerId), inside, isNull(drops.trashedAt)), words, words.length ? 200 : 500)
   // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
   const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
-  const rows = words.length ? await resolveRows(found, days) : found.map(row => resolveNode(row, above, days))
+  const rows = words.length ? await resolveRows(found.rows, days) : found.rows.map(row => resolveNode(row, above, days))
   // The owner may open a folder in the Trash, and sees what it holds as it was.
   const listed = rows.filter(row => folder.expired || !row.expired).map(row => ({ ...row, ownerBanned: folder.ownerBanned }))
-  return summarize(listed, days, { ownerId: folder.ownerId, path: words.length > 0, below: folder.id })
+  return summarize(listed, days, { ownerId: folder.ownerId, path: words.length > 0, below: folder.id, snippets: found.snippets })
 }
 
 /** Every folder you have, for picking where a drop goes. Folders in the Trash stay out. */
@@ -543,7 +548,7 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
     try {
       // A new version is a visit: the older versions restart their window with it, and take its lifetime.
       const chain = previous ? [renewDrop(previous, now), db.update(drops).set(life).where(sql`${drops.id} IN (${chainOf(previous)})`)] : []
-      await quota.commit([db.insert(drops).values(row), ...chain, ...(folder ? [touchFolder(folder.id, now)] : [])], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
+      await quota.commit([db.insert(drops).values(row), ...textStatements(row, text, previous?.id), ...chain, ...(folder ? [touchFolder(folder.id, now)] : [])], previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`)
     }
     catch (error) {
       await deleteBlobKeys([key])

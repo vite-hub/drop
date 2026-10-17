@@ -2114,6 +2114,44 @@
           "value": "\"workspace_stats\".\"id\" = 1"
         }
       }
+    },
+    "drop_texts": {
+      "name": "drop_texts",
+      "columns": {
+        "drop_id": {
+          "name": "drop_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "drop_texts_drop_id_drops_id_fk": {
+          "name": "drop_texts_drop_id_drops_id_fk",
+          "tableFrom": "drop_texts",
+          "tableTo": "drops",
+          "columnsFrom": [
+            "drop_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     }
   },
   "views": {},

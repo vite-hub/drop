@@ -4,8 +4,8 @@ import { requireIdentity } from "../../utils/identity"
 
 /**
  * Your drops at the top; with `?trash` the ones in your Trash; with `?shared` other people's drops shared with you;
- * with `?folders` every folder you have. `?q=` searches your drops at any depth, and with `?folder=<id or link>` the
- * folder's drops, or with `q` everything below it.
+ * with `?folders` every folder you have. `?q=` searches your drops at any depth, by name and by a doc's text, and with
+ * `?folder=<id or link>` the folder's drops, or with `q` everything below it.
  */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)

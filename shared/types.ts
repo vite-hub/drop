@@ -64,7 +64,9 @@ export interface DropSummary {
   thumbnail?: string
   /** Search results: the folders it sits in, top-most first. */
   path?: DropCrumb[]
-  /** "Shared with me" only: whose drop it is. */
+  /** Search results: words around the match in a doc's text, when its name doesn't have them all. */
+  snippet?: string
+  /** "Shared with me" and search: whose drop it is, when it isn't yours. */
   owner?: { name: string; image: string | null }
 }
 

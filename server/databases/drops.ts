@@ -71,6 +71,15 @@ export const dropHeads = sqliteTable("drop_heads", {
 }, table => [index("drop_heads_owner_idx").on(table.ownerId, table.updatedAt)])
 
 /**
+ * The words of a text doc (Markdown, HTML as plain text), for search. Its own table so the many `select drops.*` reads
+ * don't carry it. Only latest versions keep a row: publishing a version moves the text to it.
+ */
+export const dropTexts = sqliteTable("drop_texts", {
+  dropId: text("drop_id").primaryKey().references(() => drops.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+})
+
+/**
  * Link-shared drops someone else owns that a signed-in person opened, for their "Shared with me" list. Triggers move a
  * row to each new version and drop it with the last one. Team drops need no row: everyone in the Drop sees those.
  */

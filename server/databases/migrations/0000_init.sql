@@ -461,3 +461,10 @@ END;
 CREATE TRIGGER `drop_visits_user_delete` AFTER DELETE ON `user` BEGIN
   DELETE FROM `drop_visits` WHERE `user_id` = OLD.id;
 END;
+--> statement-breakpoint
+-- Search reads a text doc's words from here, latest versions only (server/utils/search.ts).
+CREATE TABLE `drop_texts` (
+	`drop_id` text PRIMARY KEY NOT NULL,
+	`text` text NOT NULL,
+	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
+);
