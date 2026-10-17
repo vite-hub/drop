@@ -46,7 +46,8 @@ function request(path) {
 }
 
 test("search reads a doc as text: no front matter, markup, tags, scripts or entities, and at most 64K characters", () => {
-  assert.equal(searchableText("markdown", "---\nsupersedes: x\n---\n# Plan\n\n- **Bold** [link text](https://x.dev) and `code`\n> quoted"), "Plan Bold link text and code quoted")
+  assert.equal(searchableText("markdown", "---\nsupersedes: x\n---\n# Plan\n\n- **Bold** [link text](https://x.dev) and `code`\n> quoted"), "Bold link text and code quoted", "the title's H1 goes")
+  assert.equal(searchableText("markdown", "Intro\n\n# Not first"), "Intro Not first")
   assert.equal(searchableText("html", "<html><head><title>T</title><style>p{}</style></head><body><h1>Caf&eacute;</h1><p>Fish &amp; chips&#33;</p><script>alert(1)</script></body></html>"), "Caf&eacute; Fish & chips!")
   assert.equal(searchableText("markdown", "word ".repeat(20_000)).length, MAX_SEARCH_TEXT)
 })

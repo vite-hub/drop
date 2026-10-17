@@ -32,7 +32,8 @@ export function searchableText(kind: string, source: string) {
       })
   }
   else {
-    text = splitFrontmatter(text).body.replace(/<!--[\s\S]*?-->/g, " ")
+    // A leading H1 is the doc's title, which search matches on its own: snippets start with the words after it.
+    text = splitFrontmatter(text).body.replace(/^\s*#\s[^\n]*\n/, "").replace(/<!--[\s\S]*?-->/g, " ")
       .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1") // links and images keep their text
       .replace(/^\s{0,3}(?:#{1,6}|>+|[-*+]|\d+[.)]|```+\w*|~~~+\w*)\s?/gm, "") // headings, quotes, list markers, fences
       .replace(/[*_~`|]+/g, " ")
