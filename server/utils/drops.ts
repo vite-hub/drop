@@ -1,15 +1,15 @@
-import { and, desc, eq, exists, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm"
+import { and, desc, eq, exists, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, dropHeads, drops, user } from "../databases/config"
+import { blobCleanup, dropFiles, dropHeads, drops, dropVisits, user } from "../databases/config"
 import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
 import { contentTypeOf } from "#shared/project-bundle"
-import { ACCESS_RANK, type Access, type DropAttachment, type DropDetail, type DropSummary, type DropVersion } from "#shared/types"
+import { ACCESS_RANK, type Access, type DropAttachment, type DropDetail, type DropSummary, type DropVersion, type Visibility } from "#shared/types"
 import { DAY_MS, expiresAt, type Lifetime, MAX_KEEP_REASON, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
@@ -30,16 +30,16 @@ export { MAX_FILE_BYTES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
- * What the caller may do with a drop. Editors and admins act on every drop in the workspace. Share links can view,
- * comment, or edit; a "Can edit" link lets signed-in people edit in the browser, not their agents, so only the owner
- * and staff publish through agents. An expired drop is read-only for the people who can renew it and gone for
- * everyone else.
+ * What the caller may do with a drop. Editors and admins act on every drop in the workspace. A share reaches the team
+ * (everyone signed in to this Drop, and their agents) or anyone with the link, and lets them view, comment, or edit; "Can
+ * edit" lets signed-in people edit in the browser, not their agents, so only the owner and staff publish through agents.
+ * An expired drop is read-only for the people who can renew it and gone for everyone else.
  */
 export function permissions(drop: DropRow, who: Identity | null) {
   if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || who.role === "admin")) }
   const owner = Boolean(who && who.userId === drop.ownerId)
   const staff = Boolean(who && (who.role === "admin" || who.role === "editor"))
-  const shared = drop.visibility === "shared" && !drop.shareReview && !drop.expired
+  const shared = reaches(drop, who) && !drop.shareReview && !drop.expired
   const level = ACCESS_RANK[drop.access as Access]
   const available = !drop.ownerBanned
   const live = available && !drop.expired
@@ -52,9 +52,17 @@ export function permissions(drop: DropRow, who: Identity | null) {
   }
 }
 
-/** A shared link that worked until its drop expired. Private drops stay indistinguishable from missing ones. */
+/** Whether the drop's share includes the caller, review and expiry aside. Team drops need a signed-in caller. */
+export const reaches = (drop: Pick<DropRow, "visibility">, who: Identity | null) =>
+  drop.visibility === "shared" || (drop.visibility === "team" && who !== null)
+
+/** A share that worked until its drop expired. Private drops stay indistinguishable from missing ones. */
 export const expiredLink = (drop: DropRow | null, who: Identity | null) =>
-  Boolean(drop?.expired && drop.visibility === "shared" && !drop.shareReview && !drop.ownerBanned && !drop.quarantinedAt && !permissions(drop, who).view)
+  Boolean(drop?.expired && reaches(drop, who) && !drop.shareReview && !drop.ownerBanned && !drop.quarantinedAt && !permissions(drop, who).view)
+
+/** A share the caller would see once an admin approves it. Anyone else gets the usual 404. */
+export const waitingForReview = (drop: DropRow | null, who: Identity | null) =>
+  Boolean(drop && !drop.ownerBanned && !drop.quarantinedAt && reaches(drop, who) && drop.shareReview === "pending" && !permissions(drop, who).view)
 
 export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().days): DropSummary {
   const expires = expiresAt(row, days)
@@ -114,6 +122,38 @@ export async function listDrops(who: Identity, event?: H3Event, options: { trash
     : []
   const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
   return listed.map(row => toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days))
+}
+
+/**
+ * Other people's drops you can open: everything shared with the team, plus links you opened while signed in. Newest
+ * first; drops waiting for review, in the Trash, or from banned owners stay out.
+ */
+export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<DropSummary[]> {
+  const visited = exists(db.select({ at: dropVisits.at }).from(dropVisits).where(and(eq(dropVisits.userId, who.userId), eq(dropVisits.dropId, drops.id))))
+  const rows = await db.select({ drop: drops, ownerName: user.name, ownerImage: user.image }).from(drops)
+    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id)).innerJoin(user, eq(user.id, drops.ownerId))
+    .where(and(
+      or(eq(drops.visibility, "team"), and(eq(drops.visibility, "shared"), visited)),
+      ne(drops.ownerId, who.userId), isNull(drops.parentId), isNull(drops.trashedAt), isNull(drops.quarantinedAt), isNull(drops.shareReview),
+      sql`coalesce(${user.banned}, 0) = 0`,
+    )).orderBy(desc(drops.updatedAt)).limit(200)
+  const { days } = expiryPolicy(event)
+  const now = Date.now()
+  return rows.filter(row => !isExpired(row.drop, now, days))
+    .map(row => ({ ...toSummary({ ...row.drop, expired: false }, undefined, days), owner: { name: row.ownerName, image: row.ownerImage } }))
+}
+
+/** Remembers a link-shared drop a signed-in person opened, at most once a day per drop. */
+export async function recordSharedVisit(drop: DropRow, who: Identity | null) {
+  if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || drop.visibility !== "shared" || drop.parentId) return
+  const at = Date.now()
+  try {
+    await db.insert(dropVisits).values({ userId: who.userId, dropId: drop.id, at })
+      .onConflictDoUpdate({ target: [dropVisits.userId, dropVisits.dropId], set: { at }, setWhere: lte(dropVisits.at, at - DAY_MS) })
+  }
+  catch (error) {
+    log.error({ action: "drop-shared-visit", error: String(error) })
+  }
 }
 
 function storageFailure(error: Error) {
@@ -290,7 +330,7 @@ async function deleteBlobKeys(keys: string[]) {
 }
 
 /** Stores one file as a private doc drop. Markdown and HTML must be UTF-8. */
-export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: "private" | "shared"; access?: Access }, event?: H3Event) {
+export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: Visibility; access?: Access }, event?: H3Event) {
   await drainBlobCleanup()
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   const filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
@@ -366,7 +406,7 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       trashedAt: null,
       trashReason: null,
       parentId: null,
-      shareReview: (input.visibility ?? previous?.visibility) === "shared" ? await shareReviewFor(previous?.ownerId ?? who.userId, event) : null,
+      shareReview: (input.visibility ?? previous?.visibility ?? "private") !== "private" ? await shareReviewFor(previous?.ownerId ?? who.userId, event) : null,
       quarantinedAt: null,
       publishToken: null,
     }
@@ -393,7 +433,7 @@ function cleanPath(path: string) {
 }
 
 /** Creates an app drop, or publishes the next version of one you may edit. */
-export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; files: Record<string, string>; visibility?: "private" | "shared"; access?: Access }, event?: H3Event) {
+export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; files: Record<string, string>; visibility?: Visibility; access?: Access }, event?: H3Event) {
   const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
   if (!entries.some(([path]) => path === "index.html")) throw new HTTPError({ status: 400, statusText: "An app needs an index.html." })
@@ -413,7 +453,9 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   const life = lifetimeFields(who, input, row, event)
   const note = input.note?.trim() || null
   const visibility = input.visibility ?? row?.visibility ?? "private"
-  const shareReview = input.visibility === "shared" && row?.visibility !== "shared" ? await shareReviewFor(row?.ownerId ?? who.userId, event) : (row?.shareReview ?? null)
+  const shareReview = input.visibility === undefined || input.visibility === row?.visibility
+    ? row?.shareReview ?? null
+    : input.visibility === "private" ? null : await shareReviewFor(row?.ownerId ?? who.userId, event)
 
   const id = row?.id ?? crypto.randomUUID()
   const prefix = `apps/${id}/${crypto.randomUUID()}`

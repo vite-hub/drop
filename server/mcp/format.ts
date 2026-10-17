@@ -5,7 +5,7 @@ import type { Share } from "../utils/drop-update"
 
 /** What agents get back for a drop: enough to link it, embed its file, and know who can open it and for how long. */
 export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "blobKey">) {
-  const share: Share = drop.visibility === "shared" ? drop.access : "private"
+  const share: Share = drop.visibility === "private" ? "private" : drop.access
   return {
     id: drop.id,
     title: drop.title,
@@ -15,6 +15,8 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     // Embed this in a doc (Markdown image, ::screenshot src) to make the file part of that doc.
     ...(row?.blobKey && (drop.kind === "image" || drop.kind === "file") ? { fileUrl: new URL(`/f/${row.blobKey}`, origin).href } : {}),
     share,
+    ...(drop.visibility !== "private" ? { sharedWith: drop.visibility === "team" ? "team" as const : "link" as const } : {}),
+    ...(drop.owner ? { owner: drop.owner.name } : {}),
     ...(drop.shareReview === "pending" ? { waitingForReview: true } : {}),
     lifetime: drop.lifetime,
     ...(drop.keepReason ? { keepReason: drop.keepReason } : {}),
@@ -27,7 +29,7 @@ export type McpDrop = ReturnType<typeof mcpDrop>
 
 /** One line per drop for clients that only read text. */
 export const dropLine = (drop: McpDrop) =>
-  `- ${drop.title} (${drop.kind} v${drop.version}, ${drop.share}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
+  `- ${drop.title} (${drop.kind} v${drop.version}, ${drop.share}${drop.sharedWith ? ` with the ${drop.sharedWith}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
 
 /** Where a comment points, in words: the quoted text, or a spot or area as percentages of an image or element. */
 export function commentTarget(comment: Pick<DropComment, "kind" | "quote" | "label" | "ox" | "oy" | "ow" | "oh">) {

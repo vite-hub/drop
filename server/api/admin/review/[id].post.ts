@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm"
+import { and, eq, ne } from "drizzle-orm"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { ReviewSchema } from "#shared/schemas"
@@ -17,7 +17,7 @@ export default defineValidatedHandler({
     if (action === "approve") {
       await db.batch([
         db.update(user).set({ shareApprovedAt: Date.now() }).where(eq(user.id, id)),
-        db.update(drops).set({ shareReview: null }).where(and(eq(drops.ownerId, id), eq(drops.visibility, "shared"))),
+        db.update(drops).set({ shareReview: null }).where(and(eq(drops.ownerId, id), ne(drops.visibility, "private"))),
       ])
     }
     else await db.update(drops).set({ shareReview: "rejected" }).where(and(eq(drops.ownerId, id), eq(drops.shareReview, "pending")))

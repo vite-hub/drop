@@ -9,12 +9,20 @@ useSeoMeta({ title: "Drops" })
 const { data: drops, status, error, refresh } = useDrops()
 const { upload, remove, restore, deleteForever, emptyTrash } = useDropActions()
 const { data: trash } = useApi("/api/drops", { key: "trash", query: { trash: 1 }, default: () => [] })
+const { data: withMe } = useSharedWithMe()
 const { data: usage } = useApi("/api/usage", { key: "usage" })
 const limited = computed(() => usage.value?.enabled && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null))
 const nearLimit = computed(() => usage.value && usageNearLimit(usage.value))
 const atLimit = computed(() => usage.value && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null && quota.used >= quota.limit))
 const storageMiB = computed(() => Math.ceil((usage.value?.bytes.used ?? 0) / MIB * 10) / 10)
-const filter = ref<"all" | "private" | "shared" | "trash">("all")
+const FILTERS = ["all", "private", "shared", "with-me", "trash"] as const
+type Filter = typeof FILTERS[number]
+// The tab lives in the URL so the sidebar can link straight to Shared with me.
+const route = useRoute()
+const filter = computed<Filter>({
+  get: () => FILTERS.find(tab => tab === route.query.tab) ?? "all",
+  set: tab => void navigateTo({ query: { ...route.query, tab: tab === "all" ? undefined : tab } }, { replace: true }),
+})
 const search = ref("")
 const searchInput = useTemplateRef("searchInput")
 const picker = useFileDialog({ multiple: false, reset: true })
@@ -24,15 +32,18 @@ const now = useRelativeNow()
 const counts = computed(() => ({
   all: drops.value.length,
   private: drops.value.filter(drop => drop.visibility === "private").length,
-  shared: drops.value.filter(drop => drop.visibility === "shared").length,
+  shared: drops.value.filter(drop => drop.visibility !== "private").length,
+  withMe: withMe.value.length,
   trash: trash.value.length,
 }))
 
 const visible = computed(() => {
   const query = search.value.trim().toLowerCase()
-  return (filter.value === "trash" ? trash.value : drops.value)
-    .filter(drop => filter.value === "all" || filter.value === "trash" || drop.visibility === filter.value)
-    .filter(drop => !query || `${drop.title} ${drop.filename} ${drop.actorName}`.toLowerCase().includes(query))
+  const list = filter.value === "trash" ? trash.value : filter.value === "with-me" ? withMe.value : drops.value
+  return list
+    .filter(drop => filter.value !== "private" || drop.visibility === "private")
+    .filter(drop => filter.value !== "shared" || drop.visibility !== "private")
+    .filter(drop => !query || `${drop.title} ${drop.filename} ${drop.actorName} ${drop.owner?.name ?? ""}`.toLowerCase().includes(query))
 })
 
 /**
@@ -98,6 +109,7 @@ async function onPick(file: File) {
           { label: `All ${counts.all}`, value: 'all' },
           { label: `Private ${counts.private}`, value: 'private', icon: 'i-lucide-lock' },
           { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-lucide-globe' },
+          { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-lucide-inbox' },
           { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-lucide-trash' },
         ]"
         size="sm"
@@ -125,7 +137,13 @@ async function onPick(file: File) {
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Deleted and expired drops stay here for {{ TRASH_DAYS }} days, then they're gone for good.</p>
     </div>
 
-    <div v-else-if="filter !== 'trash' && !drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+    <div v-else-if="filter === 'with-me' && !withMe.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+      <UIcon name="i-lucide-inbox" class="size-6 text-dimmed" />
+      <p class="mt-3 font-medium text-highlighted">Nothing shared with you yet</p>
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Drops your teammates share with the team show up here, and so do links you open while signed in.</p>
+    </div>
+
+    <div v-else-if="filter !== 'trash' && filter !== 'with-me' && !drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
       <UIcon name="i-lucide-layers" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing dropped yet</p>
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here.</p>

@@ -26,7 +26,7 @@ A new drop also needs a `lifetime`. Pick it from what the drop is for:
 - `review`: plans and docs going through feedback. 30 days after the last visit.
 - `keep`: pull request assets, docs linked from an issue, a README, or anything else that lasts. It never expires. Pass `keepReason`, a sentence or two the owner reads, such as the pull request it belongs to.
 
-Drops start private. Pass `share` (`view`, `comment`, or `edit`) when the user asked to share, or when the drop is clearly meant for others, like a screenshot embedded in a pull request. `edit` lets signed-in people edit a Markdown doc together.
+Drops start private. Pass `share` (`view`, `comment`, or `edit`) when the user asked to share, or when the drop is clearly meant for others, like a screenshot embedded in a pull request. `edit` lets signed-in people edit a Markdown doc together. `audience` says who it reaches: `link` (anyone with the link, the default) or `team` (everyone signed in to this Drop, who find it under Shared with me). Use `team` when the user wants their team to work on it, and `link` for anything people outside the Drop must open, like pull request assets.
 
 `publish` answers with the review page link (`url`); give the user that link. Do not repeat a successful call: every success creates another drop or version. Docs and apps are limited to 4 MiB.
 
@@ -42,9 +42,9 @@ Address the open comments, then call `publish` with `previous` set to the drop's
 
 ## Manage drops
 
-`list_drops` lists the user's drops (filter with `query`, `kind`, `shared`), or their Trash with `trash: true`, plus plan usage.
+`list_drops` lists the user's drops (filter with `query`, `kind`, `shared`), their Trash with `trash: true`, or other people's drops shared with them with `sharedWithMe: true`, plus plan usage.
 
-`update_drop` changes `share`, `title`, or `lifetime`; `renew: true` starts a fresh window; `trash: true` moves a drop to the Trash, where it stays restorable for 15 days, and `trash: false` restores it, also after it expired. Trash only what the user asked to remove, or what you made and no longer need. Only people delete for good.
+`update_drop` changes `share`, `audience`, `title`, or `lifetime`; `renew: true` starts a fresh window; `trash: true` moves a drop to the Trash, where it stays restorable for 15 days, and `trash: false` restores it, also after it expired. Trash only what the user asked to remove, or what you made and no longer need. Only people delete for good.
 
 ## Render code
 

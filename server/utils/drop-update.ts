@@ -3,7 +3,7 @@ import { type H3Event, HTTPError } from "h3"
 import type * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import type { DropPatchSchema } from "#shared/schemas"
-import type { Access } from "#shared/types"
+import type { Access, Visibility } from "#shared/types"
 import { drops } from "../databases/config"
 import { type DropRow, lifetimeFields, permissions, restoreDrop, toSummary, trashDrop } from "./drops"
 import { chainOf, expiryPolicy, renewDrop } from "./expiry"
@@ -12,9 +12,12 @@ import { shareReviewFor } from "./trust"
 
 export type DropChange = v.InferOutput<typeof DropPatchSchema>
 
-/** How agents say who can open a drop: private, or a shared link at one access level. */
+/** How agents say who can open a drop: private, or the team or anyone with the link at one access level. */
 export type Share = "private" | Access
-export const shareChange = (share: Share): Pick<DropChange, "visibility" | "access"> => share === "private" ? { visibility: "private" } : { visibility: "shared", access: share }
+export type Audience = "team" | "link"
+/** Without an audience, a drop keeps the one it has, and a private drop gets a link. */
+export const shareChange = (share: Share, audience?: Audience, current?: Visibility): Pick<DropChange, "visibility" | "access"> =>
+  share === "private" ? { visibility: "private" } : { visibility: (audience ?? (current === "team" ? "team" : "link")) === "team" ? "team" : "shared", access: share }
 
 /**
  * Share, unshare, change the link's access level, rename, change the lifetime, renew, trash, or restore. People
@@ -33,10 +36,10 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   }
   else if (drop.expired && Object.keys(body).some(key => key !== "trashed"))
     throw new HTTPError({ status: 409, statusText: "This drop is in the Trash. Restore it first." })
-  const share: { shareReview?: "pending" | "rejected" | null; visibility?: "private" | "shared"; access?: Access } = {}
+  const share: { shareReview?: "pending" | "rejected" | null; visibility?: Visibility; access?: Access } = {}
   if (body.visibility !== undefined && body.visibility !== drop.visibility) {
     share.visibility = body.visibility
-    share.shareReview = body.visibility === "shared" ? await shareReviewFor(drop.ownerId, event) : null
+    share.shareReview = body.visibility === "private" ? null : await shareReviewFor(drop.ownerId, event)
   }
   if (body.access !== undefined) share.access = body.access
   const title = typeof body.title === "string" ? { title: body.title } : {}

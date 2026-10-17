@@ -8,7 +8,7 @@ import { expiryLabel } from "#shared/expiry"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
-import type { DropComment } from "#shared/types"
+import { type DropComment, VISIBILITY_ICONS } from "#shared/types"
 import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
@@ -204,7 +204,7 @@ defineShortcuts({
 
 const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value), "Feedback copied as Markdown")
 function copyLink() {
-  if (drop.value.visibility === "shared") void copy(link.value, "Link copied")
+  if (drop.value.visibility !== "private") void copy(link.value, "Link copied")
   else shareOpen.value = true
 }
 
@@ -322,7 +322,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           </UTooltip>
           <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote" class="mx-1 h-4" orientation="vertical" />
           <UButton v-if="publicView" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" label="Report" size="sm" variant="ghost" />
-          <UButton v-if="owner" color="neutral" :icon="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'shared' ? 'ghost' : 'solid'" @click="shareOpen = true" />
+          <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'team' ? 'Team' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
           <UTooltip :text="panelOpen ? 'Hide panel' : 'Show panel'">
             <span class="relative">
@@ -348,7 +348,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
       />
       <div v-if="isApp" class="flex h-9 shrink-0 items-center gap-2 border-b border-default px-3">
         <span class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted">
-          <UIcon :name="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-3 shrink-0" />
+          <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3 shrink-0" />
           <span class="truncate">/d/{{ drop.id.slice(0, 8) }}/{{ page === "index.html" ? "" : page }}</span>
         </span>
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />

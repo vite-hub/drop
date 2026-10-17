@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how long it lives,
 // its history. Each row's action sits at its end.
-import type { DropDetail } from "#shared/types"
+import { type DropDetail, VISIBILITY_ICONS } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
 const emit = defineEmits<{ share: [] }>()
@@ -13,8 +13,9 @@ const type = computed(() => [
 const access = computed(() => {
   if (props.drop.shareReview === "pending") return "Waiting for review"
   if (props.drop.shareReview === "rejected") return "Share rejected"
-  if (props.drop.visibility !== "shared") return "Only you"
-  return { view: "Anyone can view", comment: "Anyone can comment", edit: "Anyone can edit" }[props.drop.access]
+  if (props.drop.visibility === "private") return "Only you"
+  const who = props.drop.visibility === "team" ? "Your team" : "Anyone"
+  return `${who} can ${props.drop.access}`
 })
 </script>
 
@@ -44,7 +45,7 @@ const access = computed(() => {
       <div v-if="drop.isOwner" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Access</dt>
         <dd class="flex min-w-0 flex-1 items-center gap-1.5 text-highlighted">
-          <UIcon :name="drop.visibility === 'shared' ? 'i-lucide-globe' : 'i-lucide-lock'" class="size-3.5 shrink-0 text-muted" />
+          <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3.5 shrink-0 text-muted" />
           <span class="truncate">{{ access }}</span>
         </dd>
         <UButton class="-my-1" color="neutral" label="Change" size="xs" variant="ghost" @click="emit('share')" />

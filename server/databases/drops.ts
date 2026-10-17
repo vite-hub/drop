@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
+import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
@@ -17,7 +17,8 @@ export const drops = sqliteTable("drops", {
   size: integer("size").notNull().default(0),
   version: integer("version").notNull().default(1),
   supersedesId: text("supersedes_id"),
-  visibility: text("visibility", { enum: ["private", "shared"] }).notNull().default("private"),
+  /** `team`: everyone signed in to this Drop can find and open it. `shared`: anyone with the link, no sign-in. */
+  visibility: text("visibility", { enum: ["private", "team", "shared"] }).notNull().default("private"),
   shareReview: text("share_review", { enum: ["pending", "rejected"] }),
   quarantinedAt: integer("quarantined_at"),
   access: text("access", { enum: ["view", "comment", "edit"] }).notNull().default("comment"),
@@ -51,6 +52,7 @@ export const drops = sqliteTable("drops", {
   index("drops_expiry_idx").on(table.lifetime, table.lastAccessedAt),
   index("drops_trash_idx").on(table.trashedAt),
   index("drops_parent_idx").on(table.parentId),
+  index("drops_visibility_idx").on(table.visibility, table.updatedAt),
 ])
 
 /** Current versions, maintained by drop insert/delete/update triggers for bounded listing reads. */
@@ -59,6 +61,16 @@ export const dropHeads = sqliteTable("drop_heads", {
   ownerId: text("owner_id").notNull(),
   updatedAt: integer("updated_at").notNull(),
 }, table => [index("drop_heads_owner_idx").on(table.ownerId, table.updatedAt)])
+
+/**
+ * Link-shared drops someone else owns that a signed-in person opened, for their "Shared with me" list. Triggers move a
+ * row to each new version and drop it with the last one. Team drops need no row: everyone in the Drop sees those.
+ */
+export const dropVisits = sqliteTable("drop_visits", {
+  userId: text("user_id").notNull(),
+  dropId: text("drop_id").notNull(),
+  at: integer("at").notNull(),
+}, table => [primaryKey({ columns: [table.userId, table.dropId] }), index("drop_visits_drop_idx").on(table.dropId)])
 
 /** Files of an app drop. Publishing a new version replaces the set. */
 export const dropFiles = sqliteTable("drop_files", {

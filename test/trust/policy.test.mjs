@@ -8,8 +8,9 @@ import { htmlLanding } from "../../shared/html-landing.ts"
 
 // Exercise the production permission function without its storage/rendering dependencies.
 const dropsSource = readFileSync(new URL("../../server/utils/drops.ts", import.meta.url), "utf8")
-const permissionSource = dropsSource.match(/export function permissions\([\s\S]*?\n}\n/)[0]
-  .replace(/: DropRow|: Identity \| null| as Access/g, "")
+const permissionSource = [/export function permissions\([\s\S]*?\n}\n/, /export const reaches = [^\n]*\n[^\n]*\n/]
+  .map(pattern => dropsSource.match(pattern)[0]).join("\n")
+  .replace(/: DropRow|: Pick<DropRow, "visibility">|: Identity \| null| as Access/g, "")
 const { permissions } = await import(`data:text/javascript,${encodeURIComponent('const ACCESS_RANK={view:0,comment:1,edit:2};\n' + permissionSource)}`)
 
 test("approval is optional; admins and approved members bypass it", () => {
@@ -43,6 +44,20 @@ test("a Can edit link lets signed-in people edit in the browser, not guests or t
   assert.equal(permissions({ ...drop, visibility: "private" }, person).edit, false)
   assert.equal(permissions({ ...drop, expired: true }, person).edit, false)
   assert.equal(permissions(drop, { userId: "owner", role: "member", actorKind: "agent" }).edit, true)
+})
+
+test("a team share reaches everyone signed in, never a guest", () => {
+  const drop = { ownerId: "owner", visibility: "team", access: "edit", shareReview: null, quarantinedAt: null }
+  const person = { userId: "teammate", role: "member", actorKind: "browser" }
+  assert.equal(permissions(drop, null).view, false)
+  assert.equal(permissions(drop, null).comment, false)
+  assert.equal(permissions(drop, person).edit, true)
+  assert.equal(permissions(drop, { ...person, actorKind: "agent" }).view, true)
+  assert.equal(permissions(drop, { ...person, actorKind: "agent" }).edit, false)
+  assert.equal(permissions(drop, person).manage, false)
+  assert.equal(permissions({ ...drop, access: "view" }, person).comment, false)
+  assert.equal(permissions({ ...drop, shareReview: "pending" }, person).view, false)
+  assert.equal(permissions({ ...drop, expired: true }, person).view, false)
 })
 
 test("OAuth bounds preserve desktop MCP redirects", () => {

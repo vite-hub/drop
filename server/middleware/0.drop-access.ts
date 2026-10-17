@@ -13,10 +13,10 @@ export default defineHandler(async (event) => {
   }
   const page = event.url.pathname.match(/^\/d\/([^/]+)\/?$/)
   if (!page) return
-  const [{ expiredLink, findDrop, permissions }, { identify }] = await Promise.all([import("../utils/drops"), import("../utils/identity")])
+  const [{ expiredLink, findDrop, permissions, waitingForReview }, { identify }] = await Promise.all([import("../utils/drops"), import("../utils/identity")])
   const drop = await findDrop(decodeURIComponent(page[1]!), event)
   const who = await identify(event)
-  if (drop && !drop.ownerBanned && !drop.quarantinedAt && drop.visibility === "shared" && drop.shareReview === "pending" && !permissions(drop, who).view)
+  if (waitingForReview(drop, who))
     throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
   if (expiredLink(drop, who)) throw new HTTPError({ status: 410, statusText: "Expired" })
   if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, statusText: "Not found" })

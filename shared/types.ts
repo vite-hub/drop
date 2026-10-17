@@ -3,13 +3,18 @@ import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
 
 export type DropKind = "markdown" | "html" | "image" | "file" | "app"
-export type Visibility = "private" | "shared"
+/** `team`: everyone signed in to this Drop. `shared`: anyone with the link, signed in or not. */
+export type Visibility = "private" | "team" | "shared"
 export type Access = "view" | "comment" | "edit"
 export type ActorKind = "agent" | "browser"
 
 export const ACCESS_RANK: Record<Access, number> = { view: 0, comment: 1, edit: 2 }
 export const ACCESS_LABELS: Record<Access, string> = { view: "Can view", comment: "Can comment", edit: "Can edit" }
 export const ACCESS_HINTS: Record<Access, string> = { view: "Read only.", comment: "View and leave comments.", edit: "Comment, and edit Markdown together after signing in." }
+
+export const VISIBILITY_LABELS: Record<Visibility, string> = { private: "Only you", team: "Your team", shared: "Anyone with the link" }
+export const VISIBILITY_HINTS: Record<Visibility, string> = { private: "Your connected agents can still read it.", team: "Everyone signed in to this Drop can find it.", shared: "No sign-in needed." }
+export const VISIBILITY_ICONS: Record<Visibility, string> = { private: "i-lucide-lock", team: "i-lucide-users", shared: "i-lucide-globe" }
 
 export interface DropSummary {
   id: string
@@ -40,6 +45,8 @@ export interface DropSummary {
   trashReason: "deleted" | "expired" | null
   /** The doc this file belongs to: it shares that doc's sharing, lifetime, and Trash. */
   parentId: string | null
+  /** "Shared with me" only: whose drop it is. */
+  owner?: { name: string; image: string | null }
 }
 
 export interface DropVersion { id: string; title: string; version: number; createdAt: number; note: string | null; actorName: string; current?: boolean }

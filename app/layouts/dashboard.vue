@@ -7,6 +7,7 @@ const at = (path: string) => route.path === path || route.path.startsWith(`${pat
 const close = () => (open.value = false)
 
 const bottom = computed(() => [
+  { label: "Shared with me", icon: "i-lucide-inbox", to: "/drops?tab=with-me", active: route.path === "/drops" && route.query.tab === "with-me" },
   { label: "Agents", icon: "i-lucide-bot", to: "/agents", active: at("/agents") || at("/approve") },
   { label: "Skills", icon: "i-lucide-puzzle", to: "/skills", active: at("/skills") },
   { label: "Members", icon: "i-lucide-users", to: "/members", active: at("/members") },
@@ -36,7 +37,7 @@ const item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transit
         </NuxtLink>
       </template>
 
-      <NuxtLink :class="[item, route.path === '/drops' ? 'bg-elevated font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted']" to="/drops" @click="close">
+      <NuxtLink :class="[item, route.path === '/drops' && route.query.tab !== 'with-me' ? 'bg-elevated font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted']" to="/drops" @click="close">
         <UIcon name="i-lucide-layers" class="size-4" />Drops
       </NuxtLink>
       <!-- Drops live under the Drops item: a guide line ties them to it, like folders in a file tree. -->
