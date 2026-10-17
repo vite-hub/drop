@@ -28,7 +28,7 @@ const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Wind
 
 // The first card is the point of Drop, so it gets two columns.
 const FEATURES = [
-  { icon: "i-ph-robot", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand." },
+  { icon: "i-ph-sparkle", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand." },
   { icon: "i-ph-stack", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link." },
   { icon: "i-ph-chat-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
   { icon: "i-ph-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view, comment, or edit." },

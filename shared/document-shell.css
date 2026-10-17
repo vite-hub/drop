@@ -106,3 +106,8 @@ main {
     display: none;
   }
 }
+
+/* Wide tables. Typeset keeps headers on one line, so a table with several long headers outgrew the column and ran
+   off the page. Headers wrap like cells, and a table that still can't fit scrolls inside the column (GitHub's way). */
+.typeset table:not(.typeset-scroll table) { display: block; overflow-x: auto; }
+.typeset thead th { white-space: normal; }

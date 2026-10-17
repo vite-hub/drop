@@ -38,7 +38,11 @@ const [DefineSide, ReuseSide] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
 
 const isApp = computed(() => drop.value.kind === "app")
-const owner = computed(() => drop.value.isOwner && !props.publicView)
+// The owner gets their controls on the public link too: it is where they land after sharing it.
+const owner = computed(() => drop.value.isOwner)
+// Signed-in people read a public link inside the app, sidebar included (pages/d/[id].vue); visitors see it alone.
+const { data: me } = useMe()
+const visitor = computed(() => props.publicView && !me.value)
 const openCount = computed(() => comments.value.filter(comment => !comment.resolved).length)
 const link = useShareUrl(() => drop.value.id)
 const now = useRelativeNow()
@@ -346,9 +350,9 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 
   <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
     <template #header>
-      <UDashboardNavbar :toggle="!publicView" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
+      <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
-          <NuxtLink v-if="publicView" aria-label="Drop" class="grid size-8 place-items-center" to="/"><DropMark class="h-4 w-6" /></NuxtLink>
+          <NuxtLink v-if="visitor" aria-label="Drop" class="grid size-8 place-items-center" to="/"><DropMark class="h-4 w-6" /></NuxtLink>
           <UButton v-else aria-label="Back to drops" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" to="/drops" />
         </template>
         <template #title>
@@ -367,7 +371,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <!-- One row of same-size tools: icons only, the pressed state shows the mode, shortcuts live in the tooltips. -->
         <template v-else #right>
           <UTooltip v-if="canDrawArea" :kbds="['R']" text="Comment on an area">
-            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-ph-selection-plus" size="sm" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
+            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-ph-chat-teardrop" size="sm" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
           </UTooltip>
           <UTooltip v-if="drop.canEdit || drop.editNote" :kbds="drop.canEdit ? ['E'] : undefined" :text="drop.editNote ?? 'Edit together'">
             <UButton aria-label="Edit together" color="neutral" :disabled="!drop.canEdit" icon="i-ph-pencil-simple" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
@@ -376,9 +380,14 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
             <UButton aria-label="History" :aria-pressed="panelOpen && tab === 'history'" color="neutral" icon="i-ph-clock-counter-clockwise" size="sm" :variant="panelOpen && tab === 'history' ? 'soft' : 'ghost'" @click="panel.show('history')" />
           </UTooltip>
           <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || drop.versions.length > 1" class="mx-1 h-4" orientation="vertical" />
-          <UButton v-if="publicView" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" label="Report" size="sm" variant="ghost" />
+          <UTooltip v-if="!owner" text="Copy link">
+            <UButton aria-label="Copy link" color="neutral" icon="i-ph-link" size="sm" variant="ghost" @click="copy(link, 'Link copied')" />
+          </UTooltip>
+          <UTooltip v-if="publicView && !owner" text="Report">
+            <UButton aria-label="Report" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" icon="i-ph-flag" size="sm" variant="ghost" />
+          </UTooltip>
           <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'team' ? 'Team' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
-          <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
+          <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
           <UTooltip :text="panelOpen ? 'Hide panel' : 'Show panel'">
             <span class="relative">
               <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-ph-sidebar-simple" size="sm" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />

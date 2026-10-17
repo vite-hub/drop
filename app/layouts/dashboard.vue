@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// shadcn's sidebar (sidebar-07) on Executor's flat console: one background, a hairline between sidebar and page, the
-// main nav on top, your drops as a tree under a section label (apps are folders), Docs at the bottom, and the
-// account menu (NavUser) opening upward.
+// shadcn's sidebar (sidebar-07) on Executor's flat console: one background, a hairline between sidebar and page, your
+// drops on top with their tree under a section label (apps are folders), the workspace pages and Docs at the bottom,
+// and the account menu (NavUser) opening upward.
 const route = useRoute()
 const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
@@ -10,7 +10,9 @@ const close = () => (open.value = false)
 const nav = computed(() => [
   { label: "Drops", icon: "i-ph-stack", activeIcon: "i-ph-stack-fill", to: "/drops", active: route.path === "/drops" && route.query.tab !== "with-me" },
   { label: "Shared with me", icon: "i-ph-tray", activeIcon: "i-ph-tray-fill", to: "/drops?tab=with-me", active: route.path === "/drops" && route.query.tab === "with-me" },
-  { label: "Agents", icon: "i-ph-robot", activeIcon: "i-ph-robot-fill", to: "/agents", active: at("/agents") || at("/approve") },
+])
+const workspace = computed(() => [
+  { label: "Agents", icon: "i-ph-sparkle", activeIcon: "i-ph-sparkle-fill", to: "/agents", active: at("/agents") || at("/approve") },
   { label: "Skills", icon: "i-ph-puzzle-piece", activeIcon: "i-ph-puzzle-piece-fill", to: "/skills", active: at("/skills") },
   { label: "Members", icon: "i-ph-users", activeIcon: "i-ph-users-fill", to: "/members", active: at("/members") },
 ])
@@ -49,6 +51,7 @@ const docsOpen = computed(() => docsToggled.value ?? at("/docs"))
       </div>
 
       <div class="flex flex-col gap-0.5 border-t border-default pt-2">
+        <SidebarItem v-for="link in workspace" :key="link.to" v-bind="link" @navigate="close" />
         <SidebarItem active-icon="i-ph-book-open-fill" :active="at('/docs')" icon="i-ph-book-open" label="Docs" to="/docs" @navigate="close">
           <button
             :aria-expanded="docsOpen"
