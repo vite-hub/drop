@@ -22,7 +22,9 @@ const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"
 export function searchableText(kind: string, source: string) {
   let text = source
   if (kind === "html") {
-    text = text.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|template|svg|head)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " ")
+    // Like a Markdown doc's leading H1, the first <h1> is the title, which search matches on its own.
+    text = text.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|template|svg|head|title)\b[\s\S]*?<\/\1\s*>/gi, " ")
+      .replace(/<h1\b[^>]*>[\s\S]*?<\/h1\s*>/i, " ").replace(/<[^>]*>/g, " ")
       .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
         if (name[0] === "#") {
           const code = name[1] === "x" || name[1] === "X" ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1))
