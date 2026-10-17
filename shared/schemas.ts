@@ -4,7 +4,7 @@ import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_SLUG, slugify } from "./links"
 import { MAX_APP_BYTES } from "./quotas"
-import { MAX_REVIEW_PAGE } from "./review"
+import { MAX_REVIEW_PAGE, SITE_ADDRESS_RULE, siteAddress } from "./review"
 import { ROLES } from "./roles"
 
 /** 4 MiB: the most one file (or one app) may weigh. */
@@ -94,10 +94,29 @@ export const ReviewCommentSchema = v.pipe(
   v.check(input => input.ow > 0 && input.oh > 0, "An area needs a width and a height."),
 )
 
-/** The connect popup asks for a review token for the page that opened it. Guests may give a name. */
+/** The connect popup asks which site drops cover the page that opened it, by the page's origin. */
+export const ReviewSitesSchema = v.object({
+  origin: v.pipe(v.string(), v.maxLength(300)),
+})
+
+/** Then a review token for the one the person picked, by the handle the list gave it. Guests may give a name. */
 export const ReviewTokenSchema = v.object({
   origin: v.pipe(v.string(), v.maxLength(300)),
+  choice: v.pipe(v.string(), v.maxLength(2048)),
   name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
+})
+
+/** Opening the review in Drop from the site, by the review token the page holds. */
+export const ReviewOpenSchema = v.object({
+  token: v.pipe(v.string(), v.maxLength(2048)),
+})
+
+/** A site review created in the app: the address it covers (an origin or a `*.` pattern) and its name. */
+export const SiteSchema = v.object({
+  url: v.pipe(v.string(), v.trim(), v.minLength(1, "Enter the site's address."), v.maxLength(300), v.check(url => siteAddress(url) !== null, SITE_ADDRESS_RULE)),
+  title: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(160))),
+  /** The folder to create it in, by id or link. */
+  folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
 
 export const CommentPatchSchema = v.object({ resolved: v.boolean() })

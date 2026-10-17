@@ -47,7 +47,7 @@ export const drops = sqliteTable("drops", {
   trashReason: text("trash_reason", { enum: ["deleted", "expired"] }),
   /** The doc an image belongs to. Attachments share the doc's sharing, lifetime, and Trash, and don't count as drops. */
   parentId: text("parent_id"),
-  /** Sites only: the origin of the website under review, the only one its review script may post from. */
+  /** Sites only: the origin of the website under review, or a `*.` pattern of them; the only ones its review script may post from. */
   siteUrl: text("site_url"),
   /** CAS token used while replacing an app's file set. */
   publishToken: text("publish_token"),

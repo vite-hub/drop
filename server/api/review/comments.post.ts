@@ -3,16 +3,16 @@ import { HTTPError } from "h3"
 import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { MAX_FILE_BYTES, ReviewCommentSchema } from "#shared/schemas"
-import { addReviewComment, requireReviewer, reviewApi, reviewSite, type Screenshot, screenshotType } from "../../../utils/review"
+import { addReviewComment, reviewApi, reviewSession, type Screenshot, screenshotType } from "../../utils/review"
 
 /**
  * A comment from a site under review: `data` (JSON, ReviewCommentSchema) and an optional `screenshot` of the viewport,
- * as multipart. Everything here comes from someone else's page, so it's checked like any upload: the screenshot by its
- * bytes, not its claimed type, and at most 4 MiB.
+ * as multipart. The token decides the site drop. Everything here comes from someone else's page, so it's checked like
+ * any upload: the screenshot by its bytes, not its claimed type, and at most 4 MiB. The answer is the comment's number
+ * only, nothing that would open the review.
  */
 export default reviewApi(async (event) => {
-  const site = await reviewSite(event)
-  const { claims, who } = await requireReviewer(event, site).catch(async (error) => {
+  const { site, claims, who } = await reviewSession(event).catch(async (error) => {
     await event.req.body?.cancel().catch(() => {})
     throw error
   })
@@ -39,7 +39,7 @@ export default reviewApi(async (event) => {
   }
   else if (file !== null) throw new HTTPError({ status: 400, statusText: "The screenshot must be a file." })
 
-  const comment = await addReviewComment(site, { who, name: claims.n }, input, shot)
+  const comment = await addReviewComment(site, { who, name: claims.n }, input, shot, claims.o)
   useLogger(event).set({ review: { site: site.id, comment: comment.n, screenshot: Boolean(shot) } })
-  return { n: comment.n, url: new URL(`/d/${site.link ?? site.id}`, event.url.origin).href }
+  return { n: comment.n }
 })

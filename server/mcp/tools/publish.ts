@@ -5,7 +5,7 @@ import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues } from "#shared/project-bundle"
-import { reviewSnippet } from "#shared/review"
+import { reviewBookmarklet, reviewSnippet } from "#shared/review"
 import { resolveComments } from "../../utils/comments"
 import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "../../utils/drops"
 import { shareChange, updateDrop } from "../../utils/drop-update"
@@ -27,8 +27,8 @@ const Input = v.object({
     base64: v.pipe(v.string(), v.maxLength(Math.ceil(MAX_FILE_BYTES / 3) * 4 + 1024), v.description("The file's bytes, base64-encoded.")),
   }), v.description("Any other file up to 4 MiB: a screenshot, a PDF. Images get pin and area comments. Embed its fileUrl in a doc to make it part of that doc."))),
   site: v.optional(v.pipe(v.object({
-    url: v.pipe(v.string(), v.maxLength(300), v.description("The website's address, like https://pr123.preview.example.com. Its origin is the only one the review script may send from: https, or http on localhost.")),
-  }), v.description("A live website to review in place, such as a preview deploy, staging, or a dev server. People comment on its pages through a script tag; their comments arrive here with screenshots."))),
+    url: v.pipe(v.string(), v.maxLength(300), v.description("The address people review: one origin like https://pr123.preview.example.com, or a pattern like https://*.preview.example.com, where * stands for one label, so one site drop covers every pull request's preview. https, or http on localhost.")),
+  }), v.description("A live website to review in place, such as a preview deploy, staging, or a dev server. People comment on its pages with a bookmarklet, or a script tag in preview builds; their comments arrive here with screenshots."))),
   title: v.optional(v.string()),
   slug: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_SLUG), v.description("The readable part of the drop's link, like hipoteca-madrid: a few lowercase words and dashes that say what it is. Pick one for every new drop. Later versions keep it unless you pass another; old links keep working."))),
   previous: v.optional(v.pipe(v.string(), v.description("Id or link of the drop this publishes the next version of. It keeps that drop's sharing, lifetime and link unless you pass them. Its link then opens the new version."))),
@@ -58,10 +58,10 @@ export default defineMcpTool({
       const share = input.share ? shareChange(input.share, input.audience) : {}
       const row = await createSiteDrop(who, { url: input.site.url, title: input.title, slug: input.slug, folder, ...share, lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }, event)
       const drop = mcpDrop(toSummary(await findDrop(row.id, event) ?? row), event.url.origin)
-      const script = reviewSnippet(event.url.origin, row.link!)
+      const script = reviewSnippet(event.url.origin)
       return {
-        content: [{ type: "text" as const, text: `Created a site review:\n${dropLine(drop)}\n\nAdd this tag to the site's preview builds only, never production:\n${script}\n\nComments sent from ${row.siteUrl} land on the drop; read them with read_drop.` }],
-        structuredContent: { ...drop, siteUrl: row.siteUrl!, script },
+        content: [{ type: "text" as const, text: `Created a site review:\n${dropLine(drop)}\n\nPeople review ${row.siteUrl} with the "Review with Drop" bookmarklet on the drop's page; the site needs no change. To show the Comment button without it, add this tag to the site's preview builds only, never production. It carries no key:\n${script}\n\nComments sent from ${row.siteUrl} land on the drop; read them with read_drop.` }],
+        structuredContent: { ...drop, siteUrl: row.siteUrl!, script, bookmarklet: reviewBookmarklet(event.url.origin) },
       }
     }
     let previous = input.previous ? await findDropByRef(input.previous, event) : null

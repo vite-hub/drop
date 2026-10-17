@@ -1,67 +1,69 @@
 <script setup lang="ts">
 /**
  * The popup a site's review script opens on its first Comment (shared/review-script.ts). It runs on Drop's origin,
- * with Drop's session, so it works where the site can't send Drop's cookies. It asks for a review token for the page
- * that opened it and posts it to the site's origin only; the server already refused any other origin.
+ * with Drop's session, so it works where the site can't send Drop's cookies. It looks up the site drops that cover the
+ * page that opened it and that this person may comment on, lets them pick one when there are several, and posts a
+ * review token to the page's origin only; the server already refused any other origin.
  */
 useSeoMeta({ title: "Comment on a site", robots: "noindex, nofollow" })
 
-interface Issued { token: string; expiresAt: number; siteUrl: string; title: string; name: string }
+interface Site { choice: string; title: string; owner: string; address: string }
+interface Issued { token: string; expiresAt: number; origin: string; title: string; name: string }
 
 const route = useRoute()
 const { data: me } = await useMe()
 const ready = useMounted()
-const key = computed(() => (typeof route.query.d === "string" ? route.query.d : ""))
 const origin = computed(() => (typeof route.query.origin === "string" ? route.query.origin : ""))
 const host = computed(() => (URL.canParse(origin.value) ? new URL(origin.value).host : origin.value))
 
-const state = ref<"loading" | "guest" | "signin" | "done" | "lost" | "error">("loading")
-const site = ref<Issued | null>(null)
+const state = ref<"loading" | "guest" | "choose" | "signin" | "none" | "done" | "lost" | "error">("loading")
+const sites = ref<Site[]>([])
+const issued = ref<Issued | null>(null)
 const name = ref("")
-const pending = ref(false)
+const pending = ref<string | null>(null)
 const error = ref("")
 
-const issue = (guestName?: string) => $fetch<Issued>(`/api/review/${encodeURIComponent(key.value)}/token`, { method: "POST", body: { origin: origin.value, ...(guestName ? { name: guestName } : {}) } })
-
-function handOver(issued: Issued) {
-  site.value = issued
+function handOver(answer: Issued) {
+  issued.value = answer
   // Without an opener (it was closed, or a sign-in page cut the link) the token has nowhere to go.
   if (!window.opener) return (state.value = "lost")
-  window.opener.postMessage({ __dropReview: true, token: issued.token, expiresAt: issued.expiresAt, name: issued.name }, issued.siteUrl)
+  window.opener.postMessage({ __dropReview: true, token: answer.token, expiresAt: answer.expiresAt, name: answer.name }, answer.origin)
   state.value = "done"
   setTimeout(() => window.close(), 800)
 }
 
-async function connect(guestName?: string) {
-  pending.value = true
+async function connect(site: Site) {
+  pending.value = site.choice
   error.value = ""
   try {
-    const issued = await issue(guestName)
-    // Signed out, the first answer only says guests may comment: let them say who they are first.
-    if (!me.value && guestName === undefined) {
-      site.value = issued
-      state.value = "guest"
-    }
-    else handOver(issued)
+    handOver(await $fetch<Issued>("/api/review/token", { method: "POST", body: { origin: origin.value, choice: site.choice, ...(me.value ? {} : { name: name.value }) } }))
   }
   catch (cause) {
-    const status = (cause as { statusCode?: number }).statusCode
-    if (status === 401 && !me.value) state.value = "signin"
-    else {
-      error.value = errorText(cause, "Couldn't connect to this review.")
-      state.value = "error"
-    }
+    error.value = errorText(cause, "Couldn't connect to this review.")
+    state.value = "error"
   }
-  finally { pending.value = false }
+  finally { pending.value = null }
 }
 
-onMounted(() => {
-  if (!key.value || !origin.value) {
-    error.value = "This link is missing the review or the site. Press Comment on the site again."
+onMounted(async () => {
+  if (!origin.value) {
+    error.value = "This link is missing the site. Press Comment on the site again."
     state.value = "error"
     return
   }
-  void connect()
+  try {
+    sites.value = (await $fetch<{ sites: Site[] }>("/api/review/sites", { method: "POST", body: { origin: origin.value } })).sites
+  }
+  catch (cause) {
+    error.value = errorText(cause, "Couldn't look up this site's review.")
+    state.value = "error"
+    return
+  }
+  if (!sites.value.length) state.value = me.value ? "none" : "signin"
+  // Signed out, guests say who they are first.
+  else if (!me.value) state.value = "guest"
+  else if (sites.value.length === 1) await connect(sites.value[0]!)
+  else state.value = "choose"
 })
 
 const signInTo = computed(() => `/signin?redirect=${encodeURIComponent(route.fullPath)}`)
@@ -82,19 +84,35 @@ const signInTo = computed(() => `/signin?redirect=${encodeURIComponent(route.ful
         </template>
 
         <template v-else-if="state === 'guest'">
-          <h1 class="text-lg font-semibold tracking-tight text-highlighted">Comment on {{ site?.title ?? host }}</h1>
+          <h1 class="text-lg font-semibold tracking-tight text-highlighted">Comment on {{ sites.length === 1 ? sites[0]!.title : host }}</h1>
           <p class="mt-2 text-sm leading-relaxed text-muted">Your comments go to Drop with a screenshot of what you see on <span class="font-mono text-highlighted">{{ host }}</span>.</p>
           <UFormField class="mt-6" label="Your name" hint="Optional">
-            <UInput v-model="name" class="w-full" :maxlength="60" placeholder="Guest" @keydown.enter="connect(name)" />
+            <UInput v-model="name" class="w-full" :maxlength="60" placeholder="Guest" @keydown.enter="sites.length === 1 && connect(sites[0]!)" />
           </UFormField>
-          <UButton block class="mt-4" color="neutral" label="Continue as a guest" :loading="pending" @click="connect(name)" />
+          <UButton v-if="sites.length === 1" block class="mt-4" color="neutral" label="Continue as a guest" :loading="pending !== null" @click="connect(sites[0]!)" />
+          <template v-else>
+            <p class="mt-6 text-sm font-medium text-highlighted">Pick the review</p>
+            <ReviewSiteList class="mt-2" :pending="pending" :sites="sites" @pick="connect" />
+          </template>
           <UButton block class="mt-2" color="neutral" icon="i-simple-icons-github" label="Sign in with GitHub" :to="signInTo" variant="outline" />
+        </template>
+
+        <template v-else-if="state === 'choose'">
+          <h1 class="text-lg font-semibold tracking-tight text-highlighted">Pick the review</h1>
+          <p class="mt-2 text-sm leading-relaxed text-muted">More than one review covers <span class="font-mono text-highlighted">{{ host }}</span>. Your comments go to the one you pick.</p>
+          <ReviewSiteList class="mt-6" :pending="pending" :sites="sites" @pick="connect" />
         </template>
 
         <template v-else-if="state === 'signin'">
           <h1 class="text-lg font-semibold tracking-tight text-highlighted">Sign in to comment</h1>
-          <p class="mt-2 text-sm leading-relaxed text-muted">Comments on <span class="font-mono text-highlighted">{{ host }}</span> go to a Drop review. Sign in to send yours.</p>
+          <p class="mt-2 text-sm leading-relaxed text-muted">Reviews of <span class="font-mono text-highlighted">{{ host }}</span> take comments from people they're shared with. Sign in, or ask the site's owner for a link that lets anyone comment.</p>
           <UButton block class="mt-6" color="neutral" icon="i-simple-icons-github" label="Sign in with GitHub" :to="signInTo" />
+        </template>
+
+        <template v-else-if="state === 'none'">
+          <h1 class="text-lg font-semibold tracking-tight text-highlighted">No review for you here</h1>
+          <p class="mt-2 text-sm leading-relaxed text-muted">No review of <span class="font-mono text-highlighted">{{ host }}</span> is shared with you. Ask the site's owner to share it, or create one from your Drops.</p>
+          <UButton block class="mt-6" color="neutral" label="Open Drops" target="_blank" to="/drops" variant="outline" />
         </template>
 
         <template v-else-if="state === 'done'">
@@ -102,7 +120,7 @@ const signInTo = computed(() => `/signin?redirect=${encodeURIComponent(route.ful
             <UIcon name="i-ph-check-circle" class="size-6 shrink-0 text-muted" />
             <h1 class="text-lg font-semibold tracking-tight text-highlighted">Connected</h1>
           </div>
-          <p class="mt-2 text-sm leading-relaxed text-muted">Back on {{ host }}, drag over what you want to comment on. This window closes by itself.</p>
+          <p class="mt-2 text-sm leading-relaxed text-muted">Back on {{ host }}, drag over what you want to comment on. Your comments go to {{ issued?.title }}. This window closes by itself.</p>
         </template>
 
         <template v-else-if="state === 'lost'">

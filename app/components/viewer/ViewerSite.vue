@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// A site drop's page: the website under review, the tag that adds the review to it, and what people sent from its
-// pages, newest first. Each screenshot opens as its own image, where the box shows and the thread continues.
+// A site drop's page: the website under review, the bookmarklet and the optional tag that add the review to it, and
+// what people sent from its pages, newest first. Each screenshot opens as its own image, where the box shows and the
+// thread continues.
 import { dropPath } from "#shared/links"
-import { reviewSnippet } from "#shared/review"
+import { isSitePattern, reviewBookmarklet, reviewSnippet, siteHost } from "#shared/review"
 import type { DropDetail, SiteReviewItem } from "#shared/types"
 
 /** `inset`: room to leave on the right for the floating panel, in pixels. */
@@ -10,9 +11,14 @@ const props = defineProps<{ drop: DropDetail; publicView: boolean; inset: number
 
 const state = injectDrop()!
 const items = useApi<SiteReviewItem[]>(() => `/api/drops/${props.drop.id}/review`, { key: () => `review:${props.drop.id}`, default: () => [] })
+const notify = useNotify()
 const origin = useRequestURL().origin
-const snippet = computed(() => reviewSnippet(origin, props.drop.link))
-const host = computed(() => (props.drop.siteUrl ? new URL(props.drop.siteUrl).host : ""))
+const snippet = reviewSnippet(origin)
+const bookmarklet = reviewBookmarklet(origin)
+const host = computed(() => (props.drop.siteUrl ? siteHost(props.drop.siteUrl) : ""))
+// A pattern has no one address to open; its comments carry their page's origin instead.
+const siteLink = computed(() => (props.drop.siteUrl && !isSitePattern(props.drop.siteUrl) ? props.drop.siteUrl : null))
+const pageLink = (page: string | null) => (page?.startsWith("http") ? page : page && siteLink.value ? siteLink.value + page : null)
 // Resolving from the panel updates the drop's comments; the list follows them.
 const resolved = (item: SiteReviewItem) => state.comments.data.value.find(comment => comment.id === item.id)?.resolved ?? item.resolved
 const shotTo = (shot: NonNullable<SiteReviewItem["screenshot"]>) => (props.publicView ? dropPath(shot) : `/drops/${shot.id}`)
@@ -29,13 +35,24 @@ const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.
             <UIcon name="i-ph-globe" class="size-4 shrink-0 text-muted" />
             <span class="truncate">{{ drop.siteUrl }}</span>
           </span>
-          <UButton v-if="drop.siteUrl" color="neutral" external icon="i-ph-arrow-square-out" label="Open site" target="_blank" :to="drop.siteUrl" variant="outline" />
+          <UButton v-if="siteLink" color="neutral" external icon="i-ph-arrow-square-out" label="Open site" target="_blank" :to="siteLink" variant="outline" />
+        </div>
+        <p v-if="drop.siteUrl && isSitePattern(drop.siteUrl)" class="text-sm text-muted">Covers every address where <span class="font-mono">*</span> is one label, like each pull request's preview.</p>
+      </section>
+
+      <section v-if="drop.canComment" class="space-y-3">
+        <p class="label-mono">Review the site</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- A bookmarklet: dragged to the bookmarks bar, never run here. -->
+          <a class="inline-flex h-8 cursor-grab items-center gap-1.5 rounded-md border border-default bg-elevated px-3 text-sm font-medium text-highlighted active:cursor-grabbing" :href="bookmarklet" @click.prevent="notify.done('Drag it to your bookmarks bar', 'Then click it on any page of the site.')">
+            <UIcon name="i-ph-chat-circle" class="size-4 text-muted" />Review with Drop
+          </a>
+          <p class="min-w-0 flex-1 text-sm text-muted">Drag this to your bookmarks bar. On any page of {{ host }}, click it, press Comment, and drag over what you mean. Your note lands here with a screenshot.</p>
         </div>
         <template v-if="drop.isOwner">
-          <p class="text-sm text-muted">Add this tag to the site's preview builds, never production. People who can comment here press Comment on any page, drag over what they mean, and their note arrives below with a screenshot.</p>
+          <p class="text-sm text-muted">Or show the Comment button to everyone on the preview: add this tag to preview builds, never production. It carries no key: people still need this review shared with them to comment. A page with a strict Content Security Policy may block the bookmarklet; there, use the tag and allow {{ origin }} in the preview's policy.</p>
           <AgentsCodeBlock :code="snippet" message="Tag copied" />
         </template>
-        <p v-else-if="drop.canComment" class="text-sm text-muted">Open the site and press Comment in its corner. Drag over what you mean, write your note, and it lands here with a screenshot.</p>
       </section>
 
       <section class="space-y-3">
@@ -61,7 +78,7 @@ const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.
               <p class="line-clamp-3 text-sm">{{ item.body }}</p>
               <div class="flex items-center gap-3 text-xs">
                 <span v-if="resolved(item)" class="text-muted">Resolved</span>
-                <ULink v-if="drop.siteUrl && item.page" class="text-muted hover:text-highlighted" external :href="drop.siteUrl + item.page" target="_blank">Open page</ULink>
+                <ULink v-if="pageLink(item.page)" class="text-muted hover:text-highlighted" external :href="pageLink(item.page)!" target="_blank">Open page</ULink>
               </div>
             </div>
           </li>
