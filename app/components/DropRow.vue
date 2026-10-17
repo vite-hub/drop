@@ -78,6 +78,8 @@ const menu = computed(() => [
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
         <template v-if="folder">{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
+        <!-- A site review holds no file: its address says more than "0 B". -->
+        <template v-else-if="drop.kind === 'site'">{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
         <template v-else><span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
       </p>
     </div>

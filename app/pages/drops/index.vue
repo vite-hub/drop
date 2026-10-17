@@ -111,8 +111,9 @@ async function newSite() {
 <template>
   <PageShell id="drops" title="Drops" :description="description">
     <template #actions>
-      <UButton color="neutral" icon="i-ph-folder-simple-plus" label="New Folder" size="sm" variant="ghost" @click="newFolder" />
-      <UButton color="neutral" icon="i-ph-globe-simple" label="New Site Review" size="sm" variant="ghost" @click="newSite" />
+      <!-- On a phone the three labels overflow the bar and push the title out: the two ghost buttons keep their icon. -->
+      <UButton aria-label="New Folder" color="neutral" icon="i-ph-folder-simple-plus" size="sm" variant="ghost" @click="newFolder"><span class="max-sm:hidden">New Folder</span></UButton>
+      <UButton aria-label="New Site Review" color="neutral" icon="i-ph-globe-simple" size="sm" variant="ghost" @click="newSite"><span class="max-sm:hidden">New Site Review</span></UButton>
       <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
     </template>
 
@@ -131,19 +132,23 @@ async function newSite() {
     </div>
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <UTabs
-        v-model="filter"
-        :content="false"
-        :items="[
-          { label: `All ${counts.all}`, value: 'all' },
-          { label: `Private ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
-          { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-globe' },
-          { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
-          { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-ph-trash' },
-        ]"
-        size="sm"
-        color="neutral"
-      />
+      <!-- The five tabs are wider than a phone: they scroll sideways instead of hiding the Trash off-screen. -->
+      <div class="-mx-1 max-w-full overflow-x-auto px-1">
+        <UTabs
+          v-model="filter"
+          :content="false"
+          :items="[
+            { label: `All ${counts.all}`, value: 'all' },
+            { label: `Private ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
+            { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-globe' },
+            { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
+            { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-ph-trash' },
+          ]"
+          size="sm"
+          color="neutral"
+          :ui="{ root: 'w-max' }"
+        />
+      </div>
       <UInput ref="searchInput" v-model="search" class="w-full sm:w-72" icon="i-ph-magnifying-glass" placeholder="Search drops">
         <template #trailing><UKbd value="/" /></template>
       </UInput>
