@@ -10,6 +10,8 @@ const SECONDS = { second: 1, minute: 60, hour: 3600, day: 86400, month: 2592000,
 const date = computed(() => new Date(props.at))
 const text = computed(() => {
   const seconds = (date.value.getTime() - now.value) / 1000
+  // The shared clock ticks every 30 seconds, so something you just posted is ahead of it: "in 12 sec." read as a bug.
+  if (seconds > -45) return "just now"
   const [unit] = UNITS.find(([unit, limit]) => Math.abs(seconds / SECONDS[unit]) < limit)!
   return format.format(Math.round(seconds / SECONDS[unit]), unit)
 })
