@@ -5,7 +5,7 @@ import { updateDrop } from "../../utils/drop-update"
 import { requireIdentity } from "../../utils/identity"
 import { routeId } from "../../utils/params"
 
-/** Share, unshare, change the link's access level, rename, change the lifetime, renew, trash, or restore. */
+/** Share, unshare, change the link's access level, rename, rename the link, change the lifetime, renew, trash, or restore. */
 export default defineValidatedHandler({
   validate: { body: DropPatchSchema },
   async handler(event) {

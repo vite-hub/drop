@@ -1,4 +1,5 @@
 import { type Lifetime, TRASH_DAYS } from "#shared/expiry"
+import { dropPath } from "#shared/links"
 import type { Access, DropSummary, Visibility } from "#shared/types"
 
 /**
@@ -10,10 +11,13 @@ export const useDrops = () => useApi("/api/drops", { key: "drops", default: () =
 /** Other people's drops: everything shared with the team, plus share links you opened while signed in. */
 export const useSharedWithMe = () => useApi("/api/drops", { key: "shared-with-me", query: { shared: 1 }, default: () => [] })
 
-/** A drop's share link, absolute on the server too, so SSR and hydration print the same URL. */
-export function useShareUrl(id: MaybeRefOrGetter<string>) {
+/**
+ * A doc's share link, absolute on the server too, so SSR and hydration print the same URL. It opens the latest version;
+ * `version` pins one.
+ */
+export function useShareUrl(drop: MaybeRefOrGetter<Pick<DropSummary, "link" | "slug">>, version?: MaybeRefOrGetter<number | undefined>) {
   const origin = useRequestURL().origin
-  return computed(() => `${origin}/d/${toValue(id)}`)
+  return computed(() => `${origin}${dropPath(toValue(drop), toValue(version))}`)
 }
 
 /**

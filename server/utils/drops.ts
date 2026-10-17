@@ -5,6 +5,7 @@ import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, dropHeads, drops, dropVisits, user } from "../databases/config"
+import { dropPath, newLink, slugify } from "#shared/links"
 import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
@@ -67,7 +68,7 @@ export const waitingForReview = (drop: DropRow | null, who: Identity | null) =>
 export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().days): DropSummary {
   const expires = expiresAt(row, days)
   return {
-    id: row.id, kind: row.kind, title: row.title, filename: row.filename, size: row.size, version: row.version,
+    id: row.id, link: row.link ?? row.id, slug: row.slug ?? slugify(row.title), kind: row.kind, title: row.title, filename: row.filename, size: row.size, version: row.version,
     shareReview: row.shareReview, quarantinedAt: row.quarantinedAt, visibility: row.visibility, access: row.access as Access, actorKind: row.actorKind, actorName: row.actorName,
     createdAt: row.createdAt, updatedAt: row.updatedAt, ...(paths ? { paths } : {}),
     expiresAt: expires, lifetime: row.lifetime, keepReason: row.keepReason, note: row.note, parentId: row.parentId,
@@ -94,9 +95,26 @@ async function withOwnerAccess(row: { drop: typeof drops.$inferSelect; owner: ty
   return drop
 }
 
+/** A drop by its id, or by its share link's key: the doc's latest version. */
 export async function findDrop(id: string, event?: H3Event) {
   const [row] = await db.select({ drop: drops, owner: user }).from(drops)
     .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.id, id)).limit(1)
+  return row ? withOwnerAccess(row, event) : findDropByLink(id, undefined, event)
+}
+
+/** A drop an agent names: its id, its link's key, or its share link (`…/d/<key>/<slug>?v=2` pins a version). */
+export async function findDropByRef(ref: string, event?: H3Event) {
+  const link = ref.trim().match(/\/d\/([^/?#]+)[^?#]*(?:\?(?:[^#]*&)?v=(\d+))?/)
+  if (!link) return findDrop(ref.trim(), event)
+  return link[2] ? findDropByLink(link[1]!, Number(link[2]), event) : findDrop(link[1]!, event)
+}
+
+/** The version of the doc behind a share link, or its latest one. */
+export async function findDropByLink(link: string, version?: number, event?: H3Event) {
+  const query = db.select({ drop: drops, owner: user }).from(drops).leftJoin(user, eq(user.id, drops.ownerId))
+  const [row] = version
+    ? await query.where(and(eq(drops.link, link), eq(drops.version, version))).limit(1)
+    : await query.innerJoin(dropHeads, eq(dropHeads.dropId, drops.id)).where(eq(drops.link, link)).limit(1)
   return withOwnerAccess(row, event)
 }
 
@@ -329,11 +347,14 @@ async function deleteBlobKeys(keys: string[]) {
     await db.delete(blobCleanup).where(inArray(blobCleanup.blobKey, unique.slice(offset, offset + 80)))
 }
 
-/** Stores one file as a private doc drop. Markdown and HTML must be UTF-8. */
-export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; supersedes?: string; visibility?: Visibility; access?: Access }, event?: H3Event) {
+/**
+ * Stores one file as a private doc drop. Markdown and HTML must be UTF-8. `slug` names the link (the previous
+ * version's, or the title's, otherwise); with `nameFromSlug` the file is called after it too, keeping the extension.
+ */
+export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; slug?: string; nameFromSlug?: boolean; supersedes?: string; visibility?: Visibility; access?: Access }, event?: H3Event) {
   await drainBlobCleanup()
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
-  const filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
+  let filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
   const extension = filename.match(/\.[a-z0-9]{1,16}$/i)?.[0].toLowerCase() ?? ""
   let kind = kindFromFilename(filename)
   let contentType = detectContentType(input.bytes) ?? "application/octet-stream"
@@ -383,17 +404,22 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
     }
     const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
     const now = Date.now()
+    const title = (input.title?.trim() || markdownTitle || titleFromSource(text ?? "", kind, filename)).slice(0, 160)
+    const slug = (input.slug && slugify(input.slug)) || previous?.slug || slugify(title)
+    if (input.nameFromSlug) filename = `${slug || "doc"}${extension}`
     const row: DropRow = {
       id: crypto.randomUUID(),
       ownerId: previous?.ownerId ?? who.userId,
       kind,
-      title: (input.title?.trim() || markdownTitle || titleFromSource(text ?? "", kind, filename)).slice(0, 160),
+      title,
       filename,
       blobKey: key,
       contentType,
       size: input.bytes.byteLength,
       version: (previous?.version ?? 0) + 1,
       supersedesId: previous?.id ?? null,
+      link: previous?.link ?? newLink(),
+      slug,
       visibility: input.visibility ?? previous?.visibility ?? "private",
       access: input.access ?? (previous?.access as Access | undefined) ?? "comment",
       actorKind: who.actorKind,
@@ -446,7 +472,7 @@ function cleanPath(path: string) {
  * one's files: `files` adds or replaces paths, and a path leaves the app only when `removes` names it, so an agent
  * that sends just the files it changed can't delete the rest by accident.
  */
-export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; files: Record<string, string>; removes?: string[]; visibility?: Visibility; access?: Access }, event?: H3Event) {
+export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; slug?: string; files: Record<string, string>; removes?: string[]; visibility?: Visibility; access?: Access }, event?: H3Event) {
   const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
   const removes = [...new Set((input.removes ?? []).map(cleanPath))]
@@ -498,10 +524,12 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
       }
 
       const name = input.name?.trim() || row?.title || "Untitled app"
+      const slug = (input.slug && slugify(input.slug)) || row?.slug || slugify(name)
       const next: DropRow = {
         id, ownerId: row?.ownerId ?? who.userId, kind: "app", title: name.slice(0, 160),
-        filename: row?.filename ?? `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app"}/`,
+        filename: row?.filename ?? `${slug || "app"}/`,
         blobKey: null, contentType: null, size, version: (row?.version ?? 0) + 1, supersedesId: row?.supersedesId ?? null,
+        link: row?.link ?? newLink(), slug,
         shareReview, quarantinedAt: row?.quarantinedAt ?? null,
         visibility, access: input.access ?? (row?.access as Access | undefined) ?? "comment",
         actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
@@ -519,7 +547,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
         committedPublish = true
       }
       else {
-        const update = db.update(drops).set({ title: next.title, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, lastAccessedAt: now, publishToken: token, ...life, note, visibility, access: next.access, shareReview })
+        const update = db.update(drops).set({ title: next.title, link: next.link, slug, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, lastAccessedAt: now, publishToken: token, ...life, note, visibility, access: next.access, shareReview })
           .where(and(eq(drops.id, id), eq(drops.version, row.version)))
         // The file set changes only if the update above won: both statements check for this publish's token.
         // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
@@ -606,4 +634,6 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
   return due.length + orphans.length
 }
 
-export const dropPageUrl = (origin: string, id: string) => new URL(`/d/${id}`, origin).href
+/** The doc's share link, which opens its latest version. */
+export const dropPageUrl = (origin: string, drop: Pick<DropRow, "id" | "title"> & { link: string | null; slug: string | null }) =>
+  new URL(dropPath({ link: drop.link ?? drop.id, slug: drop.slug ?? slugify(drop.title) }), origin).href

@@ -2,6 +2,7 @@
 // (UForm :schema), so a field's rules and messages are the same on both sides.
 import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
+import { MAX_SLUG, slugify } from "./links"
 import { MAX_APP_BYTES } from "./quotas"
 import { ROLES } from "./roles"
 
@@ -19,6 +20,8 @@ export const DropPatchSchema = v.object({
   visibility: v.optional(v.picklist(["private", "team", "shared"])),
   access: v.optional(v.picklist(["view", "comment", "edit"])),
   title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
+  /** The readable part of the link, for every version. The link keeps working with the old one. */
+  slug: v.optional(v.pipe(v.string(), v.maxLength(MAX_SLUG), v.check(value => slugify(value) !== "", "Use letters or numbers in the slug."))),
   lifetime: v.optional(v.picklist(LIFETIMES)),
   /** Required when an agent keeps a drop. */
   keepReason: v.optional(v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON, `Keep the reason under ${MAX_KEEP_REASON} characters.`))),
@@ -31,6 +34,8 @@ export const DropPatchSchema = v.object({
 export const AppSchema = v.object({
   id: v.optional(v.string()),
   name: v.optional(v.pipe(v.string(), v.maxLength(160))),
+  /** The readable part of its link. Later versions keep it unless they pass another. */
+  slug: v.optional(v.pipe(v.string(), v.maxLength(MAX_SLUG))),
   /** With `id`, only the files that changed: the rest carry over from the previous version. */
   files: v.record(v.string(), v.string()),
   /** Paths to delete from the previous version. A file leaves an app only when it's named here. */

@@ -8,6 +8,7 @@ import type { DropDetail, DropVersion } from "#shared/types"
 /** `inset`: room to leave on the right for the floating panel, in pixels. */
 const props = defineProps<{ version: DropVersion; previous: DropVersion | null; inset: number }>()
 const emit = defineEmits<{ close: [] }>()
+const versionTo = useVersionTo()
 
 const options = { lazy: true, server: false }
 const after = useApi<DropDetail>(() => `/api/drops/${props.version.id}`, { key: () => `version:${props.version.id}`, ...options })
@@ -34,7 +35,7 @@ const counts = computed(() => ({ add: hunks.value.filter(line => line.type === "
       <span v-if="ready && text" class="shrink-0 font-mono text-xs"><span class="text-success">+{{ counts.add }}</span> <span class="text-error">−{{ counts.remove }}</span></span>
       <span v-if="version.note" class="min-w-0 truncate text-muted">· {{ version.note }}</span>
       <span class="flex-1" />
-      <UButton v-if="!version.current" class="shrink-0" color="neutral" :label="`Open v${version.version}`" size="xs" :to="`/drops/${version.id}`" variant="ghost" />
+      <UButton v-if="!version.current" class="shrink-0" color="neutral" :label="`Open v${version.version}`" size="xs" :to="versionTo(version)" variant="ghost" />
       <UTooltip :kbds="['Esc']" text="Back to the document">
         <UButton aria-label="Back to the document" color="neutral" icon="i-ph-x" size="xs" variant="ghost" @click="emit('close')" />
       </UTooltip>

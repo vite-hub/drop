@@ -4,6 +4,7 @@ import type * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import type { DropPatchSchema } from "#shared/schemas"
 import type { Access, Visibility } from "#shared/types"
+import { slugify } from "#shared/links"
 import { drops } from "../databases/config"
 import { type DropRow, lifetimeFields, permissions, restoreDrop, toSummary, trashDrop } from "./drops"
 import { chainOf, expiryPolicy, renewDrop } from "./expiry"
@@ -20,7 +21,7 @@ export const shareChange = (share: Share, audience?: Audience, current?: Visibil
   share === "private" ? { visibility: "private" } : { visibility: (audience ?? (current === "team" ? "team" : "link")) === "team" ? "team" : "shared", access: share }
 
 /**
- * Share, unshare, change the link's access level, rename, change the lifetime, renew, trash, or restore. People
+ * Share, unshare, change the link's access level, rename, rename the link, change the lifetime, renew, trash, or restore. People
  * (PATCH /api/drops/:id) and agents (MCP) go through here, so both follow the same rules.
  */
 export async function updateDrop(found: DropRow, who: Identity, body: DropChange, event?: H3Event) {
@@ -44,9 +45,10 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   if (body.access !== undefined) share.access = body.access
   const title = typeof body.title === "string" ? { title: body.title } : {}
   const life = body.lifetime !== undefined ? lifetimeFields(who, { lifetime: body.lifetime, keepReason: body.keepReason }, drop, event) : {}
-  const chainChange = { ...share, ...life }
+  const slug = body.slug !== undefined ? { slug: slugify(body.slug) } : {}
+  const chainChange = { ...share, ...life, ...slug }
   if (Object.keys(chainChange).length) {
-    // A link and its lifetime belong to the document chain, so every version carries the same state.
+    // A link, its name and its lifetime belong to the document chain, so every version carries the same state.
     await db.update(drops).set(chainChange).where(sql`${drops.id} IN (${chainOf(drop)})`)
   }
   if (Object.keys(title).length) await db.update(drops).set(title).where(eq(drops.id, drop.id))

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { type DropSummary, type Visibility, VISIBILITY_ICONS } from "#shared/types"
+import { dropPath } from "#shared/links"
 
 const props = defineProps<{ drop: DropSummary }>()
 const emit = defineEmits<{ delete: []; restore: []; deleteForever: [] }>()
@@ -14,7 +15,7 @@ const AUDIENCES: Record<Visibility, string> = { private: "Private", team: "Team"
 const audiences = (Object.keys(AUDIENCES) as Visibility[]).map(value => ({ value, label: AUDIENCES[value], icon: VISIBILITY_ICONS[value] }))
 const status = computed(() => props.drop.quarantinedAt ? "Quarantined" : props.drop.shareReview === "pending" ? "Pending review" : props.drop.shareReview === "rejected" ? "Rejected" : AUDIENCES[props.drop.visibility])
 
-const link = useShareUrl(() => props.drop.id)
+const link = useShareUrl(() => props.drop)
 const detail = computed(() => props.drop.kind === "app" && props.drop.paths ? `${props.drop.filename} · ${props.drop.paths.length} files` : props.drop.filename)
 
 const SHARED_NOTES: Record<Visibility, string> = { private: "Only you can open it.", team: "Everyone in your team can open it.", shared: "Anyone with the link can open it." }
@@ -36,7 +37,7 @@ async function copyLink() {
 const menu = computed(() => [
   [
     { label: "Open", icon: "i-ph-eye", to: `/drops/${props.drop.id}` },
-    { label: "Open Public Page", icon: "i-ph-arrow-square-out", to: `/d/${props.drop.id}`, target: "_blank", disabled: !shared.value },
+    { label: "Open Public Page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
     { label: "Copy Link", icon: "i-ph-link", onSelect: copyLink },
   ],
   ...(theirs.value ? [] : [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]]),

@@ -12,7 +12,8 @@ const visible = computed(() => props.comments.filter(comment => (filter.value ==
 // Open comments from an earlier version whose text or element this version no longer has. They stay open (the doc
 // changed, the point may still stand) but sit apart, each with a link to the version it was written on.
 const earlier = computed(() => (filter.value === "open" ? props.comments.filter(comment => !comment.resolved && props.outdated.has(comment.id)) : []))
-const versionId = (version: number) => props.versions.find(item => item.version === version)?.id
+const versionOf = (version: number) => props.versions.find(item => item.version === version)
+const versionTo = useVersionTo()
 </script>
 
 <template>
@@ -46,7 +47,7 @@ const versionId = (version: number) => props.versions.find(item => item.version 
         <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-dashed border-default pl-2.5 text-sm text-dimmed line-through decoration-(--ui-border-accented)">{{ comment.quote }}</p>
         <p class="text-sm">{{ comment.body }}</p>
         <div class="flex items-center gap-3 text-xs">
-          <NuxtLink v-if="versionId(comment.version)" class="text-muted hover:text-highlighted" :to="`/drops/${versionId(comment.version)}`">See it on v{{ comment.version }}</NuxtLink>
+          <NuxtLink v-if="versionOf(comment.version)" class="text-muted hover:text-highlighted" :to="versionTo(versionOf(comment.version)!)">See it on v{{ comment.version }}</NuxtLink>
           <button v-if="canManage || comment.mine" class="cursor-pointer text-muted hover:text-highlighted" type="button" @click="emit('resolve', comment.id, true)">Resolve</button>
         </div>
       </li>

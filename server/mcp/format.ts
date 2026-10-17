@@ -11,7 +11,7 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     title: drop.title,
     kind: drop.kind,
     version: drop.version,
-    url: dropPageUrl(origin, drop.id),
+    url: dropPageUrl(origin, drop),
     // Embed this in a doc (Markdown image, ::screenshot src) to make the file part of that doc.
     ...(row?.blobKey && (drop.kind === "image" || drop.kind === "file") ? { fileUrl: new URL(`/f/${row.blobKey}`, origin).href } : {}),
     share,

@@ -1,6 +1,9 @@
 <script setup lang="ts">
-// What someone with the link sees: the drop, full screen, no sidebar. Private drops 404.
-// Signed-in people read it inside the app instead, with their sidebar, so the link never strands them.
+// What someone with the link sees: the doc's latest version, or the one `?v=` pins, full screen, no sidebar. Private
+// drops 404. Signed-in people read it inside the app instead, with their sidebar, so the link never strands them.
+// The address settles on the doc's link (`/d/<link>/<slug>`): an old version's id or an outdated slug moves there.
+import { type DropLink, dropPath } from "#shared/links"
+
 definePageMeta({
   middleware: async () => {
     const { data: me } = await useMe()
@@ -8,9 +11,21 @@ definePageMeta({
   },
 })
 
-const route = useRoute("d-id")
+const route = useRoute("d-id-slug")
 const { data: me } = await useMe()
-const { drop, comments } = provideDrop(() => String(route.params.id))
+const pinned = computed(() => Number(route.query.v) || undefined)
+const target = await useApi<DropLink>(() => `/api/links/${route.params.id}${pinned.value ? `?v=${pinned.value}` : ""}`, { key: () => `drop-link:${route.params.id}:${pinned.value ?? ""}` })
+
+async function settle() {
+  const link = target.data.value
+  if (!link || route.path === dropPath(link)) return
+  await navigateTo({ path: dropPath(link), query: { ...route.query, ...(link.from ? { from: link.from } : {}) } }, { replace: true })
+}
+await settle()
+watch(() => target.data.value, settle)
+
+// Until the link resolves (or when it can't), the drop API answers for the key itself and says why it can't open.
+const { drop, comments } = provideDrop(() => target.data.value?.id ?? String(route.params.id))
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
 // A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.

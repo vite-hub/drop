@@ -17,7 +17,12 @@ export const VISIBILITY_HINTS: Record<Visibility, string> = { private: "Your con
 export const VISIBILITY_ICONS: Record<Visibility, string> = { private: "i-ph-lock", team: "i-ph-users", shared: "i-ph-globe" }
 
 export interface DropSummary {
+  /** This version. */
   id: string
+  /** The doc's share link key, the same on every version (`/d/<link>/<slug>`, see #shared/links). */
+  link: string
+  /** The readable part of the link. */
+  slug: string
   kind: DropKind
   title: string
   filename: string

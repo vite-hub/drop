@@ -5,9 +5,10 @@ import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
+import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues } from "#shared/project-bundle"
 import { comments } from "../../databases/config"
-import { createDocDrop, findDrop, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "../../utils/drops"
+import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "../../utils/drops"
 import { shareChange, updateDrop } from "../../utils/drop-update"
 import { chainOf } from "../../utils/expiry"
 import { requireIdentity } from "../../utils/identity"
@@ -26,7 +27,8 @@ const Input = v.object({
     base64: v.pipe(v.string(), v.maxLength(Math.ceil(MAX_FILE_BYTES / 3) * 4 + 1024), v.description("The file's bytes, base64-encoded.")),
   }), v.description("Any other file up to 4 MiB: a screenshot, a PDF. Images get pin and area comments. Embed its fileUrl in a doc to make it part of that doc."))),
   title: v.optional(v.string()),
-  previous: v.optional(v.pipe(v.string(), v.description("Id of the drop this publishes the next version of. It keeps that drop's sharing and lifetime unless you pass them."))),
+  slug: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_SLUG), v.description("The readable part of the drop's link, like hipoteca-madrid: a few lowercase words and dashes that say what it is. Pick one for every new drop. Later versions keep it unless you pass another; old links keep working."))),
+  previous: v.optional(v.pipe(v.string(), v.description("Id or link of the drop this publishes the next version of. It keeps that drop's sharing, lifetime and link unless you pass them. Its link then opens the new version."))),
   note: v.pipe(v.string(), v.minLength(1), v.maxLength(500), v.description("What this version is or what changed, like a commit message. People see it in the version history.")),
   lifetime: v.optional(v.pipe(v.picklist(LIFETIMES), v.description("Required for a new drop. temporary: prototypes and one-off answers, gone 14 days after the last visit. review: docs going through feedback, 30 days. keep: never expires, for pull request assets and anything linked from somewhere lasting; needs keepReason."))),
   keepReason: v.optional(v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON), v.description("Why it should be kept, in a sentence or two (e.g. the pull request it belongs to). The owner sees it."))),
@@ -45,7 +47,8 @@ export default defineMcpTool({
     const given = (["markdown", "html", "files", "file"] as const).filter(key => input[key] !== undefined)
     if (given.length !== 1) throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, or file." })
     if (!input.previous && !input.lifetime) throw new HTTPError({ status: 400, message: "Say how long this drop should live: lifetime temporary, review, or keep." })
-    let previous = input.previous ? await findDrop(input.previous, event) : null
+    if (input.slug !== undefined && !slugify(input.slug)) throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
+    let previous = input.previous ? await findDropByRef(input.previous, event) : null
     if (previous?.expired && permissions(previous, who).manage) throw new HTTPError({ status: 409, message: `${input.previous} is in the Trash. Restore it with update_drop first, or publish a new drop.` })
     if (input.previous && (!previous || !permissions(previous, who).edit)) throw new HTTPError({ status: 404, message: `No drop you can publish to with id ${input.previous}.` })
     if (previous) previous = (await versionChain(previous))[0] ?? previous
@@ -56,7 +59,7 @@ export default defineMcpTool({
     let warnings: string[] = []
     if (input.files) {
       if (previous && previous.kind !== "app") throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
-      row = await publishApp(who, { id: previous?.id, name: input.title, files: input.files, removes: input.removes, ...share, ...life }, event)
+      row = await publishApp(who, { id: previous?.id, name: input.title, slug: input.slug, files: input.files, removes: input.removes, ...share, ...life }, event)
       warnings = row.warnings
     }
     else {
@@ -79,9 +82,10 @@ export default defineMcpTool({
         filename = input.html ? "doc.html" : "doc.md"
         bytes = new TextEncoder().encode(source)
       }
-      row = await createDocDrop(who, { filename, bytes, title: input.title, supersedes: previous?.id, ...share, ...life }, event)
-      // The share applies to every version, like a change on the drop's page.
-      if (previous && input.share) await updateDrop({ ...row, expired: false }, who, share, event)
+      // Markdown and HTML sent as text are named after the link's slug; a file keeps its own name.
+      row = await createDocDrop(who, { filename, bytes, title: input.title, slug: input.slug, nameFromSlug: !input.file, supersedes: previous?.id, ...share, ...life }, event)
+      // The share and the slug apply to every version, like a change on the drop's page.
+      if (previous && (input.share || input.slug)) await updateDrop({ ...row, expired: false }, who, { ...share, ...(input.slug ? { slug: input.slug } : {}) }, event)
     }
 
     let resolved: number[] = []

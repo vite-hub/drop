@@ -712,6 +712,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "link": {
+          "name": "link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "visibility": {
           "name": "visibility",
           "type": "text",
@@ -885,6 +899,14 @@
           "columns": [
             "visibility",
             "updated_at"
+          ],
+          "isUnique": false
+        },
+        "drops_link_idx": {
+          "name": "drops_link_idx",
+          "columns": [
+            "link",
+            "version"
           ],
           "isUnique": false
         }

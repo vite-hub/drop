@@ -76,12 +76,16 @@ CREATE TABLE `drops` (
 	`note` text,
 	`trashed_at` integer,
 	`trash_reason` text,
-	`parent_id` text
+	`parent_id` text,
+	`link` text,
+	`slug` text
 );
 --> statement-breakpoint
 CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);
 --> statement-breakpoint
 CREATE UNIQUE INDEX `drops_blob_key_idx` ON `drops` (`blob_key`);
+--> statement-breakpoint
+CREATE INDEX `drops_link_idx` ON `drops` (`link`,`version`);
 --> statement-breakpoint
 CREATE INDEX `drops_supersedes_idx` ON `drops` (`supersedes_id`);
 --> statement-breakpoint

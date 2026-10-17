@@ -5,6 +5,7 @@
 // composables (useDrop, useViewerPanel, useAppFiles, useDropFrame, useLiveEditor); this file wires them up.
 import { planDocument } from "#shared/documents"
 import { expiryLabel } from "#shared/expiry"
+import { dropPath } from "#shared/links"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
@@ -40,13 +41,23 @@ const { width: windowWidth } = useWindowSize()
 const isApp = computed(() => drop.value.kind === "app")
 // The owner gets their controls on the public link too: it is where they land after sharing it.
 const owner = computed(() => drop.value.isOwner)
-// Signed-in people read a public link inside the app, sidebar included (pages/d/[id].vue); visitors see it alone.
+// Signed-in people read a public link inside the app, sidebar included (pages/d/[id]/[[slug]].vue); visitors see it alone.
 const { data: me } = useMe()
 const visitor = computed(() => props.publicView && !me.value)
 const openCount = computed(() => comments.value.filter(comment => !comment.resolved).length)
-const link = useShareUrl(() => drop.value.id)
+const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
+// A doc's link opens its latest version. Someone reading an earlier one, pinned (`?v=`) or from History, can go to the
+// latest; someone whose old link moved them to the latest (`?from=`) can go back to the version they were sent.
+const latest = computed(() => drop.value.versions[0] ?? drop.value)
+const older = computed(() => latest.value.id !== drop.value.id)
+const latestTo = computed(() => (props.publicView ? dropPath(drop.value) : `/drops/${latest.value.id}`))
+const sentVersion = computed(() => {
+  const version = Number(route.query.from)
+  return props.publicView && !older.value && version > 0 && version < drop.value.version ? version : 0
+})
+const sentNotice = ref(true)
 const restoring = ref(false)
 async function restoreDrop() {
   restoring.value = true
@@ -384,7 +395,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
             <UButton aria-label="Copy link" color="neutral" icon="i-ph-link" size="sm" variant="ghost" @click="copy(link, 'Link copied')" />
           </UTooltip>
           <UTooltip v-if="publicView && !owner" text="Report">
-            <UButton aria-label="Report" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" icon="i-ph-flag" size="sm" variant="ghost" />
+            <UButton aria-label="Report" :to="{ path: '/report', query: { target: `/d/${drop.link}` } }" color="neutral" icon="i-ph-flag" size="sm" variant="ghost" />
           </UTooltip>
           <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'team' ? 'Team' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
@@ -410,10 +421,34 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         :title="expiryLabel(drop, now)"
         variant="subtle"
       />
+      <UAlert
+        v-else-if="older"
+        :actions="[{ label: `Open v${latest.version}`, color: 'neutral', variant: 'outline', size: 'sm', to: latestTo }]"
+        class="rounded-none border-0 border-b border-default"
+        color="neutral"
+        :description="`v${latest.version} is the latest version.`"
+        icon="i-ph-clock-counter-clockwise"
+        orientation="horizontal"
+        :title="`You're reading v${drop.version}`"
+        variant="subtle"
+      />
+      <UAlert
+        v-else-if="sentVersion && sentNotice"
+        :actions="[{ label: `View v${sentVersion}`, color: 'neutral', variant: 'outline', size: 'sm', to: dropPath(drop, sentVersion) }]"
+        class="rounded-none border-0 border-b border-default"
+        close
+        color="neutral"
+        :description="`The link you opened pointed at v${sentVersion}. This is v${drop.version}, the latest.`"
+        icon="i-ph-arrow-up-right"
+        orientation="horizontal"
+        title="Updated since this link was shared"
+        variant="subtle"
+        @update:open="sentNotice = $event"
+      />
       <div v-if="isApp" class="flex h-9 shrink-0 items-center gap-2 border-b border-default px-3">
         <span class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted">
           <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3 shrink-0" />
-          <span class="truncate">/d/{{ drop.id.slice(0, 8) }}/{{ page === "index.html" ? "" : page }}</span>
+          <span class="truncate">{{ drop.slug || drop.link }}/{{ page === "index.html" ? "" : page }}</span>
         </span>
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>

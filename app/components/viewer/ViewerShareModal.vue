@@ -7,7 +7,7 @@ const notify = useNotify()
 const { setVisibility } = useDropActions()
 const { copy, copied } = useCopy()
 const shared = computed(() => props.drop.visibility !== "private")
-const url = useShareUrl(() => props.drop.id)
+const url = useShareUrl(() => props.drop)
 const audiences = (Object.keys(VISIBILITY_LABELS) as Visibility[]).map(value => ({ value, label: VISIBILITY_LABELS[value], icon: VISIBILITY_ICONS[value] }))
 // Only Markdown docs have the live editor, so only they offer "Can edit".
 const levels = computed(() => (Object.keys(ACCESS_LABELS) as Access[])

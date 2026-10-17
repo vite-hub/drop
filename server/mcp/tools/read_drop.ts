@@ -3,7 +3,7 @@ import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { listComments } from "../../utils/comments"
-import { dropDetail, findDrop, permissions } from "../../utils/drops"
+import { dropDetail, findDropByRef, permissions } from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
 import { requireIdentity } from "../../utils/identity"
 import { runtimeErrors } from "../../utils/runtime-errors"
@@ -15,12 +15,12 @@ export default defineMcpTool({
   description: "Read a drop: a doc's source or every file of an app, its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. Address the open comments and errors in the next version (publish with previous and resolves).",
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(v.object({
-    id: v.pipe(v.string(), v.description("Drop id.")),
+    id: v.pipe(v.string(), v.description("Drop id, or its link.")),
     resolved: v.optional(v.pipe(v.boolean(), v.description("Include resolved comments too.")), false),
   })),
   handler: async ({ id, resolved }, event) => {
     const who = await requireIdentity(event)
-    const drop = await findDrop(id, event)
+    const drop = await findDropByRef(id, event)
     if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
     await recordVisit(event, drop, who, "beacon")
     const detail = await dropDetail(drop, who, event.url.origin, event)

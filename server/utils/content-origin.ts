@@ -10,8 +10,8 @@ import { useServerEnv } from "#vitehub/env/server"
  * With a wildcard every drop gets an origin of its own, like an app on its own subdomain, so one drop can't read
  * another's localStorage, IndexedDB, or caches. The `*` stands for part of the first label: `https://*.usercontent.example`
  * gives `<label>.usercontent.example`, and `https://*-drop.example.com` gives `<label>-drop.example.com`, one level under
- * the zone, where a free certificate still reaches. The label is a keyed hash of the drop's id, not the id, because
- * hostnames travel in clear text (DNS, TLS SNI) and a shared drop's id is the key to its link. A plain hostname puts
+ * the zone, where a free certificate still reaches. The label is a keyed hash of the doc's link key, the same on every
+ * version, not the key itself, because hostnames travel in clear text (DNS, TLS SNI) and the key opens a shared drop. A plain hostname puts
  * every drop on that one origin, sharing storage. Without either, drops keep the opaque sandbox.
  */
 interface ContentConfig { protocol: string; port: string; host: string; perDrop?: { prefix: string; suffix: string } }
@@ -59,7 +59,7 @@ export async function contentLabel(event: H3Event, dropId: string): Promise<stri
   return label
 }
 
-/** Where the viewer frames `dropId` (an app or HTML doc), or null for the opaque sandbox. Never Drop's own origin. */
+/** Where the viewer frames the drop `dropId` names (an app or HTML doc, by its link key), or null for the opaque sandbox. Never Drop's own origin. */
 export async function contentOrigin(event: H3Event, dropId: string): Promise<string | null> {
   const config = configured(event)
   if (!config) return null

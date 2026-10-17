@@ -17,6 +17,10 @@ export const drops = sqliteTable("drops", {
   size: integer("size").notNull().default(0),
   version: integer("version").notNull().default(1),
   supersedesId: text("supersedes_id"),
+  /** The share link's key (`/d/<link>`), the same on every version of a doc, so the link opens the latest one. */
+  link: text("link"),
+  /** The readable part of the link, picked by the agent or taken from the title. The latest version's is the doc's. */
+  slug: text("slug"),
   /** `team`: everyone signed in to this Drop can find and open it. `shared`: anyone with the link, no sign-in. */
   visibility: text("visibility", { enum: ["private", "team", "shared"] }).notNull().default("private"),
   shareReview: text("share_review", { enum: ["pending", "rejected"] }),
@@ -53,6 +57,7 @@ export const drops = sqliteTable("drops", {
   index("drops_trash_idx").on(table.trashedAt),
   index("drops_parent_idx").on(table.parentId),
   index("drops_visibility_idx").on(table.visibility, table.updatedAt),
+  index("drops_link_idx").on(table.link, table.version),
 ])
 
 /** Current versions, maintained by drop insert/delete/update triggers for bounded listing reads. */

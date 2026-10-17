@@ -30,10 +30,12 @@ export default quotaApiHandler(defineHandler(async (event) => {
 
   const title = form.get("title")
   const supersedes = form.get("supersedes")
+  const slug = form.get("slug")
   const drop = await createDocDrop(who, {
     filename: file.name,
     bytes: new Uint8Array(await file.arrayBuffer()),
     title: typeof title === "string" ? title : undefined,
+    slug: typeof slug === "string" ? slug.slice(0, 200) : undefined,
     supersedes: typeof supersedes === "string" ? supersedes : undefined,
   }, event)
   useLogger(event).set({ drop: { id: drop.id, kind: drop.kind, size: drop.size, version: drop.version } })
@@ -41,7 +43,7 @@ export default quotaApiHandler(defineHandler(async (event) => {
   return {
     id: drop.id,
     url: new URL(`/f/${drop.blobKey}`, origin).href,
-    page: dropPageUrl(origin, drop.id),
+    page: dropPageUrl(origin, drop),
     visibility: drop.visibility,
     version: drop.version,
   }

@@ -1,4 +1,5 @@
-import type { DropComment, DropDetail } from "#shared/types"
+import { dropPath } from "#shared/links"
+import type { DropComment, DropDetail, DropVersion } from "#shared/types"
 import type { CommentInput } from "#shared/schemas"
 
 /**
@@ -52,3 +53,11 @@ export function useDrop(id: MaybeRefOrGetter<string>) {
 
 /** The drop page provides its drop; the viewer and its panels inject it instead of threading props. */
 export const [provideDrop, injectDrop] = createInjectionState(useDrop)
+
+/** Where a version of the viewed drop opens: its pinned link on a shared page (no sign-in), its page in the app otherwise. */
+export function useVersionTo() {
+  const route = useRoute()
+  const state = injectDrop()!
+  return (version: Pick<DropVersion, "id" | "version">) =>
+    route.path.startsWith("/d/") && state.drop.data.value ? dropPath(state.drop.data.value, version.version) : `/drops/${version.id}`
+}
