@@ -8,10 +8,12 @@ const props = defineProps<{ drop: DropDetail }>()
 const emit = defineEmits<{ share: [] }>()
 const { data: me } = useMe()
 const now = useRelativeNow()
+// A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
+const site = computed(() => props.drop.kind === "site")
 const type = computed(() => [
   KIND_LABELS[props.drop.kind] ?? "File",
   ...(props.drop.kind === "app" ? [`${props.drop.paths?.length ?? 0} files`] : []),
-  props.drop.kind === "folder" ? itemCount(props.drop.items ?? 0) : formatBytes(props.drop.size),
+  ...(site.value ? [] : [props.drop.kind === "folder" ? itemCount(props.drop.items ?? 0) : formatBytes(props.drop.size)]),
 ].join(" · "))
 const access = computed(() => {
   if (props.drop.shareReview === "pending") return "Waiting for review"
@@ -38,7 +40,11 @@ const folder = computed(() => props.drop.ancestors.map(crumb => crumb.title).joi
         <dt class="w-20 shrink-0 text-muted">Updated</dt>
         <dd class="text-highlighted"><TimeAgo :at="drop.updatedAt" /></dd>
       </div>
-      <div class="flex items-center gap-3">
+      <div v-if="site && drop.siteUrl" class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Address</dt>
+        <dd class="min-w-0 truncate font-mono text-xs text-highlighted" :title="drop.siteUrl">{{ drop.siteUrl }}</dd>
+      </div>
+      <div v-else-if="drop.kind !== 'folder'" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">File</dt>
         <dd class="min-w-0 truncate font-mono text-xs text-highlighted">{{ drop.filename }}</dd>
       </div>

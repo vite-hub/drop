@@ -57,9 +57,11 @@ const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.
 
       <section class="space-y-3">
         <p class="label-mono">Comments</p>
-        <p v-if="!items.data.value.length" class="rounded-lg border border-dashed border-default px-4 py-10 text-center text-sm text-muted">
-          Nothing sent from {{ host }} yet.
-        </p>
+        <div v-if="!items.data.value.length" class="rounded-lg border border-dashed border-default px-4 py-10 text-center">
+          <UIcon name="i-ph-chat-circle" class="size-6 text-dimmed" />
+          <p class="mt-3 font-medium text-highlighted">Nothing sent from {{ host }} yet</p>
+          <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Open the site, click Review with Drop, and drag over what you mean. Each note shows up here with its screenshot.</p>
+        </div>
         <ul v-else class="grid gap-4 sm:grid-cols-2">
           <li v-for="item in items.data.value" :key="item.id" class="overflow-hidden rounded-lg border border-default" :class="resolved(item) && 'opacity-60'">
             <NuxtLink v-if="item.screenshot" class="flex h-56 items-center justify-center bg-muted p-3 transition-colors hover:bg-accented" :to="shotTo(item.screenshot)">

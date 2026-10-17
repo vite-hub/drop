@@ -37,7 +37,7 @@ async function newSite() {
       <div v-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
         <UIcon name="i-ph-folder-open" class="size-6 text-dimmed" />
         <p class="mt-3 font-medium text-highlighted">Nothing in this folder yet</p>
-        <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Agents publish into it with the folder option. Move a drop here from its menu.</p>
+        <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Ask your agent to publish into {{ drop.title }}, or move a drop here with Move to folder in its menu.</p>
       </div>
       <ul v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <li v-for="child in children" :key="child.id">
