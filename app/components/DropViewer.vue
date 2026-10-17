@@ -136,9 +136,16 @@ const pageComments = computed(() => (isApp.value ? comments.value.filter(comment
 const unplaced = ref(new Set<string>())
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
 const outdated = computed(() => new Set(comments.value.filter(comment => comment.version < drop.value.version && (replaced(comment) || unplaced.value.has(comment.id))).map(comment => comment.id)))
-/** The version whose changes are open (ViewerDiff), and the one before it. */
+/** The version whose changes show in place of the document (ViewerDiff), and the one before it. */
 const shownVersion = ref<DropVersion | null>(null)
 const previousVersion = computed(() => (shownVersion.value ? drop.value.versions[drop.value.versions.findIndex(item => item.id === shownVersion.value!.id) + 1] ?? null : null))
+/** Picking the open version again goes back to the document. Below `lg` the panel is a slideover, so it steps aside. */
+function showVersion(version: DropVersion) {
+  shownVersion.value = shownVersion.value?.id === version.id ? null : version
+  if (shownVersion.value && !wide.value) mobileSide.value = false
+}
+// The diff belongs to History: another tab goes back to the document.
+watch(tab, value => value !== "history" && (shownVersion.value = null))
 
 // What the page reports going wrong goes to the server in batches, for the agent's read_drop. Only apps and HTML pages
 // run their own code; a Markdown doc's errors would be Drop's.
@@ -230,6 +237,7 @@ defineShortcuts({
   r: toggleArea,
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
+    shownVersion.value = null
     popover.value = selection.value = null
     areaMode.value = false
   },
@@ -324,7 +332,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         @focus="focusComment"
         @resolve="resolve"
       />
-      <ViewerHistory v-else-if="tab === 'history'" :comments="comments" :drop="drop" @open="version => (shownVersion = version)" />
+      <ViewerHistory v-else-if="tab === 'history'" :comments="comments" :drop="drop" :selected="shownVersion?.id" @open="showVersion" />
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
@@ -415,6 +423,8 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <!-- Server and client bundlers format the embedded app resolver differently. -->
         <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
 
+        <ViewerDiff v-if="shownVersion && !editing" :key="shownVersion.id" :inset="floating ? FLOATING_INSET : 0" :previous="previousVersion" :version="shownVersion" @close="shownVersion = null" />
+
         <!-- As tall as its content, so a quiet drop gets a small card. Markdown docs make room for it (FLOATING_INSET). -->
         <aside
           v-if="floating"
@@ -469,5 +479,4 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
   />
 
   <ViewerShareModal v-if="owner" v-model:open="shareOpen" :drop="drop" />
-  <ViewerDiff v-if="shownVersion" :key="shownVersion.id" :open="true" :previous="previousVersion" :version="shownVersion" @update:open="open => !open && (shownVersion = null)" />
 </template>

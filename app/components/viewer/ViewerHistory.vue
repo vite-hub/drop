@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // A doc's versions one after the other, newest first, like a commit log: what each one changed (its note), who
-// published it, and the comments written on it. A version opens what it changed (ViewerDiff).
+// published it, and the comments written on it. A version shows what it changed (ViewerDiff) in place of the document;
+// `selected` is the one showing.
 import type { DropComment, DropDetail, DropVersion } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; comments: DropComment[] }>()
+const props = defineProps<{ drop: DropDetail; comments: DropComment[]; selected?: string }>()
 const emit = defineEmits<{ open: [version: DropVersion] }>()
 
 // Comments come up to the version being viewed (listComments), so later versions have none to count here.
@@ -22,11 +23,12 @@ function talk(version: DropVersion) {
       <span v-if="index < drop.versions.length - 1" class="absolute top-6 bottom-0 left-[19.5px] w-px translate-y-1.5 bg-(--ui-border)" aria-hidden="true" />
       <button
         :aria-label="`What changed in v${version.version}`"
-        class="group relative flex w-full cursor-pointer gap-3 rounded-md px-3 py-2.5 text-left text-[13px] outline-none hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
+        :aria-pressed="selected === version.id"
+        class="group relative flex w-full cursor-pointer gap-3 rounded-md px-3 py-2.5 text-left text-[13px] outline-none hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) aria-pressed:bg-elevated"
         type="button"
         @click="emit('open', version)"
       >
-        <span class="mt-1.5 size-2.5 shrink-0 rounded-full ring-4 ring-(--ui-bg) group-hover:ring-(--ui-bg-elevated)" :class="version.current ? 'bg-inverted' : 'bg-accented'" />
+        <span class="mt-1.5 size-2.5 shrink-0 rounded-full ring-4 ring-(--ui-bg) group-hover:ring-(--ui-bg-elevated) group-aria-pressed:ring-(--ui-bg-elevated)" :class="version.current ? 'bg-inverted' : 'bg-accented'" />
         <span class="min-w-0 flex-1 space-y-0.5">
           <span class="flex items-center gap-2">
             <span class="font-mono text-xs text-muted">v{{ version.version }}</span>
