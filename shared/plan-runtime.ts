@@ -121,22 +121,33 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     return box;
   }
 
+  /**
+   * Whether an element still is what a comment from an earlier version pointed at. The selector is a position in the
+   * page, so it also matches whatever took that place; the label (tag and first words, or the image's alt) tells.
+   */
+  function sameAnchor(el, m) {
+    if (!m.label) return true;
+    return m.kind === "image" ? (el.getAttribute("alt") || "image") === m.label : labelOf(el) === m.label;
+  }
+
+  let lastUnplaced = null;
   function render() {
     marks.innerHTML = "";
-    const open = [], done = [], act = [];
+    const open = [], done = [], act = [], unplaced = [];
     for (const m of markers) {
       let x, y;
       if (m.kind === "image" || m.kind === "area") {
         // Placed from the anchor's current box, so areas and pins follow reflow.
         const el = query(m.selector);
-        if (!el) continue;
+        if (!el || (m.earlier && !sameAnchor(el, m))) { unplaced.push(m.id); continue; }
         resized.observe(el);
         const r = el.getBoundingClientRect();
         x = r.left + scrollX + (m.ox / 1000) * r.width; y = r.top + scrollY + (m.oy / 1000) * r.height;
         if (m.ow || m.oh) areaBox(marks, x, y, (m.ow / 1000) * r.width, (m.oh / 1000) * r.height, (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
       } else {
+        // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
         const range = m.quote ? findRange(m.selector, m.quote) : null;
-        if (!range) continue;
+        if (!range) { unplaced.push(m.id); continue; }
         (m.id === active ? act : m.resolved ? done : open).push(range);
         const rects = range.getClientRects(), last = rects[rects.length - 1];
         if (!last) continue;
@@ -167,6 +178,8 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
         setTimeout(() => { chip.querySelector("span").textContent = "Copy"; }, 1400);
       };
     });
+    // The viewer lists the comments it couldn't place; it only says so when that changes, since this runs on resize.
+    if (unplaced.join() !== lastUnplaced) { lastUnplaced = unplaced.join(); post({ type: "unplaced", ids: unplaced }); }
     if (highlights) {
       CSS.highlights.set("drop-open", new Highlight(...open));
       CSS.highlights.set("drop-done", new Highlight(...done));

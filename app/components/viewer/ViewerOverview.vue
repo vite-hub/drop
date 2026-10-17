@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how long it lives,
-// its history. Each row's action sits at its end.
+// Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how long it lives.
+// Each row's action sits at its end. Versions have their own tab (ViewerHistory).
 import { type DropDetail, VISIBILITY_ICONS } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
@@ -53,21 +53,6 @@ const access = computed(() => {
     </dl>
 
     <ViewerLifetime v-if="drop.isOwner" :drop="drop" />
-
-    <section v-if="drop.versions.length > 1">
-      <h3 class="label-mono">History</h3>
-      <ol class="mt-3 space-y-3">
-        <li v-for="(version, index) in drop.versions" :key="version.id" class="relative flex gap-3 text-[13px]">
-          <span v-if="index < drop.versions.length - 1" class="absolute top-4 left-[4.5px] h-[calc(100%+0.25rem)] w-px bg-(--ui-border)" />
-          <span class="mt-1.5 size-2.5 shrink-0 rounded-full" :class="version.current ? 'bg-inverted' : 'bg-accented'" />
-          <div class="min-w-0">
-            <p v-if="version.current" class="font-medium text-highlighted">v{{ version.version }} · This version</p>
-            <NuxtLink v-else class="block truncate hover:underline" :to="`/drops/${version.id}`">v{{ version.version }} · {{ version.title }}</NuxtLink>
-            <p class="text-xs text-muted"><TimeAgo :at="version.createdAt" /></p>
-          </div>
-        </li>
-      </ol>
-    </section>
 
     <section v-if="$slots.actions" class="-mx-2 border-t border-default pt-3">
       <slot name="actions" />

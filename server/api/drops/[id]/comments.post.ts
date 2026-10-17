@@ -1,10 +1,9 @@
-import { sql } from "drizzle-orm"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentSchema } from "#shared/schemas"
 import { comments } from "../../../databases/config"
-import { toComment } from "../../../utils/comments"
+import { nextCommentNumber, toComment } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -23,7 +22,7 @@ export default defineValidatedHandler({
     const [row] = await db.insert(comments).values({
       id: crypto.randomUUID(),
       dropId: drop.id,
-      n: sql`(SELECT coalesce(max(n), 0) + 1 FROM comments WHERE drop_id = ${drop.id})`,
+      n: nextCommentNumber(drop),
       ...body,
       quote: body.quote ?? null,
       label: body.label ?? null,
@@ -33,6 +32,6 @@ export default defineValidatedHandler({
       resolved: false,
       createdAt: Date.now(),
     }).returning()
-    return toComment(row!, who)
+    return toComment(row!, who, drop.version)
   },
 })

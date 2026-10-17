@@ -422,6 +422,11 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       throw error
     }
     if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text, previous)
+    // TODO(repo-mirror): also commit this version to a repo the owner picks, one commit per version with the note
+    // as its message. Drop stays the source of truth: versions keep living in Blob and the database on every host.
+    // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
+    // internal-only on vite-hub/vitehub's feat/forge-primitive branch today, and on a token that may write to the
+    // owner's repo (a GitHub App install, or a wider scope on GitHub sign-in).
     return row
   })
 }
@@ -433,6 +438,10 @@ function cleanPath(path: string) {
 }
 
 /**
+ * TODO(app-history): an app's next version replaces its files in place (same row, old blobs deleted), so apps have
+ * no History tab, nothing to compare, and their comments never go outdated. Keeping each version (a row per version
+ * like docs, or ViteHub Workspace history) would give them all three.
+ *
  * Creates an app drop, or publishes the next version of one you may edit. A next version starts from the previous
  * one's files: `files` adds or replaces paths, and a path leaves the app only when `removes` names it, so an agent
  * that sends just the files it changed can't delete the rest by accident.

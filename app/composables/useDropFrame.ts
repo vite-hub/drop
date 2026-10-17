@@ -7,6 +7,7 @@ export type FrameMessage =
   | { type: "image"; src: string; alt: string; selector: string; label: string; rect?: { left: number; top: number; right: number; bottom: number } }
   | { type: "area"; selector: string; label: string; ox: number; oy: number; ow: number; oh: number; rect: { left: number; top: number; right: number; bottom: number } }
   | { type: "marker"; id: string; clientX: number; clientY: number }
+  | { type: "unplaced"; ids: string[] }
   | { type: "key"; key: string }
   | { type: "host"; path: string }
   | { type: "location"; path: string }

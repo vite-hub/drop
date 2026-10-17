@@ -9,8 +9,8 @@ export const PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-pop
  */
 export const CONTENT_SANDBOX = `${PREVIEW_SANDBOX} allow-same-origin`
 
-/** Open comments as Markdown, ready to paste back to the agent. */
-export function feedbackMarkdown(title: string, url: string, comments: DropComment[]) {
+/** Open comments as Markdown, ready to paste back to the agent. `version` is the one being viewed. */
+export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
   const open = comments.filter(comment => !comment.resolved).sort((a, b) => a.n - b.n)
   const pct = (n: number) => `${(n / 10).toFixed(0)}%`
   const target = (comment: DropComment) => {
@@ -20,6 +20,6 @@ export function feedbackMarkdown(title: string, url: string, comments: DropComme
       ? `${what}, area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
       : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
   }
-  const lines = open.map(comment => `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName})`.replace(/^/, `${comment.n}. `))
+  const lines = open.map(comment => `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})`.replace(/^/, `${comment.n}. `))
   return `## Feedback on "${title}"\n\n${url}\n\n${lines.join("\n") || "No open comments."}\n\nDrop a new version that addresses these.`
 }

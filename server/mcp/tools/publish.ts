@@ -1,5 +1,5 @@
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
 import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
@@ -9,6 +9,7 @@ import { appLinkIssues } from "#shared/project-bundle"
 import { comments } from "../../databases/config"
 import { createDocDrop, findDrop, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "../../utils/drops"
 import { shareChange, updateDrop } from "../../utils/drop-update"
+import { chainOf } from "../../utils/expiry"
 import { requireIdentity } from "../../utils/identity"
 import { annotationIssues } from "../../utils/markdown-document"
 import { quotaToolResult } from "../../utils/quotas"
@@ -31,7 +32,7 @@ const Input = v.object({
   keepReason: v.optional(v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON), v.description("Why it should be kept, in a sentence or two (e.g. the pull request it belongs to). The owner sees it."))),
   share: v.optional(v.pipe(v.picklist(["private", "view", "comment", "edit"]), v.description("private (default for new drops), or what people it's shared with can do: view, comment, or edit (signed-in people only). Share when the user asked to, or when the drop is clearly meant for others, such as a PR asset."))),
   audience: v.optional(v.pipe(v.picklist(["team", "link"]), v.description("Who the share reaches: team (everyone signed in to this Drop, who find it under Shared with me) or link (anyone with the link, no sign-in). Defaults to the drop's current audience, or link."))),
-  resolves: v.optional(v.pipe(v.array(v.pipe(v.number(), v.integer())), v.maxLength(90), v.description("Numbers of the previous version's open comments this version addresses. They're marked resolved."))),
+  resolves: v.optional(v.pipe(v.array(v.pipe(v.number(), v.integer())), v.maxLength(90), v.description("Numbers of the open comments this version addresses, from read_drop on previous. Comments written on earlier versions count too. They're marked resolved."))),
 })
 
 export default defineMcpTool({
@@ -85,9 +86,11 @@ export default defineMcpTool({
 
     let resolved: number[] = []
     if (previous && input.resolves?.length) {
-      const open = await db.select({ n: comments.n }).from(comments).where(and(eq(comments.dropId, previous.id), inArray(comments.n, input.resolves), eq(comments.resolved, false)))
-      resolved = open.map(comment => comment.n)
-      if (resolved.length) await db.update(comments).set({ resolved: true }).where(and(eq(comments.dropId, previous.id), inArray(comments.n, resolved)))
+      // Comments carry over from earlier versions (listComments), so look across the whole chain.
+      const chain = sql`${comments.dropId} IN (${chainOf(previous)})`
+      const open = await db.select({ n: comments.n }).from(comments).where(and(chain, inArray(comments.n, input.resolves), eq(comments.resolved, false)))
+      resolved = [...new Set(open.map(comment => comment.n))].sort((a, b) => a - b)
+      if (resolved.length) await db.update(comments).set({ resolved: true }).where(and(chain, inArray(comments.n, resolved)))
     }
 
     const fresh = await findDrop(row.id, event) ?? row

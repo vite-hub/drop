@@ -94,6 +94,8 @@ export interface DropComment {
   authorName: string
   resolved: boolean
   createdAt: number
+  /** The version it was written on. Open comments carry over to later versions until someone resolves them. */
+  version: number
   mine: boolean
 }
 

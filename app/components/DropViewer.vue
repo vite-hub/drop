@@ -8,7 +8,7 @@ import { expiryLabel } from "#shared/expiry"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
-import { type DropComment, VISIBILITY_ICONS } from "#shared/types"
+import { type DropComment, type DropVersion, VISIBILITY_ICONS } from "#shared/types"
 import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
@@ -50,7 +50,7 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-const panel = useViewerPanel({ owner, openCount })
+const panel = useViewerPanel({ owner, openCount, versions: computed(() => drop.value.versions.length) })
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const { files, pages, page } = useAppFiles(drop)
 
@@ -128,6 +128,16 @@ const shareOpen = ref(false)
 
 const pageComments = computed(() => (isApp.value ? comments.value.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : comments.value))
 
+// Open comments carry over from earlier versions (server/utils/comments.ts). One is outdated when this version no
+// longer has what it pointed at: the frame couldn't find its text or element (it says which), or the drop is an image,
+// where every version is a new picture.
+// TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
+// outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
+const unplaced = ref(new Set<string>())
+const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
+const outdated = computed(() => new Set(comments.value.filter(comment => comment.version < drop.value.version && (replaced(comment) || unplaced.value.has(comment.id))).map(comment => comment.id)))
+const compareWith = ref<DropVersion | null>(null)
+
 // What the page reports going wrong goes to the server in batches, for the agent's read_drop. Only apps and HTML pages
 // run their own code; a Markdown doc's errors would be Drop's.
 type RuntimeReport = { kind: string; message: string; source?: string; page?: string }
@@ -176,6 +186,7 @@ const { ready, send } = useDropFrame(frame, contentOrigin, (frameMessage, rect) 
       popover.value = { type: "new", pending: { kind: "area", selector, label, ox, oy, ow, oh }, x: rect.left + message.rect.left, y: rect.top + message.rect.bottom }
     }
   }
+  if (message.type === "unplaced") unplaced.value = new Set(message.ids)
   if (message.type === "marker") popover.value = { type: "thread", id: message.id, x: rect.left + message.clientX, y: rect.top + message.clientY }
   if (message.type === "key" && message.key === "Escape") {
     popover.value = selection.value = null
@@ -190,11 +201,14 @@ watch(srcdoc, (value) => {
   if (contentOrigin.value) reloadFrame()
 })
 watch([ready, pageComments], () => {
-  if (ready.value) send({ type: "markers", markers: pageComments.value.map(({ id, n, kind, selector, ox, oy, ow, oh, quote, resolved }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, resolved })) })
+  // `earlier`: the frame also checks that the element is still what the comment pointed at, not just in its place.
+  if (ready.value) send({ type: "markers", markers: pageComments.value.filter(comment => !replaced(comment)).map(({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, earlier: version < drop.value.version })) })
 })
 
 /** Area mode: the frame lays a crosshair over the page, and the next rectangle drawn there becomes a comment. */
 const areaMode = ref(false)
+// TODO(file-comments): files without a preview (PDFs, zips) have nothing to anchor a comment to, so they take none yet.
+// Comments on the file as a whole would close that gap.
 const canDrawArea = computed(() => drop.value.canComment && !editing.value && !lightbox.value && drop.value.kind !== "file")
 function toggleArea() {
   if (!canDrawArea.value) return
@@ -219,7 +233,7 @@ defineShortcuts({
   },
 })
 
-const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value), "Feedback copied as Markdown")
+const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), "Feedback copied as Markdown")
 function copyLink() {
   if (drop.value.visibility !== "private") void copy(link.value, "Link copied")
   else shareOpen.value = true
@@ -274,7 +288,7 @@ async function deleteDrop() {
 }
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
-const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector) : []))
+const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id)) : []))
 function pickImage(area: Area, x: number, y: number) {
   if (!lightbox.value) return
   popover.value = { type: "new", pending: { kind: "image", selector: lightbox.value.selector, ...area, label: lightbox.value.alt || "image" }, x, y }
@@ -297,7 +311,18 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
       </div>
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto">
-      <ViewerComments v-if="tab === 'comments'" :can-comment="drop.canComment" :can-manage="drop.isOwner" :comments="comments" @focus="focusComment" @resolve="resolve" />
+      <ViewerComments
+        v-if="tab === 'comments'"
+        :can-comment="drop.canComment"
+        :can-manage="drop.isOwner"
+        :comments="comments"
+        :outdated="outdated"
+        :version="drop.version"
+        :versions="drop.versions"
+        @focus="focusComment"
+        @resolve="resolve"
+      />
+      <ViewerHistory v-else-if="tab === 'history'" :comments="comments" :drop="drop" @compare="version => (compareWith = version)" />
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
@@ -337,7 +362,10 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UTooltip v-if="drop.canEdit || drop.editNote" :kbds="drop.canEdit ? ['E'] : undefined" :text="drop.editNote ?? 'Edit together'">
             <UButton aria-label="Edit together" color="neutral" :disabled="!drop.canEdit" icon="i-lucide-pencil" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
           </UTooltip>
-          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote" class="mx-1 h-4" orientation="vertical" />
+          <UTooltip v-if="drop.versions.length > 1" text="History">
+            <UButton aria-label="History" :aria-pressed="panelOpen && tab === 'history'" color="neutral" icon="i-lucide-history" size="sm" :variant="panelOpen && tab === 'history' ? 'soft' : 'ghost'" @click="panel.show('history')" />
+          </UTooltip>
+          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || drop.versions.length > 1" class="mx-1 h-4" orientation="vertical" />
           <UButton v-if="publicView" :to="{ path: '/report', query: { target: `/d/${drop.id}` } }" color="neutral" label="Report" size="sm" variant="ghost" />
           <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'team' ? 'Team' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="publicView" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
@@ -439,4 +467,5 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
   />
 
   <ViewerShareModal v-if="owner" v-model:open="shareOpen" :drop="drop" />
+  <ViewerDiff v-if="compareWith" :drop="drop" :open="true" :other="compareWith" @update:open="open => !open && (compareWith = null)" />
 </template>

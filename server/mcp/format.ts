@@ -41,5 +41,6 @@ export function commentTarget(comment: Pick<DropComment, "kind" | "quote" | "lab
   return `[${where} of ${comment.label ?? (comment.kind === "image" ? "an image" : "an element")}]`
 }
 
-export const commentLine = (comment: DropComment) =>
-  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""})`
+/** `version` is the one being read: a comment written on an earlier version says which. */
+export const commentLine = (comment: DropComment, version: number) =>
+  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})`
