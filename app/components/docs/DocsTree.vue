@@ -6,7 +6,7 @@ const active = (to: string) => isActivePath(route.path, to)
 const open = ref<Record<string, boolean>>({})
 const expanded = (group: (typeof DOCS_NAV)[number]) => open.value[group.title] ?? group.links.some(link => active(link.to))
 
-const row = "flex min-w-0 items-center gap-2 rounded-md py-1 text-[13px] transition-colors"
+const row = "flex h-7 min-w-0 items-center gap-2 rounded-md text-sm transition-colors"
 const idle = "text-muted hover:bg-elevated hover:text-highlighted"
 </script>
 
@@ -22,7 +22,7 @@ const idle = "text-muted hover:bg-elevated hover:text-highlighted"
         <span class="flex-1 truncate text-left">{{ group.title }}</span>
         <UIcon name="i-ph-caret-right" class="size-3.5 shrink-0 text-dimmed transition-transform duration-150" :class="expanded(group) && 'rotate-90'" />
       </button>
-      <ul v-if="expanded(group)" class="ml-4 flex flex-col gap-px border-l border-default py-0.5 pl-1">
+      <ul v-if="expanded(group)" class="ml-3.5 flex flex-col gap-px border-l border-default py-0.5 pl-2">
         <li v-for="link in group.links" :key="link.to">
           <NuxtLink
             :aria-current="active(link.to) ? 'page' : undefined"
@@ -30,7 +30,7 @@ const idle = "text-muted hover:bg-elevated hover:text-highlighted"
             :to="link.to"
             @click="emit('navigate')"
           >
-            <UIcon v-if="link.icon" :name="link.icon" class="size-3.5 shrink-0 text-dimmed" />
+            <UIcon v-if="link.icon" :name="link.icon" class="size-4 shrink-0 text-dimmed" />
             <span class="truncate">{{ link.label }}</span>
           </NuxtLink>
         </li>

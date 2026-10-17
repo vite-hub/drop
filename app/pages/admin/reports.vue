@@ -13,7 +13,7 @@ async function act(id: string, action: "dismiss" | "quarantine" | "ban") {
 </script>
 <template>
   <PageShell id="reports" title="Reports" description="Quarantine stops serving a drop, including its older versions. Ban stops all the owner's drops.">
-    <UButton class="mb-5" to="/admin/review" label="Review shares" color="neutral" variant="outline" />
+    <template #actions><UButton to="/admin/review" label="Review Shares" color="neutral" size="sm" variant="ghost" /></template>
     <p v-if="error" role="alert">Only admins can read reports.</p>
     <p v-else-if="!data?.length" role="status" class="text-muted">No reports.</p>
     <div v-for="report in data" :key="report.id" class="mb-4 space-y-3 rounded-lg border border-default p-4">

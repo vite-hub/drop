@@ -84,7 +84,7 @@ async function onPick(file: File) {
 <template>
   <PageShell id="drops" title="Drops" description="Docs and apps you and your agents dropped. Private until you share them.">
     <template #actions>
-      <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" variant="outline" @click="picker.open()" />
+      <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
     </template>
 
     <div v-if="usage && limited" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default px-4 py-3" aria-live="polite">

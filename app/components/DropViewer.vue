@@ -349,7 +349,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
       <UDashboardNavbar :toggle="!publicView" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
           <NuxtLink v-if="publicView" aria-label="Drop" class="grid size-8 place-items-center" to="/"><DropMark class="h-4 w-6" /></NuxtLink>
-          <UButton v-else aria-label="Back to drops" color="neutral" icon="i-ph-arrow-left" variant="ghost" to="/drops" />
+          <UButton v-else aria-label="Back to drops" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" to="/drops" />
         </template>
         <template #title>
           <span class="flex min-w-0 items-center gap-2">
@@ -428,7 +428,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <!-- As tall as its content, so a quiet drop gets a small card. Markdown docs make room for it (FLOATING_INSET). -->
         <aside
           v-if="floating"
-          class="absolute top-3 right-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[22.5rem] origin-top-right flex-col overflow-hidden rounded-xl border border-default bg-default shadow-lg shadow-black/5 [animation:pop-in_160ms_var(--ease-out)]"
+          class="absolute top-3 right-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[22.5rem] origin-top-right flex-col overflow-hidden rounded-lg border border-default bg-default shadow-md [animation:pop-in_160ms_var(--ease-out)]"
         >
           <ReuseSide />
         </aside>

@@ -13,7 +13,7 @@ async function review(id: string, action: "approve" | "reject") {
 </script>
 <template>
   <PageShell id="review" title="Review" description="Approve a member's pending shares and future public shares.">
-    <div class="mb-5 flex gap-3"><UButton to="/members" label="Members" color="neutral" variant="outline" /><UButton to="/admin/reports" label="Reports" color="neutral" variant="outline" /></div>
+    <template #actions><UButton to="/members" label="Members" color="neutral" size="sm" variant="ghost" /><UButton to="/admin/reports" label="Reports" color="neutral" size="sm" variant="ghost" /></template>
     <p v-if="error" role="alert">Only admins can review shares.</p>
     <p v-else-if="!data?.length" role="status" class="text-muted">No shares waiting for review.</p>
     <div v-for="member in data" :key="member.id" class="mb-4 space-y-3 rounded-lg border border-default p-4">

@@ -1,24 +1,23 @@
 <script setup lang="ts">
-// Executor's PageContainer + PageHeader: a max-w-4xl column, a 2rem regular-weight title, actions on the right.
+// shadcn's SiteHeader over a page: an h-12 bar with the sidebar toggle (below lg), the page title and its actions,
+// then the page in a max-w-5xl column with p-4 lg:p-6, its description first.
 withDefaults(defineProps<{ id: string; title: string; description?: string; wide?: boolean }>(), { description: undefined, wide: false })
 </script>
 
 <template>
   <UDashboardPanel :id="id" :ui="{ body: 'p-0 sm:p-0 gap-0' }">
     <template #header>
-      <UDashboardNavbar :title="title" class="lg:hidden" />
+      <UDashboardNavbar :ui="{ root: 'h-12 gap-2 px-4 lg:px-6', title: 'text-sm font-medium' }" :title="title">
+        <template v-if="$slots.actions" #right>
+          <slot name="actions" />
+        </template>
+      </UDashboardNavbar>
     </template>
     <template #body>
-      <div class="mx-auto w-full px-6 py-10 lg:px-8 lg:py-14" :class="wide ? 'max-w-5xl' : 'max-w-4xl'">
-        <div class="mb-10 flex flex-wrap items-start justify-between gap-4">
-          <div class="min-w-0">
-            <h1 class="text-[2rem] leading-none font-normal tracking-tight text-highlighted">{{ title }}</h1>
-            <p v-if="description || $slots.description" class="mt-2 max-w-2xl text-sm text-muted">
-              <slot name="description">{{ description }}</slot>
-            </p>
-          </div>
-          <div v-if="$slots.actions" class="flex items-center gap-2"><slot name="actions" /></div>
-        </div>
+      <div class="mx-auto w-full p-4 lg:p-6" :class="wide ? 'max-w-6xl' : 'max-w-5xl'">
+        <p v-if="description || $slots.description" class="mb-6 max-w-2xl text-sm text-muted">
+          <slot name="description">{{ description }}</slot>
+        </p>
         <slot />
       </div>
     </template>
