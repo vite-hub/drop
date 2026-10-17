@@ -2,7 +2,7 @@
 // Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how long it lives.
 // Each row's action sits at its end. Versions have their own tab (ViewerHistory).
 import { expiryLabel } from "#shared/expiry"
-import { type DropDetail, VISIBILITY_ICONS } from "#shared/types"
+import { ACCESS_LABELS, type DropDetail, VISIBILITY_ICONS, VISIBILITY_LABELS } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
 const emit = defineEmits<{ share: [] }>()
@@ -18,9 +18,9 @@ const type = computed(() => [
 const access = computed(() => {
   if (props.drop.shareReview === "pending") return "Waiting for review"
   if (props.drop.shareReview === "rejected") return "Share rejected"
-  if (props.drop.visibility === "private") return "Only you"
-  const who = props.drop.visibility === "team" ? "Your team" : "Anyone"
-  return `${who} can ${props.drop.access}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`
+  // The level's own name, as on rows and in the share dialog: "Team · Can comment".
+  if (props.drop.visibility === "private") return VISIBILITY_LABELS.private
+  return `${VISIBILITY_LABELS[props.drop.visibility]} · ${ACCESS_LABELS[props.drop.access]}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`
 })
 const folder = computed(() => props.drop.ancestors.map(crumb => crumb.title).join(" / "))
 </script>

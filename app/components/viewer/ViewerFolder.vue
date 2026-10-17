@@ -36,9 +36,10 @@ async function newSite() {
 <template>
   <div class="min-h-0 flex-1 overflow-y-auto">
     <div class="mx-auto w-full max-w-5xl p-4 sm:p-6">
-      <UInput v-if="me" v-model="search" aria-label="Search this folder" class="mb-4 w-full sm:w-72" icon="i-ph-magnifying-glass" placeholder="Search this folder" />
-      <div class="mb-4 flex h-8 items-center justify-between gap-3">
-        <p class="label-mono">{{ itemCount(children.length) }}</p>
+      <!-- Search and the folder's actions share one bar; visitors, who can't search, see how much it holds instead. -->
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <UInput v-if="me && children.length" v-model="search" aria-label="Search this folder" class="w-full sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1" icon="i-ph-magnifying-glass" :placeholder="`Search ${itemCount(children.length)}`" />
+        <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
         <div v-if="drop.isOwner && !drop.trashedAt" class="flex items-center gap-1">
           <!-- Like the Drops page: on a phone the ghost buttons keep only their icon. -->
           <UButton aria-label="New Folder" color="neutral" icon="i-ph-folder-simple-plus" size="sm" variant="ghost" @click="newFolder"><span class="max-sm:hidden">New Folder</span></UButton>
