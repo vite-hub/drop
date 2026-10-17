@@ -1,16 +1,11 @@
 <script setup lang="ts">
 // Self-hosting, the ViteHub way: one config, your provider, your data.
-const POINTS = [
-  "GitHub sign-in by default. It's Better Auth underneath, so you can switch to Google, GitLab, email, or SSO",
-  "On Cloudflare, the database and file storage are created on deploy",
-  "MCP server with browser sign-in for your agents",
-]
 const CONFIG_FILE = "nuxt.config.ts"
 const CONFIG = `export default defineNuxtConfig({
   modules: ["@nuxt/ui", "vite-hub/nuxt"],
   vitehub: {
     preset: "cloudflare",
-    auth: true,      // Better Auth, GitHub by default
+    auth: true,      // Better Auth
     database: true,  // drops, comments, members
     blob: true,      // files and app bundles
   },
@@ -25,13 +20,15 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
         <p class="label-mono flex items-center gap-2"><ViteHubMark class="size-3" />Built on ViteHub</p>
         <h2 class="mt-3 text-[2rem] leading-tight font-semibold tracking-tight text-highlighted">You own it.</h2>
         <p class="mt-3 max-w-[44ch] leading-relaxed text-muted">
-          Drop is a ViteHub template. Fork it, deploy it to your own account, and every drop and comment stays in your account.
+          Fork Drop and deploy it to your own account. Every drop and comment stays there.
         </p>
-        <ul class="mt-6 space-y-2.5 text-sm">
-          <li v-for="point in POINTS" :key="point" class="flex gap-2.5">
-            <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ point }}
-          </li>
-        </ul>
+        <div class="mt-6 flex max-w-[46ch] gap-3 text-sm">
+          <UIcon name="i-simple-icons-betterauth" class="mt-0.5 size-4 shrink-0 text-highlighted" />
+          <p class="text-toned">
+            Sign-in runs on Better Auth. GitHub is on by default; switch to Google, GitLab, email, or SSO in
+            <code class="font-mono text-[13px] text-highlighted">server/auth.ts</code>.
+          </p>
+        </div>
         <p class="label-mono mt-8 mb-3">Deploys to</p>
         <ul class="flex flex-wrap gap-1.5">
           <li v-for="host in HOSTS" :key="host.id">
@@ -40,7 +37,6 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
             </NuxtLink>
           </li>
         </ul>
-        <p class="mt-2.5 text-xs text-dimmed">Live editing runs on Cloudflare and on your own server.</p>
         <div class="mt-8 flex flex-wrap gap-2">
           <UButton color="neutral" variant="outline" icon="i-simple-icons-github" label="Fork on GitHub" to="https://github.com/vite-hub/drop" target="_blank" />
           <UButton color="neutral" variant="ghost" label="Self-hosting guide" to="/docs/self-host" />
