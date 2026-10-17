@@ -3,12 +3,13 @@ import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } fro
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
- * file) stored as one blob, or an app stored as a folder of blobs in `drop_files`.
+ * file) stored as one blob, an app stored as a folder of blobs in `drop_files`, a folder of other drops, or a site:
+ * a live website people review in place, whose comments arrive with screenshots.
  */
 export const drops = sqliteTable("drops", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id").notNull(),
-  kind: text("kind", { enum: ["markdown", "html", "image", "file", "app"] }).notNull(),
+  kind: text("kind", { enum: ["markdown", "html", "image", "file", "app", "folder", "site"] }).notNull(),
   title: text("title").notNull(),
   filename: text("filename").notNull(),
   /** Blob key for docs (`<uuid>.<ext>`, served at `/f/<key>`). Null for apps. */
@@ -46,6 +47,8 @@ export const drops = sqliteTable("drops", {
   trashReason: text("trash_reason", { enum: ["deleted", "expired"] }),
   /** The doc an image belongs to. Attachments share the doc's sharing, lifetime, and Trash, and don't count as drops. */
   parentId: text("parent_id"),
+  /** Sites only: the origin of the website under review, the only one its review script may post from. */
+  siteUrl: text("site_url"),
   /** CAS token used while replacing an app's file set. */
   publishToken: text("publish_token"),
 }, table => [

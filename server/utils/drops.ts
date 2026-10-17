@@ -435,6 +435,7 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       shareReview: (input.visibility ?? previous?.visibility ?? "private") !== "private" ? await shareReviewFor(previous?.ownerId ?? who.userId, event) : null,
       quarantinedAt: null,
       publishToken: null,
+      siteUrl: null,
     }
     try {
       // A new version is a visit: the older versions restart their window with it, and take its lifetime.
@@ -533,7 +534,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
         shareReview, quarantinedAt: row?.quarantinedAt ?? null,
         visibility, access: input.access ?? (row?.access as Access | undefined) ?? "comment",
         actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
-        lastAccessedAt: now, ...life, note, trashedAt: null, trashReason: null, parentId: null,
+        lastAccessedAt: now, ...life, note, trashedAt: null, trashReason: null, parentId: null, siteUrl: null,
       }
       const fileRows = [
         ...kept.map(file => ({ dropId: id, path: file.path, blobKey: file.blobKey, size: file.size })),

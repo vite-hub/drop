@@ -78,7 +78,8 @@ CREATE TABLE `drops` (
 	`trash_reason` text,
 	`parent_id` text,
 	`link` text,
-	`slug` text
+	`slug` text,
+	`site_url` text
 );
 --> statement-breakpoint
 CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);

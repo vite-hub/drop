@@ -2,7 +2,7 @@
 import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
 
-export type DropKind = "markdown" | "html" | "image" | "file" | "app"
+export type DropKind = "markdown" | "html" | "image" | "file" | "app" | "folder" | "site"
 /** `team`: everyone signed in to this Drop. `shared`: anyone with the link, signed in or not. */
 export type Visibility = "private" | "team" | "shared"
 export type Access = "view" | "comment" | "edit"
