@@ -95,6 +95,8 @@ const menu = computed(() => [
         <template v-else-if="drop.kind === 'site'">{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
         <template v-else><span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
       </p>
+      <!-- A search that matched the doc's text, not its name: the words around the match. -->
+      <p v-if="drop.snippet" class="mt-1 line-clamp-2 text-sm text-muted">{{ drop.snippet }}</p>
     </div>
     <div class="hidden min-w-0 md:block">
       <span v-if="drop.owner" class="flex min-w-0 items-center gap-1.5 text-sm text-highlighted" :title="drop.owner.name">
