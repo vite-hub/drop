@@ -2,12 +2,16 @@
 import { type DropSummary, type Visibility, VISIBILITY_ICONS } from "#shared/types"
 import { dropPath } from "#shared/links"
 
-const props = defineProps<{ drop: DropSummary }>()
-const emit = defineEmits<{ delete: []; restore: []; deleteForever: [] }>()
+// A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`).
+const props = withDefaults(defineProps<{ drop: DropSummary; depth?: number; open?: boolean }>(), { depth: 0, open: false })
+const emit = defineEmits<{ delete: []; restore: []; deleteForever: []; toggle: [] }>()
+const INDENT = ["pl-4", "pl-10", "pl-16", "pl-22", "pl-28", "pl-34", "pl-40", "pl-46"]
 const trashed = computed(() => props.drop.trashedAt !== null)
 const notify = useNotify()
 const { copy } = useCopy()
 const { setVisibility } = useDropActions()
+const moveTo = useMoveDialog()
+const folder = computed(() => props.drop.kind === "folder")
 const shared = computed(() => props.drop.visibility !== "private")
 // Someone else's drop, in Shared with me: open it and copy its link, nothing else.
 const theirs = computed(() => Boolean(props.drop.owner))
@@ -16,7 +20,11 @@ const audiences = (Object.keys(AUDIENCES) as Visibility[]).map(value => ({ value
 const status = computed(() => props.drop.quarantinedAt ? "Quarantined" : props.drop.shareReview === "pending" ? "Pending review" : props.drop.shareReview === "rejected" ? "Rejected" : AUDIENCES[props.drop.visibility])
 
 const link = useShareUrl(() => props.drop)
-const detail = computed(() => props.drop.kind === "app" && props.drop.paths ? `${props.drop.filename} · ${props.drop.paths.length} files` : props.drop.filename)
+const detail = computed(() => {
+  const where = props.drop.path?.length ? ` · in ${props.drop.path.map(crumb => crumb.title).join(" / ")}` : ""
+  if (folder.value) return `${itemCount(props.drop.items ?? 0)}${where}`
+  return `${props.drop.kind === "app" && props.drop.paths ? `${props.drop.filename} · ${props.drop.paths.length} files` : props.drop.filename}${where}`
+})
 
 const SHARED_NOTES: Record<Visibility, string> = { private: "Only you can open it.", team: "Everyone in your team can open it.", shared: "Anyone with the link can open it." }
 async function setAudience(next: Visibility) {
@@ -40,23 +48,37 @@ const menu = computed(() => [
     { label: "Open Public Page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
     { label: "Copy Link", icon: "i-ph-link", onSelect: copyLink },
   ],
-  ...(theirs.value ? [] : [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]]),
+  ...(theirs.value ? [] : [[
+    { label: "Move to Folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: props.drop }) },
+    { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") },
+  ]]),
 ])
 </script>
 
 <template>
-  <li class="group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-3 transition-colors hover:bg-muted md:grid-cols-[auto_minmax(0,1fr)_8.5rem_6.5rem_auto]">
-    <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default">
-      <UIcon :name="KIND_ICONS[drop.kind]!" class="size-[18px]" />
+  <li class="group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 py-3 pr-4 transition-colors hover:bg-muted md:grid-cols-[auto_minmax(0,1fr)_8.5rem_6.5rem_auto]" :class="INDENT[Math.min(depth, INDENT.length - 1)]">
+    <button
+      v-if="folder && drop.items && !trashed"
+      :aria-expanded="open"
+      :aria-label="`${open ? 'Collapse' : 'Expand'} ${drop.title}`"
+      class="relative z-10 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default transition-colors hover:text-highlighted"
+      type="button"
+      @click="emit('toggle')"
+    >
+      <UIcon :name="open ? 'i-ph-folder-open' : 'i-ph-folder'" class="size-[18px]" />
+    </button>
+    <span v-else class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default">
+      <UIcon :name="KIND_ICONS[drop.kind] ?? 'i-ph-file'" class="size-[18px]" />
     </span>
     <div class="min-w-0">
       <NuxtLink class="flex min-w-0 items-center gap-2 after:absolute after:inset-0" :to="`/drops/${drop.id}`">
         <span class="truncate font-medium text-highlighted">{{ drop.title }}</span>
         <UBadge v-if="drop.version > 1" class="hidden sm:inline-flex" color="neutral" icon="i-ph-clock-counter-clockwise" :label="`v${drop.version}`" size="sm" variant="outline" />
-        <ExpiryBadge class="shrink-0" :drop="drop" />
+        <ExpiryBadge v-if="!drop.parentId" class="shrink-0" :drop="drop" />
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
-        <span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span>
+        <template v-if="folder">{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
+        <template v-else><span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
       </p>
     </div>
     <div class="hidden min-w-0 md:block">
@@ -73,6 +95,10 @@ const menu = computed(() => [
     <span v-if="trashed" class="hidden text-sm text-muted md:block">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
     <span v-else-if="theirs" class="hidden items-center gap-1.5 text-sm text-muted md:flex">
       <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3.5" />{{ status }}
+    </span>
+    <!-- Shared through a folder above: the folder's share is changed there, this drop's own on its page. -->
+    <span v-else-if="drop.sharedFrom" class="hidden min-w-0 items-center gap-1.5 text-sm text-muted md:flex" :title="`Shared through ${drop.sharedFrom.title}`">
+      <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3.5 shrink-0" /><span class="truncate">Via {{ drop.sharedFrom.title }}</span>
     </span>
     <USelect
       v-else

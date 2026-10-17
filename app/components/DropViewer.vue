@@ -97,6 +97,7 @@ const attached = useAttachmentData(drop)
 
 const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value)
 const srcdoc = computed(() => {
+  if (drop.value.kind === "folder") return ""
   if (isApp.value) return appDocument(page.value)
   if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value) : ""
   if (!attached.ready.value) return ""
@@ -233,7 +234,7 @@ watch([ready, pageComments], () => {
 const areaMode = ref(false)
 // TODO(file-comments): files without a preview (PDFs, zips) have nothing to anchor a comment to, so they take none yet.
 // Comments on the file as a whole would close that gap.
-const canDrawArea = computed(() => drop.value.canComment && !editing.value && !lightbox.value && drop.value.kind !== "file")
+const canDrawArea = computed(() => drop.value.canComment && !editing.value && !lightbox.value && drop.value.kind !== "file" && drop.value.kind !== "folder")
 function toggleArea() {
   if (!canDrawArea.value) return
   popover.value = selection.value = null
@@ -312,6 +313,10 @@ async function deleteDrop() {
   if (await remove(drop.value)) await navigateTo("/drops")
 }
 
+// The folders above, as breadcrumbs: in the app for people signed in, at their share links on a public page.
+const moveTo = useMoveDialog()
+const crumbTo = (crumb: { id: string; link: string; slug: string }) => (props.publicView ? dropPath(crumb) : `/drops/${crumb.id}`)
+
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
 const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id)) : []))
 function pickImage(area: Area, x: number, y: number) {
@@ -353,6 +358,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         <template #actions>
           <ViewerAction icon="i-ph-link" label="Copy link" @click="copyLink" />
           <ViewerAction v-if="drop.url" icon="i-ph-download-simple" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
+          <ViewerAction v-if="owner && !trashed" icon="i-ph-folder-simple-plus" label="Move to folder" @click="moveTo({ drop })" />
           <ViewerAction destructive icon="i-ph-trash" label="Move to Trash" @click="deleteDrop" />
         </template>
       </ViewerOverview>
@@ -364,10 +370,17 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
       <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
           <NuxtLink v-if="visitor" aria-label="Drop" class="grid size-8 place-items-center" to="/"><DropMark class="h-4 w-6" /></NuxtLink>
+          <UButton v-else-if="drop.ancestors.length" :aria-label="`Back to ${drop.ancestors.at(-1)!.title}`" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" :to="crumbTo(drop.ancestors.at(-1)!)" />
           <UButton v-else aria-label="Back to drops" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" to="/drops" />
         </template>
         <template #title>
           <span class="flex min-w-0 items-center gap-2">
+            <nav v-if="drop.ancestors.length" aria-label="Folders" class="hidden min-w-0 shrink items-center gap-1 text-sm text-muted sm:flex">
+              <template v-for="crumb in drop.ancestors" :key="crumb.id">
+                <NuxtLink class="max-w-40 truncate transition-colors hover:text-highlighted" :to="crumbTo(crumb)">{{ crumb.title }}</NuxtLink>
+                <UIcon name="i-ph-caret-right" class="size-3 shrink-0 text-dimmed" />
+              </template>
+            </nav>
             <span class="truncate text-sm font-medium">{{ drop.title }}</span>
             <ConnectionStatus v-if="editing" class="label-mono shrink-0 data-[status=reconnecting]:text-error" :status="live.status.value">
               <ConnectionStatusLabel v-slot="{ state }">{{ liveLabel(state) }}</ConnectionStatusLabel>
@@ -455,6 +468,8 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 
       <div class="relative flex min-h-0 flex-1 flex-col">
         <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
+        <!-- The grid keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
+        <ViewerFolder v-else-if="drop.kind === 'folder'" :class="floating && 'pr-96'" :drop="drop" :public-view="publicView" />
         <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
           <div>
             <UIcon name="i-ph-file" class="size-8 text-dimmed" />

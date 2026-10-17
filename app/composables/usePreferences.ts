@@ -12,8 +12,11 @@ export function useSidePanel() {
   return { open, tab }
 }
 
-/** Which app folders are expanded in the sidebar tree. Shared state, so it survives navigation. */
+/** Which folders and apps are expanded in the sidebar tree. Shared state, so it survives navigation. */
 export const useTreeOpen = () => useState<Record<string, boolean>>("drop-tree-open", () => ({}))
+
+/** Which folders are expanded on the Drops page, at every level. */
+export const useRowsOpen = () => useState<Record<string, boolean>>("drop-rows-open", () => ({}))
 
 // One timer for every relative time on the page, alive while any of them is mounted. It catches up first, since
 // `now` may have sat still while nothing showed a time.

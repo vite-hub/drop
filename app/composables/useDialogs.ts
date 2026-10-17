@@ -1,5 +1,5 @@
 import type { Component } from "vue"
-import { ConfirmModal, PromptModal } from "#components"
+import { ConfirmModal, MoveModal, PromptModal } from "#components"
 
 function useDialog<T extends Component>(component: T) {
   const overlay = useOverlay()
@@ -25,4 +25,10 @@ export function useConfirm() {
 export function usePrompt() {
   const open = useDialog(PromptModal)
   return async (props: Parameters<typeof open>[0]) => await open(props) ?? null
+}
+
+/** `await moveTo({ drop })`: pick a folder for the drop, or the top. Resolves true once it moved. */
+export function useMoveDialog() {
+  const open = useDialog(MoveModal)
+  return async (props: Parameters<typeof open>[0]) => Boolean(await open(props))
 }

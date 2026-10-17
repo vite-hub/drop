@@ -1,22 +1,26 @@
 <script setup lang="ts">
 // Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how long it lives.
 // Each row's action sits at its end. Versions have their own tab (ViewerHistory).
+import { expiryLabel } from "#shared/expiry"
 import { type DropDetail, VISIBILITY_ICONS } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
 const emit = defineEmits<{ share: [] }>()
+const { data: me } = useMe()
+const now = useRelativeNow()
 const type = computed(() => [
   KIND_LABELS[props.drop.kind] ?? "File",
   ...(props.drop.kind === "app" ? [`${props.drop.paths?.length ?? 0} files`] : []),
-  formatBytes(props.drop.size),
+  props.drop.kind === "folder" ? itemCount(props.drop.items ?? 0) : formatBytes(props.drop.size),
 ].join(" · "))
 const access = computed(() => {
   if (props.drop.shareReview === "pending") return "Waiting for review"
   if (props.drop.shareReview === "rejected") return "Share rejected"
   if (props.drop.visibility === "private") return "Only you"
   const who = props.drop.visibility === "team" ? "Your team" : "Anyone"
-  return `${who} can ${props.drop.access}`
+  return `${who} can ${props.drop.access}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`
 })
+const folder = computed(() => props.drop.ancestors.map(crumb => crumb.title).join(" / "))
 </script>
 
 <template>
@@ -42,6 +46,10 @@ const access = computed(() => {
         <dt class="w-20 shrink-0 text-muted">Type</dt>
         <dd class="text-highlighted tabular-nums">{{ type }}</dd>
       </div>
+      <div v-if="folder" class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Folder</dt>
+        <dd class="min-w-0 truncate text-highlighted" :title="folder">{{ folder }}</dd>
+      </div>
       <div v-if="drop.isOwner" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Access</dt>
         <dd class="flex min-w-0 flex-1 items-center gap-1.5 text-highlighted">
@@ -52,7 +60,14 @@ const access = computed(() => {
       </div>
     </dl>
 
-    <ViewerLifetime v-if="drop.isOwner" :drop="drop" />
+    <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
+    <ViewerLifetime v-if="drop.isOwner && !drop.parentId" :drop="drop" />
+    <dl v-else-if="drop.isOwner && drop.ancestors.length && me?.expiry.days" class="text-sm">
+      <div class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Lifetime</dt>
+        <dd class="min-w-0 truncate text-highlighted tabular-nums">{{ expiryLabel(drop, now) }}, with {{ drop.ancestors[0]!.title }}</dd>
+      </div>
+    </dl>
 
     <section v-if="$slots.actions" class="-mx-2 border-t border-default pt-3">
       <slot name="actions" />

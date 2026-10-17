@@ -7,7 +7,9 @@ definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
 const { data: drops, status, error, refresh } = useDrops()
-const { upload, remove, restore, deleteForever, emptyTrash } = useDropActions()
+const { upload, remove, restore, deleteForever, emptyTrash, createFolder } = useDropActions()
+const prompt = usePrompt()
+const open = useRowsOpen()
 const { data: trash } = useApi("/api/drops", { key: "trash", query: { trash: 1 }, default: () => [] })
 const { data: withMe } = useSharedWithMe()
 const { data: usage } = useApi("/api/usage", { key: "usage" })
@@ -37,13 +39,18 @@ const counts = computed(() => ({
   trash: trash.value.length,
 }))
 
+// Your own drops search on the server, inside every folder; the Trash and Shared with me filter what they list.
+const query = refDebounced(computed(() => search.value.trim()), 200)
+const deep = computed(() => Boolean(query.value) && filter.value !== "trash" && filter.value !== "with-me")
+const { data: found, status: searching } = useApi<DropSummary[]>("/api/drops", { key: "drop-search", query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
+
 const visible = computed(() => {
-  const query = search.value.trim().toLowerCase()
-  const list = filter.value === "trash" ? trash.value : filter.value === "with-me" ? withMe.value : drops.value
+  const words = search.value.trim().toLowerCase()
+  const list = deep.value ? found.value : filter.value === "trash" ? trash.value : filter.value === "with-me" ? withMe.value : drops.value
   return list
     .filter(drop => filter.value !== "private" || drop.visibility === "private")
     .filter(drop => filter.value !== "shared" || drop.visibility !== "private")
-    .filter(drop => !query || `${drop.title} ${drop.filename} ${drop.actorName} ${drop.owner?.name ?? ""}`.toLowerCase().includes(query))
+    .filter(drop => deep.value || !words || `${drop.title} ${drop.filename} ${drop.actorName} ${drop.owner?.name ?? ""}`.toLowerCase().includes(words))
 })
 
 /**
@@ -79,11 +86,17 @@ async function onPick(file: File) {
   const result = await upload(file)
   if (result) await navigateTo(`/drops/${result.id}`)
 }
+
+async function newFolder() {
+  const title = await prompt({ title: "New folder", label: "Name", placeholder: "Login review", confirmLabel: "Create" })
+  if (title) await createFolder(title)
+}
 </script>
 
 <template>
   <PageShell id="drops" title="Drops" description="Docs and apps you and your agents dropped. Private until you share them.">
     <template #actions>
+      <UButton color="neutral" icon="i-ph-folder-simple-plus" label="New Folder" size="sm" variant="ghost" @click="newFolder" />
       <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
     </template>
 
@@ -150,7 +163,7 @@ async function onPick(file: File) {
       <UButton class="mt-5" color="neutral" label="Connect an Agent" to="/agents?tab=mcp" />
     </div>
 
-    <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">No drops match.</p>
+    <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">{{ deep && searching === 'pending' ? "Searching…" : "No drops match." }}</p>
 
     <div v-if="filter === 'trash' && trash.length" class="mb-3 flex items-center justify-between gap-3 text-sm text-muted">
       <p>Drops in the Trash are deleted for good {{ TRASH_DAYS }} days after they got here.</p>
@@ -161,7 +174,11 @@ async function onPick(file: File) {
       <template v-for="group in groups" :key="group.label">
         <p class="label-mono border-b border-default bg-muted px-4 py-2">{{ group.label }}</p>
         <ul class="divide-y divide-default border-b border-default last:border-b-0">
-          <DropRow v-for="drop in group.drops" :key="drop.id" :drop="drop" @delete="remove(drop)" @restore="restore(drop)" @delete-forever="deleteForever(drop)" />
+          <template v-for="drop in group.drops" :key="drop.id">
+            <DropRow :drop="drop" :open="open[drop.id]" @delete="remove(drop)" @restore="restore(drop)" @delete-forever="deleteForever(drop)" @toggle="open[drop.id] = !open[drop.id]" />
+            <!-- A folder opens in place, except in the Trash, where it comes back whole (DropRow shows no toggle there). -->
+            <DropFolderRows v-if="drop.kind === 'folder' && open[drop.id] && !drop.trashedAt" :id="drop.id" :depth="1" />
+          </template>
         </ul>
       </template>
     </div>
