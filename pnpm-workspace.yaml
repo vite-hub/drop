@@ -26,6 +26,10 @@ patchedDependencies:
   # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings
   # (vite-hub/vitehub#2468).
   '@vite-hub/blob@0.0.4': patches/@vite-hub__blob@0.0.4.patch
+  # `vitehub schedule run` returned 500 under `nuxt dev` (ssrLoadModule needs a runnable ssr environment) and ran
+  # outside Nitro elsewhere. Runs Static Schedules through the Nitro dev handler, imports registry definitions by
+  # absolute path (the app/ Vite root broke relative ones), and reloads the registry on HMR (vite-hub/vitehub#2473).
+  '@vite-hub/schedule@0.0.4': patches/@vite-hub__schedule@0.0.4.patch
   # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461 (still open).
   '@vite-hub/ui@0.0.4': patches/@vite-hub__ui@0.0.4.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.

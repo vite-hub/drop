@@ -1,0 +1,477 @@
+diff --git a/dist/cli.d.ts b/dist/cli.d.ts
+index 3e852c0410a5d28a6da0bbfc03f480175452421e..bfdfa673d77259447bfa381d6bc6e4e7593fe70d 100644
+--- a/dist/cli.d.ts
++++ b/dist/cli.d.ts
+@@ -14,9 +14,6 @@ export declare function runScheduleRunCli(args: string[], context: Pick<ViteHubC
+ }): Promise<number>;
+ //#endregion
+ //#region src/dev.d.ts
+-/** Development Server route for manual Static Schedule runs. */
+-export declare const scheduleDevRunRoute = "/__vitehub/schedule/run";
+-export declare const scheduleDevRunHeader = "x-vitehub-schedule-run";
+ /** Console route for manual Static Schedule runs on a deployment. */
+ export declare const scheduleConsoleRunRoute = "_vitehub/schedules/run";
+ //#endregion
+diff --git a/dist/cli.js b/dist/cli.js
+index 9e38e925565cf3ecc691aa8196f3ea2fb23e24d4..f6526d8f747281611eda76049177c94aa368a52c 100644
+--- a/dist/cli.js
++++ b/dist/cli.js
+@@ -1,4 +1,4 @@
+-import { a as scheduleDevRunHeader, c as scheduleDevTokenNamespace, d as redactInspectionValue, i as scheduleDevRoute, l as scheduleDevTokenServerHeader, n as scheduleConsoleRunRoute, o as scheduleDevRunRoute, r as scheduleDevHeader, u as redactInspectionText } from "./dev-BGRs_f58.js";
++import { c as redactInspectionText, i as scheduleDevRoute, l as redactInspectionValue, n as scheduleConsoleRunRoute, o as scheduleDevTokenNamespace, r as scheduleDevHeader, s as scheduleDevTokenServerHeader } from "./dev-Bqao_sPW.js";
+ import { t as isPlainObject } from "./object-B1NW521B.js";
+ import { i as viteHubDevTokenHeader, n as readViteHubDevToken } from "./dev-token-CJnWXmCB.js";
+ import { t as scheduleErrorDiagnostics } from "./error-diagnostics-BbesE9Zt.js";
+@@ -159,6 +159,11 @@ async function discoverViteHubDevServer(options) {
+ }
+ //#endregion
+ //#region src/cli-static.ts
++const scheduleDevEndpoint$1 = {
++	header: scheduleDevHeader,
++	headerValue: "1",
++	route: scheduleDevRoute
++};
+ const usage = "vitehub schedule run <name> [--url <console-url>] [--server <dev-server-url>] [--json]";
+ function cliError(message) {
+ 	return scheduleErrorDiagnostics.SCHEDULE_R0036({ message });
+@@ -168,7 +173,7 @@ function writeUsage$1(context) {
+ 		`Usage: ${usage}`,
+ 		"",
+ 		"Run a Static Schedule Definition now. The definition must set manual: true.",
+-		"Without --url, the command uses the running Vite Development Server.",
++		"Without --url, the command runs the definition in the Nitro runtime of the running Vite Development Server.",
+ 		"",
+ 		"Options:",
+ 		"  --url <url>     Deployed Console URL. Requires console.invoke. Set VITEHUB_CONSOLE_AUTHORIZATION, VITEHUB_CONSOLE_COOKIE, or CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET to authenticate.",
+@@ -255,12 +260,10 @@ function runTarget(parsed, env) {
+ 			url: new URL(scheduleConsoleRunRoute, base.href.endsWith("/") ? base.href : `${base.href}/`).href
+ 		};
+ 	}
+-	const server = baseUrl(parsed.server || env.VITEHUB_DEV_SERVER_URL || "http://localhost:5173", "--server");
+-	headers.set(scheduleDevRunHeader, "1");
+ 	return {
+ 		headers,
+ 		remote: false,
+-		url: new URL(scheduleDevRunRoute.slice(1), server.href.endsWith("/") ? server.href : `${server.href}/`).href
++		url: baseUrl(parsed.server || env.VITEHUB_DEV_SERVER_URL || "http://localhost:5173", "--server").href
+ 	};
+ }
+ function record(value) {
+@@ -280,13 +283,20 @@ function formatDuration(run) {
+ async function sendRun(target, name, fetchImpl, signal) {
+ 	let response;
+ 	try {
+-		response = await fetchImpl(target.url, {
+-			body: JSON.stringify({ name }),
++		const devBody = {
++			id: name,
++			operation: "run-static"
++		};
++		const init = {
++			body: JSON.stringify(target.remote ? { name } : devBody),
+ 			headers: target.headers,
+ 			method: "POST",
+-			redirect: "manual",
+ 			signal
+-		});
++		};
++		response = target.remote ? await fetchImpl(target.url, {
++			...init,
++			redirect: "manual"
++		}) : await fetchViteHubDevEndpoint(fetchImpl, target.url, scheduleDevEndpoint$1, init);
+ 	} catch {
+ 		throw cliError(target.remote ? `Schedule run request to ${target.url} failed.` : `No Vite Development Server with Schedule found at ${new URL(target.url).origin}.`);
+ 	}
+@@ -294,7 +304,7 @@ async function sendRun(target, name, fetchImpl, signal) {
+ 	const text = await response.text();
+ 	const json = record(parseJSON(text));
+ 	if (!response.ok) {
+-		const message = stringField(json, "message") ?? text.slice(0, 500);
++		const message = stringField(json, "message") ?? stringField(record(json?.error), "message") ?? text.slice(0, 500);
+ 		throw cliError(`Schedule run failed with HTTP ${response.status}${message ? `: ${message}` : "."}`);
+ 	}
+ 	const run = record(json?.run);
+@@ -329,21 +339,18 @@ async function runScheduleRunCli(args, context, options = {}) {
+ 				return value;
+ 			};
+ 			const server = await discoverViteHubDevServer({
+-				endpoint: {
+-					header: scheduleDevRunHeader,
+-					headerValue: "1",
+-					route: scheduleDevRunRoute
+-				},
++				endpoint: scheduleDevEndpoint$1,
+ 				fetch: fetchImpl,
+ 				parseDiscovery,
+ 				rootDir,
+-				serverUrl: baseUrl(parsed.server || context.env.VITEHUB_DEV_SERVER_URL || "http://localhost:5173", "--server").href,
++				serverUrl: target.url,
+ 				signal,
+ 				stderr: { write: (chunk) => {
+ 					discoveryFailure += String(chunk);
+ 				} }
+ 			});
+ 			if (!server) throw cliError(discoveryFailure.trim() || "No Compatible Vite Development Server for manual Schedule runs.");
++			if (server.discovery.runtime !== "nitro") throw cliError(typeof server.discovery.message === "string" ? server.discovery.message : "This Vite Development Server cannot reach the Schedule runtime.");
+ 			const serverId = server.discovery.scheduleDevTokenServerId;
+ 			const serverRoot = server.discovery.root;
+ 			if (typeof serverId !== "string" || !serverId || serverRoot !== rootDir) throw cliError("The Schedule Dev server did not provide its token scope. Restart the Vite Development Server.");
+@@ -797,4 +804,4 @@ function createScheduleCliContributor(options = {}) {
+ 	}] };
+ }
+ //#endregion
+-export { createScheduleCliContributor, parseScheduleRunArgs, runScheduleCli, runScheduleRunCli, scheduleConsoleRunRoute, scheduleDevRunHeader, scheduleDevRunRoute };
++export { createScheduleCliContributor, parseScheduleRunArgs, runScheduleCli, runScheduleRunCli, scheduleConsoleRunRoute };
+diff --git a/dist/dev-BGRs_f58.js b/dist/dev-Bqao_sPW.js
+similarity index 92%
+rename from dist/dev-BGRs_f58.js
+rename to dist/dev-Bqao_sPW.js
+index 10cd33c673e8404008e495f2b55ace609ed16736..e389e094f6558ac754931dd522480661656e64b7 100644
+--- a/dist/dev-BGRs_f58.js
++++ b/dist/dev-Bqao_sPW.js
+@@ -149,9 +149,6 @@ function redactInspectionValue(value, key) {
+ }
+ //#endregion
+ //#region src/dev.ts
+-/** Development Server route for manual Static Schedule runs. */
+-const scheduleDevRunRoute = "/__vitehub/schedule/run";
+-const scheduleDevRunHeader = "x-vitehub-schedule-run";
+ /** Console route for manual Static Schedule runs on a deployment. */
+ const scheduleConsoleRunRoute = "_vitehub/schedules/run";
+ /** Vite Development Server route that `vitehub schedule` commands call. */
+@@ -161,13 +158,17 @@ const scheduleDevRuntimeRoute = "/_vitehub/schedule/dev";
+ const scheduleDevHeader = "x-vitehub-schedule-dev";
+ const scheduleDevTokenNamespace = "schedule";
+ const scheduleDevTokenServerHeader = "x-vitehub-schedule-dev-server";
+-/** Schedule operations that the dev endpoint accepts. */
++/**
++* Schedule operations that the dev endpoint accepts. `run` starts a Runtime Schedule. `run-static` starts a Static
++* Schedule Definition that sets `manual: true`.
++*/
+ const scheduleDevOperations = [
+ 	"list",
+ 	"get",
+ 	"runs",
+ 	"attempts",
+ 	"run",
++	"run-static",
+ 	"enable",
+ 	"disable"
+ ];
+@@ -175,4 +176,4 @@ function isScheduleDevOperation(value) {
+ 	return scheduleDevOperations.some((operation) => operation === value);
+ }
+ //#endregion
+-export { scheduleDevRunHeader as a, scheduleDevTokenNamespace as c, redactInspectionValue as d, relativeDefinitionFile as f, resolve as g, relative as h, scheduleDevRoute as i, scheduleDevTokenServerHeader as l, isAbsolute as m, scheduleConsoleRunRoute as n, scheduleDevRunRoute as o, dirname as p, scheduleDevHeader as r, scheduleDevRuntimeRoute as s, isScheduleDevOperation as t, redactInspectionText as u };
++export { scheduleDevRuntimeRoute as a, redactInspectionText as c, dirname as d, isAbsolute as f, scheduleDevRoute as i, redactInspectionValue as l, resolve as m, scheduleConsoleRunRoute as n, scheduleDevTokenNamespace as o, relative as p, scheduleDevHeader as r, scheduleDevTokenServerHeader as s, isScheduleDevOperation as t, relativeDefinitionFile as u };
+diff --git a/dist/dev-endpoint-DkRWt98t.js b/dist/dev-endpoint-BfUTQfjo.js
+similarity index 96%
+rename from dist/dev-endpoint-DkRWt98t.js
+rename to dist/dev-endpoint-BfUTQfjo.js
+index f46bb2cf3b6fae72bff6b49ff20bb68b94b350d8..8f5edadd374da591b77c3d9b7b66858e90773ed9 100644
+--- a/dist/dev-endpoint-DkRWt98t.js
++++ b/dist/dev-endpoint-BfUTQfjo.js
+@@ -1,4 +1,4 @@
+-import { u as redactInspectionText } from "./dev-BGRs_f58.js";
++import { c as redactInspectionText } from "./dev-Bqao_sPW.js";
+ import { n as isViteHubSecretEqual } from "./secret-Df3BazLC.js";
+ //#region ../internal/src/dev-endpoint.ts
+ function firstHeader(value) {
+@@ -332,13 +332,16 @@ async function validateViteHubNitroDevRequest(request, guard) {
+ */
+ function renderViteHubNitroDevHandler(source) {
+ 	if (!/^[A-Za-z_$][\w$]*$/.test(source.export)) throw new TypeError(`[vitehub] Nitro dev handler export ${JSON.stringify(source.export)} must be an identifier.`);
++	const contextModules = Object.entries(source.contextModules ?? {});
++	const context = contextModules.length ? `{ ...${JSON.stringify(source.context ?? {})}, ${contextModules.map(([field], index) => `${JSON.stringify(field)}: viteHubDevContext${index}`).join(", ")} }` : source.context ? JSON.stringify(source.context) : void 0;
+ 	return [
+ 		"import { defineEventHandler } from 'h3'",
+ 		`import { ${source.export} as handleViteHubDevRequest } from ${JSON.stringify(source.module)}`,
++		...contextModules.map(([, module], index) => `import viteHubDevContext${index} from ${JSON.stringify(module)}`),
+ 		"",
+ 		`export default defineEventHandler(event => handleViteHubDevRequest(${[
+ 			"event.req",
+-			...source.context ? [JSON.stringify(source.context)] : [],
++			...context ? [context] : [],
+ 			...(source.arguments ?? []).map((value) => JSON.stringify(value))
+ 		].join(", ")}))`,
+ 		""
+diff --git a/dist/dev-run-tYXxJzQq.js b/dist/dev-run-tYXxJzQq.js
+deleted file mode 100644
+index 8f482d1e5771482e7b2c0c0e96d9f17c220978e5..0000000000000000000000000000000000000000
+diff --git a/dist/nuxt.js b/dist/nuxt.js
+index d452714ddbb7ca7139b40ac9ab917d0a77bb7a39..01ca3a2eab5d56c3f866213fc967b1782c9544f2 100644
+--- a/dist/nuxt.js
++++ b/dist/nuxt.js
+@@ -1,4 +1,4 @@
+-import { n as hubSchedule, t as createScheduleNitroConfig } from "./vite-B81eXdXV.js";
++import { n as hubSchedule, t as createScheduleNitroConfig } from "./vite-B_O5a5_s.js";
+ import { resolve } from "node:path";
+ //#region src/nuxt.ts
+ function isScheduleVitePlugin(value) {
+diff --git a/dist/runtime/console.d.ts b/dist/runtime/console.d.ts
+index edddad63a06be14e68e4348e662614a126aae90d..43b59eaadedf6f733757093f8e8cbc10f6b29f1f 100644
+--- a/dist/runtime/console.d.ts
++++ b/dist/runtime/console.d.ts
+@@ -1,4 +1,4 @@
+-import { S as ScheduleRunStatus, a as RuntimeScheduleRecord, b as ScheduleRunRecord, g as ScheduleRunAttemptStatus, h as ScheduleRunAttemptRecord } from "../types-C-cQKGDn.js";
++import { S as ScheduleRunStatus, a as RuntimeScheduleRecord, b as ScheduleRunRecord, f as ScheduleDefinitionRegistry, g as ScheduleRunAttemptStatus, h as ScheduleRunAttemptRecord } from "../types-C-cQKGDn.js";
+ import { t as ViteHubConsoleRecord } from "../console-DGZCbryO.js";
+ //#region src/runtime/console.d.ts
+ /** Error of a run or attempt. The stack is not included. */
+@@ -83,14 +83,18 @@ export declare function listScheduleRunAttempts(runId: string): Promise<Schedule
+  * The Console calls it on each request.
+  */
+ export declare function readScheduleConsoleRecords(): Promise<ViteHubConsoleRecord[]>;
++interface ScheduleDevRequestOptions {
++  authorize?: (request: Request) => Promise<boolean>;
++  /** Static Schedule registry of the Nitro runtime. `run-static` loads definitions from it. */
++  registry?: ScheduleDefinitionRegistry;
++}
+ /**
+  * Handles one Schedule operation from `vitehub schedule`. The Vite Development Server forwards the request into the
+  * Nitro runtime, so the operation uses the same stores and registry as the application.
+  *
+  * The request must carry the Schedule dev header, must not come from another origin, and must use JSON.
+  * The owner authorization callback is required. The Node dev entry supplies private project-token verification.
++ * `run-static` runs a Static Schedule Definition from `options.registry`. The definition must set `manual: true`.
+  */
+-export declare function handleScheduleDevRequest(request: Request, options?: {
+-  authorize?: (request: Request) => Promise<boolean>;
+-}): Promise<Response>;
++export declare function handleScheduleDevRequest(request: Request, options?: ScheduleDevRequestOptions): Promise<Response>;
+ //#endregion
+\ No newline at end of file
+diff --git a/dist/runtime/console.js b/dist/runtime/console.js
+index 8d65587ecb18601e4cebe73b0c3841cc3c7263bc..85223a84b09c358107bd654e1c10c86bc664891d 100644
+--- a/dist/runtime/console.js
++++ b/dist/runtime/console.js
+@@ -1,9 +1,9 @@
+-import { d as redactInspectionValue, r as scheduleDevHeader, t as isScheduleDevOperation, u as redactInspectionText } from "../dev-BGRs_f58.js";
+-import { n as executeRuntimeSchedule } from "../execute-nhmiaoc5.js";
++import { c as redactInspectionText, l as redactInspectionValue, r as scheduleDevHeader, t as isScheduleDevOperation } from "../dev-Bqao_sPW.js";
++import { n as executeRuntimeSchedule, o as runSchedule } from "../execute-nhmiaoc5.js";
+ import { t as schedules } from "../client-D2Rwxlbe.js";
+ import { n as nextRuntimeScheduleRunAt } from "../due-BxS1HtDY.js";
+ import { d as ScheduleHistoryIncompleteError, i as isScheduleWakeDriverActive, n as getScheduleRunStore, r as getScheduleRuntimeRegistry, t as getRuntimeScheduleStore } from "../state-CYVI6ikK.js";
+-import { r as validateViteHubNitroDevRequest } from "../dev-endpoint-DkRWt98t.js";
++import { r as validateViteHubNitroDevRequest } from "../dev-endpoint-BfUTQfjo.js";
+ import { ViteHubError } from "@vite-hub/runtime";
+ //#region src/runtime/console.ts
+ const consoleRunHistoryLimit = 10;
+@@ -49,6 +49,19 @@ function summarizeScheduleRun(run) {
+ 	if (startedAt) summary.startedAt = startedAt;
+ 	return summary;
+ }
++function summarizeManualScheduleRun(run) {
++	const error = summarizeError(run.error);
++	const completedAt = isoDate(run.completedAt);
++	const startedAt = isoDate(run.startedAt);
++	return {
++		...completedAt ? { completedAt } : {},
++		...error ? { error } : {},
++		id: run.id,
++		scheduleId: run.scheduleId,
++		...startedAt ? { startedAt } : {},
++		status: run.status
++	};
++}
+ function summarizeScheduleRunAttempt(attempt) {
+ 	const error = summarizeError(attempt.error);
+ 	const completedAt = isoDate(attempt.completedAt);
+@@ -261,7 +274,9 @@ function failure(message, status, code) {
+ 	} }, status);
+ }
+ const errorStatus = {
++	SCHEDULE_DEFINITION_NOT_FOUND: 404,
+ 	SCHEDULE_DISABLED: 409,
++	SCHEDULE_MANUAL_RUN_DISABLED: 403,
+ 	SCHEDULE_NOT_FOUND: 404,
+ 	SCHEDULE_RUN_NOT_FOUND: 404,
+ 	SCHEDULE_TARGET_NOT_ELIGIBLE: 409,
+@@ -288,7 +303,7 @@ async function readBody(request) {
+ 		operation
+ 	};
+ }
+-async function runOperation(body) {
++async function runOperation(body, options) {
+ 	if (body.operation === "list") return json(await inspectRuntimeSchedules());
+ 	const id = body.id;
+ 	if (!id) return failure(`The ${body.operation} operation requires an id.`, 400);
+@@ -321,6 +336,13 @@ async function runOperation(body) {
+ 				return scheduleFailure(error);
+ 			}
+ 		}
++		case "run-static":
++			if (!options.registry) return failure("No Static Schedule registry is installed in this runtime. Restart the Vite Development Server.", 409);
++			try {
++				return json({ run: summarizeManualScheduleRun(await runSchedule(id, { registry: options.registry })) });
++			} catch (error) {
++				return scheduleFailure(error);
++			}
+ 		case "enable":
+ 		case "disable": try {
+ 			const updated = body.operation === "enable" ? await schedules.enable(id) : await schedules.disable(id);
+@@ -353,6 +375,7 @@ async function runOperation(body) {
+ *
+ * The request must carry the Schedule dev header, must not come from another origin, and must use JSON.
+ * The owner authorization callback is required. The Node dev entry supplies private project-token verification.
++* `run-static` runs a Static Schedule Definition from `options.registry`. The definition must set `manual: true`.
+ */
+ async function handleScheduleDevRequest(request, options = {}) {
+ 	const { rejection } = await validateViteHubNitroDevRequest(request, {
+@@ -365,7 +388,7 @@ async function handleScheduleDevRequest(request, options = {}) {
+ 	const body = await readBody(request);
+ 	if (!body) return failure("The Schedule Dev request body is invalid.", 400);
+ 	try {
+-		return await runOperation(body);
++		return await runOperation(body, options);
+ 	} catch (error) {
+ 		return scheduleFailure(error);
+ 	}
+diff --git a/dist/runtime/dev.d.ts b/dist/runtime/dev.d.ts
+index 6b7063bb2dee5a5e53eec1ee070e1161005dc095..e29d08ef4a56a630f53689fdaa773c28c7b7eb69 100644
+--- a/dist/runtime/dev.d.ts
++++ b/dist/runtime/dev.d.ts
+@@ -1,6 +1,8 @@
++import { f as ScheduleDefinitionRegistry } from "../types-C-cQKGDn.js";
+ //#region src/runtime/dev.d.ts
+ /** Node-only authentication for the development-only Nitro Schedule route. */
+ export declare function handleScheduleDevRequest(request: Request, options?: {
++  registry?: ScheduleDefinitionRegistry;
+   rootDir?: string;
+   serverId?: string;
+ }): Promise<Response>;
+diff --git a/dist/runtime/dev.js b/dist/runtime/dev.js
+index a069acc3763588afb7ee4bc1c03e293cd7c8e8e2..b8ba57e3a8b6f5e604afb34ad66fca549016b40b 100644
+--- a/dist/runtime/dev.js
++++ b/dist/runtime/dev.js
+@@ -1,19 +1,22 @@
+-import { c as scheduleDevTokenNamespace, l as scheduleDevTokenServerHeader } from "../dev-BGRs_f58.js";
++import { o as scheduleDevTokenNamespace, s as scheduleDevTokenServerHeader } from "../dev-Bqao_sPW.js";
+ import { i as viteHubDevTokenHeader, n as readViteHubDevToken } from "../dev-token-CJnWXmCB.js";
+ import { n as isViteHubSecretEqual } from "../secret-Df3BazLC.js";
+ import { handleScheduleDevRequest as handleScheduleDevRequest$1 } from "./console.js";
+ //#region src/runtime/dev.ts
+ /** Node-only authentication for the development-only Nitro Schedule route. */
+ async function handleScheduleDevRequest(request, options = {}) {
+-	return await handleScheduleDevRequest$1(request, { authorize: async (request) => {
+-		const serverId = request.headers.get(scheduleDevTokenServerHeader);
+-		const token = request.headers.get(viteHubDevTokenHeader);
+-		if (!options.serverId || serverId !== options.serverId || !token) return false;
+-		return isViteHubSecretEqual(token, await readViteHubDevToken(options.rootDir ?? process.cwd(), {
+-			namespace: scheduleDevTokenNamespace,
+-			serverId
+-		}));
+-	} });
++	return await handleScheduleDevRequest$1(request, {
++		registry: options.registry,
++		authorize: async (request) => {
++			const serverId = request.headers.get(scheduleDevTokenServerHeader);
++			const token = request.headers.get(viteHubDevTokenHeader);
++			if (!options.serverId || serverId !== options.serverId || !token) return false;
++			return isViteHubSecretEqual(token, await readViteHubDevToken(options.rootDir ?? process.cwd(), {
++				namespace: scheduleDevTokenNamespace,
++				serverId
++			}));
++		}
++	});
+ }
+ //#endregion
+ export { handleScheduleDevRequest };
+diff --git a/dist/vite-B81eXdXV.js b/dist/vite-B_O5a5_s.js
+similarity index 99%
+rename from dist/vite-B81eXdXV.js
+rename to dist/vite-B_O5a5_s.js
+index 61a8bd0aeafcecaf13d350469bc9efcb93c660fd..9956e67d6434a28c9c46c94de3e5e3bb42998876 100644
+--- a/dist/vite-B81eXdXV.js
++++ b/dist/vite-B_O5a5_s.js
+@@ -1,9 +1,9 @@
+-import { c as scheduleDevTokenNamespace, f as relativeDefinitionFile, g as resolve$1, h as relative$1, i as scheduleDevRoute, l as scheduleDevTokenServerHeader, m as isAbsolute$1, p as dirname$1, r as scheduleDevHeader, s as scheduleDevRuntimeRoute } from "./dev-BGRs_f58.js";
++import { a as scheduleDevRuntimeRoute, d as dirname$1, f as isAbsolute$1, i as scheduleDevRoute, m as resolve$1, o as scheduleDevTokenNamespace, p as relative$1, r as scheduleDevHeader, s as scheduleDevTokenServerHeader, u as relativeDefinitionFile } from "./dev-Bqao_sPW.js";
+ import { t as isPlainObject } from "./object-B1NW521B.js";
+ import { i as viteHubDevTokenHeader, r as removeViteHubDevToken, t as createViteHubDevToken } from "./dev-token-CJnWXmCB.js";
+ import { t as scheduleErrorDiagnostics } from "./error-diagnostics-BbesE9Zt.js";
+ import { n as isViteHubSecretEqual } from "./secret-Df3BazLC.js";
+-import { n as renderViteHubNitroDevHandler, t as registerViteHubNitroDevEndpoint } from "./dev-endpoint-DkRWt98t.js";
++import { n as renderViteHubNitroDevHandler, t as registerViteHubNitroDevEndpoint } from "./dev-endpoint-BfUTQfjo.js";
+ import { builtinModules, createRequire } from "node:module";
+ import { defineDiagnostics } from "nostics";
+ import { basename, dirname, extname, isAbsolute, normalize, parse, relative, resolve, sep } from "node:path";
+@@ -5775,7 +5775,6 @@ const SCHEDULE_VITE_PLUGIN_NAME = "@vite-hub/schedule/vite";
+ const SCHEDULE_REGISTRY_ID = "#vitehub/schedule/registry";
+ const RESOLVED_SCHEDULE_REGISTRY_ID = "\0#vitehub/schedule/registry";
+ const RESOLVED_SCHEDULE_TARGETS_ID = `\0${SCHEDULE_TARGETS_ID}`;
+-const registryImportAnchor = ".vitehub/schedule/registry.js";
+ const generatedNitroSchedulePlugin = ".vitehub/nitro/schedule/plugin.ts";
+ const generatedNitroProviderRegistry = ".vitehub/nitro/schedule/provider-registry.js";
+ const generatedNitroRuntimeRegistry = ".vitehub/nitro/schedule/runtime-registry.js";
+@@ -5783,6 +5782,16 @@ const generatedNitroStaticRegistry = ".vitehub/nitro/schedule/static-registry.js
+ const generatedNitroCloudflareModule = "./.vitehub/nitro/schedule/module.mjs";
+ const generatedNitroDevHandlerDirectory = ".vitehub/nitro/schedule/dev-handlers";
+ const mergeNoExternal = createNoExternalMerger(schedulePackageName);
++function invalidateScheduleRegistry(server) {
++	const registry = server.moduleGraph.getModuleById(RESOLVED_SCHEDULE_REGISTRY_ID);
++	if (registry) server.moduleGraph.invalidateModule(registry);
++	for (const environment of Object.values(server.environments ?? {})) {
++		const module = environment.moduleGraph.getModuleById(RESOLVED_SCHEDULE_REGISTRY_ID);
++		if (!module) continue;
++		environment.moduleGraph.invalidateModule(module);
++		if (environment.config.consumer === "server") environment.hot.send({ type: "full-reload" });
++	}
++}
+ function resolveSchedulePluginRoots(root, options = {}) {
+ 	const resolvedViteRoot = resolve(root);
+ 	return {
+@@ -5862,6 +5871,7 @@ async function addNitroScheduleDevHandler(value, roots, serverId, importBase) {
+ 			rootDir: roots.viteRoot,
+ 			serverId
+ 		},
++		contextModules: { registry: SCHEDULE_REGISTRY_ID },
+ 		export: "handleScheduleDevRequest",
+ 		module: `${importBase ?? "@vite-hub/schedule"}/runtime/dev`
+ 	});
+@@ -6151,8 +6161,15 @@ function hubSchedule(options = {}) {
+ 		});
+ 	}
+ 	function createRegistryContents() {
+-		const definitions = discoverRegistrySchedules();
+-		return createRuntimeRegistryContents(projectRoot ? resolve(projectRoot, registryImportAnchor) : registryImportAnchor, definitions);
++		return [
++			"",
++			"const registry = {",
++			...discoverRegistrySchedules().map((definition) => `  [${JSON.stringify(definition.name)}]: async () => import(${JSON.stringify(definition.handler)}),`),
++			"}",
++			"",
++			"export default registry",
++			""
++		].join("\n");
+ 	}
+ 	function createTargetsContents() {
+ 		return createScheduleTargetsContents(discoverViteSchedules(), { types: false });
+@@ -6196,8 +6213,6 @@ function hubSchedule(options = {}) {
+ 					return typeof baseURL === "string" ? baseURL : process.env.NITRO_APP_BASE_URL;
+ 				}
+ 			});
+-			const { registerScheduleDevRunEndpoint } = await import("./dev-run-tYXxJzQq.js");
+-			registerScheduleDevRunEndpoint(server, { serverId: devServerId });
+ 		},
+ 		async configResolved(config) {
+ 			resolved = config;
+@@ -6236,8 +6251,7 @@ function hubSchedule(options = {}) {
+ 			const contributedSchedule = contributions.some((contribution) => normalize(contribution.definition.module).replace(/\\/g, "/") === file);
+ 			if (!/\.schedule\.(?:c|m)?[jt]s$/i.test(file) && !serverSchedule && !contributedSchedule) return;
+ 			await writeScheduleTypes(projectRoot ?? context.server.config.root, discoverRegistrySchedules(), options.typesImportBase);
+-			const registryModule = context.server.moduleGraph.getModuleById(RESOLVED_SCHEDULE_REGISTRY_ID);
+-			if (registryModule) context.server.moduleGraph.invalidateModule(registryModule);
++			invalidateScheduleRegistry(context.server);
+ 			const targetsModule = context.server.moduleGraph.getModuleById(RESOLVED_SCHEDULE_TARGETS_ID);
+ 			if (targetsModule) context.server.moduleGraph.invalidateModule(targetsModule);
+ 		},
+diff --git a/dist/vite.js b/dist/vite.js
+index e71b51c687ce54e94dff86b2998e152e50af7e49..4978116762953cadf85f4eb4e19df46bc4e1e8c5 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -1,2 +1,2 @@
+-import { a as scheduleConsoleSection, c as collectScheduleContributions, i as inspectScheduleDefinitions, n as hubSchedule, o as contributedScheduleSource, r as readScheduleDefinitionCrons, s as discoverScheduleDefinitions, t as createScheduleNitroConfig } from "./vite-B81eXdXV.js";
++import { a as scheduleConsoleSection, c as collectScheduleContributions, i as inspectScheduleDefinitions, n as hubSchedule, o as contributedScheduleSource, r as readScheduleDefinitionCrons, s as discoverScheduleDefinitions, t as createScheduleNitroConfig } from "./vite-B_O5a5_s.js";
+ export { collectScheduleContributions, contributedScheduleSource, createScheduleNitroConfig, discoverScheduleDefinitions, hubSchedule, inspectScheduleDefinitions, readScheduleDefinitionCrons, scheduleConsoleSection };
