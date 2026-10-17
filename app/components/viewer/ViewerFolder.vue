@@ -11,6 +11,9 @@ const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
 const to = (child: DropSummary) => (props.publicView ? dropPath(child) : `/drops/${child.id}`)
 const meta = (child: DropSummary) => (child.kind === "folder" ? itemCount(child.items ?? 0) : KIND_LABELS[child.kind] ?? "File")
+// Search below the folder (ViewerFolderResults): signed-in people only, since it goes through /api/drops.
+const { data: me } = useMe()
+const search = ref("")
 
 async function newFolder() {
   const title = await prompt({ title: "New folder", label: "Name", placeholder: "Screenshots", confirmLabel: "Create" })
@@ -33,6 +36,7 @@ async function newSite() {
 <template>
   <div class="min-h-0 flex-1 overflow-y-auto">
     <div class="mx-auto w-full max-w-5xl p-4 sm:p-6">
+      <UInput v-if="me" v-model="search" aria-label="Search this folder" class="mb-4 w-full sm:w-72" icon="i-ph-magnifying-glass" placeholder="Search this folder" />
       <div class="mb-4 flex h-8 items-center justify-between gap-3">
         <p class="label-mono">{{ itemCount(children.length) }}</p>
         <div v-if="drop.isOwner && !drop.trashedAt" class="flex items-center gap-1">
@@ -42,7 +46,8 @@ async function newSite() {
           <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
         </div>
       </div>
-      <div v-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+      <ViewerFolderResults v-if="search.trim()" :folder="drop.id" :public-view="publicView" :query="search" />
+      <div v-else-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
         <UIcon name="i-ph-folder-open" class="size-6 text-dimmed" />
         <p class="mt-3 font-medium text-highlighted">Nothing in this folder yet</p>
         <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Upload a file, ask your agent to publish into {{ drop.title }}, or move a drop here with Move to folder in its menu.</p>
