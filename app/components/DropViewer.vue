@@ -65,7 +65,7 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-const panel = useViewerPanel({ owner, openCount, versions: computed(() => drop.value.versions.length) })
+const panel = useViewerPanel({ owner, openCount, versions: computed(() => drop.value.versions.length), comments: computed(() => drop.value.kind !== "folder") })
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const { files, pages, page } = useAppFiles(drop)
 
@@ -268,7 +268,8 @@ function copyLink() {
 
 const togglePanel = panel.toggle
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
-const floating = computed(() => sideOpen.value && wide.value && !editing.value)
+// A folder someone else shares with you has no tab to show (no comments, no Details), so no panel either.
+const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 /** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
 const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
 watch([ready, floating], () => ready.value && send({ type: "inset", right: floating.value ? FLOATING_INSET : 0 }))
@@ -413,7 +414,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           </UTooltip>
           <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'team' ? 'Team' : drop.visibility === 'shared' ? 'Shared' : 'Share'" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
-          <UTooltip :text="panelOpen ? 'Hide panel' : 'Show panel'">
+          <UTooltip v-if="tabs.length" :text="panelOpen ? 'Hide panel' : 'Show panel'">
             <span class="relative">
               <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-ph-sidebar-simple" size="sm" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />
               <span v-if="openCount && !panelOpen" class="pointer-events-none absolute top-1 right-1 size-1.5 rounded-full bg-inverted ring-2 ring-(--ui-bg)" />
