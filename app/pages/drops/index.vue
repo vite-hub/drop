@@ -192,8 +192,8 @@ async function newSite() {
 
     <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">{{ deep && searching === 'pending' ? "Searching…" : "No drops match." }}</p>
 
-    <div v-if="filter === 'trash' && trash.length" class="mb-3 flex items-center justify-between gap-3 text-sm text-muted">
-      <p>Drops in the Trash are deleted for good {{ TRASH_DAYS }} days after they got here.</p>
+    <!-- The page description already says how long the Trash keeps things. -->
+    <div v-if="filter === 'trash' && trash.length" class="mb-3 flex justify-end">
       <UButton color="error" label="Empty Trash" size="sm" variant="outline" @click="emptyTrash(trash.length)" />
     </div>
 
