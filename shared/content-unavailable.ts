@@ -28,7 +28,10 @@ export function contentUnavailable(status: number, path: string, email?: string 
   }
   return {
     title: email ? "This content isn't available to your account." : "This content may be private or deleted.",
-    description: "Sign in with the GitHub account you used to connect your agent on this Drop site. If someone sent you the link, ask them to share it.",
+    // Most people who land here were sent a team link, not someone who connected an agent: say what to do first.
+    description: email
+      ? "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it with you, or sign in with another account."
+      : "If it was shared with your team, sign in to open it. Otherwise ask whoever sent you the link to share it.",
     email: email ?? null,
     action: { label: email ? "Use another account" : "Sign in with GitHub", to: signIn },
   }
