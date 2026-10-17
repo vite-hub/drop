@@ -45,9 +45,8 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     kv: true,
     rateLimit: true,
     schedule: true,
-    // Live editing: rooms in a SQLite Durable Object, drafts in the blob-database Workspace (BLOB + DB).
+    // Live editing: rooms in a SQLite Durable Object, drafts in BLOB (server/live-drafts/realtime.ts).
     realtime: { authority: "cloudflare" },
-    workspace: true,
   },
   // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job. The deploy build sets it to daily for Hobby.
   vercel: { preset: "vercel", blob: { ...files, driver: "vercel-blob", access: "private" }, database: d1("vitehub-drop-vercel"), schedule: true },
@@ -70,9 +69,8 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: true,
     schedule: { runtime: { driver: "process" } },
-    // Live editing rooms stay in this one process.
+    // Live editing rooms stay in this one process and save their drafts to .data/blob.
     realtime: { authority: "memory" },
-    workspace: true,
   },
 }
 
@@ -85,9 +83,8 @@ export default defineNuxtConfig({
     // PNG code images are a Browser Run screenshot. Browser Run only exists on Cloudflare, and ViteHub only
     // generates its runtime module in builds that enable it, so other hosts get a stub that says so.
     "#code-image-png": fileURLToPath(new URL(`./server/code-image-png/${host === "cloudflare" ? "browser-run" : "unavailable"}.ts`, import.meta.url)),
-    // Live editing keeps drafts in a Workspace next to Realtime rooms, which only Cloudflare and VPS builds have. The
-    // others get a stub, so no Workspace code reaches their bundles.
-    "#live-drafts": fileURLToPath(new URL(`./server/live-drafts/${liveEditing ? "workspace" : "unavailable"}.ts`, import.meta.url)),
+    // Live editing needs Realtime rooms, which only Cloudflare and VPS builds have. The others get a stub that says so.
+    "#live-drafts": fileURLToPath(new URL(`./server/live-drafts/${liveEditing ? "realtime" : "unavailable"}.ts`, import.meta.url)),
   },
 
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.

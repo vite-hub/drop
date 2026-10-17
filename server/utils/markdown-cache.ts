@@ -1,27 +1,30 @@
+import type { H3Event } from "h3"
+import { defineCachedFunction } from "nitro/cache"
 import { useStorage } from "nitro/storage"
 
 export const MARKDOWN_CACHE_TTL = 60 * 60 * 24 * 30
-const PREFIX = "markdown-v2:"
 
 export interface MarkdownRender { title: string; html: string; source: string }
-interface Entry { expires: number; value: MarkdownRender }
+type Render = (text: string) => Promise<{ title: string; html: string }>
 
-/** The TTL reaches KV's expirationTtl; expires also bounds memory and filesystem caches. */
-export async function cachedMarkdown(key: string, source: () => Promise<string>, render: (text: string) => Promise<{ title: string; html: string }>): Promise<MarkdownRender> {
-  const storage = useStorage("cache")
-  const entry = await storage.getItem<Entry>(PREFIX + key)
-  if (entry && entry.expires > Date.now()) return entry.value
-  if (entry) await storage.removeItem(PREFIX + key)
-  const text = await source()
-  const value = { ...await render(text), source: text }
-  await storage.setItem(PREFIX + key, { expires: Date.now() + MARKDOWN_CACHE_TTL * 1000, value }, { ttl: MARKDOWN_CACHE_TTL })
-  return value
-}
+/**
+ * Renders keyed by blob key, in Nitro's `cache` storage (KV on Cloudflare, memory elsewhere). Blobs never change
+ * once uploaded, so nothing invalidates a render but deleting its blob. `swr: false` makes Nitro hand the 30-day TTL
+ * to KV's expirationTtl, so unread renders disappear there too, and rerender an expired entry instead of serving it.
+ * The event lets the write outlive the response on Workers (`waitUntil`).
+ */
+const cached = defineCachedFunction(
+  async (_event: H3Event | undefined, _key: string, source: () => Promise<string>, render: Render): Promise<MarkdownRender> => {
+    const text = await source()
+    return { ...await render(text), source: text }
+  },
+  { name: "markdown", maxAge: MARKDOWN_CACHE_TTL, swr: false, getKey: (_event: H3Event | undefined, key: string) => key },
+)
+
+export const cachedMarkdown = (key: string, source: () => Promise<string>, render: Render, event?: H3Event) =>
+  cached(event, key, source, render)
 
 export async function deleteMarkdownCache(key: string) {
   if (key.startsWith("apps/") || key.startsWith("code-images/")) return
-  const storage = useStorage("cache")
-  await storage.removeItem(PREFIX + key)
-  // Remove renders written by the previous Nitro helper as well.
-  await storage.removeItem(`nitro:functions:markdown:${key}.json`)
+  await useStorage("cache").removeItem(`nitro:functions:markdown:${key}.json`)
 }

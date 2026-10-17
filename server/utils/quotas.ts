@@ -1,5 +1,5 @@
 import { and, eq, inArray, lt, lte, sql, type SQL } from "drizzle-orm"
-import type { DrizzleD1Database } from "drizzle-orm/d1"
+import type { BatchItem } from "drizzle-orm/batch"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
@@ -10,8 +10,7 @@ import { useServerEnv } from "#vitehub/env/server"
 import { dropFiles, quotaBlobs, quotaReservations } from "../databases/config"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
-const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
-type Statement = Parameters<DrizzleD1Database["batch"]>[0][number]
+type Statement = BatchItem<"sqlite">
 
 /** `DROP_QUOTAS`, `DROP_DEFAULT_PLAN`, and the `DROP_PRO_*` limits, typed and validated by Server Env. */
 export function quotaConfig() {
@@ -117,7 +116,7 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
         const batch: [Statement, ...Statement[]] = [finish]
         batch.unshift(...statements)
         let results
-        try { results = await atomic.batch(batch) }
+        try { results = await db.batch(batch) }
         catch (error) {
           if (/CHECK constraint failed.*writes/i.test(String(error)))
             throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version.", cause: error })

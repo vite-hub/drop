@@ -6,7 +6,6 @@ import { quotaBlobs, quotaReservations } from './quotas'
 import { abuseReports } from './trust'
 import { skillSettings } from './skills'
 import { blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats } from './drops'
-import { workspaceHistorySchema } from 'vite-hub/workspace/blob-database'
 import { jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource } from './oauth'
 
 export const user = sqliteTable('user', {
@@ -63,11 +62,9 @@ export const verification = sqliteTable('verification', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).$onUpdate(() => new Date()).notNull()
 }, table => [index('verification_identifier_idx').on(table.identifier)])
 
-// The drafts Workspace's manifests (server/workspaces/drafts.ts), exported so drizzle-kit generates their migration.
-export const { workspaceHistoryMetadata, workspaceHistoryObjects, workspaceHistoryRefs, workspaceHistoryRevisions } = workspaceHistorySchema
 export { quotaBlobs, quotaReservations, abuseReports, skillSettings, blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 // Where it lives (D1 binding, D1 over HTTP, or local SQLite) is per host, in nuxt.config.ts `vitehub.database`.
 export default defineDatabase({
-  schema: { workspaceHistoryRefs, workspaceHistoryRevisions, workspaceHistoryObjects, workspaceHistoryMetadata, quotaBlobs, quotaReservations, abuseReports, skillSettings, account, blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
+  schema: { quotaBlobs, quotaReservations, abuseReports, skillSettings, account, blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })

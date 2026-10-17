@@ -4,8 +4,8 @@ import { createRequire } from "node:module"
 import { pathToFileURL } from "node:url"
 import { state, calls } from "./harness.mjs"
 const { cachedMarkdown, deleteMarkdownCache, MARKDOWN_CACHE_TTL } = await import("../../server/utils/markdown-cache.ts")
-import { oldMarkdownCacheKeys } from "../../scripts/markdown-cache-keys.mjs"
 
+const KEY = "nitro:functions:markdown:doc.md.json"
 beforeEach(() => { state.entries.clear(); calls.writes.length = 0; state.failCacheDelete = false })
 const render = async text => ({ title: text, html: `<p>${text}</p>` })
 
@@ -18,14 +18,11 @@ test("KV writes physically expire in 30 days through the actual unstorage driver
   const previous = state.storage
   state.storage = createStorage({ driver: driver({ binding, base: "nitro-cache" }) })
   try {
-    if (process.env.DROP_TEST_BASELINE) {
-      // Exercise the pinned dependency through the same adapter and options as the old Nitro helper.
-      const { defineCachedFunction, setStorage } = await import(pathToFileURL(require.resolve("ocache")))
-      setStorage({ get: key => state.storage.getItem(key), set: (key, value, options) => state.storage.setItem(key, value, options?.ttl ? { ttl: options.ttl } : undefined) })
-      await defineCachedFunction((_key, text) => render(text), { group: "nitro/functions", name: "markdown", getKey: key => key, maxAge: MARKDOWN_CACHE_TTL })("doc.md", "source")
-    }
-    else await cachedMarkdown("doc.md", async () => "source", render)
+    await cachedMarkdown("doc.md", async () => "source", render)
+    // Nitro writes after it answers (waitUntil on Workers); let the write land.
+    await new Promise(resolve => setTimeout(resolve, 0))
     assert.equal(writes.length, 1)
+    assert.equal(writes[0][0], `nitro-cache:${KEY}`)
     assert.equal(writes[0][2].expirationTtl, MARKDOWN_CACHE_TTL)
     assert.equal(MARKDOWN_CACHE_TTL, 2592000)
     assert.equal(JSON.parse(writes[0][1]).value.source, "source")
@@ -36,26 +33,16 @@ test("KV writes physically expire in 30 days through the actual unstorage driver
 test("expired memory/filesystem entries refetch and rerender rather than serving stale HTML", async () => {
   const first = await cachedMarkdown("doc.md", async () => "first", render)
   assert.equal(first.source, "first")
-  state.entries.get("markdown-v2:doc.md").expires = Date.now() - 1
+  state.entries.get(KEY).mtime = Date.now() - MARKDOWN_CACHE_TTL * 1000 - 1
   const next = await cachedMarkdown("doc.md", async () => "second", render)
   assert.equal(next.html, "<p>second</p>")
   assert.equal(calls.writes.length, 2)
 })
 
-test("cache hits do not read source or render again, and deletion removes both cache formats", async () => {
+test("cache hits do not read source or render again, and deletion removes the render", async () => {
   await cachedMarkdown("doc.md", async () => "source", render)
   const never = () => { throw new Error("unexpected source read or render") }
   assert.equal((await cachedMarkdown("doc.md", never, never)).source, "source")
-  state.entries.set("nitro:functions:markdown:doc.md.json", "old cache")
   await deleteMarkdownCache("doc.md")
   assert.equal(state.entries.size, 0)
-})
-
-test("the one-time purge selects only old Markdown cache keys", () => {
-  assert.deepEqual(oldMarkdownCacheKeys([
-    { name: "nitro-cache:nitro:functions:markdown:doc.md.json" },
-    { name: "nitro-cache:nitro:handlers:stats:index.json" },
-    { name: "nitro-cache:markdown-v2:doc.md" },
-    { name: "another-prefix:nitro:functions:markdown:doc.md.json" },
-  ]), ["nitro-cache:nitro:functions:markdown:doc.md.json"])
 })

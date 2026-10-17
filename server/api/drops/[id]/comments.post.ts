@@ -16,8 +16,8 @@ export default defineValidatedHandler({
     const drop = await findDrop(await routeId(event), event)
     const who = await identify(event)
     if (!drop || !permissions(drop, who).comment) throw new HTTPError({ status: 404, statusText: "You can't comment on this drop." })
-    // Cloudflare Rate Limiting only exists on Workers; local dev skips it.
-    if (!import.meta.dev) await requireRateLimit(event, "comment", { failure: "deny", key: who?.userId, limit: 20, window: "1m" })
+    // Cloudflare Rate Limiting on Workers, ViteHub's in-memory limiter elsewhere (local dev included).
+    await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
     const body = await event.req.json()
     // The next number comes from the same statement as the insert, so two comments can't take the same one.
     const [row] = await db.insert(comments).values({

@@ -14,7 +14,8 @@ import { DAY_MS, expiresAt, type Lifetime, MAX_KEEP_REASON, TEMPORARY_DAYS, TRAS
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
-import { deleteDrafts, LIVE_EDITING } from "#live-drafts"
+import { LIVE_EDITING } from "#live-drafts"
+import { draftPath } from "./draft-paths"
 import { deleteRetainedDrop } from "./quota-deletion"
 import { chainOf, expiryPolicy, isExpired, renewDrop } from "./expiry"
 
@@ -188,7 +189,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
   }
   else if (row.blobKey) {
     if (row.kind === "markdown") {
-      const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!))
+      const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       detail.html = rendered.html
       if (detail.canEdit && hasBlockComponents(rendered.source)) {
@@ -334,7 +335,7 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
     // Renders once at upload: the title comes from Comark, and the first view hits a warm cache.
     let parsedTitle: string | undefined
     try {
-      parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, text)).title : undefined
+      parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, text, event)).title : undefined
     }
     catch (error) {
       await deleteBlobKeys([key])
@@ -495,7 +496,8 @@ export async function deleteDrop(row: DropRow) {
   const attached = await db.select().from(drops).where(sql`${drops.parentId} IN (${chainOf(row)})`)
   await deleteRetainedDrop(row, deleteBlobKeys)
   for (const file of attached) await deleteRetainedDrop(file, deleteBlobKeys)
-  if (row.kind === "markdown") await deleteDrafts(ids)
+  // Live drafts are Blob files too (#live-drafts), one per version anyone opened in the editor.
+  if (row.kind === "markdown" && LIVE_EDITING) await deleteBlobKeys(ids.map(draftPath))
 }
 
 /** Every drop in someone's Trash, for "Empty Trash". */

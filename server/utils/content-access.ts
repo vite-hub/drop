@@ -14,7 +14,8 @@ const notFound = () => new HTTPError({ status: 404, statusText: "Not found" })
 export async function requireBlobAccess(event: H3Event, key: string) {
   // Shared content must be rechecked after a ban or deletion, including raw downloads and images.
   event.res.headers.set("Cache-Control", "private, no-store")
-  if (key.startsWith("apps/")) throw notFound()
+  // App files are served from the app's own origin; live drafts only through their Realtime room.
+  if (key.startsWith("apps/") || key.startsWith("drafts/")) throw notFound()
   if (key.startsWith("code-images/")) {
     if (isExpiredCodeImage(key, new Date())) throw notFound()
     const [image] = await db.select({ ownerId: user.id, banned: user.banned, quarantined: rawFileQuarantine(event.url.pathname) }).from(codeImages)

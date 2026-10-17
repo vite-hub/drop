@@ -282,12 +282,12 @@ index 0000000000000000000000000000000000000000..ca142833cb7c14e9cc121753d581d3e2
 +import { n as ConnectionStatusIndicator, r as ConnectionStatusLabel, t as ConnectionStatus } from "./connection-status-D-6ksqhh.js";
 +export { ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel };
 diff --git a/dist/styles.css b/dist/styles.css
-index 4e7d1b8a7aa65e8f88bb7f0b484f460af31c9da5..1cb2495a752292ccb2e3e90c48ef291a5fd5145e 100644
+index 1202b1a94313fcc2ffec1d34e99b8d6380480a2b..7917a08d88c891b4f1940054ddc9578204023bd3 100644
 --- a/dist/styles.css
 +++ b/dist/styles.css
-@@ -3692,3 +3692,146 @@ button.vh-agent-tool-list__count:focus-visible {
- .vh-primitive-icon[data-icon="workspace"] {
-   --vh-primitive-icon-motion: translateY(-1px);
+@@ -4442,3 +4442,146 @@ button.vh-agent-tool-list__count:focus-visible {
+     scroll-snap-align: start;
+   }
  }
 +
 +/* Collaboration: AvatarStack, ConnectionStatus, SyncStatus, and the carets of TipTap's CollaborationCaret. */
@@ -533,12 +533,12 @@ index 0000000000000000000000000000000000000000..c3eb62f0c1675eabf96871b5f533e3fe
 +import { n as SyncStatusIndicator, r as SyncStatusLabel, t as SyncStatus } from "./sync-status-DT5pYbCU.js";
 +export { SyncStatus, SyncStatusIndicator, SyncStatusLabel };
 diff --git a/package.json b/package.json
-index 26b370d0d9444c00b76910d671ff496e9681bb84..d07b754e32e673fd1422b4d5e0f92b30af359312 100644
+index b98ba17bfb1870860c351d28f651e1606cce2f30..5752aa3867d2152fe6ae63a5b882043fac963349 100644
 --- a/package.json
 +++ b/package.json
-@@ -112,6 +112,18 @@
-       "types": "./dist/agent-unresolved-file.d.ts",
-       "import": "./dist/agent-unresolved-file.js"
+@@ -166,6 +166,18 @@
+       "require": "./dist/bubble.js",
+       "default": "./dist/bubble.js"
      },
 +    "./avatar-stack": {
 +      "types": "./dist/avatar-stack.d.ts",
@@ -554,4 +554,4 @@ index 26b370d0d9444c00b76910d671ff496e9681bb84..d07b754e32e673fd1422b4d5e0f92b30
 +    },
      "./headless": {
        "types": "./dist/headless.d.ts",
-       "import": "./dist/headless.js"
+       "import": "./dist/headless.js",

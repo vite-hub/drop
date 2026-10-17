@@ -8,8 +8,8 @@ type Published = { id: string; version: number; name: string }
 
 /**
  * Live editing of a Markdown drop. Everyone who opens it joins one Realtime room on the drop's draft, sees the others,
- * and types into the same text. Publish checkpoints the room and makes the draft the next version; the others follow.
- * Closing keeps the draft, so the next person who opens it continues where the room left off.
+ * and types into the same text. The room saves the draft on its own; publish saves it once more and makes it the next
+ * version, and the others follow. Closing keeps the draft, so the next person who opens it continues where the room left off.
  */
 export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: boolean }) {
   const notify = useNotify()
@@ -90,7 +90,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     if (!editing.value || publishing.value) return
     publishing.value = true
     try {
-      await realtime.history.checkpoint()
+      await realtime.save()
       const next = await $fetch<DropSummary & { unchanged?: boolean }>(`/api/drops/${drop.value.id}/versions`, { method: "POST", body: { force } })
       if (next.unchanged) {
         notify.done("Nothing to publish", "The draft matches the published version.")

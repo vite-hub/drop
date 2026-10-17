@@ -9,7 +9,7 @@ const { default: detailHandler } = await import("../../server/api/drops/[id].get
 const { default: patchHandler } = await import("../../server/api/drops/[id].patch.ts")
 const { default: deleteHandler } = await import("../../server/api/drops/[id].delete.ts")
 const { default: visitHandler } = await import("../../server/api/drops/[id]/visit.post.ts")
-const { default: cleanup } = await import("../../server/schedules/code-image-cleanup.ts")
+const { default: cleanup } = await import("../../server/schedules/cleanup.ts")
 const { DAY_MS, expiryLabel } = await import("../../shared/expiry.ts")
 
 migrate()

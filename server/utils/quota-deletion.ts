@@ -1,11 +1,8 @@
 import { like, sql } from "drizzle-orm"
-import type { DrizzleD1Database } from "drizzle-orm/d1"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../databases/config"
 import type { DropRow } from "./drops"
 import { bindQuotaSQL, deletionChainSQL } from "./quota-sql"
-
-const atomic = db as unknown as Pick<DrizzleD1Database, "batch">
 
 /** Remove the whole logical drop at the batch's snapshot, including a concurrent revision that already committed. */
 export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string[]) => Promise<void>) {
@@ -23,7 +20,7 @@ export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string
   }).from(keys).where(sql`1`)).onConflictDoNothing()
   const remove = db.delete(drops).where(sql`${drops.id} IN (${chain})`)
   const pending = db.select({ key: blobCleanup.blobKey }).from(blobCleanup).where(like(blobCleanup.id, `${token}:%`))
-  const [, , rows] = await atomic.batch([queue, remove, pending])
+  const [, , rows] = await db.batch([queue, remove, pending])
   // Cleanup's retry INSERT binds three values per key, below D1's 100-value ceiling.
   for (let offset = 0; offset < rows.length; offset += 25)
     await deleteKeys(rows.slice(offset, offset + 25).map(item => item.key))

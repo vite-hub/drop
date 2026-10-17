@@ -289,7 +289,7 @@ test("quota publishing keeps share review and uses one owner burst bucket for do
 
 test("cleanup releases image quota only after deleting its blob and retains OAuth cleanup", async () => {
   state.quotasEnabled = true
-  const { default: cleanup } = await import("../../server/schedules/code-image-cleanup.ts")
+  const { default: cleanup } = await import("../../server/schedules/cleanup.ts")
   const { getUsage } = await import("../../server/utils/quotas.ts")
   const result = await createCodeImage(event("/mcp", "POST"), who, { code: "const x = 1", format: "svg", scale: 4 })
   const key = new URL(result.url).pathname.slice(3)

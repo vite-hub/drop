@@ -1,4 +1,4 @@
-import { registerHooks, stripTypeScriptTypes } from "node:module"
+import { createRequire, registerHooks, stripTypeScriptTypes } from "node:module"
 import { execFileSync } from "node:child_process"
 import { readFileSync, readdirSync, existsSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
@@ -12,7 +12,11 @@ const stubs = {
   "vite-hub/database/drizzle": "export const db = globalThis.dropTest.db",
   "vite-hub/database": "export const defineDatabase = v => v",
   "vite-hub/blob": "export const blob = globalThis.dropTest.blob",
-  "nitro/cache": "export const defineCachedFunction = fn => fn",
+  // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".
+  "nitro/cache": `import { defineCachedFunction as define, setStorage } from ${JSON.stringify(pathToFileURL(createRequire(import.meta.resolve("nitro/package.json")).resolve("ocache")).href)}
+const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
+setStorage({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, value, options) => globalThis.dropTest.storage.setItem(key(k), value, options?.ttl ? { ttl: options.ttl } : undefined) })
+export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/functions", ...options })`,
   "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
   "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",

@@ -45,6 +45,6 @@ export default defineHandler(async (event) => {
   // Loaded lazily: middleware lands in the Worker's entry module, and its static imports would be re-exported
   // from there, which Workers rejects for anything that isn't a handler.
   const { renderMarkdownDocument } = await import("../utils/markdown-document")
-  const rendered = await renderMarkdownDocument(readSource, event.url.pathname, key)
+  const rendered = await renderMarkdownDocument(readSource, event.url.pathname, key, event)
   return event.req.method === "HEAD" ? "" : rendered
 })

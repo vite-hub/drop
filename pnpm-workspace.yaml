@@ -19,21 +19,20 @@ overrides:
   devalue: ^5.9.4
 
 patchedDependencies:
-  # Keeps Nuxt's dev-only module URL out of the Workers bundle.
+  # Under `nuxt dev` (cloudflare-dev), the Blob plugin stored unenv's process.env proxy as globalThis.__env__, which
+  # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings.
+  '@vite-hub/blob@0.0.4': patches/@vite-hub__blob@0.0.4.patch
+  # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461 (still open).
+  '@vite-hub/ui@0.0.4': patches/@vite-hub__ui@0.0.4.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
-  # Realtime: an authorize() hook per room, refused upgrades instead of silent sockets, checkpoints routed to the
-  # Durable Object that holds the rooms, relayed awareness ignored (not 4500), fast updates merged (not 1013), and no
-  # trailingNode (each peer added its own empty paragraph). Also RealtimeCaret and `carets` (vite-hub/vitehub#2459).
-  '@vite-hub/realtime@0.0.4': patches/@vite-hub__realtime@0.0.4.patch
-  # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461.
-  '@vite-hub/ui@0.0.4': patches/@vite-hub__ui@0.0.4.patch
-  # Lets drizzle-kit (which requires) load blob-database's workspaceHistorySchema.
-  '@vite-hub/workspace@0.0.4': patches/@vite-hub__workspace@0.0.4.patch
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
+  # Types `handleCacheHeaders` on cachedEventHandler options, and guards `nuxt dev`, where the nightly CLI gives Vite
+  # no httpServer for WebSocket upgrades.
   nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch
+  # Keeps Nuxt's dev-only module URL out of the Workers bundle.
   nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch
-  # Also forwards vite-hub/ui/avatar-stack, connection-status, and sync-status (vite-hub/vitehub#2461).
+  # Forwards vite-hub/ui/avatar-stack, connection-status, and sync-status to the patched @vite-hub/ui (#2461).
   vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
 
 # Only workerd (local Workers runtime) needs its install script.

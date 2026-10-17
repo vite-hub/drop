@@ -1,3 +1,4 @@
+import type { H3Event } from "h3"
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
 import { log } from "evlog"
@@ -134,11 +135,11 @@ export async function renderMarkdownBody(markdown: string): Promise<{ title: str
  * Blobs never change once uploaded, so a render is keyed by its blob key and cached for a month in the Worker's
  * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
  */
-export const renderMarkdownCached = (key: string, markdown: string | (() => Promise<string>)) =>
-  cachedMarkdown(key, typeof markdown === "string" ? async () => markdown : markdown, renderMarkdownBody)
+export const renderMarkdownCached = (key: string, markdown: string | (() => Promise<string>), event?: H3Event) =>
+  cachedMarkdown(key, typeof markdown === "string" ? async () => markdown : markdown, renderMarkdownBody, event)
 
-export async function renderMarkdownDocument(markdown: string | (() => Promise<string>), pathname: string, key: string): Promise<string> {
-  const { title, html: body } = await renderMarkdownCached(key, markdown)
+export async function renderMarkdownDocument(markdown: string | (() => Promise<string>), pathname: string, key: string, event?: H3Event): Promise<string> {
+  const { title, html: body } = await renderMarkdownCached(key, markdown, event)
   return `<!doctype html>
 <html lang="en">
 <head>

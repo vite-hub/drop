@@ -3,7 +3,7 @@ import { beforeEach, test } from "node:test"
 import { log } from "evlog"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 const { getUsage, withDropQuota } = await import("../../server/utils/quotas.ts")
-const { default: cleanup } = await import("../../server/schedules/code-image-cleanup.ts")
+const { default: cleanup } = await import("../../server/schedules/cleanup.ts")
 
 migrate()
 beforeEach(() => { reset(); state.quotasEnabled = true })
