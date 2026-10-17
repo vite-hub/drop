@@ -233,7 +233,8 @@ watch([ready, pageComments], () => {
 const areaMode = ref(false)
 // TODO(file-comments): files without a preview (PDFs, zips) have nothing to anchor a comment to, so they take none yet.
 // Comments on the file as a whole would close that gap.
-const canDrawArea = computed(() => drop.value.canComment && !editing.value && !lightbox.value && drop.value.kind !== "file")
+// A site takes its comments on the site itself (ViewerSite).
+const canDrawArea = computed(() => drop.value.canComment && !editing.value && !lightbox.value && drop.value.kind !== "file" && drop.value.kind !== "site")
 function toggleArea() {
   if (!canDrawArea.value) return
   popover.value = selection.value = null
@@ -455,6 +456,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
 
       <div class="relative flex min-h-0 flex-1 flex-col">
         <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
+        <ViewerSite v-else-if="drop.kind === 'site'" :drop="drop" :inset="floating ? FLOATING_INSET : 0" :public-view="publicView" />
         <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
           <div>
             <UIcon name="i-ph-file" class="size-8 text-dimmed" />

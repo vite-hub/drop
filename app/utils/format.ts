@@ -8,8 +8,9 @@ export const KIND_ICONS: Record<string, string> = {
   image: "i-ph-image",
   file: "i-ph-file",
   app: "i-ph-folder",
+  site: "i-ph-globe",
 }
 
-export const KIND_LABELS: Record<string, string> = { markdown: "Markdown", html: "HTML", image: "Image", file: "File", app: "App" }
+export const KIND_LABELS: Record<string, string> = { markdown: "Markdown", html: "HTML", image: "Image", file: "File", app: "App", site: "Site" }
 
 export const VIA_LABELS: Record<string, string> = { agent: "MCP", browser: "the browser" }
