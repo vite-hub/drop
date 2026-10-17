@@ -104,3 +104,17 @@ index 10113ab28266e2462241abfd5609765dcc46b373..657a38688bf48c80e65e9c0f7a6e5ace
      "./ui/message": {
        "types": "./dist/ui/message.d.ts",
        "import": "./dist/ui/message.js",
+diff --git a/dist/src-B5dLSX4-.js b/dist/src-B5dLSX4-.js
+index 879443e229c19d16a10d5a076303604938bb1df4..d96e966431ea0f38236523ca802f4f5804471f46 100644
+--- a/dist/src-B5dLSX4-.js
++++ b/dist/src-B5dLSX4-.js
+@@ -6048,7 +6048,8 @@ function deploymentPlugins(plan, requestedServices, blobEnabled, services, optio
+ 				...cloneRecord(options.rateLimit === true ? void 0 : options.rateLimit),
+ 				...cloneRecord(config.rateLimit),
+ 				namespace: name,
+-				provider: plan.services.rateLimit.adapter
++				// Cloudflare Rate Limit bindings exist only in the built wrangler.json, so `serve` keeps one in-memory limiter.
++				provider: building ? plan.services.rateLimit.adapter : "memory"
+ 			};
+ 			if (requestedServices.includes("sandbox") && plan.services.sandbox.supported) config.sandbox = {
+ 				...cloneRecord(config.sandbox),

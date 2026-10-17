@@ -23,7 +23,8 @@ patchedDependencies:
   # module and dropped it, so signed-in requests failed on `env.drop` until /api/auth ran again.
   '@vite-hub/auth@0.0.4': patches/@vite-hub__auth@0.0.4.patch
   # Under `nuxt dev` (cloudflare-dev), the Blob plugin stored unenv's process.env proxy as globalThis.__env__, which
-  # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings.
+  # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings
+  # (vite-hub/vitehub#2468).
   '@vite-hub/blob@0.0.4': patches/@vite-hub__blob@0.0.4.patch
   # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461 (still open).
   '@vite-hub/ui@0.0.4': patches/@vite-hub__ui@0.0.4.patch
@@ -36,6 +37,8 @@ patchedDependencies:
   # Keeps Nuxt's dev-only module URL out of the Workers bundle.
   nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch
   # Forwards vite-hub/ui/avatar-stack, connection-status, and sync-status to the patched @vite-hub/ui (#2461).
+  # Keeps Rate Limit in memory under `nuxt dev`: the preset pinned the Cloudflare provider, whose bindings exist only
+  # in the built wrangler.json, so every limited route returned 500 in dev (vite-hub/vitehub#2467).
   vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
 
 # Only workerd (local Workers runtime) needs its install script.
