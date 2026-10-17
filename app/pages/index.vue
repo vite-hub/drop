@@ -7,22 +7,10 @@ useSeoMeta({
 })
 
 const route = useRoute()
-const { signedIn, next, signIn, signInWithGitHub } = useGitHubSignIn()
+const { signedIn, signInWithGitHub } = useGitHubSignIn()
 
-// `nuxt dev` has no GitHub app: /?signin=1 shows a tiny email form instead.
+// `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.
 const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
-const dev = reactive({ email: "", password: "", error: "", pending: false })
-async function signInWithEmail() {
-  dev.pending = true
-  dev.error = ""
-  const { error } = await signIn.email({ email: dev.email, password: dev.password, callbackURL: next.value })
-  dev.pending = false
-  if (error) dev.error = error.message ?? "Couldn't sign in."
-  else {
-    clearNuxtData("me")
-    await navigateTo(next.value)
-  }
-}
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
@@ -86,13 +74,7 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
               <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="Read the docs" to="/docs" />
             </div>
 
-            <form v-if="devSignIn && !signedIn" class="mt-6 flex w-full max-w-xs flex-col gap-2 rounded-lg border border-dashed border-accented bg-default p-3 text-left" @submit.prevent="signInWithEmail">
-              <p class="label-mono">Dev sign-in</p>
-              <UInput v-model="dev.email" autocomplete="email" placeholder="Email" size="sm" type="email" required />
-              <UInput v-model="dev.password" autocomplete="current-password" placeholder="Password" size="sm" type="password" required />
-              <UButton block color="neutral" variant="outline" size="sm" label="Sign in" :loading="dev.pending" type="submit" />
-              <p v-if="dev.error" class="text-xs text-error" role="alert">{{ dev.error }}</p>
-            </form>
+            <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 max-w-xs" />
           </div>
           <LandingHeroStory class="mt-14" />
         </div>

@@ -4,6 +4,7 @@ withDefaults(defineProps<{ wide?: boolean }>(), { wide: false })
 
 const route = useRoute()
 const { signedIn, signInWithGitHub } = useGitHubSignIn()
+const dev = import.meta.dev
 </script>
 
 <template>
@@ -34,6 +35,8 @@ const { signedIn, signInWithGitHub } = useGitHubSignIn()
         </ClientOnly>
         <LandingGitHubStars />
         <UButton v-if="signedIn" class="ml-1" color="neutral" variant="outline" size="sm" label="Open Drop" to="/drops" />
+        <!-- `nuxt dev` has no GitHub app: /signin has the email form there. -->
+        <UButton v-else-if="dev" class="ml-1" color="neutral" variant="outline" size="sm" label="Sign in" to="/signin" />
         <UButton v-else class="ml-1" color="neutral" variant="outline" size="sm" label="Sign in" @click="signInWithGitHub" />
       </div>
     </div>

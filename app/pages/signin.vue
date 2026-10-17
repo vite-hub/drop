@@ -7,6 +7,7 @@ const { signOut } = useUserSession(useNuxtApp().$auth)
 const { data: method } = await useApi("/api/sign-in", { key: "sign-in" })
 const pending = ref(false)
 const error = ref("")
+const dev = import.meta.dev
 
 async function connect() {
   pending.value = true
@@ -39,11 +40,12 @@ async function connect() {
       <div class="rounded-xl border border-default p-6">
         <h1 class="text-lg font-semibold text-highlighted">{{ me ? 'Choose your Drop account' : 'Sign in to Drop' }}</h1>
         <p v-if="me" class="mt-2 text-sm text-muted">Signed in as <span class="font-medium text-highlighted">{{ me.email }}</span>.</p>
-        <p class="mt-2 text-sm leading-relaxed text-muted">Private drops belong to the GitHub account you used to connect your agent on this Drop site.</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">The first sign-in creates your account. Use the same account your agent connects with: private drops belong to it.</p>
         <UButton block class="mt-6" color="neutral" icon="i-simple-icons-github" :label="me ? 'Use another GitHub account' : 'Sign in with GitHub'" :loading="pending" @click="connect" />
         <UButton v-if="me" block class="mt-2" color="neutral" label="Continue with this account" :to="next" variant="outline" :disabled="pending" />
         <p v-if="error" class="mt-4 text-sm text-error" role="alert">{{ error }}</p>
       </div>
+      <DevSignIn v-if="dev && !me" class="mt-4" />
     </div>
   </main>
 </template>
