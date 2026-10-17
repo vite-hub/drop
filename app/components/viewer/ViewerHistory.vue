@@ -24,7 +24,7 @@ function talk(version: DropVersion) {
       <button
         :aria-label="`What changed in v${version.version}`"
         :aria-pressed="selected === version.id"
-        class="group relative flex w-full cursor-pointer gap-3 rounded-md px-3 py-2.5 text-left text-[13px] outline-none hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) aria-pressed:bg-elevated"
+        class="group relative flex w-full cursor-pointer gap-3 rounded-md px-3 py-2.5 text-left text-sm outline-none hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) aria-pressed:bg-elevated"
         type="button"
         @click="emit('open', version)"
       >

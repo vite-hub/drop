@@ -47,7 +47,7 @@ function menu(member: Member): DropdownMenuItem[][] {
       <div v-for="role in ROLES" :key="role" class="px-4 py-3">
         <p class="flex items-center gap-2 text-sm font-medium text-highlighted">
           {{ ROLE_LABELS[role] }}
-          <span v-if="role === DEFAULT_ROLE" class="label-mono text-[10px]">Default</span>
+          <span v-if="role === DEFAULT_ROLE" class="label-mono">Default</span>
         </p>
         <p class="mt-0.5 text-xs text-muted">{{ ROLE_SUMMARY[role] }}</p>
       </div>

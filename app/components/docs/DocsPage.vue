@@ -13,7 +13,7 @@ useSeoMeta({ title: () => props.title, description: () => props.lead, ogTitle: (
 <template>
   <article class="max-w-3xl">
     <header class="mb-10">
-      <h1 class="text-[2rem] leading-tight font-semibold tracking-tight text-highlighted">{{ title }}</h1>
+      <h1 class="text-3xl font-semibold tracking-tight text-highlighted">{{ title }}</h1>
       <p class="mt-3 text-base leading-relaxed text-muted">{{ lead }}</p>
     </header>
 

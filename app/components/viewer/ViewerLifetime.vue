@@ -40,7 +40,7 @@ const choose = (lifetime: Lifetime) => run(() => setLifetime(props.drop, { lifet
 </script>
 
 <template>
-  <section v-if="days > 0" class="space-y-2.5 text-[13px]">
+  <section v-if="days > 0" class="space-y-2.5 text-sm">
     <div class="flex items-center gap-3">
       <h3 class="w-20 shrink-0 text-muted">Lifetime</h3>
       <p class="min-w-0 flex-1 truncate text-highlighted tabular-nums">{{ status }}</p>

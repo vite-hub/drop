@@ -25,7 +25,7 @@ const versionId = (version: number) => props.versions.find(item => item.version 
       <li v-for="comment in visible" :key="comment.id" class="space-y-2 px-4 py-3">
         <button class="w-full cursor-pointer space-y-2 text-left" type="button" @click="emit('focus', comment)">
           <ViewerCommentHeader :comment="comment" :current="version" />
-          <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-[13px] text-muted">{{ comment.quote }}</p>
+          <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">{{ comment.quote }}</p>
           <p class="text-sm">{{ comment.body }}</p>
         </button>
         <button
@@ -43,7 +43,7 @@ const versionId = (version: number) => props.versions.find(item => item.version 
       </li>
       <li v-for="comment in earlier" :key="comment.id" class="space-y-2 px-4 py-3">
         <ViewerCommentHeader :comment="comment" :current="version" />
-        <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-dashed border-default pl-2.5 text-[13px] text-dimmed line-through decoration-(--ui-border-accented)">{{ comment.quote }}</p>
+        <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-dashed border-default pl-2.5 text-sm text-dimmed line-through decoration-(--ui-border-accented)">{{ comment.quote }}</p>
         <p class="text-sm">{{ comment.body }}</p>
         <div class="flex items-center gap-3 text-xs">
           <NuxtLink v-if="versionId(comment.version)" class="text-muted hover:text-highlighted" :to="`/drops/${versionId(comment.version)}`">See it on v{{ comment.version }}</NuxtLink>

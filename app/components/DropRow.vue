@@ -59,24 +59,24 @@ const menu = computed(() => [
       </p>
     </div>
     <div class="hidden min-w-0 md:block">
-      <span v-if="drop.owner" class="flex min-w-0 items-center gap-1.5 text-[13px] text-highlighted" :title="drop.owner.name">
+      <span v-if="drop.owner" class="flex min-w-0 items-center gap-1.5 text-sm text-highlighted" :title="drop.owner.name">
         <UAvatar :alt="drop.owner.name" class="size-3.5 text-[8px]" :src="drop.owner.image ?? undefined" />
         <span class="truncate">{{ drop.owner.name }}</span>
       </span>
-      <span v-else class="flex min-w-0 items-center gap-1.5 text-[13px] text-highlighted" :title="drop.actorName">
+      <span v-else class="flex min-w-0 items-center gap-1.5 text-sm text-highlighted" :title="drop.actorName">
         <AgentIcon class="size-3.5" :kind="drop.actorKind" :name="drop.actorName" />
         <span class="truncate">{{ drop.actorName }}</span>
       </span>
       <span class="mt-0.5 block text-xs text-muted tabular-nums"><TimeAgo :at="drop.updatedAt" /></span>
     </div>
-    <span v-if="trashed" class="hidden text-[13px] text-muted md:block">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
-    <span v-else-if="theirs" class="hidden items-center gap-1.5 text-[13px] text-muted md:flex">
+    <span v-if="trashed" class="hidden text-sm text-muted md:block">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
+    <span v-else-if="theirs" class="hidden items-center gap-1.5 text-sm text-muted md:flex">
       <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3.5" />{{ status }}
     </span>
     <USelect
       v-else
       aria-label="Who can open it"
-      class="relative z-10 hidden w-full text-[13px] md:inline-flex"
+      class="relative z-10 hidden w-full text-sm md:inline-flex"
       :class="shared ? 'text-highlighted' : 'text-muted'"
       color="neutral"
       :icon="VISIBILITY_ICONS[drop.visibility]"

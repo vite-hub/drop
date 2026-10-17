@@ -16,15 +16,15 @@ const { skills, status, setEnabled } = useSkills()
     </div>
     <p v-else-if="!skills.length" class="text-sm text-muted">No skills are on. An admin can turn them on here.</p>
 
-    <ul v-else class="divide-y divide-default border-y border-default">
-      <li v-for="skill in skills" :key="skill.name" class="flex items-start justify-between gap-6 py-6">
+    <ul v-else class="divide-y divide-default rounded-lg border border-default">
+      <li v-for="skill in skills" :key="skill.name" class="flex items-start justify-between gap-6 p-4">
         <div class="min-w-0">
           <h2 class="flex items-center gap-2 text-sm font-medium text-highlighted">
             <span class="font-mono">{{ skill.name }}</span>
             <UBadge v-if="!skill.enabled" color="neutral" variant="subtle" size="sm">Off</UBadge>
           </h2>
-          <p class="mt-1.5 max-w-xl text-sm leading-relaxed text-toned">{{ skill.description }}</p>
-          <a class="mt-3 inline-flex items-center gap-1 text-sm font-medium text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 transition-colors hover:decoration-(--ui-text-highlighted)" :href="skill.source" target="_blank" rel="noreferrer">
+          <p class="mt-1 max-w-xl text-sm leading-relaxed text-muted">{{ skill.description }}</p>
+          <a class="mt-2 inline-flex items-center gap-1 text-sm font-medium text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 transition-colors hover:decoration-(--ui-text-highlighted)" :href="skill.source" target="_blank" rel="noreferrer">
             Read on GitHub<UIcon name="i-ph-arrow-up-right" class="size-3.5" />
           </a>
         </div>

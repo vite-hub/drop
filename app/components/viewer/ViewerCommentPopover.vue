@@ -52,7 +52,7 @@ defineExpose({ fail: () => (busy.value = false) })
     </div>
     <template v-else-if="comment">
       <ViewerCommentHeader :comment="comment" />
-      <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-[13px] text-muted">{{ comment.quote }}</p>
+      <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">{{ comment.quote }}</p>
       <p class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
       <div v-if="canManage || comment.mine" class="flex justify-end gap-1.5">
         <UButton aria-label="Delete comment" color="neutral" icon="i-ph-trash" size="sm" variant="ghost" @click="emit('delete', comment.id)" />

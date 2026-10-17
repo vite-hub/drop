@@ -21,7 +21,7 @@ const access = computed(() => {
 
 <template>
   <div class="space-y-6 p-4">
-    <dl class="space-y-2.5 text-[13px]">
+    <dl class="space-y-2.5 text-sm">
       <div class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Dropped by</dt>
         <dd class="flex min-w-0 items-center gap-1.5">

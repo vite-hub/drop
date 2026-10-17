@@ -77,7 +77,7 @@ async function answer(accept: boolean) {
         <DropMark class="h-5 w-7" />Drop
       </NuxtLink>
 
-      <div class="rounded-xl border border-default bg-default p-6 shadow-sm">
+      <div class="rounded-xl border border-default bg-default p-6">
         <template v-if="!valid">
           <h1 class="text-lg font-semibold tracking-tight text-highlighted">This link has expired</h1>
           <p class="mt-2 text-sm leading-relaxed text-muted">Start the connection again from your agent. It opens a fresh link.</p>
