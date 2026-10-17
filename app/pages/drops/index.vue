@@ -140,7 +140,7 @@ async function newSite() {
           :items="[
             { label: `All ${counts.all}`, value: 'all' },
             { label: `Private ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
-            { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-globe' },
+            { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-share-network' },
             { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
             { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-ph-trash' },
           ]"

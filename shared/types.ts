@@ -12,8 +12,9 @@ export const ACCESS_RANK: Record<Access, number> = { view: 0, comment: 1, edit: 
 export const ACCESS_LABELS: Record<Access, string> = { view: "Can view", comment: "Can comment", edit: "Can edit" }
 export const ACCESS_HINTS: Record<Access, string> = { view: "Read only.", comment: "View and leave comments.", edit: "Comment, and edit Markdown together after signing in." }
 
-export const VISIBILITY_LABELS: Record<Visibility, string> = { private: "Only you", team: "Your team", shared: "Anyone with the link" }
-export const VISIBILITY_HINTS: Record<Visibility, string> = { private: "Your connected agents can still read it.", team: "Everyone signed in to this Drop can find it.", shared: "No sign-in needed." }
+/** One name per level, the same on rows, buttons, menus, and the share dialog. */
+export const VISIBILITY_LABELS: Record<Visibility, string> = { private: "Private", team: "Team", shared: "Public link" }
+export const VISIBILITY_HINTS: Record<Visibility, string> = { private: "Only you. Your connected agents can still read it.", team: "Everyone signed in to this Drop can find and open it.", shared: "Anyone with the link can open it, no sign-in needed." }
 export const VISIBILITY_ICONS: Record<Visibility, string> = { private: "i-ph-lock", team: "i-ph-users", shared: "i-ph-globe" }
 
 export interface DropSummary {

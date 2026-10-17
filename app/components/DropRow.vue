@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type DropSummary, type Visibility, VISIBILITY_ICONS } from "#shared/types"
+import { type DropSummary, type Visibility, VISIBILITY_HINTS, VISIBILITY_ICONS, VISIBILITY_LABELS } from "#shared/types"
 import { dropPath } from "#shared/links"
 
 // A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`).
@@ -15,9 +15,9 @@ const folder = computed(() => props.drop.kind === "folder")
 const shared = computed(() => props.drop.visibility !== "private")
 // Someone else's drop, in Shared with me: open it and copy its link, nothing else.
 const theirs = computed(() => Boolean(props.drop.owner))
-const AUDIENCES: Record<Visibility, string> = { private: "Private", team: "Team", shared: "Public" }
-const audiences = (Object.keys(AUDIENCES) as Visibility[]).map(value => ({ value, label: AUDIENCES[value], icon: VISIBILITY_ICONS[value] }))
-const status = computed(() => props.drop.quarantinedAt ? "Quarantined" : props.drop.shareReview === "pending" ? "Pending review" : props.drop.shareReview === "rejected" ? "Rejected" : AUDIENCES[props.drop.visibility])
+const { data: me } = useMe()
+const audiences = (Object.keys(VISIBILITY_LABELS) as Visibility[]).map(value => ({ value, label: VISIBILITY_LABELS[value], icon: VISIBILITY_ICONS[value] }))
+const status = computed(() => props.drop.quarantinedAt ? "Quarantined" : props.drop.shareReview === "pending" ? "Pending review" : props.drop.shareReview === "rejected" ? "Rejected" : VISIBILITY_LABELS[props.drop.visibility])
 
 const link = useShareUrl(() => props.drop)
 const detail = computed(() => {
@@ -26,17 +26,30 @@ const detail = computed(() => {
   return `${props.drop.kind === "app" && props.drop.paths ? `${props.drop.filename} · ${props.drop.paths.length} files` : props.drop.filename}${where}`
 })
 
-const SHARED_NOTES: Record<Visibility, string> = { private: "Only you can open it.", team: "Everyone in your team can open it.", shared: "Anyone with the link can open it." }
+const SHARED_TITLES: Record<Visibility, string> = { private: "Private again", team: "Shared with your team", shared: "Public link on" }
 async function setAudience(next: Visibility) {
-  if (next === props.drop.visibility) return
+  if (next === props.drop.visibility) return true
   // Sharing a private Markdown doc with the team means working on it together, so it opens for editing.
   const access = next === "team" && !shared.value && props.drop.kind === "markdown" ? "edit" : undefined
-  if (await setVisibility(props.drop, next, access)) notify.done(next === "private" ? "Private again" : "Shared", SHARED_NOTES[next])
+  if (!await setVisibility(props.drop, next, access)) return false
+  notify.done(SHARED_TITLES[next], VISIBILITY_HINTS[next])
+  return true
 }
 
 async function copyLink() {
+  // Copying never widens a share on its own: the toast says who each choice lets in, and the team comes first.
   if (!shared.value) {
-    notify.info({ title: "This drop is private", description: "Share it first so the link works for others.", actions: [{ label: "Share & copy", color: "neutral", variant: "outline", onClick: () => void setAudience("shared").then(copyLink) }] })
+    const shareAndCopy = (next: Visibility) => async () => {
+      if (await setAudience(next)) await copyLink()
+    }
+    notify.info({
+      title: "This drop is private",
+      description: me.value?.team ? "Share it with your team, or turn on a public link anyone can open." : "Turn on a public link to copy it. Anyone with the link can open it.",
+      actions: [
+        ...(me.value?.team ? [{ label: "Share with team & copy", color: "neutral" as const, variant: "outline" as const, onClick: shareAndCopy("team") }] : []),
+        { label: "Public link & copy", color: "neutral", variant: me.value?.team ? "ghost" : "outline", onClick: shareAndCopy("shared") },
+      ],
+    })
     return
   }
   await copy(link.value, "Link copied")
@@ -45,7 +58,7 @@ async function copyLink() {
 const menu = computed(() => [
   [
     { label: "Open", icon: "i-ph-eye", to: `/drops/${props.drop.id}` },
-    { label: "Open public page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
+    { label: "Open shared page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
     { label: "Copy link", icon: "i-ph-link", onSelect: copyLink },
   ],
   ...(theirs.value ? [] : [[
@@ -56,7 +69,7 @@ const menu = computed(() => [
 </script>
 
 <template>
-  <li class="group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 py-3 pr-4 transition-colors hover:bg-muted md:grid-cols-[auto_minmax(0,1fr)_8.5rem_6.5rem_auto]" :class="INDENT[Math.min(depth, INDENT.length - 1)]">
+  <li class="group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 py-3 pr-4 transition-colors hover:bg-muted md:grid-cols-[auto_minmax(0,1fr)_8.5rem_8rem_auto]" :class="INDENT[Math.min(depth, INDENT.length - 1)]">
     <button
       v-if="folder && drop.items && !trashed"
       :aria-expanded="open"

@@ -32,7 +32,7 @@ async function setAccess(level: Access) {
     <template #body>
       <p v-if="drop.sharedFrom" class="mb-3 flex items-start gap-2 text-sm text-muted">
         <UIcon name="i-ph-folder" class="mt-0.5 size-4 shrink-0" />
-        <span>Shared through {{ drop.sharedFrom.title }}: {{ VISIBILITY_LABELS[drop.visibility].toLowerCase() }} {{ ACCESS_LABELS[drop.access].toLowerCase() }}. Its own share below can only reach wider.</span>
+        <span>Shared through {{ drop.sharedFrom.title }} ({{ VISIBILITY_LABELS[drop.visibility] }}, {{ ACCESS_LABELS[drop.access].toLowerCase() }}). Its own share below can only reach wider.</span>
       </p>
       <div class="divide-y divide-default rounded-lg border border-default">
         <div class="flex items-center justify-between gap-3 p-3">
