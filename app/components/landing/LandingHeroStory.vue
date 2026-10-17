@@ -49,7 +49,7 @@ const { beat, index, at, go, indexOf, playing, reduced } = useStoryboard(stage, 
 const scene = computed(() => beat.value[0] as "a" | "b" | "c" | "d" | "e" | "f")
 const windows = computed(() => ({
   terminal: "ac".includes(scene.value) ? "front" : "back",
-  browser: scene.value === "a" ? "hidden" : "bdf".includes(scene.value) ? "front" : "back",
+  browser: "bdf".includes(scene.value) ? "front" : "back",
   chat: scene.value === "e" ? "front" : "hidden",
 } as const))
 
@@ -131,7 +131,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
           </LandingWindow>
 
           <!-- The drop in the browser -->
-          <LandingWindow :title="`drop.vitehub.dev/d/${v2 ? 'm8r2' : 'k3x9'}`" :frame="FRAMES.browser" :state="windows.browser" url>
+          <LandingWindow :title="`drop.vitehub.dev/d/${v2 ? 'm8r2' : 'k3x9'}`" :frame="FRAMES.browser" :state="windows.browser" :blank="!at('a.drop')" url>
             <div class="relative flex h-full flex-col">
               <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm">
                 <DropMark class="h-3.5 shrink-0" />

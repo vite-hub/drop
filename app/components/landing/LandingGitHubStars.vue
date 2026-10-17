@@ -13,7 +13,7 @@ const label = computed(() => (stars.value === null ? "" : stars.value >= 1000 ? 
 <template>
   <a
     aria-label="Drop on GitHub"
-    class="group ml-1 inline-flex h-8 items-center overflow-hidden rounded-md border border-default text-[13px] font-medium text-highlighted transition-colors hover:bg-elevated"
+    class="group ml-1 inline-flex h-8 items-center overflow-hidden rounded-md border border-default text-sm font-medium text-highlighted shadow-xs transition-colors hover:bg-elevated dark:bg-elevated/40"
     href="https://github.com/vite-hub/drop"
     rel="noreferrer"
     target="_blank"

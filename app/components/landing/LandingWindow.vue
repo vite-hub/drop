@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // A window on a stage: in front, behind, or gone. A compact stage centers the front one and hides the rest.
+// A blank window is already open but empty, like a new tab, until the agent makes what it shows; then the page fades in.
 type Frame = { x: number; y: number; w: number; h: number }
-const props = defineProps<{ title: string; frame: Frame; state: "front" | "back" | "hidden"; dark?: boolean; url?: boolean }>()
+const props = defineProps<{ title: string; frame: Frame; state: "front" | "back" | "hidden"; dark?: boolean; url?: boolean; blank?: boolean }>()
 const compact = inject(STAGE_COMPACT, ref(false))
 defineSlots<{ default(): unknown; icon?(): unknown }>()
 
@@ -30,14 +31,16 @@ const shown = computed(() => props.state === "front" || (props.state === "back" 
       <div class="absolute inset-x-24 flex justify-center">
         <span
           class="flex max-w-full items-center gap-1.5 truncate text-xs"
-          :class="[dark ? 'text-[#8b8fa3]' : 'text-muted', url && 'rounded-md border border-default bg-default px-3 py-0.5 font-mono text-[11px]']"
+          :class="[dark ? 'text-[#8b8fa3]' : 'text-muted', url && 'h-5 rounded-md border border-default bg-default px-3 py-0.5 font-mono text-[11px]', url && blank && 'w-56']"
         >
-          <slot name="icon" />{{ title }}
+          <template v-if="!blank"><slot name="icon" />{{ title }}</template>
         </span>
       </div>
     </div>
     <div class="relative min-h-0 flex-1">
-      <slot />
+      <div v-if="!blank" class="absolute inset-0 [animation:fade-in_500ms_ease-out]">
+        <slot />
+      </div>
     </div>
   </div>
 </template>

@@ -120,11 +120,19 @@ export default defineNuxtConfig({
     clientBundle: {
       scan: true,
       icons: [
-        "ph:file-text", "ph:code", "ph:image", "ph:file", "ph:folder", "ph:robot", "ph:key", "ph:user",
+        "ph:file-text", "ph:code", "ph:image", "ph:file", "ph:folder", "ph:sparkle", "ph:key", "ph:user",
         "simple-icons:claude", "simple-icons:openai", "simple-icons:cursor", "simple-icons:githubcopilot", "simple-icons:googlegemini",
         "simple-icons:windsurf", "simple-icons:zedindustries", "simple-icons:opencode", "simple-icons:githubactions",
         // Host icons in the docs (app/utils/docs.ts).
         "simple-icons:cloudflare", "simple-icons:vercel", "simple-icons:netlify", "simple-icons:deno", "ph:hard-drives",
+        // Nuxt UI's own icons (app.config ui.icons): the scanner reads templates, not app.config, so without these the
+        // color-mode toggle, close buttons, carets, and spinners render empty.
+        "ph:arrow-counter-clockwise", "ph:arrow-down", "ph:arrow-left", "ph:arrow-right", "ph:arrow-up", "ph:arrow-up-right",
+        "ph:caret-double-left", "ph:caret-double-right", "ph:caret-down", "ph:caret-left", "ph:caret-right", "ph:caret-up",
+        "ph:check", "ph:check-circle", "ph:circle-notch", "ph:copy", "ph:dots-six-vertical", "ph:dots-three", "ph:eye",
+        "ph:eye-slash", "ph:folder-open", "ph:hash", "ph:info", "ph:lightbulb", "ph:list", "ph:magnifying-glass", "ph:minus",
+        "ph:monitor", "ph:moon", "ph:plus", "ph:sidebar-simple", "ph:star", "ph:stop", "ph:sun", "ph:upload-simple",
+        "ph:warning", "ph:warning-circle", "ph:x", "ph:x-circle",
       ],
     },
   },

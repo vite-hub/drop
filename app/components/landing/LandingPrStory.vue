@@ -70,7 +70,7 @@ const click = computed(() => (beat.value === "p.tab" ? BEATS[index.value]![1] - 
             </div>
           </LandingWindow>
 
-          <LandingWindow title="github.com/acme/web/pull/142" :frame="FRAMES.pr" :state="onPr ? 'front' : at('p.pr') ? 'back' : 'hidden'" url>
+          <LandingWindow title="github.com/acme/web/pull/142" :frame="FRAMES.pr" :state="onPr ? 'front' : 'back'" :blank="!at('p.pr')" url>
             <div class="flex h-full flex-col overflow-hidden text-xs">
               <div class="px-5 pt-4">
                 <p class="text-lg font-semibold tracking-tight text-highlighted">Fix pricing card overflow on mobile <span class="font-normal text-dimmed">#142</span></p>

@@ -47,7 +47,7 @@ function play() {
           </div>
         </LandingWindow>
 
-        <LandingWindow title="drop.vitehub.dev/d/c4tc" :frame="FRAMES.browser" :state="live ? 'front' : at('g.publish') ? 'back' : 'hidden'" url>
+        <LandingWindow title="drop.vitehub.dev/d/c4tc" :frame="FRAMES.browser" :state="live ? 'front' : 'back'" :blank="!at('g.publish')" url>
           <div class="flex h-full flex-col">
             <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm" aria-hidden="true">
               <DropMark class="h-3.5 shrink-0" />

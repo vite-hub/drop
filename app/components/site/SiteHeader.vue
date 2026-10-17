@@ -23,17 +23,18 @@ const { signedIn, signInWithGitHub } = useGitHubSignIn()
         <UButton
           color="neutral"
           variant="ghost"
+          size="sm"
           label="Docs"
           to="/docs"
           :class="route.path.startsWith('/docs') ? 'text-highlighted' : 'text-muted'"
         />
         <ClientOnly>
-          <UColorModeButton />
+          <UColorModeButton size="sm" />
           <template #fallback><span class="size-8" /></template>
         </ClientOnly>
         <LandingGitHubStars />
-        <UButton v-if="signedIn" class="ml-1" color="neutral" variant="outline" label="Open Drop" to="/drops" />
-        <UButton v-else class="ml-1" color="neutral" variant="outline" label="Sign in" @click="signInWithGitHub" />
+        <UButton v-if="signedIn" class="ml-1" color="neutral" variant="outline" size="sm" label="Open Drop" to="/drops" />
+        <UButton v-else class="ml-1" color="neutral" variant="outline" size="sm" label="Sign in" @click="signInWithGitHub" />
       </div>
     </div>
   </header>
