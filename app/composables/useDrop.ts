@@ -1,6 +1,7 @@
 import { dropPath } from "#shared/links"
 import type { CommentReply, DropComment, DropDetail, DropVersion } from "#shared/types"
 import type { CommentInput } from "#shared/schemas"
+import * as v from "valibot"
 
 /**
  * One drop and its comments, with the actions the viewer needs. Keys follow the id, so the cache
@@ -82,4 +83,14 @@ export function useVersionTo() {
   const state = injectDrop()!
   return (version: Pick<DropVersion, "id" | "version">) =>
     route.path.startsWith("/d/") && state.drop.data.value ? dropPath(state.drop.data.value, version.version) : `/drops/${version.id}`
+}
+
+/** The drop API refused because the drop's share waits for the operator's review (server/api/drops/[id].get.ts). */
+export const waitingForReview = (error: unknown) => errorData(error, v.object({ shareReview: v.literal("pending") })) !== undefined
+
+/** Where the visitor is, for the sign-in redirect and the retry link: the path and query, not the hash SSR never sees. */
+export function useHerePath() {
+  const route = useRoute()
+  const router = useRouter()
+  return computed(() => router.resolve({ path: route.path, query: route.query }).fullPath)
 }

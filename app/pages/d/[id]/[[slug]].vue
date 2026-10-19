@@ -33,7 +33,8 @@ await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
 // A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.
 onMounted(() => drop.data.value && $fetch(`/api/drops/${drop.data.value.id}/visit`, { method: "POST" }).catch(() => {}))
-const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview?: string } } | undefined)?.data?.shareReview === "pending")
+const waiting = computed(() => waitingForReview(drop.error.value))
+const here = useHerePath()
 </script>
 
 <template>
@@ -42,7 +43,7 @@ const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview
     <DropViewer v-if="drop.data.value" :key="drop.data.value.id" public-view />
     <UDashboardPanel v-else id="drop-missing">
       <template #body>
-        <ContentUnavailable :status="drop.error.value?.status ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
+        <ContentUnavailable :status="drop.error.value?.status ?? 500" :path="here" :waiting-for-review="waiting" />
       </template>
     </UDashboardPanel>
   </template>
@@ -50,5 +51,5 @@ const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview
     <DropViewer :key="drop.data.value.id" public-view />
     <ShortcutsModal />
   </UDashboardGroup>
-  <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.status ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
+  <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.status ?? 500" :path="here" :waiting-for-review="waiting" />
 </template>
