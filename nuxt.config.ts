@@ -99,6 +99,8 @@ export default defineNuxtConfig({
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   runtimeConfig: { seoIndex: false },
 
+  experimental: { typescriptPlugin: true },
+
   typescript: {
     strict: true,
     typeCheck: false,
@@ -107,6 +109,8 @@ export default defineNuxtConfig({
         noUncheckedIndexedAccess: true,
         noImplicitOverride: true,
         noFallthroughCasesInSwitch: true,
+        noUnusedLocals: true,
+        noUnusedParameters: true,
       },
     },
   },
