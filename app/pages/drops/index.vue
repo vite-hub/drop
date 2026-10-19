@@ -154,9 +154,13 @@ async function newSite() {
           :ui="{ root: 'w-max' }"
         />
       </div>
-      <UInput ref="searchInput" v-model="search" class="w-full sm:w-72" icon="i-ph-magnifying-glass" placeholder="Search drops">
-        <template #trailing><UKbd value="/" /></template>
-      </UInput>
+      <div class="flex w-full items-center gap-2 sm:w-auto">
+        <!-- The page description already says how long the Trash keeps things. -->
+        <UButton v-if="filter === 'trash' && trash.length" class="shrink-0" color="error" icon="i-ph-trash" label="Empty Trash" variant="ghost" @click="emptyTrash(trash.length)" />
+        <UInput ref="searchInput" v-model="search" class="w-full sm:w-72" icon="i-ph-magnifying-glass" placeholder="Search drops">
+          <template #trailing><UKbd value="/" /></template>
+        </UInput>
+      </div>
     </div>
 
     <div v-if="status === 'pending' && !drops.length" class="space-y-2">
@@ -203,11 +207,6 @@ async function newSite() {
     </div>
 
     <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">{{ deep && searching === 'pending' ? "Searching…" : "No drops match." }}</p>
-
-    <!-- The page description already says how long the Trash keeps things. -->
-    <div v-if="filter === 'trash' && trash.length" class="mb-3 flex justify-end">
-      <UButton color="error" label="Empty Trash" size="sm" variant="outline" @click="emptyTrash(trash.length)" />
-    </div>
 
     <GetStarted v-if="filter === 'all' && drops.length && !search" :drops="drops" @site="newSite" @upload="picker.open()" />
 

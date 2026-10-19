@@ -2,6 +2,7 @@
 import { isPublic, type Share, SHARE_HINTS, SHARE_ICONS } from "#shared/share"
 import type { DropSummary } from "#shared/types"
 import { dropPath } from "#shared/links"
+import { daysUntil, purgesAt } from "#shared/expiry"
 
 // A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`). In a team
 // folder (`inTeam`) anyone may move a teammate's drop to the Trash.
@@ -9,6 +10,8 @@ const props = withDefaults(defineProps<{ drop: DropSummary; depth?: number; open
 const emit = defineEmits<{ delete: []; restore: []; deleteForever: []; toggle: [] }>()
 const INDENT = ["pl-4", "pl-10", "pl-16", "pl-22", "pl-28", "pl-34", "pl-40", "pl-46"]
 const trashed = computed(() => props.drop.trashedAt !== null)
+const now = useRelativeNow()
+const purgeDays = computed(() => props.drop.trashedAt === null ? 0 : daysUntil(purgesAt(props.drop.trashedAt), now.value))
 const notify = useNotify()
 const { copy } = useCopy()
 const { setShare } = useDropActions()
@@ -90,7 +93,8 @@ const menu = computed(() => [
       <NuxtLink class="flex min-w-0 items-center gap-2 after:absolute after:inset-0" :to="`/drops/${drop.id}`">
         <span class="truncate font-medium text-highlighted">{{ drop.title }}</span>
         <UBadge v-if="drop.version > 1" class="hidden sm:inline-flex" color="neutral" icon="i-ph-clock-counter-clockwise" :label="`v${drop.version}`" size="sm" variant="outline" />
-        <ExpiryBadge v-if="!drop.parentId" class="shrink-0" :drop="drop" />
+        <!-- In the Trash the status column says when it's deleted for good. -->
+        <ExpiryBadge v-if="!drop.parentId && !trashed" class="shrink-0" :drop="drop" />
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
         <template v-if="folder">{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
@@ -112,7 +116,10 @@ const menu = computed(() => [
       </span>
       <span class="mt-0.5 block text-xs text-muted tabular-nums"><TimeAgo :at="drop.updatedAt" /></span>
     </div>
-    <span v-if="trashed" class="hidden text-sm text-muted md:block">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
+    <div v-if="trashed" class="hidden min-w-0 md:block">
+      <span class="block text-sm text-highlighted">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
+      <span class="mt-0.5 block text-xs tabular-nums" :class="purgeDays <= 3 ? 'text-error' : 'text-muted'">{{ purgeDays ? `Gone in ${purgeDays}d` : "Gone today" }}</span>
+    </div>
     <span v-else-if="!changeable" class="hidden items-center gap-1.5 text-sm text-muted md:flex">
       <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5" />{{ drop.teamFolder ? "The team's" : status }}
     </span>
