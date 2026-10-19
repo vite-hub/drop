@@ -386,7 +386,7 @@ export function prependToHead(html: string, snippet: string): string {
 
 /** `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it. */
 export function injectRuntime(html: string, dark: boolean, inset = 0): string {
-  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});document.documentElement.style.setProperty("--drop-inset", "${Number(inset) || 0}px");</script>`
+  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
   const tail = `<script>${ANNOTATOR_SCRIPT}</script>`
   let out = prependToHead(html, head)
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail

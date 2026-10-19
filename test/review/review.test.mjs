@@ -425,7 +425,7 @@ test("read_drop lists a site's comments as page content, and update_drop resolve
 })
 
 test("review.js is one cacheable script with no key, inert until someone presses Comment, safe to add twice", async () => {
-  const response = await reviewScript(request("/review.js"))
+  const response = reviewScript(request("/review.js"))
   assert.equal(response.headers.get("content-type"), "text/javascript; charset=utf-8")
   assert.equal(response.headers.get("cross-origin-resource-policy"), "cross-origin")
   assert.match(response.headers.get("cache-control"), /public/)

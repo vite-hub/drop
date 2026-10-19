@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "vue", "import", "promise", "node"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "rules": {
+    "typescript/consistent-type-imports": "error",
+    // D1 calls run one after another on purpose: a batch would change error and rollback behaviour.
+    "no-await-in-loop": "off",
+    // Sorting arrays the function just built; toSorted() would only copy them.
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    "oxc/no-map-spread": "off",
+    // TypeScript's return types already say what a function returns.
+    "typescript/consistent-return": "off",
+    // `__drop` (frame messages) and `_meta` (MCP) are protocol fields.
+    "no-underscore-dangle": "off",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    // Doctor's typescript/strict/require-safety-comment-for-type-assertion owns casts (doctor.config.json).
+    "typescript/no-unsafe-type-assertion": "off"
+  },
+  "overrides": [
+    {
+      "files": ["test/**"],
+      "rules": {
+        // node:test's top-level test() returns a promise the runner tracks.
+        "typescript/no-floating-promises": "off",
+        "typescript/require-array-sort-compare": "off",
+        "typescript/restrict-template-expressions": "off",
+        "typescript/no-implied-eval": "off",
+        "no-shadow": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "unicorn/no-invalid-fetch-options": "off",
+        "typescript/no-base-to-string": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    ".nuxt/**",
+    ".output/**",
+    ".vitehub/**",
+    "app/.vitehub/**",
+    "dist/**",
+    ".wrangler/**",
+    ".data/**",
+    "patches/**",
+    "public/vendor/**",
+    "skills/**/assets/**"
+  ]
+}

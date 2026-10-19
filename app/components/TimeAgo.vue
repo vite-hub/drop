@@ -12,7 +12,7 @@ const text = computed(() => {
   const seconds = (date.value.getTime() - now.value) / 1000
   // The shared clock ticks every 30 seconds, so something you just posted is ahead of it: "in 12 sec." read as a bug.
   if (seconds > -45) return "just now"
-  const [unit] = UNITS.find(([unit, limit]) => Math.abs(seconds / SECONDS[unit]) < limit)!
+  const [unit] = UNITS.find(([name, limit]) => Math.abs(seconds / SECONDS[name]) < limit)!
   return format.format(Math.round(seconds / SECONDS[unit]), unit)
 })
 </script>

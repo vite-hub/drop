@@ -102,8 +102,8 @@ test("the hourly cleanup removes only old clients with no authorization evidence
   const source = readFileSync(new URL("../../server/utils/oauth-cleanup.ts", import.meta.url), "utf8")
   const implementation = source.slice(source.indexOf("export async function")).replace("export ", "").replace("now: Date", "now")
   const keys = ["db", ...Object.keys(tables), "and", "eq", "lt", "notExists"]
-  const cleanup = new Function(...keys, implementation + "; return cleanupUnusedOAuthClients")
-    (db, ...Object.values(tables), orm.and, orm.eq, orm.lt, orm.notExists)
+  const load = new Function(...keys, implementation + "; return cleanupUnusedOAuthClients")
+  const cleanup = load(db, ...Object.values(tables), orm.and, orm.eq, orm.lt, orm.notExists)
   await cleanup(now)
   assert.deepEqual(sqlDb.prepare("SELECT id FROM oauth_client ORDER BY id").all().map(row => row.id), ["consented", "recent", "refresh", "token"])
   sqlDb.close()

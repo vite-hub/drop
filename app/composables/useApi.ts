@@ -12,7 +12,7 @@ export const useApi = createUseFetch(() => {
     headers: useRequestHeaders(["cookie"]),
     $fetch: createFetch({ fetch: async (request, options) => {
       const { serverFetch } = await import("nitro")
-      return serverFetch(new URL(String(request), origin).href, options)
+      return serverFetch(new URL(request instanceof Request ? request.url : request, origin).href, options)
     } }) as typeof $fetch,
   }
 })

@@ -108,7 +108,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     }
     catch (error) {
       const head = (error as { data?: { data?: { head?: { id: string; version: number } } } }).data?.data?.head
-      if (!head) return void notify.fail("Couldn't publish", error)
+      if (!head) {
+        notify.fail("Couldn't publish", error)
+        return
+      }
       publishing.value = false
       const replace = await confirm({
         title: `v${head.version} was published while you were editing`,

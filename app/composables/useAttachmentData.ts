@@ -4,8 +4,8 @@ const FILE_LINK = /(?:https?:\/\/[^\s"'()<>]+)?(\/f\/[0-9a-f-]{36}\.[a-z0-9]{1,1
 
 const dataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader()
-  reader.onload = () => resolve(String(reader.result))
-  reader.onerror = () => reject(reader.error)
+  reader.addEventListener("load", () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Not a data URL")))
+  reader.addEventListener("error", () => reject(reader.error))
   reader.readAsDataURL(blob)
 })
 

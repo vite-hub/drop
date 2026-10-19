@@ -29,11 +29,12 @@ export function useShareUrl(drop: MaybeRefOrGetter<Pick<DropSummary, "link" | "s
  * What you can do to drops, for the page, rows, modals and the viewer: actions patch the shared "drops" cache
  * through useNuxtData instead of starting another fetch.
  */
+const refresh = () => refreshNuxtData([keys.drops, keys.usage])
+
 export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>(keys.drops)
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
   const drops = computed({ get: () => cached.value ?? [], set: value => (cached.value = value) })
-  const refresh = () => refreshNuxtData([keys.drops, keys.usage])
   const notify = useNotify()
   const confirm = useConfirm()
   // Sharing, trashing or moving a folder changes what its open listings show, so they refetch too.

@@ -75,11 +75,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
 }
 
 export default defineNuxtConfig({
-  modules: ["@nuxt/eslint", "@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt"],
-
-  eslint: {
-    config: { standalone: false },
-  },
+  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt"],
 
   vitehub: { ...VITEHUB[host], auth: true },
 
@@ -205,7 +201,7 @@ export default defineNuxtConfig({
     // The CLI nightly adds a dev-only socket-cleanup plugin from @nuxt/cli, which this Nuxt nightly's
     // server import protection rejects. Dev works without it.
     "nitro:config": function (config) {
-      config.plugins = config.plugins?.filter(plugin => !String(plugin).includes("dev-close-sockets"))
+      config.plugins = config.plugins?.filter(plugin => !plugin.includes("dev-close-sockets"))
     },
   },
 

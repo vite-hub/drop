@@ -65,7 +65,7 @@ const editing = live.editing
 // ConnectionStatus waits 1.5 s before it says Reconnecting: a dropped socket usually comes back sooner, and Yjs keeps
 // the edits meanwhile.
 const liveLabels = { connecting: "Connecting", connected: "Live", reconnecting: "Reconnecting" } as const
-const liveLabel = (state: ConnectionStatusState) => (live.publishing.value && state === "connected" ? "Publishing" : liveLabels[state])
+const liveLabel = (status: ConnectionStatusState) => (live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status])
 
 const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
 const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } = annotations
