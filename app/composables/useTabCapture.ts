@@ -1,3 +1,4 @@
+// doctor-disable vue/lifecycle/require-cleanup -- onScopeDispose(stop) below cleans up; Doctor 0.0.12 decides before it sees that call.
 const supported = () => import.meta.client && "mediaDevices" in navigator && "getDisplayMedia" in navigator.mediaDevices
 
 /** Waits for a frame painted after now, so whatever was just hidden is gone from it. */
