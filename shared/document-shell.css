@@ -111,3 +111,11 @@ main {
    off the page. Headers wrap like cells, and a table that still can't fit scrolls inside the column (GitHub's way). */
 .typeset table:not(.typeset-scroll table) { display: block; overflow-x: auto; }
 .typeset thead th { white-space: normal; }
+
+/* A before/after compare takes the room beside the text column, so its screenshots read at about twice the size.
+   It keeps clear of the viewer's floating panel on both sides (--drop-inset), and never gets narrower than the text. */
+.typeset .ca-compare {
+  --ca-wide: max(100%, min(72rem, 100vw - 2 * var(--drop-inset, 0px) - 3rem));
+  width: var(--ca-wide);
+  margin-inline: calc((100% - var(--ca-wide)) / 2);
+}
