@@ -16,7 +16,7 @@ patchedDependencies:
   h3-mcp@0.2.0: 300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b
   nitro@3.0.260610-beta: 5784600e57135b0a4bfad9dee6ec2f609bc199d5cad82885f22aaa94e2a712d8
   nuxt-nightly@5.0.0-29766097.1e475df9: bcd24143fcf00377e7d327374a487779a871a24c60d4823333a143c2ada1517a
-  vite-hub@0.0.4: 892ca56acc69bbe942fe049cbe010a7c9450ddcb84fc448aafdf3a45dadf8b65
+  vite-hub@0.0.4: a6fc1486ceb36fe5c8b8aa0030c2ecb10c659e8c16fabb7126a883fdb5c4a7c8
 
 importers:
 
@@ -147,7 +147,7 @@ importers:
         version: 1.5.0(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(patch_hash=892ca56acc69bbe942fe049cbe010a7c9450ddcb84fc448aafdf3a45dadf8b65)(7eaacffca0e388e640ffedef9c4728a9)
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(patch_hash=a6fc1486ceb36fe5c8b8aa0030c2ecb10c659e8c16fabb7126a883fdb5c4a7c8)(7eaacffca0e388e640ffedef9c4728a9)
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -4355,6 +4355,7 @@ packages:
   box-typescript-sdk-gen@1.19.1:
     resolution: {integrity: sha512-EE65DdNCSOIqUx5bV8AczL4JbrLbyhdXOXmqWXYvslJVfzeMH583g2TsKESmJSWM800a74F3BzfLm42WYRCTzw==}
     engines: {node: '>=16.0.0'}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   boxen@8.0.1:
     resolution: {integrity: sha512-F3PH5k5juxom4xktynS7MoFY+NUWH5LC4CnH11YB8NPew+HLpmBLCybSAEyb2F+4pRXhuhWqFesoQd6DAyc2hw==}
@@ -17523,7 +17524,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(patch_hash=892ca56acc69bbe942fe049cbe010a7c9450ddcb84fc448aafdf3a45dadf8b65)(7eaacffca0e388e640ffedef9c4728a9):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(patch_hash=a6fc1486ceb36fe5c8b8aa0030c2ecb10c659e8c16fabb7126a883fdb5c4a7c8)(7eaacffca0e388e640ffedef9c4728a9):
     dependencies:
       '@aws-sdk/client-s3': 3.1146.0
       '@aws-sdk/lib-storage': 3.1146.0(@aws-sdk/client-s3@3.1146.0)

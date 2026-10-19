@@ -40,7 +40,8 @@ patchedDependencies:
   nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch
   # Keeps Nuxt's dev-only module URL out of the Workers bundle.
   nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch
-  # Forwards vite-hub/ui/avatar-stack, connection-status, and sync-status to the patched @vite-hub/ui (#2461).
+  # Forwards vite-hub/ui/avatar-stack, connection-status, and sync-status to the patched @vite-hub/ui (#2461), and
+  # copies its collaboration CSS into vite-hub/ui/styles.css, a separate file; without it the avatars render full size.
   # Keeps Rate Limit in memory under `nuxt dev`: the preset pinned the Cloudflare provider, whose bindings exist only
   # in the built wrangler.json, so every limited route returned 500 in dev (vite-hub/vitehub#2467).
   vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
