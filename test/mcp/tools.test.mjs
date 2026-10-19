@@ -95,6 +95,22 @@ test("open comments follow a doc to its next versions, numbered across them, and
   assert.deepEqual(sql.prepare("SELECT n, resolved FROM comments ORDER BY n").all().map(row => [row.n, row.resolved]), [[1, 1], [2, 1]])
 })
 
+test("a comment on the whole page points at nothing in it, and agents read it as the whole page", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(new Request(`https://drop.example/api/drops/${id}/comments`, init && { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init) }))
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  const doc = (await call(publish, { markdown: "# Plan\n\nShip it on Friday.", note: "Draft", lifetime: "review" })).structuredContent
+  const added = await commentsPost(route(doc.id, { kind: "page", selector: "", ox: 0, oy: 0, body: "The whole plan reads too long." }))
+  assert.equal(added.kind, "page")
+  await assert.rejects(commentsPost(route(doc.id, { kind: "page", selector: "p", ox: 0, oy: 0, body: "Pointing at a paragraph" })), "a page comment can't carry an anchor")
+
+  const read = await call(readDrop, { id: doc.id })
+  assert.match(read.content[0].text, /1\. \[the whole page\]\n {3}The whole plan reads too long\. \(Owner\)/)
+})
+
 test("a comment carried to v2 takes replies; the agent answers in the thread and reads it back", async () => {
   const route = (id, init) => {
     const event = new H3Event(new Request(`https://drop.example/api/drops/${id}/comments`, init && { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init) }))

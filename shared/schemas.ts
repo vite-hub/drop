@@ -59,10 +59,13 @@ export const AppSchema = v.object({
 
 const thousandths = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000))
 
-/** Positions are thousandths of the anchor's box; `ow`/`oh` size an area and default to 0, a point. */
+/**
+ * Positions are thousandths of the anchor's box; `ow`/`oh` size an area and default to 0, a point. A `page` comment is
+ * about the page as a whole: no anchor, an empty selector, and zero positions.
+ */
 export const CommentSchema = v.pipe(
   v.object({
-    kind: v.picklist(["text", "image", "area"]),
+    kind: v.picklist(["text", "image", "area", "page"]),
     selector: v.pipe(v.string(), v.maxLength(2000)),
     ox: thousandths,
     oy: thousandths,
@@ -75,6 +78,7 @@ export const CommentSchema = v.pipe(
   }),
   v.check(input => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000, "The area must stay inside its anchor."),
   v.check(input => input.kind !== "area" || (input.ow > 0 && input.oh > 0), "An area needs a width and a height."),
+  v.check(input => input.kind !== "page" || (!input.selector && !input.ox && !input.oy && !input.ow && !input.oh && !input.quote), "A comment on the whole page points at nothing in it."),
 )
 
 /**

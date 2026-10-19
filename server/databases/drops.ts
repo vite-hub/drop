@@ -106,7 +106,7 @@ export const comments = sqliteTable("comments", {
   dropId: text("drop_id").notNull().references(() => drops.id, { onDelete: "cascade" }),
   n: integer("n").notNull(),
   /** `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of an HTML page. */
-  kind: text("kind", { enum: ["text", "image", "area"] }).notNull(),
+  kind: text("kind", { enum: ["text", "image", "area", "page"] }).notNull(),
   selector: text("selector").notNull(),
   ox: integer("ox").notNull().default(0),
   oy: integer("oy").notNull().default(0),

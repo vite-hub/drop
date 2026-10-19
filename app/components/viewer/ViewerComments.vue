@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { DropComment, DropVersion } from "#shared/types"
 
-const props = defineProps<{ comments: DropComment[]; canComment: boolean; canManage: boolean; version: number; versions: DropVersion[]; outdated: Set<string> }>()
-const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
+// `addPageComment` posts a comment on the page as a whole, written in the box at the bottom; it says whether it went
+// through, so the box only clears then. `focus` carries the row's box for those comments, which have no pin to open at.
+const props = defineProps<{ comments: DropComment[]; canComment: boolean; canManage: boolean; version: number; versions: DropVersion[]; outdated: Set<string>; addPageComment: (body: string) => Promise<boolean> }>()
+const emit = defineEmits<{ focus: [comment: DropComment, row: DOMRect]; resolve: [id: string, resolved: boolean] }>()
 const filter = ref<"open" | "resolved">("open")
 const tabs = computed(() => [
   { label: "Open", value: "open", badge: props.comments.filter(comment => !comment.resolved).length },
@@ -16,6 +18,18 @@ const versionOf = (version: number) => props.versions.find(item => item.version 
 const versionTo = useVersionTo()
 /** Who replied, once each, latest first. */
 const repliers = (comment: DropComment) => [...new Map(comment.replies.toReversed().map(reply => [reply.authorName, reply])).values()]
+
+const pageBody = ref("")
+const sending = ref(false)
+async function sendPageComment() {
+  if (!pageBody.value.trim() || sending.value) return
+  sending.value = true
+  if (await props.addPageComment(pageBody.value)) {
+    pageBody.value = ""
+    filter.value = "open"
+  }
+  sending.value = false
+}
 </script>
 
 <template>
@@ -23,12 +37,13 @@ const repliers = (comment: DropComment) => [...new Map(comment.replies.toReverse
     <UTabs v-model="filter" class="shrink-0 px-4" color="neutral" :content="false" :items="tabs" size="sm" variant="link" />
     <ul class="min-h-0 flex-1 divide-y divide-default overflow-y-auto border-t border-default">
       <li v-if="!visible.length && !earlier.length" class="px-4 py-10 text-center text-sm text-muted">
-        {{ filter === "resolved" ? "Nothing resolved yet." : canComment ? "Select text, click an image, or press R to comment on an area." : "No comments yet." }}
+        {{ filter === "resolved" ? "Nothing resolved yet." : canComment ? "Select text, click an image, or press R to comment on an area. For the page as a whole, write below." : "No comments yet." }}
       </li>
       <li v-for="comment in visible" :key="comment.id" class="space-y-2 px-4 py-3">
-        <button class="w-full cursor-pointer space-y-2 text-left" type="button" @click="emit('focus', comment)">
+        <button class="w-full cursor-pointer space-y-2 text-left" type="button" @click="emit('focus', comment, ($event.currentTarget as HTMLElement).getBoundingClientRect())">
           <ViewerCommentHeader :comment="comment" :current="version" />
-          <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">{{ comment.quote }}</p>
+          <p v-if="comment.kind === 'page'" class="flex items-center gap-1.5 text-xs text-muted"><UIcon name="i-ph-browser" class="size-3.5" />Whole page</p>
+          <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">{{ comment.quote }}</p>
           <p class="text-sm">{{ comment.body }}</p>
           <span v-if="comment.replies.length" class="flex items-center gap-1.5 text-xs text-muted">
             <UAvatarGroup :max="3" size="2xs">
@@ -60,5 +75,21 @@ const repliers = (comment: DropComment) => [...new Map(comment.replies.toReverse
         </div>
       </li>
     </ul>
+    <!-- A comment on the page as a whole: no text, image, or area to point at. Enter sends, Shift+Enter breaks. -->
+    <div v-if="canComment" class="flex shrink-0 items-end gap-2 border-t border-default p-1.5 pl-2.5">
+      <UTextarea
+        v-model="pageBody"
+        aria-label="Comment on the whole page"
+        autoresize
+        class="flex-1"
+        :maxrows="6"
+        placeholder="Comment on the whole page"
+        :rows="1"
+        :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
+        variant="none"
+        @keydown.enter.exact.prevent="sendPageComment"
+      />
+      <UButton aria-label="Send comment" class="size-8 justify-center rounded-full" color="neutral" :disabled="!pageBody.trim()" icon="i-ph-arrow-up" :loading="sending" @click="sendPageComment" />
+    </div>
   </div>
 </template>

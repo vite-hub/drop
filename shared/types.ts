@@ -105,8 +105,8 @@ export interface DropDetail extends DropSummary {
 export interface DropComment {
   id: string
   n: number
-  /** `text` quotes a selection, `image` marks a spot or area of an image, `area` a rectangle of a page. */
-  kind: "text" | "image" | "area"
+  /** `text` quotes a selection, `image` marks a spot or area of an image, `area` a rectangle of a page, `page` the whole page. */
+  kind: "text" | "image" | "area" | "page"
   selector: string
   /** Position and size in thousandths of the anchor's box. A point has `ow` = `oh` = 0. */
   ox: number

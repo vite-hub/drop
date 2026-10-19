@@ -235,7 +235,8 @@ watch(srcdoc, (value) => {
 })
 watch([ready, pageComments], () => {
   // `earlier`: the frame also checks that the element is still what the comment pointed at, not just in its place.
-  if (ready.value) send({ type: "markers", markers: pageComments.value.filter(comment => !replaced(comment)).map(({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version, authorName, authorImage }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, earlier: version < drop.value.version, author: authorName, image: authorImage })) })
+  // Comments on the whole page have nothing in it to pin to; they live in the panel.
+  if (ready.value) send({ type: "markers", markers: pageComments.value.filter(comment => !replaced(comment) && comment.kind !== "page").map(({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version, authorName, authorImage }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, earlier: version < drop.value.version, author: authorName, image: authorImage })) })
 })
 
 /** Area mode: the frame lays a crosshair over the page, and the next rectangle drawn there becomes a comment. */
@@ -301,6 +302,11 @@ async function submit(body: string) {
   send({ type: "clear-selection" })
 }
 
+/** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
+async function addPageComment(body: string) {
+  return Boolean(await state.addComment({ kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) }, body))
+}
+
 async function resolve(id: string, resolved: boolean) {
   popover.value = null
   await state.resolveComment(id, resolved)
@@ -324,8 +330,11 @@ function copyCommentLink(comment: DropComment) {
   void copy(url.href, "Link to the comment copied")
 }
 
-/** Scroll the document to the comment and open its thread there: the frame reports the pin, like a click on it. */
-async function focusComment(comment: DropComment) {
+/**
+ * Scroll the document to the comment and open its thread there: the frame reports the pin, like a click on it. A comment
+ * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
+ */
+async function focusComment(comment: DropComment, row?: DOMRect) {
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
@@ -333,7 +342,12 @@ async function focusComment(comment: DropComment) {
     await until(ready).toBe(true, { timeout: 5000 })
   }
   if (!wide.value) mobileSide.value = false
-  send({ type: "focus", id: comment.id, open: true })
+  if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
+  // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
+  const top = frame.value?.getBoundingClientRect()
+  popover.value = row && wide.value
+    ? { type: "thread", id: comment.id, x: row.left - 360, y: row.top - 8 }
+    : { type: "thread", id: comment.id, x: (top?.left ?? 0) + 16, y: (top?.top ?? 48) + 8 }
 }
 
 // `?comment=<n>` from a copied link: once the frame has placed the pins, open that thread with the comments showing.
@@ -384,6 +398,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         :can-comment="drop.canComment"
         :can-manage="drop.isOwner"
         :comments="comments"
+        :add-page-comment="addPageComment"
         :outdated="outdated"
         :version="drop.version"
         :versions="drop.versions"

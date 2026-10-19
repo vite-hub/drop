@@ -15,6 +15,7 @@ export function feedbackMarkdown(title: string, url: string, comments: DropComme
   const pct = (n: number) => `${(n / 10).toFixed(0)}%`
   const target = (comment: DropComment) => {
     if (comment.quote) return `> ${comment.quote}`
+    if (comment.kind === "page") return "The whole page"
     const what = `${comment.kind === "image" ? "Image" : "Element"} \`${comment.selector}\``
     return comment.ow || comment.oh
       ? `${what}, area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
