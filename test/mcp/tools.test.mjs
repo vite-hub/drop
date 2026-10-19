@@ -168,7 +168,7 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
   state.authSecret = "test-secret"
   try {
     assert.equal((await call(publish, { file: { name: "after.png" }, note: "After" })).isError, true, "the same checks run before a URL is handed out")
-    const ticket = (await call(publish, { file: { name: "after.png" }, note: "After", lifetime: "keep", keepReason: "Screenshots for vite-hub/drop#12.", share: "view" })).structuredContent
+    const ticket = (await call(publish, { file: { name: "after.png" }, note: "After", lifetime: "keep", keepReason: "Screenshots for vite-hub/drop#12.", share: "public" })).structuredContent
     assert.match(ticket.uploadUrl, /^https:\/\/drop\.example\/api\/uploads\/v2\.[\w-]+$/)
     assert.equal(ticket.method, "PUT")
     assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0, "nothing exists until the upload")
@@ -183,7 +183,7 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
     }
     const shot = await put(ticket.uploadUrl)
     assert.equal(shot.kind, "image")
-    assert.equal(shot.share, "view")
+    assert.equal(shot.share, "public")
     assert.equal(shot.lifetime, "keep")
     assert.match(shot.fileUrl, /^https:\/\/drop\.example\/f\/[0-9a-f-]{36}\.png$/)
     assert.equal(sql.prepare("SELECT actor_name FROM drops WHERE id = ?").get(shot.id).actor_name, "Claude Code", "the drop names the agent that asked")
