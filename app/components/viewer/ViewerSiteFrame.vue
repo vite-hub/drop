@@ -46,7 +46,7 @@ async function comment() {
     try { await capture.start() }
     catch (error) {
       // Closing the browser's share dialog is a choice, not a failure.
-      if ((error as DOMException).name !== "NotAllowedError") notify.fail("Couldn't start the screen capture", error)
+      if (!(error instanceof DOMException && error.name === "NotAllowedError")) notify.fail("Couldn't start the screen capture", error)
       return
     }
   }
@@ -59,7 +59,7 @@ function point(event: PointerEvent) {
   return { x: Math.min(Math.max(event.clientX - rect.left, 0), rect.width), y: Math.min(Math.max(event.clientY - rect.top, 0), rect.height) }
 }
 function down(event: PointerEvent) {
-  (event.target as HTMLElement).setPointerCapture(event.pointerId)
+  if (event.target instanceof Element) event.target.setPointerCapture(event.pointerId)
   from = point(event)
   box.value = { left: from.x, top: from.y, width: 0, height: 0 }
 }
@@ -116,12 +116,12 @@ async function send() {
   form.append("screenshot", shot.blob, "screenshot")
   sending.value = true
   try {
-    await $fetch(`/api/drops/${props.drop.id}/review`, { method: "POST", query: { origin: shot.origin }, body: form })
+    await sendSiteComment(props.drop.id, shot.origin, form)
     notify.done("Comment sent", "It's on the site's page with its screenshot.")
     discard()
     // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
     // events go nowhere.
-    void refreshNuxtData([`review:${props.drop.id}`, `comments:${props.drop.id}`])
+    void refreshNuxtData([keys.review(props.drop.id), keys.comments(props.drop.id)])
   }
   catch (error) {
     notify.fail("Couldn't send the comment", error)

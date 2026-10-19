@@ -1,4 +1,4 @@
-const supported = () => import.meta.client && typeof navigator.mediaDevices?.getDisplayMedia === "function"
+const supported = () => import.meta.client && "mediaDevices" in navigator && "getDisplayMedia" in navigator.mediaDevices
 
 /** Waits for a frame painted after now, so whatever was just hidden is gone from it. */
 function freshFrame(element: HTMLVideoElement) {
@@ -26,9 +26,10 @@ export function useTabCapture() {
 
   async function start() {
     if (stream?.active) return
-    // preferCurrentTab and selfBrowserSurface aren't in TypeScript's DOM types yet.
-    const options = { video: { displaySurface: "browser" }, audio: false, preferCurrentTab: true, selfBrowserSurface: "include", surfaceSwitching: "exclude" }
-    stream = await navigator.mediaDevices.getDisplayMedia(options as DisplayMediaStreamOptions)
+    // preferCurrentTab and selfBrowserSurface aren't in TypeScript's DOM types yet, so they ride along on a variable
+    // (only an object literal written in the call gets excess-property checks).
+    const options = { video: { displaySurface: "browser" }, audio: false, preferCurrentTab: true, selfBrowserSurface: "include", surfaceSwitching: "exclude" } as const
+    stream = await navigator.mediaDevices.getDisplayMedia(options)
     const track = stream.getVideoTracks()[0]!
     track.addEventListener("ended", stop)
     exact.value = track.getSettings().displaySurface === "browser"
@@ -45,6 +46,8 @@ export function useTabCapture() {
     stream = video = null
     active.value = false
   }
+  // Leaving the review ends the screen share, so the browser's sharing indicator doesn't stay on.
+  onScopeDispose(stop)
 
   /** `area` (CSS pixels of this window's viewport) as an image, from the next frame of the capture. */
   async function grab(area: { left: number; top: number; width: number; height: number }): Promise<Blob> {

@@ -75,13 +75,15 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   },
 }
 
+type RouteRule = NonNullable<NuxtConfig["routeRules"]>[string]
+
 // Drops' pages show drops in srcdoc frames, which inherit the page's CSP: no script policy there, only frame-ancestors
 // (shared/csp.ts; app/plugins/csp-boundary.client.ts loads them fresh from a page that has one).
-const DROP_PAGE = { security: { headers: { contentSecurityPolicy: {
+const DROP_PAGE: RouteRule = { security: { headers: { contentSecurityPolicy: {
   "base-uri": false, "object-src": false, "form-action": false, "script-src": false, "script-src-attr": false,
   "style-src": false, "img-src": false, "font-src": false, "frame-ancestors": ["'none'"],
 } } } }
-const SIGNED_IN = { appMiddleware: { auth: true }, appLayout: "dashboard" } as const
+const SIGNED_IN: RouteRule = { appMiddleware: { auth: true }, appLayout: "dashboard" }
 
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt", "nuxt-security"],

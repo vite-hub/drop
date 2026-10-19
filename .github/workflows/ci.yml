@@ -34,5 +34,6 @@ jobs:
       - run: pnpm lint
       - run: pnpm knip
       - run: pnpm typecheck
+      - run: pnpm doctor
       - run: pnpm test
       - run: pnpm build

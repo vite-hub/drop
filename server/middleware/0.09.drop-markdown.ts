@@ -29,6 +29,7 @@ export default defineHandler(async (event) => {
       if (value) headers.set(name, value)
     }
     const response = await event.app!.fetch(Object.assign(new Request(new URL(path, event.url), { headers }), { runtime: event.req.runtime }))
+    // SAFETY: only Drop's own /api/links and /api/drops routes are read here, and they answer with T.
     return response.ok ? await response.json() as T : null
   }
   const pinned = event.url.searchParams.get("v")

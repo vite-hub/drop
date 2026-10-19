@@ -12,6 +12,10 @@
     "server/schedules/*.ts",
     "server/databases/*.ts",
     "server/mcp/index.ts",
+    // ViteHub Content's definition, found by convention.
+    "server/content.ts",
+    // Tags in content/docs/**/*.md (`::roles-table`) render these; knip doesn't read the Markdown.
+    "app/components/docs/md/*.vue",
     "scripts/*.{ts,mjs}",
     "test/**/*.test.mjs",
     "test/e2e/*.mjs",

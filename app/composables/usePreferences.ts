@@ -63,7 +63,7 @@ export function useCopy() {
      */
     async copyLoading(text: Promise<string>, title = "Copied") {
       try {
-        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write)
+        if ("ClipboardItem" in globalThis && navigator.clipboard?.write)
           await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then(value => new Blob([value], { type: "text/plain" })) })])
         else await copy(await text)
         toast.add({ title })

@@ -32,7 +32,7 @@ const { drop, comments } = provideDrop(() => target.data.value?.id ?? route.para
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
 // The doc renders in a frame once the page's script runs; agents reading the HTML find its text here instead.
-useHead({ link: () => (["markdown", "html"].includes(drop.data.value?.kind ?? "") ? [{ rel: "alternate", type: "text/markdown", href: `${route.path}.md${pinned.value ? `?v=${pinned.value}` : ""}` }] : []) })
+useHeadSafe({ link: () => (["markdown", "html"].includes(drop.data.value?.kind ?? "") ? [{ rel: "alternate", type: "text/markdown", href: `${route.path}.md${pinned.value ? `?v=${pinned.value}` : ""}` }] : []) })
 // A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.
 onMounted(() => drop.data.value && $fetch(`/api/drops/${drop.data.value.id}/visit`, { method: "POST" }).catch(() => {}))
 const waiting = computed(() => waitingForReview(drop.error.value))

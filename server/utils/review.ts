@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
+import { textValue } from "#shared/utils/text"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
@@ -251,7 +252,7 @@ export async function createSiteDrop(who: Identity, input: LifetimeInput & { url
 export type Screenshot = { bytes: Uint8Array; contentType: "image/png" | "image/jpeg" | "image/webp" }
 
 /** The image's real type from its first bytes, whatever the page claimed. Only the three a browser canvas makes. */
-export function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | null {
+function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | null {
   const at = (offset: number, ...values: number[]) => values.every((value, index) => bytes[offset + index] === value)
   if (at(0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) return "image/png"
   if (at(0, 0xFF, 0xD8, 0xFF)) return "image/jpeg"
@@ -274,7 +275,7 @@ export async function readReviewComment(event: H3Event): Promise<{ input: Review
   catch { throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." }) }
   const data = form.get("data")
   let input: ReviewCommentInput
-  try { input = v.parse(ReviewCommentSchema, JSON.parse(typeof data === "string" ? data : "")) }
+  try { input = v.parse(ReviewCommentSchema, JSON.parse(textValue(data) ?? "")) }
   catch (error) { throw new HTTPError({ status: 400, statusText: v.isValiError(error) ? error.message : "The comment is missing." }) }
 
   const file = form.get("screenshot")

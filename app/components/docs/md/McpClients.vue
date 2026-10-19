@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import type { McpClient } from "~/utils/mcp-clients"
-
 // `::mcp-clients`: this Drop's MCP address, then a heading, snippet, and sign-in hint for each client, from the same snippets the app shows.
 const server = `${useRequestURL().origin}/mcp`
 const snippets = mcpSnippets(server)
-const clients = Object.keys(MCP_CLIENTS) as McpClient[]
+const clients = MCP_CLIENT_IDS
 </script>
 
 <template>
