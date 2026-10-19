@@ -67,7 +67,9 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-const panel = useViewerPanel({ owner, openCount, versions: computed(() => drop.value.versions.length), comments: computed(() => drop.value.kind !== "folder") })
+// A folder's description (what goes in it) is in Details, for everyone signed in who adds to it.
+const details = computed(() => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !props.publicView))
+const panel = useViewerPanel({ details, openCount, versions: computed(() => drop.value.versions.length), comments: computed(() => drop.value.kind !== "folder") })
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const { files, pages, page } = useAppFiles(drop)
 
@@ -280,7 +282,7 @@ const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value
 const has = (value: SideTab) => tabs.value.some(item => item.value === value)
 const showing = (value: SideTab) => panelOpen.value && tab.value === value
 const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
-// A folder someone else shares with you has no tab to show (no comments, no Details), so no panel either.
+// A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
 const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 /** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
 const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)

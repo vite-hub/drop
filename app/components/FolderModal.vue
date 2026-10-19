@@ -21,7 +21,7 @@ const submit = (event: FormSubmitEvent<v.InferOutput<typeof schema>>) =>
         <UFormField label="Name" name="title">
           <UInput v-model="state.title" autofocus class="w-full" :maxlength="160" placeholder="Meeting notes" />
         </UFormField>
-        <UFormField label="What goes here" name="description" hint="Optional" help="What belongs in it, and how to name and write it.">
+        <UFormField label="Description" name="description" hint="Optional" help="What belongs in it, and how to name and write it.">
           <UTextarea v-model="state.description" autoresize class="w-full" :maxlength="2000" :maxrows="10" placeholder="Notes from calls, one doc per meeting, named YYYY-MM-DD-topic. Start with who was there, then decisions, then action items." :rows="3" />
         </UFormField>
         <USwitch v-if="offerTeam" v-model="state.team" description="Everyone adds to it and finds it under Team. Only admins rename, describe, or share it." label="The team's folder" />
