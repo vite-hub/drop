@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import { ROLE_LABELS } from "#shared/roles"
 
+// Signed in, / opens your drops; the landing page stays at /home for everyone. Runs on the server too, so the
+// redirect happens before any HTML renders.
+definePageMeta({
+  alias: "/home",
+  middleware: async (to) => {
+    if (to.path !== "/") return
+    const { data: cached } = useNuxtData("me")
+    const me = cached.value ?? (await useMe()).data.value
+    if (me) return navigateTo("/drops", { replace: true })
+  },
+})
+
 useSeoMeta({
   title: "The shared drive for people and their agents",
   description: "Agents drop docs, pages, and small apps. People comment on the exact spot, and the agent drops the next version.",

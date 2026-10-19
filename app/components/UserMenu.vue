@@ -16,8 +16,9 @@ const items = computed<DropdownMenuItem[][]>(() => [
 ])
 async function leave() {
   await signOut()
-  // Leave first: cleared data would flash the dashboard's empty defaults for a frame.
-  await navigateTo("/")
+  // Leave first: cleared data would flash the dashboard's empty defaults for a frame. /home, not /: / sends whoever
+  // it still thinks is signed in to their drops.
+  await navigateTo("/home")
   clearNuxtData()
 }
 const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "Member" })[me.value?.role ?? "member"])
