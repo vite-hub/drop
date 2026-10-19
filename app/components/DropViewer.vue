@@ -14,7 +14,6 @@ import type { DropComment, DropVersion } from "#shared/types"
 import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
-import type { FrameMessage } from "~/composables/useDropFrame"
 import type { SideTab } from "~/utils/viewer"
 import type { PendingComment } from "./viewer/ViewerCommentPopover.vue"
 import type { Area } from "./viewer/ViewerLightbox.vue"
@@ -183,11 +182,10 @@ const flushRuntimeReports = useDebounceFn(() => {
   if (errors.length) $fetch(`/api/drops/${drop.value.id}/errors`, { method: "POST", body: { version: drop.value.version, errors } }).catch(() => {})
 }, 2000)
 
-const { ready, send } = useDropFrame(frame, contentOrigin, (frameMessage, rect) => {
-  const message = frameMessage
+const { ready, send } = useDropFrame(frame, contentOrigin, (message, rect) => {
   if (message.type === "runtime-error") {
     if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
-      runtimeReports.push({ kind: message.kind, message: String(message.message).slice(0, 500), source: message.source?.slice(0, 300), ...(isApp.value ? { page: page.value } : {}) })
+      runtimeReports.push({ kind: message.kind, message: message.message.slice(0, 500), source: message.source?.slice(0, 300), ...(isApp.value ? { page: page.value } : {}) })
       void flushRuntimeReports()
     }
     return
