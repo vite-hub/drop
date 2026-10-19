@@ -78,7 +78,7 @@ const team = "DROP_MODE=team\nDROP_ADMINS=you@example.com\nDROP_GITHUB_ORG=your-
     <DocsSection id="abuse" title="Abuse and moderation">
       <p>On a Drop open to anyone with a GitHub account, set <code>DROP_SHARE_APPROVAL=true</code> so a member's public links wait until an admin approves that member. Everything else keeps working: on a team Drop, a public link waiting for review still reaches the team. Admins skip the wait. Approve or reject members on <code>/admin/review</code>; once approved, a member shares freely. Links shared before you turn it on stay shared, so approve trusted members first if they'll publish new versions.</p>
       <p>Anyone can report a shared link at <code>/report</code>. Reports land on <code>/admin/reports</code>, where admins dismiss them, quarantine the reported drop, or ban its owner, which takes down all of their drops. Each report also logs a high-severity event; Drop sends no email, so watch your logs. <code>DROP_ABUSE_EMAIL</code> adds a public contact address to the abuse page.</p>
-      <p>Before opening your Drop to the public, adapt the templates in <code>app/pages/terms.vue</code>, <code>acceptable-use.vue</code>, and <code>abuse.vue</code> to your jurisdiction, including a DMCA contact if you need one. Drops and their files are kept out of search engines; the landing page and docs stay indexable.</p>
+      <p>Before opening your Drop to the public, adapt the templates in <code>app/pages/terms.vue</code>, <code>acceptable-use.vue</code>, and <code>abuse.vue</code> to your jurisdiction, including a DMCA contact if you need one. Drops and their files are kept out of search engines.</p>
     </DocsSection>
 
     <DocsSection id="logs" title="Logs">

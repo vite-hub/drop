@@ -96,6 +96,9 @@ export default defineNuxtConfig({
   devtools: false,
   compatibilityDate: "2026-07-17",
 
+  // Off: every page answers noindex (server/plugins/content-headers.ts).
+  runtimeConfig: { seoIndex: false },
+
   app: {
     head: {
       htmlAttrs: { lang: "en" },
