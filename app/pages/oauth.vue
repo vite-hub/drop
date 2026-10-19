@@ -6,7 +6,7 @@
  */
 useSeoMeta({ title: "Connect an agent", robots: "noindex" })
 
-const route = useRoute()
+const route = useRoute("oauth")
 const { $auth } = useNuxtApp()
 const { loggedIn, user, signIn } = useUserSession($auth)
 const ready = useMounted()

@@ -23,7 +23,7 @@ const storageMiB = computed(() => Math.ceil((usage.value?.bytes.used ?? 0) / MIB
 const FILTERS = ["all", "private", "shared", "with-me", "trash"] as const
 type Filter = typeof FILTERS[number]
 // The tab lives in the URL so the sidebar can link straight to Shared with me.
-const route = useRoute()
+const route = useRoute("drops")
 const filter = computed<Filter>({
   get: () => FILTERS.find(tab => tab === route.query.tab) ?? "all",
   set: tab => void navigateTo({ query: { ...route.query, tab: tab === "all" ? undefined : tab } }, { replace: true }),

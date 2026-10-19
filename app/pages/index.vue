@@ -41,7 +41,7 @@ useHead({
   }],
 })
 
-const route = useRoute()
+const route = useRoute("index")
 const { signedIn, signInWithGitHub } = useGitHubSignIn()
 
 // `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.

@@ -23,7 +23,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const editing = computed(() => Boolean(documentId.value))
   const people = realtime.people
 
-  const url = (id: string, edit = false) => `${options.publicView ? "/d" : "/drops"}/${id}${edit ? "?edit=1" : ""}`
+  const url = (id: string, edit = false) => ({ path: `${options.publicView ? "/d" : "/drops"}/${id}`, query: edit ? { edit: "1" } : {} })
 
   // The room's extensions exist once its Y.Doc and provider do. Rebuild the editor only for a new room: the extensions
   // list is recomputed on reconnects too, and a rebuild would drop focus mid-sentence.
