@@ -22,11 +22,15 @@ export const drops = sqliteTable("drops", {
   link: text("link"),
   /** The readable part of the link, picked by the agent or taken from the title. The latest version's is the doc's. */
   slug: text("slug"),
-  /** `team`: everyone signed in to this Drop can find and open it. `shared`: anyone with the link, no sign-in. */
-  visibility: text("visibility", { enum: ["private", "team", "shared"] }).notNull().default("private"),
+  /** Who can open it and what they can do, as one state (#shared/share). Every version of a doc carries the same. */
+  share: text("share", { enum: ["private", "team", "team_edit", "public", "public_comment"] }).notNull().default("private"),
+  /** When a public link closes; the drop falls back to Team (team Drops) or Only me. Null keeps it open. */
+  publicUntil: integer("public_until"),
+  /** Folders only: the team keeps it. Everyone adds drops to it; admins name, describe, and share it. */
+  teamFolder: integer("team_folder", { mode: "boolean" }).notNull().default(false),
+  /** Public links only: an admin approves them first when `DROP_SHARE_APPROVAL` is on. */
   shareReview: text("share_review", { enum: ["pending", "rejected"] }),
   quarantinedAt: integer("quarantined_at"),
-  access: text("access", { enum: ["view", "comment", "edit"] }).notNull().default("comment"),
   actorKind: text("actor_kind", { enum: ["agent", "browser"] }).notNull(),
   actorName: text("actor_name").notNull(),
   createdAt: integer("created_at").notNull(),
@@ -59,7 +63,7 @@ export const drops = sqliteTable("drops", {
   index("drops_expiry_idx").on(table.lifetime, table.lastAccessedAt),
   index("drops_trash_idx").on(table.trashedAt),
   index("drops_parent_idx").on(table.parentId),
-  index("drops_visibility_idx").on(table.visibility, table.updatedAt),
+  index("drops_share_idx").on(table.share, table.updatedAt),
   index("drops_link_idx").on(table.link, table.version),
 ])
 
@@ -80,7 +84,7 @@ export const dropTexts = sqliteTable("drop_texts", {
 })
 
 /**
- * Link-shared drops someone else owns that a signed-in person opened, for their "Shared with me" list. Triggers move a
+ * Public drops someone else owns that a signed-in person opened, for their "Shared with me" list. Triggers move a
  * row to each new version and drop it with the last one. Team drops need no row: everyone in the Drop sees those.
  */
 export const dropVisits = sqliteTable("drop_visits", {

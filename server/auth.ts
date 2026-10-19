@@ -10,6 +10,7 @@ import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { nativeClientRegistration } from "./utils/oauth-clients"
 import { isGitHubMember } from "./utils/github-membership"
+import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 
 // Kept out of `defineAuth()`: ViteHub's auth scanner takes minutes on generic type arguments inside it.
@@ -21,9 +22,10 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  * Drop signs in with GitHub. To use another provider, swap `socialProviders` (Google, GitLab, Discord…),
  * or add `emailAndPassword: { enabled: true }`, then set its secrets in nuxt.config.ts `vite.env.server.auth`.
  *
- * Anyone with a GitHub account can sign in and joins as a member: their drops are private to them until they
- * share them. The GitHub users listed in `DROP_ADMINS` (numeric ids, from `gh api users/<login> --jq .id`) become
- * admins when their account is created; admins can make anyone else an editor or an admin on the Members page.
+ * Anyone with a GitHub account can sign in and joins as a member. `DROP_ADMINS` lists the admins by email: whoever
+ * signs in with one of those emails, verified by the sign-in method, is an admin, so swapping GitHub for another
+ * provider keeps them. `roleOf` decides on every request; each new session writes it down for Better Auth's admin
+ * endpoints. Nobody else changes roles.
  *
  * Agents have no keys. Drop is an OAuth 2.1 authorization server for its own MCP endpoint (`oauthProvider`):
  * an MCP client registers itself, opens the browser once, and the person approves it on /oauth (signing in
@@ -73,11 +75,12 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
             }).then(response => response.ok ? response.json() as Promise<{ created_at?: string }> : null).catch(() => null)
             const githubCreatedAt = profile?.created_at ? Date.parse(profile.created_at) : NaN
             if (Number.isFinite(githubCreatedAt)) await db.update(users).set({ githubCreatedAt }).where(eq(users.id, account.userId))
-            const admins = env.drop.admins.unseal().split(/[\s,]+/).filter(Boolean)
-            if (admins.includes(account.accountId)) await db.update(users).set({ role: "admin" }).where(eq(users.id, account.userId))
           },
         },
       },
+      user: { create: { before: async user => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) } },
+      // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
+      session: { create: { after: async (session) => { await syncRole(session.userId) } } },
     },
     plugins: [
       proxyAuth(),

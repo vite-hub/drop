@@ -7,6 +7,7 @@ import addressFeedback from "./prompts/address_feedback"
 import createCodeImage from "./tools/create_code_image"
 import createFolder from "./tools/create_folder"
 import listDrops from "./tools/list_drops"
+import listFolders from "./tools/list_folders"
 import publish from "./tools/publish"
 import readDrop from "./tools/read_drop"
 import reply from "./tools/reply"
@@ -48,7 +49,7 @@ export function mcpFor(origin: string) {
     // MCP clients send no Origin; the access token, not the origin, is the boundary.
     origin: false,
     auth: oauth.auth,
-    tools: [publish, readDrop, reply, listDrops, updateDrop, createFolder, createCodeImage],
+    tools: [publish, readDrop, reply, listDrops, listFolders, updateDrop, createFolder, createCodeImage],
     prompts: [addressFeedback],
     resources: skillResources,
     // Every tool call lands on the request's wide event.

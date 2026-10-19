@@ -67,33 +67,34 @@ test("a drop in a folder takes the widest share on its path, and can be shared w
   assert.equal(plan.share, "private")
   assert.equal(permissions(await findDrop(plan.id), null).view, false)
 
-  await call(updateTool, { id: review.id, share: "view" })
+  await call(updateTool, { id: review.id, share: "public" })
   const viaFolder = await findDrop(plan.id)
   assert.equal(permissions(viaFolder, null).view, true, "sharing the folder shares what's in it")
   assert.equal(permissions(viaFolder, null).comment, false)
   assert.deepEqual(toSummary(viaFolder).sharedFrom, { id: review.id, title: "Review" })
-  assert.deepEqual(toSummary(viaFolder).ownShare, { visibility: "private", access: "comment" })
+  assert.equal(toSummary(viaFolder).ownShare, "private")
   assert.equal((await call(readDrop, { id: plan.id })).sharedThrough, "Review")
 
   // Its own share reaches as wide, at a higher level: link visitors may comment on this one doc.
-  const own = await call(updateTool, { id: plan.id, share: "comment" })
-  assert.equal(own.share, "comment")
+  const own = await call(updateTool, { id: plan.id, share: "public_comment" })
+  assert.equal(own.share, "public_comment")
   assert.equal(permissions(await findDrop(plan.id), null).comment, true)
-  assert.equal(sql.prepare("SELECT visibility FROM drops WHERE id = ?").get(review.id).visibility, "shared", "the folder's own share is untouched")
+  assert.equal(sql.prepare("SELECT share FROM drops WHERE id = ?").get(review.id).share, "public", "the folder's own share is untouched")
 
   await call(updateTool, { id: review.id, share: "private" })
   await call(updateTool, { id: plan.id, share: "private" })
   assert.equal(permissions(await findDrop(plan.id), null).view, false)
 
-  // Team shares need a signed-in caller.
-  await call(updateTool, { id: review.id, share: "comment", audience: "team" })
+  // Team shares need a team Drop and a signed-in caller.
+  state.mode = "team"
+  await call(updateTool, { id: review.id, share: "team" })
   const teammate = { ...who, userId: "mate", name: "Mate", role: "member" }
   assert.equal(permissions(await findDrop(plan.id), teammate).comment, true)
   assert.equal(permissions(await findDrop(plan.id), null).view, false)
 })
 
 test("quarantine, a pending share review, and an owner ban above a drop hide it", async () => {
-  const review = await folder("Review", { share: "view" })
+  const review = await folder("Review", { share: "public" })
   const inner = await folder("Inner", { folder: review.id })
   const plan = await doc("# Plan", { folder: inner.id })
   assert.equal(permissions(await findDrop(plan.id), null).view, true)
@@ -229,9 +230,9 @@ test("folder search finds what's anywhere below the folder and nothing outside i
 })
 
 test("an agent files its work in a folder, reads it, and moves a drop out", async () => {
-  const review = await folder("PR 12 evidence", { lifetime: "keep", keepReason: "Evidence for vite-hub/drop#12.", share: "view" })
+  const review = await folder("PR 12 evidence", { lifetime: "keep", keepReason: "Evidence for vite-hub/drop#12.", share: "public" })
   assert.equal(review.kind, "folder")
-  assert.equal(review.share, "view")
+  assert.equal(review.share, "public")
   assert.match(review.text, /folder, 0 items/)
   const shot = await call(publish, { file: { name: "before.png", base64: png }, note: "Before", folder: review.url })
   assert.equal(shot.lifetime, "keep", "it lives as long as the folder")
@@ -274,11 +275,12 @@ test("folders don't count as drops, drops in them do, and a trashed folder frees
 })
 
 test("Shared with me lists a shared folder once, and a drop shared on its own from a private folder", async () => {
+  state.mode = "team"
   sql.prepare("INSERT INTO user (id, name, email) VALUES ('mate', 'Mate', 'mate@example.com')").run()
-  const team = await folder("Team folder", { share: "comment", audience: "team" })
-  await doc("# Inside", { folder: team.id, share: "comment", audience: "team" })
-  const hidden = await folder("Private folder")
-  const alone = await doc("# Alone", { folder: hidden.id, share: "view", audience: "team" })
+  const team = await folder("Team folder", { share: "team" })
+  await doc("# Inside", { folder: team.id, share: "team" })
+  const hidden = await folder("Private folder", { share: "private" })
+  const alone = await doc("# Alone", { folder: hidden.id, share: "team" })
   const mate = { ...who, userId: "mate", name: "Mate" }
   const shared = await listSharedWithMe(mate)
   assert.deepEqual(shared.map(drop => drop.title).sort(), ["Alone", "Team folder"])
@@ -308,7 +310,7 @@ test("an upload goes into a folder, where it shares and lives with the folder", 
     try { return await filesHandler(event) }
     catch (error) { return { status: error.status, message: error.message } }
   }
-  const box = await folder("Screenshots", { share: "comment" })
+  const box = await folder("Screenshots", { share: "public_comment" })
   state.who = { ...who }
   const form = new FormData()
   form.append("file", new File(["# Notes"], "notes.md", { type: "text/markdown" }))
@@ -317,7 +319,7 @@ test("an upload goes into a folder, where it shares and lives with the folder", 
   assert.ok(uploaded.id, uploaded.message)
   const row = sql.prepare("SELECT parent_id FROM drops WHERE id = ?").get(uploaded.id)
   assert.equal(row.parent_id, box.id)
-  assert.equal((await findDrop(uploaded.id)).visibility, "shared", "it takes the folder's share")
+  assert.equal((await findDrop(uploaded.id)).share, "public_comment", "it takes the folder's share")
 
   const elsewhere = new FormData()
   elsewhere.append("file", new File(["# x"], "x.md", { type: "text/markdown" }))

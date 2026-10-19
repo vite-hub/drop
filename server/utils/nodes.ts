@@ -1,24 +1,26 @@
 import { and, eq, inArray, isNull, like, or, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { MAX_SLUG } from "#shared/links"
-import { MAX_DEPTH, VISIBILITY_RANK } from "#shared/nodes"
-import { ACCESS_RANK, type Access, type Visibility } from "#shared/types"
+import { MAX_DEPTH } from "#shared/nodes"
+import { type Share, SHARE_RANK } from "#shared/share"
 import { dropHeads, drops } from "../databases/config"
 import type { DropRow } from "./drops"
 import { isExpired } from "./expiry"
+import { shareNow } from "./share"
 
 // Every drop is a node: it may sit in a folder, and the files a doc embeds hang off the doc. A node takes the widest
 // share on its path, the strictest review and quarantine, and the lifetime and Trash of the top-most node. Reads work
 // this out from the ancestors, found in one recursive query, so sharing, moving or trashing a folder writes one row.
+// A node sits under its owner's folders, or under the team's folders, which hold everyone's drops.
 
 type Row = typeof drops.$inferSelect
-export interface Grant { visibility: Visibility; access: Access }
+export interface Grant { share: Share }
 
 /** The most steps a walk up takes: a full folder path, then a doc, then a file it embeds. */
 const MAX_WALK = MAX_DEPTH + 2
 
 /** Each row's ancestors, nearest first, keyed by the row's id. One query per 90 rows: D1 binds at most 100 values. */
-export async function ancestorsOf(rows: Pick<Row, "id" | "parentId" | "ownerId">[]) {
+export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"> & { teamFolder?: boolean })[]) {
   const parents = [...new Set(rows.flatMap(row => (row.parentId ? [row.parentId] : [])))]
   const byId = new Map<string, Row>()
   for (let offset = 0; offset < parents.length; offset += 90) {
@@ -34,10 +36,13 @@ export async function ancestorsOf(rows: Pick<Row, "id" | "parentId" | "ownerId">
   const result = new Map<string, Row[]>()
   for (const row of rows) {
     const path: Row[] = []
-    // A node only sits under its owner's nodes. Nothing writes a cycle, but one would end the walk here too.
+    // A node sits under its owner's nodes, and anyone's under team folders, which only sit under team folders. Nothing
+    // writes a cycle, but one would end the walk here too.
     for (let id = row.parentId; id && path.length < MAX_WALK;) {
       const parent = byId.get(id)
-      if (!parent || parent.ownerId !== row.ownerId || parent.id === row.id || path.includes(parent)) break
+      const below = path.at(-1) ?? row
+      if (!parent || (parent.ownerId !== below.ownerId && !parent.teamFolder) || (below.teamFolder && !parent.teamFolder)
+        || parent.id === row.id || path.includes(parent)) break
       path.push(parent)
       id = parent.parentId
     }
@@ -46,25 +51,24 @@ export async function ancestorsOf(rows: Pick<Row, "id" | "parentId" | "ownerId">
   return result
 }
 
-/** Private shares reach nobody; otherwise the audience counts first, then the access level. */
-const shareRank = (node: Grant) => (node.visibility === "private" ? -1 : VISIBILITY_RANK[node.visibility] * 3 + ACCESS_RANK[node.access])
-
 /**
- * A row as its ancestors make it. `visibility` and `access` become the widest share on the path, and `grants` keeps every
- * share for `permissions`, which picks the ones that reach the caller. Review and quarantine anywhere above hold the
- * whole subtree. Lifetime and the expiry window come from the top-most node; the nearest node in the Trash puts
+ * A row as its ancestors make it. `share` becomes the widest share in force on the path (a closed public link counts as
+ * what it fell back to), and `grants` keeps every one for `permissions`, which picks the ones that reach the caller.
+ * Review and quarantine anywhere above hold the whole subtree. Lifetime and the expiry window come from the top-most node; the nearest node in the Trash puts
  * everything below it there. `raw` keeps the row's own values, which is what changing it edits.
  */
 export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date.now()): DropRow {
-  if (!ancestors.length) return { ...row, ancestors, expired: Boolean(row.trashedAt) || isExpired(row, now, days) }
+  const own = shareNow(row, now)
+  if (!ancestors.length) return { ...row, share: own, raw: row, ancestors, grants: own === "private" ? [] : [{ share: own }], expired: Boolean(row.trashedAt) || isExpired(row, now, days) }
   const path = [row, ...ancestors]
+  const shares = path.map(node => shareNow(node, now))
   const root = ancestors.at(-1)!
-  const widest = path.reduce((best, node) => (shareRank(node as Grant) > shareRank(best as Grant) ? node : best), row)
+  const widestAt = shares.reduce((best, share, index) => (SHARE_RANK[share] > SHARE_RANK[shares[best]!] ? index : best), 0)
+  const widest = path[widestAt]!
   const trashed = path.find(node => node.trashedAt)
   const fields: Row = {
     ...row,
-    visibility: widest.visibility,
-    access: widest.access,
+    share: shares[widestAt]!,
     shareReview: path.find(node => node.shareReview === "rejected")?.shareReview ?? path.find(node => node.shareReview)?.shareReview ?? null,
     quarantinedAt: path.find(node => node.quarantinedAt)?.quarantinedAt ?? null,
     lifetime: root.lifetime,
@@ -77,11 +81,14 @@ export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date
     ...fields,
     raw: row,
     ancestors,
-    grants: path.filter(node => node.visibility !== "private").map(node => ({ visibility: node.visibility, access: node.access as Access })),
+    grants: shares.filter(share => share !== "private").map(share => ({ share })),
     ...(widest !== row ? { sharedFrom: { id: widest.id, title: widest.title } } : {}),
     expired: Boolean(fields.trashedAt) || isExpired(fields, now, days),
   }
 }
+
+/** Whether a team folder holds it, at any depth: then anyone on the team may add to that folder and trash what's in it. */
+export const inTeamFolder = (row: Pick<DropRow, "ancestors">) => Boolean(row.ancestors?.some(node => node.teamFolder))
 
 /** A file a doc embeds (or a site's screenshot): it hangs off a node that isn't a folder. Unknown ancestors count too. */
 export const isAttachment = (row: Pick<DropRow, "parentId" | "ancestors">) => row.parentId !== null && row.ancestors?.[0]?.kind !== "folder"

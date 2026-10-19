@@ -202,8 +202,13 @@ export default defineNuxtConfig({
         // Every Drop setting is read at runtime: changing one needs a restart, not a rebuild. Each also reads its
         // canonical VITEHUB_DROP_* name first (VITEHUB_DROP_QUOTAS_ENABLED for quotas.enabled).
         drop: {
-          // GitHub user ids (not logins, which can be renamed and reclaimed) that sign in as admins, comma-separated.
+          // Emails of the admins, comma-separated. Whoever signs in with one of them, verified by any sign-in method, is an admin.
           admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
+          // personal: drops start private and share by public link. team: everyone signed in is a teammate, drops start
+          // shared with the team, and admins keep the team's folders (shared/share.ts).
+          mode: env.enum(["personal", "team"], { source: env.source("DROP_MODE"), default: "personal" }),
+          // Days a public link stays open: empty for the mode's default (team 7, personal until changed), 0 turns them off.
+          publicLinkDays: env({ source: env.source("DROP_PUBLIC_LINK_DAYS"), default: "" }),
           // Only active members of this GitHub organization may sign in, open shared links, or use MCP.
           githubOrg: env({ source: env.source("DROP_GITHUB_ORG"), default: "" }),
           // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).

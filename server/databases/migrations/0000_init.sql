@@ -61,8 +61,9 @@ CREATE TABLE `drops` (
 	`size` integer DEFAULT 0 NOT NULL,
 	`version` integer DEFAULT 1 NOT NULL,
 	`supersedes_id` text,
-	`visibility` text DEFAULT 'private' NOT NULL,
-	`access` text DEFAULT 'comment' NOT NULL,
+	`share` text DEFAULT 'private' NOT NULL,
+	`public_until` integer,
+	`team_folder` integer DEFAULT false NOT NULL,
 	`actor_kind` text NOT NULL,
 	`actor_name` text NOT NULL,
 	`created_at` integer NOT NULL,
@@ -96,7 +97,7 @@ CREATE INDEX `drops_trash_idx` ON `drops` (`trashed_at`);
 --> statement-breakpoint
 CREATE INDEX `drops_parent_idx` ON `drops` (`parent_id`);
 --> statement-breakpoint
-CREATE INDEX `drops_visibility_idx` ON `drops` (`visibility`,`updated_at`);
+CREATE INDEX `drops_share_idx` ON `drops` (`share`,`updated_at`);
 --> statement-breakpoint
 CREATE TABLE `session` (
 	`id` text PRIMARY KEY NOT NULL,

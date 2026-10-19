@@ -19,7 +19,7 @@ export default defineMcpTool({
     kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "folder", "site"])),
     shared: v.optional(v.pipe(v.boolean(), v.description("true for shared drops only, false for private ones only."))),
     trash: v.optional(v.pipe(v.boolean(), v.description("List the Trash instead."))),
-    sharedWithMe: v.optional(v.pipe(v.boolean(), v.description("List other people's drops instead: everything shared with the team, and links the user opened."))),
+    sharedWithMe: v.optional(v.pipe(v.boolean(), v.description("List what others share instead: on a team Drop the team's folders and teammates' drops, on a personal one the public links the user opened."))),
     limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
   })),
   handler: async ({ query, folder, kind, shared, trash, sharedWithMe, limit }, event) => {
@@ -27,10 +27,10 @@ export default defineMcpTool({
     const words = query?.toLowerCase().split(/\s+/).filter(Boolean) ?? []
     const inside = folder ? await findDropByRef(folder, event) : null
     if (folder && (!inside || inside.kind !== "folder" || !permissions(inside, who).view)) throw new HTTPError({ status: 404, message: `No folder with id ${folder}.` })
-    const list = inside ? listFolder(inside, event, { query }) : sharedWithMe ? listSharedWithMe(who, event) : listDrops(who, event, { trash, query: trash ? undefined : query })
+    const list = inside ? listFolder(inside, event, { query, who }) : sharedWithMe ? listSharedWithMe(who, event) : listDrops(who, event, { trash, query: trash ? undefined : query })
     const [all, usage] = await Promise.all([list, getUsage(who.userId)])
     const matched = all.filter(drop => (!kind || drop.kind === kind)
-      && (shared === undefined || (drop.visibility !== "private") === shared)
+      && (shared === undefined || (drop.share !== "private") === shared)
       // Your drops and a folder's searched on the server, text included; the Trash and Shared with me filter here.
       && (inside || !(trash || sharedWithMe) || words.every(word => `${drop.title} ${drop.filename} ${drop.slug}`.toLowerCase().includes(word))))
     const drops = matched.slice(0, limit).map(drop => mcpDrop(drop, event.url.origin))

@@ -2,11 +2,10 @@ import { desc, getTableColumns, sql } from "drizzle-orm"
 import { defineHandler } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { session, user } from "../../databases/config"
-import { isRole } from "#shared/roles"
 import type { Member } from "#shared/types"
-import { requireIdentity } from "../../utils/identity"
+import { requireIdentity, roleOf } from "../../utils/identity"
 
-/** Everyone in this Drop. Anyone signed in can see who's here; only admins see emails and change it. */
+/** Everyone in this Drop. Anyone signed in can see who's here; only admins see emails and ban people. Roles come from DROP_ADMINS. */
 export default defineHandler(async (event): Promise<Member[]> => {
   const who = await requireIdentity(event)
   // One query: listing user ids to count by would pass D1's 100 bound parameters once a Drop has more people.
@@ -25,7 +24,7 @@ export default defineHandler(async (event): Promise<Member[]> => {
     name: user.name,
     email: who.role === "admin" || user.id === who.userId ? user.email : null,
     image: user.image ?? null,
-    role: isRole(user.role ?? "") ? user.role as Member["role"] : "member",
+    role: roleOf(user),
     banned: Boolean(user.banned),
     drops: user.drops,
     lastActiveAt: user.seen ? new Date(user.seen).getTime() : null,

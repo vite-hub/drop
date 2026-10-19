@@ -20,7 +20,7 @@ export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/
   "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
   "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  "#vitehub/env/server": "export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, githubOrg: '', authProxy: false, authProxyCookie: '', testSignin: false, admins: { unseal: () => '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: 100, proBytes: 1073741824, proWrites: 10000 } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
+  "#vitehub/env/server": "export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: '', authProxy: false, authProxyCookie: '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: 100, proBytes: 1073741824, proWrites: 10000 } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
   "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
   "#live-drafts": "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
 }
@@ -42,7 +42,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier in stubs) return { url: module(stubs[specifier]), shortCircuit: true }
     if (specifier.endsWith("/utils/identity") || specifier === "./identity")
-      return { url: module("export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }"), shortCircuit: true }
+      return { url: module("export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async () => {}"), shortCircuit: true }
     if (specifier.startsWith("#shared/")) return { url: new URL(`shared/${specifier.slice(8)}.ts`, root).href, shortCircuit: true }
     if (specifier.startsWith(".")) {
       const url = new URL(specifier, context.parentURL)
@@ -118,16 +118,19 @@ export function reset() {
   state.quotasEnabled = false
   state.shareApproval = false
   state.expiryDays = 30; state.customExpiry = true
+  state.mode = "personal"; state.publicLinkDays = ""; state.admins = ""
   state.failDelete = false; state.failCacheDelete = false; state.who = null
   objects.clear(); entries.clear(); queries.length = 0
   calls.get = calls.head = calls.del = 0; calls.writes.length = 0
   sql.prepare("INSERT INTO user (id, name, email) VALUES (?, ?, ?)").run("owner", "Owner", "owner@example.com")
 }
 export const who = { userId: "owner", name: "Owner", email: "owner@example.com", image: null, role: "member", actorKind: "browser", actorName: "Owner" }
-export function insertDrop(id, overrides = {}) {
+/** The share a test means by the old pair: shared is public (view) or public_comment, team with edit access is team_edit. */
+const shareOf = ({ visibility, access }) => visibility === "team" ? (access === "edit" ? "team_edit" : "team") : visibility === "private" ? "private" : access === "view" ? "public" : "public_comment"
+export function insertDrop(id, { visibility, access, ...overrides } = {}) {
   const values = {
     id, owner_id: "owner", kind: "markdown", title: id, filename: `${id}.md`, blob_key: `${id}.md`, size: 8,
-    version: 1, visibility: "shared", access: "comment", actor_kind: "browser", actor_name: "Owner", created_at: 1, updated_at: 1,
+    version: 1, share: shareOf({ visibility, access }), actor_kind: "browser", actor_name: "Owner", created_at: 1, updated_at: 1,
     // A fresh window, as if someone opened the drop just now.
     last_accessed_at: Date.now(),
     ...overrides,

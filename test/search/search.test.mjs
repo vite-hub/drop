@@ -68,32 +68,36 @@ test("a doc's text is searchable on its latest version only, with a snippet arou
 })
 
 test("another person's private drop never matches, by title or by text; team drops and drops in team folders do", async () => {
-  await doc("# Secret roadmap\n\nThe launch codeword is zebra.")
-  const team = await doc("# Team notes\n\nWe agreed on zebra stripes.", { share: "comment", audience: "team" })
-  const shared = await folder("Shared specs", { share: "view", audience: "team" })
-  const sub = await folder("Drafts", { folder: shared.id })
-  const inside = await doc("# Inner draft\n\nZebra crossings go here.", { folder: sub.id })
-  const hidden = await folder("Private folder")
-  await doc("# Hidden draft\n\nMore zebra.", { folder: hidden.id })
-  const link = await doc("# Link only\n\nZebra by link.", { share: "view" })
+  state.mode = "team"
+  await doc("# Secret roadmap\n\nThe launch codeword is zebra.", { share: "private" })
+  const team = await doc("# Team notes\n\nWe agreed on zebra stripes.")
+  const shared = await folder("Shared specs", { share: "team" })
+  const sub = await folder("Drafts", { folder: shared.id, share: "private" })
+  const inside = await doc("# Inner draft\n\nZebra crossings go here.", { folder: sub.id, share: "private" })
+  const hidden = await folder("Private folder", { share: "private" })
+  await doc("# Hidden draft\n\nMore zebra.", { folder: hidden.id, share: "private" })
+  const link = await doc("# Link only\n\nZebra by link.", { share: "public" })
 
   const found = await searchEverything(mate, "zebra")
-  assert.deepEqual(titles(found), ["Inner draft", "Team notes"])
+  assert.deepEqual(titles(found), ["Inner draft", "Link only", "Team notes"], "a public link reaches the team too")
   assert.equal(found.find(drop => drop.id === team.id).owner.name, "Owner")
   assert.deepEqual(found.find(drop => drop.id === inside.id).path.map(crumb => crumb.title), ["Shared specs", "Drafts"])
   assert.deepEqual(await searchEverything(mate, "secret roadmap"), [], "not by title either")
-  assert.deepEqual(await searchEverything({ ...mate, role: "admin" }, "secret"), [], "staff don't find private drops here")
-
-  // A link-shared drop joins once you've opened it, like Shared with me.
-  await recordSharedVisit(await findDrop(link.id), mate)
-  assert.deepEqual(titles(await searchEverything(mate, "zebra")), ["Inner draft", "Link only", "Team notes"])
+  assert.deepEqual(await searchEverything({ ...mate, role: "admin" }, "secret"), [], "admins don't find private drops here")
   // Your own come first, private ones included.
   assert.equal((await searchEverything(owner, "zebra")).length, 5)
+
+  // On a personal Drop the team shares reach nobody, and a public link joins once you've opened it, like Shared with me.
+  state.mode = "personal"
+  assert.deepEqual(await searchEverything(mate, "zebra"), [])
+  await recordSharedVisit(await findDrop(link.id), mate)
+  assert.deepEqual(titles(await searchEverything(mate, "zebra")), ["Link only"])
 })
 
 test("the Trash, review, quarantine and banned owners keep drops out of search", async () => {
-  const team = await doc("# Kiwi plan", { share: "comment", audience: "team" })
-  const box = await folder("Kiwi folder", { share: "comment", audience: "team" })
+  state.mode = "team"
+  const team = await doc("# Kiwi plan", { share: "team" })
+  const box = await folder("Kiwi folder", { share: "team" })
   await doc("# Kiwi inside", { folder: box.id })
   assert.equal((await searchEverything(mate, "kiwi")).length, 3)
 
@@ -102,9 +106,14 @@ test("the Trash, review, quarantine and banned owners keep drops out of search",
   assert.deepEqual(titles(await searchEverything(mate, "kiwi")), ["Kiwi plan"], "a folder in the Trash takes what it holds along")
   assert.deepEqual(titles(await listDrops(owner, undefined, { query: "kiwi" })), ["Kiwi plan"], "your own search skips the Trash too")
 
-  sql.prepare("UPDATE drops SET share_review = 'pending' WHERE id = ?").run(team.id)
+  // A public link waiting for review still reaches the team on a team Drop, and nobody on a personal one.
+  sql.prepare("UPDATE drops SET share = 'public', share_review = 'pending' WHERE id = ?").run(team.id)
+  assert.deepEqual(titles(await searchEverything(mate, "kiwi")), ["Kiwi plan"])
+  state.mode = "personal"
+  await recordSharedVisit({ ...await findDrop(team.id), shareReview: null }, mate)
   assert.deepEqual(await searchEverything(mate, "kiwi"), [])
-  sql.prepare("UPDATE drops SET share_review = NULL, quarantined_at = 1 WHERE id = ?").run(team.id)
+  state.mode = "team"
+  sql.prepare("UPDATE drops SET share = 'team', share_review = NULL, quarantined_at = 1 WHERE id = ?").run(team.id)
   assert.deepEqual(await searchEverything(mate, "kiwi"), [])
   sql.prepare("UPDATE drops SET quarantined_at = NULL WHERE id = ?").run(team.id)
   sql.prepare("UPDATE user SET banned = 1 WHERE id = 'owner'").run()
@@ -112,10 +121,11 @@ test("the Trash, review, quarantine and banned owners keep drops out of search",
 })
 
 test("a folder's search finds text below it, and the search API needs a signed-in person", async () => {
-  const box = await folder("Research", { share: "view", audience: "team" })
+  state.mode = "team"
+  const box = await folder("Research", { share: "team" })
   const sub = await folder("Notes", { folder: box.id })
   await doc("# Interview 3\n\nShe asked about offline mode twice.", { folder: sub.id })
-  await doc("# Elsewhere\n\nOffline mode again.")
+  await doc("# Elsewhere\n\nOffline mode again.", { share: "private" })
 
   state.who = mate
   const below = await listHandler(request(`/api/drops?folder=${box.id}&q=offline`))

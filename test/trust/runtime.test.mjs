@@ -34,7 +34,7 @@ test("approval, reports, quarantine, legal pages and native OAuth work over HTTP
   assert.equal(created.status, 200, created.text)
   const id = created.json.id
   assert.equal((await request(`/api/drops/${id}`)).status, 404)
-  const pending = await request(`/api/drops/${id}`, { method: "PATCH", cookie: owner.cookie, body: { visibility: "shared" } })
+  const pending = await request(`/api/drops/${id}`, { method: "PATCH", cookie: owner.cookie, body: { share: "public_comment" } })
   assert.equal(pending.json.shareReview, "pending", pending.text)
   const waiting = await request(`/d/${id}`)
   assert.match(waiting.text, /Waiting for review/)
@@ -52,7 +52,7 @@ test("approval, reports, quarantine, legal pages and native OAuth work over HTTP
   assert.ok(review.json.some(member => member.id === owner.id && member.drops === 1))
   assert.equal((await request(`/api/admin/review/${owner.id}`, { cookie: admin.cookie, body: { action: "reject" } })).status, 200)
   assert.equal((await request(`/api/drops/${id}`, { cookie: owner.cookie })).json.shareReview, "rejected")
-  await request(`/api/drops/${id}`, { method: "PATCH", cookie: owner.cookie, body: { visibility: "shared" } })
+  await request(`/api/drops/${id}`, { method: "PATCH", cookie: owner.cookie, body: { share: "public_comment" } })
   assert.equal((await request(`/api/admin/review/${owner.id}`, { cookie: admin.cookie, body: { action: "approve" } })).status, 200)
   assert.equal((await request(`/api/drops/${id}`)).status, 200)
   const landing = await request(raw)

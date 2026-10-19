@@ -1,11 +1,12 @@
 import { expiryLabel } from "#shared/expiry"
 import type { DropComment, DropSummary } from "#shared/types"
 import { dropPageUrl, type DropRow } from "../utils/drops"
-import type { Share } from "../utils/drop-update"
+
+/** How every tool describes the share input: one state, the same names the pages use. */
+export const SHARE_INPUT = "Who can open it: private (only the user), team (everyone signed in to this Drop opens and comments; team Drops only), team_edit (the team also edits a Markdown doc, or the Markdown in a folder, together in the browser; team Drops only), public (anyone with the link opens it, signed-in people comment), or public_comment (anyone with the link comments too, guests included). On a team Drop a public link closes after a few days and it's back to team. Leave it out to keep the current share; a new drop starts as this Drop's default: team on a team Drop, private on a personal one, and inside a folder it shares at least as wide as the folder. Make it public only when the user asks or it's clearly meant for people outside, such as a pull request asset."
 
 /** What agents get back for a drop: enough to link it, embed its file, and know who can open it and for how long. */
 export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "blobKey">) {
-  const share: Share = drop.visibility === "private" ? "private" : drop.access
   const file = row?.blobKey ? `/f/${row.blobKey}` : drop.thumbnail
   return {
     id: drop.id,
@@ -20,8 +21,9 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     // A doc found by its text: the words around the match.
     ...(drop.snippet ? { match: drop.snippet } : {}),
     ...(drop.items !== undefined ? { items: drop.items } : {}),
-    share,
-    ...(drop.visibility !== "private" ? { sharedWith: drop.visibility === "team" ? "team" as const : "link" as const } : {}),
+    share: drop.share,
+    ...(drop.publicUntil ? { publicUntil: new Date(drop.publicUntil).toISOString() } : {}),
+    ...(drop.teamFolder ? { teamFolder: true } : {}),
     // The share comes from a folder above, wider than the drop's own.
     ...(drop.sharedFrom ? { sharedThrough: drop.sharedFrom.title } : {}),
     ...(drop.owner ? { owner: drop.owner.name } : {}),
@@ -29,7 +31,8 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     lifetime: drop.lifetime,
     ...(drop.keepReason ? { keepReason: drop.keepReason } : {}),
     status: expiryLabel(drop, Date.now()),
-    ...(drop.note ? { note: drop.note } : {}),
+    // A folder's note is its description: what goes in it and how.
+    ...(drop.note ? drop.kind === "folder" ? { description: drop.note } : { note: drop.note } : {}),
   }
 }
 
@@ -37,7 +40,7 @@ export type McpDrop = ReturnType<typeof mcpDrop>
 
 /** One line per drop for clients that only read text. */
 export const dropLine = (drop: McpDrop) =>
-  `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : `${drop.kind} v${drop.version}`}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.sharedWith ? ` with the ${drop.sharedWith}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
+  `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : `${drop.kind} v${drop.version}`}${drop.teamFolder ? ", the team's" : ""}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.publicUntil ? ` until ${drop.publicUntil.slice(0, 10)}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
 
 /** Where a comment points, in words: the quoted text, or a spot or area as percentages of an image or element. */
 export function commentTarget(comment: Pick<DropComment, "kind" | "quote" | "label" | "ox" | "oy" | "ow" | "oh">) {

@@ -81,7 +81,7 @@ test("MCP-created private drops belong to the authorizing browser account", { sk
     const github = await request("/api/auth/sign-in/social", { body: { provider: "github", callbackURL: path, additionalParams: { prompt: "select_account" } } })
     assert.equal(github.status, 200)
     assert.equal(new URL(github.json.url).searchParams.get("prompt"), "select_account")
-    const shared = await request(`/api/drops/${id}`, { cookie: owner.cookie, method: "PATCH", body: { visibility: "shared" } })
+    const shared = await request(`/api/drops/${id}`, { cookie: owner.cookie, method: "PATCH", body: { share: "public_comment" } })
     assert.equal(shared.status, 200)
     assert.equal((await request(path)).status, 200)
   }

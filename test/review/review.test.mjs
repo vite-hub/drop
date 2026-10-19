@@ -115,11 +115,11 @@ test("a site's address is one origin, or a pattern of one label: https, or http 
 
 test("an agent creates one site drop for every preview, and the tag it gets carries no key", async () => {
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
-  const created = await call(publish, { site: { url: PATTERN }, title: "Acme portal previews", slug: "acme-previews", share: "comment", note: "Review the previews", lifetime: "review" })
+  const created = await call(publish, { site: { url: PATTERN }, title: "Acme portal previews", slug: "acme-previews", share: "public_comment", note: "Review the previews", lifetime: "review" })
   const drop = created.structuredContent
   assert.equal(drop.kind, "site")
   assert.equal(drop.siteUrl, PATTERN)
-  assert.equal(drop.share, "comment")
+  assert.equal(drop.share, "public_comment")
   const row = sql.prepare("SELECT link, site_url, size, blob_key FROM drops WHERE id = ?").get(drop.id)
   assert.deepEqual({ ...row }, { link: row.link, site_url: PATTERN, size: 0, blob_key: null })
   assert.equal(drop.script, '<script src="https://drop.example/review.js" defer></script>')
@@ -138,7 +138,7 @@ test("an agent creates one site drop for every preview, and the tag it gets carr
 test("people create a site review in the app, at the top or in a folder, within their plan", async () => {
   state.who = who
   const top = await newSite(post("/api/sites", { url: ` ${PATTERN}/ `, title: "Acme previews" }))
-  assert.deepEqual({ kind: top.kind, title: top.title, visibility: top.visibility, lifetime: top.lifetime, parentId: top.parentId }, { kind: "site", title: "Acme previews", visibility: "private", lifetime: "review", parentId: null })
+  assert.deepEqual({ kind: top.kind, title: top.title, share: top.share, lifetime: top.lifetime, parentId: top.parentId }, { kind: "site", title: "Acme previews", share: "private", lifetime: "review", parentId: null })
   assert.equal(sql.prepare("SELECT site_url FROM drops WHERE id = ?").get(top.id).site_url, PATTERN)
   const named = await newSite(post("/api/sites", { url: "http://localhost:3000" }))
   assert.equal(named.title, "localhost:3000", "named after its host by default")
@@ -167,6 +167,7 @@ test("people create a site review in the app, at the top or in a folder, within 
 })
 
 test("the connect popup finds the reviews that cover the page, only the ones the person may comment on", async () => {
+  state.mode = "team"
   // One review covers every preview, another one PR only.
   site("previews", { site_url: PATTERN, title: "Acme previews", updated_at: 1 })
   site("pr12", { title: "Acme PR 12", visibility: "team", updated_at: 2 })
@@ -185,9 +186,10 @@ test("the connect popup finds the reviews that cover the page, only the ones the
   assert.deepEqual(Object.keys(guest.body.sites[0]).sort(), ["address", "choice", "owner", "title"], "no id, no link")
   assert.doesNotMatch(JSON.stringify(guest.body), /previewslink|"previews"/)
 
-  // Signed in, the team review covers this PR too; the private one stays the owner's.
+  // Signed in, the team review covers this PR too, and people signed in comment on a public link; the private one
+  // stays the owner's.
   state.who = ada
-  assert.deepEqual((await sites()).body.sites.map(item => item.title), ["Acme PR 12", "Acme previews"])
+  assert.deepEqual((await sites()).body.sites.map(item => item.title), ["Acme PR 12", "Acme previews", "View-only PR 12"])
   assert.deepEqual((await sites("https://pr13-acme.preview.quiver.dk")).body.sites.map(item => item.title), ["Acme previews"])
   state.who = who
   assert.deepEqual((await sites()).body.sites.map(item => item.title).sort(), ["Acme PR 12", "Acme previews", "Private PR 12", "View-only PR 12"])
@@ -223,7 +225,7 @@ test("a token is for the picked review and the page's origin only", async () => 
   assert.equal(await readReviewToken(request("/"), choice), null)
   assert.equal((await answer(tokenPost, post("/api/review/token", { origin: SITE, choice: guest.body.token }))).status, 404)
   // A choice made before the share was taken back gets nothing.
-  sql.prepare("UPDATE drops SET visibility = 'private' WHERE id = 'previews'").run()
+  sql.prepare("UPDATE drops SET share = 'private' WHERE id = 'previews'").run()
   assert.equal((await answer(tokenPost, post("/api/review/token", { origin: SITE, choice }))).status, 404)
 })
 
@@ -287,7 +289,7 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   const image = sql.prepare("SELECT * FROM drops WHERE parent_id = 'site'").get()
   assert.equal(image.kind, "image")
   assert.equal(image.content_type, "image/png")
-  assert.equal(image.visibility, "private", "it shares the site's sharing through its parent")
+  assert.equal(image.share, "private", "it shares the site's sharing through its parent")
   assert.equal(image.note, "1440x900 viewport")
   assert.equal(image.title, "Screenshot of /pricing")
   assert.ok(objects.has(image.blob_key))
@@ -332,6 +334,7 @@ test("comments on a pattern keep the origin of the preview they came from", asyn
 })
 
 test("Open in Drop opens the review only for people who could open it without its link", async () => {
+  state.mode = "team"
   site("pr12", { visibility: "team" })
   site("previews", { site_url: PATTERN, title: "Acme previews" })
   state.who = ada
@@ -364,7 +367,7 @@ test("what the page sends is checked: the token, the image's bytes, and the fiel
   assert.equal(state.bursts.filter(burst => burst.bucket === "review-comment").length, 5, "each signed request counts")
 
   // Taking the share back ends every review session at once.
-  sql.prepare("UPDATE drops SET visibility = 'private' WHERE id = 'site'").run()
+  sql.prepare("UPDATE drops SET share = 'private' WHERE id = 'site'").run()
   assert.equal((await comment(body.token, {})).status, 401)
 })
 

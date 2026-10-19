@@ -39,7 +39,7 @@ test("proxy login preserves content restrictions, bans and MCP authorization", {
     const created = await request("/api/drops", { proxy: true, body: { filename: "proxy-test.md", content: "# Private test" } })
     assert.equal(created.status, 200, created.text)
     dropId = created.json.id
-    assert.equal((await request(`/api/drops/${dropId}`, { method: "PATCH", body: { visibility: "shared" }, proxy: true })).status, 200)
+    assert.equal((await request(`/api/drops/${dropId}`, { method: "PATCH", body: { share: "public_comment" }, proxy: true })).status, 200)
     assert.equal((await request(`/d/${dropId}`, { anonymous: true })).status, 401)
     assert.equal((await request(`/d/${dropId}`, { proxy: true })).status, 200)
     db.prepare("UPDATE user SET banned=1 WHERE id=?").run(userId)

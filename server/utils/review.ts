@@ -5,16 +5,17 @@ import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { newLink, slugify } from "#shared/links"
-import { isRole, type Role } from "#shared/roles"
 import { isSitePattern, REVIEW_TOKEN_HOURS, SITE_ADDRESS_RULE, siteAddress, siteAddressesFor, siteHost, siteMatches } from "#shared/review"
 import type { ReviewCommentInput } from "#shared/schemas"
-import type { Access, SiteReviewItem, Visibility } from "#shared/types"
+import type { SiteReviewItem } from "#shared/types"
+import { defaultShare, isPublic, type Share } from "#shared/share"
 import { account, comments, drops, user } from "../databases/config"
 import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
 import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions } from "./drops"
 import { githubOrganization, isGitHubMember } from "./github-membership"
-import type { Identity } from "./identity"
+import { type Identity, roleOf } from "./identity"
 import { DropQuotaError, withDropQuota } from "./quotas"
+import { shareFields, sharePolicy } from "./share"
 import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
 
@@ -125,11 +126,11 @@ async function covered(origin: string) {
 }
 
 /**
- * Whether `who` could open the site without its link: its owner, staff, or someone a team share reaches. A share with
- * anyone who has the link doesn't count, since finding a site by its origin is not having its link.
+ * Whether `who` could open the site without its link: its owner, an admin, or someone a team share reaches. A public
+ * link doesn't count, since finding a site by its origin is not having its link.
  */
 export function openable(site: DropRow, who: Identity | null) {
-  const grants = (site.grants ?? [site]).filter(grant => grant.visibility !== "shared")
+  const grants = (site.grants ?? [{ share: site.share }]).filter(grant => !isPublic(grant.share))
   return permissions({ ...site, grants }, who).view
 }
 
@@ -145,8 +146,7 @@ async function reviewer(claims: ReviewClaims): Promise<Identity | null | false> 
     const [github] = await db.select({ token: account.accessToken }).from(account).where(and(eq(account.userId, row.id), eq(account.providerId, "github"))).limit(1)
     if (!await isGitHubMember(github?.token)) return false
   }
-  const role = row.role ?? "member"
-  return { userId: row.id, name: row.name, email: row.email, image: row.image ?? null, role: isRole(role) ? role as Role : "member", actorKind: "browser", actorName: row.name }
+  return { userId: row.id, name: row.name, email: row.email, image: row.image ?? null, role: roleOf(row), actorKind: "browser", actorName: row.name }
 }
 
 /**
@@ -217,21 +217,21 @@ export function reviewApi(handler: (event: H3Event) => Promise<unknown>) {
 }
 
 /** A new site drop: no file, just the address people review. In a folder it lives with the folder, like any drop. */
-export async function createSiteDrop(who: Identity, input: LifetimeInput & { url: string; title?: string; slug?: string; visibility?: Visibility; access?: Access; folder?: DropRow }, event?: H3Event) {
+export async function createSiteDrop(who: Identity, input: LifetimeInput & { url: string; title?: string; slug?: string; share?: Share; folder?: DropRow }, event?: H3Event) {
   const siteUrl = siteAddress(input.url)
   if (!siteUrl) throw new HTTPError({ status: 400, statusText: `That address can't be reviewed. ${SITE_ADDRESS_RULE}` })
   const folder = input.folder ?? null
-  const ownerId = folder?.ownerId ?? who.userId
+  const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
+  const { share, publicUntil } = input.share ? shareFields(input.share, { kind: "site" }, event) : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
   return withDropQuota(ownerId, { drops: 1, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
     const host = siteHost(siteUrl)
     const title = (input.title?.trim() || host).slice(0, 160)
-    const visibility = input.visibility ?? "private"
     const row: DropRow = {
       id: crypto.randomUUID(), ownerId, kind: "site", title, filename: host, blobKey: null, contentType: null, size: 0,
       version: 1, supersedesId: null, link: newLink(), slug: await uniqueSlug(folder?.id ?? null, (input.slug && slugify(input.slug)) || slugify(title)),
-      visibility, access: input.access ?? "comment", shareReview: visibility !== "private" ? await shareReviewFor(ownerId, event) : null, quarantinedAt: null,
+      share, publicUntil, teamFolder: false, shareReview: isPublic(share) ? await shareReviewFor(ownerId, event) : null, quarantinedAt: null,
       actorKind: who.actorKind, actorName: who.actorName, createdAt: now, updatedAt: now, lastAccessedAt: now,
       ...life, note: input.note?.trim() || null, trashedAt: null, trashReason: null, parentId: folder?.id ?? null, siteUrl, publishToken: null,
     }
@@ -288,7 +288,7 @@ export async function addReviewComment(site: DropRow, author: { who: Identity | 
     const image: DropRow = {
       id, ownerId: site.ownerId, kind: "image", title: `Screenshot of ${where}`.slice(0, 160), filename: `screenshot.${EXTENSIONS[shot.contentType]}`,
       blobKey: key, contentType: shot.contentType, size: shot.bytes.byteLength, version: 1, supersedesId: null, link: newLink(), slug: "screenshot",
-      visibility: "private", access: "comment", shareReview: null, quarantinedAt: null, actorKind: "browser", actorName: author.name,
+      share: "private", publicUntil: null, teamFolder: false, shareReview: null, quarantinedAt: null, actorKind: "browser", actorName: author.name,
       createdAt: now, updatedAt: now, lastAccessedAt: now, lifetime: "review", keepReason: null,
       note: `${input.viewport.width}x${input.viewport.height} viewport`, trashedAt: null, trashReason: null, parentId: site.id, siteUrl: null, publishToken: null,
     }

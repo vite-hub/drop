@@ -5,6 +5,7 @@ import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { account, user } from "../databases/config"
 import { githubOrganization, isGitHubMember } from "./github-membership"
+import { roleOf } from "./identity"
 
 /** Whether people sign in through an existing GitHub oauth2-proxy (`DROP_AUTH_PROXY`), and its cookie to clear on logout. */
 export function authProxy() {
@@ -29,15 +30,16 @@ export const proxyAuth = () => ({
       const placeholder = `${accountId}@users.noreply.github.com`
       // Like Better Auth's GitHub provider: the public profile email, else the primary one (oauth2-proxy asks for
       // `user:email`). The placeholder stays only when GitHub shares neither.
-      const emails = profile.email ? null : await githubApi<{ email: string; primary: boolean; verified: boolean }[]>("user/emails", token)
+      const emails = await githubApi<{ email: string; primary: boolean; verified: boolean }[]>("user/emails", token)
       const email = profile.email || (emails?.find(entry => entry.primary) ?? emails?.[0])?.email || placeholder
-      const emailVerified = profile.email ? false : Boolean(emails?.find(entry => entry.email === email)?.verified)
+      // GitHub vouches for an address it verified; a public profile email alone proves nothing (DROP_ADMINS trusts it).
+      const emailVerified = Boolean(emails?.find(entry => entry.email.toLowerCase() === email.toLowerCase())?.verified)
       const [existing] = await db.select().from(account)
         .where(and(eq(account.providerId, "github"), eq(account.accountId, accountId))).limit(1)
       const userId = existing?.userId ?? `github-${accountId}`
       // A stable numeric GitHub ID avoids email-based linking and handles concurrent first requests.
       if (!existing) {
-        const role = useServerEnv().drop.admins.unseal().split(/[\s,]+/).includes(accountId) ? "admin" : "member"
+        const role = roleOf({ email, emailVerified })
         const fields = { id: userId, name: profile.name || profile.login, image: profile.avatar_url, role }
         const [created] = await db.insert(user).values({ ...fields, email, emailVerified }).onConflictDoNothing().returning({ id: user.id })
         // Another account may hold that email already: join under the placeholder instead.
@@ -48,6 +50,7 @@ export const proxyAuth = () => ({
       // People who joined before Drop asked GitHub get their real email now. Another account holding it keeps it.
       if (existing && email !== placeholder)
         await db.update(user).set({ email, emailVerified }).where(and(eq(user.id, userId), eq(user.email, placeholder))).catch(() => {})
+      if (emailVerified) await db.update(user).set({ emailVerified }).where(and(eq(user.id, userId), eq(user.email, email))).catch(() => {})
       const member = await ctx.context.internalAdapter.findUserById(userId)
       if (!member || (member as { banned?: boolean }).banned) throw new APIError("FORBIDDEN", { message: "Account unavailable." })
       const session = await ctx.context.internalAdapter.createSession(userId)

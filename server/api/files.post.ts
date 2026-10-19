@@ -51,7 +51,7 @@ export default quotaApiHandler(defineHandler(async (event) => {
     id: drop.id,
     url: new URL(`/f/${drop.blobKey}`, origin).href,
     page: dropPageUrl(origin, drop),
-    visibility: drop.visibility,
+    share: drop.share,
     version: drop.version,
   }
 }))

@@ -4,14 +4,11 @@ import { DatabaseSync } from "node:sqlite"
 import { test } from "node:test"
 import { needsShareReview, reportTarget } from "../../shared/trust.ts"
 import { registrationProblem } from "../../shared/oauth-registration.ts"
-import { htmlLanding } from "../../shared/html-landing.ts"
 
-// Exercise the production permission function without its storage/rendering dependencies.
-const dropsSource = readFileSync(new URL("../../server/utils/drops.ts", import.meta.url), "utf8")
-const permissionSource = [/export function permissions\([\s\S]*?\n}\n/, /export const reaches = [^\n]*\n[^\n]*\n/]
-  .map(pattern => dropsSource.match(pattern)[0]).join("\n")
-  .replace(/: DropRow|: Pick<DropRow, "visibility">|: Identity \| null| as Access/g, "")
-const { permissions } = await import(`data:text/javascript,${encodeURIComponent('const ACCESS_RANK={view:0,comment:1,edit:2};\n' + permissionSource)}`)
+// The harness loads the production permission function with its storage stubbed (and the CSS imports pages use).
+import { state } from "../cost/harness.mjs"
+const { permissions } = await import("../../server/utils/drops.ts")
+const { htmlLanding } = await import("../../shared/html-landing.ts")
 
 test("approval is optional; admins and approved members bypass it", () => {
   assert.equal(needsShareReview(false), false)
@@ -20,9 +17,10 @@ test("approval is optional; admins and approved members bypass it", () => {
   assert.equal(needsShareReview(true, { role: "admin", banned: true }), true)
 })
 
-test("pending and rejected shares stay private; quarantine denies content even to owners", () => {
+test("pending and rejected public links reach nobody yet; quarantine denies content even to owners", () => {
+  state.mode = "personal"
   const owner = { userId: "owner", role: "member" }
-  const drop = { ownerId: "owner", visibility: "shared", access: "comment", shareReview: null, quarantinedAt: null }
+  const drop = { ownerId: "owner", share: "public_comment", shareReview: null, quarantinedAt: null }
   assert.equal(permissions(drop, null).comment, true)
   assert.equal(permissions(drop, null).edit, false)
   for (const shareReview of ["pending", "rejected"]) {
@@ -33,21 +31,9 @@ test("pending and rejected shares stay private; quarantine denies content even t
   for (const who of [null, owner, { userId: "admin", role: "admin" }]) assert.equal(permissions({ ...drop, quarantinedAt: 1 }, who).view, false)
 })
 
-test("a Can edit link lets signed-in people edit in the browser, not guests or their agents", () => {
-  const drop = { ownerId: "owner", visibility: "shared", access: "edit", shareReview: null, quarantinedAt: null }
-  const person = { userId: "reader", role: "member", actorKind: "browser" }
-  assert.equal(permissions(drop, person).edit, true)
-  assert.equal(permissions(drop, { ...person, actorKind: "agent" }).edit, false)
-  assert.equal(permissions(drop, null).edit, false)
-  assert.equal(permissions(drop, null).comment, true)
-  assert.equal(permissions({ ...drop, access: "comment" }, person).edit, false)
-  assert.equal(permissions({ ...drop, visibility: "private" }, person).edit, false)
-  assert.equal(permissions({ ...drop, expired: true }, person).edit, false)
-  assert.equal(permissions(drop, { userId: "owner", role: "member", actorKind: "agent" }).edit, true)
-})
-
-test("a team share reaches everyone signed in, never a guest", () => {
-  const drop = { ownerId: "owner", visibility: "team", access: "edit", shareReview: null, quarantinedAt: null }
+test("Team can edit lets teammates edit in the browser, not guests or their agents", () => {
+  state.mode = "team"
+  const drop = { ownerId: "owner", share: "team_edit", shareReview: null, quarantinedAt: null }
   const person = { userId: "teammate", role: "member", actorKind: "browser" }
   assert.equal(permissions(drop, null).view, false)
   assert.equal(permissions(drop, null).comment, false)
@@ -55,9 +41,10 @@ test("a team share reaches everyone signed in, never a guest", () => {
   assert.equal(permissions(drop, { ...person, actorKind: "agent" }).view, true)
   assert.equal(permissions(drop, { ...person, actorKind: "agent" }).edit, false)
   assert.equal(permissions(drop, person).manage, false)
-  assert.equal(permissions({ ...drop, access: "view" }, person).comment, false)
-  assert.equal(permissions({ ...drop, shareReview: "pending" }, person).view, false)
+  assert.equal(permissions({ ...drop, share: "team" }, person).edit, false)
+  assert.equal(permissions({ ...drop, share: "private" }, person).view, false)
   assert.equal(permissions({ ...drop, expired: true }, person).view, false)
+  assert.equal(permissions(drop, { userId: "owner", role: "member", actorKind: "agent" }).edit, true)
 })
 
 test("OAuth bounds preserve desktop MCP redirects", () => {
@@ -127,9 +114,12 @@ test("publishing burst protection counts by owner across calls", async () => {
   const { requirePublishBurst } = await import("../../server/utils/publish-burst.ts")
   const owner = crypto.randomUUID()
   const request = () => new H3Event(new Request("https://drop.example/mcp", { method: "POST" }))
-  for (let i = 0; i < 30; i++) await requirePublishBurst(request(), owner)
+  // The harness stands in for ViteHub's limiter: it records the bucket and fails when told to.
+  await requirePublishBurst(request(), owner)
+  assert.equal(state.bursts.at(-1).key, owner)
+  state.failBurst = true
   await assert.rejects(requirePublishBurst(request(), owner), error => error.status === 429)
-  await requirePublishBurst(request(), crypto.randomUUID())
+  state.failBurst = false
 })
 
 test("raw file errors have report chrome and robots headers while API errors use Nitro", async () => {

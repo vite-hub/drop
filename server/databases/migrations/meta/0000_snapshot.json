@@ -726,13 +726,28 @@
           "notNull": false,
           "autoincrement": false
         },
-        "visibility": {
-          "name": "visibility",
+        "share": {
+          "name": "share",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": "'private'"
+        },
+        "public_until": {
+          "name": "public_until",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "team_folder": {
+          "name": "team_folder",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "false"
         },
         "share_review": {
           "name": "share_review",
@@ -747,14 +762,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "access": {
-          "name": "access",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'comment'"
         },
         "actor_kind": {
           "name": "actor_kind",
@@ -901,10 +908,10 @@
           ],
           "isUnique": false
         },
-        "drops_visibility_idx": {
-          "name": "drops_visibility_idx",
+        "drops_share_idx": {
+          "name": "drops_share_idx",
           "columns": [
-            "visibility",
+            "share",
             "updated_at"
           ],
           "isUnique": false

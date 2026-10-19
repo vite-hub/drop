@@ -5,12 +5,17 @@ import { requireIdentity } from "../../utils/identity"
 import { isAttachment } from "../../utils/nodes"
 import { routeId } from "../../utils/params"
 
-/** Moves a drop to the Trash, and a folder with everything in it. `?forever` deletes it now; only people can, never their agents. */
+/**
+ * Moves a drop to the Trash, and a folder with everything in it; anyone on the team may for a drop in a team folder.
+ * `?forever` deletes it now: its owner or an admin, people only, never their agents.
+ */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
   const drop = await findDrop(await routeId(event), event)
-  if (!drop || isAttachment(drop) || !(permissions(drop, who).owner || who.role === "admin")) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
-  if (!event.url.searchParams.has("forever")) return updateDrop(drop, who, { trashed: true }, event)
+  const forever = event.url.searchParams.has("forever")
+  const can = drop && permissions(drop, who)
+  if (!drop || !can || isAttachment(drop) || !(forever ? can.manage : can.trash)) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
+  if (!forever) return updateDrop(drop, who, { trashed: true }, event)
   if (who.actorKind !== "browser") throw new HTTPError({ status: 403, statusText: "Only people can delete a drop for good. Move it to the Trash instead." })
   await deleteDrop(drop)
   return { ok: true }

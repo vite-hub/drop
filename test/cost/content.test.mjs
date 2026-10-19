@@ -122,7 +122,7 @@ test("review policy reuses the owner join for IDs, blobs, pages and raw download
   }
   await missing(() => requireBlobAccess(event("/f/doc.md?raw"), "doc.md"))
   await assert.rejects(accessMiddleware(event("/d/doc")), error => error.status === 403)
-  for (const identity of [who, { ...who, userId: "staff", role: "editor" }, { ...who, userId: "admin", role: "admin" }]) {
+  for (const identity of [who, { ...who, userId: "admin", role: "admin" }]) {
     state.who = identity
     await requireBlobAccess(event("/f/doc.md"), "doc.md")
     await accessMiddleware(event("/d/doc"))
@@ -158,7 +158,7 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
   const reads = calls.get
   for (const blocked of ["UPDATE drops SET quarantined_at = 1", "UPDATE drops SET quarantined_at = NULL, owner_id = 'deleted-owner'"]) {
     sql.exec(blocked)
-    for (const identity of [null, who, { ...who, role: "editor" }, { ...who, role: "admin" }]) {
+    for (const identity of [null, who, { ...who, role: "admin" }]) {
       state.who = identity
       for (const path of [`/f/${key}`, `/f/${key}?raw`, "/d/doc", "/d/app"])
         for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
@@ -236,7 +236,8 @@ test("/api/me reads the maintained member counter after inserts and deletes", as
   queries.length = 0
   const viewer = await meHandler(event("/api/me"))
   assert.equal(viewer.members, 2)
-  assert.equal(viewer.team, true)
+  assert.equal(viewer.mode, "personal")
+  assert.equal(viewer.publicLinkDays, null)
   assert.equal(queries.length, 1)
   assert.doesNotMatch(queries[0].query, /count\(/)
   sql.exec("DELETE FROM user WHERE id = 'second'")
@@ -290,7 +291,7 @@ test("quota publishing keeps share review and uses one owner burst bucket for do
   state.quotasEnabled = true
   state.shareApproval = true
   const { getUsage, quotaToolResult } = await import("../../server/utils/quotas.ts")
-  const first = await createDocDrop(who, { filename: "review.md", bytes: new TextEncoder().encode("# Review"), visibility: "shared" }, event("/mcp", "POST"))
+  const first = await createDocDrop(who, { filename: "review.md", bytes: new TextEncoder().encode("# Review"), share: "public_comment" }, event("/mcp", "POST"))
   assert.equal(first.shareReview, "pending")
   assert.equal((await findDrop(first.id)).shareReview, "pending")
   assert.equal((await getUsage(who.userId)).writes.used, 1)

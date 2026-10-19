@@ -17,7 +17,7 @@ export default defineValidatedHandler({
     if (!target) throw new HTTPError({ status: 400, statusText: "Use a Drop share or file link." })
     // Attachments take their doc's sharing here, so an image in a shared doc can be reported (and quarantined).
     const drop = target.startsWith("/d/") ? await findDrop(target.slice(3)) : await findDropByBlob(decodeURIComponent(target.slice(3)))
-    if (drop && drop.visibility === "private") throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
+    if (drop && drop.share === "private") throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
     if (!drop) {
       if (decodeURIComponent(target.slice(3)).startsWith("apps/")) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
       if (!target.startsWith("/f/")) throw new HTTPError({ status: 404, statusText: "No public drop with that link." })

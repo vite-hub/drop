@@ -47,8 +47,8 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
   assert.equal(shot.kind, "image")
   assert.match(shot.fileUrl, /^https:\/\/drop\.example\/f\/[0-9a-f-]{36}\.png$/)
 
-  const doc = (await call(publish, { markdown: `# Evidence\n\n![before](${shot.fileUrl})`, note: "PR evidence", lifetime: "keep", keepReason: "Screenshots for vite-hub/drop#12.", share: "view" })).structuredContent
-  assert.equal(doc.share, "view")
+  const doc = (await call(publish, { markdown: `# Evidence\n\n![before](${shot.fileUrl})`, note: "PR evidence", lifetime: "keep", keepReason: "Screenshots for vite-hub/drop#12.", share: "public" })).structuredContent
+  assert.equal(doc.share, "public")
   assert.equal(doc.lifetime, "keep")
   assert.equal(doc.keepReason, "Screenshots for vite-hub/drop#12.")
 
@@ -62,7 +62,7 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
   assert.equal(next.version, 2)
   assert.deepEqual(next.resolved, [1])
   assert.equal(next.lifetime, "keep", "the next version keeps the lifetime")
-  assert.equal(next.share, "view")
+  assert.equal(next.share, "public")
   assert.equal(sql.prepare("SELECT resolved FROM comments WHERE id = 'c1'").get().resolved, 1)
 
   const listed = (await call(listDrops, {})).structuredContent
@@ -125,7 +125,7 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
 
 test("update_drop shares, trashes, and restores; the Trash lists separately", async () => {
   const doc = (await call(publish, { markdown: "# Plan", note: "Draft", lifetime: "review" })).structuredContent
-  assert.equal((await call(updateDrop, { id: doc.id, share: "comment" })).structuredContent.share, "comment")
+  assert.equal((await call(updateDrop, { id: doc.id, share: "public_comment" })).structuredContent.share, "public_comment")
   assert.match((await call(updateDrop, { id: doc.id, trash: true })).structuredContent.status, /^In the Trash, deleting in 15 days$/)
   assert.deepEqual((await call(listDrops, {})).structuredContent.drops, [])
   assert.equal((await call(listDrops, { trash: true })).structuredContent.drops[0].id, doc.id)

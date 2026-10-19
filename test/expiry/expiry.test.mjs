@@ -204,11 +204,11 @@ test("files a doc embeds belong to it: shared, trashed, and counted with the doc
   state.who = who
   insertDrop("shot", { kind: "image", blob_key: "11111111-2222-4333-8444-555555555555.png", filename: "shot.png", visibility: "private" })
   insertDrop("theirs", { kind: "image", blob_key: "66666666-2222-4333-8444-555555555555.png", filename: "theirs.png", visibility: "private", owner_id: "someone" })
-  const doc = await createDocDrop(who, { filename: "doc.md", visibility: "shared", lifetime: "keep", bytes: new TextEncoder().encode("![a](https://drop.example/f/11111111-2222-4333-8444-555555555555.png?raw) ![b](/f/66666666-2222-4333-8444-555555555555.png)") })
+  const doc = await createDocDrop(who, { filename: "doc.md", share: "public_comment", lifetime: "keep", bytes: new TextEncoder().encode("![a](https://drop.example/f/11111111-2222-4333-8444-555555555555.png?raw) ![b](/f/66666666-2222-4333-8444-555555555555.png)") })
   assert.equal((await findDrop("shot")).parentId, doc.id)
   assert.equal((await findDrop("theirs")).parentId, null, "someone else's file never joins your doc")
   const shot = await findDrop("shot")
-  assert.equal(shot.visibility, "shared")
+  assert.equal(shot.share, "public_comment")
   assert.equal(shot.lifetime, "keep")
   state.who = null
   await requireBlobAccess(request("/f/11111111-2222-4333-8444-555555555555.png", { headers: navigation }), "11111111-2222-4333-8444-555555555555.png")

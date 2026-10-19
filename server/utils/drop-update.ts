@@ -3,35 +3,35 @@ import { type H3Event, HTTPError } from "h3"
 import type * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import type { DropPatchSchema } from "#shared/schemas"
-import type { Access, Visibility } from "#shared/types"
+import { isPublic, type Share } from "#shared/share"
 import { slugify } from "#shared/links"
 import { drops } from "../databases/config"
 import { type DropRow, findDrop, lifetimeFields, permissions, restoreDrop, toSummary, trashDrop } from "./drops"
 import { chainOf, expiryPolicy, renewDrop } from "./expiry"
-import { moveNode } from "./folders"
+import { MAX_FOLDER_DESCRIPTION, moveNode } from "./folders"
 import type { Identity } from "./identity"
 import { isAttachment, parentNode, resolveNode, rootOf, uniqueSlug } from "./nodes"
+import { shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 
 export type DropChange = v.InferOutput<typeof DropPatchSchema>
 
-/** How agents say who can open a drop: private, or the team or anyone with the link at one access level. */
-export type Share = "private" | Access
-export type Audience = "team" | "link"
-/** Without an audience, a drop keeps the one it has, and a private drop gets a link. */
-export const shareChange = (share: Share, audience?: Audience, current?: Visibility): Pick<DropChange, "visibility" | "access"> =>
-  share === "private" ? { visibility: "private" } : { visibility: (audience ?? (current === "team" ? "team" : "link")) === "team" ? "team" : "shared", access: share }
-
 /**
- * Share, unshare, change the link's access level, rename, rename the link, change the lifetime, renew, trash, restore, or
- * move into a folder. People (PATCH /api/drops/:id) and agents (MCP) go through here, so both follow the same rules.
- * A drop in a folder changes its own share (the folder's may still reach wider) and lives as long as the folder.
+ * Share, unshare, rename, rename the link, describe a folder, change the lifetime, renew, trash, restore, or move into a
+ * folder. People (PATCH /api/drops/:id) and agents (MCP) go through here, so both follow the same rules. A drop in a
+ * folder changes its own share (the folder's may still reach wider) and lives as long as the folder. Anyone on the team
+ * may trash a drop in a team folder, and nothing else; it goes to its owner's Trash, where they or an admin restore it.
  */
 export async function updateDrop(found: DropRow, who: Identity, body: DropChange, event?: H3Event) {
+  const can = permissions(found, who)
+  const onlyTrash = body.trashed === true && Object.keys(body).length === 1
   // Attachments follow their doc; change the doc instead.
-  if (isAttachment(found) || !permissions(found, who).manage) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
-  if (body.trashed !== undefined && !permissions(found, who).owner && who.role !== "admin")
+  if (isAttachment(found) || !(can.manage || (onlyTrash && can.trash))) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
+  if (body.trashed !== undefined && !can.owner && who.role !== "admin" && !(onlyTrash && can.trash))
     throw new HTTPError({ status: 403, statusText: "Only the drop's owner can move it to the Trash or restore it." })
+  // What a folder's description says steers every agent that publishes into it, so people write it, in the browser.
+  if (body.description !== undefined && (found.kind !== "folder" || (found.teamFolder && who.actorKind !== "browser")))
+    throw new HTTPError({ status: 400, statusText: found.kind === "folder" ? "People describe team folders, in the browser." : "Only folders have a description." })
   const { days } = expiryPolicy(event)
   const now = Date.now()
   let drop = found
@@ -49,16 +49,22 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
     await moveNode(drop, body.folder || null, who, event)
     drop = (await findDrop(drop.id, event)) ?? drop
   }
+  if (body.lifetime !== undefined && drop.teamFolder) throw new HTTPError({ status: 400, statusText: "A team folder never expires." })
   if (body.lifetime !== undefined && drop.parentId)
     throw new HTTPError({ status: 400, statusText: "It lives as long as its folder. Change the folder's lifetime, or move it out first." })
   const own = drop.raw ?? drop
-  const share: { shareReview?: "pending" | "rejected" | null; visibility?: Visibility; access?: Access } = {}
-  if (body.visibility !== undefined && body.visibility !== own.visibility) {
-    share.visibility = body.visibility
-    share.shareReview = body.visibility === "private" ? null : await shareReviewFor(drop.ownerId, event)
+  // Picking Public again on a public drop starts its window over.
+  const share: { share?: Share; publicUntil?: number | null; shareReview?: "pending" | "rejected" | null } = {}
+  if (body.share !== undefined && (body.share !== own.share || isPublic(body.share))) {
+    Object.assign(share, shareFields(body.share, drop, event, now))
+    // Going public, or from public to private or the team, is a different share; public to public isn't.
+    if (isPublic(body.share) !== isPublic(own.share)) share.shareReview = isPublic(body.share) ? await shareReviewFor(drop.ownerId, event) : null
   }
-  if (body.access !== undefined) share.access = body.access
-  const title = typeof body.title === "string" ? { title: body.title } : {}
+  // The name, and a folder's description, belong to this row alone.
+  const title = {
+    ...(typeof body.title === "string" ? { title: body.title } : {}),
+    ...(body.description !== undefined ? { note: body.description.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null } : {}),
+  }
   const life = body.lifetime !== undefined ? lifetimeFields(who, { lifetime: body.lifetime, keepReason: body.keepReason }, drop, event) : {}
   const slug = body.slug !== undefined ? { slug: await uniqueSlug(drop.parentId, slugify(body.slug), own.link) } : {}
   const chainChange = { ...share, ...life, ...slug }

@@ -5,7 +5,7 @@ import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_SLUG, slugify } from "./links"
 import { MAX_APP_BYTES } from "./quotas"
 import { MAX_REVIEW_PAGE, SITE_ADDRESS_RULE, siteAddress } from "./review"
-import { ROLES } from "./roles"
+import { SHARES } from "./share"
 
 /** 4 MiB: the most one file (or one app) may weigh. */
 export const MAX_FILE_BYTES = MAX_APP_BYTES
@@ -18,8 +18,10 @@ export const NewDocSchema = v.object({
 })
 
 export const DropPatchSchema = v.object({
-  visibility: v.optional(v.picklist(["private", "team", "shared"])),
-  access: v.optional(v.picklist(["view", "comment", "edit"])),
+  /** Who can open it, as one state (#shared/share). */
+  share: v.optional(v.picklist(SHARES)),
+  /** Folders: what goes in them and how, which agents read to pick the folder. Empty clears it. */
+  description: v.optional(v.pipe(v.string(), v.maxLength(2000, "Keep the description under 2,000 characters."))),
   title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
   /** The readable part of the link, for every version. The link keeps working with the old one. */
   slug: v.optional(v.pipe(v.string(), v.maxLength(MAX_SLUG), v.check(value => slugify(value) !== "", "Use letters or numbers in the slug."))),
@@ -36,6 +38,10 @@ export const DropPatchSchema = v.object({
 
 export const FolderSchema = v.object({
   title: v.pipe(v.string(), v.trim(), v.minLength(1, "Name the folder."), v.maxLength(160)),
+  /** What goes in it and how, for people and the agents that publish into it. */
+  description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(2000, "Keep the description under 2,000 characters."))),
+  /** A team folder: on a team Drop, admins only. */
+  team: v.optional(v.boolean()),
   /** The folder to create it in, by id or link. */
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
@@ -125,7 +131,7 @@ export const CommentReplySchema = v.object({
   body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a reply."), v.maxLength(4000)),
 })
 
-export const MemberPatchSchema = v.object({ role: v.optional(v.picklist(ROLES)), banned: v.optional(v.boolean()) })
+export const MemberPatchSchema = v.object({ banned: v.boolean() })
 
 export const SkillPatchSchema = v.object({ enabled: v.boolean("Say whether the skill is enabled.") })
 

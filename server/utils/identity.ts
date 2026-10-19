@@ -7,7 +7,8 @@ import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
 import { account, oauthClient, user as users } from "../databases/config"
 import { githubOrganization, isGitHubMember } from "./github-membership"
-import { isRole, type Role } from "#shared/roles"
+import { useServerEnv } from "#vitehub/env/server"
+import { type Role, roleFor } from "#shared/roles"
 import type { ActorKind } from "#shared/types"
 import type auth from "../auth"
 
@@ -24,6 +25,23 @@ export interface Identity {
 }
 
 type DropAuth = Auth<ReturnType<typeof auth.options>>
+
+/**
+ * Someone's role, from `DROP_ADMINS`: an admin when their email is in it and a sign-in method verified it, whichever one
+ * (GitHub, another provider, email). Everyone else is a member. Outside `nuxt dev` and the runtime tests an unverified
+ * email never counts, so nobody becomes an admin by typing someone else's address.
+ */
+export const roleOf = (person: { email: string; emailVerified?: boolean | null }, admins = useServerEnv().drop.admins.unseal()): Role =>
+  roleFor(person, admins, import.meta.dev === true || useServerEnv().drop.testSignin)
+
+/**
+ * Writes the role `DROP_ADMINS` gives someone to their account, for Better Auth's admin endpoints (bans) that read it from
+ * there. Drop itself reads `roleOf` on every request, so a change to `DROP_ADMINS` takes effect on restart either way.
+ */
+export async function syncRole(userId: string) {
+  const [row] = await db.select({ email: users.email, emailVerified: users.emailVerified, role: users.role }).from(users).where(eq(users.id, userId)).limit(1)
+  if (row && row.role !== roleOf(row)) await db.update(users).set({ role: roleOf(row) }).where(eq(users.id, userId))
+}
 
 export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event) as unknown as DropAuth
 
@@ -49,10 +67,9 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   if (token) return fromAccessToken(event, token)
   const session = await authFor(event).api.getSession({ headers: event.req.headers }).catch(() => null)
   if (!session?.user || (session.user as { banned?: boolean }).banned) return null
-  const role = (session.user as { role?: string }).role ?? "member"
   return {
     userId: session.user.id, name: session.user.name, email: session.user.email, image: session.user.image ?? null,
-    role: isRole(role) ? role : "member",
+    role: roleOf(session.user),
     actorKind: "browser",
     actorName: session.user.name,
   }
@@ -80,7 +97,7 @@ async function fromAccessToken(event: H3Event, token: string): Promise<Identity 
   const [client] = clientId ? await db.select({ name: oauthClient.name }).from(oauthClient).where(eq(oauthClient.clientId, clientId)).limit(1) : []
   return {
     userId: user.id, name: user.name, email: user.email, image: user.image ?? null,
-    role: isRole(user.role ?? "") ? user.role as Role : "member",
+    role: roleOf(user),
     actorKind: "agent",
     actorName: client?.name || "MCP client",
   }
@@ -90,7 +107,7 @@ export async function requireIdentity(event: H3Event): Promise<Identity> {
   const who = await identify(event)
   if (who) return who
   event.res.headers.set("WWW-Authenticate", 'Bearer realm="drop"')
-  throw new HTTPError({ status: 401, statusText: "Sign in with GitHub, or connect your agent through Drop's MCP server." })
+  throw new HTTPError({ status: 401, statusText: "Sign in, or connect your agent through Drop's MCP server." })
 }
 
 /**

@@ -1,7 +1,6 @@
 import { lookup } from "mrmime";
 
 export type PlanKind = "markdown" | "html" | "image" | "file";
-export type Visibility = "private" | "team" | "shared";
 export type ActorKind = "agent" | "browser";
 
 /** What a file becomes, from its MIME type. Plain text reads as Markdown. */

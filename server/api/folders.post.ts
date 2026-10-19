@@ -5,13 +5,16 @@ import { createFolder, requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
 import { quotaApiHandler } from "../utils/quotas"
 
-/** New folder, at the top or inside `folder`. Private until shared, like any drop. */
+/**
+ * New folder, at the top or inside `folder`, with a description of what goes in it. It starts with this Drop's default
+ * share, like any drop. `team` makes it one of the team's folders, which only admins do.
+ */
 export default quotaApiHandler(defineValidatedHandler({
   validate: { body: FolderSchema },
   async handler(event) {
     const who = await requireIdentity(event)
-    const body = await event.req.json() as { title: string; folder?: string }
-    const parent = body.folder ? await requireFolder(body.folder, who, event) : undefined
-    return toSummary(await createFolder(who, { title: body.title, folder: parent }, event))
+    const body = await event.req.json() as { title: string; folder?: string; description?: string; team?: boolean }
+    const parent = body.folder ? await requireFolder(body.folder, who, event, undefined, "folder") : undefined
+    return toSummary(await createFolder(who, { title: body.title, folder: parent, note: body.description, team: body.team }, event))
   },
 }))

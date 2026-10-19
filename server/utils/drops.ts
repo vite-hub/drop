@@ -10,7 +10,8 @@ import { kindFromFilename, titleFromSource } from "#shared/plans"
 import { renderMarkdownCached } from "./markdown-document"
 import { deleteMarkdownCache } from "./markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
-import { ACCESS_RANK, type Access, type DropAttachment, type DropCrumb, type DropDetail, type DropSummary, type DropVersion, type Visibility } from "#shared/types"
+import type { DropAttachment, DropCrumb, DropDetail, DropSummary, DropVersion } from "#shared/types"
+import { defaultShare, isPublic, type Share, shareLevel } from "#shared/share"
 import { DAY_MS, expiresAt, type Lifetime, MAX_KEEP_REASON, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { shareReviewFor } from "./trust"
 import type { Identity } from "./identity"
@@ -19,7 +20,8 @@ import { LIVE_EDITING } from "#live-drafts"
 import { draftPath } from "./draft-paths"
 import { deleteRetainedDrop } from "./quota-deletion"
 import { chainOf, expiryPolicy, renewDrop } from "./expiry"
-import { ancestorsOf, foldersUnder, type Grant, isAttachment, itemCounts, listedNode, parentNode, resolveNode, touchFolder, uniqueSlug } from "./nodes"
+import { ancestorsOf, foldersUnder, type Grant, inTeamFolder, isAttachment, itemCounts, listedNode, parentNode, resolveNode, touchFolder, uniqueSlug } from "./nodes"
+import { sharePolicy, shareFields, shareNow } from "./share"
 import { searchHeads, searchWords, textStatements } from "./search"
 
 /**
@@ -45,42 +47,44 @@ export { MAX_FILE_BYTES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
- * What the caller may do with a drop. Editors and admins act on every drop in the workspace. A share reaches the team
- * (everyone signed in to this Drop, and their agents) or anyone with the link, and lets them view, comment, or edit; "Can
- * edit" lets signed-in people edit in the browser, not their agents, so only the owner and staff publish through agents.
- * An expired drop is read-only for the people who can renew it and gone for everyone else. A drop in a folder counts
- * every share on its path, and the widest one that reaches the caller sets the level.
+ * What the caller may do with a drop. Admins act on every drop. A share reaches the team (everyone signed in to this
+ * Drop, and their agents) or anyone with the link (see #shared/share); "Team can edit" lets people edit in the browser,
+ * not their agents, so only the owner and admins publish through agents. A public link waiting for review reaches nobody
+ * yet, while the team shares on its path still do. A team folder is the admins' to change; anyone on the team may trash
+ * the drops in it. An expired drop is read-only for the people who can renew it and gone for everyone else.
  */
 export function permissions(drop: DropRow, who: Identity | null) {
-  if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || who.role === "admin")) }
+  const admin = Boolean(who && who.role === "admin")
+  if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || admin)), trash: false }
   const owner = Boolean(who && who.userId === drop.ownerId)
-  const staff = Boolean(who && (who.role === "admin" || who.role === "editor"))
-  const reaching = (drop.grants ?? [drop]).filter(grant => reachesGrant(grant, who))
-  const shared = reaching.length > 0 && !drop.shareReview && !drop.expired
-  const level = Math.max(-1, ...reaching.map(grant => ACCESS_RANK[grant.access as Access]))
+  // On a team Drop, a public link waiting for review still reaches the team.
+  const held: Share | null = sharePolicy().mode === "team" ? "team" : null
+  const grants = (drop.grants ?? (drop.share === "private" ? [] : [{ share: drop.share }]))
+    .flatMap(grant => (drop.shareReview && isPublic(grant.share) ? (held ? [{ share: held }] : []) : [grant]))
+  const level = drop.expired ? -1 : Math.max(-1, ...grants.map(grant => shareLevel(grant.share, who !== null)))
   const available = !drop.ownerBanned
   const live = available && !drop.expired
+  const manage = drop.teamFolder ? admin : owner || admin
   return {
     owner,
-    view: available && (owner || staff || shared),
-    comment: live && (owner || staff || (shared && level >= ACCESS_RANK.comment)),
-    edit: live && (owner || staff || (shared && level >= ACCESS_RANK.edit && who?.actorKind === "browser")),
-    manage: owner || staff,
+    view: available && (owner || admin || level >= 0),
+    comment: live && (owner || admin || level >= 1),
+    edit: live && (owner || admin || (level >= 2 && who?.actorKind === "browser")),
+    manage,
+    // People, not their agents: what an agent reads could steer it to clear out the team's folders.
+    trash: manage || Boolean(live && who?.actorKind === "browser" && !drop.teamFolder && inTeamFolder(drop) && level >= 0),
   }
 }
 
-const reachesGrant = (grant: Pick<Grant, "visibility">, who: Identity | null) =>
-  grant.visibility === "shared" || (grant.visibility === "team" && who !== null)
-
 /** Whether a share on the drop's path includes the caller, review and expiry aside. Team shares need a signed-in caller. */
-export const reaches = (drop: Pick<DropRow, "visibility" | "grants">, who: Identity | null) =>
-  (drop.grants ?? [drop]).some(grant => reachesGrant(grant, who))
+export const reaches = (drop: Pick<DropRow, "share" | "grants">, who: Identity | null) =>
+  (drop.grants ?? [{ share: drop.share }]).some((grant: Grant) => shareLevel(grant.share, who !== null) >= 0)
 
 /** A share that worked until its drop expired. Private drops stay indistinguishable from missing ones. */
 export const expiredLink = (drop: DropRow | null, who: Identity | null) =>
   Boolean(drop?.expired && reaches(drop, who) && !drop.shareReview && !drop.ownerBanned && !drop.quarantinedAt && !permissions(drop, who).view)
 
-/** A share the caller would see once an admin approves it. Anyone else gets the usual 404. */
+/** A public link the caller would see once an admin approves it. Anyone else gets the usual 404. */
 export const waitingForReview = (drop: DropRow | null, who: Identity | null) =>
   Boolean(drop && !drop.ownerBanned && !drop.quarantinedAt && reaches(drop, who) && drop.shareReview === "pending" && !permissions(drop, who).view)
 
@@ -88,15 +92,20 @@ export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().
   const expires = expiresAt(row, days)
   return {
     id: row.id, link: row.link ?? row.id, slug: row.slug ?? slugify(row.title), kind: row.kind, title: row.title, filename: row.filename, size: row.size, version: row.version,
-    shareReview: row.shareReview, quarantinedAt: row.quarantinedAt, visibility: row.visibility, access: row.access as Access, actorKind: row.actorKind, actorName: row.actorName,
+    shareReview: row.shareReview, quarantinedAt: row.quarantinedAt, share: row.share, publicUntil: openUntil(row.raw ?? row),
+    actorKind: row.actorKind, actorName: row.actorName,
     createdAt: row.createdAt, updatedAt: row.updatedAt, ...(paths ? { paths } : {}),
     expiresAt: expires, lifetime: row.lifetime, keepReason: row.keepReason, note: row.note, parentId: row.parentId,
     // Past its window but not yet moved by the hourly cleanup: it's in the Trash already, as of when it expired.
     trashedAt: row.trashedAt ?? (row.expired && expires !== null ? expires : null),
     trashReason: row.trashReason ?? (row.expired ? "expired" : null),
-    ...(row.sharedFrom && row.raw ? { sharedFrom: row.sharedFrom, ownShare: { visibility: row.raw.visibility, access: row.raw.access as Access } } : {}),
+    ...(row.kind === "folder" && row.teamFolder ? { teamFolder: true } : {}),
+    ...(row.sharedFrom && row.raw ? { sharedFrom: row.sharedFrom, ownShare: row.raw.share } : {}),
   }
 }
+
+/** When the drop's own public link closes, while it's open. */
+const openUntil = (own: typeof drops.$inferSelect) => (isPublic(own.share) && isPublic(shareNow(own)) ? own.publicUntil : null)
 
 /** A node as a breadcrumb. */
 export const toCrumb = (row: typeof drops.$inferSelect): DropCrumb =>
@@ -192,7 +201,8 @@ export async function findDropByBlob(key: string, event?: H3Event) {
 export async function listDrops(who: Identity, event?: H3Event, options: { trash?: boolean; query?: string; limit?: number } = {}): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
-  const scope = options.trash ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt))) : words.length ? listedNode : isNull(drops.parentId)
+  // The team's folders list for everyone (listSharedWithMe), not as their creator's.
+  const scope = options.trash ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt))) : words.length ? listedNode : and(isNull(drops.parentId), eq(drops.teamFolder, false))
   const found = await headsMatching(and(eq(dropHeads.ownerId, who.userId), scope), words, options.limit ?? 500)
   const rows = await resolveRows(found.rows, days)
   const listed = rows.filter(row => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
@@ -201,76 +211,109 @@ export async function listDrops(who: Identity, event?: H3Event, options: { trash
 
 /**
  * A folder's drops, newest first: the ones directly inside, or with `query` the matches anywhere below it. Drops someone
- * moved to the Trash on their own list there instead. Anyone who may open the folder may open what it holds.
+ * moved to the Trash on their own list there instead. Anyone who may open the folder may open what it holds. A team
+ * folder holds everyone's drops; any other folder only its owner's.
  */
-export async function listFolder(folder: DropRow, event?: H3Event, options: { query?: string } = {}): Promise<DropSummary[]> {
+export async function listFolder(folder: DropRow, event?: H3Event, options: { query?: string; who?: Identity | null } = {}): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
   const inside = words.length ? inArray(drops.parentId, foldersUnder(folder.id)) : eq(drops.parentId, folder.id)
-  const found = await headsMatching(and(eq(dropHeads.ownerId, folder.ownerId), inside, isNull(drops.trashedAt)), words, words.length ? 200 : 500)
+  const owned = folder.teamFolder ? undefined : eq(dropHeads.ownerId, folder.ownerId)
+  const found = await headsMatching(and(owned, inside, isNull(drops.trashedAt)), words, words.length ? 200 : 500)
   // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
   const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
   const rows = words.length ? await resolveRows(found.rows, days) : found.rows.map(row => resolveNode(row, above, days))
   // The owner may open a folder in the Trash, and sees what it holds as it was.
   const listed = rows.filter(row => folder.expired || !row.expired).map(row => ({ ...row, ownerBanned: folder.ownerBanned }))
-  return summarize(listed, days, { ownerId: folder.ownerId, path: words.length > 0, below: folder.id, snippets: found.snippets })
-}
-
-/** Every folder you have, for picking where a drop goes. Folders in the Trash stay out. */
-export async function listFolders(who: Identity, event?: H3Event): Promise<DropSummary[]> {
-  const { days } = expiryPolicy(event)
-  const rows = await resolveRows(await heads(and(eq(dropHeads.ownerId, who.userId), eq(drops.kind, "folder")), 500), days)
-  return summarize(rows.filter(row => !row.expired), days, { path: true })
+  const summaries = await summarize(listed, days, { ownerId: folder.teamFolder ? undefined : folder.ownerId, path: words.length > 0, below: folder.id, snippets: found.snippets })
+  if (!folder.teamFolder) return summaries
+  // A team folder holds everyone's drops: each says whose it is, unless it's the reader's own.
+  const ownerIds = [...new Set(listed.map(row => row.ownerId).filter(id => id !== options.who?.userId))]
+  const owners = new Map<string, { name: string; image: string | null }>()
+  for (let offset = 0; offset < ownerIds.length; offset += 90)
+    for (const row of await db.select({ id: user.id, name: user.name, image: user.image }).from(user).where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
+      owners.set(row.id, { name: row.name, image: row.image })
+  const ownerOf = new Map(listed.map(row => [row.id, row.ownerId]))
+  return summaries.map(summary => {
+    const owner = owners.get(ownerOf.get(summary.id)!)
+    return owner && !summary.teamFolder ? { ...summary, owner } : summary
+  })
 }
 
 /**
- * Other people's drops you can open: everything shared with the team, plus links you opened while signed in. Newest
- * first; drops waiting for review, in the Trash, or from banned owners stay out. A folder shared with you lists once:
- * the drops inside open from it.
+ * Every folder a drop of yours may go in, for picking where it goes: your own and the team's. Folders in the Trash stay
+ * out. Each carries its description (`note`), which agents read to choose one.
+ */
+export async function listFolders(who: Identity, event?: H3Event): Promise<DropSummary[]> {
+  const { days } = expiryPolicy(event)
+  const mine = and(eq(dropHeads.ownerId, who.userId), eq(drops.teamFolder, false))
+  const rows = await resolveRows(await heads(and(eq(drops.kind, "folder"), or(mine, eq(drops.teamFolder, true))), 500), days)
+  return summarize(rows.filter(row => !row.expired && !row.quarantinedAt), days, { path: true })
+}
+
+/**
+ * SQL for a drop, at table alias `node`, that reaches someone besides its owner: on a team Drop anything not kept
+ * private; on a personal one a public link that's open and approved, which they opened while signed in.
+ */
+function reachableSql(node: string, who: Identity, now: number, event?: H3Event) {
+  const at = sql.raw(node)
+  if (sharePolicy(event).mode === "team") return sql`(${at}.share != 'private')`
+  return sql`(${at}.share IN ('public', 'public_comment') AND ${at}.share_review IS NULL AND (${at}.public_until IS NULL OR ${at}.public_until > ${now})
+    AND EXISTS (SELECT 1 FROM drop_visits v WHERE v.user_id = ${who.userId} AND v.drop_id = ${at}.id))`
+}
+
+/**
+ * What others share with you. On a team Drop: the team's folders, then everyone else's drops shared with the team. On a
+ * personal Drop: public links you opened while signed in. Newest first; drops in the Trash, quarantined, or from banned
+ * owners stay out. A folder shared with you lists once: the drops inside open from it.
  */
 export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<DropSummary[]> {
-  const visited = exists(db.select({ at: dropVisits.at }).from(dropVisits).where(and(eq(dropVisits.userId, who.userId), eq(dropVisits.dropId, drops.id))))
+  const now = Date.now()
+  const team = sharePolicy(event).mode === "team"
+  const others = and(ne(drops.ownerId, who.userId), reachableSql(`"drops"`, who, now, event))
   const rows = await db.select({ drop: drops, ownerName: user.name, ownerImage: user.image }).from(drops)
     .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id)).innerJoin(user, eq(user.id, drops.ownerId))
     .where(and(
-      or(eq(drops.visibility, "team"), and(eq(drops.visibility, "shared"), visited)),
-      ne(drops.ownerId, who.userId), listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt), isNull(drops.shareReview),
+      team ? or(others, and(eq(drops.teamFolder, true), isNull(drops.parentId))) : others,
+      listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt),
       sql`coalesce(${user.banned}, 0) = 0`,
     )).orderBy(desc(drops.updatedAt)).limit(200)
   const { days } = expiryPolicy(event)
   const ancestors = await ancestorsOf(rows.map(row => row.drop))
   const listed = new Set(rows.map(row => row.drop.id))
   const owners = new Map(rows.map(row => [row.drop.id, { name: row.ownerName, image: row.ownerImage }]))
-  const nodes = rows.map(row => resolveNode(row.drop, ancestors.get(row.drop.id) ?? [], days))
-    .filter(node => !node.expired && !node.quarantinedAt && !node.shareReview
-      && !node.ancestors!.some(above => listed.has(above.id) || (above.visibility === "team" && !above.shareReview)))
-  return (await summarize(nodes, days)).map(summary => ({ ...summary, owner: owners.get(summary.id)! }))
+  const nodes = rows.map(row => resolveNode(row.drop, ancestors.get(row.drop.id) ?? [], days, now))
+    .filter(node => !node.expired && !node.quarantinedAt && (team || !node.shareReview)
+      && !node.ancestors!.some(above => listed.has(above.id) || (team && shareNow(above, now) !== "private")))
+    .sort((a, b) => Number(b.teamFolder) - Number(a.teamFolder))
+  return (await summarize(nodes, days)).map(summary => ({ ...summary, ...(summary.teamFolder ? {} : { owner: owners.get(summary.id)! }) }))
 }
 
 /**
  * Other people's drops you can open that match a search: what Shared with me lists, and everything inside the folders
  * it lists, at any depth. The same rules hold: nothing waiting for review, quarantined, in the Trash, or from a banned
- * owner, and staff find no one's private drops here. A path shows only the folders you may open.
+ * owner, and admins find no one's private drops here. A path shows only the folders you may open.
  */
 async function searchShared(who: Identity, words: string[], limit: number, event?: H3Event): Promise<DropSummary[]> {
-  // Shared with the team, or by link and opened by you. `node` is a table alias in the query.
-  const reachable = (node: string) => sql`(${sql.raw(node)}.visibility = 'team' OR (${sql.raw(node)}.visibility = 'shared'
-    AND EXISTS (SELECT 1 FROM drop_visits v WHERE v.user_id = ${who.userId} AND v.drop_id = ${sql.raw(node)}.id)))`
+  const now = Date.now()
+  const team = sharePolicy(event).mode === "team"
+  const reachable = (node: string) => reachableSql(node, who, now, event)
+  // Folders that open to you, yours aside, and the team's, whoever made them: what's in them opens through them.
   const openFolders = sql`(
     WITH RECURSIVE open(id, depth) AS (
-      SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND d.owner_id != ${who.userId} AND ${reachable("d")}
-        AND d.trashed_at IS NULL AND d.quarantined_at IS NULL AND d.share_review IS NULL
+      SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND ((d.owner_id != ${who.userId} AND ${reachable("d")}) OR d.team_folder = 1)
+        AND d.trashed_at IS NULL AND d.quarantined_at IS NULL
       UNION ALL SELECT d.id, open.depth + 1 FROM drops d JOIN open ON d.parent_id = open.id WHERE d.kind = 'folder' AND open.depth < ${MAX_DEPTH}
     ) SELECT id FROM open
   )`
   const found = await searchHeads(and(
-    ne(dropHeads.ownerId, who.userId), listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt), isNull(drops.shareReview),
+    ne(dropHeads.ownerId, who.userId), listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt), team ? undefined : isNull(drops.shareReview),
     or(reachable(`"drops"`), inArray(drops.parentId, openFolders)),
     sql`EXISTS (SELECT 1 FROM user u WHERE u.id = ${drops.ownerId} AND coalesce(u.banned, 0) = 0)`,
   ), words, limit)
   const { days } = expiryPolicy(event)
   // Review, quarantine and the Trash anywhere above hold a drop too: resolving its path says.
-  const nodes = (await resolveRows(found.map(item => item.drop), days)).filter(node => !node.expired && !node.quarantinedAt && !node.shareReview)
+  const nodes = (await resolveRows(found.map(item => item.drop), days)).filter(node => !node.expired && !node.quarantinedAt && permissions(node, who).view)
   const ownerIds = [...new Set(nodes.map(node => node.ownerId))]
   const owners = new Map<string, { name: string; image: string | null }>()
   for (let offset = 0; offset < ownerIds.length; offset += 90)
@@ -291,9 +334,9 @@ export async function searchEverything(who: Identity, query: string, event?: H3E
   return [...await listDrops(who, event, { query, limit }), ...await searchShared(who, words, limit, event)]
 }
 
-/** Remembers a link-shared drop a signed-in person opened, at most once a day per drop. */
+/** Remembers a public drop a signed-in person opened, at most once a day per drop. */
 export async function recordSharedVisit(drop: DropRow, who: Identity | null) {
-  if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || drop.visibility !== "shared" || isAttachment(drop)) return
+  if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || !isPublic(drop.share) || isAttachment(drop)) return
   const at = Date.now()
   try {
     await db.insert(dropVisits).values({ userId: who.userId, dropId: drop.id, at })
@@ -366,6 +409,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
   const detail: DropDetail = {
     ...toSummary(row, undefined, days),
     isOwner: can.manage,
+    canTrash: can.trash,
     canComment: can.comment,
     canEdit: false,
     versions: await versionsOf(row),
@@ -373,7 +417,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
   }
   detail.canEdit = liveEditable(row, who, detail.versions)
   if (row.kind === "folder") {
-    detail.children = await listFolder(row, event)
+    detail.children = await listFolder(row, event, { who })
     detail.items = detail.children.length
   }
   if (row.kind === "app") {
@@ -500,7 +544,7 @@ async function deleteBlobKeys(keys: string[]) {
  * `folder` (checked by `requireFolder`) places a new drop in it. A drop in a folder lives as long as the folder, so it
  * takes no lifetime of its own, and its slug gets a number when another drop in the folder has it.
  */
-export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; slug?: string; nameFromSlug?: boolean; supersedes?: string; visibility?: Visibility; access?: Access; folder?: DropRow }, event?: H3Event) {
+export async function createDocDrop(who: Identity, input: LifetimeInput & { filename: string; bytes: Uint8Array; title?: string; slug?: string; nameFromSlug?: boolean; supersedes?: string; share?: Share; folder?: DropRow }, event?: H3Event) {
   await drainBlobCleanup()
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   let filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
@@ -534,8 +578,11 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
   }
   const folder = previous ? null : input.folder ?? null
   const parentId = previous?.parentId ?? folder?.id ?? null
-  const ownerId = previous?.ownerId ?? folder?.ownerId ?? who.userId
+  // A drop in someone's folder is theirs (admins add to anyone's); in a team folder it stays its publisher's.
+  const ownerId = previous?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
   const life = parentId ? lifetimeFields(who, {}, previous ?? folder, event) : lifetimeFields(who, input, previous, event)
+  const share = input.share !== undefined ? shareFields(input.share, { kind }, event)
+    : previous ? { share: previous.share, publicUntil: previous.publicUntil } : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
 
   return withDropQuota(ownerId, { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id }, event, async (quota) => {
     const key = `${crypto.randomUUID()}${extension}`
@@ -573,8 +620,8 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       supersedesId: previous?.id ?? null,
       link: previous?.link ?? newLink(),
       slug,
-      visibility: input.visibility ?? previous?.visibility ?? "private",
-      access: input.access ?? (previous?.access as Access | undefined) ?? "comment",
+      ...share,
+      teamFolder: false,
       actorKind: who.actorKind,
       actorName: who.actorName,
       createdAt: now,
@@ -585,7 +632,8 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
       trashedAt: null,
       trashReason: null,
       parentId,
-      shareReview: (input.visibility ?? previous?.visibility ?? "private") !== "private" ? await shareReviewFor(ownerId, event) : null,
+      // A public link waits for an admin's review again with each version: what it shows changed.
+      shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
       quarantinedAt: null,
       publishToken: null,
       siteUrl: null,
@@ -627,7 +675,7 @@ function cleanPath(path: string) {
  * that sends just the files it changed can't delete the rest by accident. `folder` places a new app in it, as in
  * `createDocDrop`.
  */
-export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; slug?: string; files: Record<string, string>; removes?: string[]; visibility?: Visibility; access?: Access; folder?: DropRow }, event?: H3Event) {
+export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; slug?: string; files: Record<string, string>; removes?: string[]; share?: Share; folder?: DropRow }, event?: H3Event) {
   const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
   const removes = [...new Set((input.removes ?? []).map(cleanPath))]
@@ -650,13 +698,13 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
   const own = row?.raw ?? row
   const folder = row ? null : input.folder ?? null
   const parentId = row?.parentId ?? folder?.id ?? null
-  const ownerId = row?.ownerId ?? folder?.ownerId ?? who.userId
+  const ownerId = row?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
   const life = parentId ? lifetimeFields(who, {}, own ?? folder, event) : lifetimeFields(who, input, row, event)
   const note = input.note?.trim() || null
-  const visibility = input.visibility ?? own?.visibility ?? "private"
-  const shareReview = input.visibility === undefined || input.visibility === own?.visibility
-    ? own?.shareReview ?? null
-    : input.visibility === "private" ? null : await shareReviewFor(ownerId, event)
+  const share = input.share !== undefined ? shareFields(input.share, { kind: "app" }, event)
+    : own ? { share: own.share, publicUntil: own.publicUntil } : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+  const shareReview = !isPublic(share.share) ? null
+    : own && isPublic(own.share) && input.share === undefined ? own.shareReview ?? null : await shareReviewFor(ownerId, event)
 
   const id = row?.id ?? crypto.randomUUID()
   const prefix = `apps/${id}/${crypto.randomUUID()}`
@@ -692,7 +740,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
         blobKey: null, contentType: null, size, version: (row?.version ?? 0) + 1, supersedesId: row?.supersedesId ?? null,
         link: row?.link ?? newLink(), slug,
         shareReview, quarantinedAt: own?.quarantinedAt ?? null,
-        visibility, access: input.access ?? (own?.access as Access | undefined) ?? "comment",
+        ...share, teamFolder: false,
         actorKind: who.actorKind, actorName: who.actorName, createdAt: row?.createdAt ?? now, updatedAt: now, publishToken: token,
         lastAccessedAt: now, ...life, note, trashedAt: null, trashReason: null, parentId, siteUrl: null,
       }
@@ -709,7 +757,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
         committedPublish = true
       }
       else {
-        const update = db.update(drops).set({ title: next.title, link: next.link, slug, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, lastAccessedAt: now, publishToken: token, ...life, note, visibility, access: next.access, shareReview })
+        const update = db.update(drops).set({ title: next.title, link: next.link, slug, size, version: next.version, actorKind: next.actorKind, actorName: next.actorName, updatedAt: now, lastAccessedAt: now, publishToken: token, ...life, note, ...share, shareReview })
           .where(and(eq(drops.id, id), eq(drops.version, row.version)))
         // The file set changes only if the update above won: both statements check for this publish's token.
         // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)

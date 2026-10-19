@@ -1,21 +1,10 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
 import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
+import type { DropMode, Share } from "./share"
 
 export type DropKind = "markdown" | "html" | "image" | "file" | "app" | "folder" | "site"
-/** `team`: everyone signed in to this Drop. `shared`: anyone with the link, signed in or not. */
-export type Visibility = "private" | "team" | "shared"
-export type Access = "view" | "comment" | "edit"
 export type ActorKind = "agent" | "browser"
-
-export const ACCESS_RANK: Record<Access, number> = { view: 0, comment: 1, edit: 2 }
-export const ACCESS_LABELS: Record<Access, string> = { view: "Can view", comment: "Can comment", edit: "Can edit" }
-export const ACCESS_HINTS: Record<Access, string> = { view: "Read only.", comment: "View and leave comments.", edit: "Comment, and edit Markdown together after signing in." }
-
-/** One name per level, the same on rows, buttons, menus, and the share dialog. */
-export const VISIBILITY_LABELS: Record<Visibility, string> = { private: "Private", team: "Team", shared: "Public link" }
-export const VISIBILITY_HINTS: Record<Visibility, string> = { private: "Only you. Your connected agents can still read it.", team: "Everyone signed in to this Drop can find and open it.", shared: "Anyone with the link can open it, no sign-in needed." }
-export const VISIBILITY_ICONS: Record<Visibility, string> = { private: "i-ph-lock", team: "i-ph-users", shared: "i-ph-globe" }
 
 export interface DropSummary {
   /** This version. */
@@ -31,8 +20,10 @@ export interface DropSummary {
   version: number
   shareReview: "pending" | "rejected" | null
   quarantinedAt: number | null
-  visibility: Visibility
-  access: Access
+  /** Who can open it now (see #shared/share): the widest share on its path, with a closed public link resolved. */
+  share: Share
+  /** When its own public link closes. Null while it isn't public, or when public links stay open. */
+  publicUntil: number | null
   actorKind: ActorKind
   actorName: string
   createdAt: number
@@ -44,7 +35,7 @@ export interface DropSummary {
   lifetime: Lifetime
   /** Why an agent kept this drop. Null when a person chose to keep it. */
   keepReason: string | null
-  /** What changed in this version. */
+  /** What changed in this version. A folder's is its description: what goes in it, which agents read to pick it. */
   note: string | null
   /** When it went to the Trash (or expired into it). Null while it's live. */
   trashedAt: number | null
@@ -54,10 +45,12 @@ export interface DropSummary {
    * path, and the lifetime and Trash of the top-most node (see server/utils/nodes.ts).
    */
   parentId: string | null
-  /** The node above whose share reaches wider than this drop's own. `visibility` and `access` then say the widest. */
+  /** The node above whose share reaches wider than this drop's own. `share` then says the widest. */
   sharedFrom?: { id: string; title: string }
   /** This drop's own share, when a node above shares it wider. The share controls change this one. */
-  ownShare?: { visibility: Visibility; access: Access }
+  ownShare?: Share
+  /** Folders the team keeps: everyone adds to them; admins name, describe, and share them. */
+  teamFolder?: boolean
   /** Folders: how many drops are directly inside. */
   items?: number
   /** Images in a folder or a search: where the file is served, for a thumbnail. */
@@ -79,7 +72,10 @@ export interface DropVersion { id: string; title: string; version: number; creat
 export interface DropAttachment { id: string; kind: DropKind; title: string; filename: string; size: number; url: string }
 
 export interface DropDetail extends DropSummary {
+  /** Change its share, name, lifetime, or folder: its owner and admins; a team folder's admins only. */
   isOwner: boolean
+  /** Move it to the Trash: who may change it, and anyone on the team for a drop in a team folder. */
+  canTrash: boolean
   canComment: boolean
   /** Live editing: a Markdown drop's current version, for people who may edit it, on a host with Realtime. */
   canEdit: boolean
@@ -190,7 +186,9 @@ export interface Viewer {
   role: Role
   /** This Drop's expiry rules: days a drop lives after its last visit (0 is off), and whether owners may opt out. */
   expiry: { days: number; custom: boolean }
-  /** Personal until a second person joins. */
-  team: boolean
+  /** `DROP_MODE`: a personal Drop shares by public link; on a team Drop drops start shared with the team. */
+  mode: DropMode
+  /** Days a public link stays open before it closes (null: until changed, 0: public links are off). */
+  publicLinkDays: number | null
   members: number
 }

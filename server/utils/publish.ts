@@ -4,10 +4,11 @@ import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues } from "#shared/project-bundle"
 import { reviewBookmarklet, reviewSnippet } from "#shared/review"
-import { dropLine, mcpDrop } from "../mcp/format"
+import { SHARES } from "#shared/share"
+import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
 import { resolveComments } from "./comments"
 import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "./drops"
-import { shareChange, updateDrop } from "./drop-update"
+import { updateDrop } from "./drop-update"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
 import { annotationIssues } from "./markdown-document"
@@ -33,10 +34,9 @@ export const PublishInput = v.object({
   note: v.pipe(v.string(), v.minLength(1), v.maxLength(500), v.description("What this version is or what changed, like a commit message. People see it in the version history.")),
   lifetime: v.optional(v.pipe(v.picklist(LIFETIMES), v.description("Required for a new drop. temporary: prototypes and one-off answers, gone 14 days after the last visit. review: docs going through feedback, 30 days. keep: never expires, for pull request assets and anything linked from somewhere lasting; needs keepReason."))),
   keepReason: v.optional(v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON), v.description("Why it should be kept, in a sentence or two (e.g. the pull request it belongs to). The owner sees it."))),
-  share: v.optional(v.pipe(v.picklist(["private", "view", "comment", "edit"]), v.description("private (default for new drops), or what people it's shared with can do: view, comment, or edit (signed-in people only). Share when the user asked to, or when the drop is clearly meant for others, such as a PR asset."))),
-  audience: v.optional(v.pipe(v.picklist(["team", "link"]), v.description("Who the share reaches: team (everyone signed in to this Drop, who find it under Shared with me) or link (anyone with the link, no sign-in). Defaults to the drop's current audience, or link."))),
+  share: v.optional(v.pipe(v.picklist(SHARES), v.description(SHARE_INPUT))),
   resolves: v.optional(v.pipe(v.array(v.pipe(v.number(), v.integer())), v.maxLength(90), v.description("Numbers of the open comments this version addresses, from read_drop on previous. Comments written on earlier versions count too. They're marked resolved."))),
-  folder: v.optional(v.pipe(v.string(), v.description("Id or link of a folder (create_folder) to put the drop in. It then shares and lives with the folder, so it needs no lifetime. With previous, moves the drop there."))),
+  folder: v.optional(v.pipe(v.string(), v.description("Id or link of the folder to put the drop in: the one list_folders describes as the place for it. It then shares and lives with the folder, so it needs no lifetime. Leave it out when no folder fits; the drop goes at the top. With previous, moves the drop there."))),
 })
 
 export type PublishInput = v.InferOutput<typeof PublishInput>
@@ -53,8 +53,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (input.slug !== undefined && !slugify(input.slug)) throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
   if (input.site) {
     if (input.previous || input.resolves || input.removes) throw new HTTPError({ status: 400, message: "A site has no versions. Change it with update_drop, and resolve its comments there." })
-    const share = input.share ? shareChange(input.share, input.audience) : {}
-    const row = await createSiteDrop(who, { url: input.site.url, title: input.title, slug: input.slug, folder, ...share, lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }, event)
+    const row = await createSiteDrop(who, { url: input.site.url, title: input.title, slug: input.slug, folder, share: input.share, lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }, event)
     const drop = mcpDrop(toSummary(await findDrop(row.id, event) ?? row), event.url.origin)
     const script = reviewSnippet(event.url.origin)
     return {
@@ -67,7 +66,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (input.previous && (!previous || !permissions(previous, who).edit)) throw new HTTPError({ status: 404, message: `No drop you can publish to with id ${input.previous}.` })
   if (previous?.kind === "site") throw new HTTPError({ status: 400, message: "previous is a site, which has no versions. Change it with update_drop." })
   if (previous) previous = (await versionChain(previous))[0] ?? previous
-  const share = input.share ? shareChange(input.share, input.audience, previous?.visibility) : {}
+  const share = input.share ? { share: input.share } : {}
   const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
 
   let row

@@ -63,7 +63,7 @@ const form = new FormData()
 form.set("file", new File([await readFile(new URL("../../public/og.png", import.meta.url))], "og.png"))
 const upload = await (await fetch(filesEndpoint, { body: form, headers: auth, method: "POST", signal: timeout() })).json()
 assert.match(new URL(upload.url).pathname, /^\/f\/[0-9a-f-]+\.png$/)
-assert.equal(upload.visibility, "private")
+assert.equal(upload.share, "private")
 
 // Private: its owner reads it, everyone else gets a 404.
 assert.equal((await fetch(upload.url, { signal: timeout() })).status, 404)
@@ -73,7 +73,7 @@ assert.equal(image.headers.get("content-type"), "image/png")
 
 // Shared: anyone with the link.
 const share = await fetch(new URL(`/api/drops/${upload.id}`, origin), {
-  body: JSON.stringify({ visibility: "shared" }),
+  body: JSON.stringify({ share: "public_comment" }),
   headers: { ...auth, "content-type": "application/json" },
   method: "PATCH",
   signal: timeout(),

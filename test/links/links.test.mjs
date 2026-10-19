@@ -53,7 +53,7 @@ test("slugs read well, stay short, and keep only letters and numbers", () => {
 })
 
 test("a doc keeps one link across versions; it opens the latest, ?v= pins one, and an old version's id moves to the latest", async () => {
-  const v1 = await call(publish, { markdown: "# Hipoteca de 75.000 €", note: "First", lifetime: "review", share: "comment", slug: "Hipoteca Madrid" })
+  const v1 = await call(publish, { markdown: "# Hipoteca de 75.000 €", note: "First", lifetime: "review", share: "public_comment", slug: "Hipoteca Madrid" })
   assert.match(v1.url, /^https:\/\/drop\.example\/d\/[0-9a-z]{12}\/hipoteca-madrid$/)
   const v2 = await call(publish, { previous: v1.url, markdown: "# Hipoteca, v2", note: "Second" })
   assert.equal(v2.version, 2)
@@ -107,7 +107,7 @@ test("without a slug the title names the link; drops from before links open unde
 
 test("every version of an HTML doc runs on the same content origin", async () => {
   state.contentOrigin = "https://*-drop.example.com"
-  const v1 = await call(publish, { html: "<title>Page</title><p>1</p>", note: "x", lifetime: "review", share: "view" })
+  const v1 = await call(publish, { html: "<title>Page</title><p>1</p>", note: "x", lifetime: "review", share: "public" })
   const v2 = await call(publish, { previous: v1.id, html: "<title>Page</title><p>2</p>", note: "y" })
   state.who = null
   const first = (await get(detailHandler, v1.id)).contentOrigin
