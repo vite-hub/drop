@@ -27,7 +27,7 @@ export function useMe() {
  * handlers) carry the schema's own message in `data.issues`, which beats a generic "Validation failed".
  */
 export function errorText(error: unknown, fallback = "Something went wrong. Try again.") {
-  const value = error as { data?: { code?: string; statusText?: string; message?: string; data?: { issues?: Array<{ message?: string }> } }; statusMessage?: string; message?: string }
+  const value = error as { data?: { code?: string; statusText?: string; message?: string; data?: { issues?: Array<{ message?: string }> } }; statusText?: string; message?: string }
   if (value?.data?.code === "DROP_LIMIT_REACHED") return value.data.message ?? fallback
-  return value?.data?.data?.issues?.[0]?.message ?? value?.data?.statusText ?? value?.statusMessage ?? value?.data?.message ?? value?.message ?? fallback
+  return value?.data?.data?.issues?.[0]?.message ?? value?.data?.statusText ?? value?.statusText ?? value?.data?.message ?? value?.message ?? fallback
 }

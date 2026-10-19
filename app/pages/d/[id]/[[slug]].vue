@@ -39,12 +39,12 @@ const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview
     <DropViewer v-if="drop.data.value" :key="drop.data.value.id" public-view />
     <UDashboardPanel v-else id="drop-missing">
       <template #body>
-        <ContentUnavailable :status="drop.error.value?.statusCode ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
+        <ContentUnavailable :status="drop.error.value?.status ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
       </template>
     </UDashboardPanel>
   </template>
   <UDashboardGroup v-else-if="drop.data.value" unit="rem" storage="cookie" storage-key="drop-public">
     <DropViewer :key="drop.data.value.id" public-view />
   </UDashboardGroup>
-  <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.statusCode ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
+  <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.status ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
 </template>
