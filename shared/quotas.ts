@@ -20,10 +20,6 @@ export function planLimits(plan: Plan, pro: { drops?: number; bytes?: number; wr
   return { drops: null, bytes: null, writes: null, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
 }
 
-export function isPlan(value: unknown): value is Plan {
-  return PLANS.includes(value as Plan)
-}
-
 export interface Usage {
   enabled: boolean
   plan: Plan

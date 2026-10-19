@@ -12,7 +12,7 @@ export default defineHandler(async (event) => {
   const suffixed = pathname.endsWith(".md")
   if (!suffixed && !(accept.includes("text/markdown") && !accept.includes("text/html"))) return
   // Loaded lazily: middleware lands in the Worker's entry module, which may only export handlers.
-  const { DOCS_PAGES } = await import("../../app/utils/docs")
+  const { DOCS_PAGES } = await import("#shared/utils/docs")
   const path = suffixed ? pathname.slice(0, -".md".length) : pathname.replace(/(.)\/$/, "$1")
   if (!DOCS_PAGES.some(page => page.to === path)) return
   const { htmlToMarkdown } = await import("../utils/html-markdown")

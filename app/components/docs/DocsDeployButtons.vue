@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HostId } from "~/utils/docs"
+import type { HostId } from "../../../scripts/deployment"
 
 const props = defineProps<{ host?: HostId }>()
 const hosts = computed(() => props.host ? [hostById(props.host)] : HOSTS)

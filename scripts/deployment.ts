@@ -1,5 +1,6 @@
 export const HOSTS = ["cloudflare", "vercel", "netlify", "deno", "vps"] as const
-export type Host = typeof HOSTS[number]
+export type HostId = typeof HOSTS[number]
+export type Host = HostId
 
 /** Build-time choices. Credentials and the SQLite path remain runtime settings. */
 export function deployment(env: Record<string, string | undefined> = process.env) {

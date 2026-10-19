@@ -1,5 +1,5 @@
 import { defineHandler } from "h3"
-import { DOCS_NAV } from "../../app/utils/docs"
+import { DOCS_NAV } from "#shared/utils/docs"
 import { MCP_SERVER_INFO } from "#shared/mcp"
 
 /**

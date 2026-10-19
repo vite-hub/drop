@@ -39,7 +39,7 @@ export default defineHandler(async (event) => {
   event.res.headers.set("X-Content-Type-Options", "nosniff")
   if (isHtml) {
     const text = await readSource()
-    const { htmlLanding } = await import("../../shared/html-landing")
+    const { htmlLanding } = await import("#shared/html-landing")
     return event.req.method === "HEAD" ? "" : htmlLanding(text, event.url.pathname)
   }
   // Loaded lazily: middleware lands in the Worker's entry module, and its static imports would be re-exported

@@ -1,5 +1,5 @@
 import { defineHandler } from "h3"
-import { INDEXED_PATHS } from "../../app/utils/docs"
+import { INDEXED_PATHS } from "#shared/utils/docs"
 
 /** The pages search engines may index (INDEXED_PATHS), on whichever host serves this Drop. */
 export default defineHandler((event) => {
