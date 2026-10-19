@@ -1,30 +1,33 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { parseJSONC } from "confbox"
+import * as v from "valibot"
 
-interface Binding {
-  binding: string
-  id?: string
-  database_id?: string
-  database_name?: string
-  bucket_name?: string
-}
-interface Template {
-  name: string
-  compatibility_flags: string[]
-  d1_databases: Binding[]
-  r2_buckets: Binding[]
-  kv_namespaces: Binding[]
-  secrets: { required: string[] }
-}
+// Loose: the fields Drop rewrites are checked, and every other Wrangler setting passes through untouched.
+const Binding = v.looseObject({
+  binding: v.string(),
+  id: v.optional(v.string()),
+  database_id: v.optional(v.string()),
+  database_name: v.optional(v.string()),
+  bucket_name: v.optional(v.string()),
+})
+type Binding = v.InferOutput<typeof Binding>
+const Template = v.looseObject({
+  name: v.string(),
+  compatibility_flags: v.array(v.string()),
+  d1_databases: v.array(Binding),
+  r2_buckets: v.array(Binding),
+  kv_namespaces: v.array(Binding),
+  secrets: v.looseObject({ required: v.array(v.string()) }),
+})
 
-export const cloudflareTemplate = parseJSONC<Template>(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"))
+export const cloudflareTemplate = v.parse(Template, parseJSONC(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8")))
 
 // Nitro merges root and generated Wrangler arrays by concatenating them. Keep one binding
 // per name, with the template's provisioned ids, and preserve the existing D1 build override.
 export function syncCloudflareTemplate(serverDir: string) {
   const file = join(serverDir, "wrangler.json")
-  const config = JSON.parse(readFileSync(file, "utf8")) as Template
+  const config = v.parse(Template, JSON.parse(readFileSync(file, "utf8")))
   config.name = cloudflareTemplate.name
   config.compatibility_flags = [...new Set(config.compatibility_flags)]
   for (const key of ["d1_databases", "r2_buckets", "kv_namespaces"] as const) {
