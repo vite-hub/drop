@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
+import { ROLE_LABELS } from "#shared/roles"
 
 useSeoMeta({
   title: "The shared drive for people and their agents",
@@ -42,8 +42,10 @@ const USE_CASES = [
 
 const SELF_HOSTED = [
   "Deploy to Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
-  "GitHub sign-in by default. Switch to Google, GitLab, email, or SSO with Better Auth",
+  "Any sign-in Better Auth supports",
 ]
+// The members in the self-hosted card's picture: one of each role, as they'd show on the Members page.
+const TEAM = [{ name: "You", role: "admin" }, { name: "Ben", role: "editor" }, { name: "Lea", role: "member" }] as const
 
 const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drops expire after 30 days, unless you keep them"]
 </script>
@@ -125,32 +127,58 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
 
       <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
         <h2 class="mb-10 text-3xl font-semibold tracking-tight text-highlighted lg:mb-12">Use it here, or <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">run your own</em>.</h2>
+        <!-- Each card leads with a small picture of the product: a private drop with its share switch, and a team with
+             one member per role. Flat tokens only, like the stories above. -->
         <div class="grid gap-4 md:grid-cols-2">
-          <div class="rounded-xl border border-default bg-default p-6">
-            <p class="label-mono">drop.vitehub.dev</p>
-            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Sign in and start dropping.</p>
-            <p class="mt-2 text-sm leading-relaxed text-muted">Anyone with a GitHub account can use it. Drops start private, and a link shares them only when you say so.</p>
-            <ul class="mt-5 space-y-2 text-sm">
-              <li v-for="item in HOSTED" :key="item" class="flex items-center gap-2">
-                <UIcon name="i-ph-check" class="size-4 text-muted" />{{ item }}
-              </li>
-            </ul>
-          </div>
-          <div class="rounded-xl border border-default bg-default p-6">
-            <p class="label-mono">Your own</p>
-            <p class="mt-3 text-lg font-medium tracking-tight text-highlighted">Deploy your own and choose the admins.</p>
-            <p class="mt-2 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. The GitHub accounts you list as admins can promote anyone.</p>
-            <ul class="mt-5 space-y-2 text-sm">
-              <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
-                <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
-              </li>
-            </ul>
-            <dl class="mt-5 divide-y divide-default border-y border-default text-sm">
-              <div v-for="role in ROLES" :key="role" class="flex gap-4 py-2">
-                <dt class="w-16 shrink-0 font-medium text-highlighted">{{ ROLE_LABELS[role] }}</dt>
-                <dd class="text-muted">{{ ROLE_SUMMARY[role] }}</dd>
+          <div class="flex flex-col rounded-xl border border-default bg-default p-2">
+            <div aria-hidden="true" class="relative grid h-44 place-items-center overflow-hidden rounded-lg border border-default bg-muted">
+              <div class="w-64 rounded-lg border border-default bg-default shadow-sm">
+                <div class="flex items-center gap-2 border-b border-default px-3 py-2">
+                  <UIcon name="i-ph-file-text" class="size-3.5 text-muted" />
+                  <span class="font-mono text-xs text-toned">launch-plan.md</span>
+                  <span class="ml-auto inline-flex items-center gap-1 rounded-sm border border-default px-1.5 text-xs text-muted"><UIcon name="i-ph-lock-simple" class="size-3" />Private</span>
+                </div>
+                <div class="space-y-2 px-3 py-3">
+                  <div class="h-1.5 w-3/4 rounded-full bg-accented" />
+                  <div class="h-1.5 w-full rounded-full bg-accented/70" />
+                  <div class="h-1.5 w-1/2 rounded-full bg-accented/70" />
+                </div>
               </div>
-            </dl>
+              <div class="absolute right-6 bottom-5 flex items-center gap-1.5 rounded-md border border-default bg-default px-2 py-1 text-xs text-toned shadow-md">
+                <UIcon name="i-ph-globe-simple" class="size-3.5" />Anyone with the link
+              </div>
+            </div>
+            <div class="flex-1 px-4 pt-5 pb-4">
+              <p class="label-mono">drop.vitehub.dev</p>
+              <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Sign in and start dropping.</p>
+              <p class="mt-1.5 text-sm leading-relaxed text-muted">Drops start private. A link shares one only when you say so.</p>
+              <ul class="mt-4 space-y-2 text-sm">
+                <li v-for="item in HOSTED" :key="item" class="flex gap-2">
+                  <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="flex flex-col rounded-xl border border-default bg-default p-2">
+            <div aria-hidden="true" class="grid h-44 place-items-center overflow-hidden rounded-lg border border-default bg-muted">
+              <ul class="w-64 divide-y divide-default rounded-lg border border-default bg-default shadow-sm">
+                <li v-for="person in TEAM" :key="person.name" class="flex items-center gap-2.5 px-3 py-2">
+                  <span class="grid size-6 place-items-center rounded-full bg-accented text-xs font-medium text-highlighted">{{ person.name[0] }}</span>
+                  <span class="text-sm text-highlighted">{{ person.name }}</span>
+                  <span class="ml-auto rounded-sm border border-default px-1.5 text-xs" :class="person.role === 'admin' ? 'bg-inverted text-inverted' : 'text-muted'">{{ ROLE_LABELS[person.role] }}</span>
+                </li>
+              </ul>
+            </div>
+            <div class="flex-1 px-4 pt-5 pb-4">
+              <p class="label-mono">Your own</p>
+              <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Deploy your own and choose the admins.</p>
+              <p class="mt-1.5 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. Admins promote people to {{ ROLE_LABELS.editor }}, who can edit and share any drop.</p>
+              <ul class="mt-4 space-y-2 text-sm">
+                <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
+                  <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </section>

@@ -22,13 +22,16 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
         <p class="mt-3 max-w-[44ch] leading-relaxed text-muted">
           Fork Drop and deploy it to your own account. Every drop and comment stays there.
         </p>
-        <div class="mt-6 flex max-w-[46ch] gap-3 text-sm">
-          <UIcon name="i-simple-icons-betterauth" class="mt-0.5 size-4 shrink-0 text-highlighted" />
-          <p class="text-toned">
-            Sign-in runs on Better Auth. GitHub is on by default; switch to Google, GitLab, email, or SSO in
-            <code class="font-mono text-sm text-highlighted">server/auth.ts</code>.
-          </p>
-        </div>
+        <ul class="mt-6 max-w-[46ch] space-y-3 text-sm text-toned">
+          <li class="flex gap-3">
+            <UIcon name="i-simple-icons-betterauth" class="mt-0.5 size-4 shrink-0 text-highlighted" />
+            <p>Any sign-in Better Auth supports: OAuth, email, passkeys, or SSO. Pick it in <code class="font-mono text-sm text-highlighted">server/auth.ts</code>.</p>
+          </li>
+          <li class="flex gap-3">
+            <UIcon name="i-ph-database" class="mt-0.5 size-4 shrink-0 text-highlighted" />
+            <p>Data lives in Cloudflare D1, or in SQLite on your own server.</p>
+          </li>
+        </ul>
         <p class="label-mono mt-8 mb-3">Deploys to</p>
         <ul class="flex flex-wrap gap-1.5">
           <li v-for="host in HOSTS" :key="host.id">
