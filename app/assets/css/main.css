@@ -144,12 +144,21 @@
   transition: transform 220ms var(--ease-drawer), opacity 220ms var(--ease-drawer);
 }
 .sidebar-forward-leave-active, .sidebar-back-leave-active { position: absolute; inset: 0; }
-/* The curtain: Docs' leading edge carries a hairline and a soft shadow onto the pane beneath, so mid-slide it reads
-   as a sheet passing over, not a cut. At rest that edge sits on the sidebar's own edge and overflow hides it. */
-.sidebar-pane-docs {
-  box-shadow: -1px 0 0 var(--ui-border), -14px 0 24px -12px rgb(0 0 0 / 0.14);
+/* The curtain: a hairline and a soft shadow just left of the Docs pane, so mid-slide it reads as a sheet passing over,
+   not a cut. Its opacity follows the slide: in as Docs arrives, out as it leaves, so it never pops off. At rest it
+   sits beyond the sidebar's edge, where overflow hides it. */
+.sidebar-pane-docs::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  right: 100%;
+  width: 24px;
+  pointer-events: none;
+  background: linear-gradient(to left, var(--ui-border) 0 1px, rgb(0 0 0 / 0.1) 1px, transparent);
+  transition: opacity 220ms var(--ease-drawer);
 }
-.dark .sidebar-pane-docs { box-shadow: -1px 0 0 var(--ui-border-accented), -14px 0 24px -12px rgb(0 0 0 / 0.5); }
+.dark .sidebar-pane-docs::before { background: linear-gradient(to left, var(--ui-border-accented) 0 1px, rgb(0 0 0 / 0.45) 1px, transparent); }
+.sidebar-forward-enter-from.sidebar-pane-docs::before, .sidebar-back-leave-to.sidebar-pane-docs::before { opacity: 0; }
 .sidebar-forward-enter-from, .sidebar-back-leave-to { transform: translateX(100%); }
 .sidebar-forward-leave-to, .sidebar-back-enter-from { transform: translateX(-30%); opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
