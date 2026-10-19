@@ -15,6 +15,7 @@ const { default: preflight } = await import("../../server/api/review/comments.op
 const { default: newSite } = await import("../../server/api/sites.post.ts")
 const { default: newFolder } = await import("../../server/api/folders.post.ts")
 const { default: reviewList } = await import("../../server/api/drops/[id]/review.get.ts")
+const { default: embeddedPost } = await import("../../server/api/drops/[id]/review.post.ts")
 const { default: dropComments } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: dropCommentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: reviewScript } = await import("../../server/routes/review.js.get.ts")
@@ -331,6 +332,41 @@ test("comments on a pattern keep the origin of the preview they came from", asyn
   assert.equal(sql.prepare("SELECT title FROM drops WHERE kind = 'image'").get().title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
   assert.deepEqual(await json(await count(pr12, "/pricing?plan=pro")), { open: 1 }, "each preview counts its own")
   assert.deepEqual(await json(await count(pr13, "/pricing", "https://pr13-acme.preview.quiver.dk")), { open: 1 })
+})
+
+/** A comment from Drop's embedded review: the signed-in reviewer, the address open in the frame, and a capture. */
+function embedded(id, data, { screenshot, origin = SITE } = {}) {
+  const form = new FormData()
+  form.append("data", JSON.stringify({ body: "The chart overlaps the legend", page: "/pricing", ox: 100, oy: 200, ow: 300, oh: 150, viewport: { width: 1280, height: 720 }, ...data }))
+  if (screenshot) form.append("screenshot", new Blob([screenshot]), "screenshot")
+  return answer(embeddedPost, request(`/api/drops/${id}/review?origin=${encodeURIComponent(origin)}`, { method: "POST", body: form, id }))
+}
+
+test("Drop's embedded review stores a box on a screen capture like the script's, for addresses the site covers", async () => {
+  site("previews", { site_url: PATTERN })
+  state.who = ada
+  const sent = await embedded("previews", {}, { screenshot: PNG })
+  assert.equal(sent.status, 200)
+  assert.deepEqual(await json(sent), { n: 1 })
+  const image = sql.prepare("SELECT * FROM drops WHERE kind = 'image'").get()
+  assert.equal(image.parent_id, "previews")
+  assert.equal(image.title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
+  const row = sql.prepare("SELECT * FROM comments").get()
+  assert.deepEqual([row.drop_id, row.kind, row.page, row.author_id, row.author_name, row.label], [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null], "no element: Drop can't see inside the frame")
+
+  assert.equal((await embedded("previews", {}, { origin: "https://evil.example" })).status, 400, "only addresses the site covers")
+  assert.equal((await embedded("previews", {}, { screenshot: new TextEncoder().encode("<svg>") })).status, 400, "a real image")
+})
+
+test("the embedded review needs comment access to the site", async () => {
+  site("closed", { site_url: PATTERN, visibility: "private" })
+  state.who = ada
+  assert.equal((await embedded("closed", {})).status, 404, "a private site stays hidden")
+  // Public view: signed-in people comment, a signed-out visitor only looks.
+  site("viewonly", { site_url: PATTERN, visibility: "public", access: "view" })
+  state.who = null
+  assert.equal((await embedded("viewonly", {})).status, 403)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM comments").get().n, 0)
 })
 
 test("Open in Drop opens the review only for people who could open it without its link", async () => {

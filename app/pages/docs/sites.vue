@@ -23,16 +23,22 @@ const nuxt = `// nuxt.config.ts: preview builds only\nexport default defineNuxtC
       <p>Comments from a pattern keep the address of the preview they came from, so you can tell pull requests apart.</p>
     </DocsSection>
 
-    <DocsSection id="install" title="Add the script to preview builds">
-      <p>The easiest way: add the tag to the site's preview builds once, never production. Every preview then shows the Comment button to everyone, so reviewers install nothing, and with a pattern address the comments from every pull request's preview land on the same site drop.</p>
+    <DocsSection id="here" title="Review it in Drop">
+      <p>The site drop's page opens the site inside Drop: type the address of the page (any preview a pattern covers), press <strong>Open here</strong>, then <strong>Comment</strong>, and drag a box over what you mean. Nothing changes on the site and nothing is installed.</p>
+      <p>Drop can't look inside a page from another site, so it takes the screenshot with your browser's screen sharing, which asks once per visit. Chrome, Edge, and Brave offer <strong>This tab</strong>, and the screenshot matches the page exactly. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off; the comment shows the screenshot before you send it.</p>
+      <p>A comment from here has the screenshot, your box, your note, and the address in the bar above the page. It doesn't name the element under the box, and clicks inside the page don't change that address: type the page you're on. A site that refuses to be shown in a frame stays blank; use the bookmarklet there.</p>
+    </DocsSection>
+
+    <DocsSection id="install" title="Or add the script to preview builds">
+      <p>To show the Comment button on the site itself: add the tag to the site's preview builds once, never production. Every preview then shows the Comment button to everyone, so reviewers install nothing, and with a pattern address the comments from every pull request's preview land on the same site drop.</p>
       <AgentsCodeBlock :code="tag" />
       <p>For a Nuxt app, behind a flag your preview builds set:</p>
       <AgentsCodeBlock :code="nuxt" />
       <p>The tag is the same for every site and carries no key, so nothing in the page's HTML opens the review. The button sits in the page's corner, in its own shadow root, so your styles and its styles never mix. It does nothing until someone presses it.</p>
     </DocsSection>
 
-    <DocsSection id="bookmarklet" title="Or review with the bookmarklet">
-      <p>For a site you can't change, the site drop's page has a <strong>Review with Drop</strong> button to keep in your bookmarks. It adds Drop's Comment button to the page you're on, for you only, until you reload.</p>
+    <DocsSection id="bookmarklet" title="Or use the bookmarklet">
+      <p>For a site you can't change and that won't open in a frame, the site drop's page has a <strong>Review with Drop</strong> button to keep in your bookmarks. It adds Drop's Comment button to the page you're on, for you only, until you reload.</p>
       <ol>
         <li>Show the bookmarks bar with <kbd>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd> on a Mac or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd> elsewhere. It's the same in Chrome, Edge, Brave, Firefox, and Zen; Safari calls it the Favorites bar. In Zen's single toolbar, the bar appears when you point at the top edge of the window.</li>
         <li>Drag the button onto the bar. In Firefox and Zen you can also right-click it and choose <strong>Bookmark Link</strong>.</li>

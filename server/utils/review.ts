@@ -1,12 +1,13 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { defineHandler, type H3Event, HTTPError } from "h3"
+import * as v from "valibot"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { newLink, slugify } from "#shared/links"
 import { isSitePattern, REVIEW_TOKEN_HOURS, SITE_ADDRESS_RULE, siteAddress, siteAddressesFor, siteHost, siteMatches } from "#shared/review"
-import type { ReviewCommentInput } from "#shared/schemas"
+import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { account, comments, drops, user } from "../databases/config"
@@ -252,6 +253,33 @@ export function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | n
 }
 
 const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const
+
+/**
+ * A review comment as multipart: `data` (JSON, ReviewCommentSchema) and an optional `screenshot`. Both the review
+ * script on the site and Drop's own embedded review send it. The screenshot is checked by its bytes, not its claimed
+ * type, and at most 4 MiB.
+ */
+export async function readReviewComment(event: H3Event): Promise<{ input: ReviewCommentInput; shot: Screenshot | null }> {
+  if (Number(event.req.headers.get("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024)
+    throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
+  let form: FormData
+  try { form = await event.req.formData() }
+  catch { throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." }) }
+  const data = form.get("data")
+  let input: ReviewCommentInput
+  try { input = v.parse(ReviewCommentSchema, JSON.parse(typeof data === "string" ? data : "")) }
+  catch (error) { throw new HTTPError({ status: 400, statusText: v.isValiError(error) ? error.message : "The comment is missing." }) }
+
+  const file = form.get("screenshot")
+  if (file === null) return { input, shot: null }
+  if (!(file instanceof File)) throw new HTTPError({ status: 400, statusText: "The screenshot must be a file." })
+  if (file.size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const contentType = screenshotType(bytes)
+  if (!contentType) throw new HTTPError({ status: 400, statusText: "The screenshot must be a PNG, JPEG, or WebP image." })
+  return { input, shot: { bytes, contentType } }
+}
+
 
 /**
  * Stores what someone sent from the site. With a screenshot, the screenshot becomes a private image of the site (like

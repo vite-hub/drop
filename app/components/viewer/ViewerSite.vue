@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// A site drop's page: the website under review, the bookmarklet and the optional tag that add the review to it, and
-// what people sent from its pages, newest first. Each screenshot opens as its own image, where the box shows and the
-// thread continues.
+// A site drop's page: the website under review, the three ways to comment on it (open it here in Drop, the bookmarklet,
+// or the optional tag in preview builds), and what people sent from its pages, newest first. Each screenshot opens as
+// its own image, where the box shows and the thread continues.
 import { dropPath } from "#shared/links"
-import { isSitePattern, reviewBookmarklet, reviewSnippet, siteHost } from "#shared/review"
+import { isSitePattern, reviewBookmarklet, reviewSnippet, siteHost, siteMatches } from "#shared/review"
 import type { DropDetail, SiteReviewItem } from "#shared/types"
 
 /** `inset`: room to leave on the right for the floating panel, in pixels. */
@@ -55,11 +55,24 @@ const steps = computed<Step[]>(() => {
     open,
   ]
 })
+// Review it here: the address to open in ViewerSiteFrame. A pattern starts empty, since each preview has its own.
+const address = ref("")
+watch(siteLink, link => (address.value ||= link ?? ""), { immediate: true })
+const addressCovered = computed(() => {
+  try { return Boolean(props.drop.siteUrl) && siteMatches(props.drop.siteUrl!, new URL(address.value).origin) }
+  catch { return false }
+})
+const example = computed(() => props.drop.siteUrl?.replace("*", "pr123") ?? "")
+const framed = ref<string | null>(null)
+function openHere() {
+  if (addressCovered.value) framed.value = new URL(address.value).href
+}
 const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.oy / 10}%`, width: `${item.ow / 10}%`, height: `${item.oh / 10}%` })
 </script>
 
 <template>
-  <div class="min-h-0 flex-1 overflow-y-auto">
+  <ViewerSiteFrame v-if="framed" :address="framed" :drop="drop" :inset="inset" @close="framed = null" />
+  <div v-else class="min-h-0 flex-1 overflow-y-auto">
     <div class="mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6" :style="{ paddingRight: inset ? `${inset}px` : undefined }">
       <section class="space-y-3">
         <p class="label-mono">Site</p>
@@ -73,14 +86,24 @@ const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.
         <p v-if="drop.siteUrl && isSitePattern(drop.siteUrl)" class="text-sm text-muted">Covers every address where <span class="font-mono">*</span> is one label, like each pull request's preview.</p>
       </section>
 
+      <section v-if="drop.canComment" class="space-y-3">
+        <p class="label-mono">Review it here</p>
+        <p class="text-sm text-muted">Open the site inside Drop, press Comment, and drag over what you mean. Drop takes the screenshot with your browser's screen sharing, which asks once. Nothing to install.</p>
+        <form class="flex flex-wrap items-center gap-2" @submit.prevent="openHere">
+          <UInput v-model="address" class="min-w-0 flex-1" icon="i-ph-globe" :placeholder="example" spellcheck="false" aria-label="Address to review" />
+          <UButton color="neutral" :disabled="!addressCovered" label="Open here" trailing-icon="i-ph-arrow-right" type="submit" />
+        </form>
+        <p class="text-sm text-muted">If the page stays blank, the site doesn't allow being shown in a frame; use the bookmarklet below.</p>
+      </section>
+
       <section v-if="drop.canComment && drop.isOwner" class="space-y-3">
-        <p class="label-mono">Add the Comment button for everyone</p>
+        <p class="label-mono">Or add the Comment button to previews</p>
         <p class="text-sm text-muted">Add this tag to the site's preview builds once, never production. Every preview then shows a Comment button, so nobody installs anything, and comments from every preview land here. It carries no key: people still need this review shared with them to comment. On a preview with a strict Content Security Policy, also allow {{ origin }} there.</p>
         <AgentsCodeBlock :code="snippet" message="Tag copied" />
       </section>
 
       <section v-if="drop.canComment" class="space-y-3">
-        <p class="label-mono">{{ drop.isOwner ? "Or review without the tag" : "Review the site" }}</p>
+        <p class="label-mono">Or use the bookmarklet</p>
         <div class="rounded-lg border border-default">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-default px-4 py-3">
             <!-- A bookmarklet: dragged to the bookmarks bar, never run here. -->
@@ -109,7 +132,7 @@ const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.
         <div v-if="!items.data.value.length" class="rounded-lg border border-dashed border-default px-4 py-10 text-center">
           <UIcon name="i-ph-chat-circle" class="size-6 text-dimmed" />
           <p class="mt-3 font-medium text-highlighted">Nothing sent from {{ host }} yet</p>
-          <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Open the site, click Review with Drop, and drag over what you mean. Each note shows up here with its screenshot.</p>
+          <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Open it here and press Comment, or use the bookmarklet on the site. Each note shows up here with its screenshot.</p>
         </div>
         <ul v-else class="grid gap-4 sm:grid-cols-2">
           <li v-for="item in items.data.value" :key="item.id" class="overflow-hidden rounded-lg border border-default" :class="resolved(item) && 'opacity-60'">
