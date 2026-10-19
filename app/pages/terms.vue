@@ -3,7 +3,7 @@
 useSeoMeta({ title: "Terms of service" })
 </script>
 <template>
-  <div><SiteHeader /><main class="mx-auto max-w-2xl space-y-5 px-6 py-12">
+  <div class="flex min-h-dvh flex-col"><SiteHeader /><main class="mx-auto w-full flex-1 max-w-2xl space-y-5 px-6 py-12">
     <h1 class="text-2xl font-semibold">Terms of service</h1>
     <p>By using this instance of Drop, you agree to these terms and the <NuxtLink to="/acceptable-use" class="underline">acceptable use rules</NuxtLink>.</p>
     <p>You keep ownership of your content. You give the operator permission to store and serve it as needed to run Drop. You are responsible for your uploads and for having the rights to share them.</p>

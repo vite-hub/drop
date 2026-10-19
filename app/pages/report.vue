@@ -19,7 +19,7 @@ async function submit(event: FormSubmitEvent<InferInput<typeof ReportSchema>>) {
 </script>
 
 <template>
-  <div><SiteHeader /><main class="mx-auto max-w-xl space-y-5 px-6 py-12">
+  <div class="flex min-h-dvh flex-col"><SiteHeader /><main class="mx-auto w-full flex-1 max-w-xl space-y-5 px-6 py-12">
     <h1 class="text-2xl font-semibold">Report a drop</h1>
     <p class="text-sm text-muted">No sign-in needed. Reports go to the instance operator. Do not attach or copy illegal images. CSAM is removed immediately and reported to NCMEC or the authorities.</p>
     <p v-if="sent" role="status">Report received. Thank you.</p>

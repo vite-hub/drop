@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui"
 
+// `compact`: the public pages' header, where the menu is an avatar that opens downward; the dashboard sidebar gets
+// shadcn's NavUser row, opening upward.
+const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
+
 const { signOut } = useUserSession(useNuxtApp().$auth)
 // From /api/me, which SSR fetches with the session cookie; the client-side session only exists after hydration.
 const { data: me } = useMe()
@@ -20,9 +24,16 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
 </script>
 
 <template>
-  <UDropdownMenu :items="items" :content="{ side: 'top', align: 'start', sideOffset: 6 }" :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width) min-w-52' }">
+  <UDropdownMenu
+    :items="items"
+    :content="props.compact ? { side: 'bottom', align: 'end', sideOffset: 6 } : { side: 'top', align: 'start', sideOffset: 6 }"
+    :ui="{ content: props.compact ? 'w-60' : 'w-(--reka-dropdown-menu-trigger-width) min-w-52' }"
+  >
+    <button v-if="props.compact" class="grid size-8 cursor-pointer place-items-center rounded-md transition-colors hover:bg-elevated data-[state=open]:bg-elevated" type="button" aria-label="Account menu">
+      <UAvatar :alt="me?.name ?? 'You'" class="rounded-md" :src="me?.image ?? undefined" size="xs" />
+    </button>
     <!-- shadcn's NavUser: a large sidebar button with the avatar, name and role. -->
-    <button class="flex h-12 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-elevated data-[state=open]:bg-elevated" type="button" aria-label="Account menu">
+    <button v-else class="flex h-12 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-elevated data-[state=open]:bg-elevated" type="button" aria-label="Account menu">
       <UAvatar :alt="me?.name ?? 'You'" class="rounded-lg" :src="me?.image ?? undefined" size="md" />
       <span class="min-w-0 flex-1 leading-tight">
         <span class="block truncate text-sm font-medium text-highlighted">{{ me?.name ?? "You" }}</span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // The public pages' header (landing and docs): marks on the left; Docs, theme, GitHub, and sign-in on the right.
+// Signed in, Open Drop and the account menu (theme, Sign out) take the place of the theme button and Sign in.
 withDefaults(defineProps<{ wide?: boolean }>(), { wide: false })
 
 const route = useRoute()
@@ -29,12 +30,16 @@ const dev = import.meta.dev
           to="/docs"
           :class="route.path.startsWith('/docs') ? 'text-highlighted' : 'text-muted'"
         />
-        <ClientOnly>
+        <!-- Signed in, the theme switch moves into the account menu, next to Sign out. -->
+        <ClientOnly v-if="!signedIn">
           <UColorModeButton size="sm" />
           <template #fallback><span class="size-8" /></template>
         </ClientOnly>
         <LandingGitHubStars />
-        <UButton v-if="signedIn" class="ml-1" color="neutral" variant="outline" size="sm" label="Open Drop" to="/drops" />
+        <template v-if="signedIn">
+          <UButton class="ml-1" color="neutral" variant="outline" size="sm" label="Open Drop" to="/drops" />
+          <UserMenu compact />
+        </template>
         <!-- `nuxt dev` has no GitHub app: /signin has the email form there. -->
         <UButton v-else-if="dev" class="ml-1" color="neutral" variant="outline" size="sm" label="Sign in" to="/signin" />
         <UButton v-else class="ml-1" color="neutral" variant="outline" size="sm" label="Sign in" @click="signInWithGitHub" />

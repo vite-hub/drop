@@ -4,7 +4,7 @@ useSeoMeta({ title: "Copyright and abuse contact" })
 const { data: contact } = await useApi("/api/abuse-contact")
 </script>
 <template>
-  <div><SiteHeader /><main class="mx-auto max-w-2xl space-y-5 px-6 py-12">
+  <div class="flex min-h-dvh flex-col"><SiteHeader /><main class="mx-auto w-full flex-1 max-w-2xl space-y-5 px-6 py-12">
     <h1 class="text-2xl font-semibold">Copyright and abuse contact</h1>
     <p>Use the <NuxtLink to="/report" class="underline">report form</NuxtLink> to report abuse. Include the Drop link and enough detail to locate the problem.</p>
     <p v-if="contact?.email">You can also contact the operator at <a :href="`mailto:${contact.email}`" class="underline">{{ contact.email }}</a>.</p>
