@@ -22,6 +22,39 @@ const pageLink = (page: string | null) => (page?.startsWith("http") ? page : pag
 // Resolving from the panel updates the drop's comments; the list follows them.
 const resolved = (item: SiteReviewItem) => state.comments.data.value.find(comment => comment.id === item.id)?.resolved ?? item.resolved
 const shotTo = (shot: NonNullable<SiteReviewItem["screenshot"]>) => (props.publicView ? dropPath(shot) : `/drops/${shot.id}`)
+// The bookmarklet's steps for the reader's browser. Guessed after mounting, so the server's HTML (Chrome's steps) and
+// the first client render match; the buttons fix a wrong guess.
+type Browser = "chrome" | "firefox" | "safari"
+const BROWSERS: { id: Browser; label: string }[] = [
+  { id: "chrome", label: "Chrome, Edge, Brave" },
+  { id: "firefox", label: "Firefox, Zen" },
+  { id: "safari", label: "Safari" },
+]
+const browser = ref<Browser>("chrome")
+onMounted(() => {
+  const agent = navigator.userAgent
+  if (/Firefox\//.test(agent)) browser.value = "firefox"
+  else if (/Safari\//.test(agent) && !/Chrome\/|Chromium\//.test(agent)) browser.value = "safari"
+})
+interface Step { text: string; keys?: string[]; after?: string }
+const steps = computed<Step[]>(() => {
+  const open = { text: `Open any page of ${host.value}, click Review with Drop in your bookmarks, press Comment, and drag over what you mean. Your note lands here with a screenshot.` }
+  if (browser.value === "firefox") return [
+    { text: "Show the bookmarks toolbar with", keys: ["meta", "shift", "b"], after: ". In Zen's single toolbar, it appears when you point at the top edge of the window." },
+    { text: "Drag the Review with Drop button onto it. Or right-click the button, choose Bookmark Link, and save it." },
+    open,
+  ]
+  if (browser.value === "safari") return [
+    { text: "Show the Favorites bar with", keys: ["meta", "shift", "b"], after: "." },
+    { text: "Drag the Review with Drop button onto it." },
+    open,
+  ]
+  return [
+    { text: "Show the bookmarks bar with", keys: ["meta", "shift", "b"], after: "." },
+    { text: "Drag the Review with Drop button onto it." },
+    open,
+  ]
+})
 const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.oy / 10}%`, width: `${item.ow / 10}%`, height: `${item.oh / 10}%` })
 </script>
 
@@ -40,19 +73,35 @@ const box = (item: SiteReviewItem) => ({ left: `${item.ox / 10}%`, top: `${item.
         <p v-if="drop.siteUrl && isSitePattern(drop.siteUrl)" class="text-sm text-muted">Covers every address where <span class="font-mono">*</span> is one label, like each pull request's preview.</p>
       </section>
 
+      <section v-if="drop.canComment && drop.isOwner" class="space-y-3">
+        <p class="label-mono">Add the Comment button for everyone</p>
+        <p class="text-sm text-muted">Add this tag to the site's preview builds once, never production. Every preview then shows a Comment button, so nobody installs anything, and comments from every preview land here. It carries no key: people still need this review shared with them to comment. On a preview with a strict Content Security Policy, also allow {{ origin }} there.</p>
+        <AgentsCodeBlock :code="snippet" message="Tag copied" />
+      </section>
+
       <section v-if="drop.canComment" class="space-y-3">
-        <p class="label-mono">Review the site</p>
-        <div class="flex flex-wrap items-center gap-3">
-          <!-- A bookmarklet: dragged to the bookmarks bar, never run here. -->
-          <a class="inline-flex h-8 cursor-grab items-center gap-1.5 rounded-md border border-default bg-elevated px-3 text-sm font-medium text-highlighted active:cursor-grabbing" :href="bookmarklet" @click.prevent="notify.done('Drag it to your bookmarks bar', 'Then click it on any page of the site.')">
-            <UIcon name="i-ph-chat-circle" class="size-4 text-muted" />Review with Drop
-          </a>
-          <p class="min-w-0 flex-1 text-sm text-muted">Drag this to your bookmarks bar. On any page of {{ host }}, click it, press Comment, and drag over what you mean. Your note lands here with a screenshot.</p>
+        <p class="label-mono">{{ drop.isOwner ? "Or review without the tag" : "Review the site" }}</p>
+        <div class="rounded-lg border border-default">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-default px-4 py-3">
+            <!-- A bookmarklet: dragged to the bookmarks bar, never run here. -->
+            <a class="inline-flex h-8 cursor-grab items-center gap-1.5 rounded-md border border-default bg-elevated px-3 text-sm font-medium text-highlighted active:cursor-grabbing" :href="bookmarklet" @click.prevent="notify.done('Drag it to your bookmarks bar', 'Then click it on any page of the site.')">
+              <UIcon name="i-ph-chat-circle" class="size-4 text-muted" />Review with Drop
+            </a>
+            <div class="flex gap-1" role="group" aria-label="Your browser">
+              <UButton v-for="option in BROWSERS" :key="option.id" color="neutral" size="xs" :variant="browser === option.id ? 'soft' : 'ghost'" :label="option.label" :aria-pressed="browser === option.id" @click="browser = option.id" />
+            </div>
+          </div>
+          <ol class="space-y-3 px-4 py-4 text-sm">
+            <li v-for="(step, i) in steps" :key="i" class="flex gap-3">
+              <span class="grid size-5 shrink-0 place-items-center rounded-full bg-elevated font-mono text-xs text-highlighted">{{ i + 1 }}</span>
+              <span class="text-default">
+                {{ step.text }}
+                <span v-if="step.keys" class="inline-flex gap-0.5 align-middle"><UKbd v-for="key in step.keys" :key="key" :value="key" /></span>
+                {{ step.after }}
+              </span>
+            </li>
+          </ol>
         </div>
-        <template v-if="drop.isOwner">
-          <p class="text-sm text-muted">Or show the Comment button to everyone on the preview: add this tag to preview builds, never production. It carries no key: people still need this review shared with them to comment. A page with a strict Content Security Policy may block the bookmarklet; there, use the tag and allow {{ origin }} in the preview's policy.</p>
-          <AgentsCodeBlock :code="snippet" message="Tag copied" />
-        </template>
       </section>
 
       <section class="space-y-3">

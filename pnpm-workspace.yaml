@@ -65,7 +65,7 @@ minimumReleaseAgeExclude:
   - nitro-mcp-toolkit@0.4.0
   - miniflare@5.20261006.0-alpha
   - wrangler@4.148.0
-  - comark-annotate@0.0.2
+  - comark-annotate@0.0.4
   - '@better-auth/core@1.7.10'
   - '@better-auth/drizzle-adapter@1.7.10'
   - '@better-auth/kysely-adapter@1.7.10'
