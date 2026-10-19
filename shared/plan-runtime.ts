@@ -207,7 +207,19 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
   document.addEventListener("scroll", () => { if (lastQuote) reportSelection(); }, { passive: true });
 
   document.addEventListener("click", (e) => {
-    const img = e.target && e.target.closest ? e.target.closest("img") : null;
+    const target = e.target && e.target.closest ? e.target : null;
+    // An annotated screenshot's marks are links that cover its image, so a click on one zooms the screenshot too.
+    const frame = target && target.closest(".ca-frame");
+    const img = target && (target.closest("img") || (frame && frame.querySelector(":scope > img")));
+    // A srcdoc document resolves "#id" against Drop's page, so the frame would load Drop and be refused. Scroll here.
+    const link = !img && location.protocol === "about:" && target && target.closest('a[href^="#"]');
+    if (link && !host.contains(link)) {
+      e.preventDefault();
+      const id = decodeURIComponent(link.getAttribute("href").slice(1));
+      const to = id && document.getElementById(id);
+      if (to) to.scrollIntoView({ block: "start" }); else if (!id) scrollTo(0, 0);
+      return;
+    }
     if (!img || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
     e.preventDefault(); e.stopPropagation();
     // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
