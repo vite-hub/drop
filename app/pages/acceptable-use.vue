@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Legal template. The instance owner must review and adapt this source before offering a public service.
-useSeoMeta({ title: "Acceptable use" })
+useSeoMeta({ title: "Acceptable use", description: "What you may not upload or share on Drop: phishing, malware, spam, illegal content, and copyright infringement." })
 </script>
 <template>
   <div class="flex min-h-dvh flex-col"><SiteHeader /><main class="mx-auto w-full flex-1 max-w-2xl space-y-5 px-6 py-12">

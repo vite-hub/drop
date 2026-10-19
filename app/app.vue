@@ -12,6 +12,13 @@ useSeoMeta({
   ogImageAlt: "Drop: the shared drive for people and agents.",
   twitterCard: "summary_large_image",
 })
+
+// The pages search engines index (INDEXED_PATHS) name their one address, without a query or trailing slash, so
+// /?signin=1 and /docs/ count as / and /docs. The rest answer with noindex instead (server/plugins/content-headers.ts).
+const route = useRoute()
+const canonical = computed(() => (isIndexedPath(route.path) ? `${origin}${route.path.length > 1 ? route.path.replace(/\/+$/, "") : "/"}` : undefined))
+useSeoMeta({ ogUrl: canonical })
+useHead({ link: () => (canonical.value ? [{ rel: "canonical", href: canonical.value }] : []) })
 </script>
 
 <template>

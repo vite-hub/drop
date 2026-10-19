@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Legal template. The instance owner must review and adapt this source before offering a public service.
-useSeoMeta({ title: "Terms of service" })
+useSeoMeta({ title: "Terms of service", description: "The terms for using this Drop: you own your content, public links open to anyone, and the operator may remove abuse." })
 </script>
 <template>
   <div class="flex min-h-dvh flex-col"><SiteHeader /><main class="mx-auto w-full flex-1 max-w-2xl space-y-5 px-6 py-12">

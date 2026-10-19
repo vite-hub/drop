@@ -67,3 +67,13 @@ export const DOCS_PAGES = DOCS_NAV.flatMap(group => group.links)
 
 /** Whether `path` is the docs page `to`, with or without a trailing slash. */
 export const isActivePath = (path: string, to: string) => path === to || path === `${to}/`
+
+/**
+ * The pages search engines may index: the landing and every docs and legal page. Every other page, API route and file
+ * answers with `X-Robots-Tag: noindex` (server/plugins/content-headers.ts), and only these get a canonical link and a
+ * place in /sitemap.xml.
+ */
+export const INDEXED_PATHS = ["/", ...new Set(DOCS_PAGES.map(page => page.to))]
+
+/** Whether `path` is one of INDEXED_PATHS, with or without a trailing slash. */
+export const isIndexedPath = (path: string) => INDEXED_PATHS.includes(path.length > 1 ? path.replace(/\/+$/, "") : path)

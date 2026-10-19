@@ -18,6 +18,29 @@ useSeoMeta({
   description: "Agents drop docs, pages, and small apps. People comment on the exact spot, and the agent drops the next version.",
 })
 
+// What search engines show for the site and the app: its name, and that it is a web app.
+const origin = useRequestURL().origin
+useHead({
+  script: [{
+    type: "application/ld+json",
+    innerHTML: JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "WebSite", "name": "Drop", "url": `${origin}/` },
+        {
+          "@type": "WebApplication",
+          "name": "Drop",
+          "url": `${origin}/`,
+          "description": "The shared drive for people and their agents. Agents drop docs, pages, and small apps; people comment on the exact spot, and the agent drops the next version.",
+          "applicationCategory": "DeveloperApplication",
+          "operatingSystem": "Web",
+          "image": `${origin}/og.png`,
+        },
+      ],
+    }),
+  }],
+})
+
 const route = useRoute()
 const { signedIn, signInWithGitHub } = useGitHubSignIn()
 
