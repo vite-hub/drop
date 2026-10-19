@@ -2,15 +2,9 @@
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Review" })
 const { data, refresh, error } = await useApi("/api/admin/review", { key: keys.adminReview })
-const notify = useNotify()
 const now = useRelativeNow()
-const busy = ref(false)
-async function review(id: string, action: "approve" | "reject") {
-  busy.value = true
-  try { await $fetch(`/api/admin/review/${id}`, { method: "POST", body: { action } }); await refresh() }
-  catch (cause) { notify.fail("Could not review member", cause) }
-  finally { busy.value = false }
-}
+const { busy, run } = useAdminAction(id => `/api/admin/review/${id}`, "Could not review member", refresh)
+const review = (id: string, action: "approve" | "reject") => run(id, action)
 </script>
 <template>
   <PageShell id="review" title="Review" description="Approve a member's pending shares and future public shares.">

@@ -7,23 +7,20 @@
  */
 useSeoMeta({ title: "Comment on a site", robots: "noindex, nofollow" })
 
-interface Site { choice: string; title: string; owner: string; address: string }
-interface Issued { token: string; expiresAt: number; origin: string; title: string; name: string }
-
 const route = useRoute("review-connect")
 const { data: me } = await useMe()
 const ready = useMounted()
-const origin = computed(() => (typeof route.query.origin === "string" ? route.query.origin : ""))
+const origin = computed(() => queryText(route.query.origin) ?? "")
 const host = computed(() => (URL.canParse(origin.value) ? new URL(origin.value).host : origin.value))
 
 const state = ref<"loading" | "guest" | "choose" | "signin" | "none" | "done" | "lost" | "error">("loading")
-const sites = ref<Site[]>([])
-const issued = ref<Issued | null>(null)
+const sites = ref<ReviewSite[]>([])
+const issued = ref<ReviewToken | null>(null)
 const name = ref("")
 const pending = ref<string | null>(null)
 const error = ref("")
 
-function handOver(answer: Issued) {
+function handOver(answer: ReviewToken) {
   issued.value = answer
   // Without an opener (it was closed, or a sign-in page cut the link) the token has nowhere to go.
   if (!window.opener) return (state.value = "lost")
@@ -32,11 +29,11 @@ function handOver(answer: Issued) {
   setTimeout(() => window.close(), 800)
 }
 
-async function connect(site: Site) {
+async function connect(site: ReviewSite) {
   pending.value = site.choice
   error.value = ""
   try {
-    handOver(await $fetch<Issued>("/api/review/token", { method: "POST", body: { origin: origin.value, choice: site.choice, ...(me.value ? {} : { name: name.value }) } }))
+    handOver(await issueReviewToken({ origin: origin.value, choice: site.choice, ...(me.value ? {} : { name: name.value }) }))
   }
   catch (cause) {
     error.value = errorText(cause, "Couldn't connect to this review.")
@@ -52,7 +49,7 @@ onMounted(async () => {
     return
   }
   try {
-    sites.value = (await $fetch<{ sites: Site[] }>("/api/review/sites", { method: "POST", body: { origin: origin.value } })).sites
+    sites.value = (await reviewSites(origin.value)).sites
   }
   catch (cause) {
     error.value = errorText(cause, "Couldn't look up this site's review.")

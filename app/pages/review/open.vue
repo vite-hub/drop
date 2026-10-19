@@ -15,7 +15,7 @@ onMounted(async () => {
   if (!token) return (error.value = "Press Comment on the site first, then open the review from there.")
   if (!me.value) return
   try {
-    const { to } = await $fetch<{ to: string }>("/api/review/open", { method: "POST", body: { token } })
+    const { to } = await openReview(token)
     await navigateTo(to, { replace: true })
   }
   catch (cause) {

@@ -4,14 +4,14 @@ import type { InferInput } from "valibot"
 import { ReportSchema } from "#shared/schemas"
 useSeoMeta({ title: "Report a drop", robots: "noindex, nofollow" })
 const route = useRoute("report")
-const state = reactive<InferInput<typeof ReportSchema>>({ target: typeof route.query.target === "string" ? route.query.target : "", reason: "other", details: "", email: "" })
+const state = reactive<InferInput<typeof ReportSchema>>({ target: queryText(route.query.target) ?? "", reason: "other", details: "", email: "" })
 const reasons = ReportSchema.entries.reason.options
 const sent = ref(false)
 const error = ref("")
 async function submit(event: FormSubmitEvent<InferInput<typeof ReportSchema>>) {
   error.value = ""
   try {
-    await $fetch("/api/reports", { method: "POST", body: event.data })
+    await sendReport(event.data)
     sent.value = true
   }
   catch (cause) { error.value = errorText(cause, "Could not send the report. Try again shortly.") }

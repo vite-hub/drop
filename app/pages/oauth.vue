@@ -11,33 +11,33 @@ const { $auth } = useNuxtApp()
 const { loggedIn, user, signIn } = useUserSession($auth)
 const ready = useMounted()
 
-const clientId = computed(() => (typeof route.query.client_id === "string" ? route.query.client_id : ""))
+const clientId = computed(() => queryText(route.query.client_id) ?? "")
 const valid = computed(() => Boolean(clientId.value && route.query.sig))
 
-// The agent's name, as it registered itself ("Claude Code", "Codex"…). Readable once signed in.
-const { data: client, execute: loadClient } = useAsyncData(keys.oauthClient, async () => {
+// The agent's name, as it registered itself ("Claude Code", "Codex"…). Readable once signed in, so it loads on the
+// client when the session does.
+const { data: client } = useAsyncData(keys.oauthClient, async () => {
+  if (!loggedIn.value || !valid.value) return null
   const { data, error } = await $auth.oauth2.publicClient({ query: { client_id: clientId.value } })
   if (error) throw new Error(error.message || "Couldn't load this agent. Start the connection again.")
   return data
 }, {
-  immediate: false,
   server: false,
+  watch: [loggedIn],
+  default: () => null,
 })
 const agentName = computed(() => client.value?.client_name || "An agent")
 
 // Where Allow sends the agent's access. Anyone can register an agent under any name, so the name proves nothing; the
 // redirect is part of this signed link, so it is where the code really goes.
 const destination = computed(() => {
-  const uri = typeof route.query.redirect_uri === "string" ? route.query.redirect_uri : ""
+  const uri = queryText(route.query.redirect_uri) ?? ""
   if (!URL.canParse(uri)) return null
   const url = new URL(uri)
   if (url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return { local: true, label: "an app on this computer" }
   if (!["http:", "https:"].includes(url.protocol)) return { local: true, label: `the app that opens ${url.protocol} links` }
   return { local: false, label: url.host }
 })
-watch([ready, loggedIn], () => {
-  if (ready.value && loggedIn.value && valid.value && !client.value) void loadClient()
-}, { immediate: true })
 
 const pending = ref<"github" | "allow" | "deny" | null>(null)
 const error = ref("")

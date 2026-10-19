@@ -2,14 +2,8 @@
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Reports" })
 const { data, refresh, error } = await useApi("/api/admin/reports", { key: keys.adminReports })
-const notify = useNotify()
-const busy = ref(false)
-async function act(id: string, action: "dismiss" | "quarantine" | "ban") {
-  busy.value = true
-  try { await $fetch(`/api/admin/reports/${id}`, { method: "POST", body: { action } }); await refresh() }
-  catch (cause) { notify.fail("Could not update report", cause) }
-  finally { busy.value = false }
-}
+const { busy, run } = useAdminAction(id => `/api/admin/reports/${id}`, "Could not update report", refresh)
+const act = (id: string, action: "dismiss" | "quarantine" | "ban") => run(id, action)
 </script>
 <template>
   <PageShell id="reports" title="Reports" description="Quarantine stops serving a drop, including its older versions. Ban stops all the owner's drops.">
