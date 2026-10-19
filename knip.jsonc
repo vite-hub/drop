@@ -1,0 +1,40 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // The Nuxt plugin finds app/ and server/{api,middleware,plugins,routes}. These are the other entries: files
+  // nuxt.config names by path, ViteHub's conventions (auth, databases, realtime, schedules), MCP, scripts, and tests.
+  "entry": [
+    "server/auth.ts",
+    "server/database-migrate.ts",
+    "server/handlers/*.ts",
+    "server/code-image-png/*.ts",
+    "server/live-drafts/*.ts",
+    "server/realtime/*.ts",
+    "server/schedules/*.ts",
+    "server/databases/*.ts",
+    "server/mcp/index.ts",
+    "scripts/*.{ts,mjs}",
+    "test/**/*.test.mjs",
+    "test/e2e/*.mjs",
+    "skills/**/*.js"
+  ],
+  "project": ["app/**/*.{ts,vue,css}", "server/**/*.ts", "shared/**/*.ts", "scripts/**/*.{ts,mjs}", "test/**/*.mjs", "skills/**/*.js", "*.ts"],
+  "ignoreDependencies": [
+    // nuxt.config `css` names these packages; knip doesn't resolve a package's stylesheet entry.
+    "@fontsource-variable/geist",
+    "@fontsource-variable/geist-mono",
+    "@fontsource/instrument-serif",
+    // Nuxt Icon reads the icon collections by name at build time.
+    "@iconify-json/ph",
+    "@iconify-json/simple-icons",
+    // Served from node_modules/medium-zoom/dist through nitro.publicAssets, never imported.
+    "medium-zoom",
+    // `nuxt typecheck` runs it.
+    "vue-tsc",
+    // `nuxt` is installed as an alias of nuxt-nightly, which knip reports under its real name (`#app` in app/error.vue).
+    "nuxt-nightly",
+    // Tests load these through nitro's and vite-hub's own resolution (createRequire), to test the copies they use.
+    "unstorage",
+    "@vite-hub/rate-limit",
+    "@vite-hub/auth"
+  ]
+}
