@@ -49,31 +49,59 @@ const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
-// The first card is the point of Drop, so it gets two columns.
+// The first card is the point of Drop, so it gets two columns; the rest fill two more rows of four. Each opens its docs.
 const FEATURES = [
-  { icon: "i-ph-sparkle", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand." },
-  { icon: "i-ph-stack", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link." },
-  { icon: "i-ph-chat-circle", title: "Comments on the exact spot", body: "Select a sentence or zoom into a screenshot and pin it. Copy everything back as Markdown." },
-  { icon: "i-ph-lock", title: "Private until shared", body: "One switch makes a link. Pick what it allows: view, comment, or edit." },
-  { icon: "i-ph-users", title: "Edit together", body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version." },
-  { icon: "i-ph-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys. The Drop skill comes with it." },
-  { icon: "i-ph-clock-counter-clockwise", title: "Older versions one click back", body: "Each new version of a doc gets a number. Drops nobody opens for 30 days expire unless you keep them." },
+  { icon: "i-ph-sparkle", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand.", to: "/docs/review#comments" },
+  { icon: "i-ph-stack", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link.", to: "/docs/review#docs" },
+  { icon: "i-ph-chat-circle", title: "Comments on the exact spot", body: "Select a sentence, zoom into a screenshot, or drag a box. Reply in threads, or copy everything back as Markdown.", to: "/docs/review#comments" },
+  { icon: "i-ph-lock", title: "Private until shared", body: "Share with the team or make a link. Pick what it allows: view, comment, or edit.", to: "/docs/review#sharing" },
+  { icon: "i-ph-users", title: "Edit together", body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version.", to: "/docs/review#edit" },
+  { icon: "i-ph-clock-counter-clockwise", title: "Version history", body: "Each version gets a number and a note. History shows what it changed, and open comments carry over.", to: "/docs/review#versions" },
+  { icon: "i-ph-magnifying-glass", title: "Search everything", body: "Press ⌘K to find a drop by its name or by the words inside a doc, in any folder.", to: "/docs/review#search" },
+  { icon: "i-ph-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys.", to: "/docs/agents#add-the-server" },
+  { icon: "i-ph-book-open-text", title: "Skills for your agent", body: "They come with the server: publishing for review, before-and-after for pull requests, handoffs, and explainers.", to: "/docs/agents#skill" },
+  { icon: "i-ph-folder-simple", title: "Folders agents follow", body: "A folder's description says what goes in it and how to write it. Agents read it before they publish.", to: "/docs/agents#folders" },
+  { icon: "i-ph-code", title: "Code images", body: "Your agent turns a snippet into a highlighted, framed image for a pull request or a post.", to: "/docs/agents#code-images" },
 ]
 
+// One tab each, and only the open one's story plays. Every tab's words are in the server's HTML, the closed ones hidden.
 const USE_CASES = [
   {
-    story: "pr",
+    id: "docs",
+    icon: "i-ph-file-text",
+    label: "Plans and docs",
+    title: ["Write the plan ", "together", "."],
+    body: "Your agent drops the plan in the folder that fits. The team edits it live, publishes the next version, and History shows what changed.",
+    docs: "/docs/review#edit",
+  },
+  {
+    id: "pr",
+    icon: "i-ph-git-pull-request",
     label: "Pull requests",
     title: ["Put the before and after in every ", "pull request", "."],
     body: "Claude Code drops the screenshots with its notes and links them from the PR. Reviewers see what changed, then read the diff.",
+    docs: "/docs/review#expiry",
   },
   {
-    story: "app",
+    id: "app",
+    icon: "i-ph-app-window",
     label: "Vibe-coded apps",
     title: ["Ship the thing you ", "just made", "."],
     body: "Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.",
+    docs: "/docs/review#apps",
+  },
+  {
+    id: "site",
+    icon: "i-ph-browser",
+    label: "Live sites",
+    title: ["Comment on the ", "running site", "."],
+    body: "Point a review at your preview deploys. People press Comment on the page itself and drag a box. The note lands in Drop with a screenshot, and your agent fixes it.",
+    docs: "/docs/sites",
   },
 ] as const
+type UseCase = (typeof USE_CASES)[number]["id"]
+const useCase = ref<UseCase>("docs")
+const useCaseTabs = USE_CASES.map(({ id, icon, label }) => ({ value: id, icon, label }))
 
 const SELF_HOSTED = [
   "Team mode: shared inside the team, closed to the internet",
@@ -130,30 +158,48 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
         </div>
       </section>
 
-      <section v-for="useCase in USE_CASES" :key="useCase.label" class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
-        <div class="mb-10 grid items-end gap-x-12 gap-y-3 lg:mb-12 lg:grid-cols-2">
+      <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
+        <UTabs
+          v-model="useCase"
+          :content="false"
+          color="neutral"
+          :items="useCaseTabs"
+          class="mb-10 lg:mb-12"
+          :ui="{ root: 'w-max max-w-full', list: 'overflow-x-auto', trigger: 'flex-none text-sm', label: 'overflow-visible', leadingIcon: 'hidden size-4 sm:inline-flex' }"
+        />
+        <div v-for="item in USE_CASES" v-show="item.id === useCase" :key="item.id" class="mb-10 grid items-end gap-x-12 gap-y-3 lg:mb-12 lg:grid-cols-2">
           <div>
-            <p class="label-mono mb-3">{{ useCase.label }}</p>
-            <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">{{ useCase.title[0] }}<em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">{{ useCase.title[1] }}</em>{{ useCase.title[2] }}</h2>
+            <p class="label-mono mb-3">{{ item.label }}</p>
+            <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">{{ item.title[0] }}<em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">{{ item.title[1] }}</em>{{ item.title[2] }}</h2>
           </div>
-          <p class="max-w-[52ch] leading-relaxed text-pretty text-muted">{{ useCase.body }}</p>
+          <p class="max-w-[52ch] leading-relaxed text-pretty text-muted">
+            {{ item.body }}
+            <NuxtLink :to="item.docs" class="ml-1 whitespace-nowrap text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)">How it works</NuxtLink>
+          </p>
         </div>
         <div class="rounded-xl border border-default bg-muted p-3 sm:p-8 lg:p-10">
-          <LazyLandingPrStory v-if="useCase.story === 'pr'" hydrate-on-visible />
-          <LazyLandingAppStory v-else hydrate-on-visible />
+          <LazyLandingDocStory v-if="useCase === 'docs'" hydrate-on-visible />
+          <LazyLandingPrStory v-else-if="useCase === 'pr'" hydrate-on-visible />
+          <LazyLandingAppStory v-else-if="useCase === 'app'" hydrate-on-visible />
+          <LazyLandingSiteStory v-else hydrate-on-visible />
         </div>
       </section>
 
       <section class="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
         <div class="mb-10 lg:mb-12">
-          <p class="label-mono mb-3">A live page for every file</p>
-          <h2 class="text-3xl font-semibold tracking-tight text-highlighted">What every <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">drop</em> gets.</h2>
+          <p class="label-mono mb-3">Features</p>
+          <h2 class="text-3xl font-semibold tracking-tight text-highlighted">What you and your <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">agent</em> get.</h2>
         </div>
         <div class="grid gap-px overflow-hidden rounded-xl border border-default bg-(--ui-border) sm:grid-cols-2 lg:grid-cols-4">
-          <LazyLandingSpotlightCard v-for="(feature, position) in FEATURES" :key="feature.title" class="p-6" :class="position === 0 && 'sm:col-span-2'" hydrate-on-interaction="pointerenter">
-            <UIcon :name="feature.icon" class="size-4 text-muted" />
-            <p class="mt-3 font-medium text-highlighted">{{ feature.title }}</p>
-            <p class="mt-1.5 text-sm leading-relaxed text-muted">{{ feature.body }}</p>
+          <LazyLandingSpotlightCard v-for="(feature, position) in FEATURES" :key="feature.title" class="group" :class="position === 0 && 'sm:col-span-2'" hydrate-on-interaction="pointerenter">
+            <NuxtLink :to="feature.to" class="block h-full p-6 outline-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) focus-visible:ring-inset">
+              <span class="flex items-center justify-between">
+                <UIcon :name="feature.icon" class="size-4 text-muted" />
+                <UIcon name="i-ph-arrow-up-right" class="size-3.5 text-dimmed opacity-0 transition-opacity group-hover:opacity-100" />
+              </span>
+              <span class="mt-3 block font-medium text-highlighted">{{ feature.title }}</span>
+              <span class="mt-1.5 block text-sm leading-relaxed text-muted">{{ feature.body }}</span>
+            </NuxtLink>
           </LazyLandingSpotlightCard>
         </div>
       </section>
