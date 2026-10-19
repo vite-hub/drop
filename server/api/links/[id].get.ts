@@ -1,5 +1,6 @@
-import { defineHandler, HTTPError } from "h3"
+import { defineValidatedHandler, HTTPError } from "h3"
 import { type DropLink, slugify } from "#shared/links"
+import { LinkQuerySchema } from "#shared/schemas"
 import { expiredLink, findDrop, permissions, versionChain, waitingForReview } from "../../utils/drops"
 import { identify } from "../../utils/identity"
 import { routeId } from "../../utils/params"
@@ -9,7 +10,9 @@ import { routeId } from "../../utils/params"
  * had one (`/d/<version id>`) opens the latest version too, and says which one it pointed at (`from`). The page then
  * loads that version from /api/drops/:id, which checks access again and says why a drop can't be opened.
  */
-export default defineHandler(async (event): Promise<DropLink> => {
+export default defineValidatedHandler({
+  validate: { query: LinkQuerySchema },
+  async handler(event): Promise<DropLink> {
   const key = await routeId(event)
   const pinned = Number(event.url.searchParams.get("v")) || undefined
   const who = await identify(event)
@@ -24,4 +27,5 @@ export default defineHandler(async (event): Promise<DropLink> => {
   const from = key === found.id && found.id !== head.id && !pinned ? { from: found.version } : {}
   event.res.headers.set("Cache-Control", "private, no-store")
   return { id: target.id, link: head.link ?? head.id, slug: head.slug ?? slugify(head.title), version: target.version, latest: head.version, ...from }
+  },
 })

@@ -26,5 +26,6 @@ export const cachedMarkdown = (key: string, source: () => Promise<string>, rende
 
 export async function deleteMarkdownCache(key: string) {
   if (key.startsWith("apps/") || key.startsWith("code-images/")) return
+  // Nitro's cached-function key is part of its storage contract; keep this in sync with the `name` above.
   await useStorage("cache").removeItem(`nitro:functions:markdown:${key}.json`)
 }

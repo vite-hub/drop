@@ -12,7 +12,7 @@ export default defineValidatedHandler({
   validate: { body: ReviewOpenSchema },
   async handler(event) {
     const who = await identify(event)
-    const { token } = await event.req.json() as { token: string }
+    const { token } = await event.req.json()
     const claims = await readReviewToken(event, token)
     const site = claims ? await findDrop(claims.d, event) : null
     if (!who) throw new HTTPError({ status: 401, statusText: "Sign in to open the review." })

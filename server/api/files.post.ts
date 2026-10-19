@@ -3,13 +3,12 @@ import { defineHandler, HTTPError, requireContentType } from "h3"
 import { createDocDrop, dropPageUrl, MAX_FILE_BYTES } from "../utils/drops"
 import { requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
-import { quotaApiHandler } from "../utils/quotas"
 
 /**
  * Agents upload one file. It becomes a private drop, or with `folder` (an id or link) one in that folder, shared and kept
  * with it; `url` serves the file, `page` opens it for review.
  */
-export default quotaApiHandler(defineHandler(async (event) => {
+export default defineHandler(async (event) => {
   const who = await requireIdentity(event).catch(async (error) => {
     // Release the unread upload before answering, or the connection can drop mid-stream instead of a clean 401.
     await event.req.body?.cancel().catch(() => {})
@@ -54,4 +53,4 @@ export default quotaApiHandler(defineHandler(async (event) => {
     share: drop.share,
     version: drop.version,
   }
-}))
+})

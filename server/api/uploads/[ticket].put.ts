@@ -2,7 +2,6 @@ import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError } from "h3"
 import { MAX_FILE_BYTES } from "../../utils/drops"
 import { publishInput } from "../../utils/publish"
-import { quotaApiHandler } from "../../utils/quotas"
 import { claimUpload, readUpload, releaseUpload } from "../../utils/uploads"
 
 /**
@@ -10,7 +9,7 @@ import { claimUpload, readUpload, releaseUpload } from "../../utils/uploads"
  * for the agent's sign-in, so this needs no token. It finishes that publish call with the body's bytes and answers
  * with the drop, like `publish` would have.
  */
-export default quotaApiHandler(defineHandler(async (event) => {
+export default defineHandler(async (event) => {
   const upload = await readUpload(event, event.context.params!.ticket!)
   if (!upload) {
     await event.req.body?.cancel().catch(() => {})
@@ -33,4 +32,4 @@ export default quotaApiHandler(defineHandler(async (event) => {
     await releaseUpload(upload.id)
     throw error
   }
-}))
+})

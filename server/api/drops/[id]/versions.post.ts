@@ -6,7 +6,6 @@ import { createDocDrop, findDrop, permissions, readText, toSummary, versionsOf }
 import { identify } from "../../../utils/identity"
 import { deleteDrafts, readDraft } from "#live-drafts"
 import { routeId } from "../../../utils/params"
-import { quotaApiHandler } from "../../../utils/quotas"
 
 /**
  * Publishes a Markdown drop's live draft as its next version. The text comes from the draft the room last
@@ -14,7 +13,7 @@ import { quotaApiHandler } from "../../../utils/quotas"
  * meanwhile, this is a 409 naming it, unless `force` puts the draft on top of it. People only: agents publish with
  * publish.
  */
-export default quotaApiHandler(defineValidatedHandler({
+export default defineValidatedHandler({
   validate: { body: v.object({ force: v.optional(v.boolean()) }) },
   async handler(event) {
     const drop = await findDrop(await routeId(event), event)
@@ -22,7 +21,7 @@ export default quotaApiHandler(defineValidatedHandler({
     if (!drop || !who || who.actorKind !== "browser" || drop.kind !== "markdown" || !drop.blobKey || !permissions(drop, who).edit)
       throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
     await requireRateLimit(event, "drop-version", { key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
-    const { force } = await event.req.json() as { force?: boolean }
+    const { force } = await event.req.json()
     const head = (await versionsOf(drop))[0]!
     if (head.id !== drop.id && !force)
       throw new HTTPError({ status: 409, statusText: `v${head.version} was published while you were editing.`, data: { head: { id: head.id, version: head.version } } })
@@ -35,4 +34,4 @@ export default quotaApiHandler(defineValidatedHandler({
     await deleteDrafts([drop.id])
     return toSummary(next)
   },
-}))
+})

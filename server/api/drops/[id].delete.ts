@@ -1,4 +1,5 @@
-import { defineHandler, HTTPError } from "h3"
+import { defineValidatedHandler, HTTPError } from "h3"
+import * as v from "valibot"
 import { deleteDrop, findDrop, permissions } from "../../utils/drops"
 import { updateDrop } from "../../utils/drop-update"
 import { requireIdentity } from "../../utils/identity"
@@ -9,7 +10,9 @@ import { routeId } from "../../utils/params"
  * Moves a drop to the Trash, and a folder with everything in it; anyone on the team may for a drop in a team folder.
  * `?forever` deletes it now: its owner or an admin, people only, never their agents.
  */
-export default defineHandler(async (event) => {
+export default defineValidatedHandler({
+  validate: { query: v.object({ forever: v.optional(v.string()) }) },
+  async handler(event) {
   const who = await requireIdentity(event)
   const drop = await findDrop(await routeId(event), event)
   const forever = event.url.searchParams.has("forever")
@@ -19,4 +22,5 @@ export default defineHandler(async (event) => {
   if (who.actorKind !== "browser") throw new HTTPError({ status: 403, statusText: "Only people can delete a drop for good. Move it to the Trash instead." })
   await deleteDrop(drop)
   return { ok: true }
+  },
 })
