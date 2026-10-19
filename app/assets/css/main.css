@@ -135,3 +135,15 @@
   font: 500 11px/1.4 var(--font-mono);
   padding: 1px 5px;
 }
+
+/* The sidebar's panes (layouts/dashboard.vue): forward slides the main pane out left and Docs in from the right, back
+   the reverse. Both move at once; the leaving one lies over the other. 220ms, as SLIDE_MS there. */
+.sidebar-forward-enter-active, .sidebar-forward-leave-active, .sidebar-back-enter-active, .sidebar-back-leave-active {
+  transition: transform 220ms var(--ease-drawer), opacity 220ms var(--ease-drawer);
+}
+.sidebar-forward-leave-active, .sidebar-back-leave-active { position: absolute; inset: 0; }
+.sidebar-forward-enter-from, .sidebar-back-leave-to { transform: translateX(100%); opacity: 0; }
+.sidebar-forward-leave-to, .sidebar-back-enter-from { transform: translateX(-100%); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-forward-enter-active, .sidebar-forward-leave-active, .sidebar-back-enter-active, .sidebar-back-leave-active { transition: none; }
+}
