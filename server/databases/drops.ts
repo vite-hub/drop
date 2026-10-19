@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { ACTOR_KINDS, DROP_KINDS } from "#shared/types"
+import { ACTOR_KINDS, DROP_KINDS } from "../../shared/types"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
