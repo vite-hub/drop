@@ -8,6 +8,8 @@
   },
   "scripts": {
     "build": "nuxt build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "mkdir -p .vitehub/data/database && drizzle-kit migrate --config .vitehub/database/drizzle.config.ts",
     "db:migrate:d1": "node --env-file-if-exists=.env scripts/migrate-d1.mjs",
@@ -16,6 +18,8 @@
     "dev": "nuxt dev",
     "postinstall": "vitehub types prepare && nuxt prepare",
     "preview": "cp -r server/databases/migrations .output/server/ && wrangler d1 migrations apply DB --local --config .output/server/wrangler.json && wrangler dev --config .output/server/wrangler.json --enable-containers=false --port 8788",
+    "doctor": "nuxt doctor --no-cache --max-warnings 0",
+    "test": "node --test $(find test -name '*.test.mjs' -not -path 'test/e2e/*')",
     "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
     "typecheck": "nuxt typecheck"
   },
@@ -67,10 +71,13 @@
     "yjs": "13.6.33"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "9.5.1",
+    "@nuxt/eslint": "1.17.0",
     "@types/node": "^25.9.2",
     "drizzle-kit": "^0.31.10",
     "nitro": "3.0.260610-beta",
     "typescript": "^6.0.3",
+    "vite-doctor": "0.0.12",
     "vue-tsc": "^3.3.9",
     "wrangler": "4.148.0"
   },

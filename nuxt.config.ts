@@ -75,7 +75,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
 }
 
 export default defineNuxtConfig({
-  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt"],
+  modules: ["@nuxt/eslint", "@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt"],
 
   vitehub: { ...VITEHUB[host], auth: true },
 
@@ -95,6 +95,22 @@ export default defineNuxtConfig({
   css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "@fontsource/instrument-serif/latin-400-italic.css", "~/assets/css/main.css"],
   devtools: false,
   compatibilityDate: "2026-07-17",
+
+  typescript: {
+    strict: true,
+    typeCheck: false,
+    tsConfig: {
+      compilerOptions: {
+        noUncheckedIndexedAccess: true,
+        noImplicitOverride: true,
+        noFallthroughCasesInSwitch: true,
+      },
+    },
+  },
+
+  doctor: {
+    extends: ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict"],
+  },
 
   app: {
     head: {
@@ -235,5 +251,5 @@ export default defineNuxtConfig({
         },
       },
     },
-  } as never,
+  },
 })
