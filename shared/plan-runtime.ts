@@ -71,13 +71,17 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.m img{display:block;width:100%;height:100%;object-fit:cover}' +
     '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-11px 0 0 -11px;border-radius:11px}' +
     '.m.pulse{animation:p 900ms ease-out 2}@keyframes p{50%{transform:scale(1.4)}}' +
-    '.cp{position:absolute;display:flex;gap:6px;align-items:center;height:22px;padding:0 7px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--muted-foreground);font:500 11px var(--font-mono);cursor:pointer}' +
-    '.cp:hover{color:var(--foreground)}.cp b{font-weight:500;text-transform:uppercase;letter-spacing:.06em;opacity:.7}' +
+    '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
+    '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
+    '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
     '.a{position:absolute;box-sizing:border-box;border:1.5px solid var(--foreground);border-radius:3px;background:color-mix(in oklab,var(--foreground) 6%,transparent);pointer-events:none;transition:background 120ms}' +
     '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}' +
     '</style><div class="marks"></div><div class="draft"></div>';
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
+  // Phosphor's copy and check, as in Drop's own buttons.
+  const COPY_ICON = '<svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M216 32H88a8 8 0 0 0-8 8v40H40a8 8 0 0 0-8 8v128a8 8 0 0 0 8 8h128a8 8 0 0 0 8-8v-40h40a8 8 0 0 0 8-8V40a8 8 0 0 0-8-8m-56 176H48V96h112Zm48-48h-32V88a8 8 0 0 0-8-8H96V48h112Z"/></svg>';
+  const CHECK_ICON = '<svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="m229.66 77.66l-128 128a8 8 0 0 1-11.32 0l-56-56a8 8 0 0 1 11.32-11.32L96 188.69L218.34 66.34a8 8 0 0 1 11.32 11.32"/></svg>';
   const pageStyle = document.createElement("style");
   pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}img{cursor:zoom-in}";
   let markers = [], active = null;
@@ -164,22 +168,29 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
       dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
       marks.appendChild(dot);
     }
-    // T3-style code blocks: language + copy. The sandbox has no clipboard access, so Drop copies.
+    // A copy button on each code block, shown while the pointer is over it: the block scrolls sideways under it, so an
+    // always-on label would sit on top of the code. The sandbox has no clipboard access, so Drop copies.
     document.querySelectorAll("pre:not(.mermaid)").forEach((pre) => {
       const r = pre.getBoundingClientRect();
       if (r.height < 24) return;
       const chip = document.createElement("button");
       chip.className = "cp";
-      chip.innerHTML = (pre.dataset.lang && pre.dataset.lang !== "text" ? "<b></b>" : "") + "<span>Copy</span>";
-      if (chip.querySelector("b")) chip.querySelector("b").textContent = pre.dataset.lang;
+      chip.setAttribute("aria-label", "Copy code");
+      chip.title = "Copy code";
+      chip.innerHTML = COPY_ICON;
       marks.appendChild(chip);
-      chip.style.left = r.right + scrollX - chip.offsetWidth - 8 + "px";
-      chip.style.top = r.top + scrollY + 8 + "px";
+      chip.style.left = r.right + scrollX - chip.offsetWidth - 6 + "px";
+      chip.style.top = r.top + scrollY + 6 + "px";
+      // Assigned, not added: this runs again on every resize and must not stack listeners.
+      pre.onmouseenter = () => chip.classList.add("on");
+      pre.onmouseleave = () => chip.classList.remove("on");
+      if (pre.matches(":hover")) chip.classList.add("on");
       chip.onclick = (e) => {
         e.stopPropagation();
         post({ type: "copy", text: pre.innerText });
-        chip.querySelector("span").textContent = "Copied";
-        setTimeout(() => { chip.querySelector("span").textContent = "Copy"; }, 1400);
+        chip.innerHTML = CHECK_ICON;
+        chip.setAttribute("aria-label", "Copied");
+        setTimeout(() => { chip.innerHTML = COPY_ICON; chip.setAttribute("aria-label", "Copy code"); }, 1400);
       };
     });
     // The viewer lists the comments it couldn't place; it only says so when that changes, since this runs on resize.

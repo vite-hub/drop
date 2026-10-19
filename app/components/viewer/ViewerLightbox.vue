@@ -98,7 +98,9 @@ const shownDraft = computed(() => drag.value?.area ?? props.draft)
       <span v-if="canComment" class="label-mono ml-auto">Click a spot or drag an area to comment</span>
     </div>
     <div class="relative grid min-h-0 flex-1 place-items-center overflow-auto p-6">
-      <div ref="backdrop" class="absolute inset-0 bg-muted" />
+      <!-- A click around the image closes it. A drag that starts on the image and ends here clicks the parent, not this.
+           A comment being drafted keeps it open. -->
+      <div ref="backdrop" class="absolute inset-0 bg-muted" @click="draft || close()" />
       <!-- Sized from the aspect ratio: SVGs with only a viewBox have no intrinsic size. -->
       <div
         ref="box"
