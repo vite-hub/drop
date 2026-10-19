@@ -69,8 +69,9 @@ const blocks: EditorSuggestionMenuItem[][] = [[
 <template>
   <div class="drop-doc min-h-0 flex-1 overflow-y-auto">
     <main class="mx-auto max-w-[46rem] px-6 pt-14 pb-24">
+      <!-- The header says how the connection is going; here the doc's shape stands in until its text arrives. -->
       <div v-if="!editor || !synced" aria-live="polite" class="space-y-4">
-        <p class="label-mono">Connecting</p>
+        <p class="sr-only">Loading the doc</p>
         <USkeleton class="h-8 w-2/3" />
         <USkeleton class="h-4 w-full" />
         <USkeleton class="h-4 w-11/12" />
