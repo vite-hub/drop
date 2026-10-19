@@ -96,15 +96,19 @@ onMounted(async () => {
 
 const attached = useAttachmentData(drop)
 
-const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value)
+// A plain variable, not a ref: the documents read it when they're built, and opening the panel later must not
+// rebuild (and reload) them. The "inset" message moves the text from there (set below, with `floating`).
+let startInset = 0
+const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset)
 // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
-// the frame white until the dark one replaces it.
+// the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
+// panel showing doesn't slide left once it loads.
 const srcdoc = computed(() => {
   if (!mounted.value || drop.value.kind === "folder") return ""
   if (isApp.value) return appDocument(page.value)
-  if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value) : ""
+  if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
   if (!attached.ready.value) return ""
-  return planDocument(drop.value.kind as PlanKind, attached.inline(drop.value.content ?? ""), dark.value, attached.inline(drop.value.html ?? ""))
+  return planDocument(drop.value.kind as PlanKind, attached.inline(drop.value.content ?? ""), dark.value, attached.inline(drop.value.html ?? ""), startInset)
 })
 
 // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
@@ -279,6 +283,7 @@ const floating = computed(() => sideOpen.value && wide.value && !editing.value &
 /** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
 const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
 watch([ready, floating], () => ready.value && send({ type: "inset", right: floating.value ? FLOATING_INSET : 0 }))
+watch(floating, value => (startInset = value ? FLOATING_INSET : 0), { immediate: true, flush: "sync" })
 
 function commentOnSelection() {
   if (!selection.value) return
@@ -414,7 +419,11 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UTooltip v-if="has('history')" text="History">
             <UButton aria-label="History" :aria-pressed="showing('history')" color="neutral" icon="i-ph-clock-counter-clockwise" size="sm" :variant="showing('history') ? 'soft' : 'ghost'" @click="toggleTab('history')" />
           </UTooltip>
-          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.some(item => item.value !== 'details')" class="mx-1 h-4" orientation="vertical" />
+          <UTooltip v-if="has('details')" text="Details">
+            <UButton aria-label="Details" :aria-pressed="showing('details')" color="neutral" icon="i-ph-info" size="sm" :variant="showing('details') ? 'soft' : 'ghost'" @click="toggleTab('details')" />
+          </UTooltip>
+          <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
+          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length" class="ml-1 h-4" orientation="vertical" />
           <UTooltip v-if="!owner" text="Copy link">
             <UButton aria-label="Copy link" color="neutral" icon="i-ph-link" size="sm" variant="ghost" @click="copy(link, 'Link copied')" />
           </UTooltip>
@@ -424,9 +433,6 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           </UTooltip>
           <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'private' ? 'Share' : VISIBILITY_LABELS[drop.visibility]" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
-          <UTooltip v-if="has('details')" text="Details">
-            <UButton aria-label="Details" :aria-pressed="showing('details')" color="neutral" icon="i-ph-info" size="sm" :variant="showing('details') ? 'soft' : 'ghost'" @click="toggleTab('details')" />
-          </UTooltip>
         </template>
       </UDashboardNavbar>
     </template>
