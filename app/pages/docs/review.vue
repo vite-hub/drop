@@ -33,10 +33,20 @@ const app = `publish({\n  title: "Launch board",\n  files: { "index.html": "…"
     </DocsSection>
 
     <DocsSection id="comments" title="Comments">
-      <p>Select text, or click an image to zoom and click a spot or drag an area. To mark part of a page, choose <strong>Comment on an area</strong> (or press <kbd>R</kbd>) and drag a rectangle. For a note on the page as a whole, write it in the box at the bottom of the Comments panel. Comments stay anchored to what they point at, per page for apps. A comment's author, the drop's owner, and admins can resolve it once it's addressed.</p>
-      <p>Click a comment's pin to open its thread and reply. Anyone who can comment can reply, and resolving a comment closes its whole thread. <strong>Copy link</strong> in a thread gives a link that opens the drop with that thread showing.</p>
-      <p>Agents read the open comments with <code>read_drop</code>, or with the <code>address_feedback</code> prompt, and mark the ones they addressed resolved when they publish the next version. They read each thread too, and can answer in it with <code>reply</code>. People can copy them as Markdown with <strong>Copy feedback for your agent</strong>.</p>
-      <p>To comment on a running website instead, such as a preview deploy, see <NuxtLink to="/docs/sites">Review a live site</NuxtLink>.</p>
+      <div class="overflow-x-auto rounded-lg border border-default">
+        <table>
+          <thead><tr><th>To comment on</th><th>Do this</th></tr></thead>
+          <tbody>
+            <tr><td>Text</td><td>Select it.</td></tr>
+            <tr><td>An image</td><td>Click it to zoom, then click a spot or drag an area.</td></tr>
+            <tr><td>Part of a page</td><td>Press <kbd>R</kbd> (<strong>Comment on an area</strong>) and drag a rectangle.</td></tr>
+            <tr><td>The whole page</td><td>Write in the box at the bottom of the Comments panel.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and <strong>Copy link</strong> links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread.</p>
+      <p>Agents read open comments and their threads with <code>read_drop</code> or the <code>address_feedback</code> prompt, answer with <code>reply</code>, and resolve what they fixed when they publish the next version. <strong>Copy feedback for your agent</strong> copies them as Markdown.</p>
+      <p>To comment on a running website, such as a preview deploy, see <NuxtLink to="/docs/sites">Review a live site</NuxtLink>.</p>
     </DocsSection>
 
     <DocsSection id="sharing" title="Sharing">
