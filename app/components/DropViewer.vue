@@ -304,7 +304,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
             <UButton aria-label="Details" :aria-pressed="showing('details')" color="neutral" icon="i-ph-info" size="sm" :variant="showing('details') ? 'soft' : 'ghost'" @click="toggleTab('details')" />
           </UTooltip>
           <UTooltip v-if="copiesMarkdown" text="Copy as Markdown">
-            <UButton aria-label="Copy as Markdown" color="neutral" icon="i-ph-markdown-logo" size="sm" variant="ghost" @click="copyMarkdown" />
+            <UButton aria-label="Copy as Markdown" color="neutral" icon="i-ph-copy" size="sm" variant="ghost" @click="copyMarkdown" />
           </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
           <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length || copiesMarkdown" class="ml-1 h-4" orientation="vertical" />
