@@ -13,7 +13,7 @@ Call `list_folders` first. If a folder's description says it's for pull request 
 
 ## Capture
 
-1. Find the two states: **before** from the base branch or an open preview of it, **after** from this pull request's preview. Note both URLs.
+1. Find the two states: **after** from this pull request's preview, **before** from any running deploy that still has the old behavior, such as another open pull request's preview that doesn't touch this change. Note both URLs.
 2. Capture both at the same viewport, zoom, scroll position, and page state (same data, same open menus, popups closed). The change has to be visible in what you capture. If the data or the state can't show it, set that up first; if you can't, or the two can't be made comparable, stop and report the gap instead of publishing.
 3. For every element you want to mark, measure it in the page you captured. Never estimate from the image:
 
@@ -38,7 +38,7 @@ Above the screenshots, write one line with the steps to reach the screen. Each p
 
 ## Publish
 
-1. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), and a `note`. Open the returned page.
+1. Write the doc from these rules each time, even for a next version; don't carry over an earlier version's text. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), and a `note`. Open the returned page.
 2. Take a screenshot of it and check that every mark sits on its target and every number matches its note. Fix and publish again with `previous` until it does. If a mark can't be verified, say so in the report.
 3. Give the user the link and a snippet for the pull request body, placed where the repository's pull request rules say:
 
