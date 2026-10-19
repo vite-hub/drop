@@ -9,7 +9,7 @@ type Lightbox = { src: string; alt: string; selector: string; label: string; fro
 type Popover = { x: number; y: number } & ({ type: "new"; pending: PendingComment } | { type: "thread"; id: string })
 
 /** What the frame reports about the reader's pointer and keys, in frame coordinates. */
-export type PointerMessage = Extract<FrameMessage, { type: "selection" | "image" | "area" | "marker" | "key" }>
+type PointerMessage = Extract<FrameMessage, { type: "selection" | "image" | "area" | "marker" | "key" }>
 
 /**
  * What the reader points at in the viewer: a text selection with its Comment button, an image zoomed in the lightbox,
