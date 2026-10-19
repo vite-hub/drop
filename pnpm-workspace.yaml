@@ -40,7 +40,8 @@ patchedDependencies:
   # Preserves the full server identity in both protocol eras.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
   # Types `handleCacheHeaders` on cachedEventHandler options, and guards `nuxt dev`, where the nightly CLI gives Vite
-  # no httpServer for WebSocket upgrades.
+  # no httpServer for WebSocket upgrades. In dev it also resolves bare imports from virtual modules (Nuxt's paths.mjs
+  # imports ufo) through the plugins: Vite looked for them in the project root, where pnpm hoists nothing, and 500ed.
   nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch
   # Keeps Nuxt's dev-only module URL out of the Workers bundle.
   nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch

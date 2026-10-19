@@ -1,8 +1,30 @@
 diff --git a/dist/_build/vite.dev.mjs b/dist/_build/vite.dev.mjs
-index 472be3bfa5a0c8e675fc20f086df62ea833c9543..721001bfe1124efcce6b85c32eb1069cc548946d 100644
+index 472be3bfa5a0c8e675fc20f086df62ea833c9543..293ef83652775be21bca44205ad49c0176613600 100644
 --- a/dist/_build/vite.dev.mjs
 +++ b/dist/_build/vite.dev.mjs
-@@ -54,7 +54,7 @@ async function configureViteDevServer(ctx, server) {
+@@ -4,6 +4,7 @@ import { watch as watch$1 } from "../_libs/readdirp+chokidar.mjs";
+ import { debounce } from "../_libs/perfect-debounce.mjs";
+ import { getEnvRunner } from "./vite.env.mjs";
+ import { watch } from "node:fs";
++import { isAbsolute } from "node:path";
+ import { withBase } from "ufo";
+ import { NodeRequest, sendNodeResponse } from "srvx/node";
+ import "node:http";
+@@ -31,6 +32,13 @@ var FetchableDevEnvironment = class extends DevEnvironment {
+ 			const resolved = await this.pluginContainer.resolveId(id, importer);
+ 			if (resolved && !resolved.external) return super.fetchModule(resolved.id, importer, options);
+ 		}
++		// A virtual importer (Nuxt's templates, like paths.mjs) has no directory, so Vite resolves its bare imports from the
++		// project root, where pnpm hoists nothing. Let the plugins find the package, then externalize it from there.
++		if (!id.startsWith("file://") && importer && !isAbsolute(importer) && !importer.startsWith("file://") && id[0] !== "." && id[0] !== "/") {
++			const resolved = await this.pluginContainer.resolveId(id, importer);
++			const from = resolved?.id.split("?")[0];
++			if (from && isAbsolute(from)) return super.fetchModule(id, from, options);
++		}
+ 		return super.fetchModule(id, importer, options);
+ 	}
+ 	async dispatchFetch(request) {
+@@ -54,7 +62,7 @@ async function configureViteDevServer(ctx, server) {
  	const nitroEnv = server.environments.nitro;
  	const nitroConfigFile = nitro.options._c12.configFile;
  	if (nitroConfigFile) server.config.configFileDependencies.push(nitroConfigFile);
