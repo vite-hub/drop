@@ -161,18 +161,22 @@ export const ReportSchema = v.object({
 export const ReviewSchema = v.object({ action: v.picklist(["approve", "reject"]) })
 export const ReportActionSchema = v.object({ action: v.picklist(["dismiss", "quarantine", "ban"]) })
 
-/** Query strings stay strings here. Routes convert them after h3 has validated the shape and bounds. */
+/**
+ * Query strings stay strings here. Routes convert and cut them after h3 has validated the shape: a search box or a
+ * reviewed page's URL can run long, and those requests should still answer, with the first part.
+ */
 export const DropsQuerySchema = v.object({
-  q: v.optional(v.pipe(v.string(), v.maxLength(200))),
+  q: v.optional(v.string()),
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
   trash: v.optional(v.string()),
   shared: v.optional(v.string()),
   folders: v.optional(v.string()),
 })
 
-export const SearchQuerySchema = v.object({ q: v.pipe(v.string(), v.maxLength(200)) })
-export const LinkQuerySchema = v.object({ v: v.optional(v.pipe(v.string(), v.regex(/^\d+$/))) })
-export const ReviewCommentsQuerySchema = v.object({ page: v.optional(v.pipe(v.string(), v.maxLength(MAX_REVIEW_PAGE))) })
+export const SearchQuerySchema = v.object({ q: v.optional(v.string()) })
+// The page forwards whatever `?v=` it was given; the route ignores what isn't a version number.
+export const LinkQuerySchema = v.object({ v: v.optional(v.string()) })
+export const ReviewCommentsQuerySchema = v.object({ page: v.optional(v.string()) })
 
 export const RuntimeErrorSchema = v.object({
   kind: v.picklist(["error", "rejection", "console", "load"]),

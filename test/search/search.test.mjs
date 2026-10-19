@@ -5,7 +5,7 @@ import { createMcpHandler } from "nitro-mcp-toolkit"
 import { sql, state, migrate, reset, insertDrop, who, objects } from "../cost/harness.mjs"
 const { findDrop, listDrops, recordSharedVisit, searchEverything } = await import("../../server/utils/drops.ts")
 const { updateDrop } = await import("../../server/utils/drop-update.ts")
-const { indexMissingTexts, MAX_SEARCH_TEXT, searchableText } = await import("../../server/utils/search.ts")
+const { indexMissingTexts, likePattern, MAX_SEARCH_TEXT, searchableText } = await import("../../server/utils/search.ts")
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: createFolder } = await import("../../server/mcp/tools/create_folder.ts")
 const { default: listTool } = await import("../../server/mcp/tools/list_drops.ts")
@@ -156,4 +156,16 @@ test("the hourly schedule indexes text docs published before search, once each",
   assert.equal(textOf("lost"), "", "a missing file indexes as empty, so it isn't retried")
   assert.deepEqual((await listDrops(owner, undefined, { query: "llama" })).map(drop => drop.id), ["old"])
   assert.equal(await indexMissingTexts(), 0)
+})
+
+test("a long search word becomes a LIKE pattern D1 accepts, at most 50 bytes, cut on whole characters and escapes", () => {
+  const bytes = text => new TextEncoder().encode(text).length
+  assert.equal(likePattern("plan"), "%plan%")
+  assert.equal(likePattern("50%_off"), "%50\\%\\_off%")
+  for (const word of ["a".repeat(300), "é".repeat(100), "🚀".repeat(40), "%".repeat(60)]) {
+    const pattern = likePattern(word)
+    assert.ok(bytes(pattern) <= 50, `${bytes(pattern)} bytes`)
+    assert.doesNotMatch(pattern, /\\%$/)
+  }
+  assert.equal(likePattern("a".repeat(300)), `%${"a".repeat(48)}%`)
 })

@@ -7,11 +7,12 @@ import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { newLink, slugify } from "#shared/links"
 import { isSitePattern, REVIEW_TOKEN_HOURS, SITE_ADDRESS_RULE, siteAddress, siteAddressesFor, siteHost, siteMatches } from "#shared/review"
-import type { ReviewCommentInput } from "#shared/schemas"
+import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { account, comments, drops, user } from "../databases/config"
 import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
+import { siteCoversDrop } from "./content-origin"
 import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions } from "./drops"
 import { githubOrganization, isGitHubMember } from "./github-membership"
 import { type Identity, roleOf } from "./identity"
@@ -226,6 +227,7 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
 export async function createSiteDrop(who: Identity, input: LifetimeInput & { url: string; title?: string; slug?: string; share?: Share; folder?: DropRow }, event?: H3Event) {
   const siteUrl = siteAddress(input.url)
   if (!siteUrl) throw new HTTPError({ status: 400, statusText: `That address can't be reviewed. ${SITE_ADDRESS_RULE}` })
+  if (event && siteCoversDrop(event, siteUrl)) throw new HTTPError({ status: 400, statusText: "That address is Drop itself or where it shows drops, which can't be a site to review." })
   const folder = input.folder ?? null
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
@@ -258,6 +260,33 @@ export function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | n
 }
 
 const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const
+
+/**
+ * A review comment as multipart: `data` (JSON, ReviewCommentSchema) and an optional `screenshot`. Both the review
+ * script on the site and Drop's own embedded review send it. The screenshot is checked by its bytes, not its claimed
+ * type, and at most 4 MiB.
+ */
+export async function readReviewComment(event: H3Event): Promise<{ input: ReviewCommentInput; shot: Screenshot | null }> {
+  if (Number(event.req.headers.get("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024)
+    throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
+  let form: FormData
+  try { form = await event.req.formData() }
+  catch { throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." }) }
+  const data = form.get("data")
+  let input: ReviewCommentInput
+  try { input = v.parse(ReviewCommentSchema, JSON.parse(typeof data === "string" ? data : "")) }
+  catch (error) { throw new HTTPError({ status: 400, statusText: v.isValiError(error) ? error.message : "The comment is missing." }) }
+
+  const file = form.get("screenshot")
+  if (file === null) return { input, shot: null }
+  if (!(file instanceof File)) throw new HTTPError({ status: 400, statusText: "The screenshot must be a file." })
+  if (file.size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const contentType = screenshotType(bytes)
+  if (!contentType) throw new HTTPError({ status: 400, statusText: "The screenshot must be a PNG, JPEG, or WebP image." })
+  return { input, shot: { bytes, contentType } }
+}
+
 
 /**
  * Stores what someone sent from the site. With a screenshot, the screenshot becomes a private image of the site (like

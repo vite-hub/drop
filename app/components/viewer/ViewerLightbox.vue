@@ -27,6 +27,17 @@ const animate = computed(() => motion.value !== "reduce")
 const shown = ref(!props.from)
 onKeyStroke("Escape", () => void close())
 
+// The click that opened the image left focus in the drop's frame, where Escape never reaches this page.
+onMounted(() => root.value?.focus({ preventScroll: true }))
+
+// Back closes the image, like a photo viewer. Opening adds a history entry, and closing any other way removes it.
+let popped = false
+onMounted(() => history.pushState({ ...history.state, dropLightbox: true }, ""))
+useEventListener(window, "popstate", () => {
+  popped = true
+  void close()
+})
+
 async function loaded(event: Event) {
   if (!(event.target instanceof HTMLImageElement)) return
   const { naturalWidth, naturalHeight } = event.target
@@ -48,6 +59,7 @@ let closing = false
 async function close() {
   if (closing) return
   closing = true
+  if (!popped && history.state?.dropLightbox) history.back()
   if (animate.value) await root.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "ease-in" }).finished.catch(() => {})
   emit("close")
 }
@@ -80,14 +92,16 @@ const shownDraft = computed(() => drag.value?.area ?? props.draft)
 </script>
 
 <template>
-  <div ref="root" class="fixed inset-0 z-30 flex flex-col">
+  <div ref="root" :aria-label="alt || 'Image'" aria-modal="true" class="fixed inset-0 z-30 flex flex-col outline-none" role="dialog" tabindex="-1">
     <div ref="header" class="flex h-12 shrink-0 items-center gap-3 border-b border-default bg-default px-3">
       <UButton aria-label="Close image" color="neutral" icon="i-ph-x" variant="ghost" @click="close" />
       <span class="truncate text-sm font-medium">{{ alt || "Image" }}</span>
       <span v-if="canComment" class="label-mono ml-auto">Click a spot or drag an area to comment</span>
     </div>
     <div class="relative grid min-h-0 flex-1 place-items-center overflow-auto p-6">
-      <div ref="backdrop" class="absolute inset-0 bg-muted" />
+      <!-- A click around the image closes it. A drag that starts on the image and ends here clicks the parent, not this.
+           A comment being drafted keeps it open. -->
+      <div ref="backdrop" class="absolute inset-0 bg-muted" @click="draft || close()" />
       <!-- Sized from the aspect ratio: SVGs with only a viewBox have no intrinsic size. -->
       <div
         ref="box"

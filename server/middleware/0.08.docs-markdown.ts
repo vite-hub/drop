@@ -2,7 +2,7 @@ import { defineHandler } from "h3"
 
 /**
  * Every docs page as Markdown, for agents: at its path plus `.md` (/docs/agents.md), or at its own path for a request
- * that asks for `text/markdown` and not HTML. It's the page's own server render, converted, so it never drifts from
+ * that prefers `text/markdown` to HTML. It's the page's own server render, converted, so it never drifts from
  * what people read, and it passes the same gates. Links to other docs pages point at their `.md`.
  */
 export default defineHandler(async (event) => {
@@ -10,7 +10,7 @@ export default defineHandler(async (event) => {
   const { pathname } = event.url
   const accept = event.req.headers.get("accept") ?? ""
   const suffixed = pathname.endsWith(".md")
-  if (!suffixed && !(accept.includes("text/markdown") && !accept.includes("text/html"))) return
+  if (!suffixed && !(accept.includes("text/markdown") && (await import("../../shared/accept")).prefersMarkdown(accept))) return
   // Loaded lazily: middleware lands in the Worker's entry module, which may only export handlers.
   const { DOCS_PAGES } = await import("#shared/utils/docs")
   const path = suffixed ? pathname.slice(0, -".md".length) : pathname.replace(/(.)\/$/, "$1")

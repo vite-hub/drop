@@ -1,0 +1,539 @@
+diff --git a/dist/core-BWuDGqTb.mjs b/dist/core-BWuDGqTb.mjs
+index d9bcd1dc3c5471cf3143ab759e4daa1869659ef8..b038319c30e2a3b92efe2470e5cec68a5f16ea35 100644
+--- a/dist/core-BWuDGqTb.mjs
++++ b/dist/core-BWuDGqTb.mjs
+@@ -1130,12 +1130,110 @@ function hasLocalBindingBefore(node, source) {
+ 	const value = node;
+ 	if (value?.type !== "Identifier" || typeof value.name !== "string") return false;
+ 	const parent = value.__doctorParent;
+-	if (parent?.type === "VariableDeclarator" && parent.id === value) return true;
+-	if (parent?.type === "FunctionDeclaration" && parent.id === value) return true;
+ 	if (parent?.type === "Property" && parent.key === value && !parent.computed) return true;
+-	const name = value.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+-	const before = source.slice(0, value.start);
+-	return new RegExp(String.raw`(?:\b(?:const|let|var)\s+${name}\b|[,(]\s*${name}\s*(?::[^)=]+)?=>|\(\s*${name}\s*(?::[^)]*)?\)\s*=>|function[^(]*\([^)]*\b${name}\b|[,(]\s*\{[^)]*\b${name}\b[^)]*\}\s*(?::[^)=]+)?=>|function[^(]*\([^)]*\{[^)]*\b${name}\b)`).test(before);
++	for (let scope = value.__doctorParent; scope; scope = scope.__doctorParent) if (scopeBindings(scope).has(value.name)) return true;
++	return false;
++}
++const scopeBindingCache = /* @__PURE__ */ new WeakMap();
++function scopeBindings(scope) {
++	if (!scope || typeof scope !== "object") return /* @__PURE__ */ new Set();
++	const cached = scopeBindingCache.get(scope);
++	if (cached) return cached;
++	const names = /* @__PURE__ */ new Set();
++	switch (scope.type) {
++		case "Program":
++			addStatementBindings(scope.body, names, true);
++			addHoistedVars(scope.body, names);
++			break;
++		case "FunctionDeclaration":
++		case "FunctionExpression":
++		case "ArrowFunctionExpression":
++			if (scope.type === "FunctionExpression" && scope.id) addPatternNames(scope.id, names);
++			for (const param of scope.params ?? []) addPatternNames(param, names);
++			if (scope.body?.type === "BlockStatement") addHoistedVars(scope.body.body, names);
++			break;
++		case "ClassExpression":
++		case "ClassDeclaration":
++			if (scope.id) addPatternNames(scope.id, names);
++			break;
++		case "BlockStatement":
++		case "StaticBlock":
++			addStatementBindings(scope.body, names, false);
++			break;
++		case "SwitchStatement":
++			for (const switchCase of scope.cases ?? []) addStatementBindings(switchCase.consequent, names, false);
++			break;
++		case "ForStatement":
++			addDeclarationNames(scope.init, names);
++			break;
++		case "ForInStatement":
++		case "ForOfStatement":
++			addDeclarationNames(scope.left, names);
++			break;
++		case "CatchClause":
++			if (scope.param) addPatternNames(scope.param, names);
++			break;
++	}
++	scopeBindingCache.set(scope, names);
++	return names;
++}
++function addStatementBindings(statements, names, moduleScope) {
++	if (!Array.isArray(statements)) return;
++	for (let statement of statements) {
++		if ((statement?.type === "ExportNamedDeclaration" || statement?.type === "ExportDefaultDeclaration") && statement.declaration) statement = statement.declaration;
++		if (!statement) continue;
++		if (moduleScope && statement.type === "ImportDeclaration") {
++			for (const specifier of statement.specifiers ?? []) addPatternNames(specifier.local, names);
++			continue;
++		}
++		if (statement.type === "VariableDeclaration") {
++			if (statement.kind !== "var") addDeclarationNames(statement, names);
++			continue;
++		}
++		if ((statement.type === "FunctionDeclaration" || statement.type === "ClassDeclaration" || statement.type === "TSEnumDeclaration") && statement.id) addPatternNames(statement.id, names);
++	}
++}
++function addHoistedVars(statements, names) {
++	const visit = (node) => {
++		if (!node || typeof node !== "object" || typeof node.type !== "string") return;
++		if (node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression" || node.type === "ClassDeclaration" || node.type === "ClassExpression") return;
++		if (node.type === "VariableDeclaration") {
++			if (node.kind === "var") addDeclarationNames(node, names);
++			for (const declarator of node.declarations ?? []) visit(declarator.init);
++			return;
++		}
++		for (const key of getNodeVisitorKeys(node)) {
++			const child = node[key];
++			if (Array.isArray(child)) for (const item of child) visit(item);
++			else visit(child);
++		}
++	};
++	if (Array.isArray(statements)) for (const statement of statements) visit(statement);
++}
++function addDeclarationNames(declaration, names) {
++	if (declaration?.type !== "VariableDeclaration") return;
++	for (const declarator of declaration.declarations ?? []) addPatternNames(declarator.id, names);
++}
++function addPatternNames(pattern, names) {
++	if (!pattern || typeof pattern !== "object") return;
++	switch (pattern.type) {
++		case "Identifier":
++			names.add(pattern.name);
++			return;
++		case "ObjectPattern":
++			for (const property of pattern.properties ?? []) addPatternNames(property.type === "RestElement" ? property : property.value, names);
++			return;
++		case "ArrayPattern":
++			for (const element of pattern.elements ?? []) addPatternNames(element, names);
++			return;
++		case "AssignmentPattern":
++			addPatternNames(pattern.left, names);
++			return;
++		case "RestElement":
++			addPatternNames(pattern.argument, names);
++			return;
++		case "TSParameterProperty": addPatternNames(pattern.parameter, names);
++	}
+ }
+ function isTypeofOperand(node) {
+ 	const parent = node?.__doctorParent;
+diff --git a/dist/no-route-middleware-api-security-9w2mulUQ.mjs b/dist/no-route-middleware-api-security-9w2mulUQ.mjs
+index b8b1babdb1966dd6e8f92291b6e6121d45842e79..faa0e43f012f5dd2e88ee8f39bfa0ace4e376c7e 100644
+--- a/dist/no-route-middleware-api-security-9w2mulUQ.mjs
++++ b/dist/no-route-middleware-api-security-9w2mulUQ.mjs
+@@ -2,7 +2,7 @@ import { n as autoRegisteredNuxtLayers, r as isNuxtManifestConfigurationCurrent
+ import "./core-BWuDGqTb.mjs";
+ import { a as createRule, l as doctorInternalDiagnostics, n as defineDoctorDiagnostics, r as diagnosticForCode, t as codeForRuleId } from "./diagnostics-OWBdo3Uc.mjs";
+ import { i as walkScriptLocal, n as nearestFunctionOrProgram, r as sourceForNode } from "./rule-authoring-BsEbwIZw.mjs";
+-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
++import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+ import { dirname, extname, join, relative, resolve } from "pathe";
+ import { parseSync } from "oxc-parser";
+ //#region src/rule-packs/nuxt/diagnostics.ts
+@@ -632,7 +632,7 @@ const noRouteMiddlewareApiSecurity = createRule({
+ 				const text = readFileSync(file, "utf8");
+ 				ctx.report(diagnostics.NUXT0037({
+ 					why: `Route middleware only protects app navigation. This auth-sensitive server handler has no visible server guard: ${toPosixPath(relative(ctx.project.root, file))}.`,
+-					fix: "Add server-side auth checks to the handler or protect it with server middleware."
++					fix: 'Await a server guard with the event at the top of the handler, or protect it with server middleware. If the handler already calls an app guard Doctor cannot follow, list it in this rule\'s guards option: ["warn", { guards: ["requireAdmin"] }].'
+ 				}), {
+ 					ruleId: "nuxt/middleware/no-route-middleware-api-security",
+ 					severity: "warn",
+@@ -746,8 +746,8 @@ function unguardedSensitiveHandlers(ctx, configurationCurrent) {
+ 		}
+ 	}
+ 	const registered = manifest?.isCurrent && configurationCurrent ? manifest.serverHandlers ?? [] : [];
+-	const middleware = resolvedHandlers ? resolvedHandlers.filter((handler) => handler.middleware && hasUnconditionalAuthGuard(handler.file)) : [];
+-	if (!resolvedHandlers && [...dirs?.middleware ?? [], ...layerFiles.middleware].some(hasUnconditionalAuthGuard)) return [];
++	const middleware = resolvedHandlers ? resolvedHandlers.filter((handler) => handler.middleware && hasUnconditionalAuthGuard(ctx, handler.file)) : [];
++	if (!resolvedHandlers && [...dirs?.middleware ?? [], ...layerFiles.middleware].some((file) => hasUnconditionalAuthGuard(ctx, file))) return [];
+ 	const candidates = resolvedHandlers ? resolvedHandlers.filter((handler) => !handler.middleware) : [...[
+ 		...dirs?.api ?? [],
+ 		...dirs?.routes ?? [],
+@@ -766,7 +766,7 @@ function unguardedSensitiveHandlers(ctx, configurationCurrent) {
+ 		if (registeredRoute === void 0) route = route.replace(/\/index$/i, "");
+ 		return sensitive.test(path) && !isPublicAuthOperation(route, method ?? suffix?.[1]);
+ 	};
+-	return [...new Set(candidates.filter((handler) => existsSync(handler.file) && (isSensitive(resolvedHandlers ? handler.route ?? "" : layerPaths.get(handler.file) ?? toPosixPath(relative(ctx.project.root, handler.file)), handler.method, handler.route) || isSensitive(handler.route ?? "", handler.method, handler.route)) && !isAuthProviderHandler(ctx, handler.file, handler.route) && !middleware.some((guard) => middlewareCoversHandler(guard, handler)) && !hasUnconditionalAuthGuard(handler.file)).map((handler) => handler.file))];
++	return [...new Set(candidates.filter((handler) => existsSync(handler.file) && (isSensitive(resolvedHandlers ? handler.route ?? "" : layerPaths.get(handler.file) ?? toPosixPath(relative(ctx.project.root, handler.file)), handler.method, handler.route) || isSensitive(handler.route ?? "", handler.method, handler.route)) && !isAuthProviderHandler(ctx, handler.file, handler.route) && !middleware.some((guard) => middlewareCoversHandler(guard, handler)) && !hasUnconditionalAuthGuard(ctx, handler.file)).map((handler) => handler.file))];
+ }
+ function middlewareCoversHandler(middleware, handler) {
+ 	if (middleware.method && middleware.method !== handler.method) return false;
+@@ -779,6 +779,7 @@ function isAuthProviderHandler(ctx, file, route) {
+ 	try {
+ 		const parsed = parseSync(file, readProjectFile(file));
+ 		if (parsed.errors.length) return false;
++		if (isPackageAuthMount(file, parsed.program)) return true;
+ 		const factory = parsed.program.body.find((node) => node.type === "ExportDefaultDeclaration")?.declaration;
+ 		if (factory?.type !== "CallExpression" || factory.callee.type !== "Identifier" || !["defineEventHandler", "eventHandler"].includes(factory.callee.name) || factory.callee.name === "eventHandler" && !hasFrameworkEventHandlerBinding(parsed.program, factory.callee.name)) return false;
+ 		const callback = factory.arguments[0];
+@@ -934,10 +935,73 @@ function isProviderBinding(ctx, file, program, name, visited = /* @__PURE__ */ n
+ 	}
+ 	return false;
+ }
+-function hasUnconditionalAuthGuard(file) {
++const BUILT_IN_GUARDS = new Set([
++	"requireUserSession",
++	"requireMcpAdminToken",
++	"requireAuth",
++	"authGuard",
++	"protectRoute"
++]);
++const resolvers = /* @__PURE__ */ new WeakMap();
++function guardResolver(ctx) {
++	let resolver = resolvers.get(ctx);
++	if (!resolver) {
++		const guards = ctx.options?.guards;
++		resolver = {
++			ctx,
++			configured: new Set(Array.isArray(guards) ? guards.filter((name) => typeof name === "string") : []),
++			verdicts: /* @__PURE__ */ new Map(),
++			modules: /* @__PURE__ */ new Map()
++		};
++		resolvers.set(ctx, resolver);
++	}
++	return resolver;
++}
++function handlerFactories(ctx) {
++	const major = (runtime) => {
++		const instance = ctx.project.runtimeGraph?.packages[runtime];
++		const value = instance?.state === "resolved" ? Number.parseInt(instance.version ?? "", 10) : NaN;
++		return Number.isFinite(value) ? value : void 0;
++	};
++	const h3 = major("h3");
++	const nitro = major("nitro");
++	return new Set([
++		"defineEventHandler",
++		"eventHandler",
++		"cachedEventHandler",
++		"defineCachedEventHandler",
++		...h3 === void 0 || h3 >= 2 ? ["defineHandler", "defineValidatedHandler"] : [],
++		...nitro === void 0 || nitro >= 3 ? ["defineCachedHandler"] : []
++	]);
++}
++function handlerFromFactory(ctx, program, factory) {
++	if (factory?.type !== "CallExpression" || factory.callee.type !== "Identifier") return void 0;
++	const imported = program.body.filter((node) => node.type === "ImportDeclaration").flatMap((node) => node.specifiers.map((specifier) => ({
++		source: node.source.value,
++		specifier
++	}))).find(({ specifier }) => specifier.local.name === factory.callee.name);
++	const name = imported?.specifier.type === "ImportSpecifier" && [
++		"h3",
++		"nitro/h3",
++		"nitro",
++		"nitro/runtime",
++		"nitropack/runtime",
++		"#imports"
++	].includes(imported.source) ? imported.specifier.imported.name ?? imported.specifier.imported.value : factory.callee.name;
++	if (!handlerFactories(ctx).has(name)) return void 0;
++	const argument = factory.arguments[0];
++	if (argument?.type !== "ObjectExpression") return argument;
++	return argument.properties.find((property) => property.type === "Property" && !property.computed && (property.key.name ?? property.key.value) === "handler")?.value;
++}
++function hasUnconditionalAuthGuard(ctx, file) {
+ 	try {
+ 		const parsed = parseSync(file, readProjectFile(file));
+ 		if (parsed.errors.length) return false;
++		const resolver = guardResolver(ctx);
++		const module = {
++			file,
++			program: parsed.program
++		};
+ 		let factory = parsed.program.body.find((node) => node.type === "ExportDefaultDeclaration")?.declaration;
+ 		const visited = /* @__PURE__ */ new Set();
+ 		while (factory?.type === "Identifier") {
+@@ -945,33 +1009,270 @@ function hasUnconditionalAuthGuard(file) {
+ 			visited.add(factory.name);
+ 			factory = parsed.program.body.filter((node) => node.type === "VariableDeclaration" && node.kind === "const").flatMap((node) => node.declarations).find((node) => node.id.type === "Identifier" && node.id.name === factory.name)?.init;
+ 		}
+-		if (factory?.type !== "CallExpression" || factory.callee.type !== "Identifier" || ![
+-			"defineEventHandler",
+-			"eventHandler",
+-			"cachedEventHandler"
+-		].includes(factory.callee.name)) return false;
+-		const handler = factory.arguments[0];
+-		const guardName = /^(?:requireUserSession|requireMcpAdminToken|requireAuth|authGuard|protectRoute)$/;
+-		if (handler?.type === "Identifier") return guardName.test(handler.name);
+-		if (!["ArrowFunctionExpression", "FunctionExpression"].includes(handler?.type)) return false;
+-		const isGuard = (expression) => {
+-			if (expression?.type === "AwaitExpression") expression = expression.argument;
+-			return expression?.type === "CallExpression" && expression.callee.type === "Identifier" && guardName.test(expression.callee.name) && handler.params[0]?.type === "Identifier" && expression.arguments[0]?.type === "Identifier" && expression.arguments[0].name === handler.params[0].name;
+-		};
+-		if (handler.body.type !== "BlockStatement") return isGuard(handler.body);
+-		for (const statement of handler.body.body) {
+-			if (statement.type === "ReturnStatement") return isGuard(statement.argument);
+-			if (statement.type === "ExpressionStatement") {
+-				if (isGuard(statement.expression) && statement.expression.type === "AwaitExpression") return true;
+-			} else if (statement.type === "VariableDeclaration") {
+-				if (statement.declarations.some((declaration) => declaration.init?.type === "AwaitExpression" && isGuard(declaration.init))) return true;
+-			} else if (statement.type !== "EmptyStatement") return false;
+-		}
+-		return false;
++		const handler = handlerFromFactory(ctx, parsed.program, factory);
++		if (handler?.type === "Identifier") return guardVerdict(resolver, module, handler.name) !== null;
++		return isGuardedFunction(resolver, module, handler);
+ 	} catch {
+ 		return false;
+ 	}
+ }
++function isGuardedFunction(resolver, module, fn) {
++	if (!["ArrowFunctionExpression", "FunctionExpression"].includes(fn?.type)) return false;
++	const event = fn.params[0];
++	if (event?.type !== "Identifier") return false;
++	const isGuard = (expression, mustSettle) => {
++		const awaited = expression?.type === "AwaitExpression";
++		if (awaited) expression = expression.argument;
++		if (expression?.type !== "CallExpression" || expression.callee.type !== "Identifier" || expression.arguments[0]?.type !== "Identifier" || expression.arguments[0].name !== event.name) return false;
++		const verdict = guardVerdict(resolver, module, expression.callee.name);
++		return verdict !== null && (!mustSettle || awaited || verdict.sync);
++	};
++	if (fn.body.type !== "BlockStatement") return isGuard(fn.body, false);
++	for (const statement of fn.body.body) {
++		if (statement.type === "ReturnStatement") return isGuard(statement.argument, false);
++		if (statement.type === "ExpressionStatement") {
++			if (isGuard(statement.expression, true)) return true;
++		} else if (statement.type === "VariableDeclaration") {
++			if (statement.declarations.some((item) => isGuard(item.init, true))) return true;
++		} else if (statement.type !== "EmptyStatement") return false;
++	}
++	return false;
++}
++function guardVerdict(resolver, module, name) {
++	if (BUILT_IN_GUARDS.has(name) || resolver.configured.has(name)) return { sync: false };
++	const key = `${module.file}\0${name}`;
++	if (resolver.verdicts.has(key)) return resolver.verdicts.get(key);
++	resolver.verdicts.set(key, null);
++	const guard = findGuardFunction(resolver, module, name);
++	const verdict = guard ? guardFunctionVerdict(resolver, guard) : null;
++	resolver.verdicts.set(key, verdict);
++	return verdict;
++}
++function guardFunctionVerdict(resolver, guard) {
++	const { fn } = guard;
++	if (fn.params[0]?.type !== "Identifier") return null;
++	if (fn.body.type !== "BlockStatement") return isGuardedFunction(resolver, guard.module, fn) ? { sync: false } : null;
++	if (returnsEmpty(fn.body)) return null;
++	if (throwsAuthError(fn.body.body)) return { sync: !fn.async };
++	return isGuardedFunction(resolver, guard.module, fn) ? { sync: false } : null;
++}
++function throwsAuthError(statements) {
++	return statements.some((statement) => {
++		if (statement?.type === "ThrowStatement") return isAuthHttpError(statement.argument);
++		if (statement?.type === "BlockStatement") return throwsAuthError(statement.body);
++		if (statement?.type === "IfStatement") return throwsAuthError([statement.consequent, statement.alternate].filter(Boolean));
++		return false;
++	});
++}
++function isAuthHttpError(node) {
++	const isAuthStatus = (value) => value?.type === "Literal" && (value.value === 401 || value.value === 403);
++	const hasAuthStatus = (argument) => argument?.type === "ObjectExpression" && argument.properties.some((property) => property.type === "Property" && !property.computed && ["status", "statusCode"].includes(property.key.name ?? property.key.value) && isAuthStatus(property.value));
++	if (node?.type === "NewExpression" && node.callee.type === "Identifier") return ["HTTPError", "H3Error"].includes(node.callee.name) && node.arguments.some(hasAuthStatus);
++	if (node?.type !== "CallExpression") return false;
++	if (node.callee.type === "Identifier") return node.callee.name === "createError" && hasAuthStatus(node.arguments[0]);
++	return node.callee.type === "MemberExpression" && !node.callee.computed && node.callee.object.type === "Identifier" && node.callee.object.name === "HTTPError" && node.callee.property.name === "status" && isAuthStatus(node.arguments[0]);
++}
++function returnsEmpty(node) {
++	if (!node || typeof node !== "object") return false;
++	if (Array.isArray(node)) return node.some(returnsEmpty);
++	if ([
++		"FunctionDeclaration",
++		"FunctionExpression",
++		"ArrowFunctionExpression",
++		"ClassDeclaration",
++		"ClassExpression"
++	].includes(node.type)) return false;
++	if (node.type === "ReturnStatement") {
++		const value = node.argument;
++		return !value || value.type === "Literal" && (value.value === null || value.value === false) || value.type === "Identifier" && value.name === "undefined";
++	}
++	return Object.entries(node).some(([key, value]) => key !== "parent" && value && typeof value === "object" && returnsEmpty(value));
++}
++function parseModule(resolver, file) {
++	if (resolver.modules.has(file)) return resolver.modules.get(file);
++	let module = null;
++	try {
++		const parsed = parseSync(file, readProjectFile(file));
++		if (!parsed.errors.length) module = {
++			file,
++			program: parsed.program
++		};
++	} catch {
++		module = null;
++	}
++	resolver.modules.set(file, module);
++	return module;
++}
++function findGuardFunction(resolver, module, name) {
++	const local = localFunction(module, name);
++	if (local !== void 0) return local ?? void 0;
++	for (const statement of module.program.body) {
++		if (statement.type !== "ImportDeclaration" || statement.importKind === "type") continue;
++		const specifier = statement.specifiers.find((item) => item.local.name === name);
++		if (!specifier) continue;
++		if (specifier.type === "ImportNamespaceSpecifier") return void 0;
++		const target = resolveProjectModule(resolver.ctx, module.file, statement.source.value);
++		const imported = target ? parseModule(resolver, target) : null;
++		if (!imported) return void 0;
++		return exportedFunction(resolver, imported, specifier.type === "ImportDefaultSpecifier" ? "default" : specifier.imported.name ?? specifier.imported.value, /* @__PURE__ */ new Set());
++	}
++	const candidates = serverUtilExports(resolver).get(name) ?? [];
++	return candidates.length === 1 ? candidates[0] : void 0;
++}
++function localFunction(module, name) {
++	for (let statement of module.program.body) {
++		if (statement.type === "ExportNamedDeclaration" && statement.declaration) statement = statement.declaration;
++		if (statement.type === "FunctionDeclaration" && statement.id?.name === name) return statement.body ? {
++			module,
++			fn: statement
++		} : null;
++		if (statement.type === "ClassDeclaration" && statement.id?.name === name) return null;
++		if (statement.type !== "VariableDeclaration") continue;
++		for (const declarator of statement.declarations) {
++			if (!bindsName(declarator.id, name)) continue;
++			return statement.kind === "const" && declarator.id.type === "Identifier" && ["ArrowFunctionExpression", "FunctionExpression"].includes(declarator.init?.type) ? {
++				module,
++				fn: declarator.init
++			} : null;
++		}
++	}
++}
++function exportedFunction(resolver, module, name, visited) {
++	const key = `${module.file}\0${name}`;
++	if (visited.has(key)) return void 0;
++	visited.add(key);
++	for (const statement of module.program.body) {
++		if (name === "default" && statement.type === "ExportDefaultDeclaration") {
++			const value = statement.declaration;
++			if ([
++				"FunctionDeclaration",
++				"FunctionExpression",
++				"ArrowFunctionExpression"
++			].includes(value.type)) return value.body ? {
++				module,
++				fn: value
++			} : void 0;
++			return value.type === "Identifier" ? localFunction(module, value.name) ?? void 0 : void 0;
++		}
++		if (statement.type !== "ExportNamedDeclaration" || statement.exportKind === "type") continue;
++		if (statement.declaration) {
++			const local = localFunction({
++				...module,
++				program: { body: [statement] }
++			}, name);
++			if (local) return {
++				module,
++				fn: local.fn
++			};
++			continue;
++		}
++		const specifier = statement.specifiers.find((item) => item.exportKind !== "type" && (item.exported.name ?? item.exported.value) === name);
++		if (!specifier) continue;
++		const local = specifier.local.name ?? specifier.local.value;
++		if (!statement.source) return findGuardFunction(resolver, module, local);
++		const target = resolveProjectModule(resolver.ctx, module.file, statement.source.value);
++		const reexported = target ? parseModule(resolver, target) : null;
++		return reexported ? exportedFunction(resolver, reexported, local, visited) : void 0;
++	}
++}
++function serverUtilExports(resolver) {
++	if (resolver.autoImports) return resolver.autoImports;
++	const { ctx } = resolver;
++	const exports = /* @__PURE__ */ new Map();
++	const directories = new Set([resolve(ctx.project.root, "server/utils"), ...(ctx.project.nuxt?.layers ?? []).map((layer) => resolve(ctx.project.root, layer.serverDir ?? join(layer.root, "server"), "utils"))]);
++	for (const directory of directories) {
++		if (!existsSync(directory)) continue;
++		for (const entry of readdirSync(directory, { recursive: true })) {
++			const file = resolve(directory, String(entry));
++			if (!/\.[cm]?[jt]s$/.test(file) || /\.d\.[cm]?ts$/.test(file)) continue;
++			const module = parseModule(resolver, file);
++			if (!module) continue;
++			for (const statement of module.program.body) {
++				if (statement.type !== "ExportNamedDeclaration" || !statement.declaration) continue;
++				const declaration = statement.declaration;
++				const names = declaration.type === "FunctionDeclaration" ? [declaration.id?.name] : declaration.type === "VariableDeclaration" ? declaration.declarations.map((item) => item.id.name) : [];
++				for (const name of names) {
++					const fn = name && localFunction(module, name);
++					if (!fn) continue;
++					exports.set(name, [...exports.get(name) ?? [], fn]);
++				}
++			}
++		}
++	}
++	resolver.autoImports = exports;
++	return exports;
++}
++function resolveProjectModule(ctx, file, source) {
++	const layer = [...ctx.project.nuxt.layers].filter((layer) => {
++		const root = resolve(ctx.project.root, layer.root);
++		return root !== ctx.project.root && file.startsWith(`${root}/`);
++	}).sort((a, b) => b.root.length - a.root.length)[0];
++	const aliases = {
++		"~~": ctx.project.root,
++		"@@": ctx.project.root,
++		"~": ctx.project.nuxt.appDir,
++		"@": ctx.project.nuxt.appDir,
++		...ctx.project.nuxt?.manifest?.isCurrent ? ctx.project.nuxt.manifest.aliases : {},
++		...layer && ctx.project.nuxt.localLayerAliases === true ? {
++			"~~": resolve(ctx.project.root, layer.root),
++			"@@": resolve(ctx.project.root, layer.root),
++			"~": resolve(ctx.project.root, layer.srcDir ?? layer.root),
++			"@": resolve(ctx.project.root, layer.srcDir ?? layer.root)
++		} : {}
++	};
++	const alias = Object.keys(aliases).sort((a, b) => b.length - a.length).find((key) => source === key || source.startsWith(`${key}/`));
++	const base = source.startsWith(".") ? resolve(dirname(file), source) : alias ? resolve(ctx.project.root, aliases[alias], source.slice(alias.length + 1)) : void 0;
++	if (!base) return void 0;
++	const extensions = [
++		"ts",
++		"js",
++		"mts",
++		"mjs",
++		"cts",
++		"cjs"
++	];
++	return (extname(base) ? [base] : [...extensions.map((extension) => `${base}.${extension}`), ...extensions.map((extension) => resolve(base, `index.${extension}`))]).find((candidate) => existsSync(candidate));
++}
++function isPackageAuthMount(file, program) {
++	const statements = program.body.filter((statement) => !((statement.type === "ExportNamedDeclaration" || statement.type === "ImportDeclaration") && (statement.exportKind === "type" || statement.importKind === "type")));
++	const [statement] = statements;
++	if (statements.length !== 1 || statement.type !== "ExportNamedDeclaration" || !statement.source || statement.specifiers.length !== 1) return false;
++	const [specifier] = statement.specifiers;
++	if ((specifier.local.name ?? specifier.local.value) !== "default" || (specifier.exported.name ?? specifier.exported.value) !== "default") return false;
++	const source = String(statement.source.value);
++	const match = source.match(/^((?:@[^/]+\/)?[^/.#~@][^/]*)(\/.*)?$/);
++	if (!match || !/(?:^|[/@-])(?:auth|better-auth)(?:$|[/-])/.test(source)) return false;
++	const manifest = installedPackageManifest(dirname(file), match[1]);
++	if (!manifest) return false;
++	if (manifest.name === "better-auth" || dependsOn(manifest.json, "better-auth")) return true;
++	return Object.keys({
++		...manifest.json.dependencies,
++		...manifest.json.peerDependencies
++	}).filter((name) => /(?:^|[/@-])auth(?:$|[/-])/.test(name)).some((name) => {
++		const dependency = installedPackageManifest(dirname(manifest.path), name);
++		return dependency !== void 0 && dependsOn(dependency.json, "better-auth");
++	});
++}
++function dependsOn(json, name) {
++	return [json?.dependencies, json?.peerDependencies].some((dependencies) => dependencies && typeof dependencies === "object" && name in dependencies);
++}
++function installedPackageManifest(from, name) {
++	for (let directory = from;; directory = dirname(directory)) {
++		const candidate = join(directory, "node_modules", name, "package.json");
++		if (existsSync(candidate)) try {
++			const path = realpathSync(candidate);
++			const json = JSON.parse(readFileSync(path, "utf8"));
++			return json && typeof json === "object" && json.name === name ? {
++				name,
++				path,
++				json
++			} : void 0;
++		} catch {
++			return;
++		}
++		if (dirname(directory) === directory) return void 0;
++	}
++}
+ function readProjectFile(file) {
+ 	try {
+ 		return readFileSync(file, "utf8");

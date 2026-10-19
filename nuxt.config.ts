@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
+import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
 import { DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
@@ -74,8 +75,16 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   },
 }
 
+// Drops' pages show drops in srcdoc frames, which inherit the page's CSP: no script policy there, only frame-ancestors
+// (shared/csp.ts; app/plugins/csp-boundary.client.ts loads them fresh from a page that has one).
+const DROP_PAGE = { security: { headers: { contentSecurityPolicy: {
+  "base-uri": false, "object-src": false, "form-action": false, "script-src": false, "script-src-attr": false,
+  "style-src": false, "img-src": false, "font-src": false, "frame-ancestors": ["'none'"],
+} } } }
+const SIGNED_IN = { appMiddleware: { auth: true }, appLayout: "dashboard" } as const
+
 export default defineNuxtConfig({
-  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt"],
+  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt", "nuxt-security"],
 
   vitehub: { ...VITEHUB[host], auth: true },
 
@@ -99,14 +108,55 @@ export default defineNuxtConfig({
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   runtimeConfig: { seoIndex: false },
 
-  // The signed-in pages and the docs, by path, instead of each page's definePageMeta. `/drops/**` covers `/drops` too.
-  // The landing (pages/index.vue) and shared links (pages/d/) pick their own layout in their own middleware.
+  // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
+  // check, and body limits, so the module's request middlewares stay off.
+  security: {
+    rateLimiter: false,
+    requestSizeLimiter: false,
+    xssValidator: false,
+    corsHandler: false,
+    allowedMethodsRestricter: false,
+    // It would strip console from the server bundle too, which is where Drop's logs go.
+    removeLoggers: false,
+    sri: false,
+    headers: {
+      // The review popup must keep `window.opener` to the site under review, and Drop frames other origins: its
+      // content origin and sites under review.
+      crossOriginOpenerPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      // server/middleware/0.07.frame-options.ts sends DENY on Drop's own origin only: the content origin must stay
+      // frameable, and this header would reach it as a route rule.
+      xFrameOptions: false,
+      referrerPolicy: "strict-origin-when-cross-origin",
+      strictTransportSecurity: { maxAge: 31536000, includeSubdomains: false },
+      // Screen capture stays on for Drop itself: reviewing a site inside Drop screenshots it that way.
+      permissionsPolicy: { "camera": [], "microphone": [], "geolocation": [], "payment": [], "usb": [], "serial": [], "hid": [], "display-capture": ["self"], "fullscreen": false },
+      contentSecurityPolicy: {
+        "base-uri": ["'none'"],
+        "object-src": ["'none'"],
+        "frame-ancestors": ["'none'"],
+        "form-action": ["'self'"],
+        "script-src": ["'self'", "'strict-dynamic'", "'nonce-{{nonce}}'"],
+        "script-src-attr": ["'none'"],
+        "style-src": ["'self'", "https:", "'unsafe-inline'"],
+        "img-src": ["'self'", "https:", "data:", "blob:"],
+        "font-src": ["'self'", "https:", "data:"],
+        // Sites under review may be http on localhost, and self-hosted Drops may run over http.
+        "upgrade-insecure-requests": false,
+      },
+    },
+  },
+
   routeRules: {
-    "/drops/**": { appMiddleware: { auth: true }, appLayout: "dashboard" },
-    "/agents": { appMiddleware: { auth: true }, appLayout: "dashboard" },
-    "/members": { appMiddleware: { auth: true }, appLayout: "dashboard" },
-    "/skills/**": { appMiddleware: { auth: true }, appLayout: "dashboard" },
-    "/admin/**": { appMiddleware: { auth: true }, appLayout: "dashboard" },
+    ...Object.fromEntries(DROP_PAGE_ROUTES.map(route => [route, DROP_PAGE])),
+    // The signed-in pages and the docs by path, instead of each page's definePageMeta. Nuxt merges every rule a path
+    // matches, so `/drops` gets SIGNED_IN from `/drops/**` too. The landing (pages/index.vue) and shared links
+    // (pages/d/) pick their own layout in their own middleware.
+    "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
+    "/agents": SIGNED_IN,
+    "/members": SIGNED_IN,
+    "/skills/**": SIGNED_IN,
+    "/admin/**": SIGNED_IN,
     "/docs/**": { appLayout: "docs" },
   },
 

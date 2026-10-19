@@ -20,7 +20,7 @@ const comments = computed(() => state.comments.data.value)
 
 const route = useRoute()
 const notify = useNotify()
-const { copy } = useCopy()
+const { copy, copyLoading } = useCopy()
 const { remove, restore } = useDropActions()
 const [DefineSide, ReuseSide] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
@@ -129,6 +129,9 @@ defineShortcuts({
   },
 })
 
+// The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
+const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
+const copyMarkdown = () => copyLoading($fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }), "Copied as Markdown")
 const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), "Feedback copied as Markdown")
 function copyLink() {
   if (drop.value.share !== "private") void copy(link.value, "Link copied")
@@ -302,8 +305,11 @@ const threadComment = computed(() => {
           <UTooltip v-if="has('details')" text="Details">
             <UButton aria-label="Details" :aria-pressed="showing('details')" color="neutral" icon="i-ph-info" size="sm" :variant="showing('details') ? 'soft' : 'ghost'" @click="toggleTab('details')" />
           </UTooltip>
+          <UTooltip v-if="copiesMarkdown" text="Copy as Markdown">
+            <UButton aria-label="Copy as Markdown" color="neutral" icon="i-ph-copy" size="sm" variant="ghost" @click="copyMarkdown" />
+          </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
-          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length" class="ml-1 h-4" orientation="vertical" />
+          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length || copiesMarkdown" class="ml-1 h-4" orientation="vertical" />
           <UTooltip v-if="!owner" text="Copy link">
             <UButton aria-label="Copy link" color="neutral" icon="i-ph-link" size="sm" variant="ghost" @click="copy(link, 'Link copied')" />
           </UTooltip>
