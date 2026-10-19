@@ -19,15 +19,15 @@ export default defineHandler(async (event): Promise<Member[]> => {
       AND (d.parent_id IS NULL OR EXISTS (SELECT 1 FROM drops p WHERE p.id = d.parent_id AND p.kind = 'folder')))`.mapWith(Number),
     seen: sql<Date | null>`(SELECT max(s.updated_at) FROM session s WHERE s.user_id = "user"."id")`.mapWith(session.updatedAt),
   }).from(user).orderBy(desc(user.createdAt)).limit(500)
-  return users.map(user => ({
-    id: user.id,
-    name: user.name,
-    email: who.role === "admin" || user.id === who.userId ? user.email : null,
-    image: user.image ?? null,
-    role: roleOf(user),
-    banned: Boolean(user.banned),
-    drops: user.drops,
-    lastActiveAt: user.seen ? new Date(user.seen).getTime() : null,
-    you: user.id === who.userId,
+  return users.map(member => ({
+    id: member.id,
+    name: member.name,
+    email: who.role === "admin" || member.id === who.userId ? member.email : null,
+    image: member.image ?? null,
+    role: roleOf(member),
+    banned: Boolean(member.banned),
+    drops: member.drops,
+    lastActiveAt: member.seen ? new Date(member.seen).getTime() : null,
+    you: member.id === who.userId,
   }))
 })

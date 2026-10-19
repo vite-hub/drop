@@ -78,7 +78,7 @@ function createMermaidRenderer(): NodeHandler {
   let sourceCharacters = 0
 
   return (node) => {
-    const content = String(node[1].content ?? "")
+    const content = typeof node[1].content === "string" ? node[1].content : ""
     const fallback = `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
 
     diagrams += 1

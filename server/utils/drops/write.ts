@@ -242,7 +242,7 @@ function cleanPath(path: string) {
  * `createDocDrop`.
  */
 export async function publishApp(who: Identity, input: LifetimeInput & { id?: string; name?: string; slug?: string; files: Record<string, string>; removes?: string[]; share?: Share; folder?: DropRow }, event?: H3Event) {
-  const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), String(content)] as const)
+  const entries = Object.entries(input.files ?? {}).map(([path, content]) => [cleanPath(path), content] as const)
   if (new Set(entries.map(([path]) => path)).size !== entries.length) throw new HTTPError({ status: 400, statusText: "An app cannot contain duplicate paths." })
   const removes = [...new Set((input.removes ?? []).map(cleanPath))]
   const clash = removes.filter(path => entries.some(([sent]) => sent === path))

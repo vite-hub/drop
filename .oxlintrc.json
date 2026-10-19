@@ -25,9 +25,20 @@
     "no-underscore-dangle": "off",
     "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
     // Doctor's typescript/strict/require-safety-comment-for-type-assertion owns casts (doctor.config.json).
-    "typescript/no-unsafe-type-assertion": "off"
+    "typescript/no-unsafe-type-assertion": "off",
+    // tsgolint doesn't read Nuxt's generated tsconfigs (the root one only references them): it misses
+    // noUncheckedIndexedAccess and the packages Nuxt maps through paths (h3, hookable). So `!` on an index and casts on
+    // h3 values look unnecessary, and --fix would remove ones vue-tsc needs.
+    "typescript/no-unnecessary-type-assertion": "off"
   },
   "overrides": [
+    {
+      "files": ["server/**", "shared/**"],
+      "rules": {
+        // Same cause: a union with H3Event looks redundant because H3Event doesn't resolve.
+        "typescript/no-redundant-type-constituents": "off"
+      }
+    },
     {
       "files": ["test/**"],
       "rules": {

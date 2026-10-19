@@ -28,7 +28,7 @@ export default defineMcpTool({
     await recordVisit(event, drop, who, "beacon")
     const detail = await dropDetail(drop, who, event.url.origin, event)
     const comments = (await listComments(drop, who)).filter(comment => resolved || !comment.resolved)
-    const versions = detail.versions.map(({ id, version, note, actorName, createdAt }) => ({ id, version, note, by: actorName, at: new Date(createdAt).toISOString() }))
+    const versions = detail.versions.map(({ id: versionId, version, note, actorName, createdAt }) => ({ id: versionId, version, note, by: actorName, at: new Date(createdAt).toISOString() }))
     const meta = mcpDrop(detail, event.url.origin, drop)
     if (drop.kind === "site") {
       const items = (await siteItems(drop, who, event.url.origin)).filter(item => resolved || !item.resolved).sort((a, b) => a.n - b.n)

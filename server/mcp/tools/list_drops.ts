@@ -8,6 +8,9 @@ import { requireIdentity } from "../../utils/identity"
 import { getUsage } from "../../utils/quotas"
 import { dropLine, mcpDrop } from "../format"
 
+const quota = (name: string, used: number, max: number | null, unit = (n: number) => String(n)) => `${name} ${unit(used)}${max === null ? "" : `/${unit(max)}`}`
+const mib = (n: number) => `${Math.ceil(n / MIB * 10) / 10} MiB`
+
 export default defineMcpTool({
   name: "list_drops",
   title: "List drops",
@@ -34,8 +37,6 @@ export default defineMcpTool({
       // Your drops and a folder's searched on the server, text included; the Trash and Shared with me filter here.
       && (inside || !(trash || sharedWithMe) || words.every(word => `${drop.title} ${drop.filename} ${drop.slug}`.toLowerCase().includes(word))))
     const drops = matched.slice(0, limit).map(drop => mcpDrop(drop, event.url.origin))
-    const quota = (name: string, used: number, max: number | null, unit = (n: number) => String(n)) => `${name} ${unit(used)}${max === null ? "" : `/${unit(max)}`}`
-    const mib = (n: number) => `${Math.ceil(n / MIB * 10) / 10} MiB`
     const usageLine = usage.enabled ? `Plan ${usage.plan}: ${quota("drops", usage.drops.used, usage.drops.limit)}, ${quota("storage", usage.bytes.used, usage.bytes.limit, mib)}, ${quota("writes this month", usage.writes.used, usage.writes.limit)}.` : "No plan limits."
     const text = `${drops.map(dropLine).join("\n") || (inside ? `Nothing in ${inside.title}${words.length ? " matches" : ""}.` : trash ? "The Trash is empty." : sharedWithMe ? "Nothing is shared with you yet." : "No drops.")}${matched.length > drops.length ? `\n…and ${matched.length - drops.length} more.` : ""}\n${usageLine}`
     return { content: [{ type: "text" as const, text }], structuredContent: { drops, total: matched.length, usage } }

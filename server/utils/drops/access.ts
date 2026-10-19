@@ -1,4 +1,4 @@
-import { drops } from "../../databases/config"
+import type { drops } from "../../databases/config"
 import { slugify } from "#shared/links"
 import type { DropCrumb, DropSummary } from "#shared/types"
 import { expiresAt } from "#shared/expiry"
@@ -34,7 +34,7 @@ export function permissions(drop: DropRow, who: Identity | null) {
     edit: live && (owner || admin || (level >= 2 && who?.actorKind === "browser")),
     manage,
     // People, not their agents: what an agent reads could steer it to clear out the team's folders.
-    trash: manage || Boolean(live && who?.actorKind === "browser" && !drop.teamFolder && inTeamFolder(drop) && level >= 0),
+    trash: manage || (live && who?.actorKind === "browser" && !drop.teamFolder && inTeamFolder(drop) && level >= 0),
   }
 }
 

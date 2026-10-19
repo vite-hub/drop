@@ -110,7 +110,7 @@ export async function heightOf(row: Pick<Row, "id" | "kind">) {
     SELECT id, kind, 1 FROM drops WHERE id = ${row.id}
     UNION ALL SELECT d.id, d.kind, down.depth + 1 FROM drops d JOIN down ON d.parent_id = down.id WHERE down.kind = 'folder' AND down.depth <= ${MAX_DEPTH}
   ) SELECT max(depth) AS depth FROM down`)
-  return Number(deepest?.depth ?? 1)
+  return deepest?.depth ?? 1
 }
 
 /** A folder and every folder below it, for searching a subtree. */

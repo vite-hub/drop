@@ -258,7 +258,7 @@ export async function recordSharedVisit(drop: DropRow, who: Identity | null) {
 }
 
 export function storageFailure(error: Error) {
-  log.error({ action: "storage", error: error.message, cause: String((error as { cause?: unknown }).cause ?? "") })
+  log.error({ action: "storage", error: error.message, cause: error.cause instanceof Error ? error.cause.message : error.cause })
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 

@@ -9,7 +9,7 @@ import { drops } from "../databases/config"
 /** How this Drop shares (`DROP_MODE`, `DROP_PUBLIC_LINK_DAYS`): its mode, and days a public link stays open. */
 export function sharePolicy(event?: H3Event): { mode: DropMode; publicLinkDays: number | null } {
   const { mode, publicLinkDays } = useServerEnv(event).drop
-  const days = String(publicLinkDays ?? "").trim()
+  const days = publicLinkDays.trim()
   const resolvedMode: DropMode = mode === "team" ? "team" : "personal"
   if (!days) return { mode: resolvedMode, publicLinkDays: resolvedMode === "team" ? 7 : null }
   const value = Number(days)
