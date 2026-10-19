@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
-import { comments, drops } from "../databases/config"
+import { comments, drops, user } from "../databases/config"
 import type { DropComment } from "#shared/types"
 import type { DropRow } from "./drops"
 import { chainOf } from "./expiry"
@@ -8,11 +8,20 @@ import type { Identity } from "./identity"
 
 export type CommentRow = typeof comments.$inferSelect
 
-export const toComment = (row: CommentRow, who: Identity | null, version: number): DropComment => ({
+/** `images`: the authors' pictures by user id (authorImages), for the pins and threads. */
+export const toComment = (row: CommentRow, who: Identity | null, version: number, images?: Map<string, string | null>): DropComment => ({
   id: row.id, n: row.n, kind: row.kind, selector: row.selector, ox: row.ox, oy: row.oy, ow: row.ow, oh: row.oh, quote: row.quote, label: row.label,
-  page: row.page, body: row.body, authorName: row.authorName, resolved: row.resolved, createdAt: row.createdAt, version,
-  mine: Boolean(who && row.authorId === who.userId),
+  page: row.page, body: row.body, authorName: row.authorName, authorImage: (row.authorId && images?.get(row.authorId)) || null,
+  resolved: row.resolved, createdAt: row.createdAt, version, mine: Boolean(who && row.authorId === who.userId),
 })
+
+/** The pictures of the people who wrote `rows`, in one query. Guests and agents without one get initials. */
+export async function authorImages(rows: Pick<CommentRow, "authorId">[]) {
+  const ids = [...new Set(rows.map(row => row.authorId).filter((id): id is string => Boolean(id)))]
+  if (!ids.length) return new Map<string, string | null>()
+  const people = await db.select({ id: user.id, image: user.image }).from(user).where(inArray(user.id, ids))
+  return new Map(people.map(person => [person.id, person.image]))
+}
 
 /**
  * A site and the screenshots sent from it. Their comments make one list, numbered together, so "#4" names one
@@ -32,12 +41,14 @@ const siteOf = (row: Pick<DropRow, "id" | "kind" | "parentId">) => (row.kind ===
 export async function listComments(row: Pick<DropRow, "id" | "ownerId" | "version" | "kind">, who: Identity | null) {
   if (row.kind === "site") {
     const rows = await db.select().from(comments).where(sql`${comments.dropId} IN (${siteFamily(row.id)})`).orderBy(asc(comments.n))
-    return rows.map(item => toComment(item, who, 1))
+    const images = await authorImages(rows)
+    return rows.map(item => toComment(item, who, 1, images))
   }
   const rows = await db.select({ comment: comments, version: drops.version }).from(comments).innerJoin(drops, eq(drops.id, comments.dropId))
     .where(and(sql`${comments.dropId} IN (${chainOf(row)})`, lte(drops.version, row.version)))
     .orderBy(asc(comments.n), asc(drops.version))
-  return rows.map(item => toComment(item.comment, who, item.version))
+  const images = await authorImages(rows.map(item => item.comment))
+  return rows.map(item => toComment(item.comment, who, item.version, images))
 }
 
 /**

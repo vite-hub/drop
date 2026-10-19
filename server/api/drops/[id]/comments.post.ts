@@ -3,7 +3,7 @@ import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentSchema } from "#shared/schemas"
 import { comments } from "../../../databases/config"
-import { nextCommentNumber, toComment } from "../../../utils/comments"
+import { authorImages, nextCommentNumber, toComment } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -32,6 +32,6 @@ export default defineValidatedHandler({
       resolved: false,
       createdAt: Date.now(),
     }).returning()
-    return toComment(row!, who, drop.version)
+    return toComment(row!, who, drop.version, await authorImages([row!]))
   },
 })

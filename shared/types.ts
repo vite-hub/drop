@@ -122,6 +122,8 @@ export interface DropComment {
   page: string | null
   body: string
   authorName: string
+  /** The author's picture, when they have one; pins and threads fall back to initials. */
+  authorImage: string | null
   resolved: boolean
   createdAt: number
   /** The version it was written on. Open comments carry over to later versions until someone resolves them. */

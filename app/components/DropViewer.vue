@@ -234,7 +234,7 @@ watch(srcdoc, (value) => {
 })
 watch([ready, pageComments], () => {
   // `earlier`: the frame also checks that the element is still what the comment pointed at, not just in its place.
-  if (ready.value) send({ type: "markers", markers: pageComments.value.filter(comment => !replaced(comment)).map(({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, earlier: version < drop.value.version })) })
+  if (ready.value) send({ type: "markers", markers: pageComments.value.filter(comment => !replaced(comment)).map(({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version, authorName, authorImage }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, earlier: version < drop.value.version, author: authorName, image: authorImage })) })
 })
 
 /** Area mode: the frame lays a crosshair over the page, and the next rectangle drawn there becomes a comment. */

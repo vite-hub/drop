@@ -67,8 +67,9 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
   host.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;";
   const shadow = host.attachShadow({ mode: "open" });
   shadow.innerHTML = '<style>' +
-    '.m{position:absolute;width:20px;height:20px;margin:-10px 0 0 -2px;border-radius:10px 10px 10px 2px;background:var(--primary);color:var(--primary-foreground);font:500 11px/20px var(--font-mono);text-align:center;cursor:pointer;box-shadow:0 1px 4px rgb(0 0 0/.25),0 0 0 2px var(--background);transition:transform 120ms}' +
-    '.m:hover{transform:scale(1.15)}.m.done{background:var(--muted-foreground);opacity:.6}.m.img{margin:-10px 0 0 -10px;border-radius:10px}' +
+    '.m{position:absolute;width:22px;height:22px;margin:-11px 0 0 -2px;overflow:hidden;border-radius:11px 11px 11px 2px;background:var(--primary);color:var(--primary-foreground);font:600 10px/22px var(--font-sans);letter-spacing:.02em;text-align:center;cursor:pointer;box-shadow:0 1px 4px rgb(0 0 0/.25),0 0 0 2px var(--background);transition:transform 120ms}' +
+    '.m img{display:block;width:100%;height:100%;object-fit:cover}' +
+    '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-11px 0 0 -11px;border-radius:11px}' +
     '.m.pulse{animation:p 900ms ease-out 2}@keyframes p{50%{transform:scale(1.4)}}' +
     '.cp{position:absolute;display:flex;gap:6px;align-items:center;height:22px;padding:0 7px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--muted-foreground);font:500 11px var(--font-mono);cursor:pointer}' +
     '.cp:hover{color:var(--foreground)}.cp b{font-weight:500;text-transform:uppercase;letter-spacing:.06em;opacity:.7}' +
@@ -127,6 +128,7 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
     return m.kind === "image" ? (el.getAttribute("alt") || "image") === m.label : labelOf(el) === m.label;
   }
 
+  const initials = (name) => (name || "?").trim().split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "?";
   let lastUnplaced = null;
   function render() {
     marks.innerHTML = "";
@@ -152,7 +154,10 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
       }
       const dot = document.createElement("div");
       dot.className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "");
-      dot.textContent = String(m.n);
+      // The author's picture, else their initials; the panel and the agent feedback keep the number.
+      if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.textContent = initials(m.author); }; dot.appendChild(img); }
+      else dot.textContent = initials(m.author);
+      dot.title = (m.author || "Comment") + " · #" + m.n;
       dot.style.left = x + "px"; dot.style.top = y + "px";
       dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
       marks.appendChild(dot);
