@@ -43,6 +43,7 @@
     "@tiptap/extension-placeholder": "3.31.4",
     "@tiptap/pm": "3.31.4",
     "@tiptap/vue-3": "3.31.4",
+    "@tiptap/y-tiptap": "3.0.9",
     "@valibot/to-json-schema": "^1.8.0",
     "@vueuse/core": "^14.4.0",
     "@vueuse/nuxt": "^14.4.0",
@@ -69,7 +70,8 @@
     "valibot": "^1.4.2",
     "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea",
     "vue": "3.5.44",
-    "vue-router": "5.2.0"
+    "vue-router": "5.2.0",
+    "yjs": "13.6.33"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
