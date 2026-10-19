@@ -47,7 +47,8 @@ const LABEL = "[a-z2-7]{26}"
  * Once ViteHub ships VITEHUB_SECRET (vite-hub/vitehub#2308), key it with `deriveSecret("drop:content-origin")` instead.
  */
 export async function contentLabel(event: H3Event, dropId: string): Promise<string> {
-  const secret = (useServerEnv(event) as { auth?: { secret?: { unseal: () => string } } }).auth?.secret?.unseal() || "drop-content-origin"
+  // Optional: an environment without the auth secret (the tests' one) still labels drops.
+  const secret = useServerEnv(event).auth?.secret?.unseal() || "drop-content-origin"
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(`content-origin:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
   const bytes = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(dropId)))
   let bits = 0, value = 0, label = ""

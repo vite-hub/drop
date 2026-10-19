@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { defineHandler, type H3Event, HTTPError } from "h3"
+import * as v from "valibot"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
@@ -32,10 +33,12 @@ import { touchFolder, uniqueSlug } from "./nodes"
  */
 
 /** What a review token says: the site drop, who sends (null for a guest on a "Can comment" link), and the page's origin. */
-export interface ReviewClaims { d: string; u: string | null; n: string; o: string; e: number }
+const ReviewClaims = v.object({ d: v.string(), u: v.nullable(v.string()), n: v.string(), o: v.string(), e: v.number() })
+export type ReviewClaims = v.InferOutput<typeof ReviewClaims>
 
 /** What the popup sends back when someone picks a site drop: which one, for which origin and person. Sealed too. */
-interface Choice { c: string; o: string; u: string | null; e: number }
+const Choice = v.object({ c: v.string(), o: v.string(), u: v.nullable(v.string()), e: v.number() })
+type Choice = v.InferOutput<typeof Choice>
 
 const encoder = new TextEncoder()
 const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
@@ -43,7 +46,8 @@ const unbase64url = (text: string) => Uint8Array.from(atob(text.replace(/-/g, "+
 
 /** AES-GCM under the auth secret, like content-origin labels. Once ViteHub ships VITEHUB_SECRET, `deriveSecret("drop:review-token")`. */
 async function sealKey(event: H3Event) {
-  const secret = (useServerEnv(event) as { auth?: { secret?: { unseal: () => string } } }).auth?.secret?.unseal()
+  // Optional: an environment without the auth secret (the tests' one) gets the 503 below, not a TypeError.
+  const secret = useServerEnv(event).auth?.secret?.unseal()
   // No fallback: a known key would let anyone mint tokens.
   if (!secret) throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`review-token:${secret}`))
@@ -54,7 +58,7 @@ async function sealKey(event: H3Event) {
 type SealPurpose = "token" | "choice" | "upload"
 
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
-export async function seal(event: H3Event, purpose: SealPurpose, value: object) {
+export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(purpose) }, await sealKey(event), encoder.encode(JSON.stringify(value))))
   const bytes = new Uint8Array(iv.length + sealed.length)
@@ -63,13 +67,15 @@ export async function seal(event: H3Event, purpose: SealPurpose, value: object) 
   return `v2.${base64url(bytes)}`
 }
 
-export async function unseal<T>(event: H3Event, purpose: SealPurpose, text: string, maxLength = 2048): Promise<T | null> {
+/** The sealed value, when it was sealed for `purpose` and parses as `schema`. Null for anything else. */
+export async function unseal<T extends v.GenericSchema>(event: H3Event, purpose: SealPurpose, schema: T, text: string, maxLength = 2048): Promise<v.InferOutput<T> | null> {
   const [version, body, extra] = text.split(".")
   if (version !== "v2" || !body || extra !== undefined || text.length > maxLength) return null
   try {
     const bytes = unbase64url(body)
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12), additionalData: encoder.encode(purpose) }, await sealKey(event), bytes.slice(12))
-    return JSON.parse(new TextDecoder().decode(plain)) as T
+    const parsed = v.safeParse(schema, JSON.parse(new TextDecoder().decode(plain)))
+    return parsed.success ? parsed.output : null
   }
   catch (error) {
     if (HTTPError.isError(error)) throw error
@@ -84,8 +90,8 @@ export async function signReviewToken(event: H3Event, claims: Omit<ReviewClaims,
 
 /** The token's claims when it's ours and unexpired, null otherwise. Whether its site still covers its origin is for `reviewSession`. */
 export async function readReviewToken(event: H3Event, token: string, now = Date.now()): Promise<ReviewClaims | null> {
-  const claims = await unseal<ReviewClaims>(event, "token", token)
-  return claims && typeof claims.d === "string" && typeof claims.o === "string" && claims.e > now ? claims : null
+  const claims = await unseal(event, "token", ReviewClaims, token)
+  return claims && claims.e > now ? claims : null
 }
 
 /** The handle the popup lists a site drop by: good for ten minutes, for this origin and this person only. */
@@ -94,7 +100,7 @@ export const sealChoice = (event: H3Event, site: Pick<DropRow, "id">, origin: st
 
 /** The site drop id behind a choice, when it was made for this origin and person and hasn't run out. */
 export async function openChoice(event: H3Event, text: string, origin: string, who: Identity | null, now = Date.now()) {
-  const choice = await unseal<Choice>(event, "choice", text)
+  const choice = await unseal(event, "choice", Choice, text)
   return choice && choice.o === origin && choice.u === (who?.userId ?? null) && choice.e > now ? choice.c : null
 }
 

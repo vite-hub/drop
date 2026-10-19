@@ -2,6 +2,7 @@ import { and, eq, inArray, lt, lte, sql, type SQL } from "drizzle-orm"
 import type { BatchItem } from "drizzle-orm/batch"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
+import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
 import { PUBLISH_BURST, requirePublishBurst } from "./publish-burst"
@@ -11,6 +12,9 @@ import { dropFiles, quotaBlobs, quotaReservations } from "../databases/config"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
 type Statement = BatchItem<"sqlite">
+
+// What the batch's last statement, the reservation's own update, returns: the reservation when its guard held.
+const Finished = v.array(v.object({ id: v.string() }))
 
 /** `DROP_QUOTAS`, `DROP_DEFAULT_PLAN`, and the `DROP_PRO_*` limits, typed and validated by Server Env. */
 export function quotaConfig() {
@@ -124,7 +128,8 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
             throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version.", cause: error })
           throw error
         }
-        committed = (results.at(-1) as { id: string }[]).some(row => row.id === id)
+        const finished = v.safeParse(Finished, results.at(-1))
+        committed = finished.success && finished.output.some(row => row.id === id)
         if (!committed) throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version." })
       },
     })

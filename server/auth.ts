@@ -3,15 +3,18 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { github } from "better-auth/social-providers"
 import { admin, jwt } from "better-auth/plugins"
 import { eq } from "drizzle-orm"
+import * as v from "valibot"
 import { defineAuth } from "vite-hub/auth"
 import { db, schema } from "vite-hub/database/drizzle"
-import type { ServerEnv } from "#vitehub/env/server"
 import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { nativeClientRegistration } from "./utils/oauth-clients"
 import { isGitHubMember } from "./utils/github-membership"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
+
+// The account's creation date, a review signal (shared/trust.ts).
+const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
 
 // Kept out of `defineAuth()`: ViteHub's auth scanner takes minutes on generic type arguments inside it.
 type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
@@ -35,8 +38,7 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  * Local dev has no GitHub OAuth app, so email and password sign-in is on in `nuxt dev` only.
  *
  */
-export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
-  const env = runtimeEnv as unknown as ServerEnv
+export default defineAuth(({ env, requestOrigin }) => {
   const proxied = authProxy().enabled
   const organization = env.drop.githubOrg.trim()
   const githubOptions = {
@@ -72,8 +74,9 @@ export default defineAuth(({ env: runtimeEnv, requestOrigin }) => {
             // Public GitHub metadata is a review signal; a lookup failure never blocks private use.
             const profile = await fetch(`https://api.github.com/user/${encodeURIComponent(account.accountId)}`, {
               headers: { "User-Agent": "Drop", Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(3000),
-            }).then(response => response.ok ? response.json() as Promise<{ created_at?: string }> : null).catch(() => null)
-            const githubCreatedAt = profile?.created_at ? Date.parse(profile.created_at) : NaN
+            }).then(async response => (response.ok ? v.safeParse(GitHubProfile, await response.json()) : null)).catch(() => null)
+            const createdAt = profile?.success ? profile.output.created_at : undefined
+            const githubCreatedAt = createdAt ? Date.parse(createdAt) : NaN
             if (Number.isFinite(githubCreatedAt)) await db.update(users).set({ githubCreatedAt }).where(eq(users.id, account.userId))
           },
         },

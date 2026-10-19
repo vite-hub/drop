@@ -10,6 +10,7 @@ import { githubOrganization, isGitHubMember } from "./github-membership"
 import { useServerEnv } from "#vitehub/env/server"
 import { type Role, roleFor } from "#shared/roles"
 import type { ActorKind } from "#shared/types"
+import { textValue } from "#shared/utils/text"
 import type auth from "../auth"
 
 /** Who is calling and how: a person in the browser, or an agent through an MCP client they approved. */
@@ -43,6 +44,9 @@ export async function syncRole(userId: string) {
   if (row && row.role !== roleOf(row)) await db.update(users).set({ role: roleOf(row) }).where(eq(users.id, userId))
 }
 
+// SAFETY: ViteHub builds this instance from server/auth.ts's definition, the one DropAuth is the type of. Its own type is
+// the plain Better Auth instance, without the plugins' endpoints and fields, which no single assertion bridges.
+// doctor-disable-next-line typescript/evidence/no-chained-type-assertions -- getAuthForRequest's type isn't generic over the definition
 export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event) as unknown as DropAuth
 
 export const bearerFrom = (headers: Headers) => headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? null
@@ -65,7 +69,7 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   const token = bearerFrom(event.req.headers)
   if (token) return fromAccessToken(event, token)
   const session = await authFor(event).api.getSession({ headers: event.req.headers }).catch(() => null)
-  if (!session?.user || (session.user as { banned?: boolean }).banned) return null
+  if (!session?.user || session.user.banned) return null
   return {
     userId: session.user.id, name: session.user.name, email: session.user.email, image: session.user.image ?? null,
     role: roleOf(session.user),
@@ -92,7 +96,7 @@ async function fromAccessToken(event: H3Event, token: string): Promise<Identity 
   if (!payload?.sub) return null
   const [user] = await db.select().from(users).where(eq(users.id, payload.sub)).limit(1)
   if (!user || user.banned) return null
-  const clientId = typeof payload.azp === "string" ? payload.azp : typeof payload.client_id === "string" ? payload.client_id : null
+  const clientId = textValue(payload.azp) ?? textValue(payload.client_id) ?? null
   const [client] = clientId ? await db.select({ name: oauthClient.name }).from(oauthClient).where(eq(oauthClient.clientId, clientId)).limit(1) : []
   return {
     userId: user.id, name: user.name, email: user.email, image: user.image ?? null,

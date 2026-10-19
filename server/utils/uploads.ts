@@ -1,13 +1,14 @@
 import { and, eq } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { useStorage } from "nitro/storage"
+import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
-import { isRole, type Role } from "#shared/roles"
-import type { ActorKind } from "#shared/types"
+import { isRole } from "#shared/roles"
+import { ACTOR_KINDS } from "#shared/types"
 import { account, user as users } from "../databases/config"
 import { githubOrganization, isGitHubMember } from "./github-membership"
 import type { Identity } from "./identity"
-import type { PublishInput } from "./publish"
+import { PublishInput } from "./publish"
 import { seal, unseal } from "./review"
 
 /**
@@ -21,7 +22,9 @@ export const UPLOAD_MINUTES = 15
 // A ticket carries a whole publish call (a note, a keep reason, a title), so it's longer than a review token.
 const MAX_TICKET = 8192
 
-interface UploadTicket { u: string; k: ActorKind; a: string; i: PublishInput; j: string; e: number }
+// Lazy: publish.ts imports this file, so its schema isn't there yet when this module loads.
+const UploadTicket = v.object({ u: v.string(), k: v.picklist(ACTOR_KINDS), a: v.string(), i: v.lazy(() => PublishInput), j: v.string(), e: v.number() })
+type UploadTicket = v.InferOutput<typeof UploadTicket>
 
 export async function signUpload(event: H3Event, who: Identity, input: PublishInput, now = Date.now()) {
   const { base64: _, ...file } = input.file!
@@ -32,8 +35,8 @@ export async function signUpload(event: H3Event, who: Identity, input: PublishIn
 
 /** The ticket's call and the person it acts for, when the ticket is ours, unexpired, and its person may still publish. */
 export async function readUpload(event: H3Event, sealed: string, now = Date.now()) {
-  const ticket = await unseal<UploadTicket>(event, "upload", sealed, MAX_TICKET)
-  if (!ticket || typeof ticket.u !== "string" || ticket.e <= now || !ticket.i?.file) return null
+  const ticket = await unseal(event, "upload", UploadTicket, sealed, MAX_TICKET)
+  if (!ticket || ticket.e <= now || !ticket.i.file) return null
   const [row] = await db.select().from(users).where(eq(users.id, ticket.u)).limit(1)
   if (!row || row.banned) return null
   // An organization's Drop only acts for current members, as for any other request.
@@ -42,9 +45,10 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
       .where(and(eq(account.userId, row.id), eq(account.providerId, "github"))).limit(1)
     if (!await isGitHubMember(github?.token)) return null
   }
+  const role = row.role ?? ""
   const who: Identity = {
     userId: row.id, name: row.name, email: row.email, image: row.image ?? null,
-    role: isRole(row.role ?? "") ? row.role as Role : "member",
+    role: isRole(role) ? role : "member",
     actorKind: ticket.k,
     actorName: ticket.a,
   }
