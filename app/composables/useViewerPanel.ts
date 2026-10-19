@@ -29,7 +29,6 @@ export function useViewerPanel(options: { owner: Ref<boolean>; openCount: Ref<nu
     mobileSide,
     tabs,
     tab,
-    toggle: () => (wide.value ? (sideOpen.value = !sideOpen.value) : (mobileSide.value = !mobileSide.value)),
     close: () => (wide.value ? (sideOpen.value = false) : (mobileSide.value = false)),
     show(value: SideTab) {
       tab.value = value

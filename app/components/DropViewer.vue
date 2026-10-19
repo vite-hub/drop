@@ -14,6 +14,7 @@ import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
 import type { FrameMessage } from "~/composables/useDropFrame"
+import type { SideTab } from "~/utils/viewer"
 import type { PendingComment } from "./viewer/ViewerCommentPopover.vue"
 import type { Area } from "./viewer/ViewerLightbox.vue"
 
@@ -34,7 +35,7 @@ const { copy } = useCopy()
 const { remove, restore } = useDropActions()
 const colorMode = useColorMode()
 const mounted = useMounted()
-const dark = computed(() => mounted.value && colorMode.value === "dark")
+const dark = computed(() => colorMode.value === "dark")
 const [DefineSide, ReuseSide] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
 
@@ -96,8 +97,10 @@ onMounted(async () => {
 const attached = useAttachmentData(drop)
 
 const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value)
+// Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
+// the frame white until the dark one replaces it.
 const srcdoc = computed(() => {
-  if (drop.value.kind === "folder") return ""
+  if (!mounted.value || drop.value.kind === "folder") return ""
   if (isApp.value) return appDocument(page.value)
   if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value) : ""
   if (!attached.ready.value) return ""
@@ -266,8 +269,11 @@ function copyLink() {
   else shareOpen.value = true
 }
 
-const togglePanel = panel.toggle
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
+// Each tab has its own button in the header, like a toolbar's panes: it opens the panel there, and closes it once open.
+const has = (value: SideTab) => tabs.value.some(item => item.value === value)
+const showing = (value: SideTab) => panelOpen.value && tab.value === value
+const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
 // A folder someone else shares with you has no tab to show (no comments, no Details), so no panel either.
 const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 /** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
@@ -402,10 +408,13 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UTooltip v-if="drop.canEdit || drop.editNote" :kbds="drop.canEdit ? ['E'] : undefined" :text="drop.editNote ?? 'Edit together'">
             <UButton aria-label="Edit together" color="neutral" :disabled="!drop.canEdit" icon="i-ph-pencil-simple" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
           </UTooltip>
-          <UTooltip v-if="drop.versions.length > 1" text="History">
-            <UButton aria-label="History" :aria-pressed="panelOpen && tab === 'history'" color="neutral" icon="i-ph-clock-counter-clockwise" size="sm" :variant="panelOpen && tab === 'history' ? 'soft' : 'ghost'" @click="panel.show('history')" />
+          <UTooltip v-if="has('comments')" :kbds="['C']" text="Comments">
+            <UButton :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'" :aria-pressed="showing('comments')" color="neutral" icon="i-ph-chats" :label="openCount ? String(openCount) : undefined" size="sm" :ui="{ label: 'font-mono text-xs tabular-nums' }" :variant="showing('comments') ? 'soft' : 'ghost'" @click="toggleTab('comments')" />
           </UTooltip>
-          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || drop.versions.length > 1" class="mx-1 h-4" orientation="vertical" />
+          <UTooltip v-if="has('history')" text="History">
+            <UButton aria-label="History" :aria-pressed="showing('history')" color="neutral" icon="i-ph-clock-counter-clockwise" size="sm" :variant="showing('history') ? 'soft' : 'ghost'" @click="toggleTab('history')" />
+          </UTooltip>
+          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.some(item => item.value !== 'details')" class="mx-1 h-4" orientation="vertical" />
           <UTooltip v-if="!owner" text="Copy link">
             <UButton aria-label="Copy link" color="neutral" icon="i-ph-link" size="sm" variant="ghost" @click="copy(link, 'Link copied')" />
           </UTooltip>
@@ -415,11 +424,8 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           </UTooltip>
           <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'private' ? 'Share' : VISIBILITY_LABELS[drop.visibility]" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
-          <UTooltip v-if="tabs.length" :text="panelOpen ? 'Hide panel' : 'Show panel'">
-            <span class="relative">
-              <UButton :aria-label="panelOpen ? 'Hide panel' : 'Show panel'" :aria-pressed="panelOpen" color="neutral" icon="i-ph-sidebar-simple" size="sm" :variant="panelOpen ? 'soft' : 'ghost'" @click="togglePanel" />
-              <span v-if="openCount && !panelOpen" class="pointer-events-none absolute top-1 right-1 size-1.5 rounded-full bg-inverted ring-2 ring-(--ui-bg)" />
-            </span>
+          <UTooltip v-if="has('details')" text="Details">
+            <UButton aria-label="Details" :aria-pressed="showing('details')" color="neutral" icon="i-ph-info" size="sm" :variant="showing('details') ? 'soft' : 'ghost'" @click="toggleTab('details')" />
           </UTooltip>
         </template>
       </UDashboardNavbar>
@@ -482,9 +488,10 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
             <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-ph-download-simple" label="Download" :to="drop.url" external target="_blank" variant="outline" />
           </div>
         </div>
-        <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
-        <!-- Server and client bundlers format the embedded app resolver differently. -->
-        <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
+        <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
+        <!-- Server and client bundlers format the embedded app resolver differently. [color-scheme:light] on both frames
+             matches a blank or light document, so the browser paints no opaque white backdrop behind it in dark mode. -->
+        <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
 
         <ViewerDiff v-if="shownVersion && !editing" :key="shownVersion.id" :inset="floating ? FLOATING_INSET : 0" :previous="previousVersion" :version="shownVersion" @close="shownVersion = null" />
 
