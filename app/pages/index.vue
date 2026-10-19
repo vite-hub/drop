@@ -49,19 +49,20 @@ const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
-// The first card is the point of Drop, so it gets two columns; the rest fill two more rows of four. Each opens its docs.
+// The first card is the point of Drop, so it gets two columns; the rest fill two more rows of four. Each opens its
+// screenshot on the Features docs page.
 const FEATURES = [
-  { icon: "i-ph-sparkle", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand.", to: "/docs/review#comments" },
-  { icon: "i-ph-stack", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link.", to: "/docs/review#docs" },
-  { icon: "i-ph-chat-circle", title: "Comments on the exact spot", body: "Select a sentence, zoom into a screenshot, or drag a box. Reply in threads, or copy everything back as Markdown.", to: "/docs/review#comments" },
-  { icon: "i-ph-lock", title: "Private until shared", body: "Share with the team or make a link. Pick what it allows: view, comment, or edit.", to: "/docs/review#sharing" },
-  { icon: "i-ph-users", title: "Edit together", body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version.", to: "/docs/review#edit" },
-  { icon: "i-ph-clock-counter-clockwise", title: "Version history", body: "Each version gets a number and a note. History shows what it changed, and open comments carry over.", to: "/docs/review#versions" },
-  { icon: "i-ph-magnifying-glass", title: "Search everything", body: "Press ⌘K to find a drop by its name or by the words inside a doc, in any folder.", to: "/docs/review#search" },
-  { icon: "i-ph-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys.", to: "/docs/agents#add-the-server" },
-  { icon: "i-ph-book-open-text", title: "Skills for your agent", body: "They come with the server: publishing for review, before-and-after for pull requests, UI prototypes, handoffs, and explainers.", to: "/docs/agents#skill" },
-  { icon: "i-ph-folder-simple", title: "Folders agents follow", body: "A folder's description says what goes in it and how to write it. Agents read it before they publish.", to: "/docs/agents#folders" },
-  { icon: "i-ph-code", title: "Code images", body: "Your agent turns a snippet into a highlighted, framed image for a pull request or a post.", to: "/docs/agents#code-images" },
+  { icon: "i-ph-sparkle", title: "Agents make the changes", body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand.", to: "/docs/features#agents" },
+  { icon: "i-ph-stack", title: "Docs and apps", body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link.", to: "/docs/features#apps" },
+  { icon: "i-ph-chat-circle", title: "Comments on the exact spot", body: "Select a sentence, zoom into a screenshot, or drag a box. Reply in threads, or copy everything back as Markdown.", to: "/docs/features#comments" },
+  { icon: "i-ph-lock", title: "Private until shared", body: "Share with the team or make a link. Pick what it allows: view, comment, or edit.", to: "/docs/features#sharing" },
+  { icon: "i-ph-users", title: "Edit together", body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version.", to: "/docs/features#edit" },
+  { icon: "i-ph-clock-counter-clockwise", title: "Version history", body: "Each version gets a number and a note. History shows what it changed, and open comments carry over.", to: "/docs/features#versions" },
+  { icon: "i-ph-magnifying-glass", title: "Search everything", body: "Press ⌘K to find a drop by its name or by the words inside a doc, in any folder.", to: "/docs/features#search" },
+  { icon: "i-ph-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys.", to: "/docs/features#agents" },
+  { icon: "i-ph-book-open-text", title: "Skills for your agent", body: "They come with the server: publishing for review, before-and-after for pull requests, UI prototypes, handoffs, and explainers.", to: "/docs/features#skills" },
+  { icon: "i-ph-folder-simple", title: "Folders agents follow", body: "A folder's description says what goes in it and how to write it. Agents read it before they publish.", to: "/docs/features#folders" },
+  { icon: "i-ph-code", title: "Code images", body: "Your agent turns a snippet into a highlighted, framed image for a pull request or a post.", to: "/docs/features#code-images" },
 ]
 
 // One tab each, and only the open one's story plays. Every tab's words are in the server's HTML, the closed ones hidden.
@@ -72,7 +73,7 @@ const USE_CASES = [
     label: "Plans and docs",
     title: ["Write the plan ", "together", "."],
     body: "Your agent drops the plan in the folder that fits. The team edits it live, publishes the next version, and History shows what changed.",
-    docs: "/docs/review#edit",
+    docs: "/docs/features#edit",
   },
   {
     id: "pr",
@@ -88,7 +89,7 @@ const USE_CASES = [
     label: "Vibe-coded apps",
     title: ["Ship the thing you ", "just made", "."],
     body: "Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.",
-    docs: "/docs/review#apps",
+    docs: "/docs/features#apps",
   },
   {
     id: "site",

@@ -1,6 +1,7 @@
 import { decodeHTML } from "entities"
 
-const SKIP = new Set(["script", "style", "svg", "button", "nav", "template", "noscript"])
+// Figures are screenshots and the landing stories (DocsFigure); the text around them says what they show.
+const SKIP = new Set(["script", "style", "svg", "button", "nav", "template", "noscript", "figure"])
 const VOID = new Set(["br", "img", "hr", "input", "meta", "link", "source", "wbr"])
 
 interface Frame { tag: string; text: string; href?: string; ordered?: boolean; index?: number; cells?: string[]; rows?: string[][] }

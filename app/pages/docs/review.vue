@@ -29,11 +29,7 @@ const app = `publish({\n  title: "Launch board",\n  files: { "index.html": "…"
       <p>A folder works like one drop for sharing and lifetime. Sharing it shares everything inside, and one drop inside can still be shared wider on its own. Everything in it lives as long as the folder, and goes to the Trash and comes back with it. Folders don't count toward your plan's drops; the drops in them do.</p>
       <p>Every folder has a description, in its <strong>Details</strong>: what belongs in it and how to name and write it, up to 2,000 characters. For example, "Notes from calls, one doc per meeting, named YYYY-MM-DD-topic. Start with who was there, then decisions, then action items." Agents read the descriptions with <code>list_folders</code> before they publish something new, put it in the folder that fits, and follow what the description asks. You or your agent describe your own folders.</p>
       <p>On a team Drop, admins also make the team's folders, with the team's folder switch under <strong>New › Folder</strong>, and write their descriptions. Everyone on the team and their agents add drops to them; each drop stays its publisher's and counts against their plan. Team folders never expire and can't be Only me. Only admins rename, describe, share, or trash them, or add subfolders. Anyone on the team can move a drop in a team folder to the Trash from the browser; it goes to its owner's Trash, where the owner or an admin restores it.</p>
-    </DocsSection>
-
-    <DocsSection id="search" title="Search">
-      <p>Press <kbd>⌘K</kbd> (<kbd>Ctrl K</kbd> on Windows and Linux), or <strong>Search</strong> in the sidebar, on any page of Drop while you're signed in. It finds drops by their title, file name, or link, and docs by the words inside their latest version. It searches your drops in every folder, then the ones shared with you. Without words, it lists your latest drops and Drop's pages.</p>
-      <p>The search box on the Drops page (<kbd>/</kbd> puts the cursor in it) looks inside every folder too, and a folder's page searches only what's inside it. Agents search with <code>list_drops</code> and <code>query</code>, and add <code>folder</code> to search one folder and everything below it.</p>
+      <p>To find a drop in any folder, use <NuxtLink to="/docs/features#search">Search</NuxtLink>.</p>
     </DocsSection>
 
     <DocsSection id="comments" title="Comments">
@@ -84,25 +80,6 @@ const app = `publish({\n  title: "Launch board",\n  files: { "index.html": "…"
       </ul>
       <p>A drop that expires, or that you or your agent delete, goes to the <strong>Trash</strong>. Its links stop working. For 15 days you can restore it from the Trash on the Drops page; then it's deleted with its comments and files. You can also delete it for good, or empty the Trash, yourself. Agents can move drops to the Trash and restore them, but only people delete for good.</p>
       <p>Images and files a doc embeds from Drop belong to that doc: whoever can open the doc can see them, and they live and go to the Trash with it. A Drop's admin can change the 30 days, or allow only admins to keep drops.</p>
-    </DocsSection>
-
-    <DocsSection id="shortcuts" title="Keyboard shortcuts">
-      <div class="overflow-x-auto rounded-lg border border-default">
-        <table>
-          <thead><tr><th>Keys</th><th>Where</th><th>What it does</th></tr></thead>
-          <tbody>
-            <tr><td><kbd>⌘K</kbd></td><td>Any page, signed in</td><td>Search drops, docs, and pages</td></tr>
-            <tr><td><kbd>⌘B</kbd></td><td>Any page, signed in</td><td>Hide or show the sidebar</td></tr>
-            <tr><td><kbd>/</kbd></td><td>Drops page</td><td>Put the cursor in the search box</td></tr>
-            <tr><td><kbd>C</kbd></td><td>A drop</td><td>Open the comments</td></tr>
-            <tr><td><kbd>R</kbd></td><td>A drop</td><td>Comment on an area</td></tr>
-            <tr><td><kbd>E</kbd></td><td>A Markdown doc you may edit</td><td>Edit together</td></tr>
-            <tr><td><kbd>⌘S</kbd></td><td>The live editor</td><td>Publish the draft as the next version</td></tr>
-            <tr><td><kbd>Esc</kbd></td><td>A drop</td><td>Close a comment, leave area mode, or go back from a version</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>On Windows and Linux, use <kbd>Ctrl</kbd> for <kbd>⌘</kbd>.</p>
     </DocsSection>
   </DocsPage>
 </template>

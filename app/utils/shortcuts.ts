@@ -4,6 +4,8 @@
 export interface Shortcut {
   keys: string[]
   label: string
+  /** Where it works, when that's narrower than its group's. */
+  where?: string
 }
 
 export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcut[] }[] = [
@@ -14,7 +16,7 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
       { keys: ["?"], label: "Show keyboard shortcuts" },
       { keys: ["meta", "k"], label: "Search drops, docs, and pages" },
       { keys: ["meta", "b"], label: "Hide or show the sidebar" },
-      { keys: ["/"], label: "Search the Drops page" },
+      { keys: ["/"], label: "Search the Drops page", where: "The Drops page" },
     ],
   },
   {
@@ -35,3 +37,6 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
     ],
   },
 ]
+
+/** How the docs print a key that isn't a single letter. The docs show a Mac's ⌘ and say Ctrl works elsewhere. */
+export const KEY_LABELS: Record<string, string> = { meta: "⌘", escape: "Esc" }

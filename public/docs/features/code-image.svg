@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="501" height="294" viewBox="0 0 501 294">
+<defs><linearGradient id="frame" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+<rect width="501" height="294" rx="16" fill="url(#frame)"/>
+<rect x="32" y="32" width="437" height="230" rx="12" fill="#24292e"/>
+<circle cx="52" cy="51" r="6" fill="#ff5f57"/><circle cx="72" cy="51" r="6" fill="#febc2e"/><circle cx="92" cy="51" r="6" fill="#28c840"/>
+<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#e1e4e8">
+<text x="52" y="86.5" xml:space="preserve"><tspan fill="#F97583">export</tspan><tspan fill="#E1E4E8"> </tspan><tspan fill="#F97583">async</tspan><tspan fill="#E1E4E8"> </tspan><tspan fill="#F97583">function</tspan><tspan fill="#E1E4E8"> </tspan><tspan fill="#B392F0">publishPlan</tspan><tspan fill="#E1E4E8">(</tspan><tspan fill="#FFAB70">drop</tspan><tspan fill="#E1E4E8">, </tspan><tspan fill="#FFAB70">plan</tspan><tspan fill="#E1E4E8">) {</tspan></text>
+<text x="52" y="108.5" xml:space="preserve"><tspan fill="#E1E4E8">  </tspan><tspan fill="#F97583">const</tspan><tspan fill="#E1E4E8"> { </tspan><tspan fill="#79B8FF">link</tspan><tspan fill="#E1E4E8"> } </tspan><tspan fill="#F97583">=</tspan><tspan fill="#E1E4E8"> </tspan><tspan fill="#F97583">await</tspan><tspan fill="#E1E4E8"> drop.</tspan><tspan fill="#B392F0">publish</tspan><tspan fill="#E1E4E8">({</tspan></text>
+<text x="52" y="130.5" xml:space="preserve"><tspan fill="#E1E4E8">    markdown: plan,</tspan></text>
+<text x="52" y="152.5" xml:space="preserve"><tspan fill="#E1E4E8">    folder: </tspan><tspan fill="#9ECBFF">&quot;Plans&quot;</tspan><tspan fill="#E1E4E8">,</tspan></text>
+<text x="52" y="174.5" xml:space="preserve"><tspan fill="#E1E4E8">    lifetime: </tspan><tspan fill="#9ECBFF">&quot;review&quot;</tspan><tspan fill="#E1E4E8">,</tspan></text>
+<text x="52" y="196.5" xml:space="preserve"><tspan fill="#E1E4E8">  })</tspan></text>
+<text x="52" y="218.5" xml:space="preserve"><tspan fill="#E1E4E8">  </tspan><tspan fill="#F97583">return</tspan><tspan fill="#E1E4E8"> link</tspan></text>
+<text x="52" y="240.5" xml:space="preserve"><tspan fill="#E1E4E8">}</tspan></text>
+</g>
+</svg>

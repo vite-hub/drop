@@ -44,6 +44,7 @@ export const DOCS_NAV: Array<{ title: string; links: DocsLink[] }> = [
     title: "Use Drop",
     links: [
       { label: "Introduction", to: "/docs" },
+      { label: "Features", to: "/docs/features" },
       { label: "Connect an agent", to: "/docs/agents" },
       { label: "Review and share", to: "/docs/review" },
       { label: "Review a live site", to: "/docs/sites" },
