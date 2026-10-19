@@ -1,5 +1,6 @@
 import type { H3Event } from "h3"
 import { useServerEnv } from "#vitehub/env/server"
+import { siteMatches } from "#shared/review"
 
 /**
  * Apps and HTML docs run real code, and real apps need a real origin: storage, cookies, and history.pushState all
@@ -110,3 +111,21 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
   });
   parent.postMessage({ __drop: true, type: "host", path: location.pathname }, "*");
 })();</script></body></html>`
+
+/**
+ * Whether a site review's address reaches Drop itself or its content origin. Reviewing either inside Drop would frame
+ * Drop's own pages, or other people's drops, in Drop's page, so neither can be a site to review.
+ */
+export function siteCoversDrop(event: H3Event, siteUrl: string): boolean {
+  if (siteMatches(siteUrl, event.url.origin)) return true
+  const config = configured(event)
+  if (!config) return false
+  if (!siteUrl.includes("*")) {
+    const { hostname, port } = new URL(siteUrl)
+    if (port !== config.port) return false
+    return config.perDrop ? new RegExp(`^${escape(config.perDrop.prefix)}${LABEL}${escape(config.perDrop.suffix)}$`).test(hostname) : hostname === config.host
+  }
+  // A pattern covers the content origin when it covers any one drop's host on it.
+  const sample = config.perDrop ? `${config.perDrop.prefix}${"a".repeat(26)}${config.perDrop.suffix}` : config.host
+  return siteMatches(siteUrl, `${config.protocol}//${sample}${config.port ? `:${config.port}` : ""}`)
+}
