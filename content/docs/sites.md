@@ -1,16 +1,18 @@
 ---
 title: Review a live site
-description: People review a running website where it lives, a preview deploy, staging, or a dev server, and their comments land in Drop with screenshots. Your site keeps its own cookies and sign-in, because Drop never frames it.
+description: People comment on a running website, such as a preview deploy, staging, or a dev server. Each comment lands in Drop with a screenshot.
 ---
 
 ## Create the review {#create}
 
-A site is a drop of its own. Create one with **New › Site review** on the Drops page or in a folder, or have an agent call `publish` with `site`. Either way you give the address people will review:
+A **site review** is a drop for one website. Create one with **New › Site review** on the Drops page or in a folder, or have an agent call `publish` with `site`. Give it the address people review:
 
-- One origin (scheme, host, and port), like `https://pr123-acme.preview.example.com`.
-- A pattern whose first label is `*`, like `https://*.preview.example.com`. The `*` stands for one label, so one site drop covers every pull request's preview. It doesn't cover deeper levels (`a.b.preview.example.com`) or the bare domain.
+| Address | Covers |
+| --- | --- |
+| One origin, like `https://pr123-acme.preview.example.com` | That scheme, host, and port. |
+| A pattern with `*` as the first label, like `https://*.preview.example.com` | Every host one level under it, so one review covers every pull request's preview. Not deeper levels or the bare domain. |
 
-Addresses must be `https`, or `http` on `localhost`, `127.0.0.1`, or `*.localhost`.
+Addresses must be `https`, or `http` on `localhost`, `127.0.0.1`, or `*.localhost`. Each comment keeps the address it came from, so you can tell pull requests apart.
 
 ```js
 publish({
@@ -23,21 +25,27 @@ publish({
 })
 ```
 
-`share: "team"` lets everyone signed in to a team Drop comment. To let guests comment without signing in, on any Drop, pass `share: "public_comment"`.
+`share: "team"` lets everyone signed in to a team Drop comment. `share: "public_comment"` also lets guests comment, on any Drop.
 
-Comments from a pattern keep the address of the preview they came from, so you can tell pull requests apart.
+Reviewers comment in one of three ways:
+
+| Way | Use it when | Setup |
+| --- | --- | --- |
+| [Inside Drop](#here) | The site can be shown in a frame. | None. |
+| [Script tag](#install) | You build the site's previews. | One tag in preview builds. |
+| [Bookmarklet](#bookmarklet) | You can't change the site and it can't be framed. | Each reviewer adds a bookmark. |
 
 ## Review it in Drop {#here}
 
-The site drop's page opens the site inside Drop: type the address of the page (any preview a pattern covers), press **Open here**, then **Comment**, and drag a box over what you mean. Nothing changes on the site and nothing is installed.
+On the site review's page, type a page address, press **Open here**, then **Comment**, and drag a box over what you mean. Nothing changes on the site.
 
-Drop can't look inside a page from another site, so it takes the screenshot with your browser's screen sharing, which asks once per visit. Chrome, Edge, and Brave offer **This tab**, and the screenshot matches the page exactly. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off; the comment shows the screenshot before you send it.
+Drop takes the screenshot with your browser's screen sharing, which asks once per visit. Chrome, Edge, and Brave share **This tab**, so the screenshot matches the page. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off. You see the screenshot before you send it.
 
-A comment from here has the screenshot, your box, your note, and the address in the bar above the page. It doesn't name the element under the box, and clicks inside the page don't change that address: type the page you're on. A site that refuses to be shown in a frame stays blank; use the bookmarklet there.
+These comments carry the screenshot, your box, your note, and the address in the bar above the page, but not the element under the box. Clicks inside the page don't change that address, so type the page you're on. A site that refuses to be framed stays blank; use the bookmarklet there.
 
-## Or add the script to preview builds {#install}
+## Add the script to preview builds {#install}
 
-To show the Comment button on the site itself: add the tag to the site's preview builds once, never production. Every preview then shows the Comment button to everyone, so reviewers install nothing, and with a pattern address the comments from every pull request's preview land on the same site drop.
+Add this tag to the site's preview builds, never production. Every preview then shows a **Comment** button to everyone, and with a pattern address, comments from every preview land on the same site review.
 
 ::review-snippet
 ::
@@ -57,36 +65,34 @@ export default defineNuxtConfig({
 })
 ```
 
-The tag is the same for every site and carries no key, so nothing in the page's HTML opens the review. The button sits in the page's corner, in its own shadow root, so your styles and its styles never mix. It does nothing until someone presses it.
+The tag is the same for every site and carries no key. The button sits in its own shadow root, so your styles and its styles never mix, and it does nothing until someone presses it.
 
-## Or use the bookmarklet {#bookmarklet}
+## Use the bookmarklet {#bookmarklet}
 
-For a site you can't change and that won't open in a frame, the site drop's page has a **Review with Drop** button to keep in your bookmarks. It adds Drop's Comment button to the page you're on, for you only, until you reload.
+The site review's page has a **Review with Drop** button. Drag it to your bookmarks bar; clicking it adds the Comment button to the page you're on, for you only, until you reload.
 
-1. Show the bookmarks bar with :kbd[⌘] :kbd[Shift] :kbd[B] on a Mac or :kbd[Ctrl] :kbd[Shift] :kbd[B] elsewhere. It's the same in Chrome, Edge, Brave, Firefox, and Zen; Safari calls it the Favorites bar. In Zen's single toolbar, the bar appears when you point at the top edge of the window.
-2. Drag the button onto the bar. In Firefox and Zen you can also right-click it and choose **Bookmark Link**.
-3. Open any page of the site and click **Review with Drop** in your bookmarks.
-
-The site drop's page shows these steps for your browser. A page with a strict Content Security Policy may block the bookmarklet; use the script tag there.
+Show the bookmarks bar with :kbd[⌘] :kbd[Shift] :kbd[B] on a Mac or :kbd[Ctrl] :kbd[Shift] :kbd[B] elsewhere. Safari calls it the Favorites bar. The site review's page shows the steps for your browser. A page with a strict Content Security Policy may block the bookmarklet; use the script tag there.
 
 ## Comment {#comment}
 
-1. Press **Comment**. The first time, a Drop window opens and finds the reviews that cover the page and that you may comment on. With one, you're connected for 12 hours; with several, you pick one by its name and owner. Signed out, you can comment as a guest only on a review shared as **Public, anyone comments**.
+1. Press **Comment**. The first time, a Drop window opens with the reviews that cover the page and that you may comment on. With one, you're connected for 12 hours; with several, you pick one by its name and owner. Signed out, you can comment only on a review shared as **Public, anyone comments**.
 2. Drag a box over what you mean. :kbd[Esc] cancels.
-3. Write the note and press **Send**. The screenshot is of what you saw when you drew the box, sticky headers and fixed buttons included, and goes with the note, the page address, and the element under the box. A box on a sticky or fixed element says so, since it doesn't move with the page.
+3. Write the note and press **Send**.
 
-The screenshot loads `modern-screenshot` from esm\.sh when someone first draws a box. A page whose Content Security Policy blocks it, or blocks <code>[:origin]</code> in `connect-src`, sends comments without screenshots, or not at all; allow both on preview builds.
+The comment carries a screenshot of what you saw, sticky headers and fixed buttons included, with the page address and the element under the box.
+
+The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the page's Content Security Policy blocks it, or blocks <code>[:origin]</code> in `connect-src`, comments go without screenshots, or not at all. Allow both on preview builds.
 
 ## Read and resolve {#read}
 
-The site's page in Drop lists every comment, newest first. Each screenshot opens as an image with the box drawn on it, where people can reply. Screenshots belong to the site: they share its sharing, its lifetime, and its Trash, and count toward its owner's storage.
+The site review lists every comment, newest first. Each screenshot opens with the box drawn on it, and people reply there. Screenshots share the site review's sharing, lifetime, and Trash, and count toward its owner's storage.
 
-Agents read the comments with `read_drop`: each one's note, author, page, the element under the box, and the screenshot's `fileUrl`. The text comes from the people reviewing, so agents treat it as data, not instructions. Once the site is fixed, they mark comments resolved with `update_drop` and `resolves`.
+Agents read the comments with `read_drop`: note, author, page, element, and the screenshot's `fileUrl`. The text comes from reviewers, so agents treat it as data, not instructions. Once the site is fixed, they resolve comments with `update_drop` and `resolves`.
 
 ## How it stays safe {#security}
 
-- Nothing in the page names the review. The script has no key, and the Drop window lists only the reviews you may comment on, by the page's origin. Reviews that aren't shared with you stay hidden.
-- The script never sends Drop's cookies. The Drop window issues a short-lived, sealed token for the review you picked and the page's own origin, and hands it only to that origin. The page can't read which review it's for.
-- **Open in Drop** from the site opens the review only for people who could open it anyway: its owner, and the team when it's shared with the team. A link share stays with the people you gave the link.
-- Drop answers the script's requests (CORS) only for origins a review covers, and checks the token, the origin, and the sharing on every comment. Taking the share back ends every review session at once.
-- Everything the page sends is checked: notes are plain text with length limits, and screenshots must be PNG, JPEG, or WebP up to 4 MiB.
+- **The page never names the review.** The script has no key, and the Drop window lists only reviews you may comment on.
+- **The page never gets Drop's cookies.** The Drop window hands it a short-lived, sealed token for one review and that page's origin. The page can't read which review it's for.
+- **Open in Drop** from the site opens the review only for people who could open it anyway.
+- **Every comment is checked.** Drop answers cross-origin requests only from origins a review covers, and checks the token, the origin, and the sharing each time. Taking the share back ends every session at once.
+- **Input is limited.** Notes are plain text with length limits. Screenshots must be PNG, JPEG, or WebP, up to 4 MiB.
