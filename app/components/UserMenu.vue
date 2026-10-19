@@ -29,17 +29,22 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
     :content="props.compact ? { side: 'bottom', align: 'end', sideOffset: 6 } : { side: 'top', align: 'start', sideOffset: 6 }"
     :ui="{ content: props.compact ? 'w-60' : 'w-(--reka-dropdown-menu-trigger-width) min-w-52' }"
   >
-    <button v-if="props.compact" class="grid size-8 cursor-pointer place-items-center rounded-md transition-colors hover:bg-elevated data-[state=open]:bg-elevated" type="button" aria-label="Account menu">
-      <UAvatar :alt="me?.name ?? 'You'" class="rounded-md" :src="me?.image ?? undefined" size="xs" />
-    </button>
-    <!-- shadcn's NavUser: a large sidebar button with the avatar, name and role. -->
-    <button v-else class="flex h-12 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-elevated data-[state=open]:bg-elevated" type="button" aria-label="Account menu">
-      <UAvatar :alt="me?.name ?? 'You'" class="rounded-lg" :src="me?.image ?? undefined" size="md" />
-      <span class="min-w-0 flex-1 leading-tight">
-        <span class="block truncate text-sm font-medium text-highlighted">{{ me?.name ?? "You" }}</span>
-        <span class="block truncate text-xs text-muted">{{ roleLabel }}</span>
-      </span>
-      <UIcon name="i-ph-caret-up-down" class="size-4 shrink-0 text-dimmed" />
+    <!-- One trigger element either way: the dropdown's slot hydrates a single node. Compact is just the avatar;
+         otherwise shadcn's NavUser, a large sidebar button with the avatar, name and role. -->
+    <button
+      class="flex cursor-pointer items-center rounded-md transition-colors hover:bg-elevated data-[state=open]:bg-elevated"
+      :class="props.compact ? 'size-8 justify-center' : 'h-12 w-full gap-2 px-2 text-left'"
+      type="button"
+      aria-label="Account menu"
+    >
+      <UAvatar :alt="me?.name ?? 'You'" :class="props.compact ? 'rounded-md' : 'rounded-lg'" :src="me?.image ?? undefined" :size="props.compact ? 'xs' : 'md'" />
+      <template v-if="!props.compact">
+        <span class="min-w-0 flex-1 leading-tight">
+          <span class="block truncate text-sm font-medium text-highlighted">{{ me?.name ?? "You" }}</span>
+          <span class="block truncate text-xs text-muted">{{ roleLabel }}</span>
+        </span>
+        <UIcon name="i-ph-caret-up-down" class="size-4 shrink-0 text-dimmed" />
+      </template>
     </button>
 
     <template #account>
