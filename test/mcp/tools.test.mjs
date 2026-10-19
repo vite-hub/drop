@@ -9,6 +9,7 @@ const { default: listDrops } = await import("../../server/mcp/tools/list_drops.t
 const { default: updateDrop } = await import("../../server/mcp/tools/update_drop.ts")
 const { default: commentsGet } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
+const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
 
 migrate()
 beforeEach(() => {
@@ -132,4 +133,35 @@ test("read_drop shows the errors people's browsers reported for the current app 
   await call(publish, { previous: app.id, files: { "index.html": "<p>fixed</p>" }, note: "v2" })
   await recordRuntimeErrors(app.id, 1, [report])
   assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
+})
+
+test("a file without base64 gets an upload URL; curl -T creates the drop once, and a changed ticket does nothing", async () => {
+  state.authSecret = "test-secret"
+  try {
+    assert.equal((await call(publish, { file: { name: "after.png" }, note: "After" })).isError, true, "the same checks run before a URL is handed out")
+    const ticket = (await call(publish, { file: { name: "after.png" }, note: "After", lifetime: "keep", keepReason: "Screenshots for vite-hub/drop#12.", share: "view" })).structuredContent
+    assert.match(ticket.uploadUrl, /^https:\/\/drop\.example\/api\/uploads\/v2\.[\w-]+$/)
+    assert.equal(ticket.method, "PUT")
+    assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0, "nothing exists until the upload")
+
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
+    state.who = null // curl sends no sign-in; the ticket stands in for it
+    const put = (url, body = png) => {
+      const event = new H3Event(new Request(url, { method: "PUT", body, headers: { "content-length": String(body.length) } }))
+      event.context.log = { set() {}, error() {}, warn() {} }
+      event.context.params = { ticket: new URL(url).pathname.split("/").pop() }
+      return uploadPut(event)
+    }
+    const shot = await put(ticket.uploadUrl)
+    assert.equal(shot.kind, "image")
+    assert.equal(shot.share, "view")
+    assert.equal(shot.lifetime, "keep")
+    assert.match(shot.fileUrl, /^https:\/\/drop\.example\/f\/[0-9a-f-]{36}\.png$/)
+    assert.equal(sql.prepare("SELECT actor_name FROM drops WHERE id = ?").get(shot.id).actor_name, "Claude Code", "the drop names the agent that asked")
+
+    await assert.rejects(put(ticket.uploadUrl), /already used/)
+    const tampered = ticket.uploadUrl.slice(0, -4) + (ticket.uploadUrl.endsWith("AAAA") ? "BBBB" : "AAAA")
+    await assert.rejects(put(tampered), /run out or isn't valid/)
+  }
+  finally { state.authSecret = undefined }
 })

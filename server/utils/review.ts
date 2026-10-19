@@ -49,8 +49,11 @@ async function sealKey(event: H3Event) {
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"])
 }
 
+/** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
+type SealPurpose = "token" | "choice" | "upload"
+
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
-async function seal(event: H3Event, purpose: "token" | "choice", value: object) {
+export async function seal(event: H3Event, purpose: SealPurpose, value: object) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(purpose) }, await sealKey(event), encoder.encode(JSON.stringify(value))))
   const bytes = new Uint8Array(iv.length + sealed.length)
@@ -59,9 +62,9 @@ async function seal(event: H3Event, purpose: "token" | "choice", value: object) 
   return `v2.${base64url(bytes)}`
 }
 
-async function unseal<T>(event: H3Event, purpose: "token" | "choice", text: string): Promise<T | null> {
+export async function unseal<T>(event: H3Event, purpose: SealPurpose, text: string, maxLength = 2048): Promise<T | null> {
   const [version, body, extra] = text.split(".")
-  if (version !== "v2" || !body || extra !== undefined || text.length > 2048) return null
+  if (version !== "v2" || !body || extra !== undefined || text.length > maxLength) return null
   try {
     const bytes = unbase64url(body)
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12), additionalData: encoder.encode(purpose) }, await sealKey(event), bytes.slice(12))

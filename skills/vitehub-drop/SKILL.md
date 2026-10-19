@@ -16,7 +16,7 @@ You work through Drop's MCP server at `https://drop.vitehub.dev/mcp`. There is n
 - `markdown`: a doc. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
 - `html`: a self-contained HTML page.
 - `files`: a small static app, files keyed by path with an `index.html`. Relative links, ES modules, and `fetch("data.json")` work like on any static host. There is no server code: import libraries from a CDN URL such as `https://esm.sh/preact`, since bare imports like `"preact"` don't load in a browser.
-- `file`: any other file up to 4 MiB, as `{ name, base64 }`. Use it for screenshots: people pin comments on an image or drag an area on it.
+- `file`: any other file up to 4 MiB. Use it for screenshots: people pin comments on an image or drag an area on it. For a file on disk, pass only `{ name }`: `publish` answers with an `uploadUrl`, good for 15 minutes and one upload. Run `curl -T <path> '<uploadUrl>'`; it creates the drop and prints it as JSON, with its `fileUrl`. Pass `{ name, base64 }` only for a few bytes you already hold as text.
 
 Every publish needs a `note`: what this is, or for a new version what changed, like a commit message. People read it in the version history.
 

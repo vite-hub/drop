@@ -18,7 +18,7 @@ Show reviewers what changed on screen, marked up so they don't have to hunt for 
    [(r.x / innerWidth) * 100, (r.y / innerHeight) * 100, (r.width / innerWidth) * 100, (r.height / innerHeight) * 100].map((v) => +v.toFixed(1));
    ```
 
-4. Publish each screenshot to Drop with `publish` and `file` (`lifetime: "keep"`, `keepReason` naming the pull request, `share: "view"`), then use the `fileUrl` it returns. Images already hosted elsewhere over `https` work too.
+4. Publish each screenshot with `publish` and `file: { name }` (`lifetime: "keep"`, `keepReason` naming the pull request, `share: "view"`). It answers with an `uploadUrl`; run `curl -T before.png '<uploadUrl>'`, which prints the drop with its `fileUrl`. Images already hosted elsewhere over `https` work too.
 
 ## Write
 
