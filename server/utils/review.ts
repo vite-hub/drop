@@ -12,6 +12,7 @@ import type { SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { account, comments, drops, user } from "../databases/config"
 import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
+import { siteCoversDrop } from "./content-origin"
 import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions } from "./drops"
 import { githubOrganization, isGitHubMember } from "./github-membership"
 import { type Identity, roleOf } from "./identity"
@@ -221,6 +222,7 @@ export function reviewApi(handler: (event: H3Event) => Promise<unknown>) {
 export async function createSiteDrop(who: Identity, input: LifetimeInput & { url: string; title?: string; slug?: string; share?: Share; folder?: DropRow }, event?: H3Event) {
   const siteUrl = siteAddress(input.url)
   if (!siteUrl) throw new HTTPError({ status: 400, statusText: `That address can't be reviewed. ${SITE_ADDRESS_RULE}` })
+  if (event && siteCoversDrop(event, siteUrl)) throw new HTTPError({ status: 400, statusText: "That address is Drop itself or where it shows drops, which can't be a site to review." })
   const folder = input.folder ?? null
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)

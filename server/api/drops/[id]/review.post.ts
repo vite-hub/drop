@@ -2,6 +2,7 @@ import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { siteMatches } from "#shared/review"
+import { siteCoversDrop } from "../../../utils/content-origin"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -20,7 +21,7 @@ export default defineHandler(async (event) => {
   if (!site || site.kind !== "site" || !permissions(site, who).view) throw new HTTPError({ status: 404, statusText: "No site with that id." })
   if (!permissions(site, who).comment) throw new HTTPError({ status: 403, statusText: "You can't comment on this site." })
   const origin = event.url.searchParams.get("origin") ?? ""
-  if (!site.siteUrl || !siteMatches(site.siteUrl, origin)) throw new HTTPError({ status: 400, statusText: "That address isn't part of this site." })
+  if (!site.siteUrl || !siteMatches(site.siteUrl, origin) || siteCoversDrop(event, origin)) throw new HTTPError({ status: 400, statusText: "That address isn't part of this site." })
   await requireRateLimit(event, "review-comment", { key: who?.userId, limit: 20, window: "1m" })
   const { input, shot } = await readReviewComment(event)
 

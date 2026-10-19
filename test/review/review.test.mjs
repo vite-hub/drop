@@ -167,6 +167,25 @@ test("people create a site review in the app, at the top or in a folder, within 
   assert.equal((await json(full)).code, "DROP_LIMIT_REACHED")
 })
 
+test("a site review can't be Drop itself or where Drop shows drops", async () => {
+  state.who = who
+  state.contentOrigin = "https://*-drop.example.com"
+  for (const url of ["https://drop.example", "https://abcdefghijklmnopqrstuvwxyz-drop.example.com", "https://*.example.com"]) {
+    const response = await answer(newSite, post("/api/sites", { url }))
+    assert.equal(response.status, 400, url)
+    assert.match((await json(response)).message, /Drop itself/)
+  }
+  // Other sites under the same zone are fine: only the content origin's shape is refused.
+  assert.equal((await answer(newSite, post("/api/sites", { url: "https://staging.example.com" }))).status, 200)
+  state.contentOrigin = "https://usercontent.example.org"
+  assert.equal((await answer(newSite, post("/api/sites", { url: "https://usercontent.example.org" }))).status, 400)
+  assert.equal((await answer(newSite, post("/api/sites", { url: "https://*.example.org" }))).status, 400)
+
+  // A site drop from before the rule still can't take comments from inside Drop for Drop's own address.
+  site("old", { site_url: "https://*.example" })
+  assert.equal((await embedded("old", {}, { origin: "https://drop.example" })).status, 400)
+})
+
 test("the connect popup finds the reviews that cover the page, only the ones the person may comment on", async () => {
   state.mode = "team"
   // One review covers every preview, another one PR only.

@@ -148,10 +148,19 @@ onBeforeUnmount(discard)
       <UButton color="neutral" :variant="drawing ? 'solid' : 'outline'" icon="i-ph-chat-circle" :label="drawing ? 'Drawing…' : 'Comment'" @click="comment" />
     </div>
     <p v-if="!valid" class="border-b border-default px-3 py-1.5 text-xs text-error">That address isn't part of this site ({{ drop.siteUrl }}).</p>
-    <p v-else-if="capture.active.value && !capture.exact.value" class="border-b border-default px-3 py-1.5 text-xs text-muted">You shared a window, not this tab, so a screenshot may be slightly off. Check it before you send.</p>
+    <p v-else-if="capture.active.value && !capture.exact.value" class="border-b border-default px-3 py-1.5 text-xs text-muted">You shared a window or a screen, not this tab, so a screenshot may be slightly off or show more than this page. Check it before you send.</p>
 
     <div ref="stage" class="relative min-h-0 flex-1 bg-muted">
-      <iframe :key="open" class="absolute inset-0 size-full border-0 bg-white" :src="open" :title="`${drop.title}: the site under review`" />
+      <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
+           dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
+      <iframe
+        :key="open"
+        class="absolute inset-0 size-full border-0 bg-white"
+        referrerpolicy="strict-origin"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
+        :src="open"
+        :title="`${drop.title}: the site under review`"
+      />
       <div v-if="drawing" class="absolute inset-0 cursor-crosshair touch-none bg-inverted/5" @pointerdown="down" @pointermove="move" @pointerup="up">
         <div v-if="box" class="absolute rounded-sm border-2 border-inverted bg-inverted/10" :style="{ left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` }" />
         <p v-else class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm">Drag over what you mean. <UKbd value="escape" /> cancels.</p>
