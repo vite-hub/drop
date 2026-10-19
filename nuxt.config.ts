@@ -125,6 +125,8 @@ export default defineNuxtConfig({
         "simple-icons:windsurf", "simple-icons:zedindustries", "simple-icons:opencode", "simple-icons:githubactions",
         // Host icons in the docs (app/utils/docs.ts).
         "simple-icons:cloudflare", "simple-icons:vercel", "simple-icons:netlify", "simple-icons:deno", "ph:hard-drives",
+        // Share states' icons (SHARE_ICONS in shared/share.ts) that no template names.
+        "ph:users-three",
         // The Get started checklist's step marks (app/components/GetStarted.vue).
         "ph:check-circle-fill", "ph:circle",
         // Nuxt UI's own icons (app.config ui.icons): the scanner reads templates, not app.config, so without these the
