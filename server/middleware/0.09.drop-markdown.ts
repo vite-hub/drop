@@ -8,8 +8,8 @@ const DOC_PATH = /^\/d\/([^/]+?)(?:\/([^/]+?))?(\.md)?$/
 const AI_FETCHER = /ChatGPT-User|OAI-SearchBot|GPTBot|Claude-User|Claude-SearchBot|ClaudeBot|Perplexity-User|PerplexityBot/i
 
 /**
- * A doc's share link as Markdown: `/d/<link>/<slug>.md`, or the link itself for a request that asks for
- * `text/markdown` and not HTML, or comes from an AI fetcher. Markdown docs and single HTML pages only; anything else
+ * A doc's share link as Markdown: `/d/<link>/<slug>.md`, or the link itself for a request that prefers
+ * `text/markdown` to HTML, or comes from an AI fetcher. Markdown docs and single HTML pages only; anything else
  * falls through to the page. It reads the doc through the API, so it passes the same gates the page does.
  */
 export default defineHandler(async (event) => {
@@ -18,7 +18,8 @@ export default defineHandler(async (event) => {
   if (!match) return
   const [, key, , suffix] = match
   const accept = event.req.headers.get("accept") ?? ""
-  const wanted = suffix || (accept.includes("text/markdown") && !accept.includes("text/html")) || AI_FETCHER.test(event.req.headers.get("user-agent") ?? "")
+  const asked = accept.includes("text/markdown") && (await import("../../shared/accept")).prefersMarkdown(accept)
+  const wanted = suffix || asked || AI_FETCHER.test(event.req.headers.get("user-agent") ?? "")
   if (!wanted || !key) return
   // A sub-request through this app, as the reader: same cookies, same platform runtime (bindings) as this request.
   const read = async <T>(path: string) => {
