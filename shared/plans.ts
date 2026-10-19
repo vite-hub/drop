@@ -11,6 +11,12 @@ export function kindFromFilename(filename: string): PlanKind {
   return "file"
 }
 
+/** A file the viewer plays: MP4, WebM, and the rest browsers play in a <video>. It stays a `file` drop. */
+export function videoType(filename: string): string | undefined {
+  const type = lookup(filename)
+  return type?.startsWith("video/") ? type : undefined
+}
+
 /** An HTML doc's <title> or first <h1>, else the filename. (Markdown titles come from Comark's parse.) */
 export function titleFromSource(source: string, kind: PlanKind, filename: string): string {
   if (kind === "html") {

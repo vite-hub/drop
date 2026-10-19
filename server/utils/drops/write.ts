@@ -7,7 +7,7 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
-import { kindFromFilename, titleFromSource } from "#shared/plans"
+import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
 import { renderMarkdownCached } from "../markdown-document"
 import { deleteMarkdownCache } from "../markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
@@ -168,6 +168,8 @@ export async function createDocDrop(
     contentType = kind === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8"
   }
   if (kind === "file" && contentType.startsWith("image/")) kind = "image"
+  // The bytes only tell images and PDFs apart; files are served with nosniff, so a video needs its type to play.
+  if (kind === "file" && contentType === "application/octet-stream") contentType = videoType(filename) ?? contentType
 
   let previous: DropRow | null = null
   const supersedes =

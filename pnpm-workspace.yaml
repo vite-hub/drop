@@ -25,7 +25,7 @@ patchedDependencies:
   "@vite-hub/auth@0.0.4": patches/@vite-hub__auth@0.0.4.patch
   # Under `nuxt dev` (cloudflare-dev), the Blob plugin stored unenv's process.env proxy as globalThis.__env__, which
   # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings
-  # (vite-hub/vitehub#2468).
+  # (vite-hub/vitehub#2468). Its serve() also answers a single byte Range with a 206, so videos seek (and play in Safari).
   "@vite-hub/blob@0.0.4": patches/@vite-hub__blob@0.0.4.patch
   # `vitehub schedule run` returned 500 under `nuxt dev` (ssrLoadModule needs a runnable ssr environment) and ran
   # outside Nitro elsewhere. Runs Static Schedules through the Nitro dev handler, imports registry definitions by

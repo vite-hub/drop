@@ -6,6 +6,7 @@
 // wires them up.
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
+import { videoType } from "#shared/plans"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropComment, DropVersion } from "#shared/types"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
@@ -26,6 +27,7 @@ const [DefineSide, ReuseSide] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
 
 const isApp = computed(() => drop.value.kind === "app")
+const video = computed(() => (drop.value.kind === "file" ? videoType(drop.value.filename) : undefined))
 // The owner gets their controls on the public link too: it is where they land after sharing it.
 const owner = computed(() => drop.value.isOwner)
 // Signed-in people read a public link inside the app, sidebar included (pages/d/[id]/[[slug]].vue); visitors see it alone.
@@ -644,6 +646,7 @@ const threadComment = computed(() => {
           :inset="floating ? FLOATING_INSET : 0"
           :public-view="publicView"
         />
+        <ViewerVideo v-else-if="video && drop.url" :inset="inset" :src="drop.url" :title="drop.title" :type="video" />
         <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
         <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
           <div>

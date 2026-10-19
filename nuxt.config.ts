@@ -219,6 +219,9 @@ export default defineNuxtConfig({
 
   experimental: { typescriptPlugin: true },
 
+  // media-chrome's elements (app/components/viewer/ViewerVideo.vue) are web components, not Vue components.
+  vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("media-") } },
+
   typescript: {
     strict: true,
     typeCheck: false,

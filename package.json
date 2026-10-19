@@ -58,6 +58,7 @@
     "isbot": "^5.2.2",
     "jose": "^6.2.12",
     "mdream": "2.0.3",
+    "media-chrome": "^4.19.3",
     "medium-zoom": "1.1.0",
     "mrmime": "^2.0.1",
     "nanotar": "^0.3.0",
