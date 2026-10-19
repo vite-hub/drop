@@ -6,7 +6,7 @@ import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
 
-export type PendingComment = Omit<CommentInput, "body">
+type PendingComment = Omit<CommentInput, "body">
 
 const props = defineProps<{ x: number; y: number; pending?: PendingComment; comment?: DropComment; canManage: boolean; canReply: boolean }>()
 const emit = defineEmits<{

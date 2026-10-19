@@ -8,7 +8,7 @@ import { prependToHead } from "./plan-runtime.ts"
 export type ProjectFiles = Record<string, string>
 
 /** Resolves `ref` relative to the file at `from`. Returns null for external URLs. Embedded in the page runtime. */
-export function resolvePath(from: string, ref: string): string | null {
+function resolvePath(from: string, ref: string): string | null {
   if (!ref || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) return null
   const clean = ref.split("#")[0]!.split("?")[0]!
   if (!clean) return null

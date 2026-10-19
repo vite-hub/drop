@@ -151,7 +151,7 @@ export async function cleanupQuotaReservations(now: Date) {
     log.warn({ action: "quota-reservation-release", reservation, ageMs: now.getTime() - reservation.createdAt })
 }
 
-export async function releaseQuotaBlobs(keys: string[]) {
+async function releaseQuotaBlobs(keys: string[]) {
   // D1's bind limit is lower than a blob-list page size.
   for (let offset = 0; offset < keys.length; offset += 80)
     await db.delete(quotaBlobs).where(inArray(quotaBlobs.blobKey, keys.slice(offset, offset + 80)))

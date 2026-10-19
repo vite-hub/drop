@@ -33,7 +33,7 @@ export interface Usage {
   selfHostUrl: string
 }
 
-export const QUOTA_UNITS = ["drops", "bytes", "writes", "appFiles", "appBytes", "burstPublishes"] as const
+const QUOTA_UNITS = ["drops", "bytes", "writes", "appFiles", "appBytes", "burstPublishes"] as const
 export type QuotaUnit = typeof QUOTA_UNITS[number]
 export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
@@ -60,7 +60,7 @@ export const QuotaFailureSchema = v.object({
 }) satisfies v.GenericSchema<QuotaFailure>
 
 /** The first instant of next month, UTC, when monthly file writes start over. */
-export function nextMonthStart(now = new Date()): Date {
+function nextMonthStart(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
 }
 

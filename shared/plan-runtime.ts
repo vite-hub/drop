@@ -61,7 +61,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
  * Commented text is highlighted with the CSS Custom Highlight API and everything else draws in a shadow root, so the
  * author's DOM is never modified.
  */
-export const ANNOTATOR_SCRIPT = String.raw`(() => {
+const ANNOTATOR_SCRIPT = String.raw`(() => {
   const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
   const host = document.createElement("drop-comments");
   host.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;";
@@ -362,7 +362,7 @@ export const OPAQUE_ORIGIN_SHIM = String.raw`(() => {
  * promises nobody handled, console.error calls, and files that failed to load. Runs before the page's scripts.
  * At most 20 distinct reports per page load, each cut to 500 characters.
  */
-export const ERROR_REPORTER = String.raw`(() => {
+const ERROR_REPORTER = String.raw`(() => {
   const seen = new Set();
   const text = (value) => {
     if (value instanceof Error) return value.name + ": " + value.message;

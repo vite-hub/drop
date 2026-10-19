@@ -3,7 +3,7 @@
 // areas. Opened from a page, it zooms out of the image's place there (FLIP), like medium-zoom.
 import type { DropComment } from "#shared/types"
 
-export type Area = { ox: number; oy: number; ow: number; oh: number }
+type Area = { ox: number; oy: number; ow: number; oh: number }
 
 const props = defineProps<{
   src: string

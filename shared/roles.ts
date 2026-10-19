@@ -15,7 +15,7 @@ export const ROLE_SUMMARY: Record<Role, string> = {
 export const isRole = (value: string): value is Role => ROLES.some(role => role === value)
 
 /** The admins `DROP_ADMINS` names: emails, comma- or space-separated, compared without case. */
-export const adminEmails = (value: string) => value.split(/[\s,]+/).map(email => email.trim().toLowerCase()).filter(Boolean)
+const adminEmails = (value: string) => value.split(/[\s,]+/).map(email => email.trim().toLowerCase()).filter(Boolean)
 
 /**
  * Someone's role: admin when `admins` (DROP_ADMINS) has their email and a sign-in method verified it. `trustUnverified`

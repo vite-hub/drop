@@ -4,7 +4,7 @@
 
 /** Crockford's base32, lowercase: no i, l, o or u to misread. */
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
-export const LINK_LENGTH = 12
+const LINK_LENGTH = 12
 export const MAX_SLUG = 60
 
 /** A new link key: 12 characters, 60 random bits. Like a drop's id, it's the key to a shared drop. */

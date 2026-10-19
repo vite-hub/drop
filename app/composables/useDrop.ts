@@ -7,7 +7,7 @@ import * as v from "valibot"
  * One drop and its comments, with the actions the viewer needs. Keys follow the id, so the cache
  * stays right when the router reuses the page for another drop (the next version, for instance).
  */
-export function useDrop(id: MaybeRefOrGetter<string>) {
+function useDrop(id: MaybeRefOrGetter<string>) {
   const notify = useNotify()
   const drop = useApi<DropDetail>(() => `/api/drops/${toValue(id)}`, { key: () => keys.drop(toValue(id)) })
   const comments = useApi<DropComment[]>(() => `/api/drops/${toValue(id)}/comments`, { key: () => keys.comments(toValue(id)), default: () => [] })

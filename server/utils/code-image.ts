@@ -54,8 +54,8 @@ const THEMES = {
   "catppuccin-mocha": () => import("@shikijs/themes/catppuccin-mocha"),
 } as const
 
-export type CodeTheme = keyof typeof THEMES
-export const DEFAULT_CODE_THEME: CodeTheme = "github-dark"
+type CodeTheme = keyof typeof THEMES
+const DEFAULT_CODE_THEME: CodeTheme = "github-dark"
 
 /** Theme names agents learned from the old Ray.so renderer keep working. */
 const THEME_ALIASES = new Map<string, CodeTheme>([
@@ -123,7 +123,7 @@ ${lines.join("\n")}
   return { svg, width, height }
 }
 
-export const CODE_IMAGE_PREFIX = "code-images/"
+const CODE_IMAGE_PREFIX = "code-images/"
 const CODE_IMAGE_TTL_MS = 5 * 60 * 1000
 
 /** Code images are public and short-lived: the expiry is part of the key, and an hourly schedule sweeps them. */

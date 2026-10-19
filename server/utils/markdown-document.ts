@@ -103,7 +103,7 @@ export async function annotationIssues(markdown: string): Promise<string[]> {
   return (await parseMarkdown(markdown)).meta.annotateIssues ?? []
 }
 
-export async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string }> {
+async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string }> {
   try {
     const document = await parseMarkdown(markdown)
     const supersedes = supersedesHref(document.frontmatter.supersedes)

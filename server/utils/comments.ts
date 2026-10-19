@@ -12,7 +12,7 @@ export type ReplyRow = typeof commentReplies.$inferSelect
 /** What toComment adds from other tables: the authors' pictures by user id, and each comment's replies. */
 export type CommentExtras = { images: Map<string, string | null>; replies: Map<string, ReplyRow[]> }
 
-export const toReply = (row: ReplyRow, who: Identity | null, images?: Map<string, string | null>): CommentReply => ({
+const toReply = (row: ReplyRow, who: Identity | null, images?: Map<string, string | null>): CommentReply => ({
   id: row.id, body: row.body, authorName: row.authorName, authorImage: (row.authorId && images?.get(row.authorId)) || null,
   createdAt: row.createdAt, mine: Boolean(who && row.authorId === who.userId),
 })

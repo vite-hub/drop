@@ -5,7 +5,7 @@
 import { ELEMENT_NAMING } from "./plan-runtime"
 
 /** Pinned, and loaded only when someone presses Comment. A page whose CSP blocks it sends comments without a screenshot. */
-export const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
+const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
 
 const STYLE = `
 :host { all: initial; --bg: #fff; --fg: #0a0a0a; --muted: #737373; --border: #e5e5e5; --primary: #171717; --primary-fg: #fafafa; --ring: #a3a3a3; --error: #dc2626; }
@@ -62,7 +62,7 @@ const MARKUP = `<div class="ui">
  * `describe` names the element under a box, and says when it's on a sticky or fixed one, which doesn't scroll. Needs
  * ELEMENT_NAMING's labelOf.
  */
-export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024;
+const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024;
   let screenshotModule = null;
   // Loaded when someone presses Comment, so the box's screenshot can start the moment it's drawn.
   const loadScreenshot = () => (screenshotModule = screenshotModule || import(${JSON.stringify(SCREENSHOT_MODULE)}));

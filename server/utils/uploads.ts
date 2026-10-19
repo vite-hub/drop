@@ -18,7 +18,7 @@ import { seal, unseal } from "./review"
  * Uploading runs that call with the file's bytes, checks and all, so the ticket can't do more than the call could.
  */
 
-export const UPLOAD_MINUTES = 15
+const UPLOAD_MINUTES = 15
 // A ticket carries a whole publish call (a note, a keep reason, a title), so it's longer than a review token.
 const MAX_TICKET = 8192
 

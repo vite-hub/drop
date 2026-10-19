@@ -19,7 +19,7 @@ export function appFileChunks(rows: (typeof dropFiles.$inferInsert)[]) {
 // The same conditional INSERT runs on D1 and in the SQLite concurrency tests. Drops in the Trash (on their own or in
 // a folder that is), folders, and files a doc embeds don't count as drops; drops in folders do. Bytes still count
 // until they're deleted.
-export const usageCTE = `WITH RECURSIVE scope AS (SELECT ? AS owner, ? AS month, ? AS cutoff), trashed(id) AS (
+const usageCTE = `WITH RECURSIVE scope AS (SELECT ? AS owner, ? AS month, ? AS cutoff), trashed(id) AS (
   SELECT id FROM drops WHERE owner_id = (SELECT owner FROM scope) AND trashed_at IS NOT NULL
   UNION SELECT d.id FROM drops d JOIN trashed t ON d.parent_id = t.id
 ), usage AS (
