@@ -1,5 +1,5 @@
 import type { Component } from "vue"
-import { ConfirmModal, MoveModal, PromptModal, SiteModal } from "#components"
+import { ConfirmModal, FolderModal, MoveModal, PromptModal, SiteModal } from "#components"
 
 function useDialog<T extends Component>(component: T) {
   const overlay = useOverlay()
@@ -31,6 +31,12 @@ export function usePrompt() {
 export function useSiteDialog() {
   const open = useDialog(SiteModal)
   return async () => await open({}) ?? null
+}
+
+/** `await folderDialog({ offerTeam })`: a new folder's name, description, and whether it's the team's; null when cancelled. */
+export function useFolderDialog() {
+  const open = useDialog(FolderModal)
+  return async (props: Parameters<typeof open>[0] = {}) => await open(props) ?? null
 }
 
 /** `await moveTo({ drop })`: pick a folder for the drop, or the top. Resolves true once it moved. */

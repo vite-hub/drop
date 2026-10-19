@@ -61,7 +61,7 @@ const click = computed(() => (beat.value === "p.tab" ? BEATS[index.value]![1] - 
                   summary="1 addition and 1 removal"
                   :lines="EDIT"
                 />
-                <BrainlessClaudeToolCall v-if="at('p.drop')" tool="drop - publish (MCP)" arg='title: "Pricing card: before/after", lifetime: "keep", share: "view", …' result="Published: drop.vitehub.dev/d/p7q2 (id=p7q2)" />
+                <BrainlessClaudeToolCall v-if="at('p.drop')" tool="drop - publish (MCP)" arg='title: "Pricing card: before/after", lifetime: "keep", share: "public", …' result="Published: drop.vitehub.dev/d/p7q2 (id=p7q2)" />
                 <BrainlessClaudeToolCall v-if="at('p.pr')" tool="Bash" arg="gh pr create --fill" result="https://github.com/acme/web/pull/142" />
               </div>
               <BrainlessClaudePrompt>

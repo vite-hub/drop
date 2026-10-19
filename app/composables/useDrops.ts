@@ -1,6 +1,7 @@
 import { type Lifetime, TRASH_DAYS } from "#shared/expiry"
 import { dropPath } from "#shared/links"
-import type { Access, DropSummary, Visibility } from "#shared/types"
+import type { Share } from "#shared/share"
+import type { DropSummary, Viewer } from "#shared/types"
 
 /**
  * Your drops. The list is one keyed cache ("drops") shared by the sidebar tree and the Drops page; the actions
@@ -8,7 +9,7 @@ import type { Access, DropSummary, Visibility } from "#shared/types"
  */
 export const useDrops = () => useApi("/api/drops", { key: "drops", default: () => [] })
 
-/** Other people's drops: everything shared with the team, plus share links you opened while signed in. */
+/** What others share with you: on a team Drop the team's folders and teammates' drops, on a personal one the public links you opened. */
 export const useSharedWithMe = () => useApi("/api/drops", { key: "shared-with-me", query: { shared: 1 }, default: () => [] })
 
 /** The drops directly in a folder, for an expanded row in the tree or the Drops page. Keyed `folder:<id>`. */
@@ -30,6 +31,7 @@ export function useShareUrl(drop: MaybeRefOrGetter<Pick<DropSummary, "link" | "s
  */
 export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>("drops")
+  const { data: me } = useNuxtData<Viewer | null>("me")
   const drops = computed({ get: () => cached.value ?? [], set: value => (cached.value = value) })
   const refresh = () => refreshNuxtData(["drops", "usage"])
   const notify = useNotify()
@@ -42,7 +44,7 @@ export function useDropActions() {
     drops.value = drops.value.map(drop => (drop.id === id ? { ...drop, ...change } : drop))
   }
 
-  /** Uploads one file as a private drop, or into `folder`, where it shares and lives with the folder. */
+  /** Uploads one file as a drop with this Drop's default share, or into `folder`, where it shares and lives with the folder. */
   async function upload(file: File, folder?: Pick<DropSummary, "id" | "title">) {
     const form = new FormData()
     form.append("file", file)
@@ -50,7 +52,7 @@ export function useDropActions() {
     try {
       const result = await $fetch<{ id: string }>("/api/files", { method: "POST", body: form })
       await (folder ? refreshNuxtData(["drops", "usage", `folder:${folder.id}`, `drop:${folder.id}`]) : refresh())
-      notify.done(folder ? `Dropped into ${folder.title}` : "Dropped privately", file.name)
+      notify.done(folder ? `Dropped into ${folder.title}` : me.value?.mode === "team" ? "Dropped for the team" : "Dropped privately", file.name)
       return result
     }
     catch (error) {
@@ -59,14 +61,14 @@ export function useDropActions() {
     }
   }
 
-  // Optimistic: sharing is a toggle, so it flips at once and rolls back if the server says no.
-  async function setVisibility(drop: Pick<DropSummary, "id">, visibility: Visibility, access?: Access) {
+  // Optimistic: sharing is one pick, so it changes at once and rolls back if the server says no.
+  async function setShare(drop: Pick<DropSummary, "id">, share: Share) {
     const before = drops.value
-    patch(drop.id, { visibility, ...(access ? { access } : {}) })
+    patch(drop.id, { share })
     try {
-      const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { visibility, ...(access ? { access } : {}) } })
+      const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { share } })
       patch(drop.id, result)
-      await refreshNuxtData([`drop:${drop.id}`, ...folders()])
+      await refreshNuxtData([`drop:${drop.id}`, "shared-with-me", ...folders()])
       return true
     }
     catch (error) {
@@ -148,11 +150,11 @@ export function useDropActions() {
     }
   }
 
-  /** A new folder at the top, or inside `parent`. */
-  async function createFolder(title: string, parent?: Pick<DropSummary, "id">) {
+  /** A new folder at the top, or inside `parent`, with what goes in it. `team` makes one of the team's (admins only). */
+  async function createFolder(title: string, parent?: Pick<DropSummary, "id">, options: { description?: string; team?: boolean } = {}) {
     try {
-      const folder = await $fetch<DropSummary>("/api/folders", { method: "POST", body: { title, ...(parent ? { folder: parent.id } : {}) } })
-      await refreshNuxtData(["drops", ...(parent ? [`folder:${parent.id}`, `drop:${parent.id}`] : [])])
+      const folder = await $fetch<DropSummary>("/api/folders", { method: "POST", body: { title, ...(parent ? { folder: parent.id } : {}), ...options } })
+      await refreshNuxtData(["drops", "shared-with-me", ...(parent ? [`folder:${parent.id}`, `drop:${parent.id}`] : [])])
       notify.done("Folder created", folder.title)
       return folder
     }
@@ -174,6 +176,21 @@ export function useDropActions() {
     }
   }
 
+  /** A folder's description: what goes in it and how, which agents read to pick it. */
+  async function describe(folder: Pick<DropSummary, "id">, description: string) {
+    try {
+      const result = await $fetch<DropSummary>(`/api/drops/${folder.id}`, { method: "PATCH", body: { description } })
+      patch(folder.id, result)
+      await refreshNuxtData([`drop:${folder.id}`, "shared-with-me"])
+      notify.done("Description saved")
+      return true
+    }
+    catch (error) {
+      notify.fail("Couldn't save the description", error)
+      return false
+    }
+  }
+
   /** Moves a drop into a folder, or to the top with null. It then shares and lives with the folder. */
   async function move(drop: Pick<DropSummary, "id" | "title" | "parentId">, folder: Pick<DropSummary, "id" | "title"> | null) {
     try {
@@ -189,5 +206,5 @@ export function useDropActions() {
     }
   }
 
-  return { upload, setVisibility, setLifetime, remove, restore, deleteForever, emptyTrash, createFolder, createSite, move }
+  return { upload, setShare, setLifetime, remove, restore, deleteForever, emptyTrash, createFolder, createSite, describe, move }
 }

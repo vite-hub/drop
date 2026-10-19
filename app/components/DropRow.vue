@@ -1,23 +1,27 @@
 <script setup lang="ts">
-import { type DropSummary, type Visibility, VISIBILITY_HINTS, VISIBILITY_ICONS, VISIBILITY_LABELS } from "#shared/types"
+import { isPublic, type Share, SHARE_HINTS, SHARE_ICONS } from "#shared/share"
+import type { DropSummary } from "#shared/types"
 import { dropPath } from "#shared/links"
 
-// A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`).
-const props = withDefaults(defineProps<{ drop: DropSummary; depth?: number; open?: boolean }>(), { depth: 0, open: false })
+// A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`). In a team
+// folder (`inTeam`) anyone may move a teammate's drop to the Trash.
+const props = withDefaults(defineProps<{ drop: DropSummary; depth?: number; open?: boolean; inTeam?: boolean }>(), { depth: 0, open: false, inTeam: false })
 const emit = defineEmits<{ delete: []; restore: []; deleteForever: []; toggle: [] }>()
 const INDENT = ["pl-4", "pl-10", "pl-16", "pl-22", "pl-28", "pl-34", "pl-40", "pl-46"]
 const trashed = computed(() => props.drop.trashedAt !== null)
 const notify = useNotify()
 const { copy } = useCopy()
-const { setVisibility } = useDropActions()
+const { setShare } = useDropActions()
 const moveTo = useMoveDialog()
 const folder = computed(() => props.drop.kind === "folder")
-const shared = computed(() => props.drop.visibility !== "private")
-// Someone else's drop, in Shared with me: open it and copy its link, nothing else.
+const shared = computed(() => props.drop.share !== "private")
+// Someone else's drop, in Shared with me or a team folder: open it and copy its link; in a team folder, trash it too.
 const theirs = computed(() => Boolean(props.drop.owner))
 const { data: me } = useMe()
-const audiences = (Object.keys(VISIBILITY_LABELS) as Visibility[]).map(value => ({ value, label: VISIBILITY_LABELS[value], icon: VISIBILITY_ICONS[value] }))
-const status = computed(() => props.drop.quarantinedAt ? "Quarantined" : props.drop.shareReview === "pending" ? "Pending review" : props.drop.shareReview === "rejected" ? "Rejected" : VISIBILITY_LABELS[props.drop.visibility])
+// The team's folders are the admins' to share.
+const changeable = computed(() => !theirs.value && (!props.drop.teamFolder || me.value?.role === "admin"))
+const choices = computed(() => shareItems(me.value, props.drop))
+const status = computed(() => shareStatus(props.drop))
 
 const link = useShareUrl(() => props.drop)
 const detail = computed(() => {
@@ -26,28 +30,27 @@ const detail = computed(() => {
   return `${props.drop.kind === "app" && props.drop.paths ? `${props.drop.filename} · ${props.drop.paths.length} files` : props.drop.filename}${where}`
 })
 
-const SHARED_TITLES: Record<Visibility, string> = { private: "Private again", team: "Shared with your team", shared: "Public link on" }
-async function setAudience(next: Visibility) {
-  if (next === props.drop.visibility) return true
-  // Sharing a private Markdown doc with the team means working on it together, so it opens for editing.
-  const access = next === "team" && !shared.value && props.drop.kind === "markdown" ? "edit" : undefined
-  if (!await setVisibility(props.drop, next, access)) return false
-  notify.done(SHARED_TITLES[next], VISIBILITY_HINTS[next])
+async function pick(next: Share) {
+  if (next === props.drop.share) return true
+  if (!await setShare(props.drop, next)) return false
+  notify.done(SHARED_TITLES[next], SHARE_HINTS[next])
   return true
 }
 
 async function copyLink() {
   // Copying never widens a share on its own: the toast says who each choice lets in, and the team comes first.
-  if (!shared.value) {
-    const shareAndCopy = (next: Visibility) => async () => {
-      if (await setAudience(next)) await copyLink()
+  if (!shared.value && changeable.value) {
+    const shareAndCopy = (next: Share) => async () => {
+      if (await pick(next)) await copyLink()
     }
+    const team = choices.value.some(item => item.value === "team")
+    const open = choices.value.some(item => item.value === "public")
     notify.info({
-      title: "This drop is private",
-      description: me.value?.team ? "Share it with your team, or turn on a public link anyone can open." : "Turn on a public link to copy it. Anyone with the link can open it.",
+      title: "Only you can open this",
+      description: team ? "Share it with the team, or turn on a public link anyone can open." : open ? "Turn on a public link to copy it. Anyone with the link can open it." : "Share it before you copy its link.",
       actions: [
-        ...(me.value?.team ? [{ label: "Share with team & copy", color: "neutral" as const, variant: "outline" as const, onClick: shareAndCopy("team") }] : []),
-        { label: "Public link & copy", color: "neutral", variant: me.value?.team ? "ghost" : "outline", onClick: shareAndCopy("shared") },
+        ...(team ? [{ label: "Share with team & copy", color: "neutral" as const, variant: "outline" as const, onClick: shareAndCopy("team") }] : []),
+        ...(open ? [{ label: "Public link & copy", color: "neutral" as const, variant: team ? "ghost" as const : "outline" as const, onClick: shareAndCopy("public") }] : []),
       ],
     })
     return
@@ -58,13 +61,13 @@ async function copyLink() {
 const menu = computed(() => [
   [
     { label: "Open", icon: "i-ph-eye", to: `/drops/${props.drop.id}` },
-    { label: "Open shared page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
+    { label: isPublic(props.drop.share) ? "Open public page" : "Open shared page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
     { label: "Copy link", icon: "i-ph-link", onSelect: copyLink },
   ],
-  ...(theirs.value ? [] : [[
+  ...(changeable.value ? [[
     { label: "Move to folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: props.drop }) },
     { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") },
-  ]]),
+  ]] : theirs.value && props.inTeam ? [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]] : []),
 ])
 </script>
 
@@ -110,12 +113,12 @@ const menu = computed(() => [
       <span class="mt-0.5 block text-xs text-muted tabular-nums"><TimeAgo :at="drop.updatedAt" /></span>
     </div>
     <span v-if="trashed" class="hidden text-sm text-muted md:block">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
-    <span v-else-if="theirs" class="hidden items-center gap-1.5 text-sm text-muted md:flex">
-      <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3.5" />{{ status }}
+    <span v-else-if="!changeable" class="hidden items-center gap-1.5 text-sm text-muted md:flex">
+      <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5" />{{ drop.teamFolder ? "The team's" : status }}
     </span>
     <!-- Shared through a folder above: the folder's share is changed there, this drop's own on its page. -->
     <span v-else-if="drop.sharedFrom" class="hidden min-w-0 items-center gap-1.5 text-sm text-muted md:flex" :title="`Shared through ${drop.sharedFrom.title}`">
-      <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3.5 shrink-0" /><span class="truncate">Via {{ drop.sharedFrom.title }}</span>
+      <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5 shrink-0" /><span class="truncate">Via {{ drop.sharedFrom.title }}</span>
     </span>
     <USelect
       v-else
@@ -123,12 +126,12 @@ const menu = computed(() => [
       class="relative z-10 hidden w-full text-sm md:inline-flex"
       :class="shared ? 'text-highlighted' : 'text-muted'"
       color="neutral"
-      :icon="VISIBILITY_ICONS[drop.visibility]"
-      :items="audiences"
-      :model-value="drop.visibility"
+      :icon="SHARE_ICONS[drop.share]"
+      :items="choices"
+      :model-value="drop.share"
       size="sm"
       variant="ghost"
-      @update:model-value="setAudience"
+      @update:model-value="pick"
     >
       <template #default>{{ status }}</template>
     </USelect>

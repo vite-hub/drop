@@ -41,11 +41,12 @@ const USE_CASES = [
 ] as const
 
 const SELF_HOSTED = [
+  "Team mode: shared inside the team, closed to the internet",
   "Deploy to Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
   "Any sign-in Better Auth supports",
 ]
-// The members in the self-hosted card's picture: one of each role, as they'd show on the Members page.
-const TEAM = [{ name: "You", role: "admin" }, { name: "Ben", role: "editor" }, { name: "Lea", role: "member" }] as const
+// The members in the self-hosted card's picture, as they'd show on the Members page.
+const TEAM = [{ name: "You", role: "admin" }, { name: "Ben", role: "member" }, { name: "Lea", role: "member" }] as const
 
 const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drops expire after 30 days, unless you keep them"]
 </script>
@@ -171,8 +172,8 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
             </div>
             <div class="flex-1 px-4 pt-5 pb-4">
               <p class="label-mono">Your own</p>
-              <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Deploy your own and choose the admins.</p>
-              <p class="mt-1.5 text-sm leading-relaxed text-muted">Everyone joins as {{ ROLE_LABELS.member }}. Admins promote people to {{ ROLE_LABELS.editor }}, who can edit and share any drop.</p>
+              <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Deploy one for your team.</p>
+              <p class="mt-1.5 text-sm leading-relaxed text-muted">What anyone drops is the team's, filed in folders your admins describe for people and agents. Public links close after a week.</p>
               <ul class="mt-4 space-y-2 text-sm">
                 <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
                   <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}

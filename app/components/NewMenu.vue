@@ -3,12 +3,14 @@
 // upload, a folder or a site to review. On a phone it keeps only its icon, so the bar doesn't push the title out.
 import type { DropdownMenuItem } from "@nuxt/ui"
 
+// `folder` false hides the folder entry: in a team folder only admins add folders.
+const props = withDefaults(defineProps<{ folder?: boolean }>(), { folder: true })
 const emit = defineEmits<{ folder: []; site: [] }>()
 
-const items: DropdownMenuItem[] = [
-  { label: "Folder", description: "Groups related drops", icon: "i-ph-folder-simple", onSelect: () => emit("folder") },
+const items = computed<DropdownMenuItem[]>(() => [
+  ...(props.folder ? [{ label: "Folder", description: "Groups related drops", icon: "i-ph-folder-simple", onSelect: () => emit("folder") }] : []),
   { label: "Site review", description: "Comments on a live URL", icon: "i-ph-globe-simple", onSelect: () => emit("site") },
-]
+])
 </script>
 
 <template>

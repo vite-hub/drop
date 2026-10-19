@@ -14,8 +14,12 @@ const close = () => (open.value = false)
 
 const onDrops = computed(() => route.path === "/drops" && route.query.tab !== "with-me")
 const onShared = computed(() => route.path === "/drops" && route.query.tab === "with-me")
-// Drops start open on their tree; the caret folds it away.
+// Drops start open on their tree; the caret folds it away. A team Drop leads with the team's folders, and its Team page
+// takes the place of Shared with me.
 const dropsOpen = ref(true)
+const teamOpen = ref(true)
+const { data: me } = useMe()
+const team = computed(() => me.value?.mode === "team")
 const workspace = computed(() => [
   { label: "Agents", icon: "i-ph-sparkle", activeIcon: "i-ph-sparkle-fill", to: "/agents", active: at("/agents") || at("/approve") },
   { label: "Skills", icon: "i-ph-puzzle-piece", activeIcon: "i-ph-puzzle-piece-fill", to: "/skills", active: at("/skills") },
@@ -68,9 +72,25 @@ function leaveDocs() {
       <div class="relative -mx-2 flex min-h-0 flex-1 overflow-hidden">
         <Transition :name="`sidebar-${slide}`">
           <div v-if="pane === 'main'" key="main" class="flex min-h-0 w-full min-w-0 flex-col bg-default px-2">
-            <!-- Drops, their tree, and Shared with me: the part of this pane that scrolls. -->
+            <!-- The team's folders, your drops, and what's shared with you: the part of this pane that scrolls. -->
             <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
-              <SidebarItem active-icon="i-ph-stack-fill" :active="onDrops" icon="i-ph-stack" label="Drops" to="/drops" @navigate="close">
+              <template v-if="team">
+                <SidebarItem active-icon="i-ph-users-fill" :active="onShared" icon="i-ph-users" label="Team" to="/drops?tab=with-me" @navigate="close">
+                  <button
+                    :aria-expanded="teamOpen"
+                    :aria-label="teamOpen ? 'Collapse team folders' : 'Expand team folders'"
+                    class="grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed hover:bg-accented hover:text-highlighted"
+                    type="button"
+                    @click="teamOpen = !teamOpen"
+                  >
+                    <UIcon name="i-ph-caret-right" class="size-3.5 transition-transform duration-150" :class="teamOpen && 'rotate-90'" />
+                  </button>
+                </SidebarItem>
+                <div v-if="teamOpen" class="ml-3.5 border-l border-default pl-2">
+                  <TeamTree @navigate="close" />
+                </div>
+              </template>
+              <SidebarItem active-icon="i-ph-stack-fill" :active="onDrops" icon="i-ph-stack" :label="team ? 'My drops' : 'Drops'" to="/drops" @navigate="close">
                 <button
                   :aria-expanded="dropsOpen"
                   :aria-label="dropsOpen ? 'Collapse drops' : 'Expand drops'"
@@ -84,7 +104,7 @@ function leaveDocs() {
               <div v-if="dropsOpen" class="ml-3.5 border-l border-default pl-2">
                 <DropTree @navigate="close" />
               </div>
-              <SidebarItem active-icon="i-ph-tray-fill" :active="onShared" icon="i-ph-tray" label="Shared with me" to="/drops?tab=with-me" @navigate="close" />
+              <SidebarItem v-if="!team" active-icon="i-ph-tray-fill" :active="onShared" icon="i-ph-tray" label="Shared with me" to="/drops?tab=with-me" @navigate="close" />
             </nav>
 
             <div class="flex flex-col gap-0.5 border-t border-default pt-2">

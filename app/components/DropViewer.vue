@@ -9,7 +9,8 @@ import { dropPath } from "#shared/links"
 import { injectRuntime } from "#shared/plan-runtime"
 import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
-import { type DropComment, type DropVersion, VISIBILITY_ICONS, VISIBILITY_LABELS } from "#shared/types"
+import { SHARE_ICONS } from "#shared/share"
+import type { DropComment, DropVersion } from "#shared/types"
 import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
@@ -269,7 +270,7 @@ defineShortcuts({
 
 const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), "Feedback copied as Markdown")
 function copyLink() {
-  if (drop.value.visibility !== "private") void copy(link.value, "Link copied")
+  if (drop.value.share !== "private") void copy(link.value, "Link copied")
   else shareOpen.value = true
 }
 
@@ -396,7 +397,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <ViewerAction icon="i-ph-link" label="Copy link" @click="copyLink" />
           <ViewerAction v-if="drop.url" icon="i-ph-download-simple" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
           <ViewerAction v-if="owner && !trashed" icon="i-ph-folder-simple-plus" label="Move to folder" @click="moveTo({ drop })" />
-          <ViewerAction destructive icon="i-ph-trash" label="Move to Trash" @click="deleteDrop" />
+          <ViewerAction v-if="drop.canTrash && !trashed" destructive icon="i-ph-trash" label="Move to Trash" @click="deleteDrop" />
         </template>
       </ViewerOverview>
     </div>
@@ -455,7 +456,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UTooltip v-if="visitor" text="Report">
             <UButton aria-label="Report" :to="{ path: '/report', query: { target: `/d/${drop.link}` } }" color="neutral" icon="i-ph-flag" size="sm" variant="ghost" />
           </UTooltip>
-          <UButton v-if="owner" color="neutral" :icon="VISIBILITY_ICONS[drop.visibility]" :label="drop.shareReview === 'pending' ? 'Pending review' : drop.shareReview === 'rejected' ? 'Share rejected' : drop.visibility === 'private' ? 'Share' : VISIBILITY_LABELS[drop.visibility]" size="sm" :variant="drop.visibility === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
+          <UButton v-if="owner" color="neutral" :icon="SHARE_ICONS[drop.share]" :label="drop.share === 'private' && !drop.shareReview ? 'Share' : shareStatus(drop)" size="sm" :variant="drop.share === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
         </template>
       </UDashboardNavbar>
@@ -467,7 +468,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
         :actions="[{ label: 'Restore', color: 'error', variant: 'outline', size: 'sm', loading: restoring, onClick: restoreDrop }]"
         class="rounded-none border-0 border-b border-default"
         color="error"
-        :description="drop.trashReason === 'expired' ? 'Nobody opened it for a while, so its link stopped working. Only you and editors can see it until you restore it.' : 'Its link stopped working. Only you and editors can see it until you restore it.'"
+        :description="drop.trashReason === 'expired' ? 'Nobody opened it for a while, so its link stopped working. Only you and admins can see it until you restore it.' : 'Its link stopped working. Only you and admins can see it until you restore it.'"
         icon="i-ph-trash"
         orientation="horizontal"
         :title="expiryLabel(drop, now)"
@@ -499,7 +500,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
       />
       <div v-if="isApp" class="flex h-9 shrink-0 items-center gap-2 border-b border-default px-3">
         <span class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted">
-          <UIcon :name="VISIBILITY_ICONS[drop.visibility]" class="size-3 shrink-0" />
+          <UIcon :name="SHARE_ICONS[drop.share]" class="size-3 shrink-0" />
           <span class="truncate">{{ drop.slug || drop.link }}/{{ page === "index.html" ? "" : page }}</span>
         </span>
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />

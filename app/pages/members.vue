@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { Member } from "#shared/types"
-import { DEFAULT_ROLE, ROLE_LABELS, ROLE_SUMMARY, ROLES, type Role } from "#shared/roles"
+import { DEFAULT_ROLE, ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Members" })
 
-// Anyone can sign in with GitHub and joins as Member; admins promote people from here.
+// Anyone who signs in joins as a Member; DROP_ADMINS names the admins by email, so nobody changes roles here.
 const { data: me } = useMe()
-const { members, status, setRole, ban, unban, remove } = useMembers()
+const { members, status, ban, unban, remove } = useMembers()
 const admin = computed(() => me.value?.role === "admin")
 const search = ref("")
 const host = useRequestURL().host
@@ -16,9 +16,9 @@ const host = useRequestURL().host
 const description = computed(() => {
   const total = members.value.length || me.value?.members || 1
   return total > 1
-    ? `${total} people. Anyone can sign in with GitHub and joins as ${ROLE_LABELS[DEFAULT_ROLE]}; their drops stay private to them.`
+    ? `${total} people. Everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}; ${me.value?.mode === "team" ? "what they drop is the team's unless they keep it to themselves" : "their drops stay private to them"}.`
     // There's no invite flow: say how a teammate gets in, since that's the first thing a new owner looks for here.
-    : `Just you so far. To bring your team in, send them ${host}: anyone who signs in with GitHub joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
+    : `Just you so far. To bring your team in, send them ${host}: everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
 })
 
 const rows = computed(() => {
@@ -28,7 +28,6 @@ const rows = computed(() => {
     .sort((a, b) => Number(b.you) - Number(a.you) || ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || a.name.localeCompare(b.name))
 })
 
-const roleItems = ROLES.map(value => ({ label: ROLE_LABELS[value], value }))
 const statusOf = (member: Member) => (member.banned ? "Banned" : "Active")
 
 function menu(member: Member): DropdownMenuItem[][] {
@@ -45,7 +44,7 @@ function menu(member: Member): DropdownMenuItem[][] {
 <template>
   <PageShell id="members" title="Members" :description="description">
     <template v-if="admin" #actions><UButton to="/admin/review" label="Review Shares" color="neutral" size="sm" variant="ghost" /><UButton to="/admin/reports" label="Reports" color="neutral" size="sm" variant="ghost" /></template>
-    <div class="mb-6 grid grid-cols-1 divide-y divide-default rounded-lg border border-default sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+    <div class="mb-6 grid grid-cols-1 divide-y divide-default rounded-lg border border-default sm:grid-cols-2 sm:divide-x sm:divide-y-0">
       <div v-for="role in ROLES" :key="role" class="px-4 py-3">
         <p class="flex items-center gap-2 text-sm font-medium text-highlighted">
           {{ ROLE_LABELS[role] }}
@@ -90,17 +89,7 @@ function menu(member: Member): DropdownMenuItem[][] {
               </div>
             </td>
             <td class="px-2 py-3 sm:px-4">
-              <USelect
-                v-if="admin && !member.you"
-                :aria-label="`Role for ${member.name}`"
-                class="w-full"
-                color="neutral"
-                :items="roleItems"
-                :model-value="member.role"
-                size="sm"
-                @update:model-value="value => setRole(member, value as Role)"
-              />
-              <span v-else class="px-2.5">{{ ROLE_LABELS[member.role] }}</span>
+              <span>{{ ROLE_LABELS[member.role] }}</span>
             </td>
             <td class="hidden px-4 py-3 text-right font-mono text-xs md:table-cell">{{ member.drops }}</td>
             <td class="hidden px-4 py-3 sm:table-cell">
@@ -116,7 +105,7 @@ function menu(member: Member): DropdownMenuItem[][] {
       </table>
     </div>
 
-    <p v-if="!admin && me" class="mt-3 text-xs text-muted">Only admins can change roles.</p>
+    <p v-if="me" class="mt-3 text-xs text-muted">Admins are the people whose emails are in <code>DROP_ADMINS</code>, set where this Drop is deployed.</p>
 
 
   </PageShell>

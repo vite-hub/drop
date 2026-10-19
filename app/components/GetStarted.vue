@@ -14,13 +14,16 @@ const snippets = mcpSnippets(`${origin}/mcp`)
 const clients = (Object.keys(MCP_CLIENTS) as McpClient[]).map(value => ({ label: MCP_CLIENTS[value], value }))
 const client = ref<McpClient>("claude")
 const PROMPT = "Write a one-page plan for what we're building next and drop it for review."
+// On a team Drop a drop is the team's from the start, so sharing is done once there's one.
+const { data: me } = useMe()
+const team = computed(() => me.value?.mode === "team")
 
 // Docs and apps count as a first drop; a folder or a site review alone has nothing to read yet.
 const docs = computed(() => props.drops.filter(drop => drop.kind !== "folder" && drop.kind !== "site"))
 const steps = computed(() => [
   { id: "agent", title: "Connect an agent", done: agents.value.length > 0 || props.drops.some(drop => drop.actorKind === "agent") },
   { id: "drop", title: "Drop your first doc", done: docs.value.length > 0 },
-  { id: "share", title: "Share it", done: props.drops.some(drop => drop.visibility !== "private") },
+  { id: "share", title: team.value ? "Show it to the team" : "Share it", done: props.drops.some(drop => drop.share !== "private") },
   { id: "site", title: "Review a live site", done: props.drops.some(drop => drop.kind === "site"), optional: true },
 ])
 const required = computed(() => steps.value.filter(step => !step.optional))
@@ -85,7 +88,8 @@ const tabsUi = { list: "w-auto", indicator: "bg-default shadow-xs ring ring-defa
           </template>
 
           <template v-else-if="step.id === 'share'">
-            <p>Everything starts private. Open a drop and press Share: pick your team, or anyone with the link, and whether they can view, comment, or edit.</p>
+            <p v-if="team">Your team sees what you drop, and comments on it. Press Share to keep one to yourself, let the team edit it, or open a public link for people outside.</p>
+            <p v-else>Everything starts private. Open a drop and press Share to turn on a public link, and choose whether people with it can comment.</p>
             <UButton v-if="firstDoc" color="neutral" :label="`Open ${firstDoc.title}`" size="xs" :to="`/drops/${firstDoc.id}`" trailing-icon="i-ph-arrow-right" variant="outline" />
             <p v-else>Drop something first.</p>
           </template>

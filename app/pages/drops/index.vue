@@ -8,8 +8,10 @@ useSeoMeta({ title: "Drops" })
 
 const { data: drops, status, error, refresh } = useDrops()
 const { upload, remove, restore, deleteForever, emptyTrash, createFolder, createSite } = useDropActions()
-const prompt = usePrompt()
+const folderDialog = useFolderDialog()
 const siteDialog = useSiteDialog()
+const { data: me } = useMe()
+const team = computed(() => me.value?.mode === "team")
 const open = useRowsOpen()
 const { data: trash } = useApi("/api/drops", { key: "trash", query: { trash: 1 }, default: () => [] })
 const { data: withMe } = useSharedWithMe()
@@ -33,17 +35,18 @@ picker.onChange(files => files?.[0] && void onPick(files[0]))
 const now = useRelativeNow()
 const getStartedHidden = useGetStartedHidden()
 
-// The header says what the tab lists: Shared with me and the Trash aren't drops you made.
-const DESCRIPTIONS: Partial<Record<Filter, string>> = {
-  "with-me": "Drops your teammates shared with the team, and share links you opened while signed in.",
-  "trash": `Deleted and expired drops. Restore one within ${TRASH_DAYS} days, or it's gone for good.`,
-}
-const description = computed(() => DESCRIPTIONS[filter.value] ?? "Docs and apps you and your agents dropped. Private until you share them.")
+// The header says what the tab lists: Team, Shared with me and the Trash aren't drops you made. On a team Drop the
+// "with-me" tab is the team's: its folders and what teammates share.
+const description = computed(() => {
+  if (filter.value === "trash") return `Deleted and expired drops. Restore one within ${TRASH_DAYS} days, or it's gone for good.`
+  if (filter.value === "with-me") return team.value ? "The team's folders, and what your teammates and their agents dropped for the team." : "Public links others shared that you opened while signed in."
+  return team.value ? "Docs and apps you and your agents dropped. The team sees them, unless you keep one to yourself." : "Docs and apps you and your agents dropped. Only you see them until you share them."
+})
 
 const counts = computed(() => ({
   all: drops.value.length,
-  private: drops.value.filter(drop => drop.visibility === "private").length,
-  shared: drops.value.filter(drop => drop.visibility !== "private").length,
+  private: drops.value.filter(drop => drop.share === "private").length,
+  shared: drops.value.filter(drop => drop.share !== "private").length,
   withMe: withMe.value.length,
   trash: trash.value.length,
 }))
@@ -57,8 +60,8 @@ const visible = computed(() => {
   const words = search.value.trim().toLowerCase()
   const list = deep.value ? found.value : filter.value === "trash" ? trash.value : filter.value === "with-me" ? withMe.value : drops.value
   return list
-    .filter(drop => filter.value !== "private" || drop.visibility === "private")
-    .filter(drop => filter.value !== "shared" || drop.visibility !== "private")
+    .filter(drop => filter.value !== "private" || drop.share === "private")
+    .filter(drop => filter.value !== "shared" || drop.share !== "private")
     .filter(drop => deep.value || !words || `${drop.title} ${drop.filename} ${drop.actorName} ${drop.owner?.name ?? ""}`.toLowerCase().includes(words))
 })
 
@@ -96,9 +99,13 @@ async function onPick(file: File) {
   if (result) await navigateTo(`/drops/${result.id}`)
 }
 
+// Admins on a team Drop make the team's folders; on the Team tab that's what a new folder is by default.
 async function newFolder() {
-  const title = await prompt({ title: "New folder", label: "Name", placeholder: "Login review", confirmLabel: "Create" })
-  if (title) await createFolder(title)
+  const offerTeam = team.value && me.value?.role === "admin"
+  const input = await folderDialog({ offerTeam, team: offerTeam && filter.value === "with-me" })
+  if (!input) return
+  const folder = await createFolder(input.title, undefined, { description: input.description, team: input.team })
+  if (folder?.teamFolder && filter.value !== "with-me") filter.value = "with-me"
 }
 
 async function newSite() {
@@ -137,9 +144,9 @@ async function newSite() {
           :content="false"
           :items="[
             { label: `All ${counts.all}`, value: 'all' },
-            { label: `Private ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
+            { label: `Only me ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
             { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-share-network' },
-            { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
+            team ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-ph-users' } : { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
             { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-ph-trash' },
           ]"
           size="sm"
@@ -170,9 +177,16 @@ async function newSite() {
     </div>
 
     <div v-else-if="filter === 'with-me' && !withMe.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
-      <UIcon name="i-ph-tray" class="size-6 text-dimmed" />
-      <p class="mt-3 font-medium text-highlighted">Nothing shared with you yet</p>
-      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Drops your teammates share with the team show up here, and so do links you open while signed in.</p>
+      <UIcon :name="team ? 'i-ph-users' : 'i-ph-tray'" class="size-6 text-dimmed" />
+      <p class="mt-3 font-medium text-highlighted">{{ team ? "No team folders yet" : "Nothing shared with you yet" }}</p>
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
+        {{ team
+          ? me?.role === "admin"
+            ? "Make a folder for each kind of thing the team keeps, like meeting notes or pull request evidence, and say what goes in it. Agents read that to file things there."
+            : "Admins make the team's folders. What your teammates drop for the team shows up here too."
+          : "Public links you open while signed in show up here." }}
+      </p>
+      <UButton v-if="team && me?.role === 'admin'" class="mt-5" color="neutral" icon="i-ph-folder-simple-plus" label="New team folder" @click="newFolder" />
     </div>
 
     <!-- A first run gets the checklist instead; once it's dismissed, the empty page still says what goes here. -->
@@ -204,7 +218,7 @@ async function newSite() {
           <template v-for="drop in group.drops" :key="drop.id">
             <DropRow :drop="drop" :open="open[drop.id]" @delete="remove(drop)" @restore="restore(drop)" @delete-forever="deleteForever(drop)" @toggle="open[drop.id] = !open[drop.id]" />
             <!-- A folder opens in place, except in the Trash, where it comes back whole (DropRow shows no toggle there). -->
-            <DropFolderRows v-if="drop.kind === 'folder' && open[drop.id] && !drop.trashedAt" :id="drop.id" :depth="1" />
+            <DropFolderRows v-if="drop.kind === 'folder' && open[drop.id] && !drop.trashedAt" :id="drop.id" :depth="1" :team="drop.teamFolder" />
           </template>
         </ul>
       </template>
