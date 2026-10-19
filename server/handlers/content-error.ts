@@ -1,6 +1,6 @@
 import type { H3Event, HTTPError } from "h3"
 import { escapeUTF8 as escapeHtml } from "entities"
-import { contentUnavailable } from "#shared/content-unavailable"
+import { contentUnavailable } from "../../shared/content-unavailable.ts"
 import { authProxy } from "../utils/proxy-auth"
 
 /** Raw file errors need trusted chrome too. Returning nothing keeps Nitro's normal API error handler. */
