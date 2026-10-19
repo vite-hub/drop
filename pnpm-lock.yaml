@@ -86,8 +86,8 @@ importers:
         specifier: 1.7.10
         version: 1.7.10(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261005.1)(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)(bun-types@1.4.2)(kysely@0.29.6)(sql.js@1.14.2))(react@19.3.0)(vue@3.5.44(typescript@6.0.3))
       comark-annotate:
-        specifier: 0.0.2
-        version: 0.0.2(@comark/html@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))
+        specifier: 0.0.3
+        version: 0.0.3(@comark/html@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))
       confbox:
         specifier: ^0.3.1
         version: 0.3.1
@@ -4548,8 +4548,8 @@ packages:
   colortranslator@5.0.0:
     resolution: {integrity: sha512-Z3UPUKasUVDFCDYAjP2fmlVRf1jFHJv1izAmPjiOa0OCIw1W7iC8PZ2GsoDa8uZv+mKyWopxxStT9q05+27h7w==}
 
-  comark-annotate@0.0.2:
-    resolution: {integrity: sha512-GL2/3FZ+67aSbC9VVigOtOaD7mUAp7bcsWmkCVN/pHB7ZdbWAGSZUpKgDfc4bVNZStYNAbdfgrvLo+RjaMy7sw==}
+  comark-annotate@0.0.3:
+    resolution: {integrity: sha512-fVDCX7lT+VqB8PqZS8rAbAlT89sykgTi4m9uAkg+BN4bRlhTP1acyAGVov4tsfmlWB/myJKvMB0sTXNXWJ1r5g==}
     hasBin: true
     peerDependencies:
       '@comark/html': ^0.7.0
@@ -13539,7 +13539,7 @@ snapshots:
 
   colortranslator@5.0.0: {}
 
-  comark-annotate@0.0.2(@comark/html@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)):
+  comark-annotate@0.0.3(@comark/html@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)):
     dependencies:
       '@comark/html': 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
       comark: 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
