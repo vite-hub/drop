@@ -3,7 +3,6 @@ import type { DropdownMenuItem } from "@nuxt/ui"
 import type { Member } from "#shared/types"
 import { DEFAULT_ROLE, ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 
-definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Members" })
 
 // Anyone who signs in joins as a Member; DROP_ADMINS names the admins by email, so nobody changes roles here.

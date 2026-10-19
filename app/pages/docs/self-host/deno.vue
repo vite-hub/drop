@@ -1,6 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: "docs" })
-
 const bucket = "npx wrangler r2 bucket create my-drop"
 </script>
 

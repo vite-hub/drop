@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { MCP_LATEST, MCP_LEGACY } from "#shared/mcp"
 
-definePageMeta({ layout: "docs" })
-
 const server = `${useRequestURL().origin}/mcp`
 const snippets = mcpSnippets(server)
 const clients = MCP_CLIENT_IDS

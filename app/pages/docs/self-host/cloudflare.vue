@@ -1,6 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: "docs" })
-
 const STEPS = {
   clone: "npx giget gh:vite-hub/drop my-drop\ncd my-drop\npnpm install\npnpm exec wrangler login",
   resources: "pnpm exec wrangler d1 create vitehub-drop   # prints the database id\npnpm exec wrangler r2 bucket create vitehub-drop",

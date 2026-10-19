@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 
-definePageMeta({ layout: "docs" })
-
 const build = "DROP_HOST=vercel pnpm build   # explicit override: cloudflare, vercel, netlify, deno, or vps"
 const local = "pnpm install\npnpm db:migrate   # once, and after schema changes\npnpm dev          # http://localhost:3000"
 const database = "npx wrangler login\nnpx wrangler d1 create my-drop"

@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { PLAN_AUTHORING_GUIDE } from "#shared/plan-runtime"
 
-definePageMeta({ layout: "docs" })
-
 const app = `publish({\n  title: "Launch board",\n  files: { "index.html": "…", "app.js": "…", "data.json": "[…]" },\n  note: "First board with the launch checklist",\n  lifetime: "temporary"\n})`
 </script>
 

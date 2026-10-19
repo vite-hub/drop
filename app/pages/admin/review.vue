@@ -1,5 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Review" })
 const { data, refresh, error } = await useApi("/api/admin/review", { key: keys.adminReview })
 const now = useRelativeNow()

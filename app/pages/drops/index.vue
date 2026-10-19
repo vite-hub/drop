@@ -3,7 +3,6 @@ import { TRASH_DAYS } from "#shared/expiry"
 import { MIB, usageNearLimit } from "#shared/quotas"
 import type { DropSummary } from "#shared/types"
 
-definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Drops" })
 
 const { data: drops, status, error, refresh } = useDrops()

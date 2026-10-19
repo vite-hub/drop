@@ -1,6 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: "docs" })
-
 const deploy = "git clone https://github.com/vite-hub/drop my-drop\ncd my-drop\ncp .env.example .env\n${EDITOR:-nano} .env\ndocker compose up -d --build"
 const caddy = "drop.example.com {\n  header /f/* Cache-Control \"private, no-store\"\n  reverse_proxy 127.0.0.1:3000\n}"
 const update = "git pull\ndocker compose up -d --build"

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Skills" })
 
 // The catalog agents get over MCP: one row per skill with what it's for, and the full skill on GitHub.

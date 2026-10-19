@@ -1,6 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: "dashboard", middleware: "auth" })
-
 const route = useRoute("drops-id")
 const { drop, comments } = provideDrop(() => route.params.id)
 await Promise.all([drop, comments])

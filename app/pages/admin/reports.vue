@@ -1,5 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Reports" })
 const { data, refresh, error } = await useApi("/api/admin/reports", { key: keys.adminReports })
 const { busy, run } = useAdminAction(id => `/api/admin/reports/${id}`, "Could not update report", refresh)

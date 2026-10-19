@@ -99,6 +99,17 @@ export default defineNuxtConfig({
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   runtimeConfig: { seoIndex: false },
 
+  // The signed-in pages and the docs, by path, instead of each page's definePageMeta. `/drops/**` covers `/drops` too.
+  // The landing (pages/index.vue) and shared links (pages/d/) pick their own layout in their own middleware.
+  routeRules: {
+    "/drops/**": { appMiddleware: { auth: true }, appLayout: "dashboard" },
+    "/agents": { appMiddleware: { auth: true }, appLayout: "dashboard" },
+    "/members": { appMiddleware: { auth: true }, appLayout: "dashboard" },
+    "/skills/**": { appMiddleware: { auth: true }, appLayout: "dashboard" },
+    "/admin/**": { appMiddleware: { auth: true }, appLayout: "dashboard" },
+    "/docs/**": { appLayout: "docs" },
+  },
+
   experimental: { typescriptPlugin: true },
 
   typescript: {

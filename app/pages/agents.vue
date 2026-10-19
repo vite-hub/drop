@@ -2,7 +2,6 @@
 import type { TabsItem } from "@nuxt/ui"
 import { PLAN_TEMPLATE } from "#shared/plan-template"
 
-definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Agents" })
 
 const origin = useRequestURL().origin

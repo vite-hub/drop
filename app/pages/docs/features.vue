@@ -2,7 +2,6 @@
 // Every feature on one page, the ones people use daily first, each with a screenshot and a link to the page with the
 // details. Screenshots live in public/docs/features/; the two that need live editing or someone else's site use the
 // landing's stories instead. Search and the shortcut table live here, not on Review and share.
-definePageMeta({ layout: "docs" })
 </script>
 
 <template>

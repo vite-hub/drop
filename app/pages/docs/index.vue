@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 
-definePageMeta({ layout: "docs" })
-
 const origin = useRequestURL().origin
 const mcp = mcpSnippets(`${origin}/mcp`).claude
 </script>

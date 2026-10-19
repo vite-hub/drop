@@ -1,7 +1,3 @@
-<script setup lang="ts">
-definePageMeta({ layout: "docs" })
-</script>
-
 <template>
   <DocsPage title="Deploy to Netlify" lead="Drop on Netlify Functions, with a Cloudflare D1 database, Netlify Blobs for files, and a scheduled function that deletes expired code images.">
     <DocsDeployButtons host="netlify" />

@@ -1,7 +1,3 @@
-<script setup lang="ts">
-definePageMeta({ layout: "docs" })
-</script>
-
 <template>
   <DocsPage title="Deploy to Vercel" lead="Drop on Vercel Functions, with a Cloudflare D1 database, a private Vercel Blob store for files, and a Vercel Cron Job that deletes expired code images.">
     <DocsDeployButtons host="vercel" />

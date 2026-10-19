@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { reviewSnippet } from "#shared/review"
 
-definePageMeta({ layout: "docs" })
-
 const origin = useRequestURL().origin
 const publish = `publish({\n  site: { url: "https://*.preview.example.com" },\n  title: "Acme portal previews",\n  slug: "acme-previews",\n  share: "team",\n  note: "Review the pull request previews",\n  lifetime: "review"\n})`
 const tag = reviewSnippet(origin)
