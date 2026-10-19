@@ -170,6 +170,9 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.11
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)(supports-color@8.1.1)
       nitro:
         specifier: 3.0.260610-beta
         version: 3.0.260610-beta(patch_hash=5784600e57135b0a4bfad9dee6ec2f609bc199d5cad82885f22aaa94e2a712d8)(@azure/identity@4.13.3(supports-color@8.1.1))(@azure/storage-blob@12.34.0(supports-color@8.1.1))(@libsql/client@0.18.0)(@vercel/functions@3.9.11(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261005.1)(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)(bun-types@1.4.2)(kysely@0.29.6)(sql.js@1.14.2))(giget@3.3.1)(jiti@2.7.0)(lru-cache@11.5.3)(uploadthing@7.7.4(express@5.2.1(supports-color@8.1.1))(h3@2.0.1-rc.33(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))(tailwindcss@4.3.3))(vite@8.3.2)(wrangler@4.148.0(@cloudflare/workers-types@5.20261005.1)(@types/node@25.9.9))
