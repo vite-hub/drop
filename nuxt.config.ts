@@ -77,6 +77,10 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
 export default defineNuxtConfig({
   modules: ["@nuxt/eslint", "@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt"],
 
+  eslint: {
+    config: { standalone: false },
+  },
+
   vitehub: { ...VITEHUB[host], auth: true },
 
   alias: {
