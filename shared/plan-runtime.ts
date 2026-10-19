@@ -158,7 +158,7 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.textContent = initials(m.author); }; dot.appendChild(img); }
       else dot.textContent = initials(m.author);
       dot.title = (m.author || "Comment") + " · #" + m.n;
-      dot.style.left = x + "px"; dot.style.top = y + "px";
+      dot.style.left = x + "px"; dot.style.top = y + "px"; dot.dataset.id = m.id;
       dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
       marks.appendChild(dot);
     }
@@ -272,6 +272,11 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
       active = m.id; render();
       const dot = Array.from(marks.children).find((d) => d.classList.contains("pulse"));
       if (dot) scrollTo({ top: Math.max(0, parseFloat(dot.style.top) - innerHeight / 3), behavior: "smooth" });
+      // With open: once the scroll settles, report the pin like a click, so Drop opens its thread beside it.
+      if (dot && m.open) setTimeout(() => {
+        const pin = Array.from(marks.children).find((d) => d.dataset.id === m.id);
+        if (pin) { const r = pin.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); }
+      }, 500);
       setTimeout(() => { active = null; render(); }, 2200);
     }
   });

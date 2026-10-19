@@ -1,5 +1,5 @@
 import { dropPath } from "#shared/links"
-import type { DropComment, DropDetail, DropVersion } from "#shared/types"
+import type { CommentReply, DropComment, DropDetail, DropVersion } from "#shared/types"
 import type { CommentInput } from "#shared/schemas"
 
 /**
@@ -17,7 +17,7 @@ export function useDrop(id: MaybeRefOrGetter<string>) {
     try {
       const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, { method: "POST", body: { ...input, body } })
       comments.data.value = [...comments.data.value, comment]
-      notify.done(`Comment ${comment.n} added`)
+      notify.done("Comment added")
       return comment
     }
     catch (error) {
@@ -48,7 +48,31 @@ export function useDrop(id: MaybeRefOrGetter<string>) {
     }
   }
 
-  return { drop, comments, addComment, resolveComment, removeComment }
+  const setReplies = (commentId: string, change: (replies: CommentReply[]) => CommentReply[]) =>
+    (comments.data.value = comments.data.value.map(comment => (comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment)))
+
+  async function addReply(commentId: string, body: string) {
+    try {
+      const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, { method: "POST", body: { body } })
+      setReplies(commentId, replies => [...replies, reply])
+      return reply
+    }
+    catch (error) {
+      notify.fail("Couldn't send the reply", error)
+    }
+  }
+
+  async function removeReply(commentId: string, replyId: string) {
+    try {
+      await $fetch(`/api/replies/${replyId}`, { method: "DELETE" })
+      setReplies(commentId, replies => replies.filter(reply => reply.id !== replyId))
+    }
+    catch (error) {
+      notify.fail("Couldn't delete the reply", error)
+    }
+  }
+
+  return { drop, comments, addComment, resolveComment, removeComment, addReply, removeReply }
 }
 
 /** The drop page provides its drop; the viewer and its panels inject it instead of threading props. */

@@ -119,6 +119,19 @@ export const comments = sqliteTable("comments", {
   createdAt: integer("created_at").notNull(),
 }, table => [index("comments_drop_idx").on(table.dropId, table.n), uniqueIndex("comments_drop_n_unique").on(table.dropId, table.n)])
 
+/**
+ * Replies in a comment's thread. The comment holds the anchor, the number, and the resolved state; a reply is only
+ * words, so it has its own table and leaves the anchoring code alone. Deleting the comment deletes its thread.
+ */
+export const commentReplies = sqliteTable("comment_replies", {
+  id: text("id").primaryKey(),
+  commentId: text("comment_id").notNull().references(() => comments.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  authorId: text("author_id"),
+  authorName: text("author_name").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, table => [index("comment_replies_comment_idx").on(table.commentId, table.createdAt)])
+
 /** Blob deletions that need another attempt after metadata has been removed. */
 export const blobCleanup = sqliteTable("blob_cleanup", {
   id: text("id").primaryKey(),

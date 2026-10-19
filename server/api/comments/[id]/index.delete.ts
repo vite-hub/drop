@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
-import { comments } from "../../databases/config"
-import { findDrop, permissions } from "../../utils/drops"
-import { identify } from "../../utils/identity"
-import { routeId } from "../../utils/params"
+import { comments } from "../../../databases/config"
+import { findDrop, permissions } from "../../../utils/drops"
+import { identify } from "../../../utils/identity"
+import { routeId } from "../../../utils/params"
 
 export default defineHandler(async (event) => {
   const [comment] = await db.select().from(comments).where(eq(comments.id, await routeId(event))).limit(1)

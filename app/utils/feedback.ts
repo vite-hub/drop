@@ -20,6 +20,6 @@ export function feedbackMarkdown(title: string, url: string, comments: DropComme
       ? `${what}, area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
       : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
   }
-  const lines = open.map(comment => `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})`.replace(/^/, `${comment.n}. `))
+  const lines = open.map(comment => `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})${comment.replies.map(reply => `\n   ↳ ${reply.authorName}: ${reply.body.replace(/\n/g, "\n     ")}`).join("")}`.replace(/^/, `${comment.n}. `))
   return `## Feedback on "${title}"\n\n${url}\n\n${lines.join("\n") || "No open comments."}\n\nDrop a new version that addresses these.`
 }

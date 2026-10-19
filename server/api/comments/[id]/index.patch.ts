@@ -2,10 +2,10 @@ import { eq } from "drizzle-orm"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { CommentPatchSchema } from "#shared/schemas"
-import { comments } from "../../databases/config"
-import { findDrop, permissions } from "../../utils/drops"
-import { identify } from "../../utils/identity"
-import { routeId } from "../../utils/params"
+import { comments } from "../../../databases/config"
+import { findDrop, permissions } from "../../../utils/drops"
+import { identify } from "../../../utils/identity"
+import { routeId } from "../../../utils/params"
 
 /** Resolve or reopen: the drop's managers, or the comment's author. */
 export default defineValidatedHandler({

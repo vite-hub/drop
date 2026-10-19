@@ -51,4 +51,12 @@ export function commentTarget(comment: Pick<DropComment, "kind" | "quote" | "lab
 
 /** `version` is the one being read: a comment written on an earlier version says which. */
 export const commentLine = (comment: DropComment, version: number) =>
-  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})`
+  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${replyLines(comment)}`
+
+/** A comment's thread under it, oldest first, one line per reply. */
+export const replyLines = (comment: Pick<DropComment, "replies">) =>
+  comment.replies.map(reply => `\n   ↳ ${reply.authorName}: ${reply.body}`).join("")
+
+/** The thread for structured output. */
+export const replyItems = (comment: Pick<DropComment, "replies">) =>
+  comment.replies.map(reply => ({ body: reply.body, author: reply.authorName, at: new Date(reply.createdAt).toISOString() }))

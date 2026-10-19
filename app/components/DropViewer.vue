@@ -146,7 +146,7 @@ const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const selection = ref<Selection | null>(null)
 const lightbox = ref<Lightbox | null>(null)
 const popover = ref<Popover | null>(null)
-const popoverRef = useTemplateRef<{ fail: () => void }>("popoverRef")
+const popoverRef = useTemplateRef<{ fail: () => void; sent: () => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 
 const pageComments = computed(() => (isApp.value ? comments.value.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : comments.value))
@@ -310,17 +310,41 @@ async function removeComment(id: string) {
   await state.removeComment(id)
 }
 
+async function reply(id: string, body: string) {
+  if (await state.addReply(id, body)) await popoverRef.value?.sent()
+  else popoverRef.value?.fail()
+}
+
+// A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
+// it works for whoever can open the drop.
+function copyCommentLink(comment: DropComment) {
+  const url = new URL(link.value)
+  url.searchParams.set("comment", String(comment.n))
+  void copy(url.href, "Link to the comment copied")
+}
+
+/** Scroll the document to the comment and open its thread there: the frame reports the pin, like a click on it. */
 async function focusComment(comment: DropComment) {
-  if (!isApp.value) return send({ type: "focus", id: comment.id })
-  if (!wide.value) mobileSide.value = false
-  if (comment.page && comment.page !== page.value) {
+  if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
     await nextTick()
     await until(ready).toBe(true, { timeout: 5000 })
   }
-  send({ type: "focus", id: comment.id })
+  if (!wide.value) mobileSide.value = false
+  send({ type: "focus", id: comment.id, open: true })
 }
+
+// `?comment=<n>` from a copied link: once the frame has placed the pins, open that thread with the comments showing.
+onMounted(async () => {
+  const n = Number(route.query.comment)
+  if (!n || !["markdown", "image", "html", "app"].includes(drop.value.kind)) return
+  await until(ready).toBe(true, { timeout: 10000 })
+  const comment = comments.value.find(item => item.n === n)
+  if (!comment) return notify.info({ title: `Comment #${n} isn't on this version`, icon: "i-ph-chat-circle-slash", color: "neutral" })
+  if (wide.value && has("comments")) panel.show("comments")
+  void focusComment(comment)
+})
 
 async function deleteDrop() {
   if (await remove(drop.value)) await navigateTo("/drops")
@@ -548,8 +572,12 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
     :pending="popover.type === 'new' ? popover.pending : undefined"
     :x="popover.x"
     :y="popover.y"
+    :can-reply="drop.canComment"
     @cancel="popover = null"
+    @copy-link="copyCommentLink"
     @delete="removeComment"
+    @delete-reply="(id, replyId) => state.removeReply(id, replyId)"
+    @reply="reply"
     @resolve="resolve"
     @submit="submit"
   />

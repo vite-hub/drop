@@ -32,6 +32,6 @@ export default defineValidatedHandler({
       resolved: false,
       createdAt: Date.now(),
     }).returning()
-    return toComment(row!, who, drop.version, await authorImages([row!]))
+    return toComment(row!, who, drop.version, { images: await authorImages([row!]), replies: new Map() })
   },
 })

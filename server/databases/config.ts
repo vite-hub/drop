@@ -5,7 +5,7 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { quotaBlobs, quotaReservations } from './quotas'
 import { abuseReports } from './trust'
 import { skillSettings } from './skills'
-import { blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, dropTexts, dropVisits, workspaceStats } from './drops'
+import { blobCleanup, codeImages, commentReplies, comments, dropFiles, dropHeads, drops, dropTexts, dropVisits, workspaceStats } from './drops'
 import { jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource } from './oauth'
 
 export const user = sqliteTable('user', {
@@ -62,9 +62,9 @@ export const verification = sqliteTable('verification', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).$onUpdate(() => new Date()).notNull()
 }, table => [index('verification_identifier_idx').on(table.identifier)])
 
-export { quotaBlobs, quotaReservations, abuseReports, skillSettings, blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, dropTexts, dropVisits, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
+export { quotaBlobs, quotaReservations, abuseReports, skillSettings, blobCleanup, codeImages, commentReplies, comments, dropFiles, dropHeads, drops, dropTexts, dropVisits, workspaceStats, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken }
 
 // Where it lives (D1 binding, D1 over HTTP, or local SQLite) is per host, in nuxt.config.ts `vitehub.database`.
 export default defineDatabase({
-  schema: { quotaBlobs, quotaReservations, abuseReports, skillSettings, account, blobCleanup, codeImages, comments, dropFiles, dropHeads, drops, dropTexts, dropVisits, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
+  schema: { quotaBlobs, quotaReservations, abuseReports, skillSettings, account, blobCleanup, codeImages, commentReplies, comments, dropFiles, dropHeads, drops, dropTexts, dropVisits, workspaceStats, jwks, oauthAccessToken, oauthClient, oauthClientAssertion, oauthClientResource, oauthConsent, oauthRefreshToken, oauthResource, session, user, verification }
 })

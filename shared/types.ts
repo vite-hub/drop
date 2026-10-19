@@ -129,6 +129,18 @@ export interface DropComment {
   /** The version it was written on. Open comments carry over to later versions until someone resolves them. */
   version: number
   mine: boolean
+  /** The thread under it, oldest first. */
+  replies: CommentReply[]
+}
+
+/** A reply in a comment's thread: words only, the comment keeps the anchor and the resolved state. */
+export interface CommentReply {
+  id: string
+  body: string
+  authorName: string
+  authorImage: string | null
+  createdAt: number
+  mine: boolean
 }
 
 /**

@@ -14,6 +14,8 @@ const visible = computed(() => props.comments.filter(comment => (filter.value ==
 const earlier = computed(() => (filter.value === "open" ? props.comments.filter(comment => !comment.resolved && props.outdated.has(comment.id)) : []))
 const versionOf = (version: number) => props.versions.find(item => item.version === version)
 const versionTo = useVersionTo()
+/** Who replied, once each, latest first. */
+const repliers = (comment: DropComment) => [...new Map(comment.replies.toReversed().map(reply => [reply.authorName, reply])).values()]
 </script>
 
 <template>
@@ -28,6 +30,12 @@ const versionTo = useVersionTo()
           <ViewerCommentHeader :comment="comment" :current="version" />
           <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">{{ comment.quote }}</p>
           <p class="text-sm">{{ comment.body }}</p>
+          <span v-if="comment.replies.length" class="flex items-center gap-1.5 text-xs text-muted">
+            <UAvatarGroup :max="3" size="2xs">
+              <UAvatar v-for="reply in repliers(comment)" :key="reply.authorName" :alt="reply.authorName" :src="reply.authorImage ?? undefined" />
+            </UAvatarGroup>
+            {{ comment.replies.length === 1 ? "1 reply" : `${comment.replies.length} replies` }}
+          </span>
         </button>
         <button
           v-if="canManage || comment.mine"

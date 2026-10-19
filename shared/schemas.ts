@@ -121,6 +121,10 @@ export const SiteSchema = v.object({
 
 export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 
+export const CommentReplySchema = v.object({
+  body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a reply."), v.maxLength(4000)),
+})
+
 export const MemberPatchSchema = v.object({ role: v.optional(v.picklist(ROLES)), banned: v.optional(v.boolean()) })
 
 export const SkillPatchSchema = v.object({ enabled: v.boolean("Say whether the skill is enabled.") })

@@ -10,7 +10,7 @@ import { isSitePattern, REVIEW_TOKEN_HOURS, SITE_ADDRESS_RULE, siteAddress, site
 import type { ReviewCommentInput } from "#shared/schemas"
 import type { Access, SiteReviewItem, Visibility } from "#shared/types"
 import { account, comments, drops, user } from "../databases/config"
-import { authorImages, nextCommentNumber, siteFamily, toComment } from "./comments"
+import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
 import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions } from "./drops"
 import { githubOrganization, isGitHubMember } from "./github-membership"
 import type { Identity } from "./identity"
@@ -313,9 +313,9 @@ export async function siteItems(site: Pick<DropRow, "id">, who: Identity | null,
     .from(comments).innerJoin(drops, eq(drops.id, comments.dropId))
     .where(and(sql`${comments.dropId} IN (${siteFamily(site.id)})`, page ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')` : undefined))
     .orderBy(asc(comments.createdAt)).limit(500)
-  const images = await authorImages(rows.map(item => item.comment))
+  const extras = await commentExtras(rows.map(item => item.comment), siteFamily(site.id))
   return rows.reverse().map(({ comment, shot }) => ({
-    ...toComment(comment, who, 1, images),
+    ...toComment(comment, who, 1, extras),
     screenshot: shot.kind === "image" && shot.blobKey ? { id: shot.id, link: shot.link ?? shot.id, slug: shot.slug ?? "screenshot", url: new URL(`/f/${shot.blobKey}`, origin).href } : null,
   }))
 }

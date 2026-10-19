@@ -468,3 +468,16 @@ CREATE TABLE `drop_texts` (
 	`text` text NOT NULL,
 	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
 );
+--> statement-breakpoint
+-- A comment's thread: replies are words only; the comment keeps the anchor, number, and resolved state.
+CREATE TABLE `comment_replies` (
+	`id` text PRIMARY KEY NOT NULL,
+	`comment_id` text NOT NULL,
+	`body` text NOT NULL,
+	`author_id` text,
+	`author_name` text NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`comment_id`) REFERENCES `comments`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `comment_replies_comment_idx` ON `comment_replies` (`comment_id`,`created_at`);

@@ -10,12 +10,12 @@ import { recordVisit } from "../../utils/expiry"
 import { requireIdentity } from "../../utils/identity"
 import { siteItems } from "../../utils/review"
 import { runtimeErrors } from "../../utils/runtime-errors"
-import { commentLine, commentTarget, dropLine, mcpDrop } from "../format"
+import { commentLine, commentTarget, dropLine, mcpDrop, replyItems, replyLines } from "../format"
 
 export default defineMcpTool({
   name: "read_drop",
   title: "Read a drop",
-  description: "Read a drop: a doc's source or every file of an app, its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. Address the open comments and errors in the next version (publish with previous and resolves). For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; fix the site, then resolve them with update_drop.",
+  description: "Read a drop: a doc's source or every file of an app, its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. Address the open comments and errors in the next version (publish with previous and resolves); a comment's replies follow it (↳), and reply answers in its thread. For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; fix the site, then resolve them with update_drop.",
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(v.object({
     id: v.pipe(v.string(), v.description("Drop id, or its link.")),
@@ -43,7 +43,7 @@ export default defineMcpTool({
         structuredContent: {
           ...meta, siteUrl: drop.siteUrl, script,
           comments: items.map(item => ({
-            n: item.n, body: item.body, author: item.authorName, page: item.page, resolved: item.resolved, at: new Date(item.createdAt).toISOString(),
+            n: item.n, body: item.body, author: item.authorName, page: item.page, resolved: item.resolved, at: new Date(item.createdAt).toISOString(), replies: replyItems(item),
             element: { selector: item.label, text: item.quote }, box: { ox: item.ox, oy: item.oy, ow: item.ow, oh: item.oh },
             fileUrl: item.screenshot?.url ?? null,
           })),
@@ -73,7 +73,7 @@ export default defineMcpTool({
         ...meta, versions,
         ...(folder ? { folder } : {}),
         ...(children ? { children } : {}),
-        comments: comments.map(comment => ({ n: comment.n, kind: comment.kind, target: commentTarget(comment), body: comment.body, author: comment.authorName, page: comment.page, resolved: comment.resolved, version: comment.version })),
+        comments: comments.map(comment => ({ n: comment.n, kind: comment.kind, target: commentTarget(comment), body: comment.body, author: comment.authorName, page: comment.page, resolved: comment.resolved, version: comment.version, replies: replyItems(comment) })),
         attachments: detail.attachments ?? [],
         ...(drop.kind === "app" || drop.kind === "html" ? { errors: errors.map(({ lastAt, ...error }) => ({ ...error, lastAt: new Date(lastAt).toISOString() })) } : {}),
         ...(detail.files ? { files: detail.files } : { content: detail.content ?? null, fileUrl: detail.url ?? null }),
@@ -87,7 +87,7 @@ const pct = (n: number) => `${Math.round(n / 10)}%`
 /** A site comment for agents: where it was sent from, what the box covers, and the screenshot to look at. */
 const siteLine = (item: SiteReviewItem) => [
   `${item.n}. ${item.page ?? "/"} (${item.authorName})${item.resolved ? " [resolved]" : ""}`,
-  `   ${item.body}`,
+  `   ${item.body}${replyLines(item)}`,
   `   Box ${pct(item.ox)}–${pct(item.ox + item.ow)} across, ${pct(item.oy)}–${pct(item.oy + item.oh)} down the ${item.screenshot ? "screenshot" : "viewport"}${item.quote ? `, over ${item.quote}` : ""}${item.label ? ` (${item.label})` : ""}`,
   ...(item.screenshot ? [`   Screenshot: ${item.screenshot.url}`] : []),
 ].join("\n")

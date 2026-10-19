@@ -1,26 +1,53 @@
-import { and, asc, eq, inArray, lte, sql } from "drizzle-orm"
+import { and, asc, eq, inArray, lte, type SQL, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
-import { comments, drops, user } from "../databases/config"
-import type { DropComment } from "#shared/types"
+import { commentReplies, comments, drops, user } from "../databases/config"
+import type { CommentReply, DropComment } from "#shared/types"
 import type { DropRow } from "./drops"
 import { chainOf } from "./expiry"
 import type { Identity } from "./identity"
 
 export type CommentRow = typeof comments.$inferSelect
 
-/** `images`: the authors' pictures by user id (authorImages), for the pins and threads. */
-export const toComment = (row: CommentRow, who: Identity | null, version: number, images?: Map<string, string | null>): DropComment => ({
-  id: row.id, n: row.n, kind: row.kind, selector: row.selector, ox: row.ox, oy: row.oy, ow: row.ow, oh: row.oh, quote: row.quote, label: row.label,
-  page: row.page, body: row.body, authorName: row.authorName, authorImage: (row.authorId && images?.get(row.authorId)) || null,
-  resolved: row.resolved, createdAt: row.createdAt, version, mine: Boolean(who && row.authorId === who.userId),
+export type ReplyRow = typeof commentReplies.$inferSelect
+/** What toComment adds from other tables: the authors' pictures by user id, and each comment's replies. */
+export type CommentExtras = { images: Map<string, string | null>; replies: Map<string, ReplyRow[]> }
+
+export const toReply = (row: ReplyRow, who: Identity | null, images?: Map<string, string | null>): CommentReply => ({
+  id: row.id, body: row.body, authorName: row.authorName, authorImage: (row.authorId && images?.get(row.authorId)) || null,
+  createdAt: row.createdAt, mine: Boolean(who && row.authorId === who.userId),
 })
 
-/** The pictures of the people who wrote `rows`, in one query. Guests and agents without one get initials. */
+export const toComment = (row: CommentRow, who: Identity | null, version: number, extras?: CommentExtras): DropComment => ({
+  id: row.id, n: row.n, kind: row.kind, selector: row.selector, ox: row.ox, oy: row.oy, ow: row.ow, oh: row.oh, quote: row.quote, label: row.label,
+  page: row.page, body: row.body, authorName: row.authorName, authorImage: (row.authorId && extras?.images.get(row.authorId)) || null,
+  resolved: row.resolved, createdAt: row.createdAt, version, mine: Boolean(who && row.authorId === who.userId),
+  replies: (extras?.replies.get(row.id) ?? []).map(reply => toReply(reply, who, extras?.images)),
+})
+
+/** The pictures of the people who wrote `rows`. Guests and agents without one get initials. D1 binds at most 100. */
 export async function authorImages(rows: Pick<CommentRow, "authorId">[]) {
   const ids = [...new Set(rows.map(row => row.authorId).filter((id): id is string => Boolean(id)))]
-  if (!ids.length) return new Map<string, string | null>()
-  const people = await db.select({ id: user.id, image: user.image }).from(user).where(inArray(user.id, ids))
-  return new Map(people.map(person => [person.id, person.image]))
+  const images = new Map<string, string | null>()
+  for (let index = 0; index < ids.length; index += 90) {
+    const people = await db.select({ id: user.id, image: user.image }).from(user).where(inArray(user.id, ids.slice(index, index + 90)))
+    for (const person of people) images.set(person.id, person.image)
+  }
+  return images
+}
+
+/**
+ * The replies and pictures for comments on the drops `dropIds` selects (a subquery, so no list of ids to bind).
+ * Replies come oldest first, grouped by comment.
+ */
+export async function commentExtras(rows: CommentRow[], dropIds: SQL) {
+  const replies = rows.length
+    ? await db.select().from(commentReplies)
+      .where(sql`${commentReplies.commentId} IN (SELECT id FROM comments WHERE drop_id IN (${dropIds}))`)
+      .orderBy(asc(commentReplies.createdAt))
+    : []
+  const byComment = new Map<string, ReplyRow[]>()
+  for (const reply of replies) byComment.set(reply.commentId, [...(byComment.get(reply.commentId) ?? []), reply])
+  return { images: await authorImages([...rows, ...replies]), replies: byComment }
 }
 
 /**
@@ -41,14 +68,14 @@ const siteOf = (row: Pick<DropRow, "id" | "kind" | "parentId">) => (row.kind ===
 export async function listComments(row: Pick<DropRow, "id" | "ownerId" | "version" | "kind">, who: Identity | null) {
   if (row.kind === "site") {
     const rows = await db.select().from(comments).where(sql`${comments.dropId} IN (${siteFamily(row.id)})`).orderBy(asc(comments.n))
-    const images = await authorImages(rows)
-    return rows.map(item => toComment(item, who, 1, images))
+    const extras = await commentExtras(rows, siteFamily(row.id))
+    return rows.map(item => toComment(item, who, 1, extras))
   }
   const rows = await db.select({ comment: comments, version: drops.version }).from(comments).innerJoin(drops, eq(drops.id, comments.dropId))
     .where(and(sql`${comments.dropId} IN (${chainOf(row)})`, lte(drops.version, row.version)))
     .orderBy(asc(comments.n), asc(drops.version))
-  const images = await authorImages(rows.map(item => item.comment))
-  return rows.map(item => toComment(item.comment, who, item.version, images))
+  const extras = await commentExtras(rows.map(item => item.comment), chainOf(row))
+  return rows.map(item => toComment(item.comment, who, item.version, extras))
 }
 
 /**
@@ -69,4 +96,24 @@ export async function resolveComments(row: Pick<DropRow, "id" | "ownerId" | "kin
   const resolved = [...new Set(open.map(comment => comment.n))].sort((a, b) => a - b)
   if (resolved.length) await db.update(comments).set({ resolved: true }).where(and(scope, inArray(comments.n, resolved)))
   return resolved
+}
+
+/** Comment #n on a drop: numbers count across the version chain, and across a site with its screenshots. */
+export async function findCommentByNumber(row: Pick<DropRow, "id" | "ownerId" | "kind" | "parentId">, n: number) {
+  const where = row.kind === "site" ? sql`${comments.dropId} IN (${siteFamily(row.id)})` : sql`${comments.dropId} IN (${chainOf(row)})`
+  const [comment] = await db.select().from(comments).where(and(where, eq(comments.n, n))).limit(1)
+  return comment ?? null
+}
+
+/** Adds a reply to `comment`'s thread; the callers check who may. */
+export async function addReply(comment: Pick<CommentRow, "id">, who: Identity | null, body: string) {
+  const [row] = await db.insert(commentReplies).values({
+    id: crypto.randomUUID(),
+    commentId: comment.id,
+    body,
+    authorId: who?.userId ?? null,
+    authorName: who?.name ?? "Guest",
+    createdAt: Date.now(),
+  }).returning()
+  return toReply(row!, who, await authorImages([row!]))
 }
