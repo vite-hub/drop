@@ -8,7 +8,7 @@ useSeoMeta({ title: "Agents" })
 const origin = useRequestURL().origin
 const server = `${origin}/mcp`
 const MCP_SNIPPETS = mcpSnippets(server)
-const clients: TabsItem[] = (Object.keys(MCP_CLIENTS) as McpClient[]).map(value => ({ label: MCP_CLIENTS[value], value }))
+const clients: TabsItem[] = MCP_CLIENT_IDS.map(value => ({ label: MCP_CLIENTS[value], value }))
 
 // Executor's segmented control: the active tab is a raised white chip, not a filled button.
 const tabsUi = { list: "w-auto", indicator: "bg-default shadow-xs ring ring-default", trigger: "text-sm data-[state=active]:text-highlighted", leadingIcon: "hidden size-3.5 sm:inline-flex" }

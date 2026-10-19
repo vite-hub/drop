@@ -210,7 +210,7 @@ export function useDropActions() {
   async function move(drop: Pick<DropSummary, "id" | "title" | "parentId">, folder: Pick<DropSummary, "id" | "title"> | null) {
     try {
       await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { folder: folder?.id ?? null } })
-      const around = [drop.parentId, folder?.id].filter(id => id != null).map(keys.drop)
+      const around = [drop.parentId, folder?.id].flatMap(id => (id == null ? [] : [keys.drop(id)]))
       await refreshNuxtData([keys.drops, keys.drop(drop.id), ...around, ...folders()])
       notify.done(folder ? `Moved to ${folder.title}` : "Moved to the top", drop.title)
       return true

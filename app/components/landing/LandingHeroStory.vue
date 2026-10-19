@@ -46,7 +46,9 @@ const stage = useTemplateRef<HTMLElement>("stage")
 const canvas = useTemplateRef<HTMLElement>("canvas")
 const { beat, index, at, go, indexOf, playing, reduced } = useStoryboard(stage, BEATS, { still: "f.hold" })
 
-const scene = computed(() => beat.value[0] as "a" | "b" | "c" | "d" | "e" | "f")
+const SCENES = ["a", "b", "c", "d", "e", "f"] as const
+// Every beat's name starts with its scene's letter.
+const scene = computed(() => SCENES.find(letter => beat.value.startsWith(`${letter}.`)) ?? "a")
 const windows = computed(() => ({
   terminal: "ac".includes(scene.value) ? "front" : "back",
   browser: "bdf".includes(scene.value) ? "front" : "back",
@@ -57,7 +59,7 @@ const v2 = computed(() => at("d.open"))
 const modal = computed(() => at("d.modal") && !at("d.dock"))
 const shared = computed(() => at("d.switch"))
 const copied = computed(() => at("d.dock"))
-const front = computed(() => (Object.keys(windows.value) as (keyof typeof FRAMES)[]).find(id => windows.value[id] === "front"))
+const front = computed(() => APPS.find(app => windows.value[app.id] === "front")?.id)
 
 // Apps that have been opened this loop get a dot under their dock icon, like a running app.
 const running = computed(() => ({ terminal: true, browser: at("b.open"), chat: at("e.open") }))

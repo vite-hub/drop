@@ -39,4 +39,4 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
 ]
 
 /** How the docs print a key that isn't a single letter. The docs show a Mac's ⌘ and say Ctrl works elsewhere. */
-export const KEY_LABELS: Record<string, string> = { meta: "⌘", escape: "Esc" }
+export const KEY_LABELS = new Map([["meta", "⌘"], ["escape", "Esc"]])

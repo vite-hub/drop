@@ -12,7 +12,7 @@ export const ROLE_SUMMARY: Record<Role, string> = {
   member: "Create, share, and comment on drops, and add to the team's folders."
 }
 
-export const isRole = (value: string): value is Role => (ROLES as string[]).includes(value)
+export const isRole = (value: string): value is Role => ROLES.some(role => role === value)
 
 /** The admins `DROP_ADMINS` names: emails, comma- or space-separated, compared without case. */
 export const adminEmails = (value: string) => value.split(/[\s,]+/).map(email => email.trim().toLowerCase()).filter(Boolean)

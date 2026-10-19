@@ -11,7 +11,7 @@ const hidden = useGetStartedHidden()
 const { agents } = useAgents()
 const origin = useRequestURL().origin
 const snippets = mcpSnippets(`${origin}/mcp`)
-const clients = (Object.keys(MCP_CLIENTS) as McpClient[]).map(value => ({ label: MCP_CLIENTS[value], value }))
+const clients = MCP_CLIENT_IDS.map(value => ({ label: MCP_CLIENTS[value], value }))
 const client = ref<McpClient>("claude")
 const PROMPT = "Write a one-page plan for what we're building next and drop it for review."
 // On a team Drop a drop is the team's from the start, so sharing is done once there's one.

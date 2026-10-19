@@ -28,7 +28,8 @@ const shown = ref(!props.from)
 onKeyStroke("Escape", () => void close())
 
 async function loaded(event: Event) {
-  const { naturalWidth, naturalHeight } = event.target as HTMLImageElement
+  if (!(event.target instanceof HTMLImageElement)) return
+  const { naturalWidth, naturalHeight } = event.target
   if (naturalWidth > 0 && naturalHeight > 0) aspect.value = naturalWidth / naturalHeight
   if (shown.value) return
   await nextTick()
@@ -57,7 +58,7 @@ const at = (value: number, start: number, size: number) => Math.min(1000, Math.m
 
 function press(event: PointerEvent) {
   if (!props.canComment || event.button !== 0) return
-  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  if (event.currentTarget instanceof Element) event.currentTarget.setPointerCapture(event.pointerId)
   drag.value = { x: event.clientX, y: event.clientY, rect: box.value!.getBoundingClientRect() }
 }
 function move(event: PointerEvent) {

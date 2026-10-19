@@ -1,7 +1,6 @@
 import { planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { injectRuntime } from "#shared/plan-runtime"
-import type { PlanKind } from "#shared/plans"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 
@@ -50,11 +49,13 @@ export function useViewerFrame(options: {
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
   // panel showing doesn't slide left once it loads.
   const srcdoc = computed(() => {
-    if (!mounted.value || drop.value.kind === "folder") return ""
-    if (isApp.value) return appDocument(page.value)
-    if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
+    const { kind } = drop.value
+    // A site review shows the live site itself (ViewerSite), not a document.
+    if (!mounted.value || kind === "folder" || kind === "site") return ""
+    if (kind === "app") return appDocument(page.value)
+    if (kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
     if (!attached.ready.value) return ""
-    return planDocument(drop.value.kind as PlanKind, attached.inline(drop.value.content ?? ""), dark.value, attached.inline(drop.value.html ?? ""), startInset)
+    return planDocument(kind, attached.inline(drop.value.content ?? ""), dark.value, attached.inline(drop.value.html ?? ""), startInset)
   })
 
   // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over

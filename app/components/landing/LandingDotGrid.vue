@@ -5,6 +5,7 @@ const { gap = 22, radius = 140 } = defineProps<{ gap?: number; radius?: number }
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas")
 const colorMode = useColorMode()
 const motion = usePreferredReducedMotion()
+const { pixelRatio } = useDevicePixelRatio()
 const pointer = { x: -9999, y: -9999 }
 
 function draw() {
@@ -12,7 +13,7 @@ function draw() {
   const context = element?.getContext("2d")
   if (!element || !context) return
   const { width, height } = element.getBoundingClientRect()
-  const ratio = window.devicePixelRatio || 1
+  const ratio = pixelRatio.value || 1
   if (element.width !== Math.round(width * ratio) || element.height !== Math.round(height * ratio)) {
     element.width = Math.round(width * ratio)
     element.height = Math.round(height * ratio)

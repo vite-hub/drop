@@ -8,7 +8,6 @@ import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropComment, DropVersion } from "#shared/types"
-import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
 import type { SideTab } from "~/utils/viewer"
@@ -213,7 +212,10 @@ const crumbTo = (crumb: { id: string; link: string; slug: string }) => (publicVi
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
 const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id)) : []))
-const threadComment = computed(() => (popover.value?.type === "thread" ? comments.value.find(comment => comment.id === (popover.value as { id: string }).id) : undefined))
+const threadComment = computed(() => {
+  const open = popover.value
+  return open?.type === "thread" ? comments.value.find(comment => comment.id === open.id) : undefined
+})
 </script>
 
 <template>
@@ -373,8 +375,9 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           </div>
         </div>
         <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
-        <!-- Server and client bundlers format the embedded app resolver differently. [color-scheme:light] on both frames
-             matches a blank or light document, so the browser paints no opaque white backdrop behind it in dark mode. -->
+        <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
+             backdrop behind it in dark mode. -->
+        <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
         <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
 
         <ViewerDiff v-if="shownVersion && !editing" :key="shownVersion.id" :inset="floating ? FLOATING_INSET : 0" :previous="previousVersion" :version="shownVersion" @close="shownVersion = null" />

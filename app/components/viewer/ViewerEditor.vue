@@ -24,7 +24,7 @@ onMounted(async () => {
 async function editLink() {
   const editor = props.editor
   if (!editor) return
-  const previous = editor.getAttributes("link").href as string | undefined
+  const previous: string | undefined = editor.getAttributes("link").href
   const href = await prompt({ title: previous ? "Edit link" : "Insert link", label: "URL", initial: previous ?? "", confirmLabel: previous ? "Save" : "Insert" })
   if (href === null) return
   const chain = editor.chain().focus().extendMarkRange("link")

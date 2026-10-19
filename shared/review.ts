@@ -50,8 +50,8 @@ export const SITE_ADDRESS_RULE = "Use https, or http on localhost. A pattern sta
 export function siteMatches(address: string, origin: string): boolean {
   if (exactOrigin(origin) !== origin) return false
   if (!address.includes("*")) return address === origin
-  const [prefix, suffix] = address.split("*.") as [string, string]
-  if (!origin.startsWith(prefix) || !origin.endsWith(`.${suffix}`)) return false
+  const [prefix, suffix] = address.split("*.")
+  if (prefix === undefined || suffix === undefined || !origin.startsWith(prefix) || !origin.endsWith(`.${suffix}`)) return false
   return LABEL.test(origin.slice(prefix.length, origin.length - suffix.length - 1))
 }
 

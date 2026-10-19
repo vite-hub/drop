@@ -9,7 +9,7 @@ import type { Editor } from "@tiptap/vue-3"
 type Person = { label: string; avatar: { src?: string; alt: string } }
 
 const props = defineProps<{ editor: Editor; people: Person[] }>()
-const appConfig = useAppConfig() as { ui?: { editorMentionMenu?: Record<string, unknown> } }
+const appConfig = useAppConfig()
 const ui = computed(() => tv({ extend: theme, ...appConfig.ui?.editorMentionMenu })())
 const UAvatar = resolveComponent("UAvatar")
 const PLUGIN = "peopleMenu"

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { MCP_LATEST, MCP_LEGACY } from "#shared/mcp"
-import type { McpClient } from "~/utils/mcp-clients"
 
 definePageMeta({ layout: "docs" })
 
 const server = `${useRequestURL().origin}/mcp`
 const snippets = mcpSnippets(server)
-const clients = Object.keys(MCP_CLIENTS) as McpClient[]
+const clients = MCP_CLIENT_IDS
 
 // The MCP server's own catalog (tools, prompts, skill resources), so the docs never drift from it.
 const { data: catalog } = await useApi("/api/mcp", { key: keys.mcpCatalog, default: () => [] })
