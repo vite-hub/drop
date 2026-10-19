@@ -8,7 +8,7 @@ export function useAppFiles(drop: Ref<DropDetail>) {
   const page = ref("index.html")
 
   function openFromQuery() {
-    const target = queryText(route.query.file) ?? null
+    const target = textValue(route.query.file) ?? null
     if (drop.value.kind !== "app") return
     page.value = target && pages.value.includes(target) ? target : "index.html"
   }

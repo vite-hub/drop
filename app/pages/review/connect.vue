@@ -10,7 +10,7 @@ useSeoMeta({ title: "Comment on a site", robots: "noindex, nofollow" })
 const route = useRoute("review-connect")
 const { data: me } = await useMe()
 const ready = useMounted()
-const origin = computed(() => queryText(route.query.origin) ?? "")
+const origin = computed(() => textValue(route.query.origin) ?? "")
 const host = computed(() => (URL.canParse(origin.value) ? new URL(origin.value).host : origin.value))
 
 const state = ref<"loading" | "guest" | "choose" | "signin" | "none" | "done" | "lost" | "error">("loading")

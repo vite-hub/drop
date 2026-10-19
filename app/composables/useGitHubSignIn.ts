@@ -13,7 +13,7 @@ export function useGitHubSignIn() {
 
   const appOrigin = useRequestURL().origin
   const next = computed(() => {
-    const value = queryText(route.query.redirect)
+    const value = textValue(route.query.redirect)
     if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/drops"
     try {
       const resolved = new URL(value, appOrigin)

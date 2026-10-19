@@ -11,7 +11,7 @@ const { $auth } = useNuxtApp()
 const { loggedIn, user, signIn } = useUserSession($auth)
 const ready = useMounted()
 
-const clientId = computed(() => queryText(route.query.client_id) ?? "")
+const clientId = computed(() => textValue(route.query.client_id) ?? "")
 const valid = computed(() => Boolean(clientId.value && route.query.sig))
 
 // The agent's name, as it registered itself ("Claude Code", "Codex"…). Readable once signed in, so it loads on the
@@ -31,7 +31,7 @@ const agentName = computed(() => client.value?.client_name || "An agent")
 // Where Allow sends the agent's access. Anyone can register an agent under any name, so the name proves nothing; the
 // redirect is part of this signed link, so it is where the code really goes.
 const destination = computed(() => {
-  const uri = queryText(route.query.redirect_uri) ?? ""
+  const uri = textValue(route.query.redirect_uri) ?? ""
   if (!URL.canParse(uri)) return null
   const url = new URL(uri)
   if (url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return { local: true, label: "an app on this computer" }

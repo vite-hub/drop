@@ -4,7 +4,7 @@ import type { InferInput } from "valibot"
 import { ReportSchema } from "#shared/schemas"
 useSeoMeta({ title: "Report a drop", robots: "noindex, nofollow" })
 const route = useRoute("report")
-const state = reactive<InferInput<typeof ReportSchema>>({ target: queryText(route.query.target) ?? "", reason: "other", details: "", email: "" })
+const state = reactive<InferInput<typeof ReportSchema>>({ target: textValue(route.query.target) ?? "", reason: "other", details: "", email: "" })
 const reasons = ReportSchema.entries.reason.options
 const sent = ref(false)
 const error = ref("")
