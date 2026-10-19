@@ -93,7 +93,7 @@ function leaveDocs() {
             </div>
           </div>
 
-          <nav v-else key="docs" aria-label="Docs" class="relative z-10 flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto bg-default px-2 pb-2">
+          <nav v-else key="docs" aria-label="Docs" class="sidebar-pane-docs relative z-10 flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto bg-default px-2 pb-2">
             <SidebarItem active-icon="i-ph-arrow-left" :active="false" icon="i-ph-arrow-left" label="Back" @navigate="leaveDocs" />
             <p class="label-mono mt-2 flex h-8 shrink-0 items-center px-2">Docs</p>
             <DocsTree @navigate="close" />

@@ -144,6 +144,12 @@
   transition: transform 220ms var(--ease-drawer), opacity 220ms var(--ease-drawer);
 }
 .sidebar-forward-leave-active, .sidebar-back-leave-active { position: absolute; inset: 0; }
+/* The curtain: Docs' leading edge carries a hairline and a soft shadow onto the pane beneath, so mid-slide it reads
+   as a sheet passing over, not a cut. At rest that edge sits on the sidebar's own edge and overflow hides it. */
+.sidebar-pane-docs {
+  box-shadow: -1px 0 0 var(--ui-border), -14px 0 24px -12px rgb(0 0 0 / 0.14);
+}
+.dark .sidebar-pane-docs { box-shadow: -1px 0 0 var(--ui-border-accented), -14px 0 24px -12px rgb(0 0 0 / 0.5); }
 .sidebar-forward-enter-from, .sidebar-back-leave-to { transform: translateX(100%); }
 .sidebar-forward-leave-to, .sidebar-back-enter-from { transform: translateX(-30%); opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
