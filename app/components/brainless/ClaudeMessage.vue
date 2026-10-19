@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A conversation turn: the user's full-width prompt row, or plain assistant text after a ⏺.
 // Ported from Brainless (MIT, see LICENSE).
-withDefaults(defineProps<{ role?: "user" | "assistant" }>(), { role: "assistant" })
+const { role = "assistant" } = defineProps<{ role?: "user" | "assistant" }>()
 </script>
 
 <template>

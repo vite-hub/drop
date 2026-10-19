@@ -6,36 +6,36 @@ import { daysUntil, purgesAt } from "#shared/expiry"
 
 // A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`). In a team
 // folder (`inTeam`) anyone may move a teammate's drop to the Trash.
-const props = withDefaults(defineProps<{ drop: DropSummary; depth?: number; open?: boolean; inTeam?: boolean }>(), { depth: 0, open: false, inTeam: false })
+const { drop, depth = 0, open = false, inTeam = false } = defineProps<{ drop: DropSummary; depth?: number; open?: boolean; inTeam?: boolean }>()
 const emit = defineEmits<{ delete: []; restore: []; deleteForever: []; toggle: [] }>()
 const INDENT = ["pl-4", "pl-10", "pl-16", "pl-22", "pl-28", "pl-34", "pl-40", "pl-46"]
-const trashed = computed(() => props.drop.trashedAt !== null)
+const trashed = computed(() => drop.trashedAt !== null)
 const now = useRelativeNow()
-const purgeDays = computed(() => props.drop.trashedAt === null ? 0 : daysUntil(purgesAt(props.drop.trashedAt), now.value))
+const purgeDays = computed(() => drop.trashedAt === null ? 0 : daysUntil(purgesAt(drop.trashedAt), now.value))
 const notify = useNotify()
 const { copy } = useCopy()
 const { setShare } = useDropActions()
 const moveTo = useMoveDialog()
-const folder = computed(() => props.drop.kind === "folder")
-const shared = computed(() => props.drop.share !== "private")
+const folder = computed(() => drop.kind === "folder")
+const shared = computed(() => drop.share !== "private")
 // Someone else's drop, in Shared with me or a team folder: open it and copy its link; in a team folder, trash it too.
-const theirs = computed(() => Boolean(props.drop.owner))
+const theirs = computed(() => Boolean(drop.owner))
 const { data: me } = useMe()
 // The team's folders are the admins' to share.
-const changeable = computed(() => !theirs.value && (!props.drop.teamFolder || me.value?.role === "admin"))
-const choices = computed(() => shareItems(me.value, props.drop))
-const status = computed(() => shareStatus(props.drop, now.value))
+const changeable = computed(() => !theirs.value && (!drop.teamFolder || me.value?.role === "admin"))
+const choices = computed(() => shareItems(me.value, drop))
+const status = computed(() => shareStatus(drop, now.value))
 
-const link = useShareUrl(() => props.drop)
+const link = useShareUrl(() => drop)
 const detail = computed(() => {
-  const where = props.drop.path?.length ? ` · in ${props.drop.path.map(crumb => crumb.title).join(" / ")}` : ""
-  if (folder.value) return `${itemCount(props.drop.items ?? 0)}${where}`
-  return `${props.drop.kind === "app" && props.drop.paths ? `${props.drop.filename} · ${props.drop.paths.length} files` : props.drop.filename}${where}`
+  const where = drop.path?.length ? ` · in ${drop.path.map(crumb => crumb.title).join(" / ")}` : ""
+  if (folder.value) return `${itemCount(drop.items ?? 0)}${where}`
+  return `${drop.kind === "app" && drop.paths ? `${drop.filename} · ${drop.paths.length} files` : drop.filename}${where}`
 })
 
 async function pick(next: Share) {
-  if (next === props.drop.share) return true
-  if (!await setShare(props.drop, next)) return false
+  if (next === drop.share) return true
+  if (!await setShare(drop, next)) return false
   notify.done(SHARED_TITLES[next], SHARE_HINTS[next])
   return true
 }
@@ -47,13 +47,13 @@ async function copyLink() {
       if (await pick(next)) await copyLink()
     }
     const team = choices.value.some(item => item.value === "team")
-    const open = choices.value.some(item => item.value === "public")
+    const canPublic = choices.value.some(item => item.value === "public")
     notify.info({
       title: "Only you can open this",
-      description: team ? "Share it with the team, or turn on a public link anyone can open." : open ? "Turn on a public link to copy it. Anyone with the link can open it." : "Share it before you copy its link.",
+      description: team ? "Share it with the team, or turn on a public link anyone can open." : canPublic ? "Turn on a public link to copy it. Anyone with the link can open it." : "Share it before you copy its link.",
       actions: [
         ...(team ? [{ label: "Share with team & copy", color: "neutral" as const, variant: "outline" as const, onClick: shareAndCopy("team") }] : []),
-        ...(open ? [{ label: "Public link & copy", color: "neutral" as const, variant: team ? "ghost" as const : "outline" as const, onClick: shareAndCopy("public") }] : []),
+        ...(canPublic ? [{ label: "Public link & copy", color: "neutral" as const, variant: team ? "ghost" as const : "outline" as const, onClick: shareAndCopy("public") }] : []),
       ],
     })
     return
@@ -63,14 +63,14 @@ async function copyLink() {
 
 const menu = computed(() => [
   [
-    { label: "Open", icon: "i-ph-eye", to: `/drops/${props.drop.id}` },
-    { label: isPublic(props.drop.share) ? "Open public page" : "Open shared page", icon: "i-ph-arrow-square-out", to: dropPath(props.drop), target: "_blank", disabled: !shared.value },
+    { label: "Open", icon: "i-ph-eye", to: `/drops/${drop.id}` },
+    { label: isPublic(drop.share) ? "Open public page" : "Open shared page", icon: "i-ph-arrow-square-out", to: dropPath(drop), target: "_blank", disabled: !shared.value },
     { label: "Copy link", icon: "i-ph-link", onSelect: copyLink },
   ],
   ...(changeable.value ? [[
-    { label: "Move to folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: props.drop }) },
+    { label: "Move to folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: drop }) },
     { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") },
-  ]] : theirs.value && props.inTeam ? [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]] : []),
+  ]] : theirs.value && inTeam ? [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]] : []),
 ])
 </script>
 

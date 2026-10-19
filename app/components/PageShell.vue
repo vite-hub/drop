@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // shadcn's SiteHeader over a page: an h-12 bar with the sidebar toggle (below lg, or once ⌘B folds the sidebar), the
 // page title and its actions, then the page in a max-w-5xl column with p-4 lg:p-6, its description first.
-withDefaults(defineProps<{ id: string; title: string; description?: string; wide?: boolean }>(), { description: undefined, wide: false })
+const { wide = false } = defineProps<{ id: string; title: string; description?: string; wide?: boolean }>()
 </script>
 
 <template>

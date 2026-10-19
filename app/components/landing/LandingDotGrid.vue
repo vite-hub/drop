@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // A canvas of dots; the ones near the pointer grow and darken. Static under reduced motion.
-const props = withDefaults(defineProps<{ gap?: number; radius?: number }>(), { gap: 22, radius: 140 })
+const { gap = 22, radius = 140 } = defineProps<{ gap?: number; radius?: number }>()
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas")
 const colorMode = useColorMode()
@@ -20,9 +20,9 @@ function draw() {
   const base = colorMode.value === "dark" ? "255,255,255" : "0,0,0"
   context.setTransform(ratio, 0, 0, ratio, 0, 0)
   context.clearRect(0, 0, width, height)
-  for (let x = props.gap / 2; x < width; x += props.gap) {
-    for (let y = props.gap / 2; y < height; y += props.gap) {
-      const near = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / props.radius)
+  for (let x = gap / 2; x < width; x += gap) {
+    for (let y = gap / 2; y < height; y += gap) {
+      const near = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / radius)
       context.fillStyle = `rgba(${base},${0.1 + near * 0.45})`
       context.beginPath()
       context.arc(x, y, 1 + near * 1.6, 0, Math.PI * 2)

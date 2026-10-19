@@ -3,7 +3,7 @@ import type { DropComment } from "#shared/types"
 
 /** `current`: the version being viewed, so a comment carried over from an earlier one says which. `numbered`: off in
  * the thread, whose bar already names the comment. */
-withDefaults(defineProps<{ comment: DropComment; current?: number; numbered?: boolean }>(), { current: undefined, numbered: true })
+const { numbered = true } = defineProps<{ comment: DropComment; current?: number; numbered?: boolean }>()
 </script>
 
 <template>

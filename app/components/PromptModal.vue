@@ -4,18 +4,18 @@
 import type { FormSubmitEvent } from "@nuxt/ui"
 import * as v from "valibot"
 
-const props = withDefaults(defineProps<{
+const { initial = "", confirmLabel = "Add", schema: valueSchema } = defineProps<{
   title: string
   label: string
   placeholder?: string
   initial?: string
   confirmLabel?: string
   schema?: v.GenericSchema<string, string>
-}>(), { placeholder: undefined, initial: "", confirmLabel: "Add", schema: undefined })
+}>()
 const emit = defineEmits<{ close: [value: string | null] }>()
 const formId = useId()
-const schema = v.object({ value: props.schema ?? v.pipe(v.string(), v.trim(), v.minLength(1, "Enter a value.")) })
-const state = reactive({ value: props.initial })
+const schema = v.object({ value: valueSchema ?? v.pipe(v.string(), v.trim(), v.minLength(1, "Enter a value.")) })
+const state = reactive({ value: initial })
 const submit = (event: FormSubmitEvent<{ value: string }>) => emit("close", event.data.value)
 </script>
 

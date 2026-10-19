@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Claude Code's working line: a cycling sparkle, a shimmering verb, and the elapsed time.
 // Ported from Brainless (MIT, see LICENSE). Holds still under reduced motion.
-const props = withDefaults(defineProps<{ verb?: string }>(), { verb: "Percolating" })
+const { verb = "Percolating" } = defineProps<{ verb?: string }>()
 const GLYPHS = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"]
 const glyph = ref(2)
 const seconds = ref(0)
@@ -13,7 +13,7 @@ useIntervalFn(() => seconds.value++, 1000)
 <template>
   <div class="flex items-center gap-2 font-mono text-[13px]">
     <span aria-hidden="true" class="inline-block w-[1ch] text-[#cd694a]">{{ GLYPHS[glyph] }}</span>
-    <span class="claude-verb">{{ props.verb }}…</span>
+    <span class="claude-verb">{{ verb }}…</span>
     <span class="text-[#7d7d7d]">({{ seconds }}s · ↑ {{ seconds * 137 }} tokens · esc to interrupt)</span>
   </div>
 </template>

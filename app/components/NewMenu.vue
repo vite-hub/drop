@@ -4,11 +4,11 @@
 import type { DropdownMenuItem } from "@nuxt/ui"
 
 // `folder` false hides the folder entry: in a team folder only admins add folders.
-const props = withDefaults(defineProps<{ folder?: boolean }>(), { folder: true })
+const { folder = true } = defineProps<{ folder?: boolean }>()
 const emit = defineEmits<{ folder: []; site: [] }>()
 
 const items = computed<DropdownMenuItem[]>(() => [
-  ...(props.folder ? [{ label: "Folder", description: "Groups related drops", icon: "i-ph-folder-simple", onSelect: () => emit("folder") }] : []),
+  ...(folder ? [{ label: "Folder", description: "Groups related drops", icon: "i-ph-folder-simple", onSelect: () => emit("folder") }] : []),
   { label: "Site review", description: "Comments on a live URL", icon: "i-ph-globe-simple", onSelect: () => emit("site") },
 ])
 </script>

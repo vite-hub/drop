@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // An endless, slow strip of logos that pauses on hover. Static and wrapped under reduced motion.
-withDefaults(defineProps<{ seconds?: number }>(), { seconds: 40 })
+const { seconds = 40 } = defineProps<{ seconds?: number }>()
 </script>
 
 <template>

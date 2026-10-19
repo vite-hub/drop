@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // A copyable snippet. The copy button sits on its own strip so long commands never run under it.
-const props = withDefaults(defineProps<{ code: string; message?: string }>(), { message: "Copied" })
+const { code, message = "Copied" } = defineProps<{ code: string; message?: string }>()
 const { copy: copyText, copied } = useCopy()
-const copy = () => copyText(props.code, props.message)
+const copy = () => copyText(code, message)
 </script>
 
 <template>

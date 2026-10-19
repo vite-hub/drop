@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The public pages' header (landing and docs): marks on the left; Docs, theme, GitHub, and sign-in on the right.
 // Signed in, Open Drop and the account menu (theme, Sign out) take the place of the theme button and Sign in.
-withDefaults(defineProps<{ wide?: boolean }>(), { wide: false })
+const { wide = false } = defineProps<{ wide?: boolean }>()
 
 const route = useRoute()
 const { signedIn, signInWithGitHub } = useGitHubSignIn()

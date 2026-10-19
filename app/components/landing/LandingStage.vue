@@ -2,14 +2,14 @@
 // A fixed-size canvas scaled down to fit its container, so scripted positions hold at any width.
 // Phones get the compact canvas, which shows one window at a time. `grow` lets it scale up past its size on wide screens.
 // The server assumes a laptop (as useViewerPanel does), and hydration keeps that until mounted, so the two agree.
-const props = withDefaults(defineProps<{ size: [number, number]; compactSize: [number, number]; grow?: number }>(), { grow: 1 })
+const { size, compactSize, grow = 1 } = defineProps<{ size: [number, number]; compactSize: [number, number]; grow?: number }>()
 
 const root = useTemplateRef<HTMLElement>("root")
 const { width } = useElementSize(root)
 const compact = useMediaQuery("(max-width: 639px)", { ssrWidth: 1280 })
 provide(STAGE_COMPACT, compact)
-const canvas = computed(() => (compact.value ? props.compactSize : props.size))
-const scale = computed(() => Math.min(props.grow, width.value / canvas.value[0]))
+const canvas = computed(() => (compact.value ? compactSize : size))
+const scale = computed(() => Math.min(grow, width.value / canvas.value[0]))
 </script>
 
 <template>

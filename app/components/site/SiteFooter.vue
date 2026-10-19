@@ -1,5 +1,5 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ wide?: boolean }>(), { wide: false })
+const { wide = false } = defineProps<{ wide?: boolean }>()
 </script>
 
 <template>

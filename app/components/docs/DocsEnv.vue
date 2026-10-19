@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The settings every Drop needs or most often sets, plus the host's own (`extra`). Shown on each host page.
-const props = withDefaults(defineProps<{ extra?: Array<[name: string, what: string]> }>(), { extra: () => [] })
+const { extra = [] } = defineProps<{ extra?: Array<[name: string, what: string]> }>()
 
 const COMMON: Array<[string, string]> = [
   ["GITHUB_CLIENT_ID", "Your GitHub OAuth app's client ID."],
@@ -10,7 +10,7 @@ const COMMON: Array<[string, string]> = [
   ["DROP_MODE", "Optional. team for a Drop one team runs: everyone signed in is a teammate, and new drops start shared with the Team. Defaults to personal."],
   ["DROP_PUBLIC_LINK_DAYS", "Optional. Days a public link stays open. Empty: 7 on a team Drop, no limit on a personal one. 0 turns public links off."],
 ]
-const rows = computed(() => [...COMMON, ...props.extra])
+const rows = computed(() => [...COMMON, ...extra])
 </script>
 
 <template>

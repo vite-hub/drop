@@ -13,7 +13,7 @@ import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
 import type { SideTab } from "~/utils/viewer"
 
-const props = withDefaults(defineProps<{ publicView?: boolean }>(), { publicView: false })
+const { publicView = false } = defineProps<{ publicView?: boolean }>()
 
 const state = injectDrop()!
 const drop = computed(() => state.drop.data.value!)
@@ -31,7 +31,7 @@ const isApp = computed(() => drop.value.kind === "app")
 const owner = computed(() => drop.value.isOwner)
 // Signed-in people read a public link inside the app, sidebar included (pages/d/[id]/[[slug]].vue); visitors see it alone.
 const { data: me } = useMe()
-const visitor = computed(() => props.publicView && !me.value)
+const visitor = computed(() => publicView && !me.value)
 const openCount = computed(() => comments.value.filter(comment => !comment.resolved).length)
 const link = useShareUrl(drop)
 const now = useRelativeNow()
@@ -40,10 +40,10 @@ const trashed = computed(() => drop.value.trashedAt !== null)
 // latest; someone whose old link moved them to the latest (`?from=`) can go back to the version they were sent.
 const latest = computed(() => drop.value.versions[0] ?? drop.value)
 const older = computed(() => latest.value.id !== drop.value.id)
-const latestTo = computed(() => (props.publicView ? dropPath(drop.value) : `/drops/${latest.value.id}`))
+const latestTo = computed(() => (publicView ? dropPath(drop.value) : `/drops/${latest.value.id}`))
 const sentVersion = computed(() => {
   const version = Number(route.query.from)
-  return props.publicView && !older.value && version > 0 && version < drop.value.version ? version : 0
+  return publicView && !older.value && version > 0 && version < drop.value.version ? version : 0
 })
 const sentNotice = ref(true)
 const restoring = ref(false)
@@ -54,13 +54,13 @@ async function restoreDrop() {
 }
 
 // A folder's description (what goes in it) is in Details, for everyone signed in who adds to it.
-const details = computed(() => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !props.publicView))
+const details = computed(() => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !publicView))
 const panel = useViewerPanel({ details, openCount, versions: computed(() => drop.value.versions.length), comments: computed(() => drop.value.kind !== "folder") })
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const app = useAppFiles(drop)
 const { pages, page } = app
 
-const live = useLiveEditor(drop, { publicView: props.publicView })
+const live = useLiveEditor(drop, { publicView: publicView })
 const editing = live.editing
 // ConnectionStatus waits 1.5 s before it says Reconnecting: a dropped socket usually comes back sooner, and Yjs keeps
 // the edits meanwhile.
@@ -209,7 +209,7 @@ async function deleteDrop() {
 
 // The folders above, as breadcrumbs: in the app for people signed in, at their share links on a public page.
 const moveTo = useMoveDialog()
-const crumbTo = (crumb: { id: string; link: string; slug: string }) => (props.publicView ? dropPath(crumb) : `/drops/${crumb.id}`)
+const crumbTo = (crumb: { id: string; link: string; slug: string }) => (publicView ? dropPath(crumb) : `/drops/${crumb.id}`)
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
 const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id)) : []))

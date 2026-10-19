@@ -5,11 +5,11 @@ import type { FormSubmitEvent } from "@nuxt/ui"
 import * as v from "valibot"
 import { FolderSchema } from "#shared/schemas"
 
-const props = withDefaults(defineProps<{ offerTeam?: boolean; team?: boolean; inside?: string }>(), { offerTeam: false, team: false, inside: undefined })
+const { offerTeam = false, team = false } = defineProps<{ offerTeam?: boolean; team?: boolean; inside?: string }>()
 const emit = defineEmits<{ close: [value: { title: string; description?: string; team: boolean } | null] }>()
 const formId = useId()
 const schema = v.object({ title: FolderSchema.entries.title, description: FolderSchema.entries.description })
-const state = reactive({ title: "", description: "", team: props.team })
+const state = reactive({ title: "", description: "", team })
 const submit = (event: FormSubmitEvent<v.InferOutput<typeof schema>>) =>
   emit("close", { title: event.data.title, ...(event.data.description ? { description: event.data.description } : {}), team: state.team })
 </script>

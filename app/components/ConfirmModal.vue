@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Opened through useConfirm(): resolves true when confirmed, false on cancel or dismiss.
-withDefaults(defineProps<{ title: string; description?: string; confirmLabel?: string; destructive?: boolean }>(), { description: undefined, confirmLabel: "Confirm", destructive: false })
+const { confirmLabel = "Confirm", destructive = false } = defineProps<{ title: string; description?: string; confirmLabel?: string; destructive?: boolean }>()
 const emit = defineEmits<{ close: [confirmed: boolean] }>()
 </script>
 
