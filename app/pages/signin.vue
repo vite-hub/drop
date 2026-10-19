@@ -4,7 +4,7 @@ useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 const { data: me } = await useMe()
 const { next, signIn } = useGitHubSignIn()
 const { signOut } = useUserSession(useNuxtApp().$auth)
-const { data: method } = await useApi("/api/sign-in", { key: "sign-in" })
+const { data: method } = await useSignInMethod()
 const pending = ref(false)
 const error = ref("")
 const dev = import.meta.dev

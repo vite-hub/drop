@@ -13,7 +13,7 @@ export function useNotify() {
       const body = (error as { data?: QuotaFailure })?.data
       if (body?.code === "DROP_LIMIT_REACHED") {
         quotaNotice.value = body
-        void refreshNuxtData("usage")
+        void refreshNuxtData(keys.usage)
         return
       }
       toast.add({ title, description: errorText(error), color: "error", icon: "i-ph-warning-circle" })

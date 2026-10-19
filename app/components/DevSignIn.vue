@@ -15,7 +15,7 @@ async function submit() {
   form.pending = false
   if (error) form.error = error.message ?? (creating.value ? "Couldn't create the account." : "Couldn't sign in.")
   else {
-    clearNuxtData("me")
+    clearNuxtData(keys.me)
     await navigateTo(next.value)
   }
 }

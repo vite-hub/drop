@@ -8,7 +8,7 @@ const { data: me } = useMe()
 const { data: recent } = useDrops()
 const term = ref("")
 const query = refDebounced(computed(() => term.value.trim()), 150)
-const { data: found, status } = useApi<DropSummary[]>("/api/search", { key: "search", query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
+const { data: found, status } = useApi<DropSummary[]>("/api/search", { key: keys.search, query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
 
 /** Where a drop lives: whose it is when it isn't yours, then its folders. */
 function where(drop: DropSummary) {

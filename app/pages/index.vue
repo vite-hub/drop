@@ -7,7 +7,7 @@ definePageMeta({
   alias: "/home",
   middleware: async (to) => {
     if (to.path !== "/") return
-    const { data: cached } = useNuxtData("me")
+    const { data: cached } = useNuxtData(keys.me)
     const me = cached.value ?? (await useMe()).data.value
     if (me) return navigateTo("/drops", { replace: true })
   },

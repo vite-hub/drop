@@ -19,7 +19,12 @@ export const useApi = createUseFetch(() => {
 
 /** The signed-in person, their role, and whether this Drop is personal or a team. Null when signed out. */
 export function useMe() {
-  return useApi("/api/me", { key: "me", default: () => null })
+  return useApi("/api/me", { key: keys.me, default: () => null })
+}
+
+/** How this Drop signs people in. `proxy`: through an oauth2-proxy (read at runtime), so signing in again returns the same account. */
+export function useSignInMethod() {
+  return useApi("/api/sign-in", { key: keys.signIn })
 }
 
 /**

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Review" })
-const { data, refresh, error } = await useApi("/api/admin/review")
+const { data, refresh, error } = await useApi("/api/admin/review", { key: keys.adminReview })
 const notify = useNotify()
 const busy = ref(false)
 async function review(id: string, action: "approve" | "reject") {

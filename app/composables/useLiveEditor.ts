@@ -100,7 +100,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       realtime.provider.value?.awareness.setLocalStateField("published", { id: next.id, version: next.version, name: me?.name ?? "Someone" } satisfies Published)
       notify.done(`Published v${next.version}`, "The previous version stays in history.")
       // A new version adds bytes and a write, so the plan usage moves too.
-      await refreshNuxtData(["drops", "usage"])
+      await refreshNuxtData([keys.drops, keys.usage])
       // Let the announcement reach the room before this client leaves it.
       await promiseTimeout(300)
       close()

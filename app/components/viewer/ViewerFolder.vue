@@ -21,7 +21,7 @@ const addsFolders = computed(() => props.drop.isOwner)
 
 async function newFolder() {
   const input = await folderDialog({ inside: props.drop.title })
-  if (input && await createFolder(input.title, props.drop, { description: input.description })) await refreshNuxtData(`drop:${props.drop.id}`)
+  if (input && await createFolder(input.title, props.drop, { description: input.description })) await refreshNuxtData(keys.drop(props.drop.id))
 }
 
 const picker = useFileDialog({ multiple: false, reset: true })

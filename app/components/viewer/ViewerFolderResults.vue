@@ -7,7 +7,7 @@ import type { DropSummary } from "#shared/types"
 const props = defineProps<{ folder: string; query: string; publicView?: boolean }>()
 const query = refDebounced(computed(() => props.query.trim()), 200)
 const { data: found, status } = useApi<DropSummary[]>("/api/drops", {
-  key: () => `folder-search:${props.folder}`,
+  key: () => keys.folderSearch(props.folder),
   query: computed(() => ({ folder: props.folder, q: query.value })),
   default: () => [],
   // It mounts with the first word typed, so that fetch goes out at once; later words refetch through `query`.
