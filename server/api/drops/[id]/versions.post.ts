@@ -22,7 +22,7 @@ export default quotaApiHandler(defineValidatedHandler({
     if (!drop || !who || who.actorKind !== "browser" || drop.kind !== "markdown" || !drop.blobKey || !permissions(drop, who).edit)
       throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
     await requireRateLimit(event, "drop-version", { key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
-    const { force } = await event.req.json() as { force?: boolean }
+    const { force } = await event.req.json()
     const head = (await versionsOf(drop))[0]!
     if (head.id !== drop.id && !force)
       throw new HTTPError({ status: 409, statusText: `v${head.version} was published while you were editing.`, data: { head: { id: head.id, version: head.version } } })

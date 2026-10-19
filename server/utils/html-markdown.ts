@@ -17,7 +17,7 @@ export function htmlToMarkdown(html: string, origin: string): string {
   const inPre = () => stack.some(frame => frame.tag === "pre")
   const append = (text: string) => { top().text += text }
 
-  for (const match of html.matchAll(/<!--[\s\S]*?-->|<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*?)(\/?)>|([^<]+)/g)) {
+  for (const match of html.matchAll(/<!--[\s\S]*?-->|<(\/?)([a-z][a-z0-9-]*)([^>]*?)(\/?)>|([^<]+)/gi)) {
     const [, closing, rawTag, attributes = "", selfClosing, text] = match
     if (text !== undefined) {
       if (skipping) continue

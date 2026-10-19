@@ -3,9 +3,8 @@
 // A blank window is already open but empty, like a new tab, until the agent makes what it shows; then the page fades in.
 type Frame = { x: number; y: number; w: number; h: number }
 const props = defineProps<{ title: string; frame: Frame; state: "front" | "back" | "hidden"; dark?: boolean; url?: boolean; blank?: boolean }>()
-const compact = inject(STAGE_COMPACT, ref(false))
 defineSlots<{ default(): unknown; icon?(): unknown }>()
-
+const compact = inject(STAGE_COMPACT, ref(false))
 const style = computed(() => ({
   left: compact.value ? `calc(50% - ${props.frame.w / 2}px)` : `${props.frame.x}px`,
   top: compact.value ? "0px" : `${props.frame.y}px`,

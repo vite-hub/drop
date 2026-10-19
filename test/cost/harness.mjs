@@ -17,7 +17,7 @@ const stubs = {
 const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
 setStorage({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, value, options) => globalThis.dropTest.storage.setItem(key(k), value, options?.ttl ? { ttl: options.ttl } : undefined) })
 export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/functions", ...options })`,
-  "nitro/storage": 'export const useStorage = () => globalThis.dropTest.storage',
+  "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
   "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",
   "#vitehub/env/server": "export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: '', authProxy: false, authProxyCookie: '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: 100, proBytes: 1073741824, proWrites: 10000 } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
@@ -33,7 +33,7 @@ registerHooks({
       if (["server/utils/drops.ts", "server/middleware/0.drop-access.ts", "server/middleware/1.markdown-documents.ts", "server/api/me.get.ts", "server/utils/code-image-store.ts"].includes(path)) {
         let source = execFileSync("git", ["show", `${process.env.DROP_TEST_BASELINE}:${path}`], { cwd: fileURLToPath(root), encoding: "utf8" })
         // Let the new gate call the old middleware's lookup without introducing its owner join.
-        if (path === "server/utils/drops.ts") source += '\nexport async function findDropByBlob(key) { const [row] = await db.select().from(drops).where(eq(drops.blobKey, key)).limit(1); return row ?? null }\n'
+        if (path === "server/utils/drops.ts") source += "\nexport async function findDropByBlob(key) { const [row] = await db.select().from(drops).where(eq(drops.blobKey, key)).limit(1); return row ?? null }\n"
         return { format: "module", source: stripTypeScriptTypes(source), shortCircuit: true }
       }
     }

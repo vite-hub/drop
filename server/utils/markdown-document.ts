@@ -66,7 +66,6 @@ function supersedesHref(value: unknown): string | undefined {
     if (["http:", "https:"].includes(url.protocol)) return url.href
   }
   catch {}
-  return
 }
 
 const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render }) => {
@@ -87,7 +86,7 @@ function createMermaidRenderer(): NodeHandler {
     if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback
 
     const rendered = Mermaid(node)
-    return rendered.startsWith('<div class="mermaid">')
+    return rendered.startsWith("<div class=\"mermaid\">")
       ? rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
       : fallback
   }
@@ -123,7 +122,7 @@ export async function renderMarkdownBody(markdown: string): Promise<{ title: str
         warning: renderCallout,
       },
     })
-    return { title: documentTitle(document), html: revision + problems + (content || '<p class="empty-document">This document is empty.</p>') }
+    return { title: documentTitle(document), html: revision + problems + (content || "<p class=\"empty-document\">This document is empty.</p>") }
   }
   catch (error) {
     log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })

@@ -21,7 +21,10 @@ export function useStoryboard<Name extends string>(target: MaybeElementRef, beat
   const playing = computed(() => visible.value && !held.value && !reduced.value)
 
   const { start, stop } = useTimeoutFn(() => (index.value = (index.value + 1) % beats.length), () => beats[index.value]![1], { immediate: false })
-  watch([index, playing], () => (stop(), playing.value && start()), { immediate: true })
+  watch([index, playing], () => {
+    stop()
+    if (playing.value) start()
+  }, { immediate: true })
   onMounted(() => watch(reduced, value => value && (index.value = order.get(options.still)!), { immediate: true }))
 
   const beat = computed(() => beats[index.value]![0])

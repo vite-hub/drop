@@ -94,4 +94,4 @@ export const PLAN_TEMPLATE = String.raw`<!doctype html>
   await mermaid.run({ querySelector: "pre.mermaid" });
 </script>
 </body>
-</html>`;
+</html>`

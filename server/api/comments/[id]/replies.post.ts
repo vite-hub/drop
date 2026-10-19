@@ -22,6 +22,6 @@ export default defineValidatedHandler({
     // Replies share the comment limit: a thread is no way around it.
     await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
     const { body } = await event.req.json()
-    return await addReply(comment, who, body)
+    return addReply(comment, who, body)
   },
 })

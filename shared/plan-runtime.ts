@@ -1,9 +1,9 @@
 // What Drop injects into every plan document.
 // The theme contract matches T3 Code's HTML renders (same shadcn token names, --chart-1…6, base stylesheet),
 // so a page an agent built for T3 renders the same way in Drop.
-import THEME from "./theme.css?raw";
+import THEME from "./theme.css?raw"
 
-const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`;
+const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
 
 // The frame runs on another origin than Drop's assets, so Geist comes from Google Fonts here. The colors are the
 // app's own (shared/theme.css).
@@ -12,14 +12,14 @@ ${THEME}
 :root { ${FONTS} }
 html { background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 body { margin: 0; }
-code, kbd, pre, samp { font-family: var(--font-mono); }`;
+code, kbd, pre, samp { font-family: var(--font-mono); }`
 
 /** The rules agents follow when they build an HTML plan. Shown on the Agents page and shipped in the skill. */
 export const PLAN_AUTHORING_GUIDE = `Write one self-contained HTML document with inline <style> and <script>. Load libraries from a CDN (Chart.js, Mermaid, D3, KaTeX); they run as-is.
 Drop shows the page full screen, so center a readable column (max-width ~760px) with its own padding.
 Drop injects its theme as CSS custom properties on :root and follows the reader's light/dark mode: --background, --foreground, --muted, --muted-foreground, --card, --border, --primary, --primary-foreground, --destructive, --code-background, --chart-1 … --chart-8 (use in order), --positive, --caution, --negative, --radius, --font-sans, --font-mono. Use them instead of fixed colors. Grayscale first: color only for chart series and status.
 Readers comment by selecting text, clicking images, or drawing a rectangle over any part of the page, so prefer real text, lists, and tables over text baked into images.
-These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`;
+These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`
 
 /**
  * How a comment names an element of someone's page: a CSS path to it, a label (its tag and first words), and the
@@ -53,7 +53,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
       if (area < bestArea) { best = el; bestArea = area; }
     }
     return best || under[0] || document.body;
-  }`;
+  }`
 
 /**
  * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
@@ -294,7 +294,7 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
   document.documentElement.appendChild(host);
   document.head.appendChild(pageStyle);
   post({ type: "ready" });
-})();`;
+})();`
 
 /** Inject theme + annotator into a full HTML document without touching the author's markup. */
 /**
@@ -341,7 +341,7 @@ export const OPAQUE_ORIGIN_SHIM = String.raw`(() => {
       catch { return original.call(this, state, title); }
     };
   }
-})();`;
+})();`
 
 /**
  * Reports the page's own failures to Drop so the agent that published it can read them: uncaught errors, rejected
@@ -373,20 +373,20 @@ export const ERROR_REPORTER = String.raw`(() => {
     report("console", args.map(text).join(" "));
     return original.apply(this, args);
   };
-})();`;
+})();`
 
 /** Puts `snippet` first in the head, or after the doctype when there's no head tag, so the page keeps standards mode. */
 export function prependToHead(html: string, snippet: string): string {
-  if (/<head(\s[^>]*)?>/i.test(html)) return html.replace(/<head(\s[^>]*)?>/i, (match) => match + snippet);
-  const doctype = html.match(/^\s*<!doctype[^>]*>/i)?.[0] ?? "";
-  return doctype + snippet + html.slice(doctype.length);
+  if (/<head(\s[^>]*)?>/i.test(html)) return html.replace(/<head(\s[^>]*)?>/i, (match) => match + snippet)
+  const doctype = html.match(/^\s*<!doctype[^>]*>/i)?.[0] ?? ""
+  return doctype + snippet + html.slice(doctype.length)
 }
 
 /** `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it. */
 export function injectRuntime(html: string, dark: boolean, inset = 0): string {
-  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});document.documentElement.style.setProperty("--drop-inset", "${Number(inset) || 0}px");</script>`;
-  const tail = `<script>${ANNOTATOR_SCRIPT}</script>`;
-  let out = prependToHead(html, head);
-  out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail;
-  return out;
+  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});document.documentElement.style.setProperty("--drop-inset", "${Number(inset) || 0}px");</script>`
+  const tail = `<script>${ANNOTATOR_SCRIPT}</script>`
+  let out = prependToHead(html, head)
+  out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail
+  return out
 }

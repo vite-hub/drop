@@ -20,7 +20,7 @@ async function read(key: string) {
   const [error, file] = await blob.get(key)
   if (error?.code === "BLOB_NOT_FOUND") return null
   if (error) throw error
-  return file ? await file.text() : null
+  return file ? file.text() : null
 }
 
 async function write(key: string, body: string) {

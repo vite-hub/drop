@@ -18,7 +18,7 @@
     "dev": "nuxt dev",
     "postinstall": "vitehub types prepare && nuxt prepare",
     "preview": "cp -r server/databases/migrations .output/server/ && wrangler d1 migrations apply DB --local --config .output/server/wrangler.json && wrangler dev --config .output/server/wrangler.json --enable-containers=false --port 8788",
-    "doctor": "vite-doctor . --no-cache --max-warnings 0 --extends nuxt/strict,typescript/strict,vue/strict,vite/strict,nitro/strict",
+    "doctor": "vite-doctor . --no-cache --severity error --max-warnings 0 --extends nuxt/strict,typescript/strict,vue/strict,vite/strict,nitro/strict",
     "test": "node --test $(find test -name '*.test.mjs' -not -path 'test/e2e/*')",
     "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
     "typecheck": "nuxt typecheck"

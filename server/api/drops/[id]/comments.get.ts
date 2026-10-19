@@ -8,5 +8,5 @@ export default defineHandler(async (event) => {
   const drop = await findDrop(await routeId(event), event)
   const who = await identify(event)
   if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
-  return await listComments(drop, who)
+  return listComments(drop, who)
 })

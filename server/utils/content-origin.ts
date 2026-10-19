@@ -30,9 +30,12 @@ function configured(event: H3Event): ContentConfig | null {
   // One `*`, inside the first label, with a domain after it.
   const at = name.indexOf("*")
   const firstDot = name.indexOf(".")
-  if (name.indexOf("*", at + 1) !== -1 || firstDot === -1 || at > firstDot) return null
+  if (name.includes("*", at + 1) || firstDot === -1 || at > firstDot) return null
   const prefix = name.slice(0, at), suffix = name.slice(at + 1)
-  try { new URL(`${protocol}//${prefix}a${suffix}`) }
+  try {
+    const valid = new URL(`${protocol}//${prefix}a${suffix}`)
+    if (!valid.hostname) return null
+  }
   catch { return null }
   return { protocol, port, host: name, perDrop: { prefix, suffix } }
 }

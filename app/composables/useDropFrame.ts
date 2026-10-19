@@ -1,18 +1,18 @@
 /** Messages the sandboxed drop sends up (see shared/plan-runtime.ts). */
-export type FrameMessage =
-  | { type: "ready" }
-  | { type: "navigate"; path: string }
-  | { type: "copy"; text: string }
-  | { type: "selection"; clear?: boolean; quote: string; selector: string; label: string; rect: { left: number; top: number; right: number; bottom: number } }
-  | { type: "image"; src: string; alt: string; selector: string; label: string; rect?: { left: number; top: number; right: number; bottom: number } }
-  | { type: "area"; selector: string; label: string; ox: number; oy: number; ow: number; oh: number; rect: { left: number; top: number; right: number; bottom: number } }
-  | { type: "marker"; id: string; clientX: number; clientY: number }
-  | { type: "unplaced"; ids: string[] }
-  | { type: "key"; key: string }
-  | { type: "host"; path: string }
-  | { type: "location"; path: string }
-  | { type: "frame-request"; id: string; path: string }
-  | { type: "runtime-error"; kind: "error" | "rejection" | "console" | "load"; message: string; source?: string }
+export type FrameMessage
+  = | { type: "ready" }
+    | { type: "navigate"; path: string }
+    | { type: "copy"; text: string }
+    | { type: "selection"; clear?: boolean; quote: string; selector: string; label: string; rect: { left: number; top: number; right: number; bottom: number } }
+    | { type: "image"; src: string; alt: string; selector: string; label: string; rect?: { left: number; top: number; right: number; bottom: number } }
+    | { type: "area"; selector: string; label: string; ox: number; oy: number; ow: number; oh: number; rect: { left: number; top: number; right: number; bottom: number } }
+    | { type: "marker"; id: string; clientX: number; clientY: number }
+    | { type: "unplaced"; ids: string[] }
+    | { type: "key"; key: string }
+    | { type: "host"; path: string }
+    | { type: "location"; path: string }
+    | { type: "frame-request"; id: string; path: string }
+    | { type: "runtime-error"; kind: "error" | "rejection" | "console" | "load"; message: string; source?: string }
 
 /**
  * The postMessage bridge to the sandboxed iframe. Messages are matched by source window. An opaque-origin frame

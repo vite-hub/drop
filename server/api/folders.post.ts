@@ -13,7 +13,7 @@ export default quotaApiHandler(defineValidatedHandler({
   validate: { body: FolderSchema },
   async handler(event) {
     const who = await requireIdentity(event)
-    const body = await event.req.json() as { title: string; folder?: string; description?: string; team?: boolean }
+    const body = await event.req.json()
     const parent = body.folder ? await requireFolder(body.folder, who, event, undefined, "folder") : undefined
     return toSummary(await createFolder(who, { title: body.title, folder: parent, note: body.description, team: body.team }, event))
   },

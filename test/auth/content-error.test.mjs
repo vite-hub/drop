@@ -22,7 +22,7 @@ test("signed-out content errors offer sign-in and preserve the original link", a
 })
 
 test("signed-in content errors show only the current account and offer account switching", async () => {
-  const response = await render(404, { email: 'viewer+<test>@example.test' }, { ownerEmail: "hidden-owner@example.test", title: "Secret title" })
+  const response = await render(404, { email: "viewer+<test>@example.test" }, { ownerEmail: "hidden-owner@example.test", title: "Secret title" })
   const html = await response.text()
   assert.match(html, /viewer\+&lt;test&gt;@example.test/)
   assert.match(html, /Use another account/)

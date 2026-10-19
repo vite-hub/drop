@@ -357,7 +357,7 @@ export async function readText(key: string) {
   if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
   if (error) throw storageFailure(error)
   if (!file) throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  return await file.text()
+  return file.text()
 }
 
 export async function versionChain(row: DropRow) {
@@ -689,7 +689,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
 
   await drainBlobCleanup()
   const now = Date.now()
-  let row: DropRow | null = input.id ? await findDrop(input.id) : null
+  const row: DropRow | null = input.id ? await findDrop(input.id) : null
   if (input.id && (!row || row.kind !== "app")) throw new HTTPError({ status: 404, statusText: "No app with that id." })
   // An expired app is read-only even for its owner, so check the Trash before the edit right. Apps have no version chain.
   if (row?.expired && permissions(row, who).manage) throw new HTTPError({ status: 409, statusText: "That app is in the Trash. Restore it first, or publish a new app." })

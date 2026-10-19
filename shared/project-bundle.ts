@@ -2,61 +2,61 @@
 // stylesheets, scripts and SVGs are inlined, ES module imports resolve to inline modules, fetch() of a
 // project file returns that file, and links to other pages switch pages.
 
-import { lookup } from "mrmime";
-import { prependToHead } from "./plan-runtime.ts";
+import { lookup } from "mrmime"
+import { prependToHead } from "./plan-runtime.ts"
 
-export type ProjectFiles = Record<string, string>;
+export type ProjectFiles = Record<string, string>
 
 /** Resolves `ref` relative to the file at `from`. Returns null for external URLs. Embedded in the page runtime. */
 export function resolvePath(from: string, ref: string): string | null {
-  if (!ref || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) return null;
-  const clean = ref.split("#")[0]!.split("?")[0]!;
-  if (!clean) return null;
-  const parts = clean.startsWith("/") ? [] : from.split("/").slice(0, -1);
+  if (!ref || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) return null
+  const clean = ref.split("#")[0]!.split("?")[0]!
+  if (!clean) return null
+  const parts = clean.startsWith("/") ? [] : from.split("/").slice(0, -1)
   for (const part of clean.replace(/^\//, "").split("/")) {
-    if (part === "..") parts.pop();
-    else if (part && part !== ".") parts.push(part);
+    if (part === "..") parts.pop()
+    else if (part && part !== ".") parts.push(part)
   }
-  return parts.join("/");
+  return parts.join("/")
 }
 
 /** The page a URL path opens, the way a static host serves it: `/` and `/docs/` open their index.html. Embedded in the page runtime. */
 export function pageAt(pages: string[], path: string): string | null {
-  const clean = path.replace(/^\/+/, "");
-  const candidates = [clean, `${clean.replace(/\/$/, "")}/index.html`.replace(/^\//, ""), `${clean}.html`];
-  return candidates.find((candidate) => candidate && pages.includes(candidate)) ?? null;
+  const clean = path.replace(/^\/+/, "")
+  const candidates = [clean, `${clean.replace(/\/$/, "")}/index.html`.replace(/^\//, ""), `${clean}.html`]
+  return candidates.find((candidate) => candidate && pages.includes(candidate)) ?? null
 }
 
 /** The URL path a static host serves `page` at: an index.html at its folder. */
-export const pageUrl = (page: string): string => encodeURI(`/${page.replace(/(^|\/)index\.html$/, "$1")}`);
+export const pageUrl = (page: string): string => encodeURI(`/${page.replace(/(^|\/)index\.html$/, "$1")}`)
 
-export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain";
+export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain"
 
-const dataUrl = (path: string, content: string) => `data:${contentTypeOf(path)};charset=utf-8,${encodeURIComponent(content)}`;
-const safeScript = (code: string) => code.replace(/<\/script/gi, "<\\/script");
+const dataUrl = (path: string, content: string) => `data:${contentTypeOf(path)};charset=utf-8,${encodeURIComponent(content)}`
+const safeScript = (code: string) => code.replace(/<\/script/gi, "<\\/script")
 
 function inlineCss(files: ProjectFiles, path: string, css: string): string {
   return css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (match, _quote, ref: string) => {
-    const target = resolvePath(path, ref);
-    return target && files[target] !== undefined ? `url("${dataUrl(target, files[target]!)}")` : match;
-  });
+    const target = resolvePath(path, ref)
+    return target && files[target] !== undefined ? `url("${dataUrl(target, files[target])}")` : match
+  })
 }
 
 function bundleModule(files: ProjectFiles, path: string, seen: Set<string>): string {
-  const code = files[path] ?? "";
-  if (seen.has(path)) return code;
-  const next = new Set(seen).add(path);
+  const code = files[path] ?? ""
+  if (seen.has(path)) return code
+  const next = new Set(seen).add(path)
   const replace = (specifier: string) => {
-    const target = resolvePath(path, specifier);
-    if (!target || files[target] === undefined) return specifier;
-    return target.endsWith(".json") ? dataUrl(target, files[target]!) : `data:text/javascript;charset=utf-8,${encodeURIComponent(bundleModule(files, target, next))}`;
-  };
+    const target = resolvePath(path, specifier)
+    if (!target || files[target] === undefined) return specifier
+    return target.endsWith(".json") ? dataUrl(target, files[target]) : `data:text/javascript;charset=utf-8,${encodeURIComponent(bundleModule(files, target, next))}`
+  }
   return code
-    .replace(/(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.{1,2}\/[^'"]+|\/[^'"]+)\2/g, (_match, lead: string, quote: string, specifier: string) => `${lead}${quote}${replace(specifier)}${quote}`);
+    .replace(/(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.{1,2}\/[^'"]+|\/[^'"]+)\2/g, (_match, lead: string, quote: string, specifier: string) => `${lead}${quote}${replace(specifier)}${quote}`)
 }
 
 function pageRuntime(files: ProjectFiles, page: string): string {
-  const assets = Object.fromEntries(Object.entries(files).filter(([path]) => !path.endsWith(".html")));
+  const assets = Object.fromEntries(Object.entries(files).filter(([path]) => !path.endsWith(".html")))
   // On the content origin the app has a real URL: links navigate like on any static host, and the viewer follows
   // along. In the opaque sandbox nothing can navigate, so links to other pages ask the viewer to switch.
   return `<script>(() => {
@@ -119,40 +119,40 @@ function pageRuntime(files: ProjectFiles, page: string): string {
       post({ type: "navigate", path: target });
     }
   }, true);
-})();</script>`;
+})();</script>`
 }
 
 /** One self-contained HTML document for `page`, ready for injectRuntime (theme + comments). */
 export function buildProjectDocument(files: ProjectFiles, page: string): string {
-  const source = files[page];
+  const source = files[page]
   if (source === undefined) {
-    return `<!doctype html><html><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;font-family:var(--font-sans);color:var(--muted-foreground)">${page} isn't in this project.</body></html>`;
+    return `<!doctype html><html><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;font-family:var(--font-sans);color:var(--muted-foreground)">${page} isn't in this project.</body></html>`
   }
   const html = source
     .replace(/<link\b[^>]*\brel=["']?stylesheet["']?[^>]*>/gi, (tag) => {
-      const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
-      const target = href ? resolvePath(page, href) : null;
-      return target && files[target] !== undefined ? `<style data-file="${target}">${inlineCss(files, target, files[target]!)}</style>` : tag;
+      const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1]
+      const target = href ? resolvePath(page, href) : null
+      return target && files[target] !== undefined ? `<style data-file="${target}">${inlineCss(files, target, files[target])}</style>` : tag
     })
     .replace(/<script\b([^>]*)\bsrc=["']([^"']+)["']([^>]*)><\/script>/gi, (tag, before: string, src: string, after: string) => {
-      const target = resolvePath(page, src);
-      if (!target || files[target] === undefined) return tag;
-      const isModule = /type=["']?module/i.test(before + after);
-      const code = isModule ? bundleModule(files, target, new Set()) : files[target]!;
-      return `<script${isModule ? ' type="module"' : ""} data-file="${target}">${safeScript(code)}</script>`;
+      const target = resolvePath(page, src)
+      if (!target || files[target] === undefined) return tag
+      const isModule = /type=["']?module/i.test(before + after)
+      const code = isModule ? bundleModule(files, target, new Set()) : files[target]
+      return `<script${isModule ? " type=\"module\"" : ""} data-file="${target}">${safeScript(code)}</script>`
     })
     .replace(/(<(?:img|source|image|use)\b[^>]*?\s(?:src|href)=)(["'])([^"']+)\2/gi, (match, lead: string, quote: string, ref: string) => {
-      const target = resolvePath(page, ref);
-      return target && files[target] !== undefined ? `${lead}${quote}${dataUrl(target, files[target]!)}${quote}` : match;
-    });
-  return prependToHead(html, pageRuntime(files, page));
+      const target = resolvePath(page, ref)
+      return target && files[target] !== undefined ? `${lead}${quote}${dataUrl(target, files[target])}${quote}` : match
+    })
+  return prependToHead(html, pageRuntime(files, page))
 }
 
 const LINK_TAGS: [RegExp, string][] = [
   [/<script\b[^>]*\bsrc=["']([^"']+)["']/gi, "script"],
   [/<link\b[^>]*\bhref=["']([^"']+)["']/gi, "stylesheet or icon"],
   [/<(?:img|source|image|use|video|audio|iframe)\b[^>]*?\s(?:src|href)=["']([^"']+)["']/gi, "image or media"],
-];
+]
 
 /**
  * References in the sent files that point at nothing in the app, the way the viewer resolves them: a script,
@@ -161,37 +161,37 @@ const LINK_TAGS: [RegExp, string][] = [
  * is one sentence an agent can act on.
  */
 export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
-  const all = new Set(paths);
-  const pages = paths.filter((path) => path.endsWith(".html"));
-  const importMap = Object.entries(sent).some(([path, text]) => path.endsWith(".html") && /<script\b[^>]*type=["']?importmap/i.test(text));
-  const issues = new Set<string>();
+  const all = new Set(paths)
+  const pages = paths.filter((path) => path.endsWith(".html"))
+  const importMap = Object.entries(sent).some(([path, text]) => path.endsWith(".html") && /<script\b[^>]*type=["']?importmap/i.test(text))
+  const issues = new Set<string>()
   const check = (from: string, ref: string, what: string, page = false) => {
-    if (/[`$]|\{\{/.test(ref)) return;
-    const target = resolvePath(from, ref.trim());
-    if (target === null || target === "" && !page) return;
-    if (all.has(target) || (page && pageAt(pages, `/${target}`) !== null)) return;
-    issues.add(`${from} ${page ? "links to" : `loads ${what}`} "${ref}", but ${target || "index.html"} isn't in the app.`);
-  };
+    if (/[`$]|\{\{/.test(ref)) return
+    const target = resolvePath(from, ref.trim())
+    if (target === null || target === "" && !page) return
+    if (all.has(target) || (page && pageAt(pages, `/${target}`) !== null)) return
+    issues.add(`${from} ${page ? "links to" : `loads ${what}`} "${ref}", but ${target || "index.html"} isn't in the app.`)
+  }
   for (const [path, text] of Object.entries(sent)) {
     if (path.endsWith(".html") || path.endsWith(".htm")) {
-      const html = text.replace(/<!--[\s\S]*?-->/g, "");
-      for (const [pattern, what] of LINK_TAGS) for (const match of html.matchAll(pattern)) check(path, match[1]!, what);
-      for (const match of html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["']/gi)) check(path, match[1]!, "", true);
-      for (const match of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) scanScript(path, match[1]!);
+      const html = text.replace(/<!--[\s\S]*?-->/g, "")
+      for (const [pattern, what] of LINK_TAGS) for (const match of html.matchAll(pattern)) check(path, match[1]!, what)
+      for (const match of html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["']/gi)) check(path, match[1]!, "", true)
+      for (const match of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) scanScript(path, match[1]!)
     }
     else if (path.endsWith(".css")) {
-      for (const match of text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) if (!match[2]!.startsWith("data:")) check(path, match[2]!, "a file");
+      for (const match of text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) if (!match[2]!.startsWith("data:")) check(path, match[2]!, "a file")
     }
-    else if (/\.m?js$/.test(path)) scanScript(path, text);
+    else if (/\.m?js$/.test(path)) scanScript(path, text)
   }
   function scanScript(path: string, code: string) {
     for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"]+)\1/g)) {
-      const specifier = match[2]!;
-      if (/^(?:\.{1,2}\/|\/)/.test(specifier)) check(path, specifier, "a module");
+      const specifier = match[2]!
+      if (/^(?:\.{1,2}\/|\/)/.test(specifier)) check(path, specifier, "a module")
       else if (!importMap && !/^[a-z][a-z0-9+.-]*:/i.test(specifier))
-        issues.add(`${path} imports "${specifier}", a bare module name that browsers can't load. Import it from a CDN URL (https://esm.sh/${specifier}) or add an import map.`);
+        issues.add(`${path} imports "${specifier}", a bare module name that browsers can't load. Import it from a CDN URL (https://esm.sh/${specifier}) or add an import map.`)
     }
-    for (const match of code.matchAll(/\bfetch\(\s*(['"])([^'"]+)\1/g)) check(path, match[2]!, "data from");
+    for (const match of code.matchAll(/\bfetch\(\s*(['"])([^'"]+)\1/g)) check(path, match[2]!, "data from")
   }
-  return [...issues].slice(0, 20);
+  return [...issues].slice(0, 20)
 }

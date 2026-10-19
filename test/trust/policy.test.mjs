@@ -63,8 +63,8 @@ test("report paths cannot navigate to another origin or use traversal", () => {
 })
 
 test("HTML report chrome is outside the frame and user markup is escaped", () => {
-  const html = htmlLanding('<script>parent.document.body.innerHTML="bad"</script><a href="/">fake</a>', "/f/file.html")
-  assert.ok(html.indexOf('>Report</a>') < html.indexOf('<iframe'))
+  const html = htmlLanding("<script>parent.document.body.innerHTML=\"bad\"</script><a href=\"/\">fake</a>", "/f/file.html")
+  assert.ok(html.indexOf(">Report</a>") < html.indexOf("<iframe"))
   assert.match(html, /sandbox="allow-scripts/)
   assert.doesNotMatch(html, /allow-same-origin/)
   assert.doesNotMatch(html, /<script>/)

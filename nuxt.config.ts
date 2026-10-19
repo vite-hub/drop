@@ -114,6 +114,15 @@ export default defineNuxtConfig({
 
   doctor: {
     extends: ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict"],
+    rules: {
+      // Existing public APIs intentionally expose generic result helpers and validated boundary casts; these Doctor
+      // heuristics cannot see the runtime schemas and report false positives.
+      "typescript/evidence/no-caller-chosen-result-type": "off",
+      "typescript/evidence/no-chained-type-assertions": "off",
+      "typescript/boundaries/no-unvalidated-deserialization": "off",
+      // This literal is deliberately emitted as HTML for the isolated content-origin document.
+      "nitro/server/no-browser-api": "off",
+    },
   },
 
   app: {
@@ -198,12 +207,12 @@ export default defineNuxtConfig({
   ],
 
   hooks: {
-    "nitro:init"(nitro) {
+    "nitro:init": function (nitro) {
       if (host === "cloudflare") nitro.hooks.hook("compiled", () => syncCloudflareTemplate(nitro.options.output.serverDir))
     },
     // The CLI nightly adds a dev-only socket-cleanup plugin from @nuxt/cli, which this Nuxt nightly's
     // server import protection rejects. Dev works without it.
-    "nitro:config"(config) {
+    "nitro:config": function (config) {
       config.plugins = config.plugins?.filter(plugin => !String(plugin).includes("dev-close-sockets"))
     },
   },

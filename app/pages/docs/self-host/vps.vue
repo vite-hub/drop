@@ -31,14 +31,16 @@ const update = "git pull\ndocker compose up -d --build"
     </DocsSection>
 
     <DocsSection id="env" title="Settings">
-      <DocsEnv :extra="[
+      <DocsEnv
+:extra="[
         ['DROP_DATABASE', 'Optional build override: sqlite or d1. Existing D1 database ids keep the D1 driver.'],
         ['DROP_DATABASE_URL', 'Runtime SQLite file: URL. Defaults to file:.data/database/drop.db. Keep it on the persistent volume.'],
         ['DROP_GITHUB_ORG', 'Optional active organization membership requirement for publishing, viewing, and MCP.'],
         ['DROP_AUTH_PROXY', 'Set true to reuse GitHub oauth2-proxy; requires DROP_GITHUB_ORG.'],
         ['DROP_AUTH_PROXY_COOKIE', 'Optional proxy cookie name to clear on logout. Secure, host-only, Path=/.'],
         ['DROP_CONTENT_ORIGIN', 'Optional wildcard origin for apps and HTML docs, one subdomain per drop, proxied to the same port.'],
-      ]" />
+      ]"
+/>
     </DocsSection>
 
     <DocsSection id="auth-proxy" title="Reuse GitHub oauth2-proxy">

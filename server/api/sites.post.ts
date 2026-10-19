@@ -11,7 +11,7 @@ export default quotaApiHandler(defineValidatedHandler({
   validate: { body: SiteSchema },
   async handler(event) {
     const who = await requireIdentity(event)
-    const body = await event.req.json() as { url: string; title?: string; folder?: string }
+    const body = await event.req.json()
     const folder = body.folder ? await requireFolder(body.folder, who, event) : undefined
     return toSummary(await createSiteDrop(who, { url: body.url, title: body.title, folder }, event))
   },

@@ -148,7 +148,7 @@ test("Drop's scripts go first in the head without dropping the page out of stand
   assert.equal(prependToHead("<p>hi", "<x>"), "<x><p>hi")
   const app = injectRuntime(buildProjectDocument({ "index.html": "<!doctype html><html><head></head><body><a href=\"/about/\">About</a></body></html>", "about/index.html": "" }, "index.html"), false)
   assert.ok(app.startsWith("<!doctype html>"))
-  assert.ok(app.indexOf('if (self.origin !== "null") return;') < app.indexOf("const pageAt"), "the opaque shim runs before the app runtime")
+  assert.ok(app.indexOf("if (self.origin !== \"null\") return;") < app.indexOf("const pageAt"), "the opaque shim runs before the app runtime")
 })
 
 /** Runs the shim in a window whose storage, cookies, and URL changes throw, like an opaque-origin sandbox. */
