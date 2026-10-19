@@ -7,6 +7,7 @@ import { QuotaFailureSchema, type QuotaFailure } from "#shared/quotas"
  * Preserve both: Better Auth uses HTTPS to choose the __Secure- session cookie. Nitro's serverFetch
  * keeps the request in-process, including on Workers where fetching our own hostname would loop.
  */
+// doctor-disable-next-line nuxt/fetch/keyed-composable-registration-required -- Nuxt registers createUseFetch exports from composables/ itself (the build passes useApi its key); Doctor's manifest stringifies those entries to "[object Object]"
 export const useApi = createUseFetch(() => {
   if (import.meta.client) return {}
   const origin = useRequestURL().origin
