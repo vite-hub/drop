@@ -1,3 +1,4 @@
+import { H3Event } from "h3"
 import { definePlugin } from "nitro"
 import { useRuntimeConfig } from "nitro/runtime-config"
 import { isIndexedPath } from "../../app/utils/docs"
@@ -18,11 +19,13 @@ export default definePlugin((app) => {
     // Drop's own origin only: drops on the content origin keep the browser's defaults, like any site. Once seen over
     // https, browsers stay on https (never on localhost, where development runs over http). No COOP: the review popup
     // must keep its link to the site that opened it.
-    if (!isContentRequest(event)) {
+    // The hook's type is the bare HTTPEvent; Nitro hands it the full H3Event, which the content check needs.
+    const url = new URL(event.req.url)
+    if (!(event instanceof H3Event && isContentRequest(event))) {
       if (!response.headers.has("Permissions-Policy")) response.headers.set("Permissions-Policy", PERMISSIONS_POLICY)
-      if (event.url.protocol === "https:" && event.url.hostname !== "localhost") response.headers.set("Strict-Transport-Security", "max-age=31536000")
+      if (url.protocol === "https:" && url.hostname !== "localhost") response.headers.set("Strict-Transport-Security", "max-age=31536000")
     }
-    const path = new URL(event.req.url).pathname
+    const path = url.pathname
     if (path.startsWith("/f/") || path.startsWith("/d/")) {
       response.headers.set("X-Robots-Tag", "noindex, nofollow")
       response.headers.set("Cache-Control", "private, no-store")
