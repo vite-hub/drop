@@ -19,6 +19,7 @@ const nuxt = `// nuxt.config.ts: preview builds only\nexport default defineNuxtC
       </ul>
       <p>Addresses must be <code>https</code>, or <code>http</code> on <code>localhost</code>, <code>127.0.0.1</code>, or <code>*.localhost</code>.</p>
       <AgentsCodeBlock :code="publish" />
+      <p><code>share: "team"</code> lets everyone signed in to a team Drop comment. To let guests comment without signing in, on any Drop, pass <code>share: "public_comment"</code>.</p>
       <p>Comments from a pattern keep the address of the preview they came from, so you can tell pull requests apart.</p>
     </DocsSection>
 
@@ -37,7 +38,7 @@ const nuxt = `// nuxt.config.ts: preview builds only\nexport default defineNuxtC
 
     <DocsSection id="comment" title="Comment">
       <ol>
-        <li>Press <strong>Comment</strong>. The first time, a Drop window opens and finds the reviews that cover the page and that you may comment on. With one, you're connected for 12 hours; with several, you pick one by its name and owner. Signed out, you can comment as a guest only on a review shared with anyone who has the link to comment.</li>
+        <li>Press <strong>Comment</strong>. The first time, a Drop window opens and finds the reviews that cover the page and that you may comment on. With one, you're connected for 12 hours; with several, you pick one by its name and owner. Signed out, you can comment as a guest only on a review shared as <strong>Public, anyone comments</strong>.</li>
         <li>Drag a box over what you mean. <kbd>Esc</kbd> cancels.</li>
         <li>Write the note and press <strong>Send</strong>. The screenshot is of what you saw when you drew the box, sticky headers and fixed buttons included, and goes with the note, the page address, and the element under the box. A box on a sticky or fixed element says so, since it doesn't move with the page.</li>
       </ol>

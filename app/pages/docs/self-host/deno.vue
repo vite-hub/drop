@@ -18,7 +18,7 @@ const bucket = "npx wrangler r2 bucket create my-drop"
           <p>Under R2, Manage API tokens, create a token with Object Read and Write permission for that bucket. Keep its access key id and secret access key.</p>
         </li>
         <li>Choose an organization and app name. <NuxtLink to="/docs/self-host#github">Create the GitHub OAuth app</NuxtLink> with callback <code>https://&lt;app&gt;.&lt;org&gt;.deno.net/api/auth/callback/github</code>.</li>
-        <li>Before deploying, open Edit Environment Variables and add all settings below. Make the D1 settings available to build and runtime; <code>S3_BUCKET</code>, <code>S3_ENDPOINT</code>, and <code>S3_REGION</code> must be available to the build. Put GitHub credentials, the auth secret, admin ids, and S3 access keys in the production runtime context.</li>
+        <li>Before deploying, open Edit Environment Variables and add all settings below. Make the D1 settings available to build and runtime; <code>S3_BUCKET</code>, <code>S3_ENDPOINT</code>, and <code>S3_REGION</code> must be available to the build. Put GitHub credentials, the auth secret, admin emails, and S3 access keys in the production runtime context.</li>
       </ol>
       <p>Use a separate D1 database and bucket in preview contexts, or turn previews off. Deno runs pre-deploy migrations for each timeline.</p>
     </DocsSection>

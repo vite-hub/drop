@@ -12,8 +12,8 @@ const mcp = mcpSnippets(`${origin}/mcp`).claude
     <DocsSection id="how-it-works" title="How it works">
       <ol>
         <li><strong>Agents drop their work</strong> over MCP: a plan in Markdown, an HTML report, or a small static app made of files.</li>
-        <li><strong>Every drop starts private.</strong> Only its owner, and the workspace's editors and admins, can open it.</li>
-        <li><strong>People review it</strong> full screen. Select text or click a spot in an image to comment. The owner shares a link that can view, comment, or edit a Markdown doc together.</li>
+        <li><strong>Drops start with their owner, or with the team.</strong> On a personal Drop, like drop.vitehub.dev, a new drop is Only me: its owner and the admins open it. On a Drop a team runs for itself, new drops start shared with the Team.</li>
+        <li><strong>People review it</strong> full screen. Select text or click a spot in an image to comment. The owner shares it with the team, who can also edit a Markdown doc together, or with anyone who has a public link.</li>
         <li><strong>The agent reads the open comments</strong> and drops the next version. Older doc versions stay in history. Apps keep only their latest file set.</li>
       </ol>
     </DocsSection>
@@ -48,7 +48,7 @@ const mcp = mcpSnippets(`${origin}/mcp`).claude
     </DocsSection>
 
     <DocsSection id="roles" title="Roles">
-      <p>Everyone who signs in joins as a Member. The GitHub accounts a Drop's owner lists as admins join as Admin, and admins change roles on the Members page.</p>
+      <p>Everyone who signs in joins as a Member. The people whose emails the operator lists in <code>DROP_ADMINS</code> are Admins, whichever way they sign in. Roles come from that list, not from the Members page, where admins ban and unban members.</p>
       <div class="overflow-x-auto rounded-lg border border-default">
         <table>
           <thead><tr><th>Role</th><th>What they can do</th></tr></thead>

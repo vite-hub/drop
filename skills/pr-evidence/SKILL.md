@@ -7,6 +7,10 @@ description: Builds pull-request evidence for UI changes, with before and after 
 
 Show reviewers what changed on screen, marked up so they don't have to hunt for it. You write Markdown with comark-annotate components; Drop renders it as a page with hand-drawn marks, numbered notes, and arrows.
 
+## Where it lives
+
+Call `list_folders` first. If a folder's description says it's for pull request evidence, publish every screenshot and the doc into it with `folder`, and follow what its description asks; they need no `lifetime`, since they live with the folder. Otherwise pass `lifetime: "keep"` and a `keepReason` naming the pull request.
+
 ## Capture
 
 1. Find the two states: **before** from the base branch or an open preview of it, **after** from this pull request's preview. Note both URLs.
@@ -18,7 +22,7 @@ Show reviewers what changed on screen, marked up so they don't have to hunt for 
    [(r.x / innerWidth) * 100, (r.y / innerHeight) * 100, (r.width / innerWidth) * 100, (r.height / innerHeight) * 100].map((v) => +v.toFixed(1));
    ```
 
-4. Publish each screenshot with `publish` and `file: { name }` (`lifetime: "keep"`, `keepReason` naming the pull request, `share: "view"`). It answers with an `uploadUrl`; run `curl -T before.png '<uploadUrl>'`, which prints the drop with its `fileUrl`. Images already hosted elsewhere over `https` work too.
+4. Publish each screenshot with `publish` and `file: { name }` (`share: "public"`, plus the folder or lifetime from [Where it lives](#where-it-lives)). It answers with an `uploadUrl`; run `curl -T before.png '<uploadUrl>'`, which prints the drop with its `fileUrl`. Images already hosted elsewhere over `https` work too.
 
 ## Write
 
@@ -34,7 +38,7 @@ Start the document with the pull request link, the two preview URLs, and the exa
 
 ## Publish
 
-1. Publish the Markdown with `publish`: `lifetime: "keep"`, a `keepReason` naming the pull request, `share: "view"`, and a `note`. Open the returned page.
+1. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), and a `note`. Open the returned page.
 2. Take a screenshot of it and check that every mark sits on its target and every number matches its note. Fix and publish again with `previous` until it does. If a mark can't be verified, say so in the report.
 3. Give the user the link and a snippet for the pull request body:
 
@@ -42,4 +46,4 @@ Start the document with the pull request link, the two preview URLs, and the exa
    **Visual changes:** [before/after on Drop](<link>)
    ```
 
-Drop keeps the doc private until the user shares it; remind them before they paste the link into the pull request.
+The doc is a public link, so anyone with the pull request can open it. On some Drops public links close after a few days (`publicUntil` says when); tell the user the date if there is one.

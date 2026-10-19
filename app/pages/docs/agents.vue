@@ -58,7 +58,12 @@ const tools = computed(() => catalog.value.map(item => ({ name: item.uri ?? item
           </tbody>
         </table>
       </div>
-      <p>Every call runs as the person who allowed the client, with their role. New drops start private.</p>
+      <p>Every call runs as the person who allowed the client, with their role. New drops start with the Drop's default share: Team on a team Drop, Only me on a personal one. Agents make a drop public only when you ask, or when it's meant for people outside, like pull request assets.</p>
+    </DocsSection>
+
+    <DocsSection id="folders" title="Where agents publish">
+      <p>Before publishing something new, an agent calls <code>list_folders</code>. It lists every folder you can publish into, the team's first, each with its path and description. The agent passes the folder whose description fits to <code>publish</code> and follows what the description asks, such as how to name the doc. When none fits, it publishes at the top.</p>
+      <p>So write a folder's description for the agent too: what goes in it, how to name it, and how to lay it out. Agents take descriptions as guidance about where things go, not as instructions for anything else. An agent can describe your own folders with <code>create_folder</code> or <code>update_drop</code> and <code>description</code>; admins describe the team's folders in the browser.</p>
     </DocsSection>
 
     <DocsSection id="code-images" title="Code images">

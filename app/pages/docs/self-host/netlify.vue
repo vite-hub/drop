@@ -11,7 +11,7 @@ definePageMeta({ layout: "docs" })
       <ol>
         <li><NuxtLink to="/docs/self-host#database">Create a D1 database and account API token</NuxtLink>. Keep the account id, token, database id, and database name ready.</li>
         <li>Choose a site name and <NuxtLink to="/docs/self-host#github">create the GitHub OAuth app</NuxtLink> with callback <code>https://&lt;site&gt;.netlify.app/api/auth/callback/github</code>.</li>
-        <li>Fill the form with those settings, a generated auth secret, and your GitHub user id. If the generated site address differs, update the OAuth callback.</li>
+        <li>Fill the form with those settings, a generated auth secret, and your admin email. If the generated site address differs, update the OAuth callback.</li>
       </ol>
     </DocsSection>
 

@@ -7,13 +7,14 @@ const build = "DROP_HOST=vercel pnpm build   # explicit override: cloudflare, ve
 const local = "pnpm install\npnpm db:migrate   # once, and after schema changes\npnpm dev          # http://localhost:3000"
 const database = "npx wrangler login\nnpx wrangler d1 create my-drop"
 const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
+const team = "DROP_MODE=team\nDROP_ADMINS=you@example.com\nDROP_GITHUB_ORG=your-org\nDROP_PUBLIC_LINK_DAYS=7"
 </script>
 
 <template>
   <DocsPage title="Host it yourself" lead="Run your own Drop on Cloudflare, Vercel, Netlify, Deno Deploy, or a VPS.">
     <DocsDeployButtons />
 
-    <p>Start with the button for your host. You still supply GitHub sign-in and your admin user id. The steps below cover those values and the database.</p>
+    <p>Start with the button for your host. You still supply GitHub sign-in and your admin email. The steps below cover those values and the database.</p>
 
     <DocsSection id="github" title="Sign-in and admins">
       <p>Drop signs in with GitHub. You can also <NuxtLink to="/docs/self-host/vps#auth-proxy">reuse an existing GitHub oauth2-proxy</NuxtLink>. For native sign-in, <a href="https://github.com/settings/applications/new">Create a GitHub OAuth app</a> with:</p>
@@ -23,7 +24,8 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
       </ul>
       <p>Then give the deployment these settings. Each host page says where they go. Drop reads its settings when it runs, so changing one needs a restart, not a rebuild; only the host and database choices below are fixed at build time. Each setting also answers to a <code>VITEHUB_</code> name, such as <code>VITEHUB_DROP_GITHUB_ORG</code>, which wins when both are set. Booleans take <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>, and an invalid value stops Drop with an error naming the setting.</p>
       <DocsEnv />
-      <p>By default, anyone with a GitHub account can sign in and joins as a Member. Set <code>DROP_GITHUB_ORG</code> to require active organization membership for publishing and viewing, including shared links and MCP. GitHub sign-in then requests <code>read:org</code>. The accounts in <code>DROP_ADMINS</code> join as Admin, and admins change roles on the Members page. To use another sign-in provider, change the Better Auth options in <code>server/auth.ts</code>.</p>
+      <p>By default, anyone with a GitHub account can sign in and joins as a Member. Set <code>DROP_GITHUB_ORG</code> to require active organization membership for publishing and viewing, including shared links and MCP. GitHub sign-in then requests <code>read:org</code>.</p>
+      <p><code>DROP_ADMINS</code> lists admin emails, separated by commas or spaces; case doesn't matter. Whoever signs in with one of them is an Admin, as long as their sign-in method verified the email, so an admin stays one after switching from GitHub to another provider. Drop reads the list on every request: to add or remove an admin, change it and restart. Nobody changes roles on the Members page; admins ban and unban members there. In <code>nuxt dev</code> and with <code>DROP_TEST_SIGNIN</code>, an unverified email counts too. To use another sign-in provider, change the Better Auth options in <code>server/auth.ts</code>.</p>
       <div class="overflow-x-auto rounded-lg border border-default">
         <table>
           <thead><tr><th>Role</th><th>What they can do</th></tr></thead>
@@ -32,6 +34,20 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
           </tbody>
         </table>
       </div>
+    </DocsSection>
+
+    <DocsSection id="team-mode" title="Team mode">
+      <p>By default a Drop is personal, like drop.vitehub.dev: drops start Only me, and people share them by public link. Set <code>DROP_MODE=team</code> for a Drop that one team runs for itself, usually behind <code>DROP_GITHUB_ORG</code> or <NuxtLink to="/docs/self-host/vps#auth-proxy">oauth2-proxy</NuxtLink>. Everyone signed in is then a teammate:</p>
+      <ul>
+        <li>New drops start shared with the Team: everyone signed in opens them and comments. People pick Only me to keep a draft to themselves, or Team can edit to edit a Markdown doc together.</li>
+        <li>The sidebar leads with Team. Its tab lists the team's folders, then teammates' drops shared with the team.</li>
+        <li>Admins create team folders in the browser: <strong>New › Folder</strong> with the team's folder switch on, or <strong>New team folder</strong> on an empty Team tab. Everyone on the team, and their agents, adds drops to them. A drop in a team folder stays its publisher's and counts against their plan. Team folders never expire and can't be Only me.</li>
+        <li>Only admins rename, describe, share, or trash a team folder, and add subfolders to it. Anyone on the team can move a drop in one to the Trash from the browser; it goes to its owner's Trash, where the owner or an admin restores it.</li>
+      </ul>
+      <p>Every folder has a description of what goes in it and how to name and write it, such as "Notes from calls, one doc per meeting, named YYYY-MM-DD-topic." Admins write the team folders' descriptions. Agents read them with <code>list_folders</code> before they publish, and put each new drop in the folder that fits.</p>
+      <p><code>DROP_PUBLIC_LINK_DAYS</code> sets how many days a public link stays open. Left empty, it's 7 on a team Drop and no limit on a personal one; <code>0</code> turns public links off. When a link closes, the drop falls back to Team on a team Drop, or Only me on a personal one, and picking Public again starts the window over. This is separate from a drop's lifetime, which decides when the drop itself goes to the Trash.</p>
+      <p>A team deployment's settings:</p>
+      <AgentsCodeBlock :code="team" />
     </DocsSection>
 
     <DocsSection id="content-origin" title="Give apps their own domain">
@@ -60,7 +76,7 @@ const smoke = "DROP_URL=https://<your-domain> pnpm test:e2e:deployed"
     </DocsSection>
 
     <DocsSection id="abuse" title="Abuse and moderation">
-      <p>On a Drop open to anyone with a GitHub account, set <code>DROP_SHARE_APPROVAL=true</code> so a member's public shares wait until an admin approves that member. Private use keeps working, and admins skip the wait. Approve or reject members on <code>/admin/review</code>; once approved, a member shares freely. Links shared before you turn it on stay shared, so approve trusted members first if they'll publish new versions.</p>
+      <p>On a Drop open to anyone with a GitHub account, set <code>DROP_SHARE_APPROVAL=true</code> so a member's public links wait until an admin approves that member. Everything else keeps working: on a team Drop, a public link waiting for review still reaches the team. Admins skip the wait. Approve or reject members on <code>/admin/review</code>; once approved, a member shares freely. Links shared before you turn it on stay shared, so approve trusted members first if they'll publish new versions.</p>
       <p>Anyone can report a shared link at <code>/report</code>. Reports land on <code>/admin/reports</code>, where admins dismiss them, quarantine the reported drop, or ban its owner, which takes down all of their drops. Each report also logs a high-severity event; Drop sends no email, so watch your logs. <code>DROP_ABUSE_EMAIL</code> adds a public contact address to the abuse page.</p>
       <p>Before opening your Drop to the public, adapt the templates in <code>app/pages/terms.vue</code>, <code>acceptable-use.vue</code>, and <code>abuse.vue</code> to your jurisdiction, including a DMCA contact if you need one. Drops and their files are kept out of search engines; the landing page and docs stay indexable.</p>
     </DocsSection>

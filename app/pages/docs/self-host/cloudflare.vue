@@ -18,7 +18,7 @@ const STEPS = {
       <p>The button clones Drop into your GitHub account, creates D1, R2, and KV, and asks for the four sign-in settings below. It builds, applies migrations, and deploys the Worker. Enable R2 and Browser Run in your Cloudflare account first; they may require billing.</p>
       <ol>
         <li>Choose a Worker name and note its <code>https://&lt;worker&gt;.&lt;subdomain&gt;.workers.dev</code> address.</li>
-        <li><NuxtLink to="/docs/self-host#github">Create a GitHub OAuth app</NuxtLink> with that address and callback <code>&lt;origin&gt;/api/auth/callback/github</code>. Supply its client id and secret, <code>BETTER_AUTH_SECRET</code> from <code>openssl rand -base64 32</code>, and <code>DROP_ADMINS</code> from <code>gh api users/&lt;login&gt; --jq .id</code>.</li>
+        <li><NuxtLink to="/docs/self-host#github">Create a GitHub OAuth app</NuxtLink> with that address and callback <code>&lt;origin&gt;/api/auth/callback/github</code>. Supply its client id and secret, <code>BETTER_AUTH_SECRET</code> from <code>openssl rand -base64 32</code>, and <code>DROP_ADMINS</code> with the admins' emails.</li>
         <li>Accept <code>pnpm build</code> as the build command and <code>pnpm run deploy</code> as the deploy command. If you add a custom domain later, update the OAuth app's homepage and callback.</li>
       </ol>
       <p>The root <code>wrangler.jsonc</code> describes resources for the button. Cloudflare writes their new ids there. ViteHub generates <code>.output/server/wrangler.json</code> during the build; Drop carries the template's resource names and ids into that file. <code>CLOUDFLARE_D1_DATABASE_ID</code> still takes priority, so existing Workers Builds keep their current database.</p>

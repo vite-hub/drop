@@ -44,6 +44,6 @@ Before publishing, remove secrets and personal data: tokens, keys, passwords, co
 
 ## Publish
 
-Publish the document with Drop's `publish` tool as Markdown, with `lifetime: "review"` and a `note`, and give the user the review link it returns. It starts private; tell the user to share it from Drop when it's ready for someone else. If you are updating an earlier handoff, pass its id as `previous` so the link keeps one history.
+Call Drop's `list_folders` first. Then publish the document with `publish` as Markdown, with a `note`. If a folder's description fits handoffs, pass it as `folder` and follow what the description asks; otherwise publish at the top with `lifetime: "review"`. Give the user the review link it returns. It starts with the Drop's default share: the team on a team Drop, only the user otherwise. Tell the user who can open it, and to share it from Drop if someone else needs it. If you are updating an earlier handoff, pass its id as `previous` so the link keeps one history.
 
 If Drop's tools aren't available, write the file to the system's temporary directory instead and give the user its path.
