@@ -45,6 +45,9 @@ patchedDependencies:
   # Keeps Rate Limit in memory under `nuxt dev`: the preset pinned the Cloudflare provider, whose bindings exist only
   # in the built wrangler.json, so every limited route returned 500 in dev (vite-hub/vitehub#2467).
   vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
+  # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
+  # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
+  vite-doctor@0.0.12: patches/vite-doctor@0.0.12.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
