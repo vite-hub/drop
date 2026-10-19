@@ -1,16 +1,16 @@
 <script setup lang="ts">
 // shadcn's sidebar (sidebar-07) on Executor's flat console: one background, a hairline between sidebar and page, your
-// search above the drops, the drops with their tree under a section label (apps are folders), the workspace pages and
-// Docs at the bottom, and the account menu (NavUser) opening upward.
+// search above the drops, Drops folding open into their tree like Google Drive's My Drive (apps are folders), the
+// workspace pages and Docs at the bottom, and the account menu (NavUser) opening upward.
 const route = useRoute()
 const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
 const close = () => (open.value = false)
 
-const nav = computed(() => [
-  { label: "Drops", icon: "i-ph-stack", activeIcon: "i-ph-stack-fill", to: "/drops", active: route.path === "/drops" && route.query.tab !== "with-me" },
-  { label: "Shared with me", icon: "i-ph-tray", activeIcon: "i-ph-tray-fill", to: "/drops?tab=with-me", active: route.path === "/drops" && route.query.tab === "with-me" },
-])
+const onDrops = computed(() => route.path === "/drops" && route.query.tab !== "with-me")
+const onShared = computed(() => route.path === "/drops" && route.query.tab === "with-me")
+// Drops start open on their tree; the caret folds it away, like Docs below.
+const dropsOpen = ref(true)
 const workspace = computed(() => [
   { label: "Agents", icon: "i-ph-sparkle", activeIcon: "i-ph-sparkle-fill", to: "/agents", active: at("/agents") || at("/approve") },
   { label: "Skills", icon: "i-ph-puzzle-piece", activeIcon: "i-ph-puzzle-piece-fill", to: "/skills", active: at("/skills") },
@@ -43,15 +43,24 @@ const docsOpen = computed(() => docsToggled.value ?? at("/docs"))
       <!-- Opens the ⌘K palette (SearchPalette), which every dashboard page mounts below. -->
       <UDashboardSearchButton class="mb-2 w-full text-muted" label="Search" size="sm" />
 
-      <nav aria-label="Main" class="flex flex-col gap-0.5">
-        <SidebarItem v-for="link in nav" :key="link.to" v-bind="link" @navigate="close" />
+      <!-- Drops, their tree, and Shared with me: the one part of the sidebar that scrolls. -->
+      <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+        <SidebarItem active-icon="i-ph-stack-fill" :active="onDrops" icon="i-ph-stack" label="Drops" to="/drops" @navigate="close">
+          <button
+            :aria-expanded="dropsOpen"
+            :aria-label="dropsOpen ? 'Collapse drops' : 'Expand drops'"
+            class="grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed hover:bg-accented hover:text-highlighted"
+            type="button"
+            @click="dropsOpen = !dropsOpen"
+          >
+            <UIcon name="i-ph-caret-right" class="size-3.5 transition-transform duration-150" :class="dropsOpen && 'rotate-90'" />
+          </button>
+        </SidebarItem>
+        <div v-if="dropsOpen" class="ml-3.5 border-l border-default pl-2">
+          <DropTree @navigate="close" />
+        </div>
+        <SidebarItem active-icon="i-ph-tray-fill" :active="onShared" icon="i-ph-tray" label="Shared with me" to="/drops?tab=with-me" @navigate="close" />
       </nav>
-
-      <!-- Your drops, newest first: the one part of the sidebar that scrolls. -->
-      <p class="label-mono mt-4 flex h-8 shrink-0 items-center px-2">Your drops</p>
-      <div class="-mx-2 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        <DropTree @navigate="close" />
-      </div>
 
       <div class="flex flex-col gap-0.5 border-t border-default pt-2">
         <SidebarItem v-for="link in workspace" :key="link.to" v-bind="link" @navigate="close" />
