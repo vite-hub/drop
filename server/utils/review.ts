@@ -200,7 +200,7 @@ export const reviewPage = (site: Pick<DropRow, "siteUrl">, origin: string, page:
  * Review routes answer the site's page in every case, errors included, so the script can tell an ended session from
  * a full plan. CORS headers set by `reviewSession` would otherwise be lost to Nitro's error page.
  */
-export function reviewApi(handler: (event: H3Event) => Promise<unknown>) {
+export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | unknown) {
   return defineHandler(async (event) => {
     try { return await handler(event) }
     catch (error) {
