@@ -3,7 +3,7 @@ import { test } from "node:test"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync, mkdtempSync, rmSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { homedir } from "node:os"
+import { tmpdir } from "node:os"
 import { Worker } from "node:worker_threads"
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import * as v from "valibot"
@@ -212,7 +212,7 @@ test("temporary code images charge a write and bytes until blob cleanup, with no
 })
 
 test("concurrent SQLite clients cannot reserve more than three slots or the remaining write budget", async () => {
-  const directory = mkdtempSync(join(homedir(), ".cache/fleet/tmp/drop-quota-test-"))
+  const directory = mkdtempSync(join(tmpdir(), "drop-quota-test-"))
   const path = join(directory, "quotas.sqlite")
   const db = setup(path)
   const source = `const { parentPort, workerData } = require('node:worker_threads'); const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(workerData.path); db.exec('PRAGMA busy_timeout=10000'); const row = db.prepare(workerData.query).get(...workerData.values); db.close(); parentPort.postMessage(Boolean(row));`
