@@ -31,8 +31,11 @@ async function openDocs() {
   pane.value = "docs"
   if (at("/docs")) return
   await new Promise(resolve => setTimeout(resolve, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : SLIDE_MS))
-  await navigateTo("/docs")
+  // Back during the slide cancels the trip.
+  if (pane.value === "docs") await navigateTo("/docs")
 }
+// The Docs row is a button, so it gets no link prefetch: load the page's code on hover, ready when the slide ends.
+const preloadDocs = () => void preloadRouteComponents("/docs")
 function leaveDocs() {
   slide.value = "back"
   pane.value = "main"
@@ -64,7 +67,7 @@ function leaveDocs() {
       <!-- Everything between Search and the account menu: the main pane or the docs pane, sliding past each other. -->
       <div class="relative -mx-2 flex min-h-0 flex-1 overflow-hidden">
         <Transition :name="`sidebar-${slide}`">
-          <div v-if="pane === 'main'" key="main" class="flex min-h-0 w-full min-w-0 flex-col px-2">
+          <div v-if="pane === 'main'" key="main" class="flex min-h-0 w-full min-w-0 flex-col bg-default px-2">
             <!-- Drops, their tree, and Shared with me: the part of this pane that scrolls. -->
             <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <SidebarItem active-icon="i-ph-stack-fill" :active="onDrops" icon="i-ph-stack" label="Drops" to="/drops" @navigate="close">
@@ -86,11 +89,11 @@ function leaveDocs() {
 
             <div class="flex flex-col gap-0.5 border-t border-default pt-2">
               <SidebarItem v-for="link in workspace" :key="link.to" v-bind="link" @navigate="close" />
-              <SidebarItem active-icon="i-ph-book-open-fill" :active="at('/docs')" icon="i-ph-book-open" label="Docs" trailing-icon="i-ph-caret-right" @navigate="openDocs" />
+              <SidebarItem active-icon="i-ph-book-open-fill" :active="at('/docs')" icon="i-ph-book-open" label="Docs" trailing-icon="i-ph-caret-right" @focusin="preloadDocs" @navigate="openDocs" @pointerenter="preloadDocs" />
             </div>
           </div>
 
-          <nav v-else key="docs" aria-label="Docs" class="flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+          <nav v-else key="docs" aria-label="Docs" class="relative z-10 flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto bg-default px-2 pb-2">
             <SidebarItem active-icon="i-ph-arrow-left" :active="false" icon="i-ph-arrow-left" label="Back" @navigate="leaveDocs" />
             <p class="label-mono mt-2 flex h-8 shrink-0 items-center px-2">Docs</p>
             <DocsTree @navigate="close" />

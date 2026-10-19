@@ -136,14 +136,17 @@
   padding: 1px 5px;
 }
 
-/* The sidebar's panes (layouts/dashboard.vue): forward slides the main pane out left and Docs in from the right, back
-   the reverse. Both move at once; the leaving one lies over the other. 220ms, as SLIDE_MS there. */
+/* The sidebar's panes (layouts/dashboard.vue), as a native drill-down. Forward: Docs slides in from the right over the
+   main pane, which drifts a third of the way left and fades beneath it. Back: the reverse, Docs leaving to the right.
+   Docs sits on top either way (z-10, and both panes are opaque). 220ms, as SLIDE_MS there. Reduced motion keeps a
+   short fade and drops the movement. */
 .sidebar-forward-enter-active, .sidebar-forward-leave-active, .sidebar-back-enter-active, .sidebar-back-leave-active {
   transition: transform 220ms var(--ease-drawer), opacity 220ms var(--ease-drawer);
 }
 .sidebar-forward-leave-active, .sidebar-back-leave-active { position: absolute; inset: 0; }
-.sidebar-forward-enter-from, .sidebar-back-leave-to { transform: translateX(100%); opacity: 0; }
-.sidebar-forward-leave-to, .sidebar-back-enter-from { transform: translateX(-100%); opacity: 0; }
+.sidebar-forward-enter-from, .sidebar-back-leave-to { transform: translateX(100%); }
+.sidebar-forward-leave-to, .sidebar-back-enter-from { transform: translateX(-30%); opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-forward-enter-active, .sidebar-forward-leave-active, .sidebar-back-enter-active, .sidebar-back-leave-active { transition: none; }
+  .sidebar-forward-enter-active, .sidebar-forward-leave-active, .sidebar-back-enter-active, .sidebar-back-leave-active { transition: opacity 150ms var(--ease-out); }
+  .sidebar-forward-enter-from, .sidebar-back-leave-to, .sidebar-forward-leave-to, .sidebar-back-enter-from { transform: none; opacity: 0; }
 }
