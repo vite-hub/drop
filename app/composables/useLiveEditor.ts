@@ -1,10 +1,13 @@
 import { promiseTimeout } from "@vueuse/core"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { Editor } from "@tiptap/vue-3"
-import { RealtimeCaret, useRealtimeTiptap } from "vite-hub/realtime/vue"
+import * as v from "valibot"
+import { RealtimeCaret } from "vite-hub/realtime/vue"
 import type { DropDetail, DropSummary } from "#shared/types"
 
-type Published = { id: string; version: number; name: string }
+// What a publishing client leaves on its awareness state. Other clients set it, so it's parsed, not trusted.
+const PublishedSchema = v.object({ id: v.string(), version: v.number(), name: v.string() })
+type Published = v.InferOutput<typeof PublishedSchema>
 
 /**
  * Live editing of a Markdown drop. Everyone who opens it joins one Realtime room on the drop's draft, sees the others,
@@ -51,7 +54,8 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     if (!provider) return
     const check = () => {
       for (const [clientId, state] of provider.awareness.getStates()) {
-        const published = (state as { published?: Published }).published
+        const parsed = v.safeParse(v.object({ published: PublishedSchema }), state)
+        const published = parsed.success ? parsed.output.published : undefined
         if (clientId === provider.awareness.clientID || !published || published.id === announced) continue
         announced = published.id
         notify.info({
@@ -107,7 +111,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       await navigateTo(url(next.id))
     }
     catch (error) {
-      const head = (error as { data?: { data?: { head?: { id: string; version: number } } } }).data?.data?.head
+      const head = errorData(error, v.object({ head: v.object({ id: v.string(), version: v.number() }) }))?.head
       if (!head) {
         notify.fail("Couldn't publish", error)
         return

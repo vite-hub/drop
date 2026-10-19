@@ -1,3 +1,5 @@
+import * as v from "valibot"
+
 export const PLANS = ["free", "pro", "unlimited"] as const
 export type Plan = typeof PLANS[number]
 export const MIB = 1024 * 1024
@@ -31,7 +33,8 @@ export interface Usage {
   selfHostUrl: string
 }
 
-export type QuotaUnit = "drops" | "bytes" | "writes" | "appFiles" | "appBytes" | "burstPublishes"
+export const QUOTA_UNITS = ["drops", "bytes", "writes", "appFiles", "appBytes", "burstPublishes"] as const
+export type QuotaUnit = typeof QUOTA_UNITS[number]
 export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
   quota: { unit: QuotaUnit; used: number; limit: number }
@@ -44,6 +47,17 @@ export interface QuotaFailure {
   selfHostUrl: string
   message: string
 }
+
+/** A refused write's body, as the app reads it back from an API error. */
+export const QuotaFailureSchema = v.object({
+  code: v.literal("DROP_LIMIT_REACHED"),
+  quota: v.object({ unit: v.picklist(QUOTA_UNITS), used: v.number(), limit: v.number() }),
+  retryable: v.boolean(),
+  retryAfterSeconds: v.optional(v.number()),
+  resetAt: v.optional(v.string()),
+  selfHostUrl: v.string(),
+  message: v.string(),
+}) satisfies v.GenericSchema<QuotaFailure>
 
 /** The first instant of next month, UTC, when monthly file writes start over. */
 export function nextMonthStart(now = new Date()): Date {

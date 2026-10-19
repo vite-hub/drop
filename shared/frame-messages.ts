@@ -31,8 +31,12 @@ export const FrameMessage = v.variant("type", [
 
 export type FrameMessage = v.InferOutput<typeof FrameMessage>
 
+// Drop's runtimes mark every message they post; other scripts in the page post their own.
+const Marked = v.object({ __drop: v.literal(true) })
+
 /** The message, or null when it isn't one a drop frame sends. */
 export function parseFrameMessage(data: unknown): FrameMessage | null {
+  if (!v.is(Marked, data)) return null
   const result = v.safeParse(FrameMessage, data)
   return result.success ? result.output : null
 }
