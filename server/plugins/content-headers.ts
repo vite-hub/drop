@@ -1,3 +1,4 @@
+import type { H3Event } from "h3"
 import { definePlugin } from "nitro"
 import { useRuntimeConfig } from "nitro/runtime-config"
 import { isIndexedPath } from "#shared/utils/docs"
@@ -11,7 +12,10 @@ const PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=()
 
 /** Error handlers replace the response, so set content headers after them too. */
 export default definePlugin((app) => {
-  app.hooks.hook("response", (response, event) => {
+  app.hooks.hook("response", (response, hookEvent) => {
+    // Safe: Nitro forwards h3's onResponse(res, event), which passes the request's H3Event; the hook type only
+    // promises an HTTPEvent.
+    const event = hookEvent as H3Event
     // Never guess a type from the bytes, and send only the origin to other sites: a share link is its own key.
     if (!response.headers.has("X-Content-Type-Options")) response.headers.set("X-Content-Type-Options", "nosniff")
     if (!response.headers.has("Referrer-Policy")) response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")

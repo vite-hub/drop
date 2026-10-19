@@ -1,3 +1,16 @@
+const supported = () => import.meta.client && typeof navigator.mediaDevices?.getDisplayMedia === "function"
+
+/** Waits for a frame painted after now, so whatever was just hidden is gone from it. */
+function freshFrame(element: HTMLVideoElement) {
+  return new Promise<void>((resolve) => {
+    const timeout = setTimeout(resolve, 300)
+    element.requestVideoFrameCallback?.(() => {
+      clearTimeout(timeout)
+      resolve()
+    })
+  })
+}
+
 /**
  * Screenshots of something Drop can't read itself, like a site in a frame on another origin: the browser's screen
  * capture, asked for once and kept open while the review lasts. Chromium offers "This tab", which captures exactly
@@ -10,8 +23,6 @@ export function useTabCapture() {
   const exact = ref(false)
   let stream: MediaStream | null = null
   let video: HTMLVideoElement | null = null
-
-  const supported = () => import.meta.client && typeof navigator.mediaDevices?.getDisplayMedia === "function"
 
   async function start() {
     if (stream?.active) return
@@ -33,17 +44,6 @@ export function useTabCapture() {
     stream?.getTracks().forEach(track => track.stop())
     stream = video = null
     active.value = false
-  }
-
-  /** Waits for a frame painted after now, so whatever was just hidden is gone from it. */
-  function freshFrame(element: HTMLVideoElement) {
-    return new Promise<void>((resolve) => {
-      const timeout = setTimeout(resolve, 300)
-      element.requestVideoFrameCallback?.(() => {
-        clearTimeout(timeout)
-        resolve()
-      })
-    })
   }
 
   /** `area` (CSS pixels of this window's viewport) as an image, from the next frame of the capture. */
