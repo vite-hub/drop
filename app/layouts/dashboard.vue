@@ -7,10 +7,15 @@
 // right, with Back at its top; Back slides the other way and stays on the page. The logo, Search and the account menu
 // hold still. Docs pages use another layout (docs.vue wraps this one), so the slide runs here first and the page opens
 // once it's done; the sidebar there starts on the docs pane, and the swap doesn't show.
+//
+// ⌘B or the button in its header folds the whole sidebar away, like T3 Code; the pages' top bars then lead with the
+// button that brings it back (SidebarExpand). The sidebar's cookie keeps it folded across visits.
 const route = useRoute()
 const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
 const close = () => (open.value = false)
+const collapsed = useSidebarCollapsed()
+defineShortcuts({ meta_b: () => (collapsed.value = !collapsed.value) })
 
 const onDrops = computed(() => route.path === "/drops" && route.query.tab !== "with-me")
 const onShared = computed(() => route.path === "/drops" && route.query.tab === "with-me")
@@ -51,11 +56,13 @@ function leaveDocs() {
     <UDashboardSidebar
       id="nav"
       v-model:open="open"
+      v-model:collapsed="collapsed"
+      collapsible
       :default-size="15"
       :min-size="12"
       :max-size="20"
       resizable
-      :ui="{ root: 'bg-default', header: 'h-12 border-b border-default px-4', body: 'gap-0 p-2', footer: 'border-t border-default p-2' }"
+      :ui="{ root: ['bg-default', collapsed && 'lg:hidden'], handle: collapsed ? 'lg:hidden' : undefined, header: 'h-12 border-b border-default px-4', body: 'gap-0 p-2', footer: 'border-t border-default p-2' }"
     >
       <template #header>
         <NuxtLink class="flex items-center gap-2" to="/drops" @click="close">
@@ -63,6 +70,9 @@ function leaveDocs() {
           <span class="text-sm font-semibold tracking-tight">Drop</span>
           <span class="rounded-sm border border-default px-1 font-mono text-[11px] leading-4 text-muted">v0.1</span>
         </NuxtLink>
+        <UTooltip :kbds="['meta', 'b']" text="Hide sidebar">
+          <UDashboardSidebarCollapse class="-mr-2 ml-auto" size="sm" />
+        </UTooltip>
       </template>
 
       <!-- Opens the ⌘K palette (SearchPalette), which every dashboard page mounts below. -->

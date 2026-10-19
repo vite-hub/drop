@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// shadcn's SiteHeader over a page: an h-12 bar with the sidebar toggle (below lg), the page title and its actions,
-// then the page in a max-w-5xl column with p-4 lg:p-6, its description first.
+// shadcn's SiteHeader over a page: an h-12 bar with the sidebar toggle (below lg, or once ⌘B folds the sidebar), the
+// page title and its actions, then the page in a max-w-5xl column with p-4 lg:p-6, its description first.
 withDefaults(defineProps<{ id: string; title: string; description?: string; wide?: boolean }>(), { description: undefined, wide: false })
 </script>
 
@@ -8,6 +8,9 @@ withDefaults(defineProps<{ id: string; title: string; description?: string; wide
   <UDashboardPanel :id="id" :ui="{ body: 'p-0 sm:p-0 gap-0' }">
     <template #header>
       <UDashboardNavbar :ui="{ root: 'h-12 gap-2 px-4 lg:px-6', title: 'text-sm font-medium' }" :title="title">
+        <template #leading>
+          <SidebarExpand />
+        </template>
         <template v-if="$slots.actions" #right>
           <slot name="actions" />
         </template>

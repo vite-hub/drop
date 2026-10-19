@@ -7,6 +7,7 @@ const route = useRoute()
 const active = (to: string) => isActivePath(route.path, to)
 const current = computed(() => DOCS_PAGES.find(page => active(page.to)))
 const menuOpen = ref(false)
+const sidebarCollapsed = useSidebarCollapsed()
 watch(() => route.path, () => (menuOpen.value = false))
 // From /api/me, which SSR fetches with the session cookie, so the server picks the right shell.
 const { data: me } = await useMe()
@@ -16,7 +17,12 @@ const { data: me } = await useMe()
   <DashboardLayout v-if="me">
     <UDashboardPanel id="docs" :ui="{ body: 'p-0 sm:p-0 gap-0' }">
       <template #header>
-        <UDashboardNavbar :title="current?.label ?? 'Docs'" class="lg:hidden" />
+        <!-- Wide screens show it only to bring back a folded sidebar. -->
+        <UDashboardNavbar :class="!sidebarCollapsed && 'lg:hidden'" :title="current?.label ?? 'Docs'">
+          <template #leading>
+            <SidebarExpand />
+          </template>
+        </UDashboardNavbar>
       </template>
       <template #body>
         <!-- The sidebar's Docs item carries the section nav, so the page is prose alone. -->

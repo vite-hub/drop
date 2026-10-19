@@ -407,6 +407,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
     <template #header>
       <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
+          <SidebarExpand v-if="!visitor" />
           <NuxtLink v-if="visitor" aria-label="Drop" class="grid size-8 place-items-center" to="/"><DropMark class="h-4 w-6" /></NuxtLink>
           <UButton v-else-if="drop.ancestors.length" :aria-label="`Back to ${drop.ancestors.at(-1)!.title}`" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" :to="crumbTo(drop.ancestors.at(-1)!)" />
           <UButton v-else aria-label="Back to drops" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" to="/drops" />
