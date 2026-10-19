@@ -18,6 +18,43 @@ main { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 `
 
 /**
+ * A spreadsheet's preview (server/utils/spreadsheet.ts): Drop's table look from the docs, as a grid. The column letters
+ * and row numbers stay put while the cells scroll, like a spreadsheet's, and numbers line up right in Geist Mono.
+ */
+const SHEET_CSS = `
+body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out; padding-right: var(--drop-inset, 0px); }
+.sheets { display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; padding: 1.5rem; gap: .75rem; }
+.sheet-tabs { display: flex; gap: .25rem; flex-wrap: wrap; padding: .25rem; border-radius: var(--radius); background: var(--muted); align-self: flex-start; }
+.sheet-tabs button { font: inherit; font-size: .8125rem; font-weight: 500; color: var(--muted-foreground); background: none; border: 0; border-radius: calc(var(--radius) - 4px); padding: .25rem .75rem; cursor: pointer; transition: color 150ms ease-out, background-color 150ms ease-out; }
+.sheet-tabs button:hover { color: var(--foreground); }
+.sheet-tabs button[aria-selected="true"] { color: var(--foreground); background: var(--background); box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+.sheet { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: .5rem; }
+.sheet[hidden] { display: none; }
+.sheet-scroll { overflow: auto; min-height: 0; align-self: flex-start; max-width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+table { border-collapse: separate; border-spacing: 0; font-size: .8125rem; line-height: 1.4; }
+th, td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: .375rem .625rem; white-space: nowrap; max-width: 28rem; overflow: hidden; text-overflow: ellipsis; text-align: left; vertical-align: top; }
+td.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.b { font-weight: 600; }
+thead th { position: sticky; top: 0; z-index: 1; background: var(--muted); color: var(--muted-foreground); font-weight: 500; font-size: .75rem; text-align: center; }
+tbody th { position: sticky; left: 0; background: var(--muted); color: var(--muted-foreground); font-weight: 400; font-size: .75rem; font-family: var(--font-mono); text-align: right; min-width: 2rem; }
+thead th.corner { left: 0; z-index: 2; }
+tbody tr:hover td { background: var(--accent); }
+tbody tr:last-child > * { border-bottom: 0; }
+tr > :last-child { border-right: 0; }
+.sheet-note, .sheet-empty { margin: 0; font-size: .8125rem; color: var(--muted-foreground); }
+.sheet-empty { margin: auto; }
+`
+
+/** Switches the sheet showing when a workbook has more than one. */
+const SHEET_TABS_SCRIPT = String.raw`(() => {
+  const tabs = [...document.querySelectorAll(".sheet-tabs button")];
+  tabs.forEach((tab) => tab.addEventListener("click", () => {
+    tabs.forEach((other) => other.setAttribute("aria-selected", String(other === tab)));
+    document.querySelectorAll(".sheet").forEach((sheet) => { sheet.hidden = sheet.dataset.sheet !== tab.dataset.sheet; });
+  }));
+})()`
+
+/**
  * The doc's outline, Docus-style but plain: its h2 and h3 headings in the room right of the text column, the one
  * being read marked. It only shows where it fits beside the column and clear of the viewer's floating panel
  * (--drop-inset). It draws in a shadow root, so comments never take its headings for the doc's own text.
@@ -76,13 +113,16 @@ const OUTLINE_SCRIPT = String.raw`(() => {
 
 /**
  * Builds the exact document an iframe shows for a drop, with Drop's theme and annotator injected. `html` is the
- * server-rendered body for Markdown.
+ * server-rendered body for Markdown, and a spreadsheet's sheets for a file.
  */
 export function planDocument(kind: PlanKind, source: string, dark = false, html = "", inset = 0): string {
   if (kind === "html") return injectRuntime(source, dark, inset)
   if (kind === "image") {
     const src = source.trim().startsWith("<svg") ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}` : source
     return injectRuntime(`<!doctype html><html><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:var(--muted)"><img src="${escapeHtml(src)}" style="max-width:min(100%,960px);box-shadow:0 10px 40px rgb(0 0 0/.15);border-radius:10px" alt=""></body></html>`, dark)
+  }
+  if (kind === "file" && html) {
+    return injectRuntime(`<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${THEME_CSS}${SHEET_CSS}</style></head><body><main class="sheets">${html}</main><script>${SHEET_TABS_SCRIPT}</script></body></html>`, dark, inset)
   }
   if (kind === "file") {
     return injectRuntime(`<!doctype html><html><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;color:var(--muted-foreground)">No preview for this file type.</body></html>`, dark)

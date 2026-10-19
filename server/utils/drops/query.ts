@@ -4,6 +4,7 @@ import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { renderMarkdownCached } from "../markdown-document"
+import { renderSpreadsheetCached, SPREADSHEET_EXTENSIONS, spreadsheetExtension } from "../spreadsheet"
 import type { DropAttachment, DropCrumb, DropDetail, DropSummary, DropVersion } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
@@ -270,6 +271,14 @@ export async function readText(key: string) {
   return await file.text()
 }
 
+async function readBytes(key: string) {
+  const [error, file] = await blob.get(key)
+  if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
+  if (error) throw storageFailure(error)
+  if (!file) throw new HTTPError({ status: 404, statusText: "File content is missing." })
+  return new Uint8Array(await file.arrayBuffer())
+}
+
 export async function versionChain(row: DropRow) {
   // Follow indexed parent/child links, retaining the existing 50 older / 100 total view bounds.
   const docs = await db.select().from(drops).where(inArray(drops.id, sql`(
@@ -346,6 +355,11 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
       }
     }
     else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
+    else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {
+      // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
+      const key = row.blobKey
+      detail.html = await renderSpreadsheetCached(key, spreadsheetExtension(row.filename), () => readBytes(key), event)
+    }
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
   if (TEXT_KINDS.has(row.kind)) detail.attachments = await attachmentsOf(row, origin)

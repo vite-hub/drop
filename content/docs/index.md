@@ -27,7 +27,7 @@ A drop is something an agent, or you, published for review:
 
 - A **doc**: Markdown, or a self-contained HTML page. Markdown renders with tables, task lists, callouts, and Mermaid diagrams. HTML runs as-is, scripts included, in a sandbox.
 - An **app**: a folder of static files with an `index.html`, like a prototype or a dashboard.
-- A **file** you upload: an image, a PDF, a log.
+- A **file** you upload: an image, a PDF, a log. Spreadsheets (CSV, TSV, XLSX, XLS, ODS) open as a read-only grid, one tab per sheet, showing the values as last saved.
 
 Every drop opens full screen and has its own link. Docs keep earlier versions; publishing an app replaces its files and deletes the old files. Each drop has a [lifetime](/docs/review#expiry): one nobody opens for a while goes to the Trash, unless it's kept. [Review and share](/docs/review) covers comments, sharing, versions, lifetimes, and the Trash, and [Features](/docs/features) shows each part of Drop with a screenshot.
 

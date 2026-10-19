@@ -115,6 +115,9 @@ importers:
       h3-mcp:
         specifier: 0.2.0
         version: 0.2.0(patch_hash=300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b)(h3@2.0.1(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0))
+      hucre:
+        specifier: ^1.2.0
+        version: 1.2.0
       isbot:
         specifier: ^5.2.2
         version: 5.2.2
@@ -6892,6 +6895,11 @@ packages:
 
   httpxy@0.5.5:
     resolution: {integrity: sha512-uDjmnPyp1q4Sgzf3w+J/Fc6UqcCEj0x4Wjp7OqK5dGhNeDgpyrAmnS6ey8QWrX3SWDon2DMKf9sBa5X9+CVyMA==}
+
+  hucre@1.2.0:
+    resolution: {integrity: sha512-7PU0o0ZEpBmNbS2FZb9I8lD0F40TVxX3qqq/u3tvQ557xs0GPjsxNtR01YHT4nvni3C0FD+scnFErHEhM/x+oQ==}
+    engines: {node: '>=24'}
+    hasBin: true
 
   human-signals@2.1.0:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
@@ -17000,6 +17008,8 @@ snapshots:
       - supports-color
 
   httpxy@0.5.5: {}
+
+  hucre@1.2.0: {}
 
   human-signals@2.1.0: {}
 

@@ -372,7 +372,8 @@ const threadComment = computed(() => {
         <!-- The grid keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
         <ViewerFolder v-else-if="drop.kind === 'folder'" :class="floating && 'pr-96'" :drop="drop" :public-view="publicView" />
         <ViewerSite v-else-if="drop.kind === 'site'" :drop="drop" :inset="floating ? FLOATING_INSET : 0" :public-view="publicView" />
-        <div v-else-if="drop.kind === 'file'" class="grid flex-1 place-items-center p-10 text-center">
+        <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
+        <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
           <div>
             <UIcon name="i-ph-file" class="size-8 text-dimmed" />
             <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
