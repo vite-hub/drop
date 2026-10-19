@@ -57,5 +57,20 @@ export function useCopy() {
       await copy(text)
       toast.add({ title })
     },
+    /**
+     * Copy text that's still loading. Safari only lets a click write the clipboard straight away, so where it can the
+     * write starts now and the browser waits for the text.
+     */
+    async copyLoading(text: Promise<string>, title = "Copied") {
+      try {
+        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write)
+          await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then(value => new Blob([value], { type: "text/plain" })) })])
+        else await copy(await text)
+        toast.add({ title })
+      }
+      catch {
+        toast.add({ title: "Couldn't copy", color: "error" })
+      }
+    },
   }
 }
