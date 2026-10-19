@@ -2,26 +2,16 @@
 // The drop viewer (T3 Code's layout): a main column with its own header, and one panel with tabs (Comments,
 // Details) that floats over the content, Mesurer-style. Docs and apps share it. People review and comment, agents
 // publish new versions, and people who may edit a Markdown doc edit it together live (useLiveEditor). State lives in
-// composables (useDrop, useViewerPanel, useAppFiles, useDropFrame, useLiveEditor); this file wires them up.
-import { planDocument } from "#shared/documents"
+// composables (useDrop, useViewerPanel, useAppFiles, useViewerFrame, useViewerAnnotations, useLiveEditor); this file
+// wires them up.
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
-import { injectRuntime } from "#shared/plan-runtime"
-import type { PlanKind } from "#shared/plans"
-import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropComment, DropVersion } from "#shared/types"
 import { until } from "@vueuse/core"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
 import type { SideTab } from "~/utils/viewer"
-import type { PendingComment } from "./viewer/ViewerCommentPopover.vue"
-import type { Area } from "./viewer/ViewerLightbox.vue"
-
-type Rect = { left: number; top: number; right: number; bottom: number }
-type Selection = { quote: string; selector: string; label: string; rect: Rect }
-type Lightbox = { src: string; alt: string; selector: string; label: string; from?: { left: number; top: number; width: number; height: number } }
-type Popover = { x: number; y: number } & ({ type: "new"; pending: PendingComment } | { type: "thread"; id: string })
 
 const props = withDefaults(defineProps<{ publicView?: boolean }>(), { publicView: false })
 
@@ -33,9 +23,6 @@ const route = useRoute()
 const notify = useNotify()
 const { copy } = useCopy()
 const { remove, restore } = useDropActions()
-const colorMode = useColorMode()
-const mounted = useMounted()
-const dark = computed(() => colorMode.value === "dark")
 const [DefineSide, ReuseSide] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
 
@@ -70,7 +57,8 @@ async function restoreDrop() {
 const details = computed(() => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !props.publicView))
 const panel = useViewerPanel({ details, openCount, versions: computed(() => drop.value.versions.length), comments: computed(() => drop.value.kind !== "folder") })
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
-const { files, pages, page } = useAppFiles(drop)
+const app = useAppFiles(drop)
+const { pages, page } = app
 
 const live = useLiveEditor(drop, { publicView: props.publicView })
 const editing = live.editing
@@ -78,6 +66,12 @@ const editing = live.editing
 // the edits meanwhile.
 const liveLabels = { connecting: "Connecting", connected: "Live", reconnecting: "Reconnecting" } as const
 const liveLabel = (state: ConnectionStatusState) => (live.publishing.value && state === "connected" ? "Publishing" : liveLabels[state])
+
+const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
+const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } = annotations
+const popoverRef = useTemplateRef<{ fail: () => void; sent: () => Promise<void> }>("popoverRef")
+const shareOpen = ref(false)
+
 function startEdit() {
   popover.value = selection.value = null
   void live.open()
@@ -88,69 +82,6 @@ onMounted(() => {
   if (route.query.edit === "1" && drop.value.canEdit) startEdit()
 })
 
-// Images load into the sandbox as data URLs: the opaque-origin frame can't send your session cookie.
-const imageBlob = shallowRef<Blob>()
-const { base64: imageData } = useBase64(imageBlob)
-onMounted(async () => {
-  if (drop.value.kind !== "image" || !drop.value.url) return
-  imageBlob.value = await $fetch<Blob>(drop.value.url, { responseType: "blob" }).catch(() => undefined)
-})
-
-const attached = useAttachmentData(drop)
-
-// A plain variable, not a ref: the documents read it when they're built, and opening the panel later must not
-// rebuild (and reload) them. The "inset" message moves the text from there (set below, with `floating`).
-let startInset = 0
-const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset)
-// Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
-// the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
-// panel showing doesn't slide left once it loads.
-const srcdoc = computed(() => {
-  if (!mounted.value || drop.value.kind === "folder") return ""
-  if (isApp.value) return appDocument(page.value)
-  if (drop.value.kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
-  if (!attached.ready.value) return ""
-  return planDocument(drop.value.kind as PlanKind, attached.inline(drop.value.content ?? ""), dark.value, attached.inline(drop.value.html ?? ""), startInset)
-})
-
-// With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
-// postMessage (see server/utils/content-origin.ts). Otherwise the document is the iframe's srcdoc, in an opaque origin.
-const contentOrigin = computed(() => drop.value.contentOrigin)
-const frameSrc = ref<string>()
-const frameKey = ref(0)
-/** The document the content frame shows. When the frame moves on its own, the viewer follows without a reload. */
-let frameDocument = ""
-function reloadFrame() {
-  frameSrc.value = contentOrigin.value ? contentOrigin.value + (isApp.value ? pageUrl(page.value) : "/") : undefined
-  frameKey.value++
-}
-onMounted(reloadFrame)
-
-function pageFor(path: string) {
-  let decoded = path
-  try { decoded = decodeURIComponent(path) }
-  catch {}
-  return pageAt(pages.value, decoded)
-}
-
-/** A path no page matches gets 404.html, or index.html for single-page apps, like a static host. */
-const fallbackDocument = () => appDocument("404.html" in files.value ? "404.html" : "index.html")
-
-/** The content frame navigated by itself (a link, history.pushState, a reload): show the page it landed on. */
-function followFrame(path: string) {
-  if (!isApp.value) return true
-  const target = pageFor(path)
-  if (target) page.value = target
-  return target !== null
-}
-
-const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const selection = ref<Selection | null>(null)
-const lightbox = ref<Lightbox | null>(null)
-const popover = ref<Popover | null>(null)
-const popoverRef = useTemplateRef<{ fail: () => void; sent: () => Promise<void> }>("popoverRef")
-const shareOpen = ref(false)
-
 const pageComments = computed(() => (isApp.value ? comments.value.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : comments.value))
 
 // Open comments carry over from earlier versions (server/utils/comments.ts). One is outdated when this version no
@@ -158,8 +89,24 @@ const pageComments = computed(() => (isApp.value ? comments.value.filter(comment
 // where every version is a new picture.
 // TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
-const unplaced = ref(new Set<string>())
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
+// Comments on the whole page have nothing in it to pin to; they live in the panel.
+const pinned = computed(() => pageComments.value.filter(comment => !replaced(comment) && comment.kind !== "page"))
+
+const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
+// Each tab has its own button in the header, like a toolbar's panes: it opens the panel there, and closes it once open.
+const has = (value: SideTab) => tabs.value.some(item => item.value === value)
+const showing = (value: SideTab) => panelOpen.value && tab.value === value
+const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
+// A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
+const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
+/** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
+const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
+const inset = computed(() => (floating.value ? FLOATING_INSET : 0))
+
+const frame = useTemplateRef<HTMLIFrameElement>("frame")
+const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced } = useViewerFrame({ drop, frame, app, pinned, inset, annotations })
+
 const outdated = computed(() => new Set(comments.value.filter(comment => comment.version < drop.value.version && (replaced(comment) || unplaced.value.has(comment.id))).map(comment => comment.id)))
 /** The version whose changes show in place of the document (ViewerDiff), and the one before it. */
 const shownVersion = ref<DropVersion | null>(null)
@@ -172,91 +119,6 @@ function showVersion(version: DropVersion) {
 // The diff belongs to History: another tab goes back to the document.
 watch(tab, value => value !== "history" && (shownVersion.value = null))
 
-// What the page reports going wrong goes to the server in batches, for the agent's read_drop. Only apps and HTML pages
-// run their own code; a Markdown doc's errors would be Drop's.
-type RuntimeReport = { kind: string; message: string; source?: string; page?: string }
-let runtimeReports: RuntimeReport[] = []
-const flushRuntimeReports = useDebounceFn(() => {
-  const errors = runtimeReports.splice(0, 20)
-  runtimeReports = []
-  if (errors.length) $fetch(`/api/drops/${drop.value.id}/errors`, { method: "POST", body: { version: drop.value.version, errors } }).catch(() => {})
-}, 2000)
-
-const { ready, send } = useDropFrame(frame, contentOrigin, (message, rect) => {
-  if (message.type === "runtime-error") {
-    if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
-      runtimeReports.push({ kind: message.kind, message: message.message.slice(0, 500), source: message.source?.slice(0, 300), ...(isApp.value ? { page: page.value } : {}) })
-      void flushRuntimeReports()
-    }
-    return
-  }
-  if (message.type === "host") {
-    frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
-    send({ type: "document", html: frameDocument })
-  }
-  if (message.type === "frame-request" && isApp.value) {
-    const target = pageFor(message.path)
-    send({ type: "document", id: message.id, html: target ? appDocument(target) : fallbackDocument() })
-  }
-  if (message.type === "location" && followFrame(message.path)) frameDocument = srcdoc.value
-  if (message.type === "navigate" && isApp.value) page.value = message.path
-  if (message.type === "copy") void copy(message.text, "Code copied")
-  if (message.type === "selection" && drop.value.canComment && !editing.value) {
-    selection.value = message.clear ? null : {
-      quote: message.quote, selector: message.selector, label: message.label,
-      rect: { left: rect.left + message.rect.left, top: rect.top + message.rect.top, right: rect.left + message.rect.right, bottom: rect.top + message.rect.bottom },
-    }
-  }
-  if (message.type === "image") {
-    const from = message.rect && { left: rect.left + message.rect.left, top: rect.top + message.rect.top, width: message.rect.right - message.rect.left, height: message.rect.bottom - message.rect.top }
-    areaMode.value = false
-    lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
-  }
-  if (message.type === "area") {
-    areaMode.value = false
-    if (drop.value.canComment && !editing.value) {
-      const { selector, label, ox, oy, ow, oh } = message
-      popover.value = { type: "new", pending: { kind: "area", selector, label, ox, oy, ow, oh }, x: rect.left + message.rect.left, y: rect.top + message.rect.bottom }
-    }
-  }
-  if (message.type === "unplaced") unplaced.value = new Set(message.ids)
-  if (message.type === "marker") popover.value = { type: "thread", id: message.id, x: rect.left + message.clientX, y: rect.top + message.clientY }
-  if (message.type === "key" && message.key === "Escape") {
-    popover.value = selection.value = null
-    areaMode.value = false
-  }
-  // Apps may use R themselves, so only docs forward it.
-  if (message.type === "key" && message.key === "r" && !isApp.value) toggleArea()
-})
-watch(srcdoc, (value) => {
-  if (contentOrigin.value && value === frameDocument) return
-  ready.value = false
-  if (contentOrigin.value) reloadFrame()
-})
-watch([ready, pageComments], () => {
-  // `earlier`: the frame also checks that the element is still what the comment pointed at, not just in its place.
-  // Comments on the whole page have nothing in it to pin to; they live in the panel.
-  if (ready.value) send({ type: "markers", markers: pageComments.value.filter(comment => !replaced(comment) && comment.kind !== "page").map(({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version, authorName, authorImage }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, earlier: version < drop.value.version, author: authorName, image: authorImage })) })
-})
-
-/** Area mode: the frame lays a crosshair over the page, and the next rectangle drawn there becomes a comment. */
-const areaMode = ref(false)
-// TODO(file-comments): files without a preview (PDFs, zips) have nothing to anchor a comment to, so they take none yet.
-// Comments on the file as a whole would close that gap.
-// A site takes its comments on the site itself (ViewerSite).
-const canDrawArea = computed(() => drop.value.canComment && !editing.value && !lightbox.value && drop.value.kind !== "file" && drop.value.kind !== "folder" && drop.value.kind !== "site")
-function toggleArea() {
-  if (!canDrawArea.value) return
-  popover.value = selection.value = null
-  areaMode.value = !areaMode.value
-  if (areaMode.value && !wide.value) mobileSide.value = false
-}
-watch(canDrawArea, value => !value && (areaMode.value = false))
-watch([ready, areaMode], () => ready.value && send({ type: "area-mode", on: areaMode.value }))
-// The frame keeps the drawn rectangle while its comment is written; drop it once the popover goes.
-const draftingArea = computed(() => popover.value?.type === "new" && popover.value.pending.kind === "area")
-watch(draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
-
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
   e: () => !editing.value && drop.value.canEdit && startEdit(),
@@ -264,8 +126,7 @@ defineShortcuts({
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
     shownVersion.value = null
-    popover.value = selection.value = null
-    areaMode.value = false
+    annotations.dismiss()
   },
 })
 
@@ -273,25 +134,6 @@ const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, c
 function copyLink() {
   if (drop.value.share !== "private") void copy(link.value, "Link copied")
   else shareOpen.value = true
-}
-
-const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
-// Each tab has its own button in the header, like a toolbar's panes: it opens the panel there, and closes it once open.
-const has = (value: SideTab) => tabs.value.some(item => item.value === value)
-const showing = (value: SideTab) => panelOpen.value && tab.value === value
-const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
-// A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
-const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
-/** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
-const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
-watch([ready, floating], () => ready.value && send({ type: "inset", right: floating.value ? FLOATING_INSET : 0 }))
-watch(floating, value => (startInset = value ? FLOATING_INSET : 0), { immediate: true, flush: "sync" })
-
-function commentOnSelection() {
-  if (!selection.value) return
-  const { selector, quote, label, rect } = selection.value
-  popover.value = { type: "new", pending: { kind: "text", selector, ox: 0, oy: 0, ow: 0, oh: 0, quote, label }, x: rect.left, y: rect.bottom }
-  selection.value = null
 }
 
 async function submit(body: string) {
@@ -371,11 +213,6 @@ const crumbTo = (crumb: { id: string; link: string; slug: string }) => (props.pu
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
 const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id)) : []))
-function pickImage(area: Area, x: number, y: number) {
-  if (!lightbox.value) return
-  popover.value = { type: "new", pending: { kind: "image", selector: lightbox.value.selector, ...area, label: lightbox.value.alt || "image" }, x, y }
-}
-const imageDraft = computed(() => (popover.value?.type === "new" && popover.value.pending.kind === "image" && popover.value.pending.ow ? popover.value.pending : undefined))
 const threadComment = computed(() => (popover.value?.type === "thread" ? comments.value.find(comment => comment.id === (popover.value as { id: string }).id) : undefined))
 </script>
 

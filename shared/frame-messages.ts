@@ -7,7 +7,7 @@ import * as v from "valibot"
 const Rect = v.object({ left: v.number(), top: v.number(), right: v.number(), bottom: v.number() })
 const path = { path: v.string() }
 
-export const RuntimeErrorKind = v.picklist(["error", "rejection", "console", "load"])
+const RuntimeErrorKind = v.picklist(["error", "rejection", "console", "load"])
 
 export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("ready") }),
