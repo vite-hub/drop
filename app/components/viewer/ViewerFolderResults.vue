@@ -16,7 +16,7 @@ const { data: found, status } = useApi<DropSummary[]>("/api/drops", {
 // Until the debounced words reach the server, the last results would answer the new words.
 const pending = computed(() => status.value === "pending" || query.value !== props.query.trim())
 const to = (drop: DropSummary) => (props.publicView ? dropPath(drop) : `/drops/${drop.id}`)
-const meta = (drop: DropSummary) => [drop.path?.length ? `in ${drop.path.map(crumb => crumb.title).join(" / ")}` : "", drop.kind === "folder" ? itemCount(drop.items ?? 0) : KIND_LABELS[drop.kind] ?? "File"].filter(Boolean).join(" · ")
+const meta = (drop: DropSummary) => [drop.path?.length ? `in ${drop.path.map(crumb => crumb.title).join(" / ")}` : "", drop.kind === "folder" ? itemCount(drop.items ?? 0) : KIND_LABELS[drop.kind]].filter(Boolean).join(" · ")
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const meta = (drop: DropSummary) => [drop.path?.length ? `in ${drop.path.map(cru
       <li v-for="drop in found" :key="drop.id">
         <NuxtLink class="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted" :to="to(drop)">
           <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default">
-            <UIcon :name="KIND_ICONS[drop.kind] ?? 'i-ph-file'" class="size-[18px]" />
+            <UIcon :name="KIND_ICONS[drop.kind]" class="size-[18px]" />
           </span>
           <span class="min-w-0 flex-1">
             <span class="block truncate font-medium text-highlighted">{{ drop.title }}</span>

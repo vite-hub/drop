@@ -13,7 +13,7 @@ const now = useRelativeNow()
 // A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
 const site = computed(() => props.drop.kind === "site")
 const type = computed(() => [
-  props.drop.teamFolder ? "Team folder" : KIND_LABELS[props.drop.kind] ?? "File",
+  props.drop.teamFolder ? "Team folder" : KIND_LABELS[props.drop.kind],
   ...(props.drop.kind === "app" ? [`${props.drop.paths?.length ?? 0} files`] : []),
   ...(site.value ? [] : [props.drop.kind === "folder" ? itemCount(props.drop.items ?? 0) : formatBytes(props.drop.size)]),
 ].join(" · "))

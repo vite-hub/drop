@@ -45,7 +45,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
   <li>
     <div :class="[row, here && !(expandable && file) ? active : idle]">
       <NuxtLink class="flex h-full min-w-0 flex-1 items-center gap-2" :to="`/drops/${drop.id}`" @click="emit('navigate')">
-        <UIcon :name="drop.kind === 'folder' && expanded ? 'i-ph-folder-open' : KIND_ICONS[drop.kind] ?? 'i-ph-file'" class="size-4 shrink-0 text-dimmed" />
+        <UIcon :name="drop.kind === 'folder' && expanded ? 'i-ph-folder-open' : KIND_ICONS[drop.kind]" class="size-4 shrink-0 text-dimmed" />
         <span class="truncate" :title="drop.title">{{ drop.title }}</span>
       </NuxtLink>
       <UDropdownMenu v-if="changeable" :content="{ align: 'start', side: 'right' }" :items="menu">

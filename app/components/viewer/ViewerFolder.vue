@@ -11,7 +11,7 @@ const folderDialog = useFolderDialog()
 const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
 const to = (child: DropSummary) => (props.publicView ? dropPath(child) : `/drops/${child.id}`)
-const meta = (child: DropSummary) => [child.kind === "folder" ? itemCount(child.items ?? 0) : KIND_LABELS[child.kind] ?? "File", child.owner?.name].filter(Boolean).join(" · ")
+const meta = (child: DropSummary) => [child.kind === "folder" ? itemCount(child.items ?? 0) : KIND_LABELS[child.kind], child.owner?.name].filter(Boolean).join(" · ")
 // Search below the folder (ViewerFolderResults): signed-in people only, since it goes through /api/drops.
 const { data: me } = useMe()
 const search = ref("")
@@ -60,7 +60,7 @@ async function newSite() {
           <NuxtLink class="group block overflow-hidden rounded-lg border border-default bg-default transition-colors hover:bg-muted" :to="to(child)">
             <div class="grid aspect-4/3 place-items-center overflow-hidden border-b border-default bg-elevated">
               <img v-if="child.thumbnail" :alt="child.title" class="size-full object-cover" loading="lazy" :src="child.thumbnail">
-              <UIcon v-else :name="KIND_ICONS[child.kind] ?? 'i-ph-file'" class="size-8 text-dimmed" />
+              <UIcon v-else :name="KIND_ICONS[child.kind]" class="size-8 text-dimmed" />
             </div>
             <div class="min-w-0 px-3 py-2.5">
               <p class="truncate text-sm font-medium text-highlighted" :title="child.title">{{ child.title }}</p>

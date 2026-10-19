@@ -16,7 +16,7 @@ function where(drop: DropSummary) {
   return [drop.owner?.name, folders && `in ${folders}`].filter(Boolean).join(" · ") || undefined
 }
 const toItem = (drop: DropSummary): CommandPaletteItem => ({
-  id: drop.id, label: drop.title, suffix: where(drop), description: drop.snippet, icon: KIND_ICONS[drop.kind] ?? "i-ph-file", to: `/drops/${drop.id}`,
+  id: drop.id, label: drop.title, suffix: where(drop), description: drop.snippet, icon: KIND_ICONS[drop.kind], to: `/drops/${drop.id}`,
 })
 
 // Plain links: the three /drops tabs would all read as the current page otherwise.
