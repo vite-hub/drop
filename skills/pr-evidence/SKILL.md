@@ -13,8 +13,8 @@ Call `list_folders` first. If a folder's description says it's for pull request 
 
 ## Capture
 
-1. Find the two states: **after** from this pull request's preview, **before** from any running deploy that still has the old behavior, such as another open pull request's preview that doesn't touch this change. Note both URLs.
-2. Capture both at the same viewport, zoom, scroll position, and page state (same data, same open menus, popups closed). The change has to be visible in what you capture. If the data or the state can't show it, set that up first. A doc with only one of the two states, or a description in place of a screenshot, isn't evidence: if you can't capture both comparably, report the gap and don't publish.
+1. Find the two states: **after** from this pull request's preview, **before** from any running deploy that still has the old behavior, such as another open pull request's preview that doesn't touch this change. Note both URLs. Each preview takes its own login, which the pull request it belongs to usually publishes, for example in a deploy bot's comment; sign in to the before preview with its pull request's login, not one from another environment.
+2. Capture both at the same viewport, zoom, scroll position, and page state (same data, same open menus, popups closed). The change has to be visible in what you capture. If the data or the state can't show it, set that up first. A doc with only one of the two states, or a description in place of a screenshot, isn't evidence: if you can't capture both comparably, publish nothing: no new drop and no new version of an existing one. Your final answer says what blocked you.
 3. For every element you want to mark, measure it in the page you captured. Never estimate from the image:
 
    ```js
