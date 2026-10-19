@@ -1,4 +1,5 @@
-import { defineHandler, HTTPError } from "h3"
+import { defineValidatedHandler, HTTPError } from "h3"
+import { DropsQuerySchema } from "#shared/schemas"
 import { findDropByRef, listDrops, listFolder, listFolders, listSharedWithMe, permissions } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
 
@@ -7,7 +8,9 @@ import { requireIdentity } from "../../utils/identity"
  * the team's folders first); with `?folders` every folder your drops may go in, yours and the team's. `?q=` searches your drops at any depth, by name and by a doc's text, and with
  * `?folder=<id or link>` the folder's drops, or with `q` everything below it.
  */
-export default defineHandler(async (event) => {
+export default defineValidatedHandler({
+  validate: { query: DropsQuerySchema },
+  async handler(event) {
   const who = await requireIdentity(event)
   const query = event.url.searchParams
   const words = query.get("q")?.slice(0, 200) || undefined
@@ -18,4 +21,5 @@ export default defineHandler(async (event) => {
   }
   if (query.has("folders")) return listFolders(who, event)
   return query.has("shared") ? listSharedWithMe(who, event) : listDrops(who, event, { trash: query.has("trash"), query: words })
+  },
 })

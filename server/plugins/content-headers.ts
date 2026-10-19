@@ -1,6 +1,6 @@
 import { definePlugin } from "nitro"
 import { useRuntimeConfig } from "nitro/runtime-config"
-import { isIndexedPath } from "../../app/utils/docs"
+import { isIndexedPath } from "#shared/utils/docs"
 
 /** Error handlers replace the response, so set content headers after them too. */
 export default definePlugin((app) => {

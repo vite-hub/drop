@@ -70,9 +70,8 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   if (event) {
     try { await requirePublishBurst(event, ownerId) }
     catch (error) {
-      const failure = error as { status?: number; statusCode?: number; headers?: HeadersInit }
-      if (failure.status === 429 || failure.statusCode === 429) {
-        const retryAfter = Number(new Headers(failure.headers).get("retry-after"))
+      if (HTTPError.isError(error) && error.status === 429) {
+        const retryAfter = Number(new Headers(error.headers).get("retry-after"))
         throw new DropQuotaError(quotaFailure("burstPublishes", PUBLISH_BURST, PUBLISH_BURST, retryAfter > 0 ? Math.ceil(retryAfter) : 60))
       }
       throw error
@@ -162,16 +161,5 @@ export async function cleanupQuotaBlobs(now: Date) {
     const [error] = await blob.del(keys)
     if (error) throw error
     await releaseQuotaBlobs(keys)
-  }
-}
-
-/** Return quota JSON directly before generic error handlers reshape HTTPError bodies. */
-export function quotaApiHandler<Args extends unknown[], Result>(handler: (...args: Args) => Result) {
-  return async (...args: Args): Promise<Awaited<Result> | Response> => {
-    try { return await handler(...args) }
-    catch (error) {
-      if (!(error instanceof DropQuotaError)) throw error
-      return Response.json(error.quotaBody, { status: error.status, headers: error.quotaBody.retryAfterSeconds ? { "Retry-After": String(error.quotaBody.retryAfterSeconds) } : undefined })
-    }
   }
 }

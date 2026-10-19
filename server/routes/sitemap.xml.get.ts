@@ -1,6 +1,6 @@
 import { defineHandler, HTTPError } from "h3"
 import { useRuntimeConfig } from "nitro/runtime-config"
-import { INDEXED_PATHS } from "../../app/utils/docs"
+import { INDEXED_PATHS } from "#shared/utils/docs"
 
 /** The pages search engines may index (INDEXED_PATHS), on whichever host serves this Drop. None while indexing is off. */
 export default defineHandler((event) => {

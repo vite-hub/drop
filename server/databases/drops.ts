@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
+import { ACTOR_KINDS, DROP_KINDS } from "../../shared/types.ts"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
@@ -9,7 +10,7 @@ import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } fro
 export const drops = sqliteTable("drops", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id").notNull(),
-  kind: text("kind", { enum: ["markdown", "html", "image", "file", "app", "folder", "site"] }).notNull(),
+  kind: text("kind", { enum: DROP_KINDS }).notNull(),
   title: text("title").notNull(),
   filename: text("filename").notNull(),
   /** Blob key for docs (`<uuid>.<ext>`, served at `/f/<key>`). Null for apps. */
@@ -31,7 +32,7 @@ export const drops = sqliteTable("drops", {
   /** Public links only: an admin approves them first when `DROP_SHARE_APPROVAL` is on. */
   shareReview: text("share_review", { enum: ["pending", "rejected"] }),
   quarantinedAt: integer("quarantined_at"),
-  actorKind: text("actor_kind", { enum: ["agent", "browser"] }).notNull(),
+  actorKind: text("actor_kind", { enum: ACTOR_KINDS }).notNull(),
   actorName: text("actor_name").notNull(),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),

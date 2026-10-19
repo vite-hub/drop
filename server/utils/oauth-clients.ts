@@ -1,5 +1,5 @@
 import { APIError } from "better-auth/api"
-import { registrationProblem } from "../../shared/oauth-registration"
+import { registrationProblem } from "#shared/oauth-registration"
 import { createAuthMiddleware } from "better-auth/api"
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"])

@@ -160,3 +160,23 @@ export const ReportSchema = v.object({
 })
 export const ReviewSchema = v.object({ action: v.picklist(["approve", "reject"]) })
 export const ReportActionSchema = v.object({ action: v.picklist(["dismiss", "quarantine", "ban"]) })
+
+/** Query strings stay strings here. Routes convert them after h3 has validated the shape and bounds. */
+export const DropsQuerySchema = v.object({
+  q: v.optional(v.pipe(v.string(), v.maxLength(200))),
+  folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
+  trash: v.optional(v.string()),
+  shared: v.optional(v.string()),
+  folders: v.optional(v.string()),
+})
+
+export const SearchQuerySchema = v.object({ q: v.pipe(v.string(), v.maxLength(200)) })
+export const LinkQuerySchema = v.object({ v: v.optional(v.pipe(v.string(), v.regex(/^\d+$/))) })
+export const ReviewCommentsQuerySchema = v.object({ page: v.optional(v.pipe(v.string(), v.maxLength(MAX_REVIEW_PAGE))) })
+
+export const RuntimeErrorSchema = v.object({
+  kind: v.picklist(["error", "rejection", "console", "load"]),
+  message: v.pipe(v.string(), v.minLength(1), v.maxLength(500)),
+  source: v.optional(v.pipe(v.string(), v.maxLength(300))),
+  page: v.optional(v.pipe(v.string(), v.maxLength(300))),
+})

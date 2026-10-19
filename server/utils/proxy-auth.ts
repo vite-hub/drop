@@ -2,19 +2,11 @@ import { APIError, createAuthEndpoint } from "better-auth/api"
 import { setSessionCookie } from "better-auth/cookies"
 import { and, eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
-import { useServerEnv } from "#vitehub/env/server"
 import { account, user } from "../databases/config"
-import { githubOrganization, isGitHubMember } from "./github-membership"
+import { isGitHubMember } from "./github-membership"
+import { readAuthProxyConfig } from "./proxy-auth-config"
 import { roleOf } from "./identity"
-
-/** Whether people sign in through an existing GitHub oauth2-proxy (`DROP_AUTH_PROXY`), and its cookie to clear on logout. */
-export function authProxy() {
-  const { authProxy: enabled, authProxyCookie } = useServerEnv().drop
-  const cookie = authProxyCookie.trim() || null
-  if (enabled && !githubOrganization()) throw new Error("DROP_AUTH_PROXY requires DROP_GITHUB_ORG.")
-  if (cookie && !/^[\w-]+$/.test(cookie)) throw new Error("DROP_AUTH_PROXY_COOKIE must be a cookie name.")
-  return { enabled, cookie }
-}
+export const authProxy = readAuthProxyConfig
 
 /** Exchange oauth2-proxy's GitHub token for Drop's session. Header names alone prove nothing. */
 export const proxyAuth = () => ({

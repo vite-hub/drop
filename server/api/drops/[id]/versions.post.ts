@@ -6,7 +6,6 @@ import { createDocDrop, findDrop, permissions, readText, toSummary, versionsOf }
 import { identify } from "../../../utils/identity"
 import { deleteDrafts, readDraft } from "#live-drafts"
 import { routeId } from "../../../utils/params"
-import { quotaApiHandler } from "../../../utils/quotas"
 
 /**
  * Publishes a Markdown drop's live draft as its next version. The text comes from the draft the room last
@@ -14,7 +13,7 @@ import { quotaApiHandler } from "../../../utils/quotas"
  * meanwhile, this is a 409 naming it, unless `force` puts the draft on top of it. People only: agents publish with
  * publish.
  */
-export default quotaApiHandler(defineValidatedHandler({
+export default defineValidatedHandler({
   validate: { body: v.object({ force: v.optional(v.boolean()) }) },
   async handler(event) {
     const drop = await findDrop(await routeId(event), event)
@@ -35,4 +34,4 @@ export default quotaApiHandler(defineValidatedHandler({
     await deleteDrafts([drop.id])
     return toSummary(next)
   },
-}))
+})

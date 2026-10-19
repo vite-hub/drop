@@ -2,3 +2,10 @@
 declare module "cloudflare:workers" {
   export const env: Record<string, unknown>
 }
+
+declare module "h3" {
+  interface H3EventContext {
+    dropIdentity?: Promise<import("../server/utils/identity").Identity | null>
+    dropAccessChecked?: boolean
+  }
+}

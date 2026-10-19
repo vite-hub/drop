@@ -1,3 +1,5 @@
+import type { HostId } from "../../scripts/deployment"
+
 // The docs' sidebar, page order, and the hosts Drop deploys to (nuxt.config.ts reads DROP_HOST at build time).
 export interface DocsLink {
   label: string
@@ -5,9 +7,7 @@ export interface DocsLink {
   icon?: string
 }
 
-export type HostId = "cloudflare" | "vercel" | "netlify" | "deno" | "vps"
-
-export interface Host {
+interface HostDetails {
   id: HostId
   name: string
   icon: string
@@ -20,7 +20,7 @@ export interface Host {
   cleanup: string
 }
 
-export const HOSTS: Host[] = [
+export const HOSTS: HostDetails[] = [
   { id: "cloudflare", name: "Cloudflare", icon: "i-simple-icons-cloudflare", live: "https://drop.vitehub.dev", database: "D1", files: "R2", rateLimits: "Workers rate limiting", codeImages: "PNG and SVG", cleanup: "Cron trigger" },
   { id: "vercel", name: "Vercel", icon: "i-simple-icons-vercel", database: "D1 over HTTP", files: "Vercel Blob", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Vercel Cron Job" },
   { id: "netlify", name: "Netlify", icon: "i-simple-icons-netlify", database: "D1 over HTTP", files: "Netlify Blobs", rateLimits: "Per instance", codeImages: "SVG", cleanup: "Scheduled function" },
@@ -49,13 +49,11 @@ export const DOCS_NAV: Array<{ title: string; links: DocsLink[] }> = [
       { label: "Review and share", to: "/docs/review" },
       { label: "Review a live site", to: "/docs/sites" },
     ],
-  },
-  { title: "Policies", links: [
+  }, { title: "Policies", links: [
     { label: "Terms of service", to: "/terms" },
     { label: "Acceptable use", to: "/acceptable-use" },
     { label: "Copyright and abuse", to: "/abuse" },
-  ] },
-  {
+  ] }, {
     title: "Self-host",
     links: [
       { label: "Overview", to: "/docs/self-host" },
@@ -65,16 +63,6 @@ export const DOCS_NAV: Array<{ title: string; links: DocsLink[] }> = [
 ]
 
 export const DOCS_PAGES = DOCS_NAV.flatMap(group => group.links)
-
-/** Whether `path` is the docs page `to`, with or without a trailing slash. */
 export const isActivePath = (path: string, to: string) => path === to || path === `${to}/`
-
-/**
- * The pages search engines may index: the landing and every docs and legal page. Every other page, API route and file
- * answers with `X-Robots-Tag: noindex` (server/plugins/content-headers.ts), and only these get a canonical link and a
- * place in /sitemap.xml.
- */
 export const INDEXED_PATHS = ["/", ...new Set(DOCS_PAGES.map(page => page.to))]
-
-/** Whether `path` is one of INDEXED_PATHS, with or without a trailing slash. */
 export const isIndexedPath = (path: string) => INDEXED_PATHS.includes(path.length > 1 ? path.replace(/\/+$/, "") : path)
