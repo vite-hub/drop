@@ -49,6 +49,9 @@ const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
+// The review loop, beside the pitch.
+const LOOP = ["Your agent drops a draft", "You comment on the exact spot", "Your agent reads the comments and drops v2"]
+
 // The first card is the point of Drop, so it gets two columns; the rest fill two more rows of four. Each opens its
 // screenshot on the Features docs page.
 const FEATURES = [
@@ -123,7 +126,9 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
       <section class="relative overflow-hidden">
         <LandingDotGrid class="absolute inset-0 size-full [mask-image:radial-gradient(ellipse_at_50%_0%,black_10%,transparent_60%)]" />
         <div class="relative mx-auto w-full max-w-6xl px-4 pt-16 pb-24 sm:px-6 lg:pt-24 lg:pb-32">
-          <div class="flex flex-col items-center text-center">
+          <!-- The pitch on the left and the review loop's three steps beside it (the Loop prototype won, 2026-10-19). -->
+          <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:gap-16">
+          <div class="flex flex-col items-center text-center lg:items-start lg:text-left">
             <NuxtLink to="/docs/agents" class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted">
               <span class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[11px] tracking-wide text-highlighted uppercase">MCP</span>
               Connect Claude Code, Codex, or any agent
@@ -135,13 +140,20 @@ const HOSTED = ["Sign in with GitHub", "Agents connect over MCP", "Unopened drop
             <p class="mt-6 max-w-[56ch] text-lg leading-relaxed text-pretty text-muted">
               <LandingMention name="Claude Code" icon="i-simple-icons-claude" color="#D97757" href="https://claude.com/claude-code" />, <LandingMention name="Codex" icon="i-simple-icons-openai" href="https://openai.com/codex" />, or any <LandingMention name="MCP" icon="i-simple-icons-modelcontextprotocol" href="https://modelcontextprotocol.io" /> agent drops a doc, a page, or a small app. You comment on the exact spot, and the agent drops the next version.
             </p>
-            <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <div class="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
               <UButton v-if="signedIn" color="neutral" size="lg" class="h-10 px-4" label="Open Drop" trailing-icon="i-ph-arrow-right" to="/drops" />
               <UButton v-else color="neutral" size="lg" class="h-10 px-4" icon="i-simple-icons-github" label="Sign in with GitHub" @click="signInWithGitHub" />
               <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="Read the docs" to="/docs" />
             </div>
 
             <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 max-w-xs" />
+          </div>
+          <ol class="mx-auto grid w-full max-w-md gap-3 lg:mx-0 lg:max-w-none">
+            <li v-for="(step, i) in LOOP" :key="step" class="flex items-center gap-4 rounded-xl border border-default bg-default p-4 shadow-xs">
+              <span class="grid size-8 shrink-0 place-items-center rounded-full bg-inverted font-mono text-sm font-medium text-inverted">{{ i + 1 }}</span>
+              <span class="text-base text-highlighted">{{ step }}</span>
+            </li>
+          </ol>
           </div>
           <LandingHeroStory class="mt-14" />
         </div>
