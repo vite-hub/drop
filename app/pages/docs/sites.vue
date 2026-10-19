@@ -23,17 +23,22 @@ const nuxt = `// nuxt.config.ts: preview builds only\nexport default defineNuxtC
       <p>Comments from a pattern keep the address of the preview they came from, so you can tell pull requests apart.</p>
     </DocsSection>
 
-    <DocsSection id="bookmarklet" title="Review with the bookmarklet">
-      <p>The site needs no change. The site drop's page has a <strong>Review with Drop</strong> link: drag it to your bookmarks bar, open any page of the site, and click it. It adds Drop's Comment button to that page, for you only, until you reload.</p>
-      <p>A page with a strict Content Security Policy may block it. Use the script tag there.</p>
-    </DocsSection>
-
-    <DocsSection id="install" title="Or add the script">
-      <p>To show the Comment button to everyone on a preview, add the tag to its pages, in preview builds only:</p>
+    <DocsSection id="install" title="Add the script to preview builds">
+      <p>The easiest way: add the tag to the site's preview builds once, never production. Every preview then shows the Comment button to everyone, so reviewers install nothing, and with a pattern address the comments from every pull request's preview land on the same site drop.</p>
       <AgentsCodeBlock :code="tag" />
       <p>For a Nuxt app, behind a flag your preview builds set:</p>
       <AgentsCodeBlock :code="nuxt" />
       <p>The tag is the same for every site and carries no key, so nothing in the page's HTML opens the review. The button sits in the page's corner, in its own shadow root, so your styles and its styles never mix. It does nothing until someone presses it.</p>
+    </DocsSection>
+
+    <DocsSection id="bookmarklet" title="Or review with the bookmarklet">
+      <p>For a site you can't change, the site drop's page has a <strong>Review with Drop</strong> button to keep in your bookmarks. It adds Drop's Comment button to the page you're on, for you only, until you reload.</p>
+      <ol>
+        <li>Show the bookmarks bar with <kbd>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd> on a Mac or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd> elsewhere. It's the same in Chrome, Edge, Brave, Firefox, and Zen; Safari calls it the Favorites bar. In Zen's single toolbar, the bar appears when you point at the top edge of the window.</li>
+        <li>Drag the button onto the bar. In Firefox and Zen you can also right-click it and choose <strong>Bookmark Link</strong>.</li>
+        <li>Open any page of the site and click <strong>Review with Drop</strong> in your bookmarks.</li>
+      </ol>
+      <p>The site drop's page shows these steps for your browser. A page with a strict Content Security Policy may block the bookmarklet; use the script tag there.</p>
     </DocsSection>
 
     <DocsSection id="comment" title="Comment">
