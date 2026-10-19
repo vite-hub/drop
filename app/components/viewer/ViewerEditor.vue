@@ -37,7 +37,7 @@ const toolbar = computed<EditorToolbarItem[][]>(() => [
     { kind: "mark", mark: "italic", icon: "i-ph-text-italic", "aria-label": "Italic" },
     { kind: "mark", mark: "strike", icon: "i-ph-text-strikethrough", "aria-label": "Strikethrough" },
     { kind: "mark", mark: "code", icon: "i-ph-code", "aria-label": "Code" },
-    { icon: "i-ph-link", "aria-label": "Link", active: props.editor?.isActive("link"), onClick: editLink },
+    { icon: "i-ph-link", "aria-label": "Link", active: props.editor?.isActive("link"), onClick: () => void editLink() },
   ],
   [
     { kind: "heading", level: 1, icon: "i-ph-text-h-one", "aria-label": "Heading 1" },

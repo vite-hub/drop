@@ -274,7 +274,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
             </nav>
             <span class="truncate text-sm font-medium">{{ drop.title }}</span>
             <ConnectionStatus v-if="editing" class="label-mono shrink-0 data-[status=reconnecting]:text-error" :status="live.status.value">
-              <ConnectionStatusLabel v-slot="{ state }">{{ liveLabel(state) }}</ConnectionStatusLabel>
+              <ConnectionStatusLabel v-slot="{ state: connection }">{{ liveLabel(connection) }}</ConnectionStatusLabel>
             </ConnectionStatus>
           </span>
         </template>

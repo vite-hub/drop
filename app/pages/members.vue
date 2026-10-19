@@ -33,9 +33,9 @@ const statusOf = (member: Member) => (member.banned ? "Banned" : "Active")
 function menu(member: Member): DropdownMenuItem[][] {
   return [[
     member.banned
-      ? { label: "Unban", icon: "i-ph-arrow-counter-clockwise", onSelect: () => unban(member) }
-      : { label: "Ban", icon: "i-ph-prohibit", color: "error", onSelect: () => ban(member) },
-    { label: "Remove", icon: "i-ph-trash", color: "error", onSelect: () => remove(member) },
+      ? { label: "Unban", icon: "i-ph-arrow-counter-clockwise", onSelect: () => void unban(member) }
+      : { label: "Ban", icon: "i-ph-prohibit", color: "error", onSelect: () => void ban(member) },
+    { label: "Remove", icon: "i-ph-trash", color: "error", onSelect: () => void remove(member) },
   ]]
 }
 

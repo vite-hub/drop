@@ -25,10 +25,11 @@ async function newFolder() {
 }
 
 const picker = useFileDialog({ multiple: false, reset: true })
-picker.onChange(async (files) => {
+picker.onChange(files => void uploadPicked(files))
+async function uploadPicked(files: FileList | null) {
   const result = files?.[0] && await upload(files[0], props.drop)
   if (result) await navigateTo(`/drops/${result.id}`)
-})
+}
 
 async function newSite() {
   const input = await siteDialog()

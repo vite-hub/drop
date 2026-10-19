@@ -53,7 +53,7 @@ export function useCopy() {
   const { copy, copied } = useClipboard({ copiedDuring: 1400, legacy: true })
   return {
     copied,
-    async copy(text: string, title = "Copied") {
+    copy: async (text: string, title = "Copied") => {
       await copy(text)
       toast.add({ title })
     },

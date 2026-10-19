@@ -129,7 +129,11 @@ export function useViewerFrame(options: {
         return
       case "ready":
         return
-      default:
+      case "selection":
+      case "image":
+      case "area":
+      case "marker":
+      case "key":
         annotations.receive(message, rect)
     }
   })

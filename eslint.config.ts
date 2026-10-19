@@ -15,6 +15,8 @@ export default withNuxt(
       "public/vendor/**",
       "skills/**/generated/**",
       "skills/**/*.md",
+      // Shipped to agents and injected into their pages as written.
+      "skills/**/assets/**",
     ],
     stylistic: { quotes: "double", semi: false },
     lessOpinionated: true,
@@ -72,6 +74,8 @@ export default withNuxt(
       "vue/block-tag-newline": "off",
       "vue/multiline-html-element-content-newline": "off",
       "vue/padding-line-between-blocks": "off",
+      // TypeScript reports real redeclarations; a valibot schema and its inferred type share one name on purpose.
+      "ts/no-redeclare": "off",
     },
   },
   {
@@ -97,15 +101,15 @@ export default withNuxt(
     },
   },
   {
-    files: ["app/**/*.{ts,vue}"],
+    files: ["app/**/*.vue", "app/composables/useDialogs.ts"],
     rules: {
-      // Vue/Nuxt macro inference is not available to the ESLint project service; vue-tsc remains authoritative.
+      // ESLint's type service can't read SFC types (imports of .vue files, template refs, defineModel), so these
+      // report "error typed" values that vue-tsc resolves. vue-tsc stays the type check for .vue files.
       "ts/no-unsafe-assignment": "off",
       "ts/no-unsafe-argument": "off",
       "ts/no-unsafe-call": "off",
       "ts/no-unsafe-member-access": "off",
       "ts/no-unsafe-return": "off",
-      "ts/no-misused-promises": "off",
       "ts/unbound-method": "off",
     },
   },
@@ -137,13 +141,6 @@ export default withNuxt(
     rules: {
       // jose exposes its verification error code through an untyped catch value.
       "ts/no-unsafe-member-access": "off",
-    },
-  },
-  {
-    files: ["server/utils/publish.ts"],
-    rules: {
-      // Valibot's schema and inferred output intentionally share this public name.
-      "ts/no-redeclare": "off",
     },
   },
 )

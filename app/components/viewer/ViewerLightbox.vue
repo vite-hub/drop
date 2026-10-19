@@ -25,7 +25,7 @@ const motion = usePreferredReducedMotion()
 const animate = computed(() => motion.value !== "reduce")
 // Hidden until the image is measured, so it doesn't flash at its final size before zooming there.
 const shown = ref(!props.from)
-onKeyStroke("Escape", close)
+onKeyStroke("Escape", () => void close())
 
 async function loaded(event: Event) {
   const { naturalWidth, naturalHeight } = event.target as HTMLImageElement

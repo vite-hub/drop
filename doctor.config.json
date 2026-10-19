@@ -1,9 +1,3 @@
 {
-  "extends": ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict"],
-  "rules": {
-    "typescript/evidence/no-caller-chosen-result-type": "off",
-    "typescript/evidence/no-chained-type-assertions": "off",
-    "typescript/boundaries/no-unvalidated-deserialization": "off",
-    "nitro/server/no-browser-api": "off"
-  }
+  "extends": ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict"]
 }

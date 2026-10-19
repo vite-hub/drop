@@ -1,8 +1,10 @@
 import type { FrameMessage } from "#shared/frame-messages"
+import type { CommentInput } from "#shared/schemas"
 import type { DropDetail } from "#shared/types"
-import type { PendingComment } from "~/components/viewer/ViewerCommentPopover.vue"
-import type { Area } from "~/components/viewer/ViewerLightbox.vue"
 
+// Spelled out here rather than imported from the popover and lightbox SFCs, whose types ESLint can't read.
+type PendingComment = Omit<CommentInput, "body">
+type Area = { ox: number; oy: number; ow: number; oh: number }
 type Rect = { left: number; top: number; right: number; bottom: number }
 type Selection = { quote: string; selector: string; label: string; rect: Rect }
 type Lightbox = { src: string; alt: string; selector: string; label: string; from?: { left: number; top: number; width: number; height: number } }

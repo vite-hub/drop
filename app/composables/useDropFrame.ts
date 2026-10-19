@@ -10,7 +10,7 @@ import { type FrameMessage, parseFrameMessage } from "#shared/frame-messages"
 export function useDropFrame(frame: Readonly<Ref<HTMLIFrameElement | null | undefined>>, origin: MaybeRefOrGetter<string | undefined>, onMessage: (message: FrameMessage, rect: DOMRect) => void) {
   const ready = ref(false)
   useEventListener("message", (event: MessageEvent) => {
-    if (event.data?.__drop !== true || !frame.value || event.source !== frame.value.contentWindow) return
+    if ((event.data as { __drop?: unknown } | null)?.__drop !== true || !frame.value || event.source !== frame.value.contentWindow) return
     if (toValue(origin) && event.origin !== toValue(origin)) return
     const message = parseFrameMessage(event.data)
     if (!message) return

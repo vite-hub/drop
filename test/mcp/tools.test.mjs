@@ -122,7 +122,7 @@ test("a comment inside an element with an id says which section it's in, so a pr
   const html = `<!doctype html><title>Hero</title><body><section id="v-prism" data-variant="Prism"><h1>Plan demand</h1></section><section id="v-glyphs" data-variant="Glyphs"><h1>Plan demand</h1></section></body>`
   const page = (await call(publish, { html, note: "Which hero?", lifetime: "temporary" })).structuredContent
   await commentsPost(route(page.id, { kind: "text", selector: "#v-prism > h1", ox: 0, oy: 0, quote: "Plan demand", body: "Too quiet." }))
-  await commentsPost(route(page.id, { kind: "area", selector: "#v-glyphs", label: 'section "Plan demand"', ox: 0, oy: 0, ow: 1000, oh: 500, body: "Keep this one." }))
+  await commentsPost(route(page.id, { kind: "area", selector: "#v-glyphs", label: "section \"Plan demand\"", ox: 0, oy: 0, ow: 1000, oh: 500, body: "Keep this one." }))
   await commentsPost(route(page.id, { kind: "text", selector: "body > p", ox: 0, oy: 0, quote: "Plan", body: "No id above it." }))
 
   const { text } = (await call(readDrop, { id: page.id })).content[0]
