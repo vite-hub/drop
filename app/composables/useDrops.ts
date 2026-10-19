@@ -92,6 +92,20 @@ export function useDropActions() {
     }
   }
 
+  /** A new name for the drop. Its link keeps its slug. */
+  async function rename(drop: Pick<DropSummary, "id" | "parentId">, title: string) {
+    try {
+      const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { title } })
+      patch(drop.id, result)
+      await refreshNuxtData([`drop:${drop.id}`, "shared-with-me", ...(drop.parentId ? [`folder:${drop.parentId}`] : [])])
+      return true
+    }
+    catch (error) {
+      notify.fail("Couldn't rename it", error)
+      return false
+    }
+  }
+
   /** Moves a drop to the Trash at once, with an undo: nothing is lost for 15 days. */
   async function remove(drop: Pick<DropSummary, "id" | "title">) {
     try {
@@ -206,5 +220,5 @@ export function useDropActions() {
     }
   }
 
-  return { upload, setShare, setLifetime, remove, restore, deleteForever, emptyTrash, createFolder, createSite, describe, move }
+  return { upload, setShare, setLifetime, rename, remove, restore, deleteForever, emptyTrash, createFolder, createSite, describe, move }
 }
