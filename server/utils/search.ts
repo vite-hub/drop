@@ -49,7 +49,21 @@ export function searchableText(kind: string, source: string) {
 /** Search words: lower case, at most ten, each matched anywhere in the title, file name, slug, or a doc's text. */
 export const searchWords = (query?: string) => query?.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 10) ?? []
 
-const pattern = (word: string) => `%${word.replace(/[\\%_]/g, "\\$&")}%`
+const encoder = new TextEncoder()
+
+/**
+ * A word as a LIKE pattern. D1 refuses patterns over 50 bytes, so a long word keeps the escaped characters that fit in
+ * 48 bytes; the two `%` take the rest. A prefix of the word still finds what the whole word would.
+ */
+export function likePattern(word: string) {
+  let escaped = ""
+  for (const char of word) {
+    const next = escaped + char.replace(/[\\%_]/, "\\$&")
+    if (encoder.encode(next).length > 48) break
+    escaped = next
+  }
+  return `%${escaped}%`
+}
 const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coalesce(${drops.slug}, ''))`
 
 /**
@@ -57,7 +71,7 @@ const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coa
  * the text isn't lowered row by row. Needs `drop_texts` left-joined (see `searchHeads`).
  */
 export const matching = (words: string[]) => words.map(word =>
-  sql`(${named} LIKE ${pattern(word)} ESCAPE '\\' OR ${dropTexts.text} LIKE ${pattern(word)} ESCAPE '\\')`)
+  sql`(${named} LIKE ${likePattern(word)} ESCAPE '\\' OR ${dropTexts.text} LIKE ${likePattern(word)} ESCAPE '\\')`)
 
 /**
  * Words around the first word found in the doc's text, or null when the name alone matches every word. Worked out in
@@ -67,7 +81,7 @@ function snippetOf(words: string[]): SQL<string | null> {
   if (!words.length) return sql<null>`NULL`
   const at = sql.join(words.map(word => sql`nullif(instr(lower(${dropTexts.text}), ${word}), 0)`), sql`, `)
   const position = words.length > 1 ? sql`coalesce(${at})` : at
-  const nameOnly = sql.join(words.map(word => sql`${named} LIKE ${pattern(word)} ESCAPE '\\'`), sql` AND `)
+  const nameOnly = sql.join(words.map(word => sql`${named} LIKE ${likePattern(word)} ESCAPE '\\'`), sql` AND `)
   return sql<string | null>`CASE WHEN ${dropTexts.text} IS NULL OR (${nameOnly}) THEN NULL
     ELSE (SELECT CASE WHEN p IS NULL THEN NULL ELSE (CASE WHEN p > 61 THEN '…' ELSE '' END) || substr(${dropTexts.text}, max(1, p - 60), 180) END FROM (SELECT ${position} AS p)) END`
 }
