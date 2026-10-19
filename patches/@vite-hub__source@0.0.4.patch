@@ -1,0 +1,64 @@
+diff --git a/dist/files.d.ts b/dist/files.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..773355704f3eed9f3d7f1124a77905d586b64c96
+--- /dev/null
++++ b/dist/files.d.ts
+@@ -0,0 +1,7 @@
++import { s as SourceContent, t as FileSource } from "./types-BigOktIj.js";
++interface FilesSourceOptions {
++  /** Removed from the start of every path, such as the folder that an `import.meta.glob()` pattern starts with. */
++  base?: string;
++}
++declare function files(entries: Record<string, SourceContent>, options?: FilesSourceOptions): FileSource<string>;
++export { type FilesSourceOptions, files };
+diff --git a/dist/files.js b/dist/files.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..ceec3f16f6fb1be7987f9a417fb86801878a3607
+--- /dev/null
++++ b/dist/files.js
+@@ -0,0 +1,28 @@
++import { a as sourceError, n as normalizeSafeSourcePath } from "./path-Dk4Vqm9k.js";
++//#region src/sources/files.ts
++// Backport of files() from vite-hub/vitehub#2627. The media type covers Markdown only: the released build has no mrmime export.
++function files(entries, options = {}) {
++	const base = options.base ? `${options.base.replace(/\\/g, "/").replace(/\/+$/, "")}/` : "";
++	const items = new Map();
++	for (const [path, content] of Object.entries(entries)) {
++		const portable = path.replace(/\\/g, "/");
++		if (base && !portable.startsWith(base)) throw sourceError(`[vitehub] files() path ${JSON.stringify(path)} does not start with base ${JSON.stringify(options.base)}.`);
++		const key = normalizeSafeSourcePath(portable.slice(base.length));
++		if (items.has(key)) throw sourceError(`[vitehub] files() has two files at ${JSON.stringify(key)}.`);
++		items.set(key, content);
++	}
++	const keys = [...items.keys()].sort((left, right) => left.localeCompare(right));
++	return {
++		name: "files",
++		async getKeys() {
++			return keys;
++		},
++		async getItem(key) {
++			const content = items.get(key);
++			if (content === void 0) throw sourceError(`[vitehub] files() could not find ${JSON.stringify(key)}.`);
++			return { key, path: key, content, mediaType: key.endsWith(".md") ? "text/markdown" : void 0 };
++		}
++	};
++}
++//#endregion
++export { files };
+diff --git a/package.json b/package.json
+index 9f5f1b85eab85e5de479e61a8b3fa8e84166eee5..69a7c9c549cb94de20a5661146f2250ac22e6350 100644
+--- a/package.json
++++ b/package.json
+@@ -46,6 +46,12 @@
+       "require": "./dist/file.js",
+       "default": "./dist/file.js"
+     },
++    "./files": {
++      "types": "./dist/files.d.ts",
++      "import": "./dist/files.js",
++      "require": "./dist/files.js",
++      "default": "./dist/files.js"
++    },
+     "./github": {
+       "types": "./dist/github.d.ts",
+       "import": "./dist/github.js",

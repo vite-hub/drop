@@ -30,6 +30,9 @@ patchedDependencies:
   # outside Nitro elsewhere. Runs Static Schedules through the Nitro dev handler, imports registry definitions by
   # absolute path (the app/ Vite root broke relative ones), and reloads the registry on HMR (vite-hub/vitehub#2473).
   '@vite-hub/schedule@0.0.4': patches/@vite-hub__schedule@0.0.4.patch
+  # files(): a Source over files bundled at build time, so the docs' Content runs on Workers without a file system.
+  # The vite-hub patch adds its `vite-hub/source/files` export (vite-hub/vitehub#2627).
+  '@vite-hub/source@0.0.4': patches/@vite-hub__source@0.0.4.patch
   # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461 (still open).
   '@vite-hub/ui@0.0.4': patches/@vite-hub__ui@0.0.4.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.

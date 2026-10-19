@@ -1,8 +1,21 @@
 diff --git a/dist/package-cEctEXPi.js b/dist/package-cEctEXPi.js
-index b6db80ba6fe5fdcdbda67b1b64d47d4e297fa184..78adffe35b0ffe36629b9f85f4bf5a22518a09b6 100644
+index b6db80ba6fe5fdcdbda67b1b64d47d4e297fa184..81f6bd4663f628b0355bdd191edbb345bf1a01a9 100644
 --- a/dist/package-cEctEXPi.js
 +++ b/dist/package-cEctEXPi.js
-@@ -1144,6 +1144,24 @@ var exports = {
+@@ -841,6 +841,12 @@ var exports = {
+ 		"require": "./dist/source/file.js",
+ 		"default": "./dist/source/file.js"
+ 	},
++	"./source/files": {
++		"types": "./dist/source/files.d.ts",
++		"import": "./dist/source/files.js",
++		"require": "./dist/source/files.js",
++		"default": "./dist/source/files.js"
++	},
+ 	"./source/github": {
+ 		"types": "./dist/source/github.d.ts",
+ 		"import": "./dist/source/github.js",
+@@ -1144,6 +1150,24 @@ var exports = {
  		"require": "./dist/ui/marker.js",
  		"default": "./dist/ui/marker.js"
  	},
@@ -27,6 +40,34 @@ index b6db80ba6fe5fdcdbda67b1b64d47d4e297fa184..78adffe35b0ffe36629b9f85f4bf5a22
  	"./ui/message": {
  		"types": "./dist/ui/message.d.ts",
  		"import": "./dist/ui/message.js",
+diff --git a/dist/source/files.d.ts b/dist/source/files.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..07010f792a7a7dd9169102c3c2f98a220b3b2b25
+--- /dev/null
++++ b/dist/source/files.d.ts
+@@ -0,0 +1 @@
++export * from "@vite-hub/source/files";
+diff --git a/dist/source/files.js b/dist/source/files.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..07010f792a7a7dd9169102c3c2f98a220b3b2b25
+--- /dev/null
++++ b/dist/source/files.js
+@@ -0,0 +1 @@
++export * from "@vite-hub/source/files";
+diff --git a/dist/src-B5dLSX4-.js b/dist/src-B5dLSX4-.js
+index 879443e229c19d16a10d5a076303604938bb1df4..d96e966431ea0f38236523ca802f4f5804471f46 100644
+--- a/dist/src-B5dLSX4-.js
++++ b/dist/src-B5dLSX4-.js
+@@ -6048,7 +6048,8 @@ function deploymentPlugins(plan, requestedServices, blobEnabled, services, optio
+ 				...cloneRecord(options.rateLimit === true ? void 0 : options.rateLimit),
+ 				...cloneRecord(config.rateLimit),
+ 				namespace: name,
+-				provider: plan.services.rateLimit.adapter
++				// Cloudflare Rate Limit bindings exist only in the built wrangler.json, so `serve` keeps one in-memory limiter.
++				provider: building ? plan.services.rateLimit.adapter : "memory"
+ 			};
+ 			if (requestedServices.includes("sandbox") && plan.services.sandbox.supported) config.sandbox = {
+ 				...cloneRecord(config.sandbox),
 diff --git a/dist/ui/avatar-stack.d.ts b/dist/ui/avatar-stack.d.ts
 new file mode 100644
 index 0000000000000000000000000000000000000000..5cfbf700f05fd53964babb949be760a8cfb0005f
@@ -59,65 +100,6 @@ index 0000000000000000000000000000000000000000..b245347b1e9a91ec46478e4c82b5448d
 +++ b/dist/ui/connection-status.js
 @@ -0,0 +1 @@
 +export * from "@vite-hub/ui/connection-status";
-diff --git a/dist/ui/sync-status.d.ts b/dist/ui/sync-status.d.ts
-new file mode 100644
-index 0000000000000000000000000000000000000000..d1913265f4291c4d70451ba3f8051dcfcde90af9
---- /dev/null
-+++ b/dist/ui/sync-status.d.ts
-@@ -0,0 +1,2 @@
-+export * from "@vite-hub/ui/sync-status";
-+export {};
-\ No newline at end of file
-diff --git a/dist/ui/sync-status.js b/dist/ui/sync-status.js
-new file mode 100644
-index 0000000000000000000000000000000000000000..a8a1e768919492c344398850c23c20086b1ae89d
---- /dev/null
-+++ b/dist/ui/sync-status.js
-@@ -0,0 +1 @@
-+export * from "@vite-hub/ui/sync-status";
-diff --git a/package.json b/package.json
-index 10113ab28266e2462241abfd5609765dcc46b373..657a38688bf48c80e65e9c0f7a6e5acef00017e3 100644
---- a/package.json
-+++ b/package.json
-@@ -1176,6 +1176,24 @@
-       "require": "./dist/ui/marker.js",
-       "default": "./dist/ui/marker.js"
-     },
-+    "./ui/avatar-stack": {
-+      "types": "./dist/ui/avatar-stack.d.ts",
-+      "import": "./dist/ui/avatar-stack.js",
-+      "require": "./dist/ui/avatar-stack.js",
-+      "default": "./dist/ui/avatar-stack.js"
-+    },
-+    "./ui/connection-status": {
-+      "types": "./dist/ui/connection-status.d.ts",
-+      "import": "./dist/ui/connection-status.js",
-+      "require": "./dist/ui/connection-status.js",
-+      "default": "./dist/ui/connection-status.js"
-+    },
-+    "./ui/sync-status": {
-+      "types": "./dist/ui/sync-status.d.ts",
-+      "import": "./dist/ui/sync-status.js",
-+      "require": "./dist/ui/sync-status.js",
-+      "default": "./dist/ui/sync-status.js"
-+    },
-     "./ui/message": {
-       "types": "./dist/ui/message.d.ts",
-       "import": "./dist/ui/message.js",
-diff --git a/dist/src-B5dLSX4-.js b/dist/src-B5dLSX4-.js
-index 879443e229c19d16a10d5a076303604938bb1df4..d96e966431ea0f38236523ca802f4f5804471f46 100644
---- a/dist/src-B5dLSX4-.js
-+++ b/dist/src-B5dLSX4-.js
-@@ -6048,7 +6048,8 @@ function deploymentPlugins(plan, requestedServices, blobEnabled, services, optio
- 				...cloneRecord(options.rateLimit === true ? void 0 : options.rateLimit),
- 				...cloneRecord(config.rateLimit),
- 				namespace: name,
--				provider: plan.services.rateLimit.adapter
-+				// Cloudflare Rate Limit bindings exist only in the built wrangler.json, so `serve` keeps one in-memory limiter.
-+				provider: building ? plan.services.rateLimit.adapter : "memory"
- 			};
- 			if (requestedServices.includes("sandbox") && plan.services.sandbox.supported) config.sandbox = {
- 				...cloneRecord(config.sandbox),
 diff --git a/dist/ui/styles.css b/dist/ui/styles.css
 index 1202b1a94313fcc2ffec1d34e99b8d6380480a2b..7917a08d88c891b4f1940054ddc9578204023bd3 100644
 --- a/dist/ui/styles.css
@@ -269,3 +251,61 @@ index 1202b1a94313fcc2ffec1d34e99b8d6380480a2b..7917a08d88c891b4f1940054ddc95782
 +    white-space: nowrap;
 +  }
 +}
+diff --git a/dist/ui/sync-status.d.ts b/dist/ui/sync-status.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d1913265f4291c4d70451ba3f8051dcfcde90af9
+--- /dev/null
++++ b/dist/ui/sync-status.d.ts
+@@ -0,0 +1,2 @@
++export * from "@vite-hub/ui/sync-status";
++export {};
+\ No newline at end of file
+diff --git a/dist/ui/sync-status.js b/dist/ui/sync-status.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8a1e768919492c344398850c23c20086b1ae89d
+--- /dev/null
++++ b/dist/ui/sync-status.js
+@@ -0,0 +1 @@
++export * from "@vite-hub/ui/sync-status";
+diff --git a/package.json b/package.json
+index 10113ab28266e2462241abfd5609765dcc46b373..53c703a05276a7c2e7a6d591de68a5000fa5bb11 100644
+--- a/package.json
++++ b/package.json
+@@ -873,6 +873,12 @@
+       "require": "./dist/source/file.js",
+       "default": "./dist/source/file.js"
+     },
++    "./source/files": {
++      "types": "./dist/source/files.d.ts",
++      "import": "./dist/source/files.js",
++      "require": "./dist/source/files.js",
++      "default": "./dist/source/files.js"
++    },
+     "./source/github": {
+       "types": "./dist/source/github.d.ts",
+       "import": "./dist/source/github.js",
+@@ -1176,6 +1182,24 @@
+       "require": "./dist/ui/marker.js",
+       "default": "./dist/ui/marker.js"
+     },
++    "./ui/avatar-stack": {
++      "types": "./dist/ui/avatar-stack.d.ts",
++      "import": "./dist/ui/avatar-stack.js",
++      "require": "./dist/ui/avatar-stack.js",
++      "default": "./dist/ui/avatar-stack.js"
++    },
++    "./ui/connection-status": {
++      "types": "./dist/ui/connection-status.d.ts",
++      "import": "./dist/ui/connection-status.js",
++      "require": "./dist/ui/connection-status.js",
++      "default": "./dist/ui/connection-status.js"
++    },
++    "./ui/sync-status": {
++      "types": "./dist/ui/sync-status.d.ts",
++      "import": "./dist/ui/sync-status.js",
++      "require": "./dist/ui/sync-status.js",
++      "default": "./dist/ui/sync-status.js"
++    },
+     "./ui/message": {
+       "types": "./dist/ui/message.d.ts",
+       "import": "./dist/ui/message.js",
