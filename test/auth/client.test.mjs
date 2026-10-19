@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
-import { test } from "node:test"
+import { test } from "vite-plus/test"
 
 // Load the real Nuxt plugin with only Nuxt's registration helper supplied.
-globalThis.defineNuxtPlugin = plugin => plugin
+globalThis.defineNuxtPlugin = (plugin) => plugin
 const { default: createPlugin } = await import("../../app/plugins/auth.ts")
 delete globalThis.defineNuxtPlugin
 
@@ -23,14 +23,24 @@ async function browser(run) {
   globalThis.window = { location: new URL("/oauth", origin) }
   globalThis.fetch = async (url, options) => {
     const path = new URL(url, origin).pathname
-    calls.push({ path, query: new URL(url, origin).searchParams, body: options.body ? JSON.parse(options.body) : undefined })
+    calls.push({
+      path,
+      query: new URL(url, origin).searchParams,
+      body: options.body ? JSON.parse(options.body) : undefined,
+    })
     const data = path.endsWith("/public-client")
       ? { client_id: "mcp-client", client_name: "MCP agent" }
-      : { redirect: true, url: path.endsWith("/consent") ? "com.cursor:/callback?code=answer" : "https://github.com/login/oauth/authorize" }
+      : {
+          redirect: true,
+          url: path.endsWith("/consent")
+            ? "com.cursor:/callback?code=answer"
+            : "https://github.com/login/oauth/authorize",
+        }
     return Response.json(data)
   }
-  try { await run(createPlugin().provide.auth, calls) }
-  finally {
+  try {
+    await run(createPlugin().provide.auth, calls)
+  } finally {
     globalThis.fetch = previousFetch
     if (previousWindow === undefined) delete globalThis.window
     else globalThis.window = previousWindow
@@ -39,7 +49,13 @@ async function browser(run) {
 
 test("OAuth sign-in and consent forward only signed parameters, including repeated resources", async () => {
   await browser(async (auth, calls) => {
-    const query = new URLSearchParams({ client_id: "mcp-client", scope: "openid offline_access", state: "oauth-state", ba_iat: "123", sig: "test-signature" })
+    const query = new URLSearchParams({
+      client_id: "mcp-client",
+      scope: "openid offline_access",
+      state: "oauth-state",
+      ba_iat: "123",
+      sig: "test-signature",
+    })
     query.append("resource", "https://drop.example/mcp")
     query.append("resource", "https://other.example/mcp")
     for (const name of ["client_id", "scope", "state", "ba_iat", "resource", "ba_param"]) query.append("ba_param", name)
@@ -63,7 +79,10 @@ test("OAuth sign-in and consent forward only signed parameters, including repeat
       assert.equal(call.path, "/api/auth/oauth2/consent")
       assert.equal(call.body.accept, accept)
       assert.equal(call.body.oauth_query, signed)
-      assert.deepEqual(new URLSearchParams(call.body.oauth_query).getAll("resource"), ["https://drop.example/mcp", "https://other.example/mcp"])
+      assert.deepEqual(new URLSearchParams(call.body.oauth_query).getAll("resource"), [
+        "https://drop.example/mcp",
+        "https://other.example/mcp",
+      ])
       assert.equal(window.location.href, "com.cursor:/callback?code=answer", "Better Auth handles native MCP redirects")
     }
   })

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
+import { beforeEach, test } from "vite-plus/test"
 import { writeXlsx } from "hucre/xlsx"
 import { state, calls, migrate, reset, insertDrop } from "./harness.mjs"
 const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
@@ -10,11 +10,21 @@ migrate()
 beforeEach(reset)
 
 test("a workbook shows each visible sheet's formatted values, merges, and no trailing blanks", async () => {
-  const bytes = await writeXlsx({ sheets: [
-    { name: "Plan", rows: [["Piece", "Qty", "Price", null], ["Bolt", 120, { value: 0.35, style: { numFmt: "$#,##0.00" } }, null], [null, null, null, null]], merges: [{ startRow: 0, startCol: 0, endRow: 0, endCol: 1 }] },
-    { name: "Notes <b>", rows: [["ok"]] },
-    { name: "Secret", rows: [["hidden"]], hidden: true },
-  ] })
+  const bytes = await writeXlsx({
+    sheets: [
+      {
+        name: "Plan",
+        rows: [
+          ["Piece", "Qty", "Price", null],
+          ["Bolt", 120, { value: 0.35, style: { numFmt: "$#,##0.00" } }, null],
+          [null, null, null, null],
+        ],
+        merges: [{ startRow: 0, startCol: 0, endRow: 0, endCol: 1 }],
+      },
+      { name: "Notes <b>", rows: [["ok"]] },
+      { name: "Secret", rows: [["hidden"]], hidden: true },
+    ],
+  })
   const html = await renderSpreadsheet(bytes, ".xlsx")
   assert.match(html, /role="tab"[^>]*>Plan</)
   assert.match(html, />Notes &lt;b&gt;</)

@@ -1,13 +1,17 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
+import { beforeEach, test } from "vite-plus/test"
 import { createRequire } from "node:module"
 import { pathToFileURL } from "node:url"
 import { state, calls } from "./harness.mjs"
 const { cachedMarkdown, deleteMarkdownCache, MARKDOWN_CACHE_TTL } = await import("../../server/utils/markdown-cache.ts")
 
 const KEY = "nitro:functions:markdown:doc.md.json"
-beforeEach(() => { state.entries.clear(); calls.writes.length = 0; state.failCacheDelete = false })
-const render = async text => ({ title: text, html: `<p>${text}</p>` })
+beforeEach(() => {
+  state.entries.clear()
+  calls.writes.length = 0
+  state.failCacheDelete = false
+})
+const render = async (text) => ({ title: text, html: `<p>${text}</p>` })
 
 test("KV writes physically expire in 30 days through the actual unstorage driver", async () => {
   const require = createRequire(import.meta.resolve("nitro/package.json"))
@@ -20,14 +24,15 @@ test("KV writes physically expire in 30 days through the actual unstorage driver
   try {
     await cachedMarkdown("doc.md", async () => "source", render)
     // Nitro writes after it answers (waitUntil on Workers); let the write land.
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
     assert.equal(writes.length, 1)
     assert.equal(writes[0][0], `nitro-cache:${KEY}`)
     assert.equal(writes[0][2].expirationTtl, MARKDOWN_CACHE_TTL)
     assert.equal(MARKDOWN_CACHE_TTL, 2592000)
     assert.equal(JSON.parse(writes[0][1]).value.source, "source")
+  } finally {
+    state.storage = previous
   }
-  finally { state.storage = previous }
 })
 
 test("expired memory/filesystem entries refetch and rerender rather than serving stale HTML", async () => {
@@ -41,7 +46,9 @@ test("expired memory/filesystem entries refetch and rerender rather than serving
 
 test("cache hits do not read source or render again, and deletion removes the render", async () => {
   await cachedMarkdown("doc.md", async () => "source", render)
-  const never = () => { throw new Error("unexpected source read or render") }
+  const never = () => {
+    throw new Error("unexpected source read or render")
+  }
   assert.equal((await cachedMarkdown("doc.md", never, never)).source, "source")
   await deleteMarkdownCache("doc.md")
   assert.equal(state.entries.size, 0)

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { test } from "node:test"
+import { test } from "vite-plus/test"
 import { cloudflareTemplate, syncCloudflareTemplate } from "../../scripts/cloudflare-template.ts"
 
 test("template resource ids survive Nitro's array merge and D1 build variables take priority", () => {
@@ -46,8 +46,7 @@ test("template resource ids survive Nitro's array merge and D1 build variables t
     const overridden = JSON.parse(readFileSync(file, "utf8"))
     assert.equal(overridden.d1_databases[0].database_id, "existing-build-id")
     assert.equal(overridden.d1_databases[0].database_name, "existing-database")
-  }
-  finally {
+  } finally {
     Object.assign(cloudflareTemplate, template)
     process.env = previousEnv
     rmSync(directory, { recursive: true, force: true })

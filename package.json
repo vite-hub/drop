@@ -1,15 +1,11 @@
 {
   "name": "vitehub-drop",
-  "type": "module",
   "private": true,
-  "packageManager": "pnpm@11.18.0",
-  "engines": {
-    "node": ">=24.0.0"
-  },
+  "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
     "knip": "knip",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "mkdir -p .vitehub/data/database && drizzle-kit migrate --config .vitehub/database/drizzle.config.ts",
@@ -20,9 +16,12 @@
     "postinstall": "vitehub types prepare && nuxt prepare",
     "preview": "cp -r server/databases/migrations .output/server/ && wrangler d1 migrations apply DB --local --config .output/server/wrangler.json && wrangler dev --config .output/server/wrangler.json --enable-containers=false --port 8788",
     "doctor": "vite-doctor . --no-cache --severity warn --max-warnings 0",
-    "test": "node --test $(find test -name '*.test.mjs' -not -path 'test/e2e/*')",
+    "test": "vp test",
+    "fmt": "vp fmt",
+    "check": "vp check",
     "test:e2e:deployed": "node test/e2e/deployed-flow.mjs",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "prepare": "vp config"
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.7.10",
@@ -80,13 +79,16 @@
     "drizzle-kit": "^0.31.10",
     "knip": "6.41.0",
     "nitro": "3.0.260610-beta",
-    "oxlint": "1.88.0",
-    "oxlint-tsgolint": "7.0.2004",
     "typescript": "^6.0.3",
     "vite-doctor": "0.0.12",
+    "vite-plus": "catalog:",
     "vue-tsc": "^3.3.9",
     "wrangler": "4.148.0"
   },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@11.18.0",
   "cloudflare": {
     "bindings": {
       "DB": {

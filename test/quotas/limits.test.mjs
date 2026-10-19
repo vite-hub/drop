@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { test } from "node:test"
+import { test, vi } from "vite-plus/test"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync, mkdtempSync, rmSync, readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -11,39 +11,77 @@ import { H3Event, HTTPError, toResponse } from "h3"
 import { createMcpHandler, defineMcpTool } from "nitro-mcp-toolkit"
 import { MCP_LATEST, MCP_LEGACY } from "../../shared/mcp.ts"
 import { MIB, planLimits, quotaFailure, quotaToolFailure, usageNearLimit } from "../../shared/quotas.ts"
-import { appFileChunks, deletionChainSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "../../server/utils/quota-sql.ts"
+import {
+  appFileChunks,
+  deletionChainSQL,
+  QUOTA_RESERVATION_TTL_MS,
+  reserveSQL,
+  usageSQL,
+} from "../../server/utils/quota-sql.ts"
 
 function setup(path = ":memory:") {
   const db = new DatabaseSync(path)
   db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000")
   const migrations = new URL("../../server/databases/migrations/", import.meta.url)
-  for (const name of readdirSync(migrations).filter(name => name.endsWith(".sql")).sort()) db.exec(readFileSync(new URL(name, migrations), "utf8"))
+  for (const name of readdirSync(migrations)
+    .filter((name) => name.endsWith(".sql"))
+    .sort())
+    db.exec(readFileSync(new URL(name, migrations), "utf8"))
   return db
 }
 // Free allows 50 drops; three keep the slot arithmetic below readable.
 const SMALL = { ...planLimits("free"), drops: 3 }
-function reserve(db, { owner = "owner", month = "2026-10", drops = 1, bytes = 10, writes = 1, target = null, limits = SMALL } = {}) {
+function reserve(
+  db,
+  { owner = "owner", month = "2026-10", drops = 1, bytes = 10, writes = 1, target = null, limits = SMALL } = {},
+) {
   const id = crypto.randomUUID()
   const now = Date.now()
-  const row = db.prepare(reserveSQL).get(owner, month, now - QUOTA_RESERVATION_TTL_MS, id, drops, bytes, writes, target, now,
-    limits.drops === null ? 0 : 1, drops, limits.drops ?? 0,
-    limits.bytes === null ? 0 : 1, bytes, limits.bytes ?? 0,
-    limits.writes === null ? 0 : 1, writes, limits.writes ?? 0)
+  const row = db
+    .prepare(reserveSQL)
+    .get(
+      owner,
+      month,
+      now - QUOTA_RESERVATION_TTL_MS,
+      id,
+      drops,
+      bytes,
+      writes,
+      target,
+      now,
+      limits.drops === null ? 0 : 1,
+      drops,
+      limits.drops ?? 0,
+      limits.bytes === null ? 0 : 1,
+      bytes,
+      limits.bytes ?? 0,
+      limits.writes === null ? 0 : 1,
+      writes,
+      limits.writes ?? 0,
+    )
   return row ? id : null
 }
 function doc(db, id, { size = 10, previous = null, owner = "owner", kind = "markdown" } = {}) {
-  db.prepare(`INSERT INTO drops (id, owner_id, kind, title, filename, size, supersedes_id, actor_kind, actor_name, created_at, updated_at) VALUES (?, ?, ?, 'Doc', 'doc.md', ?, ?, 'browser', 'Tester', 0, 0)`).run(id, owner, kind, size, previous)
+  db.prepare(
+    `INSERT INTO drops (id, owner_id, kind, title, filename, size, supersedes_id, actor_kind, actor_name, created_at, updated_at) VALUES (?, ?, ?, 'Doc', 'doc.md', ?, ?, 'browser', 'Tester', 0, 0)`,
+  ).run(id, owner, kind, size, previous)
 }
 function commit(db, id, operation, success = true) {
   db.exec("BEGIN")
   try {
     operation()
-    db.prepare("UPDATE quota_reservations SET committed=1, drops=0, bytes=0, writes=CASE WHEN ? THEN writes ELSE -1 END WHERE id=?").run(Number(success), id)
+    db.prepare(
+      "UPDATE quota_reservations SET committed=1, drops=0, bytes=0, writes=CASE WHEN ? THEN writes ELSE -1 END WHERE id=?",
+    ).run(Number(success), id)
     db.exec("COMMIT")
+  } catch (error) {
+    db.exec("ROLLBACK")
+    throw error
   }
-  catch (error) { db.exec("ROLLBACK"); throw error }
 }
-const used = (db, owner = "owner", month = "2026-10") => ({ ...db.prepare(usageSQL).get(owner, month, Date.now() - QUOTA_RESERVATION_TTL_MS) })
+const used = (db, owner = "owner", month = "2026-10") => ({
+  ...db.prepare(usageSQL).get(owner, month, Date.now() - QUOTA_RESERVATION_TTL_MS),
+})
 
 test("plans, warnings, and non-retryable agent guidance", () => {
   assert.deepEqual(planLimits("free"), { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB })
@@ -57,11 +95,19 @@ test("plans, warnings, and non-retryable agent guidance", () => {
   assert.match(quotaToolFailure(body).content[0].text, /Do not retry or delete/)
   assert.equal("upgradeUrl" in body, false)
   assert.equal(body.selfHostUrl, "/docs/self-host")
-  const usage = { enabled: true, drops: { used: 2, limit: 3 }, bytes: { used: 0, limit: 100 * MIB }, writes: { used: 0, limit: 1000 } }
+  const usage = {
+    enabled: true,
+    drops: { used: 2, limit: 3 },
+    bytes: { used: 0, limit: 100 * MIB },
+    writes: { used: 0, limit: 1000 },
+  }
   assert.equal(usageNearLimit(usage), true)
   assert.equal(usageNearLimit({ ...usage, enabled: false }), false)
   assert.equal(usageNearLimit({ ...usage, drops: { used: 1, limit: 3 } }), false)
-  assert.equal(usageNearLimit({ ...usage, drops: { used: 1, limit: 3 }, bytes: { used: 80 * MIB, limit: 100 * MIB } }), true)
+  assert.equal(
+    usageNearLimit({ ...usage, drops: { used: 1, limit: 3 }, bytes: { used: 80 * MIB, limit: 100 * MIB } }),
+    true,
+  )
 })
 
 test("three logical drops allow revisions, count all retained versions, and deletion frees capacity", () => {
@@ -87,7 +133,9 @@ test("drops in the Trash and files a doc embeds keep their bytes but free their 
   doc(db, "doc1")
   doc(db, "shot", { kind: "image" })
   assert.deepEqual(used(db), { drops: 3, bytes: 30, writes: 0 })
-  db.exec("UPDATE drops SET trashed_at = 1, trash_reason = 'deleted' WHERE id = 'doc1'; UPDATE drops SET parent_id = 'doc0' WHERE id = 'shot'")
+  db.exec(
+    "UPDATE drops SET trashed_at = 1, trash_reason = 'deleted' WHERE id = 'doc1'; UPDATE drops SET parent_id = 'doc0' WHERE id = 'shot'",
+  )
   assert.deepEqual(used(db), { drops: 1, bytes: 30, writes: 0 })
   db.close()
 })
@@ -105,21 +153,27 @@ test("storage and writes reserve exact boundaries, with per-owner and UTC month 
   db.close()
 })
 
-test("stale pending reservations stop consuming slots, bytes, and writes before cleanup", (t) => {
+test("stale pending reservations stop consuming slots, bytes, and writes before cleanup", () => {
   const now = Date.UTC(2026, 9, 8, 12)
-  t.mock.timers.enable({ apis: ["Date"], now })
+  vi.useFakeTimers({ toFake: ["Date"], now })
   const db = setup()
   const stale = reserve(db, { drops: 3, bytes: 100 * MIB, writes: 1000 })
   db.prepare("UPDATE quota_reservations SET created_at=? WHERE id=?").run(now - 15 * 60 * 1000 - 1, stale)
   assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 0 })
-  assert.ok(db.prepare("SELECT id FROM quota_reservations WHERE id=?").get(stale), "Usage reads do not delete reservations")
-  assert.ok(reserve(db, { drops: 3, bytes: 100 * MIB, writes: 1000 }), "Atomic quota checks also ignore stale reservations")
+  assert.ok(
+    db.prepare("SELECT id FROM quota_reservations WHERE id=?").get(stale),
+    "Usage reads do not delete reservations",
+  )
+  assert.ok(
+    reserve(db, { drops: 3, bytes: 100 * MIB, writes: 1000 }),
+    "Atomic quota checks also ignore stale reservations",
+  )
   db.close()
 })
 
-test("fresh pending reservations and the exact 15-minute boundary still count", (t) => {
+test("fresh pending reservations and the exact 15-minute boundary still count", () => {
   const now = Date.UTC(2026, 9, 8, 12)
-  t.mock.timers.enable({ apis: ["Date"], now })
+  vi.useFakeTimers({ toFake: ["Date"], now })
   const db = setup()
   const boundary = reserve(db, { drops: 2, bytes: 20, writes: 2 })
   db.prepare("UPDATE quota_reservations SET created_at=? WHERE id=?").run(now - 15 * 60 * 1000, boundary)
@@ -127,15 +181,15 @@ test("fresh pending reservations and the exact 15-minute boundary still count", 
   assert.ok(fresh)
   assert.deepEqual(used(db), { drops: 3, bytes: 30, writes: 3 })
   assert.equal(reserve(db), null)
-  t.mock.timers.tick(1)
+  vi.advanceTimersByTime(1)
   assert.deepEqual(used(db), { drops: 1, bytes: 10, writes: 1 })
   assert.ok(reserve(db))
   db.close()
 })
 
-test("expiry preserves committed monthly writes and owner and month isolation", (t) => {
+test("expiry preserves committed monthly writes and owner and month isolation", () => {
   const now = Date.UTC(2026, 9, 8, 12)
-  t.mock.timers.enable({ apis: ["Date"], now })
+  vi.useFakeTimers({ toFake: ["Date"], now })
   const db = setup()
   const committed = reserve(db, { writes: 7 })
   commit(db, committed, () => doc(db, "retained"))
@@ -173,7 +227,9 @@ test("app files count once, replacement counts writes and only storage growth, p
   assert.throws(() => reserve(db, { drops: 0, target: "app" }), /UNIQUE constraint/)
   commit(db, id, () => {
     db.exec("DELETE FROM drop_files WHERE drop_id='app'")
-    db.exec("INSERT INTO drop_files (drop_id,path,blob_key,size) VALUES ('app','index.html','new',15), ('app','style.css','css',15)")
+    db.exec(
+      "INSERT INTO drop_files (drop_id,path,blob_key,size) VALUES ('app','index.html','new',15), ('app','style.css','css',15)",
+    )
   })
   assert.deepEqual(used(db), { drops: 1, bytes: 30, writes: 2 })
   assert.ok(reserve(db, { drops: 0, bytes: 0, target: "app" }))
@@ -204,7 +260,11 @@ test("unlimited plans reserve beyond free and Pro caps without imposing owner li
 test("temporary code images charge a write and bytes until blob cleanup, with no drop", () => {
   const db = setup()
   const id = reserve(db, { drops: 0, bytes: 15 })
-  commit(db, id, () => db.exec("INSERT INTO quota_blobs (blob_key,owner_id,size,expires_at) VALUES ('code-images/old/image.svg','owner',15,0)"))
+  commit(db, id, () =>
+    db.exec(
+      "INSERT INTO quota_blobs (blob_key,owner_id,size,expires_at) VALUES ('code-images/old/image.svg','owner',15,0)",
+    ),
+  )
   assert.deepEqual(used(db), { drops: 0, bytes: 15, writes: 1 })
   db.exec("DELETE FROM quota_blobs WHERE blob_key='code-images/old/image.svg'")
   assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 1 })
@@ -216,27 +276,98 @@ test("concurrent SQLite clients cannot reserve more than three slots or the rema
   const path = join(directory, "quotas.sqlite")
   const db = setup(path)
   const source = `const { parentPort, workerData } = require('node:worker_threads'); const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(workerData.path); db.exec('PRAGMA busy_timeout=10000'); const row = db.prepare(workerData.query).get(...workerData.values); db.close(); parentPort.postMessage(Boolean(row));`
-  const race = (drops, bytes, writes, dropLimit, byteLimit, writeLimit) => Promise.all(Array.from({ length: 12 }, () => new Promise((resolve, reject) => {
-    const now = Date.now()
-    const worker = new Worker(source, { eval: true, workerData: { path, query: reserveSQL, values: ["owner", "2026-10", now - QUOTA_RESERVATION_TTL_MS, crypto.randomUUID(), drops, bytes, writes, null, now, 1, drops, dropLimit, 1, bytes, byteLimit, 1, writes, writeLimit] } })
-    worker.once("message", resolve); worker.once("error", reject)
-  })))
+  const race = (drops, bytes, writes, dropLimit, byteLimit, writeLimit) =>
+    Promise.all(
+      Array.from(
+        { length: 12 },
+        () =>
+          new Promise((resolve, reject) => {
+            const now = Date.now()
+            const worker = new Worker(source, {
+              eval: true,
+              workerData: {
+                path,
+                query: reserveSQL,
+                values: [
+                  "owner",
+                  "2026-10",
+                  now - QUOTA_RESERVATION_TTL_MS,
+                  crypto.randomUUID(),
+                  drops,
+                  bytes,
+                  writes,
+                  null,
+                  now,
+                  1,
+                  drops,
+                  dropLimit,
+                  1,
+                  bytes,
+                  byteLimit,
+                  1,
+                  writes,
+                  writeLimit,
+                ],
+              },
+            })
+            worker.once("message", resolve)
+            worker.once("error", reject)
+          }),
+      ),
+    )
   try {
     assert.equal((await race(1, 1, 1, 3, 100, 1000)).filter(Boolean).length, 3)
     db.exec("DELETE FROM quota_reservations")
     assert.equal((await race(0, 0, 2, 100, 100, 5)).filter(Boolean).length, 2)
     db.exec("DELETE FROM quota_reservations")
     assert.equal((await race(0, 4, 0, 100, 10, 1000)).filter(Boolean).length, 2)
+  } finally {
+    db.close()
+    rmSync(directory, { recursive: true, force: true })
   }
-  finally { db.close(); rmSync(directory, { recursive: true, force: true }) }
 })
 
 for (const version of [MCP_LATEST, ...MCP_LEGACY]) {
   test(`quota failures are normal tool results with structured content over MCP ${version}`, async () => {
     const failure = quotaFailure("writes", 1000, 1000)
-    const handler = createMcpHandler({ name: "quota-test", version: "1", origin: false, tools: [defineMcpTool({ name: "denied", inputSchema: toStandardJsonSchema(v.object({})), handler: async () => quotaToolFailure(failure) })] })
-    const params = { name: "denied", arguments: {}, ...(version === MCP_LATEST ? { _meta: { "io.modelcontextprotocol/protocolVersion": version, "io.modelcontextprotocol/clientInfo": { name: "quota-test", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } : {}) }
-    const event = new H3Event(new Request("https://drop.example/mcp", { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": version, "mcp-method": "tools/call", "mcp-name": "denied" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params }) }))
+    const handler = createMcpHandler({
+      name: "quota-test",
+      version: "1",
+      origin: false,
+      tools: [
+        defineMcpTool({
+          name: "denied",
+          inputSchema: toStandardJsonSchema(v.object({})),
+          handler: async () => quotaToolFailure(failure),
+        }),
+      ],
+    })
+    const params = {
+      name: "denied",
+      arguments: {},
+      ...(version === MCP_LATEST
+        ? {
+            _meta: {
+              "io.modelcontextprotocol/protocolVersion": version,
+              "io.modelcontextprotocol/clientInfo": { name: "quota-test", version: "1" },
+              "io.modelcontextprotocol/clientCapabilities": {},
+            },
+          }
+        : {}),
+    }
+    const event = new H3Event(
+      new Request("https://drop.example/mcp", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          "mcp-protocol-version": version,
+          "mcp-method": "tools/call",
+          "mcp-name": "denied",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params }),
+      }),
+    )
     const response = await toResponse(await handler(event), event)
     assert.equal(response.status, 200)
     const body = await response.text()
@@ -251,7 +382,10 @@ for (const version of [MCP_LATEST, ...MCP_LEGACY]) {
 test("REST quota errors preserve the same top-level JSON fields with 402", async () => {
   const failure = quotaFailure("drops", 3, 3)
   const event = new H3Event(new Request("https://drop.example/api/drops"))
-  const response = await toResponse(new HTTPError({ status: 402, message: failure.message, body: { ...failure } }), event)
+  const response = await toResponse(
+    new HTTPError({ status: 402, message: failure.message, body: { ...failure } }),
+    event,
+  )
   assert.equal(response.status, 402)
   const body = await response.json()
   for (const [key, value] of Object.entries(failure)) assert.deepEqual(body[key], value)
@@ -264,7 +398,14 @@ test("deleting a long version chain frees every retained byte and slot without r
   doc(db, "other", { owner: "other" })
   const ledger = reserve(db, { drops: 0, bytes: 0, writes: 7 })
   commit(db, ledger, () => {})
-  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run("long150", "owner", "owner", "long150", "owner", "owner")
+  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run(
+    "long150",
+    "owner",
+    "owner",
+    "long150",
+    "owner",
+    "owner",
+  )
   assert.deepEqual(used(db), { drops: 1, bytes: 1, writes: 7 })
   assert.deepEqual(used(db, "other"), { drops: 1, bytes: 10, writes: 0 })
   db.close()
@@ -275,7 +416,14 @@ test("full-chain deletion never follows a parent belonging to another owner", ()
   doc(db, "foreign", { owner: "other" })
   doc(db, "owned", { previous: "foreign" })
   doc(db, "owned-next", { previous: "owned" })
-  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run("owned", "owner", "owner", "owned", "owner", "owner")
+  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run(
+    "owned",
+    "owner",
+    "owner",
+    "owned",
+    "owner",
+    "owner",
+  )
   assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 0 })
   assert.deepEqual(used(db, "other"), { drops: 1, bytes: 10, writes: 0 })
   db.close()
@@ -283,9 +431,14 @@ test("full-chain deletion never follows a parent belonging to another owner", ()
 
 test("app metadata inserts stay within D1's bound-parameter limit at both plan maximums", () => {
   for (const count of [50, 200]) {
-    const files = Array.from({ length: count }, (_, i) => ({ dropId: "app", path: `${i}.html`, blobKey: `${i}.html`, size: 0 }))
+    const files = Array.from({ length: count }, (_, i) => ({
+      dropId: "app",
+      path: `${i}.html`,
+      blobKey: `${i}.html`,
+      size: 0,
+    }))
     const chunks = appFileChunks(files)
     assert.deepEqual(chunks.flat(), files)
-    assert.ok(chunks.every(chunk => chunk.length * 4 <= 100))
+    assert.ok(chunks.every((chunk) => chunk.length * 4 <= 100))
   }
 })

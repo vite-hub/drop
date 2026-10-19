@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
-import { test } from "node:test"
+import { test } from "vite-plus/test"
 import { H3Event, HTTPError } from "h3"
-// The harness stubs Server Env, so the error page reads the proxy setting the way it does under Nitro.
+// test/stubs.ts stubs Server Env, so the error page reads the proxy setting the way it does under Nitro.
 import { state } from "../cost/harness.mjs"
 const { default: contentError } = await import("../../server/handlers/content-error.ts")
 
@@ -24,7 +24,11 @@ test("signed-out content errors offer sign-in and preserve the original link", a
 })
 
 test("signed-in content errors show only the current account and offer account switching", async () => {
-  const response = await render(404, { email: "viewer+<test>@example.test" }, { ownerEmail: "hidden-owner@example.test", title: "Secret title" })
+  const response = await render(
+    404,
+    { email: "viewer+<test>@example.test" },
+    { ownerEmail: "hidden-owner@example.test", title: "Secret title" },
+  )
   const html = await response.text()
   assert.match(html, /viewer\+&lt;test&gt;@example.test/)
   assert.match(html, /Use another account/)
@@ -52,6 +56,7 @@ test("behind the auth proxy, signed-in content errors don't send people back thr
     assert.doesNotMatch(html, /Use another account|\/signin/)
     assert.equal(html.match(/href="\/drops"/g)?.length, 1)
     assert.match(await (await render(404)).text(), /Sign in with GitHub/)
+  } finally {
+    Object.assign(state, { authProxy: false, githubOrg: "" })
   }
-  finally { Object.assign(state, { authProxy: false, githubOrg: "" }) }
 })

@@ -31,9 +31,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm fmt --check
       - run: pnpm lint
       - run: pnpm knip
       - run: pnpm typecheck
-      - run: pnpm doctor
+      # `run`: pnpm 11's own `pnpm doctor` checks the pnpm install, not the project.
+      - run: pnpm run doctor
       - run: pnpm test
       - run: pnpm build

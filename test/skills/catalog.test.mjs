@@ -1,12 +1,14 @@
 import assert from "node:assert/strict"
 import { readdir, readFile } from "node:fs/promises"
-import { test } from "node:test"
+import { test } from "vite-plus/test"
 import { parseYAML } from "confbox/yaml"
 import { createMarkdownParser } from "@comark/html/parse"
 import annotate from "comark-annotate"
 
 const root = new URL("../../skills/", import.meta.url)
-const names = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name)
+const names = (await readdir(root, { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
 
 test("ships the five built-in skills", () => {
   assert.deepEqual(names.sort(), ["handoff", "pr-evidence", "prototype", "show-me", "vitehub-drop"])

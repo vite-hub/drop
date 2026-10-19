@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
+import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext } from "node:vm"
 import { H3Event } from "h3"
 import { migrate, reset, insertDrop, state } from "../cost/harness.mjs"
@@ -48,7 +48,12 @@ test("a wildcard content origin gives every drop its own origin, named by a hash
   assert.notEqual(await contentOrigin(request("https://drop.example/d/x"), "another-id"), first)
   assert.doesNotMatch(first, /8f14e45f/)
   assert.equal(isContentRequest(request(`${first}/index.html`)), true)
-  for (const host of ["drop-usercontent.example", "evil.drop-usercontent.example", "a.b.drop-usercontent.example", "drop.example"])
+  for (const host of [
+    "drop-usercontent.example",
+    "evil.drop-usercontent.example",
+    "a.b.drop-usercontent.example",
+    "drop.example",
+  ])
     assert.equal(isContentRequest(request(`https://${host}/`)), false, host)
   const response = await contentMiddleware(request(`${first}/about/`, { headers: { "sec-fetch-dest": "iframe" } }))
   assert.equal(response.status, 200)
@@ -62,15 +67,30 @@ test("a wildcard can sit inside the first label, one level under the zone, and m
   const origin = await contentOrigin(request("https://drop.vitehub.dev/d/x"), id)
   assert.match(origin, /^https:\/\/[a-z2-7]{26}-drop\.vitehub\.dev$/)
   assert.equal(isContentRequest(request(`${origin}/`)), true)
-  for (const host of ["drop.vitehub.dev", "vitehub.dev", "babysitter.vitehub.dev", "x-drop.vitehub.dev", "drop-usercontent.vitehub.dev", `${origin.slice(8, 34)}.vitehub.dev`])
+  for (const host of [
+    "drop.vitehub.dev",
+    "vitehub.dev",
+    "babysitter.vitehub.dev",
+    "x-drop.vitehub.dev",
+    "drop-usercontent.vitehub.dev",
+    `${origin.slice(8, 34)}.vitehub.dev`,
+  ])
     assert.equal(isContentRequest(request(`https://${host}/`)), false, host)
-  assert.equal(await contentMiddleware(request("https://drop.vitehub.dev/", { headers: { "sec-fetch-dest": "document" } })), undefined)
+  assert.equal(
+    await contentMiddleware(request("https://drop.vitehub.dev/", { headers: { "sec-fetch-dest": "document" } })),
+    undefined,
+  )
   for (const host of ["evil-drop.vitehub.dev", "x-drop.vitehub.dev", `${origin.slice(8, 20)}-drop.vitehub.dev`]) {
     const response = await contentMiddleware(request(`https://${host}/`, { headers: { "sec-fetch-dest": "document" } }))
     assert.equal(response?.status, 404, host)
   }
   state.contentOrigin = "https://*.usercontent.vitehub.dev"
-  assert.equal(await contentMiddleware(request("https://evil.usercontent.vitehub.dev/", { headers: { "sec-fetch-dest": "document" } })), undefined)
+  assert.equal(
+    await contentMiddleware(
+      request("https://evil.usercontent.vitehub.dev/", { headers: { "sec-fetch-dest": "document" } }),
+    ),
+    undefined,
+  )
   for (const value of ["https://*.*.x.dev", "https://x.*.dev", "https://*", "ftp://*.x.dev", "https://*.x.dev/path"]) {
     state.contentOrigin = value
     assert.equal(await contentOrigin(request("https://drop.vitehub.dev/d/x"), id), null, value)
@@ -79,7 +99,9 @@ test("a wildcard can sit inside the first label, one level under the zone, and m
 
 test("the content origin serves only the frame host, at any path, and nothing of Drop", async () => {
   for (const path of ["/", "/product/", "/api/me", "/d/abc", "/f/key.html"]) {
-    const response = await contentMiddleware(request(`https://drop-usercontent.example${path}`, { headers: { "sec-fetch-dest": "iframe" } }))
+    const response = await contentMiddleware(
+      request(`https://drop-usercontent.example${path}`, { headers: { "sec-fetch-dest": "iframe" } }),
+    )
     assert.equal(response.status, 200, path)
     const html = await response.text()
     assert.match(html, /document\.write\(message\.html\)/)
@@ -87,8 +109,18 @@ test("the content origin serves only the frame host, at any path, and nothing of
     assert.doesNotMatch(html, /__NUXT__|_nuxt/)
     assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow")
   }
-  for (const [method, dest] of [["GET", "empty"], ["GET", "script"], ["POST", "iframe"], ["DELETE", null]]) {
-    const response = await contentMiddleware(request("https://drop-usercontent.example/data.json", { method, headers: dest ? { "sec-fetch-dest": dest } : {} }))
+  for (const [method, dest] of [
+    ["GET", "empty"],
+    ["GET", "script"],
+    ["POST", "iframe"],
+    ["DELETE", null],
+  ]) {
+    const response = await contentMiddleware(
+      request("https://drop-usercontent.example/data.json", {
+        method,
+        headers: dest ? { "sec-fetch-dest": dest } : {},
+      }),
+    )
     assert.equal(response.status, 404, `${method} ${dest}`)
   }
   assert.equal(await contentMiddleware(request("https://drop.example/d/abc")), undefined)
@@ -104,7 +136,10 @@ test("cookie-carrying API writes must come from Drop's own origin", () => {
     { ...cookie, origin: "https://evil.example" },
   ]
   for (const headers of blocked)
-    assert.throws(() => writesMiddleware(request("https://drop.example/api/drops/x", { method: "DELETE", headers })), error => error.status === 403)
+    assert.throws(
+      () => writesMiddleware(request("https://drop.example/api/drops/x", { method: "DELETE", headers })),
+      (error) => error.status === 403,
+    )
   const allowed = [
     ["DELETE", "/api/drops/x", { ...cookie, "sec-fetch-site": "same-origin", origin: "https://drop.example" }],
     ["POST", "/api/apps", { ...cookie }],
@@ -113,14 +148,22 @@ test("cookie-carrying API writes must come from Drop's own origin", () => {
     ["POST", "/mcp", { ...cookie, origin: "https://evil.example" }],
   ]
   for (const [method, path, headers] of allowed)
-    assert.equal(writesMiddleware(request(`https://drop.example${path}`, { method, headers })), undefined, `${method} ${path}`)
+    assert.equal(
+      writesMiddleware(request(`https://drop.example${path}`, { method, headers })),
+      undefined,
+      `${method} ${path}`,
+    )
 })
 
 test("apps and HTML docs carry the content origin; other kinds don't", async () => {
   insertDrop("page", { kind: "html", filename: "page.html", blob_key: "page.html" })
   insertDrop("notes")
   insertDrop("app", { kind: "app", filename: "app", blob_key: null })
-  for (const [id, expected] of [["page", "https://drop-usercontent.example"], ["notes", undefined], ["app", "https://drop-usercontent.example"]]) {
+  for (const [id, expected] of [
+    ["page", "https://drop-usercontent.example"],
+    ["notes", undefined],
+    ["app", "https://drop-usercontent.example"],
+  ]) {
     const event = request(`https://drop.example/api/drops/${id}`)
     event.context.params = { id }
     assert.equal((await detailHandler(event)).contentOrigin, expected, id)
@@ -133,7 +176,16 @@ test("apps and HTML docs carry the content origin; other kinds don't", async () 
 
 test("app pages map to the URLs a static host serves them at", () => {
   const pages = ["index.html", "about.html", "product/index.html", "docs/a b/index.html"]
-  for (const [path, page] of [["/", "index.html"], ["", "index.html"], ["/product/", "product/index.html"], ["/product", "product/index.html"], ["/about", "about.html"], ["/about.html", "about.html"], ["/docs/a b/", "docs/a b/index.html"], ["/missing", null]])
+  for (const [path, page] of [
+    ["/", "index.html"],
+    ["", "index.html"],
+    ["/product/", "product/index.html"],
+    ["/product", "product/index.html"],
+    ["/about", "about.html"],
+    ["/about.html", "about.html"],
+    ["/docs/a b/", "docs/a b/index.html"],
+    ["/missing", null],
+  ])
     assert.equal(pageAt(pages, path), page, path)
   assert.equal(pageUrl("index.html"), "/")
   assert.equal(pageUrl("product/index.html"), "/product/")
@@ -143,27 +195,51 @@ test("app pages map to the URLs a static host serves them at", () => {
 })
 
 test("Drop's scripts go first in the head without dropping the page out of standards mode", () => {
-  assert.equal(prependToHead("<!doctype html><html><head><title>x</title></head></html>", "<x>"), "<!doctype html><html><head><x><title>x</title></head></html>")
+  assert.equal(
+    prependToHead("<!doctype html><html><head><title>x</title></head></html>", "<x>"),
+    "<!doctype html><html><head><x><title>x</title></head></html>",
+  )
   assert.equal(prependToHead("<!DOCTYPE html><p>hi", "<x>"), "<!DOCTYPE html><x><p>hi")
   assert.equal(prependToHead("<p>hi", "<x>"), "<x><p>hi")
-  const app = injectRuntime(buildProjectDocument({ "index.html": "<!doctype html><html><head></head><body><a href=\"/about/\">About</a></body></html>", "about/index.html": "" }, "index.html"), false)
+  const app = injectRuntime(
+    buildProjectDocument(
+      {
+        "index.html": '<!doctype html><html><head></head><body><a href="/about/">About</a></body></html>',
+        "about/index.html": "",
+      },
+      "index.html",
+    ),
+    false,
+  )
   assert.ok(app.startsWith("<!doctype html>"))
-  assert.ok(app.indexOf("if (self.origin !== \"null\") return;") < app.indexOf("const pageAt"), "the opaque shim runs before the app runtime")
+  assert.ok(
+    app.indexOf('if (self.origin !== "null") return;') < app.indexOf("const pageAt"),
+    "the opaque shim runs before the app runtime",
+  )
 })
 
 /** Runs the shim in a window whose storage, cookies, and URL changes throw, like an opaque-origin sandbox. */
 function opaqueWindow(origin = "null") {
-  const insecure = () => { throw new Error("The operation is insecure.") }
+  const insecure = () => {
+    throw new Error("The operation is insecure.")
+  }
   const calls = []
   const history = {
-    pushState(state, title, url) { if (url !== undefined) insecure(); calls.push(["push", state]) },
-    replaceState(state, title, url) { if (url !== undefined) insecure(); calls.push(["replace", state]) },
+    pushState(state, title, url) {
+      if (url !== undefined) insecure()
+      calls.push(["push", state])
+    },
+    replaceState(state, title, url) {
+      if (url !== undefined) insecure()
+      calls.push(["replace", state])
+    },
   }
   const document = {}
   Object.defineProperty(document, "cookie", { configurable: true, get: insecure, set: insecure })
   const window = { history, document, self: { origin }, calls }
   window.window = window
-  for (const name of ["localStorage", "sessionStorage"]) Object.defineProperty(window, name, { configurable: true, get: insecure })
+  for (const name of ["localStorage", "sessionStorage"])
+    Object.defineProperty(window, name, { configurable: true, get: insecure })
   runInNewContext(OPAQUE_ORIGIN_SHIM, window)
   return window
 }
@@ -185,7 +261,10 @@ test("in an opaque sandbox, storage and cookies last for the page and URL change
   assert.equal(window.document.cookie, "b=2")
   window.history.pushState({ page: 2 }, "", "/product/")
   window.history.replaceState({ page: 3 }, "", "#top")
-  assert.deepEqual(window.calls, [["push", { page: 2 }], ["replace", { page: 3 }]])
+  assert.deepEqual(window.calls, [
+    ["push", { page: 2 }],
+    ["replace", { page: 3 }],
+  ])
 })
 
 test("on a real origin the shim leaves the browser's own storage alone", () => {

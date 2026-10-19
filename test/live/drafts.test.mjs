@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
+import { beforeEach, test } from "vite-plus/test"
 import { objects } from "../cost/harness.mjs"
 const { deleteDrafts, draftDocument, ensureDraft, readDraft } = await import("../../server/live-drafts/realtime.ts")
 const { isRealtimeDocumentConflict } = await import("vite-hub/realtime")
@@ -26,7 +26,10 @@ test("a room saves only over the text it loaded", async () => {
   assert.notEqual(saved.digest, loaded.digest)
   assert.equal((await draftDocument.load(room)).digest, saved.digest)
   // A second save from the stale digest is a conflict, so Realtime reloads and resets the room instead of overwriting.
-  await assert.rejects(draftDocument.save(room, { body: "# Plan\n\nTwo.\n" }, saving(loaded.digest)), isRealtimeDocumentConflict)
+  await assert.rejects(
+    draftDocument.save(room, { body: "# Plan\n\nTwo.\n" }, saving(loaded.digest)),
+    isRealtimeDocumentConflict,
+  )
   assert.equal(await readDraft(ID), "# Plan\n\nOne.\n")
 })
 

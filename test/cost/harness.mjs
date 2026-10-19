@@ -1,80 +1,37 @@
-import { createRequire, registerHooks, stripTypeScriptTypes } from "node:module"
-import { execFileSync } from "node:child_process"
-import { readFileSync, readdirSync, existsSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
-import { fileURLToPath, pathToFileURL } from "node:url"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { H3Event } from "h3"
 
 const root = new URL("../../", import.meta.url)
-const module = code => `data:text/javascript,${encodeURIComponent(code)}`
-const stubs = {
-  "vite-hub/database/drizzle": "export const db = globalThis.dropTest.db",
-  "vite-hub/database": "export const defineDatabase = v => v",
-  "vite-hub/blob": "export const blob = globalThis.dropTest.blob",
-  // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".
-  "nitro/cache": `import { defineCachedFunction as define, setStorage } from ${JSON.stringify(pathToFileURL(createRequire(import.meta.resolve("nitro/package.json")).resolve("ocache")).href)}
-const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
-setStorage({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, value, options) => globalThis.dropTest.storage.setItem(key(k), value, options?.ttl ? { ttl: options.ttl } : undefined) })
-export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/functions", ...options })`,
-  "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
-  "vite-hub/rate-limit": "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
-  "vite-hub/schedule": "export const defineSchedule = value => value",
-  "#vitehub/env/server": "export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: t.githubOrg ?? '', authProxy: t.authProxy ?? false, authProxyCookie: '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: 100, proBytes: 1073741824, proWrites: 10000 } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
-  "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
-  "#live-drafts": "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
-}
-registerHooks({
-  load(url, context, next) {
-    if (url.endsWith("?raw"))
-      return { format: "module", source: `export default ${JSON.stringify(readFileSync(new URL(url.replace(/\?raw$/, "")), "utf8"))}`, shortCircuit: true }
-    if (process.env.DROP_TEST_BASELINE && url.startsWith(root.href)) {
-      const path = url.slice(root.href.length)
-      if (["server/utils/drops.ts", "server/middleware/0.drop-access.ts", "server/middleware/1.markdown-documents.ts", "server/api/me.get.ts", "server/utils/code-image-store.ts"].includes(path)) {
-        let source = execFileSync("git", ["show", `${process.env.DROP_TEST_BASELINE}:${path}`], { cwd: fileURLToPath(root), encoding: "utf8" })
-        // Let the new gate call the old middleware's lookup without introducing its owner join.
-        if (path === "server/utils/drops.ts") source += "\nexport async function findDropByBlob(key) { const [row] = await db.select().from(drops).where(eq(drops.blobKey, key)).limit(1); return row ?? null }\n"
-        return { format: "module", source: stripTypeScriptTypes(source), shortCircuit: true }
-      }
-    }
-    return next(url, context)
-  },
-  resolve(specifier, context, next) {
-    if (specifier in stubs) return { url: module(stubs[specifier]), shortCircuit: true }
-    if (specifier.endsWith("/utils/identity") || specifier === "./identity")
-      return { url: module("export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async () => {}"), shortCircuit: true }
-    if (specifier.startsWith("#shared/")) return { url: new URL(`shared/${specifier.slice(8)}.ts`, root).href, shortCircuit: true }
-    if (specifier.startsWith(".")) {
-      const url = new URL(specifier, context.parentURL)
-      if (!url.pathname.endsWith(".ts") && existsSync(fileURLToPath(url) + ".ts"))
-        return { url: url.href + ".ts", shortCircuit: true }
-    }
-    return next(specifier, context)
-  },
-})
 
 export const sql = new DatabaseSync(":memory:")
 export const queries = []
 const execute = async (query, params, method) => {
   queries.push({ query, params })
   const statement = sql.prepare(query)
-  if (method === "run" || !statement.columns().length) { statement.run(...params); return { rows: [] } }
+  if (method === "run" || !statement.columns().length) {
+    statement.run(...params)
+    return { rows: [] }
+  }
   statement.setReturnArrays(true)
   const rows = statement.all(...params)
   return { rows: method === "get" ? rows[0] : rows }
 }
-const db = drizzle(execute, async queries => {
+const db = drizzle(execute, async (queries) => {
   sql.exec("BEGIN")
   try {
     const result = []
     for (const item of queries) result.push(await execute(item.sql, item.params, item.method))
     sql.exec("COMMIT")
     return result
+  } catch (error) {
+    sql.exec("ROLLBACK")
+    throw error
   }
-  catch (error) { sql.exec("ROLLBACK"); throw error }
 })
 // Match D1's raw all() results, which return named columns instead of proxy arrays.
-db.all = async query => {
+db.all = async (query) => {
   const compiled = db.dialect.sqlToQuery(query)
   queries.push({ query: compiled.sql, params: compiled.params })
   return sql.prepare(compiled.sql).all(...compiled.params)
@@ -82,14 +39,31 @@ db.all = async query => {
 export const objects = new Map()
 const entries = new Map()
 export const calls = { get: 0, head: 0, del: 0, writes: [] }
-export const state = globalThis.dropTest = {
-  db, who: null, objects, entries, bursts: [], failBurst: false, failDelete: false, failCacheDelete: false,
+// The stubs in test/stubs.ts hand this state to the server code under test.
+export const state = (globalThis.dropTest = {
+  db,
+  who: null,
+  objects,
+  entries,
+  bursts: [],
+  failBurst: false,
+  failDelete: false,
+  failCacheDelete: false,
   blob: {
-    list: async () => [null, { blobs: [...objects.keys()].map(pathname => ({ pathname })) }],
-    get: async key => { calls.get++; return [null, objects.get(key)?.body ?? null] },
-    head: async key => { calls.head++; return [null, objects.get(key) ?? null] },
-    put: async (key, body) => { objects.set(key, { body: new Blob([body]), uploadedAt: new Date() }); return [null, { url: `/f/${key}` }] },
-    del: async keys => {
+    list: async () => [null, { blobs: [...objects.keys()].map((pathname) => ({ pathname })) }],
+    get: async (key) => {
+      calls.get++
+      return [null, objects.get(key)?.body ?? null]
+    },
+    head: async (key) => {
+      calls.head++
+      return [null, objects.get(key) ?? null]
+    },
+    put: async (key, body) => {
+      objects.set(key, { body: new Blob([body]), uploadedAt: new Date() })
+      return [null, { url: `/f/${key}` }]
+    },
+    del: async (keys) => {
       calls.del++
       if (state.failDelete) return [new Error("injected blob delete failure")]
       for (const key of Array.isArray(keys) ? keys : [keys]) objects.delete(key)
@@ -97,14 +71,22 @@ export const state = globalThis.dropTest = {
     },
   },
   storage: {
-    getItem: async key => entries.get(key) ?? null,
-    setItem: async (key, value, options) => { calls.writes.push({ key, value, options }); entries.set(key, value) },
-    removeItem: async key => { if (state.failCacheDelete) throw new Error("cache delete failure"); entries.delete(key) },
+    getItem: async (key) => entries.get(key) ?? null,
+    setItem: async (key, value, options) => {
+      calls.writes.push({ key, value, options })
+      entries.set(key, value)
+    },
+    removeItem: async (key) => {
+      if (state.failCacheDelete) throw new Error("cache delete failure")
+      entries.delete(key)
+    },
   },
-}
+})
 export function migrate() {
   const directory = new URL("server/databases/migrations/", root)
-  for (const name of readdirSync(directory).filter(name => name.endsWith(".sql")).sort())
+  for (const name of readdirSync(directory)
+    .filter((name) => name.endsWith(".sql"))
+    .sort())
     sql.exec(readFileSync(new URL(name, directory), "utf8"))
 }
 export function event(path, method = "GET") {
@@ -113,29 +95,70 @@ export function event(path, method = "GET") {
   return request
 }
 export function reset() {
-  sql.exec("DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM user")
-  state.bursts.length = 0; state.failBurst = false
+  sql.exec(
+    "DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM user",
+  )
+  state.bursts.length = 0
+  state.failBurst = false
   state.quotasEnabled = false
   state.shareApproval = false
-  state.expiryDays = 30; state.customExpiry = true
-  state.mode = "personal"; state.publicLinkDays = ""; state.admins = ""
-  state.failDelete = false; state.failCacheDelete = false; state.who = null
-  objects.clear(); entries.clear(); queries.length = 0
-  calls.get = calls.head = calls.del = 0; calls.writes.length = 0
+  state.expiryDays = 30
+  state.customExpiry = true
+  state.mode = "personal"
+  state.publicLinkDays = ""
+  state.admins = ""
+  state.failDelete = false
+  state.failCacheDelete = false
+  state.who = null
+  objects.clear()
+  entries.clear()
+  queries.length = 0
+  calls.get = calls.head = calls.del = 0
+  calls.writes.length = 0
   sql.prepare("INSERT INTO user (id, name, email) VALUES (?, ?, ?)").run("owner", "Owner", "owner@example.com")
 }
-export const who = { userId: "owner", name: "Owner", email: "owner@example.com", image: null, role: "member", actorKind: "browser", actorName: "Owner" }
+export const who = {
+  userId: "owner",
+  name: "Owner",
+  email: "owner@example.com",
+  image: null,
+  role: "member",
+  actorKind: "browser",
+  actorName: "Owner",
+}
 /** The share a test means by the old pair: shared is public (view) or public_comment, team with edit access is team_edit. */
-const shareOf = ({ visibility, access }) => visibility === "team" ? (access === "edit" ? "team_edit" : "team") : visibility === "private" ? "private" : access === "view" ? "public" : "public_comment"
+const shareOf = ({ visibility, access }) =>
+  visibility === "team"
+    ? access === "edit"
+      ? "team_edit"
+      : "team"
+    : visibility === "private"
+      ? "private"
+      : access === "view"
+        ? "public"
+        : "public_comment"
 export function insertDrop(id, { visibility, access, ...overrides } = {}) {
   const values = {
-    id, owner_id: "owner", kind: "markdown", title: id, filename: `${id}.md`, blob_key: `${id}.md`, size: 8,
-    version: 1, share: shareOf({ visibility, access }), actor_kind: "browser", actor_name: "Owner", created_at: 1, updated_at: 1,
+    id,
+    owner_id: "owner",
+    kind: "markdown",
+    title: id,
+    filename: `${id}.md`,
+    blob_key: `${id}.md`,
+    size: 8,
+    version: 1,
+    share: shareOf({ visibility, access }),
+    actor_kind: "browser",
+    actor_name: "Owner",
+    created_at: 1,
+    updated_at: 1,
     // A fresh window, as if someone opened the drop just now.
     last_accessed_at: Date.now(),
     ...overrides,
   }
   const keys = Object.keys(values)
-  sql.prepare(`INSERT INTO drops (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`).run(...Object.values(values))
+  sql
+    .prepare(`INSERT INTO drops (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`)
+    .run(...Object.values(values))
   if (values.blob_key) objects.set(values.blob_key, { body: new Blob(["# Source"]), uploadedAt: new Date() })
 }

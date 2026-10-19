@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
+import { beforeEach, test } from "vite-plus/test"
 import { readFileSync } from "node:fs"
 import { sql, queries, state, calls, migrate, reset, insertDrop, who, event } from "./harness.mjs"
-const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionChain, deleteDrop, publishApp } = await import("../../server/utils/drops.ts")
+const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionChain, deleteDrop, publishApp } =
+  await import("../../server/utils/drops.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 const { default: accessMiddleware } = await import("../../server/middleware/0.drop-access.ts")
 const { default: markdownMiddleware } = await import("../../server/middleware/1.markdown-documents.ts")
@@ -12,7 +13,7 @@ const { createCodeImage } = await import("../../server/utils/code-image-store.ts
 
 migrate()
 beforeEach(reset)
-const missing = action => assert.rejects(action, error => error.status === 404)
+const missing = (action) => assert.rejects(action, (error) => error.status === 404)
 
 test("a chain uses one indexed query and preserves older/newer bounds", async () => {
   for (let i = 0; i < 150; i++) insertDrop(`v${i}`, { supersedes_id: i ? `v${i - 1}` : null, version: i + 1 })
@@ -25,7 +26,11 @@ test("a chain uses one indexed query and preserves older/newer bounds", async ()
   assert.equal(chain[0].id, "v124")
   assert.equal(chain.at(-1).id, "v25")
   const { query, params } = queries[0]
-  const plan = sql.prepare(`EXPLAIN QUERY PLAN ${query}`).all(...params).map(row => row.detail).join("\n")
+  const plan = sql
+    .prepare(`EXPLAIN QUERY PLAN ${query}`)
+    .all(...params)
+    .map((row) => row.detail)
+    .join("\n")
   assert.match(plan, /SEARCH d USING INDEX drops_supersedes/)
   assert.doesNotMatch(plan, /SCAN d\b/)
   assert.match(query, /WITH RECURSIVE/)
@@ -36,9 +41,13 @@ test("listing limits latest drops, rather than losing slots to old versions", as
   for (let i = 0; i < 500; i++) insertDrop(`other${i}`)
   const rows = await listDrops(who)
   assert.equal(rows.length, 500)
-  assert.equal(rows.filter(row => row.id.startsWith("v")).length, 1)
-  assert.ok(rows.some(row => row.id === "v599"))
-  const plan = sql.prepare(`EXPLAIN QUERY PLAN ${queries[0].query}`).all(...queries[0].params).map(row => row.detail).join("\n")
+  assert.equal(rows.filter((row) => row.id.startsWith("v")).length, 1)
+  assert.ok(rows.some((row) => row.id === "v599"))
+  const plan = sql
+    .prepare(`EXPLAIN QUERY PLAN ${queries[0].query}`)
+    .all(...queries[0].params)
+    .map((row) => row.detail)
+    .join("\n")
   assert.match(plan, /drop_heads_owner_idx/)
   assert.doesNotMatch(plan, /SCAN drops|drops_owner_idx/)
 })
@@ -48,10 +57,17 @@ test("publishing from an older doc id still extends the latest version in its ch
   insertDrop("second", { supersedes_id: "first", version: 2 })
   insertDrop("third", { supersedes_id: "second", version: 3 })
   insertDrop("unrelated", { version: 99 })
-  const next = await createDocDrop(who, { filename: "plan.md", bytes: new TextEncoder().encode("# Fourth"), supersedes: "first" })
+  const next = await createDocDrop(who, {
+    filename: "plan.md",
+    bytes: new TextEncoder().encode("# Fourth"),
+    supersedes: "first",
+  })
   assert.equal(next.supersedesId, "third")
   assert.equal(next.version, 4)
-  assert.deepEqual((await versionChain(next)).map(row => row.id), [next.id, "third", "second", "first"])
+  assert.deepEqual(
+    (await versionChain(next)).map((row) => row.id),
+    [next.id, "third", "second", "first"],
+  )
 })
 
 test("a warm markdown file and detail render never fetch R2 source", async () => {
@@ -81,8 +97,7 @@ test("a banned owner's shared doc, downloads, page, app, and code image all retu
   sql.prepare("INSERT INTO code_images VALUES (?, ?, ?)").run(imageKey, "owner", Date.now() + 300000)
   sql.exec("UPDATE user SET banned = 1 WHERE id = 'owner'")
   for (const path of [`/f/${key}`, `/f/${key}?raw`, `/f/${imageKey}`, "/f/apps/app/file.html", "/d/doc", "/d/app"])
-    for (const method of ["GET", "HEAD", "POST"])
-      await missing(() => accessMiddleware(event(path, method)))
+    for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
   const request = event(`/f/${key}`)
   await missing(() => markdownMiddleware(request))
   for (const id of ["doc", "app"]) {
@@ -121,14 +136,17 @@ test("review policy reuses the owner join for IDs, blobs, pages and raw download
     assert.equal(queries.length, 1)
   }
   await missing(() => requireBlobAccess(event("/f/doc.md?raw"), "doc.md"))
-  await assert.rejects(accessMiddleware(event("/d/doc")), error => error.status === 403)
+  await assert.rejects(accessMiddleware(event("/d/doc")), (error) => error.status === 403)
   for (const identity of [who, { ...who, userId: "admin", role: "admin" }]) {
     state.who = identity
     await requireBlobAccess(event("/f/doc.md"), "doc.md")
     await accessMiddleware(event("/d/doc"))
   }
   state.who = null
-  for (const approval of ["UPDATE user SET share_approved_at = 1", "UPDATE user SET share_approved_at = NULL, role = 'admin'"]) {
+  for (const approval of [
+    "UPDATE user SET share_approved_at = 1",
+    "UPDATE user SET share_approved_at = NULL, role = 'admin'",
+  ]) {
     sql.exec(approval)
     queries.length = 0
     await requireBlobAccess(event("/f/doc.md"), "doc.md")
@@ -156,14 +174,18 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
   await dropDetail(await findDrop("doc"), null, "https://drop.example")
   assert.ok(state.entries.size)
   const reads = calls.get
-  for (const blocked of ["UPDATE drops SET quarantined_at = 1", "UPDATE drops SET quarantined_at = NULL, owner_id = 'deleted-owner'"]) {
+  for (const blocked of [
+    "UPDATE drops SET quarantined_at = 1",
+    "UPDATE drops SET quarantined_at = NULL, owner_id = 'deleted-owner'",
+  ]) {
     sql.exec(blocked)
     for (const identity of [null, who, { ...who, role: "admin" }]) {
       state.who = identity
       for (const path of [`/f/${key}`, `/f/${key}?raw`, "/d/doc", "/d/app"])
         for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
       await missing(() => markdownMiddleware(event(`/f/${key}`)))
-      for (const id of ["doc", "app"]) await missing(async () => dropDetail(await findDrop(id), identity, "https://drop.example"))
+      for (const id of ["doc", "app"])
+        await missing(async () => dropDetail(await findDrop(id), identity, "https://drop.example"))
     }
   }
   assert.equal(calls.get, reads)
@@ -173,7 +195,11 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
 test("reports quarantine code images while image access stays one query", async () => {
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
   sql.prepare("INSERT INTO code_images VALUES (?, ?, ?)").run(imageKey, "owner", Date.now() + 300000)
-  sql.prepare("INSERT INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)").run(imageKey, `/f/${imageKey}`)
+  sql
+    .prepare(
+      "INSERT INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)",
+    )
+    .run(imageKey, `/f/${imageKey}`)
   queries.length = 0
   await missing(() => requireBlobAccess(event(`/f/${imageKey}`), imageKey))
   assert.equal(queries.length, 1)
@@ -248,37 +274,56 @@ test("app publishing keeps only the latest file set, as the docs promise", async
   const first = await publishApp(who, { files: { "index.html": "first", "old.js": "old", "keep.css": "a{}" } })
   const keys = () => [...state.objects.keys()]
   const firstKeys = keys()
-  const keepKey = firstKeys.find(key => key.endsWith("/keep.css"))
-  const next = await publishApp(who, { id: first.id, files: { "index.html": "second", "new.js": "new" }, removes: ["old.js"] })
+  const keepKey = firstKeys.find((key) => key.endsWith("/keep.css"))
+  const next = await publishApp(who, {
+    id: first.id,
+    files: { "index.html": "second", "new.js": "new" },
+    removes: ["old.js"],
+  })
   assert.equal(next.id, first.id)
   assert.equal(next.version, 2)
   // Replaced and removed files lose their blobs; the untouched one keeps its blob and isn't written again.
-  assert.ok(firstKeys.filter(key => key !== keepKey).every(key => !state.objects.has(key)))
+  assert.ok(firstKeys.filter((key) => key !== keepKey).every((key) => !state.objects.has(key)))
   assert.ok(state.objects.has(keepKey))
   const detail = await dropDetail(await findDrop(first.id), who, "https://drop.example")
   assert.deepEqual(detail.files, { "index.html": "second", "keep.css": "a{}", "new.js": "new" })
   assert.equal(detail.versions.length, 1)
   for (const path of ["content/docs/index.md", "content/docs/review.md", "skills/vitehub-drop/SKILL.md"])
-    assert.match(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"), /[Aa]pps? keeps? only|[Oo]nly the latest app|[Aa]pps? keeps? (?:only )?(?:their|its) latest/)
+    assert.match(
+      readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"),
+      /[Aa]pps? keeps? only|[Oo]nly the latest app|[Aa]pps? keeps? (?:only )?(?:their|its) latest/,
+    )
 })
 
 test("an app's next version deletes a file only when removes names it", async () => {
   const app = await publishApp(who, { files: { "index.html": "one", "data.json": "{}" } })
   const before = [...state.objects.keys()]
   await assert.rejects(publishApp(who, { id: app.id, files: {}, removes: ["gone.js"] }), /gone\.js, which isn't in v1/)
-  await assert.rejects(publishApp(who, { id: app.id, files: { "data.json": "[]" }, removes: ["data.json"] }), /removes and files both name data\.json/)
+  await assert.rejects(
+    publishApp(who, { id: app.id, files: { "data.json": "[]" }, removes: ["data.json"] }),
+    /removes and files both name data\.json/,
+  )
   await assert.rejects(publishApp(who, { id: app.id, files: {}, removes: ["index.html"] }), /without an index\.html/)
   await assert.rejects(publishApp(who, { id: app.id, files: {} }), /Send the files that changed/)
   assert.deepEqual([...state.objects.keys()], before)
   const v2 = await publishApp(who, { id: app.id, files: { "index.html": "two" } })
   assert.equal(v2.version, 2)
-  assert.deepEqual((await dropDetail(await findDrop(app.id), who, "https://drop.example")).files, { "data.json": "{}", "index.html": "two" })
+  assert.deepEqual((await dropDetail(await findDrop(app.id), who, "https://drop.example")).files, {
+    "data.json": "{}",
+    "index.html": "two",
+  })
   await publishApp(who, { id: app.id, files: {}, removes: ["data.json"] })
-  assert.deepEqual((await dropDetail(await findDrop(app.id), who, "https://drop.example")).files, { "index.html": "two" })
+  assert.deepEqual((await dropDetail(await findDrop(app.id), who, "https://drop.example")).files, {
+    "index.html": "two",
+  })
 })
 
 test("new code images record an owner and become unavailable when they are banned", async () => {
-  const result = await createCodeImage(event("/api/code", "POST"), who, { code: "const value = 1", format: "svg", scale: 4 })
+  const result = await createCodeImage(event("/api/code", "POST"), who, {
+    code: "const value = 1",
+    format: "svg",
+    scale: 4,
+  })
   const key = new URL(result.url).pathname.slice(3)
   assert.equal(sql.prepare("SELECT owner_id FROM code_images WHERE blob_key = ?").get(key).owner_id, who.userId)
   await requireBlobAccess(event(`/f/${key}`), key)
@@ -286,22 +331,27 @@ test("new code images record an owner and become unavailable when they are banne
   await missing(() => requireBlobAccess(event(`/f/${key}`), key))
 })
 
-
 test("quota publishing keeps share review and uses one owner burst bucket for docs, apps and images", async () => {
   state.quotasEnabled = true
   state.shareApproval = true
   const { getUsage, quotaToolResult } = await import("../../server/utils/quotas.ts")
-  const first = await createDocDrop(who, { filename: "review.md", bytes: new TextEncoder().encode("# Review"), share: "public_comment" }, event("/mcp", "POST"))
+  const first = await createDocDrop(
+    who,
+    { filename: "review.md", bytes: new TextEncoder().encode("# Review"), share: "public_comment" },
+    event("/mcp", "POST"),
+  )
   assert.equal(first.shareReview, "pending")
   assert.equal((await findDrop(first.id)).shareReview, "pending")
   assert.equal((await getUsage(who.userId)).writes.used, 1)
   await publishApp(who, { files: { "index.html": "app" } }, event("/mcp", "POST"))
   await createCodeImage(event("/mcp", "POST"), who, { code: "const x = 1", format: "svg", scale: 4 })
   assert.equal((await getUsage(who.userId)).writes.used, 3)
-  assert.equal(state.bursts.filter(call => call.bucket === "file-upload").length, 3)
-  assert.ok(state.bursts.every(call => call.key === who.userId))
+  assert.equal(state.bursts.filter((call) => call.bucket === "file-upload").length, 3)
+  assert.ok(state.bursts.every((call) => call.key === who.userId))
   state.failBurst = true
-  const result = await quotaToolResult(() => createDocDrop(who, { filename: "denied.md", bytes: new TextEncoder().encode("denied") }, event("/mcp", "POST")))
+  const result = await quotaToolResult(() =>
+    createDocDrop(who, { filename: "denied.md", bytes: new TextEncoder().encode("denied") }, event("/mcp", "POST")),
+  )
   assert.equal(result.isError, true)
   assert.equal(result.structuredContent.quota.unit, "burstPublishes")
   assert.equal((await getUsage(who.userId)).writes.used, 3)

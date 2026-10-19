@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
+import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { sql, state, migrate, reset, insertDrop, who, objects } from "../cost/harness.mjs"
@@ -26,23 +26,47 @@ beforeEach(() => {
   state.who = agent
 })
 
-const server = createMcpHandler({ name: "drop-test", version: "1", origin: false, tools: [publish, readDrop, listTool, updateTool, createFolder] })
+const server = createMcpHandler({
+  name: "drop-test",
+  version: "1",
+  origin: false,
+  tools: [publish, readDrop, listTool, updateTool, createFolder],
+})
 async function call(tool, input) {
-  const request = new H3Event(new Request("https://drop.example/mcp", {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool.name, arguments: input } }),
-  }))
+  const request = new H3Event(
+    new Request("https://drop.example/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2025-06-18",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: tool.name, arguments: input },
+      }),
+    }),
+  )
   request.context.log = { set() {}, error() {}, warn() {} }
   const text = await (await toResponse(await server(request), request)).text()
   const body = JSON.parse(text.startsWith("{") ? text : text.match(/^data: (.+)$/m)[1])
   if (body.error) return { isError: true, message: body.error.message }
   const result = body.result
-  return result.isError ? { isError: true, message: result.content.map(block => block.text).join(" ") } : { ...result.structuredContent, text: result.content[0].text }
+  return result.isError
+    ? { isError: true, message: result.content.map((block) => block.text).join(" ") }
+    : { ...result.structuredContent, text: result.content[0].text }
 }
 
 function request(path, { method = "GET", body, id, headers = {} } = {}) {
-  const event = new H3Event(new Request(`https://drop.example${path}`, { method, headers: { ...headers, ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined }))
+  const event = new H3Event(
+    new Request(`https://drop.example${path}`, {
+      method,
+      headers: { ...headers, ...(body ? { "content-type": "application/json" } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+  )
   event.context.log = { set() {}, error() {} }
   if (id) event.context.params = { id }
   return event
@@ -54,12 +78,17 @@ const folder = async (title, extra = {}) => {
   return created
 }
 const doc = async (markdown, extra = {}) => {
-  const published = await call(publish, { markdown, note: "Draft", ...(extra.folder ? {} : { lifetime: "review" }), ...extra })
+  const published = await call(publish, {
+    markdown,
+    note: "Draft",
+    ...(extra.folder ? {} : { lifetime: "review" }),
+    ...extra,
+  })
   assert.ok(!published.isError, published.message)
   return published
 }
 const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]).toString("base64")
-const exists = id => Boolean(sql.prepare("SELECT id FROM drops WHERE id = ?").get(id))
+const exists = (id) => Boolean(sql.prepare("SELECT id FROM drops WHERE id = ?").get(id))
 
 test("a drop in a folder takes the widest share on its path, and can be shared wider on its own", async () => {
   const review = await folder("Review")
@@ -79,7 +108,11 @@ test("a drop in a folder takes the widest share on its path, and can be shared w
   const own = await call(updateTool, { id: plan.id, share: "public_comment" })
   assert.equal(own.share, "public_comment")
   assert.equal(permissions(await findDrop(plan.id), null).comment, true)
-  assert.equal(sql.prepare("SELECT share FROM drops WHERE id = ?").get(review.id).share, "public", "the folder's own share is untouched")
+  assert.equal(
+    sql.prepare("SELECT share FROM drops WHERE id = ?").get(review.id).share,
+    "public",
+    "the folder's own share is untouched",
+  )
 
   await call(updateTool, { id: review.id, share: "private" })
   await call(updateTool, { id: plan.id, share: "private" })
@@ -111,20 +144,33 @@ test("quarantine, a pending share review, and an owner ban above a drop hide it"
   assert.equal(permissions(await findDrop(plan.id), null).view, false)
 })
 
-test("a folder's lifetime and Trash apply to everything below it: trash, restore, and purge the subtree", async (t) => {
+test("a folder's lifetime and Trash apply to everything below it: trash, restore, and purge the subtree", async () => {
   const now = Date.UTC(2026, 9, 17, 12)
-  t.mock.timers.enable({ apis: ["Date"], now })
+  vi.useFakeTimers({ toFake: ["Date"], now })
   const review = await folder("Review", { lifetime: "temporary" })
   const inner = await folder("Inner", { folder: review.id })
   const shot = await call(publish, { file: { name: "before.png", base64: png }, note: "Before", folder: inner.id })
   const plan = await doc(`# Plan\n\n![before](${shot.fileUrl})`, { folder: inner.id })
-  const embedded = await call(publish, { file: { name: "embedded.png", base64: png }, note: "Embedded", lifetime: "temporary" })
-  const head = (await call(publish, { previous: plan.id, markdown: `# Plan\n\n![a](${embedded.fileUrl})`, note: "With a picture" })).id
-  assert.equal(sql.prepare("SELECT parent_id FROM drops WHERE id = ?").get(shot.id).parent_id, inner.id, "a file in a folder stays there when a doc embeds it")
+  const embedded = await call(publish, {
+    file: { name: "embedded.png", base64: png },
+    note: "Embedded",
+    lifetime: "temporary",
+  })
+  const head = (
+    await call(publish, { previous: plan.id, markdown: `# Plan\n\n![a](${embedded.fileUrl})`, note: "With a picture" })
+  ).id
+  assert.equal(
+    sql.prepare("SELECT parent_id FROM drops WHERE id = ?").get(shot.id).parent_id,
+    inner.id,
+    "a file in a folder stays there when a doc embeds it",
+  )
   assert.equal(sql.prepare("SELECT parent_id FROM drops WHERE id = ?").get(embedded.id).parent_id, head)
 
   assert.equal((await call(readDrop, { id: head })).lifetime, "temporary", "it lives as long as the folder at the top")
-  assert.match((await call(updateTool, { id: head, lifetime: "keep", keepReason: "x" })).message, /lives as long as its folder/)
+  assert.match(
+    (await call(updateTool, { id: head, lifetime: "keep", keepReason: "x" })).message,
+    /lives as long as its folder/,
+  )
 
   // Visiting anything inside renews the folder at the top.
   sql.prepare("UPDATE drops SET last_accessed_at = ? WHERE id = ?").run(now - 10 * DAY_MS, review.id)
@@ -139,7 +185,11 @@ test("a folder's lifetime and Trash apply to everything below it: trash, restore
   state.who = who
   await call(updateTool, { id: review.id, trash: true })
   for (const id of [inner.id, shot.id, head, embedded.id]) assert.equal((await findDrop(id)).expired, true, id)
-  assert.deepEqual((await listDrops(who, undefined, { trash: true })).map(drop => drop.id), [review.id], "only the top-most node lists in the Trash")
+  assert.deepEqual(
+    (await listDrops(who, undefined, { trash: true })).map((drop) => drop.id),
+    [review.id],
+    "only the top-most node lists in the Trash",
+  )
   assert.match((await call(updateTool, { id: head, trash: false })).message, /It's in Review, which is in the Trash/)
 
   await call(updateTool, { id: review.id, trash: false })
@@ -147,12 +197,15 @@ test("a folder's lifetime and Trash apply to everything below it: trash, restore
 
   // One drop trashed on its own lists in the Trash by itself and comes back alone.
   await call(updateTool, { id: shot.id, trash: true })
-  assert.deepEqual((await listDrops(who, undefined, { trash: true })).map(drop => drop.id), [shot.id])
+  assert.deepEqual(
+    (await listDrops(who, undefined, { trash: true })).map((drop) => drop.id),
+    [shot.id],
+  )
   assert.equal((await findDrop(head)).expired, false)
   await call(updateTool, { id: shot.id, trash: false })
 
   await call(updateTool, { id: review.id, trash: true })
-  t.mock.timers.tick(16 * DAY_MS)
+  vi.advanceTimersByTime(16 * DAY_MS)
   await cleanup.handler({ scheduledAt: new Date(Date.now()) })
   for (const id of [review.id, inner.id, shot.id, plan.id, head, embedded.id]) assert.equal(exists(id), false, id)
   assert.equal(objects.size, 0, "every blob below the folder is gone")
@@ -162,8 +215,14 @@ test("folders nest eight levels deep and never inside themselves", async () => {
   const path = [await folder("Level 1")]
   for (let level = 2; level <= 8; level++) path.push(await folder(`Level ${level}`, { folder: path.at(-1).id }))
   assert.match((await call(createFolder, { title: "Level 9", folder: path.at(-1).id })).message, /nest 8 levels deep/)
-  assert.match((await call(publish, { markdown: "# Deep", note: "x", folder: path.at(-1).id })).message, /nest 8 levels deep/)
-  assert.ok(!(await call(publish, { markdown: "# Deep", note: "x", folder: path[6].id })).isError, "a doc fits at depth 8")
+  assert.match(
+    (await call(publish, { markdown: "# Deep", note: "x", folder: path.at(-1).id })).message,
+    /nest 8 levels deep/,
+  )
+  assert.ok(
+    !(await call(publish, { markdown: "# Deep", note: "x", folder: path[6].id })).isError,
+    "a doc fits at depth 8",
+  )
 
   assert.match((await call(updateTool, { id: path[0].id, folder: path[0].id })).message, /can't go inside itself/)
   assert.match((await call(updateTool, { id: path[0].id, folder: path[3].id })).message, /can't go inside itself/)
@@ -200,37 +259,74 @@ test("slugs are unique among a folder's drops, like file names", async () => {
 test("folder search finds what's anywhere below the folder and nothing outside it", async () => {
   const review = await folder("Login review", { slug: "login-review" })
   const shots = await folder("Screenshots", { folder: review.id })
-  const before = await call(publish, { file: { name: "before.png", base64: png }, title: "Login before", note: "x", folder: shots.id })
-  const after = await call(publish, { file: { name: "after.png", base64: png }, title: "Login after", note: "x", folder: shots.id })
+  const before = await call(publish, {
+    file: { name: "before.png", base64: png },
+    title: "Login before",
+    note: "x",
+    folder: shots.id,
+  })
+  const after = await call(publish, {
+    file: { name: "after.png", base64: png },
+    title: "Login after",
+    note: "x",
+    folder: shots.id,
+  })
   await doc("# Login notes", { folder: review.id })
-  await call(publish, { file: { name: "login-other.png", base64: png }, title: "Login elsewhere", note: "x", lifetime: "review" })
+  await call(publish, {
+    file: { name: "login-other.png", base64: png },
+    title: "Login elsewhere",
+    note: "x",
+    lifetime: "review",
+  })
 
   state.who = who
   const top = await listHandler(request("/api/drops"))
-  assert.deepEqual(top.map(drop => drop.title).sort(), ["Login elsewhere", "Login review"], "the top lists folders, not what's in them")
-  assert.equal(top.find(drop => drop.kind === "folder").items, 2)
+  assert.deepEqual(
+    top.map((drop) => drop.title).sort(),
+    ["Login elsewhere", "Login review"],
+    "the top lists folders, not what's in them",
+  )
+  assert.equal(top.find((drop) => drop.kind === "folder").items, 2)
 
   const children = await listHandler(request(`/api/drops?folder=${review.id}`))
-  assert.deepEqual(children.map(drop => drop.title).sort(), ["Login notes", "Screenshots"])
+  assert.deepEqual(children.map((drop) => drop.title).sort(), ["Login notes", "Screenshots"])
 
   const found = await listHandler(request(`/api/drops?folder=${review.url.match(/\/d\/([^/]+)/)[1]}&q=login%20before`))
-  assert.deepEqual(found.map(drop => drop.id), [before.id])
-  assert.deepEqual(found[0].path.map(crumb => crumb.title), ["Screenshots"], "results say where they sit below the folder")
+  assert.deepEqual(
+    found.map((drop) => drop.id),
+    [before.id],
+  )
+  assert.deepEqual(
+    found[0].path.map((crumb) => crumb.title),
+    ["Screenshots"],
+    "results say where they sit below the folder",
+  )
   assert.match(found[0].thumbnail, /^\/f\/[0-9a-f-]{36}\.png$/)
 
   const everywhere = await listHandler(request("/api/drops?q=login"))
-  assert.deepEqual(everywhere.map(drop => drop.title).sort(), ["Login after", "Login before", "Login elsewhere", "Login notes", "Login review"], "a search without a folder looks at every depth")
+  assert.deepEqual(
+    everywhere.map((drop) => drop.title).sort(),
+    ["Login after", "Login before", "Login elsewhere", "Login notes", "Login review"],
+    "a search without a folder looks at every depth",
+  )
 
   state.who = agent
   const listed = await call(listTool, { folder: review.url, query: "after" })
-  assert.deepEqual(listed.drops.map(drop => drop.id), [after.id])
+  assert.deepEqual(
+    listed.drops.map((drop) => drop.id),
+    [after.id],
+  )
   assert.equal(listed.drops[0].folder, "Screenshots")
   assert.match(listed.drops[0].fileUrl, /^https:\/\/drop\.example\/f\//)
   assert.match((await call(listTool, { folder: "nope" })).message, /No folder with id nope/)
 })
 
 test("an agent files its work in a folder, reads it, and moves a drop out", async () => {
-  const review = await folder("PR 12 evidence", { lifetime: "keep", keepReason: "Evidence for vite-hub/drop#12.", share: "public" })
+  const review = await folder("PR 12 evidence", {
+    lifetime: "keep",
+    keepReason: "Evidence for vite-hub/drop#12.",
+    share: "public",
+  })
   assert.equal(review.kind, "folder")
   assert.equal(review.share, "public")
   assert.match(review.text, /folder, 0 items/)
@@ -239,26 +335,41 @@ test("an agent files its work in a folder, reads it, and moves a drop out", asyn
   assert.equal(shot.sharedThrough, "PR 12 evidence")
 
   const read = await call(readDrop, { id: review.id })
-  assert.deepEqual(read.children.map(child => [child.id, child.kind]), [[shot.id, "image"]])
+  assert.deepEqual(
+    read.children.map((child) => [child.id, child.kind]),
+    [[shot.id, "image"]],
+  )
   assert.match(read.text, /## In this folder\n- before/)
   assert.doesNotMatch(read.text, /## Content/)
   assert.equal((await call(readDrop, { id: shot.id })).folder, "PR 12 evidence")
 
-  assert.deepEqual((await call(listTool, {})).drops.map(drop => drop.id), [review.id])
+  assert.deepEqual(
+    (await call(listTool, {})).drops.map((drop) => drop.id),
+    [review.id],
+  )
   const out = await call(updateTool, { id: shot.id, folder: "" })
   assert.equal(out.lifetime, "keep", "it keeps the lifetime it lived by")
   assert.equal(out.share, "private", "out of the folder, only its own share is left")
-  assert.deepEqual((await call(listTool, {})).drops.map(drop => drop.id).sort(), [review.id, shot.id].sort())
+  assert.deepEqual((await call(listTool, {})).drops.map((drop) => drop.id).sort(), [review.id, shot.id].sort())
 
   // People make folders too, and the drop page answers with its children and the way back up.
   state.who = who
-  const inner = await folderHandler(request("/api/folders", { method: "POST", body: { title: "Inner", folder: review.id } }))
+  const inner = await folderHandler(
+    request("/api/folders", { method: "POST", body: { title: "Inner", folder: review.id } }),
+  )
   await call(updateTool, { id: shot.id, folder: inner.id })
   const detail = await detailHandler(request(`/api/drops/${shot.id}`, { id: shot.id }))
-  assert.deepEqual(detail.ancestors.map(crumb => crumb.title), ["PR 12 evidence", "Inner"])
+  assert.deepEqual(
+    detail.ancestors.map((crumb) => crumb.title),
+    ["PR 12 evidence", "Inner"],
+  )
   state.who = null
   const visitor = await detailHandler(request(`/api/drops/${inner.id}`, { id: inner.id }))
-  assert.deepEqual(visitor.children.map(child => child.id), [shot.id], "a shared folder opens for visitors, with what's in it")
+  assert.deepEqual(
+    visitor.children.map((child) => child.id),
+    [shot.id],
+    "a shared folder opens for visitors, with what's in it",
+  )
   await requireBlobAccess(request(shot.fileUrl.replace("https://drop.example", "")), shot.fileUrl.split("/f/")[1])
 })
 
@@ -283,7 +394,7 @@ test("Shared with me lists a shared folder once, and a drop shared on its own fr
   const alone = await doc("# Alone", { folder: hidden.id, share: "team" })
   const mate = { ...who, userId: "mate", name: "Mate" }
   const shared = await listSharedWithMe(mate)
-  assert.deepEqual(shared.map(drop => drop.title).sort(), ["Alone", "Team folder"])
+  assert.deepEqual(shared.map((drop) => drop.title).sort(), ["Alone", "Team folder"])
   state.who = mate
   const detail = await detailHandler(request(`/api/drops/${alone.id}`, { id: alone.id }))
   assert.deepEqual(detail.ancestors, [], "the private folder's name stays private")
@@ -292,12 +403,25 @@ test("Shared with me lists a shared folder once, and a drop shared on its own fr
 test("a site's screenshots hang off it like a doc's embedded files", async () => {
   state.who = who
   insertDrop("site", { kind: "site", blob_key: null, visibility: "private", site_url: "https://example.com" })
-  insertDrop("shot", { kind: "image", blob_key: "shot.png", filename: "shot.png", visibility: "private", parent_id: "site" })
+  insertDrop("shot", {
+    kind: "image",
+    blob_key: "shot.png",
+    filename: "shot.png",
+    visibility: "private",
+    parent_id: "site",
+  })
   const shot = await findDrop("shot")
   assert.equal(shot.parentId, "site")
-  await assert.rejects(updateDrop(shot, who, { title: "x" }), error => error.status === 404)
-  assert.deepEqual((await listDrops(who)).map(drop => drop.id), ["site"])
-  assert.deepEqual((await listDrops(who, undefined, { query: "shot" })).map(drop => drop.id), [], "search skips attached files")
+  await assert.rejects(updateDrop(shot, who, { title: "x" }), (error) => error.status === 404)
+  assert.deepEqual(
+    (await listDrops(who)).map((drop) => drop.id),
+    ["site"],
+  )
+  assert.deepEqual(
+    (await listDrops(who, undefined, { query: "shot" })).map((drop) => drop.id),
+    [],
+    "search skips attached files",
+  )
   state.quotasEnabled = true
   assert.equal((await getUsage("owner")).drops.used, 1)
 })
@@ -307,8 +431,11 @@ test("an upload goes into a folder, where it shares and lives with the folder", 
   const upload = async (form) => {
     const event = new H3Event(new Request("https://drop.example/api/files", { method: "POST", body: form }))
     event.context.log = { set() {}, error() {}, warn() {} }
-    try { return await filesHandler(event) }
-    catch (error) { return { status: error.status, message: error.message } }
+    try {
+      return await filesHandler(event)
+    } catch (error) {
+      return { status: error.status, message: error.message }
+    }
   }
   const box = await folder("Screenshots", { share: "public_comment" })
   state.who = { ...who }

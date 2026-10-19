@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
+import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { insertDrop, migrate, objects, reset, sql, state, who } from "../cost/harness.mjs"
@@ -25,7 +25,7 @@ const { default: updateDrop } = await import("../../server/mcp/tools/update_drop
 
 const SITE = "https://pr12-acme.preview.quiver.dk"
 const PATTERN = "https://*.preview.quiver.dk"
-const PNG = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13])
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
 
 migrate()
 beforeEach(() => {
@@ -35,7 +35,15 @@ beforeEach(() => {
 })
 
 const ada = { ...who, userId: "ada", name: "Ada", email: "ada@example.com", actorName: "Ada" }
-const site = (id = "site", overrides = {}) => insertDrop(id, { kind: "site", blob_key: null, filename: "pr12-acme.preview.quiver.dk", link: `${id}link`, site_url: SITE, ...overrides })
+const site = (id = "site", overrides = {}) =>
+  insertDrop(id, {
+    kind: "site",
+    blob_key: null,
+    filename: "pr12-acme.preview.quiver.dk",
+    link: `${id}link`,
+    site_url: SITE,
+    ...overrides,
+  })
 
 function request(path, { method = "GET", headers = {}, body, id = "site" } = {}) {
   const event = new H3Event(new Request(`https://drop.example${path}`, { method, headers, body }))
@@ -43,13 +51,16 @@ function request(path, { method = "GET", headers = {}, body, id = "site" } = {})
   event.context.params = { id }
   return event
 }
-const post = (path, body) => request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+const post = (path, body) =>
+  request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
 /** What the browser gets back: handlers return a Response, a value, or throw. */
 async function answer(handler, event) {
-  const value = await Promise.resolve().then(() => handler(event)).catch(error => error)
+  const value = await Promise.resolve()
+    .then(() => handler(event))
+    .catch((error) => error)
   return toResponse(value, event)
 }
-const json = async response => JSON.parse(await response.text())
+const json = async (response) => JSON.parse(await response.text())
 
 /** The connect popup's two steps: the site drops for the page's origin, then a token for one of them. */
 async function sites(origin = SITE) {
@@ -66,25 +77,69 @@ async function token(origin = SITE, { name, pick = 0 } = {}) {
 
 function comment(bearer, data, { screenshot, origin = SITE } = {}) {
   const form = new FormData()
-  form.append("data", JSON.stringify({ body: "Make the button bigger", page: "/pricing?plan=pro#faq", selector: "main > button", label: "button \"Buy\"", ox: 100, oy: 200, ow: 300, oh: 150, viewport: { width: 1440, height: 900 }, ...data }))
+  form.append(
+    "data",
+    JSON.stringify({
+      body: "Make the button bigger",
+      page: "/pricing?plan=pro#faq",
+      selector: "main > button",
+      label: 'button "Buy"',
+      ox: 100,
+      oy: 200,
+      ow: 300,
+      oh: 150,
+      viewport: { width: 1440, height: 900 },
+      ...data,
+    }),
+  )
   if (screenshot) form.append("screenshot", new Blob([screenshot]), "screenshot")
-  return answer(commentsPost, request("/api/review/comments", { method: "POST", headers: { origin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) }, body: form }))
+  return answer(
+    commentsPost,
+    request("/api/review/comments", {
+      method: "POST",
+      headers: { origin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) },
+      body: form,
+    }),
+  )
 }
 const count = async (bearer, page, origin = SITE) =>
-  answer(commentsGet, request(`/api/review/comments?page=${encodeURIComponent(page)}`, { headers: { origin, authorization: `Bearer ${bearer}` } }))
+  answer(
+    commentsGet,
+    request(`/api/review/comments?page=${encodeURIComponent(page)}`, {
+      headers: { origin, authorization: `Bearer ${bearer}` },
+    }),
+  )
 
-const server = createMcpHandler({ name: "drop-test", version: "1", origin: false, tools: [publish, readDrop, updateDrop] })
+const server = createMcpHandler({
+  name: "drop-test",
+  version: "1",
+  origin: false,
+  tools: [publish, readDrop, updateDrop],
+})
 async function call(tool, input) {
-  const event = new H3Event(new Request("https://drop.example/mcp", {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool.name, arguments: input } }),
-  }))
+  const event = new H3Event(
+    new Request("https://drop.example/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2025-06-18",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: tool.name, arguments: input },
+      }),
+    }),
+  )
   event.context.log = { set() {}, error() {}, warn() {} }
   const text = await (await toResponse(await server(event), event)).text()
   const body = JSON.parse(text.startsWith("{") ? text : text.match(/^data: (.+)$/m)[1])
   if (body.error) return { isError: true, message: body.error.message }
-  return body.result.isError ? { isError: true, message: body.result.content.map(block => block.text).join(" ") } : body.result
+  return body.result.isError
+    ? { isError: true, message: body.result.content.map((block) => block.text).join(" ") }
+    : body.result
 }
 
 test("a site's address is one origin, or a pattern of one label: https, or http on this computer", () => {
@@ -95,51 +150,99 @@ test("a site's address is one origin, or a pattern of one label: https, or http 
   assert.equal(siteAddress("https://*.Preview.Quiver.dk/dashboard"), PATTERN)
   assert.equal(siteAddress("https://*.preview.quiver.dk:8443"), `${PATTERN}:8443`)
   assert.equal(siteAddress("http://*.localhost:3000"), "http://*.localhost:3000")
-  for (const bad of ["http://preview.quiver.dk", "http://*.preview.quiver.dk", "https://user:pass@quiver.dk", "javascript:alert(1)", "not a url",
-    "https://*.dk", "https://*.*.quiver.dk", "https://pr.*.quiver.dk", "https://*.0.0.1", "https://*.quiver.dk@evil.com", "*.quiver.dk"])
+  for (const bad of [
+    "http://preview.quiver.dk",
+    "http://*.preview.quiver.dk",
+    "https://user:pass@quiver.dk",
+    "javascript:alert(1)",
+    "not a url",
+    "https://*.dk",
+    "https://*.*.quiver.dk",
+    "https://pr.*.quiver.dk",
+    "https://*.0.0.1",
+    "https://*.quiver.dk@evil.com",
+    "*.quiver.dk",
+  ])
     assert.equal(siteAddress(bad), null, bad)
 
   assert.ok(siteMatches(PATTERN, SITE))
   assert.ok(siteMatches(PATTERN, "https://main.preview.quiver.dk"))
   assert.ok(siteMatches(SITE, SITE))
   assert.ok(siteMatches("http://*.localhost:3000", "http://app.localhost:3000"))
-  for (const origin of ["https://evil.com", "https://a.b.preview.quiver.dk", "https://preview.quiver.dk", "https://xpreview.quiver.dk", "https://pr1.preview.quiver.dk.evil.com",
-    "http://pr1.preview.quiver.dk", "https://pr1.preview.quiver.dk:8443", "https://pr1.preview.quiver.dk/", "null", ""])
+  for (const origin of [
+    "https://evil.com",
+    "https://a.b.preview.quiver.dk",
+    "https://preview.quiver.dk",
+    "https://xpreview.quiver.dk",
+    "https://pr1.preview.quiver.dk.evil.com",
+    "http://pr1.preview.quiver.dk",
+    "https://pr1.preview.quiver.dk:8443",
+    "https://pr1.preview.quiver.dk/",
+    "null",
+    "",
+  ])
     assert.equal(siteMatches(PATTERN, origin), false, origin)
   assert.equal(siteMatches(SITE, "https://pr13-acme.preview.quiver.dk"), false)
 
   assert.deepEqual(siteAddressesFor(SITE), [SITE, PATTERN])
-  assert.deepEqual(siteAddressesFor("https://quiver.dk"), ["https://quiver.dk"], "no pattern covers a whole top-level domain")
+  assert.deepEqual(
+    siteAddressesFor("https://quiver.dk"),
+    ["https://quiver.dk"],
+    "no pattern covers a whole top-level domain",
+  )
   assert.deepEqual(siteAddressesFor("http://127.0.0.1:5173"), ["http://127.0.0.1:5173"])
   assert.deepEqual(siteAddressesFor("null"), [])
 })
 
 test("an agent creates one site drop for every preview, and the tag it gets carries no key", async () => {
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
-  const created = await call(publish, { site: { url: PATTERN }, title: "Acme portal previews", slug: "acme-previews", share: "public_comment", note: "Review the previews", lifetime: "review" })
+  const created = await call(publish, {
+    site: { url: PATTERN },
+    title: "Acme portal previews",
+    slug: "acme-previews",
+    share: "public_comment",
+    note: "Review the previews",
+    lifetime: "review",
+  })
   const drop = created.structuredContent
   assert.equal(drop.kind, "site")
   assert.equal(drop.siteUrl, PATTERN)
   assert.equal(drop.share, "public_comment")
   const row = sql.prepare("SELECT link, site_url, size, blob_key FROM drops WHERE id = ?").get(drop.id)
   assert.deepEqual({ ...row }, { link: row.link, site_url: PATTERN, size: 0, blob_key: null })
-  assert.equal(drop.script, "<script src=\"https://drop.example/review.js\" defer></script>")
+  assert.equal(drop.script, '<script src="https://drop.example/review.js" defer></script>')
   assert.equal(drop.bookmarklet, reviewBookmarklet("https://drop.example"))
-  assert.doesNotMatch(created.content[0].text.split("\n\n")[1], new RegExp(row.link), "the link is the agent's, not the tag's")
+  assert.doesNotMatch(
+    created.content[0].text.split("\n\n")[1],
+    new RegExp(row.link),
+    "the link is the agent's, not the tag's",
+  )
   assert.match(created.content[0].text, /preview builds only/)
   assert.match(created.content[0].text, /bookmarklet/)
 
-  assert.match((await call(publish, { site: { url: "http://staging.quiver.dk" }, note: "x", lifetime: "review" })).message, /https, or http on localhost/)
-  assert.match((await call(publish, { site: { url: "https://*.dk" }, note: "x", lifetime: "review" })).message, /can't be reviewed/)
+  assert.match(
+    (await call(publish, { site: { url: "http://staging.quiver.dk" }, note: "x", lifetime: "review" })).message,
+    /https, or http on localhost/,
+  )
+  assert.match(
+    (await call(publish, { site: { url: "https://*.dk" }, note: "x", lifetime: "review" })).message,
+    /can't be reviewed/,
+  )
   assert.match((await call(publish, { site: { url: SITE }, previous: drop.id, note: "x" })).message, /no versions/)
-  assert.match((await call(publish, { site: { url: SITE }, markdown: "# A", note: "x", lifetime: "review" })).message, /exactly one/)
+  assert.match(
+    (await call(publish, { site: { url: SITE }, markdown: "# A", note: "x", lifetime: "review" })).message,
+    /exactly one/,
+  )
   assert.match((await call(publish, { previous: drop.id, markdown: "# A", note: "x" })).message, /previous is a site/)
 })
 
 test("people create a site review in the app, at the top or in a folder, within their plan", async () => {
   state.who = who
   const top = await newSite(post("/api/sites", { url: ` ${PATTERN}/ `, title: "Acme previews" }))
-  assert.deepEqual({ kind: top.kind, title: top.title, share: top.share, lifetime: top.lifetime, parentId: top.parentId }, { kind: "site", title: "Acme previews", share: "private", lifetime: "review", parentId: null })
+  assert.deepEqual(
+    { kind: top.kind, title: top.title, share: top.share, lifetime: top.lifetime, parentId: top.parentId },
+    { kind: "site", title: "Acme previews", share: "private", lifetime: "review", parentId: null },
+  )
   assert.equal(sql.prepare("SELECT site_url FROM drops WHERE id = ?").get(top.id).site_url, PATTERN)
   const named = await newSite(post("/api/sites", { url: "http://localhost:3000" }))
   assert.equal(named.title, "localhost:3000", "named after its host by default")
@@ -155,7 +258,11 @@ test("people create a site review in the app, at the top or in a folder, within 
     assert.equal(response.status, 400, url)
   }
   state.who = ada
-  assert.equal((await answer(newSite, post("/api/sites", { url: SITE, folder: folder.id }))).status, 404, "only into your own folders")
+  assert.equal(
+    (await answer(newSite, post("/api/sites", { url: SITE, folder: folder.id }))).status,
+    404,
+    "only into your own folders",
+  )
   state.who = null
   assert.equal((await answer(newSite, post("/api/sites", { url: SITE }))).status, 401)
 
@@ -170,7 +277,11 @@ test("people create a site review in the app, at the top or in a folder, within 
 test("a site review can't be Drop itself or where Drop shows drops", async () => {
   state.who = who
   state.contentOrigin = "https://*-drop.example.com"
-  for (const url of ["https://drop.example", "https://abcdefghijklmnopqrstuvwxyz-drop.example.com", "https://*.example.com"]) {
+  for (const url of [
+    "https://drop.example",
+    "https://abcdefghijklmnopqrstuvwxyz-drop.example.com",
+    "https://*.example.com",
+  ]) {
     const response = await answer(newSite, post("/api/sites", { url }))
     assert.equal(response.status, 400, url)
     assert.match((await json(response)).message, /Drop itself/)
@@ -200,7 +311,10 @@ test("the connect popup finds the reviews that cover the page, only the ones the
   state.who = null
   const guest = await sites()
   assert.equal(guest.status, 200)
-  assert.deepEqual(guest.body.sites.map(item => item.title), ["Acme previews"])
+  assert.deepEqual(
+    guest.body.sites.map((item) => item.title),
+    ["Acme previews"],
+  )
   assert.equal(guest.body.sites[0].owner, "Owner")
   assert.equal(guest.body.sites[0].address, PATTERN)
   assert.deepEqual(Object.keys(guest.body.sites[0]).sort(), ["address", "choice", "owner", "title"], "no id, no link")
@@ -209,10 +323,21 @@ test("the connect popup finds the reviews that cover the page, only the ones the
   // Signed in, the team review covers this PR too, and people signed in comment on a public link; the private one
   // stays the owner's.
   state.who = ada
-  assert.deepEqual((await sites()).body.sites.map(item => item.title), ["Acme PR 12", "Acme previews", "View-only PR 12"])
-  assert.deepEqual((await sites("https://pr13-acme.preview.quiver.dk")).body.sites.map(item => item.title), ["Acme previews"])
+  assert.deepEqual(
+    (await sites()).body.sites.map((item) => item.title),
+    ["Acme PR 12", "Acme previews", "View-only PR 12"],
+  )
+  assert.deepEqual(
+    (await sites("https://pr13-acme.preview.quiver.dk")).body.sites.map((item) => item.title),
+    ["Acme previews"],
+  )
   state.who = who
-  assert.deepEqual((await sites()).body.sites.map(item => item.title).sort(), ["Acme PR 12", "Acme previews", "Private PR 12", "View-only PR 12"])
+  assert.deepEqual((await sites()).body.sites.map((item) => item.title).sort(), [
+    "Acme PR 12",
+    "Acme previews",
+    "Private PR 12",
+    "View-only PR 12",
+  ])
 
   // None: deeper levels, the bare domain, and other sites.
   for (const origin of ["https://a.b.preview.quiver.dk", "https://preview.quiver.dk", "https://evil.com"])
@@ -226,10 +351,17 @@ test("a token is for the picked review and the page's origin only", async () => 
   state.who = null
   const guest = await token(SITE, { name: "Ole" })
   assert.equal(guest.status, 200)
-  assert.deepEqual({ origin: guest.body.origin, title: guest.body.title, name: guest.body.name }, { origin: SITE, title: "Acme previews", name: "Ole (guest)" })
+  assert.deepEqual(
+    { origin: guest.body.origin, title: guest.body.title, name: guest.body.name },
+    { origin: SITE, title: "Acme previews", name: "Ole (guest)" },
+  )
   assert.deepEqual(Object.keys(guest.body).sort(), ["expiresAt", "name", "origin", "title", "token"])
   const claims = await readReviewToken(request("/"), guest.body.token)
-  assert.deepEqual({ d: claims.d, u: claims.u, n: claims.n, o: claims.o }, { d: "previews", u: null, n: "Ole (guest)", o: SITE }, "the page's own origin, not the pattern")
+  assert.deepEqual(
+    { d: claims.d, u: claims.u, n: claims.n, o: claims.o },
+    { d: "previews", u: null, n: "Ole (guest)", o: SITE },
+    "the page's own origin, not the pattern",
+  )
 
   // The page can't read the token: no id, no link.
   const sealed = Buffer.from(guest.body.token.split(".")[1], "base64url").toString("latin1")
@@ -238,12 +370,19 @@ test("a token is for the picked review and the page's origin only", async () => 
   // A choice works for its origin and its person only, and never as a token.
   const { body } = await sites(SITE)
   const choice = body.sites[0].choice
-  assert.equal((await answer(tokenPost, post("/api/review/token", { origin: "https://pr13-acme.preview.quiver.dk", choice }))).status, 404)
+  assert.equal(
+    (await answer(tokenPost, post("/api/review/token", { origin: "https://pr13-acme.preview.quiver.dk", choice })))
+      .status,
+    404,
+  )
   state.who = ada
   assert.equal((await answer(tokenPost, post("/api/review/token", { origin: SITE, choice }))).status, 404)
   state.who = null
   assert.equal(await readReviewToken(request("/"), choice), null)
-  assert.equal((await answer(tokenPost, post("/api/review/token", { origin: SITE, choice: guest.body.token }))).status, 404)
+  assert.equal(
+    (await answer(tokenPost, post("/api/review/token", { origin: SITE, choice: guest.body.token }))).status,
+    404,
+  )
   // A choice made before the share was taken back gets nothing.
   sql.prepare("UPDATE drops SET share = 'private' WHERE id = 'previews'").run()
   assert.equal((await answer(tokenPost, post("/api/review/token", { origin: SITE, choice }))).status, 404)
@@ -258,7 +397,11 @@ test("tokens are sealed, bound to their review, and expire", async () => {
   const [version, body] = value.split(".")
   const bytes = Buffer.from(body, "base64url")
   bytes[bytes.length - 1] ^= 1
-  assert.equal(await readReviewToken(event, `${version}.${bytes.toString("base64url")}`, 2_000), null, "a changed token")
+  assert.equal(
+    await readReviewToken(event, `${version}.${bytes.toString("base64url")}`, 2_000),
+    null,
+    "a changed token",
+  )
   assert.equal(await readReviewToken(event, `v1.${body}.x`, 2_000), null)
   const choice = await sealChoice(event, { id: "site" }, SITE, null)
   assert.equal(await readReviewToken(event, choice, 2_000), null, "a choice isn't a token")
@@ -271,14 +414,29 @@ test("tokens are sealed, bound to their review, and expire", async () => {
 test("CORS answers origins a review covers, and only the token's origin gets in", async () => {
   site("previews", { site_url: PATTERN })
   for (const origin of [SITE, "https://pr13-acme.preview.quiver.dk"]) {
-    const allowed = await answer(preflight, request("/api/review/comments", { method: "OPTIONS", headers: { origin, "access-control-request-method": "POST" } }))
+    const allowed = await answer(
+      preflight,
+      request("/api/review/comments", {
+        method: "OPTIONS",
+        headers: { origin, "access-control-request-method": "POST" },
+      }),
+    )
     assert.equal(allowed.status, 204)
     assert.equal(allowed.headers.get("access-control-allow-origin"), origin, "the request's origin, never *")
     assert.match(allowed.headers.get("access-control-allow-headers"), /authorization/)
     assert.equal(allowed.headers.get("access-control-allow-credentials"), null)
   }
-  for (const origin of ["https://evil.example", "https://a.b.preview.quiver.dk", "https://preview.quiver.dk", "null", undefined]) {
-    const denied = await answer(preflight, request("/api/review/comments", { method: "OPTIONS", headers: origin ? { origin } : {} }))
+  for (const origin of [
+    "https://evil.example",
+    "https://a.b.preview.quiver.dk",
+    "https://preview.quiver.dk",
+    "null",
+    undefined,
+  ]) {
+    const denied = await answer(
+      preflight,
+      request("/api/review/comments", { method: "OPTIONS", headers: origin ? { origin } : {} }),
+    )
     assert.equal(denied.status, 404, String(origin))
     assert.equal(denied.headers.get("access-control-allow-origin"), null)
   }
@@ -314,25 +472,72 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   assert.equal(image.title, "Screenshot of /pricing")
   assert.ok(objects.has(image.blob_key))
   const first = sql.prepare("SELECT * FROM comments WHERE drop_id = ?").get(image.id)
-  assert.deepEqual({ kind: first.kind, selector: first.selector, ox: first.ox, oy: first.oy, ow: first.ow, oh: first.oh, label: first.label, quote: first.quote, page: first.page, author_name: first.author_name, author_id: first.author_id },
-    { kind: "image", selector: "body > img", ox: 100, oy: 200, ow: 300, oh: 150, label: "main > button", quote: "button \"Buy\"", page: "/pricing?plan=pro#faq", author_name: "Ole (guest)", author_id: null })
+  assert.deepEqual(
+    {
+      kind: first.kind,
+      selector: first.selector,
+      ox: first.ox,
+      oy: first.oy,
+      ow: first.ow,
+      oh: first.oh,
+      label: first.label,
+      quote: first.quote,
+      page: first.page,
+      author_name: first.author_name,
+      author_id: first.author_id,
+    },
+    {
+      kind: "image",
+      selector: "body > img",
+      ox: 100,
+      oy: 200,
+      ow: 300,
+      oh: 150,
+      label: "main > button",
+      quote: 'button "Buy"',
+      page: "/pricing?plan=pro#faq",
+      author_name: "Ole (guest)",
+      author_id: null,
+    },
+  )
 
-  const plain = await comment(body.token, { body: "Typo in the footer", page: "/", label: "a \"Pricing\" in a sticky header" })
+  const plain = await comment(body.token, {
+    body: "Typo in the footer",
+    page: "/",
+    label: 'a "Pricing" in a sticky header',
+  })
   assert.equal((await json(plain)).n, 2, "numbered with the screenshots' comments")
   const second = sql.prepare("SELECT * FROM comments WHERE drop_id = 'site'").get()
   assert.equal(second.kind, "area")
   assert.equal(second.selector, "main > button")
-  assert.equal(second.quote, "a \"Pricing\" in a sticky header", "the script says when the box is on something that doesn't scroll")
+  assert.equal(
+    second.quote,
+    'a "Pricing" in a sticky header',
+    "the script says when the box is on something that doesn't scroll",
+  )
 
   // A reply on the screenshot in Drop takes the site's next number.
   state.who = who
-  const reply = request(`/api/drops/${image.id}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "image", selector: "body > img", ox: 10, oy: 10, body: "Agreed" }), id: image.id })
+  const reply = request(`/api/drops/${image.id}/comments`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind: "image", selector: "body > img", ox: 10, oy: 10, body: "Agreed" }),
+    id: image.id,
+  })
   assert.equal((await dropCommentsPost(reply)).n, 3)
   const listed = await dropComments(request(`/api/drops/site/comments`))
-  assert.deepEqual(listed.map(item => item.n), [1, 2, 3], "the site's comment list takes in its screenshots'")
+  assert.deepEqual(
+    listed.map((item) => item.n),
+    [1, 2, 3],
+    "the site's comment list takes in its screenshots'",
+  )
 
   const items = await reviewList(request("/api/drops/site/review"))
-  assert.deepEqual(items.map(item => item.n), [3, 2, 1], "newest first")
+  assert.deepEqual(
+    items.map((item) => item.n),
+    [3, 2, 1],
+    "newest first",
+  )
   assert.equal(items[2].screenshot.url, `https://drop.example/f/${image.blob_key}`)
   assert.equal(items[1].screenshot, null)
 
@@ -346,9 +551,21 @@ test("comments on a pattern keep the origin of the preview they came from", asyn
   const pr12 = (await token(SITE, { name: "Ole" })).body.token
   const pr13 = (await token("https://pr13-acme.preview.quiver.dk", { name: "Ole" })).body.token
   assert.equal((await comment(pr12, {}, { screenshot: PNG })).status, 200)
-  assert.equal((await comment(pr13, { page: "/pricing" }, { origin: "https://pr13-acme.preview.quiver.dk" })).status, 200)
-  assert.deepEqual(sql.prepare("SELECT page FROM comments ORDER BY n").all().map(row => row.page), [`${SITE}/pricing?plan=pro#faq`, "https://pr13-acme.preview.quiver.dk/pricing"])
-  assert.equal(sql.prepare("SELECT title FROM drops WHERE kind = 'image'").get().title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
+  assert.equal(
+    (await comment(pr13, { page: "/pricing" }, { origin: "https://pr13-acme.preview.quiver.dk" })).status,
+    200,
+  )
+  assert.deepEqual(
+    sql
+      .prepare("SELECT page FROM comments ORDER BY n")
+      .all()
+      .map((row) => row.page),
+    [`${SITE}/pricing?plan=pro#faq`, "https://pr13-acme.preview.quiver.dk/pricing"],
+  )
+  assert.equal(
+    sql.prepare("SELECT title FROM drops WHERE kind = 'image'").get().title,
+    "Screenshot of pr12-acme.preview.quiver.dk/pricing",
+  )
   assert.deepEqual(await json(await count(pr12, "/pricing?plan=pro")), { open: 1 }, "each preview counts its own")
   assert.deepEqual(await json(await count(pr13, "/pricing", "https://pr13-acme.preview.quiver.dk")), { open: 1 })
 })
@@ -356,9 +573,24 @@ test("comments on a pattern keep the origin of the preview they came from", asyn
 /** A comment from Drop's embedded review: the signed-in reviewer, the address open in the frame, and a capture. */
 function embedded(id, data, { screenshot, origin = SITE } = {}) {
   const form = new FormData()
-  form.append("data", JSON.stringify({ body: "The chart overlaps the legend", page: "/pricing", ox: 100, oy: 200, ow: 300, oh: 150, viewport: { width: 1280, height: 720 }, ...data }))
+  form.append(
+    "data",
+    JSON.stringify({
+      body: "The chart overlaps the legend",
+      page: "/pricing",
+      ox: 100,
+      oy: 200,
+      ow: 300,
+      oh: 150,
+      viewport: { width: 1280, height: 720 },
+      ...data,
+    }),
+  )
   if (screenshot) form.append("screenshot", new Blob([screenshot]), "screenshot")
-  return answer(embeddedPost, request(`/api/drops/${id}/review?origin=${encodeURIComponent(origin)}`, { method: "POST", body: form, id }))
+  return answer(
+    embeddedPost,
+    request(`/api/drops/${id}/review?origin=${encodeURIComponent(origin)}`, { method: "POST", body: form, id }),
+  )
 }
 
 test("Drop's embedded review stores a box on a screen capture like the script's, for addresses the site covers", async () => {
@@ -371,10 +603,22 @@ test("Drop's embedded review stores a box on a screen capture like the script's,
   assert.equal(image.parent_id, "previews")
   assert.equal(image.title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
   const row = sql.prepare("SELECT * FROM comments").get()
-  assert.deepEqual([row.drop_id, row.kind, row.page, row.author_id, row.author_name, row.label], [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null], "no element: Drop can't see inside the frame")
+  assert.deepEqual(
+    [row.drop_id, row.kind, row.page, row.author_id, row.author_name, row.label],
+    [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null],
+    "no element: Drop can't see inside the frame",
+  )
 
-  assert.equal((await embedded("previews", {}, { origin: "https://evil.example" })).status, 400, "only addresses the site covers")
-  assert.equal((await embedded("previews", {}, { screenshot: new TextEncoder().encode("<svg>") })).status, 400, "a real image")
+  assert.equal(
+    (await embedded("previews", {}, { origin: "https://evil.example" })).status,
+    400,
+    "only addresses the site covers",
+  )
+  assert.equal(
+    (await embedded("previews", {}, { screenshot: new TextEncoder().encode("<svg>") })).status,
+    400,
+    "a real image",
+  )
 })
 
 test("the embedded review needs comment access to the site", async () => {
@@ -396,9 +640,17 @@ test("Open in Drop opens the review only for people who could open it without it
   const team = (await token(SITE, { pick: 0 })).body.token
   const link = (await token(SITE, { pick: 1 })).body.token
   assert.deepEqual(await openPost(post("/api/review/open", { token: team })), { to: "/drops/pr12" })
-  assert.equal((await answer(openPost, post("/api/review/open", { token: link }))).status, 404, "a link share found by origin isn't the link")
+  assert.equal(
+    (await answer(openPost, post("/api/review/open", { token: link }))).status,
+    404,
+    "a link share found by origin isn't the link",
+  )
   state.who = who
-  assert.deepEqual(await openPost(post("/api/review/open", { token: link })), { to: "/drops/previews" }, "the owner opens it")
+  assert.deepEqual(
+    await openPost(post("/api/review/open", { token: link })),
+    { to: "/drops/previews" },
+    "the owner opens it",
+  )
   state.who = null
   assert.equal((await answer(openPost, post("/api/review/open", { token: link }))).status, 401)
   state.who = ada
@@ -413,13 +665,20 @@ test("what the page sends is checked: the token, the image's bytes, and the fiel
   assert.equal(missing.headers.get("access-control-allow-origin"), SITE, "the script can tell an ended session")
   assert.equal((await comment("v2.forged", {})).status, 401)
 
-  assert.equal((await comment(body.token, {}, { screenshot: new TextEncoder().encode("<svg onload=alert(1)>") })).status, 400)
+  assert.equal(
+    (await comment(body.token, {}, { screenshot: new TextEncoder().encode("<svg onload=alert(1)>") })).status,
+    400,
+  )
   assert.equal((await comment(body.token, { body: " " })).status, 400)
   assert.equal((await comment(body.token, { body: "x".repeat(4001) })).status, 400)
   assert.equal((await comment(body.token, { page: "https://elsewhere.example/" })).status, 400)
   assert.equal((await comment(body.token, { ox: 900, ow: 300 })).status, 400)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM comments").get().n, 0)
-  assert.equal(state.bursts.filter(burst => burst.bucket === "review-comment").length, 5, "each signed request counts")
+  assert.equal(
+    state.bursts.filter((burst) => burst.bucket === "review-comment").length,
+    5,
+    "each signed request counts",
+  )
 
   // Taking the share back ends every review session at once.
   sql.prepare("UPDATE drops SET share = 'private' WHERE id = 'site'").run()
@@ -465,7 +724,7 @@ test("read_drop lists a site's comments as page content, and update_drop resolve
   assert.match(text, /Box 10%–40% across, 20%–35% down the screenshot, over button "Buy" \(main > button\)/)
   const [first, second] = read.structuredContent.comments
   assert.match(first.fileUrl, /^https:\/\/drop\.example\/f\/[0-9a-f-]{36}\.png$/)
-  assert.deepEqual(first.element, { selector: "main > button", text: "button \"Buy\"" })
+  assert.deepEqual(first.element, { selector: "main > button", text: 'button "Buy"' })
   assert.equal(second.fileUrl, null)
   assert.equal(read.structuredContent.siteUrl, SITE)
 

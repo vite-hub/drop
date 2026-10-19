@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { test } from "node:test"
+import { test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { defineMcpHandler } from "h3-mcp"
 import { defineMcpHandler as modernHandler } from "h3-mcp/modern"
@@ -18,16 +18,18 @@ const identity = {
 }
 
 async function request(handler, method, params, version) {
-  const event = new H3Event(new Request("https://drop.example/mcp", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-      "mcp-protocol-version": version,
-      "mcp-method": method,
-    },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  }))
+  const event = new H3Event(
+    new Request("https://drop.example/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": version,
+        "mcp-method": method,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    }),
+  )
   const response = await toResponse(await handler(event), event)
   assert.equal(response.status, 200)
   const body = await response.text()
@@ -46,23 +48,33 @@ for (const [name, create, modern, legacy] of [
     const handler = create({ ...identity, origin: false })
     if (modern) {
       for (const method of ["server/discover", "tools/list"]) {
-        const result = await request(handler, method, {
-          _meta: {
-            "io.modelcontextprotocol/protocolVersion": MCP_LATEST,
-            "io.modelcontextprotocol/clientInfo": { name: "identity-test", version: "1.0.0" },
-            "io.modelcontextprotocol/clientCapabilities": {},
+        const result = await request(
+          handler,
+          method,
+          {
+            _meta: {
+              "io.modelcontextprotocol/protocolVersion": MCP_LATEST,
+              "io.modelcontextprotocol/clientInfo": { name: "identity-test", version: "1.0.0" },
+              "io.modelcontextprotocol/clientCapabilities": {},
+            },
           },
-        }, MCP_LATEST)
+          MCP_LATEST,
+        )
         assert.deepEqual(result._meta["io.modelcontextprotocol/serverInfo"], identity)
       }
     }
     if (legacy) {
       for (const protocolVersion of MCP_LEGACY) {
-        const result = await request(handler, "initialize", {
+        const result = await request(
+          handler,
+          "initialize",
+          {
+            protocolVersion,
+            clientInfo: { name: "identity-test", version: "1.0.0" },
+            capabilities: {},
+          },
           protocolVersion,
-          clientInfo: { name: "identity-test", version: "1.0.0" },
-          capabilities: {},
-        }, protocolVersion)
+        )
         assert.deepEqual(result.serverInfo, identity)
       }
     }
