@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readdirSync } from "node:fs"
 import { beforeEach, test } from "node:test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
@@ -209,4 +210,21 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
     await assert.rejects(put(tampered), /run out or isn't valid/)
   }
   finally { state.authSecret = undefined }
+})
+
+test("tools/list publishes every tool's input schema", async () => {
+  // One schema that can't become JSON Schema (v.trim(), say) fails tools/list, and with it every client's connection.
+  const dir = new URL("../../server/mcp/tools/", import.meta.url)
+  const tools = await Promise.all(readdirSync(dir).filter(file => file.endsWith(".ts")).map(async file => (await import(new URL(file, dir).href)).default))
+  const all = createMcpHandler({ name: "drop-test", version: "1", origin: false, tools })
+  const request = new H3Event(new Request("https://drop.example/mcp", {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+  }))
+  request.context.log = { set() {}, error() {}, warn() {} }
+  const text = await (await toResponse(await all(request), request)).text()
+  const body = JSON.parse(text.startsWith("{") ? text : text.match(/^data: (.+)$/m)[1])
+  assert.equal(body.error, undefined, body.error?.message)
+  assert.deepEqual(body.result.tools.map(tool => tool.name).sort(), tools.map(tool => tool.name).sort())
 })
