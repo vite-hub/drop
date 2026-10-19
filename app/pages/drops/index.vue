@@ -111,9 +111,7 @@ async function newSite() {
 <template>
   <PageShell id="drops" title="Drops" :description="description">
     <template #actions>
-      <!-- On a phone the three labels overflow the bar and push the title out: the two ghost buttons keep their icon. -->
-      <UButton aria-label="New Folder" color="neutral" icon="i-ph-folder-simple-plus" size="sm" variant="ghost" @click="newFolder"><span class="max-sm:hidden">New Folder</span></UButton>
-      <UButton aria-label="New Site Review" color="neutral" icon="i-ph-globe-simple" size="sm" variant="ghost" @click="newSite"><span class="max-sm:hidden">New Site Review</span></UButton>
+      <NewMenu @folder="newFolder" @site="newSite" />
       <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
     </template>
 

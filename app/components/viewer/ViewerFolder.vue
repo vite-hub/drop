@@ -41,9 +41,7 @@ async function newSite() {
         <UInput v-if="me && children.length" v-model="search" aria-label="Search this folder" class="w-full sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1" icon="i-ph-magnifying-glass" :placeholder="`Search ${itemCount(children.length)}`" />
         <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
         <div v-if="drop.isOwner && !drop.trashedAt" class="flex items-center gap-1">
-          <!-- Like the Drops page: on a phone the ghost buttons keep only their icon. -->
-          <UButton aria-label="New Folder" color="neutral" icon="i-ph-folder-simple-plus" size="sm" variant="ghost" @click="newFolder"><span class="max-sm:hidden">New Folder</span></UButton>
-          <UButton aria-label="New Site Review" color="neutral" icon="i-ph-globe-simple" size="sm" variant="ghost" @click="newSite"><span class="max-sm:hidden">New Site Review</span></UButton>
+          <NewMenu @folder="newFolder" @site="newSite" />
           <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
         </div>
       </div>

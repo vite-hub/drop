@@ -12,7 +12,7 @@ const nuxt = `// nuxt.config.ts: preview builds only\nexport default defineNuxtC
 <template>
   <DocsPage title="Review a live site" lead="People review a running website where it lives, a preview deploy, staging, or a dev server, and their comments land in Drop with screenshots. Your site keeps its own cookies and sign-in, because Drop never frames it.">
     <DocsSection id="create" title="Create the review">
-      <p>A site is a drop of its own. Create one with <strong>New Site Review</strong> on the Drops page or in a folder, or have an agent call <code>publish</code> with <code>site</code>. Either way you give the address people will review:</p>
+      <p>A site is a drop of its own. Create one with <strong>New › Site review</strong> on the Drops page or in a folder, or have an agent call <code>publish</code> with <code>site</code>. Either way you give the address people will review:</p>
       <ul>
         <li>One origin (scheme, host, and port), like <code>https://pr123-acme.preview.example.com</code>.</li>
         <li>A pattern whose first label is <code>*</code>, like <code>https://*.preview.example.com</code>. The <code>*</code> stands for one label, so one site drop covers every pull request's preview. It doesn't cover deeper levels (<code>a.b.preview.example.com</code>) or the bare domain.</li>
