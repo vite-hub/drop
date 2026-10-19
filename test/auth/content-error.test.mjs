@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { H3Event, HTTPError } from "h3"
-import contentError from "../../server/handlers/content-error.ts"
+// The harness stubs Server Env, so the error page reads the proxy setting the way it does under Nitro.
+import { state } from "../cost/harness.mjs"
+const { default: contentError } = await import("../../server/handlers/content-error.ts")
 
 const path = "/d/11111111-1111-4111-8111-111111111111"
 async function render(status, identity = null, data) {
@@ -44,12 +46,12 @@ test("service failures offer a retry without blaming account permissions", async
 })
 
 test("behind the auth proxy, signed-in content errors don't send people back through sign-in", async () => {
-  process.env.DROP_AUTH_PROXY = "1"
+  Object.assign(state, { authProxy: true, githubOrg: "acme" })
   try {
     const html = await (await render(404, { email: "member@example.test" })).text()
     assert.doesNotMatch(html, /Use another account|\/signin/)
     assert.equal(html.match(/href="\/drops"/g)?.length, 1)
     assert.match(await (await render(404)).text(), /Sign in with GitHub/)
   }
-  finally { delete process.env.DROP_AUTH_PROXY }
+  finally { Object.assign(state, { authProxy: false, githubOrg: "" }) }
 })
