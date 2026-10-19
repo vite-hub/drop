@@ -20,7 +20,7 @@ import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
  *
  * Admins switch them on and off for the whole deployment (`skill_settings`); every surface serves only the enabled set.
  */
-export interface SkillFile { path: string; text: string; bytes: Uint8Array; mimeType: string }
+export interface SkillFile { path: string; text: string; bytes: Uint8Array<ArrayBuffer>; mimeType: string }
 export interface Skill { name: string; description: string; frontmatter: Record<string, unknown>; files: SkillFile[] }
 
 const encoder = new TextEncoder()
@@ -80,8 +80,8 @@ export async function setSkillEnabled(name: string, enabled: boolean, userId: st
 }
 
 /** `sha256:<hex>`, the digest format both the MCP Skills extension and Discovery v0.2.0 use. */
-export async function digest(bytes: Uint8Array): Promise<string> {
-  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>))
+export async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))
   return `sha256:${Array.from(hash, byte => byte.toString(16).padStart(2, "0")).join("")}`
 }
 
@@ -90,11 +90,12 @@ export async function digest(bytes: Uint8Array): Promise<string> {
  * archive's root with no wrapper folder, as the spec asks. Fixed mtimes keep the bytes, and so the digest, the same
  * on every isolate; built once per isolate.
  */
-const archives = new Map<string, Promise<Uint8Array>>()
+const archives = new Map<string, Promise<Uint8Array<ArrayBuffer>>>()
 export function skillArchive(item: Skill) {
   let archive = archives.get(item.name)
   if (!archive) {
-    archive = createTarGzip(item.files.map(entry => ({ name: entry.path, data: entry.bytes, attrs: { mtime: 0, mode: "644" } })))
+    // Copied once into a plain ArrayBuffer, which Response and crypto.subtle take.
+    archive = createTarGzip(item.files.map(entry => ({ name: entry.path, data: entry.bytes, attrs: { mtime: 0, mode: "644" } }))).then(bytes => new Uint8Array(bytes))
     archives.set(item.name, archive)
   }
   return archive

@@ -12,6 +12,7 @@ import taskList from "@comark/html/plugins/task-list"
 import annotate, { components as annotations } from "comark-annotate/html"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
+import { textValue } from "#shared/utils/text"
 import { cachedMarkdown } from "./markdown-cache"
 
 // screenshot, compare, and annotation are comark-annotate's: annotated screenshots for PR evidence.
@@ -44,21 +45,22 @@ const parseMarkdown = createMarkdownParser({ plugins, registerDefaultPlugins: fa
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
 function textContent(node: MarkdownNode): string {
-  if (typeof node === "string") return node
-  if (node[0] === null) return ""
-  return node.slice(2).map(child => textContent(child as MarkdownNode)).join("")
+  if (!Array.isArray(node)) return node
+  const [tag, , ...children] = node
+  return tag === null ? "" : children.map(child => textContent(child)).join("")
 }
 
 function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): string {
-  if (typeof document.frontmatter.title === "string" && document.frontmatter.title.trim())
-    return document.frontmatter.title.trim()
+  const title = textValue(document.frontmatter.title)?.trim()
+  if (title) return title
 
   const heading = document.nodes.find(node => Array.isArray(node) && node[0] === "h1")
   return (heading && textContent(heading).trim()) || "Untitled document"
 }
 
-function supersedesHref(value: unknown): string | undefined {
-  if (typeof value !== "string") return
+function supersedesHref(input: unknown): string | undefined {
+  const value = textValue(input)
+  if (value === undefined) return
   if (/^\/[fi]\/[0-9a-f-]+\.(?:md|markdown)$/i.test(value)) return value
 
   try {
@@ -69,7 +71,7 @@ function supersedesHref(value: unknown): string | undefined {
 }
 
 const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render }) => {
-  const kind = typeof attrs.type === "string" ? attrs.type : tag
+  const kind = textValue(attrs.type) ?? tag
   return `<aside class="callout" data-kind="${escapeHtml(kind)}">${await render(children)}</aside>`
 }
 
@@ -78,7 +80,7 @@ function createMermaidRenderer(): NodeHandler {
   let sourceCharacters = 0
 
   return (node) => {
-    const content = typeof node[1].content === "string" ? node[1].content : ""
+    const content = textValue(node[1].content) ?? ""
     const fallback = `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
 
     diagrams += 1
@@ -134,10 +136,10 @@ export async function renderMarkdownBody(markdown: string): Promise<{ title: str
  * Blobs never change once uploaded, so a render is keyed by its blob key and cached for a month in the Worker's
  * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
  */
-export const renderMarkdownCached = (key: string, markdown: string | (() => Promise<string>), event?: H3Event) =>
-  cachedMarkdown(key, typeof markdown === "string" ? async () => markdown : markdown, renderMarkdownBody, event)
+export const renderMarkdownCached = (key: string, markdown: () => Promise<string>, event?: H3Event) =>
+  cachedMarkdown(key, markdown, renderMarkdownBody, event)
 
-export async function renderMarkdownDocument(markdown: string | (() => Promise<string>), pathname: string, key: string, event?: H3Event): Promise<string> {
+export async function renderMarkdownDocument(markdown: () => Promise<string>, pathname: string, key: string, event?: H3Event): Promise<string> {
   const { title, html: body } = await renderMarkdownCached(key, markdown, event)
   return `<!doctype html>
 <html lang="en">

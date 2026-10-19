@@ -1,6 +1,7 @@
 import { and, eq, exists, inArray, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
+import * as v from "valibot"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
@@ -25,6 +26,9 @@ import { MAX_APP_FILES } from "#shared/quotas"
 import { splitFrontmatter } from "#shared/frontmatter"
 import { permissions } from "./access"
 import { findDrop, findDropByBlob, versionChain, storageFailure } from "./query"
+
+// Storage that was down (503), not a row someone else published first.
+const Unavailable = v.object({ status: v.literal(503) })
 
 const TEXT_KINDS = new Set(["markdown", "html"])
 /** `/f/<key>` links in a doc's source, absolute or relative, with or without `?raw`. */
@@ -161,7 +165,7 @@ export async function createDocDrop(who: Identity, input: LifetimeInput & { file
     // Renders once at upload: the title comes from Comark, and the first view hits a warm cache.
     let parsedTitle: string | undefined
     try {
-      parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, text, event)).title : undefined
+      parsedTitle = kind === "markdown" && text ? (await renderMarkdownCached(key, async () => text, event)).title : undefined
     }
     catch (error) {
       await deleteBlobKeys([key])
@@ -345,8 +349,7 @@ export async function publishApp(who: Identity, input: LifetimeInput & { id?: st
       if (!committedPublish) {
         await deleteBlobKeys(stagedKeys)
       }
-      const status = typeof error === "object" && error ? (error as { status?: unknown }).status : undefined
-      if (row && status !== 503 && /unique|constraint/i.test(String(error)))
+      if (row && !v.is(Unavailable, error) && /unique|constraint/i.test(String(error)))
         throw new HTTPError({ status: 409, statusText: "This app was published by someone else. Retry from the latest version.", cause: error })
       throw error
     }

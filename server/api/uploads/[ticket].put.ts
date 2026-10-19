@@ -24,7 +24,7 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 409, statusText: "This upload URL was already used. Call publish again to upload another file." })
   try {
     const { result } = await publishInput(upload.who, upload.input, event, bytes)
-    useLogger(event).set({ user: { id: upload.who.userId }, actor: { kind: upload.who.actorKind, name: upload.who.actorName }, drop: { id: (result as { id: string }).id, size: bytes.byteLength } })
+    useLogger(event).set({ user: { id: upload.who.userId }, actor: { kind: upload.who.actorKind, name: upload.who.actorName }, drop: { id: "id" in result ? result.id : undefined, size: bytes.byteLength } })
     event.res.headers.set("Cache-Control", "no-store")
     return result
   }

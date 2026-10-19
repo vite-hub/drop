@@ -13,7 +13,7 @@ export const MAX_SEARCH_TEXT = 64_000
 /** Kinds whose words are searchable. Plain text files are `markdown` drops. */
 export const SEARCH_KINDS = ["markdown", "html"] as const
 
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " }
+const ENTITIES = new Map([["amp", "&"], ["lt", "<"], ["gt", ">"], ["quot", "\""], ["apos", "'"], ["nbsp", " "]])
 
 /**
  * What a reader sees of a doc, as one line of plain text: Markdown without its front matter and markup, HTML without
@@ -30,7 +30,7 @@ export function searchableText(kind: string, source: string) {
           const code = name[1] === "x" || name[1] === "X" ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1))
           return code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : " "
         }
-        return ENTITIES[name.toLowerCase()] ?? entity
+        return ENTITIES.get(name.toLowerCase()) ?? entity
       })
   }
   else {
@@ -100,7 +100,7 @@ export async function searchHeads(where: SQL | undefined, words: string[], limit
 export function textStatements(row: { id: string; kind: string }, source: string | undefined, previousId?: string | null) {
   const statements = []
   if (previousId) statements.push(db.delete(dropTexts).where(eq(dropTexts.dropId, previousId)))
-  if (source !== undefined && (SEARCH_KINDS as readonly string[]).includes(row.kind))
+  if (source !== undefined && SEARCH_KINDS.some(kind => kind === row.kind))
     statements.push(db.insert(dropTexts).values({ dropId: row.id, text: searchableText(row.kind, source) }))
   return statements
 }

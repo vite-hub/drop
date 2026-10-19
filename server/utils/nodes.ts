@@ -81,7 +81,7 @@ export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date
     ...fields,
     raw: row,
     ancestors,
-    grants: shares.filter(share => share !== "private").map(share => ({ share })),
+    grants: shares.flatMap(share => (share === "private" ? [] : [{ share }])),
     ...(widest !== row ? { sharedFrom: { id: widest.id, title: widest.title } } : {}),
     expired: Boolean(fields.trashedAt) || isExpired(fields, now, days),
   }

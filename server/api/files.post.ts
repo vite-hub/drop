@@ -1,5 +1,6 @@
 import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError, requireContentType } from "h3"
+import { textValue } from "#shared/utils/text"
 import { createDocDrop, dropPageUrl, MAX_FILE_BYTES } from "../utils/drops"
 import { requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
@@ -31,17 +32,14 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 400, statusText: "Exactly one file is required." })
   if (file.size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
 
-  const title = form.get("title")
-  const supersedes = form.get("supersedes")
-  const slug = form.get("slug")
-  const folderRef = form.get("folder")
-  const folder = typeof folderRef === "string" && folderRef ? await requireFolder(folderRef, who, event) : undefined
+  const folderRef = textValue(form.get("folder"))
+  const folder = folderRef ? await requireFolder(folderRef, who, event) : undefined
   const drop = await createDocDrop(who, {
     filename: file.name,
     bytes: new Uint8Array(await file.arrayBuffer()),
-    title: typeof title === "string" ? title : undefined,
-    slug: typeof slug === "string" ? slug.slice(0, 200) : undefined,
-    supersedes: typeof supersedes === "string" ? supersedes : undefined,
+    title: textValue(form.get("title")),
+    slug: textValue(form.get("slug"))?.slice(0, 200),
+    supersedes: textValue(form.get("supersedes")),
     folder,
   }, event)
   useLogger(event).set({ drop: { id: drop.id, kind: drop.kind, size: drop.size, version: drop.version } })

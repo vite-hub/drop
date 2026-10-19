@@ -3,6 +3,7 @@ import { HTTPError } from "h3"
 import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { MAX_FILE_BYTES, ReviewCommentSchema } from "#shared/schemas"
+import { textValue } from "#shared/utils/text"
 import { addReviewComment, reviewApi, reviewSession, type Screenshot, screenshotType } from "../../utils/review"
 
 /**
@@ -25,7 +26,7 @@ export default reviewApi(async (event) => {
   catch { throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." }) }
   const data = form.get("data")
   let input
-  try { input = v.parse(ReviewCommentSchema, JSON.parse(typeof data === "string" ? data : "")) }
+  try { input = v.parse(ReviewCommentSchema, JSON.parse(textValue(data) ?? "")) }
   catch (error) { throw new HTTPError({ status: 400, statusText: v.isValiError(error) ? error.message : "The comment is missing." }) }
 
   const file = form.get("screenshot")

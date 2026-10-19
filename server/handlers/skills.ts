@@ -32,7 +32,7 @@ export default defineHandler(async (event) => {
   const archive = v2 ? path.match(/^([a-z0-9-]+)\.tar\.gz$/)?.[1] : undefined
   if (archive) {
     const skill = await findEnabledSkill(archive)
-    if (skill) return new Response(await skillArchive(skill) as Uint8Array<ArrayBuffer>, { headers: { "content-type": "application/gzip", "cache-control": "public, max-age=60" } })
+    if (skill) return new Response(await skillArchive(skill), { headers: { "content-type": "application/gzip", "cache-control": "public, max-age=60" } })
   }
 
   const [name, ...rest] = path.split("/")

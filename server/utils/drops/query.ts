@@ -49,7 +49,7 @@ async function summarize(rows: DropRow[], days: number, options: { ownerId?: str
     ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).innerJoin(dropHeads, eq(dropHeads.dropId, dropFiles.dropId)).where(eq(dropHeads.ownerId, options.ownerId))
     : []
   const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
-  const counts = await itemCounts(rows.filter(row => row.kind === "folder").map(row => row.id))
+  const counts = await itemCounts(rows.flatMap(row => (row.kind === "folder" ? [row.id] : [])))
   const pathOf = (row: DropRow) => {
     const above = row.ancestors ?? []
     const stop = options.below ? above.findIndex(node => node.id === options.below) : -1

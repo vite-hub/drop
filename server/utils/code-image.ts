@@ -36,10 +36,10 @@ const LANGUAGES = {
   yaml: () => import("@shikijs/langs/yaml"),
 } as const
 
-const LANGUAGE_ALIASES: Record<string, keyof typeof LANGUAGES> = {
-  js: "javascript", ts: "typescript", sh: "bash", shell: "bash", zsh: "bash", py: "python", rb: "ruby",
-  rs: "rust", md: "markdown", yml: "yaml", "c++": "cpp", cs: "csharp", kt: "kotlin",
-}
+const LANGUAGE_ALIASES = new Map<string, keyof typeof LANGUAGES>([
+  ["js", "javascript"], ["ts", "typescript"], ["sh", "bash"], ["shell", "bash"], ["zsh", "bash"], ["py", "python"], ["rb", "ruby"],
+  ["rs", "rust"], ["md", "markdown"], ["yml", "yaml"], ["c++", "cpp"], ["cs", "csharp"], ["kt", "kotlin"],
+])
 
 const THEMES = {
   "github-dark": () => import("@shikijs/themes/github-dark"),
@@ -58,10 +58,13 @@ export type CodeTheme = keyof typeof THEMES
 export const DEFAULT_CODE_THEME: CodeTheme = "github-dark"
 
 /** Theme names agents learned from the old Ray.so renderer keep working. */
-const THEME_ALIASES: Record<string, CodeTheme> = {
-  nuxt: "vitesse-dark", midnight: "night-owl", vercel: "github-dark", raycast: "one-dark-pro",
-  candy: "dracula", breeze: "github-light", mono: "github-dark", noir: "github-dark",
-}
+const THEME_ALIASES = new Map<string, CodeTheme>([
+  ["nuxt", "vitesse-dark"], ["midnight", "night-owl"], ["vercel", "github-dark"], ["raycast", "one-dark-pro"],
+  ["candy", "dracula"], ["breeze", "github-light"], ["mono", "github-dark"], ["noir", "github-dark"],
+])
+
+/** Whether `name` is one of `table`'s own keys, so a name like "constructor" never reaches Object's. */
+const isKeyOf = <T extends object>(table: T, name: string): name is Extract<keyof T, string> => Object.hasOwn(table, name)
 
 let highlighter: Promise<HighlighterCore> | undefined
 
@@ -69,8 +72,8 @@ async function prepare(language: string | undefined, theme: string | undefined) 
   highlighter ??= createHighlighterCore({ themes: [], langs: [], engine: createJavaScriptRegexEngine() })
   const shiki = await highlighter
   const requested = language?.toLowerCase()
-  const lang = requested && (requested in LANGUAGES ? requested as keyof typeof LANGUAGES : LANGUAGE_ALIASES[requested])
-  const themeName = theme && (theme in THEMES ? theme as CodeTheme : THEME_ALIASES[theme]) || DEFAULT_CODE_THEME
+  const lang = requested && (isKeyOf(LANGUAGES, requested) ? requested : LANGUAGE_ALIASES.get(requested))
+  const themeName = theme && (isKeyOf(THEMES, theme) ? theme : THEME_ALIASES.get(theme)) || DEFAULT_CODE_THEME
   if (lang && !shiki.getLoadedLanguages().includes(lang)) await shiki.loadLanguage((await LANGUAGES[lang]()).default)
   if (!shiki.getLoadedThemes().includes(themeName)) await shiki.loadTheme((await THEMES[themeName]()).default)
   return { shiki, lang: lang ?? "text", theme: themeName }

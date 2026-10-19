@@ -62,7 +62,7 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   }
   // The name, and a folder's description, belong to this row alone.
   const title = {
-    ...(typeof body.title === "string" ? { title: body.title } : {}),
+    ...(body.title !== undefined ? { title: body.title } : {}),
     ...(body.description !== undefined ? { note: body.description.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null } : {}),
   }
   const life = body.lifetime !== undefined ? lifetimeFields(who, { lifetime: body.lifetime, keepReason: body.keepReason }, drop, event) : {}

@@ -13,6 +13,7 @@ export default defineRealtime({
   auth: true,
   async authorize({ event: hostEvent, documentId }) {
     if (documentId === null) return true
+    // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which findDrop and identify read.
     const event = hostEvent as H3Event
     const [{ draftDropId }, { findDrop, liveEditable, versionsOf }, { identify }] = await Promise.all([
       import("../utils/draft-paths"), import("../utils/drops"), import("../utils/identity"),
