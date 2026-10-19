@@ -15,7 +15,7 @@ export default defineValidatedHandler({
   async handler(event) {
     const who = await identify(event)
     await requireRateLimit(event, "review-token", { key: who?.userId, limit: 20, window: "1m" })
-    const { origin } = await event.req.json() as { origin: string }
+    const { origin } = await event.req.json()
     if (!siteAddressesFor(origin).length) throw new HTTPError({ status: 400, statusText: "Drop reviews pages on https, or http on localhost." })
     const found = await sitesFor(origin, who, event)
     event.res.headers.set("Cache-Control", "no-store")

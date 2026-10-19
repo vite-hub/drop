@@ -15,7 +15,7 @@ async function fixture(run) {
   try {
     await mkdir(join(root, "app"))
     await mkdir(join(root, "server"))
-    await writeFile(join(root, "package.json"), '{"type":"module"}')
+    await writeFile(join(root, "package.json"), "{\"type\":\"module\"}")
     await run(root)
   }
   finally {

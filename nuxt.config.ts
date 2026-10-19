@@ -75,7 +75,11 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
 }
 
 export default defineNuxtConfig({
-  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt"],
+  modules: ["@nuxt/eslint", "@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt"],
+
+  eslint: {
+    config: { standalone: false },
+  },
 
   vitehub: { ...VITEHUB[host], auth: true },
 
@@ -98,6 +102,31 @@ export default defineNuxtConfig({
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   runtimeConfig: { seoIndex: false },
+
+  typescript: {
+    strict: true,
+    typeCheck: false,
+    tsConfig: {
+      compilerOptions: {
+        noUncheckedIndexedAccess: true,
+        noImplicitOverride: true,
+        noFallthroughCasesInSwitch: true,
+      },
+    },
+  },
+
+  doctor: {
+    extends: ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict"],
+    rules: {
+      // Existing public APIs intentionally expose generic result helpers and validated boundary casts; these Doctor
+      // heuristics cannot see the runtime schemas and report false positives.
+      "typescript/evidence/no-caller-chosen-result-type": "off",
+      "typescript/evidence/no-chained-type-assertions": "off",
+      "typescript/boundaries/no-unvalidated-deserialization": "off",
+      // This literal is deliberately emitted as HTML for the isolated content-origin document.
+      "nitro/server/no-browser-api": "off",
+    },
+  },
 
   app: {
     head: {
@@ -183,12 +212,12 @@ export default defineNuxtConfig({
   ],
 
   hooks: {
-    "nitro:init"(nitro) {
+    "nitro:init": function (nitro) {
       if (host === "cloudflare") nitro.hooks.hook("compiled", () => syncCloudflareTemplate(nitro.options.output.serverDir))
     },
     // The CLI nightly adds a dev-only socket-cleanup plugin from @nuxt/cli, which this Nuxt nightly's
     // server import protection rejects. Dev works without it.
-    "nitro:config"(config) {
+    "nitro:config": function (config) {
       config.plugins = config.plugins?.filter(plugin => !String(plugin).includes("dev-close-sockets"))
     },
   },
@@ -240,5 +269,5 @@ export default defineNuxtConfig({
         },
       },
     },
-  } as never,
+  },
 })

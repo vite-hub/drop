@@ -25,7 +25,7 @@ export default defineValidatedHandler({
     event.res.status = 204
     if (!drop || (drop.kind !== "app" && drop.kind !== "html") || drop.expired || !permissions(drop, who).view) return null
     await requireRateLimit(event, "runtime-error", { key: `${drop.id}:${who?.userId ?? "guest"}`, limit: 10, window: "1m" })
-    const { version, errors } = await event.req.json() as { version: number; errors: v.InferOutput<typeof Report>[] }
+    const { version, errors } = await event.req.json()
     if (version === drop.version) await recordRuntimeErrors(drop.id, version, errors)
     return null
   },

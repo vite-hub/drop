@@ -2,10 +2,10 @@
 // preview builds or from the "Review with Drop" bookmarklet. It adds one element, a toolbar in a closed shadow root,
 // so the page's CSS can't reach it and it touches nothing else on the page. It does nothing until someone presses
 // Comment. It carries no key: Drop finds the site drop from the page's origin when someone connects.
-import { ELEMENT_NAMING } from "./plan-runtime";
+import { ELEMENT_NAMING } from "./plan-runtime"
 
 /** Pinned, and loaded only when someone presses Comment. A page whose CSP blocks it sends comments without a screenshot. */
-export const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0";
+export const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
 
 const STYLE = `
 :host { all: initial; --bg: #fff; --fg: #0a0a0a; --muted: #737373; --border: #e5e5e5; --primary: #171717; --primary-fg: #fafafa; --ring: #a3a3a3; --error: #dc2626; }
@@ -32,9 +32,9 @@ textarea { display: block; width: 100%; min-height: 88px; resize: vertical; padd
 .msg { margin: 8px 0 0; color: var(--error); font-size: 13px; }
 .toast { position: fixed; right: 16px; bottom: 64px; display: flex; gap: 8px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .toast a { color: var(--fg); font-weight: 500; }
-`;
+`
 
-const ICON = `<svg viewBox="0 0 256 256" aria-hidden="true"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>`;
+const ICON = `<svg viewBox="0 0 256 256" aria-hidden="true"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>`
 
 const MARKUP = `<div class="ui">
 <div class="bar"><button class="btn primary" type="button" data-act="comment">${ICON}Comment</button><a class="count" hidden target="_blank" rel="noopener"></a></div>
@@ -43,7 +43,7 @@ const MARKUP = `<div class="ui">
 <form class="pop" hidden><textarea aria-label="Comment" maxlength="4000" placeholder="What should change here?"></textarea><p class="msg" role="alert" hidden></p>
 <div class="row"><span class="who"></span><button class="btn" type="button" data-act="cancel">Cancel</button><button class="btn primary" type="submit">Send</button></div></form>
 <div class="toast" role="status" hidden></div>
-</div>`;
+</div>`
 
 /**
  * The screenshot: `captureViewport(skip)` draws the viewport as the reviewer sees it, without `skip` (the toolbar),
@@ -187,7 +187,7 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024;
       return node === el ? label + " (" + what + ")" : label + " in a " + what;
     }
     return label;
-  }`;
+  }`
 
 /**
  * The review toolbar. Comment opens Drop's connect popup the first time (Drop's origin, Drop's session), which hands
@@ -394,4 +394,4 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   document.documentElement.appendChild(host);
   void refreshCount();
-})();`;
+})();`

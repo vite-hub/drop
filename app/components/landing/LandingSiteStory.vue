@@ -42,7 +42,7 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
             <div class="flex h-full flex-col gap-3 p-4">
               <div class="flex min-h-0 flex-1 flex-col justify-end gap-2.5 overflow-hidden [&>*]:shrink-0 [&>*]:[animation:pop-in_320ms_var(--ease-out)]">
                 <BrainlessClaudeMessage v-if="at('a.read')" role="user">fix what the reviewers marked on the preview</BrainlessClaudeMessage>
-                <BrainlessClaudeToolCall v-if="at('a.read')" tool="drop - read_drop (MCP)" arg='id: "acme-previews"' result='1. "Say "Start free trial"…" (Ana) · /pricing · screenshot' />
+                <BrainlessClaudeToolCall v-if="at('a.read')" tool="drop - read_drop (MCP)" arg="id: &quot;acme-previews&quot;" result="1. &quot;Say &quot;Start free trial&quot;…&quot; (Ana) · /pricing · screenshot" />
                 <BrainlessClaudeDiff
                   v-if="at('a.fix')"
                   file="app/pages/pricing.vue"
@@ -53,7 +53,7 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                   ]"
                 />
                 <template v-if="at('a.resolve')">
-                  <BrainlessClaudeToolCall tool="drop - update_drop (MCP)" arg='id: "acme-previews", resolves: [1]' result="Resolved #1" />
+                  <BrainlessClaudeToolCall tool="drop - update_drop (MCP)" arg="id: &quot;acme-previews&quot;, resolves: [1]" result="Resolved #1" />
                   <BrainlessClaudeMessage>Pushed. The preview redeploys with the new label.</BrainlessClaudeMessage>
                 </template>
               </div>

@@ -16,7 +16,7 @@ export default defineValidatedHandler({
   async handler(event) {
     const who = await identify(event)
     await requireRateLimit(event, "review-token", { key: who?.userId, limit: 20, window: "1m" })
-    const { origin, choice, name } = await event.req.json() as { origin: string; choice: string; name?: string }
+    const { origin, choice, name } = await event.req.json()
     const id = await openChoice(event, choice, origin, who)
     const site = id ? await findDrop(id, event) : null
     if (!site || site.kind !== "site" || !site.siteUrl || !siteMatches(site.siteUrl, origin) || !permissions(site, who).comment)

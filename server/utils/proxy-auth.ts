@@ -12,7 +12,7 @@ export function authProxy() {
   const { authProxy: enabled, authProxyCookie } = useServerEnv().drop
   const cookie = authProxyCookie.trim() || null
   if (enabled && !githubOrganization()) throw new Error("DROP_AUTH_PROXY requires DROP_GITHUB_ORG.")
-  if (cookie && !/^[A-Za-z0-9_-]+$/.test(cookie)) throw new Error("DROP_AUTH_PROXY_COOKIE must be a cookie name.")
+  if (cookie && !/^[\w-]+$/.test(cookie)) throw new Error("DROP_AUTH_PROXY_COOKIE must be a cookie name.")
   return { enabled, cookie }
 }
 

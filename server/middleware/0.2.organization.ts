@@ -11,7 +11,7 @@ export default defineHandler(async (event) => {
   if (/^\/api\/review\/[^/]+\/comments$/.test(path)) return
   // An upload URL sends no session either: its ticket carries the member, who must still be one (readUpload).
   if (/^\/api\/uploads\/[^/]+$/.test(path)) return
-  if (/^\/(?:api|d|f|i)(?:\/|$)/.test(path)) {
+  if (/^\/(?:api|[dfi])(?:\/|$)/.test(path)) {
     const { requireIdentity } = await import("../utils/identity")
     await requireIdentity(event)
     event.res.headers.set("Cache-Control", "private, no-store")

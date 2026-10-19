@@ -80,7 +80,7 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
 let signingKeys: { at: number; keys: Promise<JSONWebKeySet> } | undefined
 function jwksFor(event: H3Event, fresh = false) {
   if (fresh || !signingKeys || Date.now() - signingKeys.at > 300_000)
-    signingKeys = { at: Date.now(), keys: authFor(event).api.getJwks() as Promise<JSONWebKeySet> }
+    signingKeys = { at: Date.now(), keys: authFor(event).api.getJwks() }
   return signingKeys.keys
 }
 
@@ -106,7 +106,7 @@ async function fromAccessToken(event: H3Event, token: string): Promise<Identity 
 export async function requireIdentity(event: H3Event): Promise<Identity> {
   const who = await identify(event)
   if (who) return who
-  event.res.headers.set("WWW-Authenticate", 'Bearer realm="drop"')
+  event.res.headers.set("WWW-Authenticate", "Bearer realm=\"drop\"")
   throw new HTTPError({ status: 401, statusText: "Sign in, or connect your agent through Drop's MCP server." })
 }
 

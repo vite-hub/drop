@@ -218,8 +218,8 @@ test("concurrent SQLite clients cannot reserve more than three slots or the rema
   const source = `const { parentPort, workerData } = require('node:worker_threads'); const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(workerData.path); db.exec('PRAGMA busy_timeout=10000'); const row = db.prepare(workerData.query).get(...workerData.values); db.close(); parentPort.postMessage(Boolean(row));`
   const race = (drops, bytes, writes, dropLimit, byteLimit, writeLimit) => Promise.all(Array.from({ length: 12 }, () => new Promise((resolve, reject) => {
     const now = Date.now()
-    const worker = new Worker(source, { eval: true, workerData: { path, query: reserveSQL, values: ['owner', '2026-10', now - QUOTA_RESERVATION_TTL_MS, crypto.randomUUID(), drops, bytes, writes, null, now, 1, drops, dropLimit, 1, bytes, byteLimit, 1, writes, writeLimit] } })
-    worker.once('message', resolve); worker.once('error', reject)
+    const worker = new Worker(source, { eval: true, workerData: { path, query: reserveSQL, values: ["owner", "2026-10", now - QUOTA_RESERVATION_TTL_MS, crypto.randomUUID(), drops, bytes, writes, null, now, 1, drops, dropLimit, 1, bytes, byteLimit, 1, writes, writeLimit] } })
+    worker.once("message", resolve); worker.once("error", reject)
   })))
   try {
     assert.equal((await race(1, 1, 1, 3, 100, 1000)).filter(Boolean).length, 3)

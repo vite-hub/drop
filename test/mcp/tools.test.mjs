@@ -170,10 +170,10 @@ test("update_drop shares, trashes, and restores; the Trash lists separately", as
 })
 
 test("an agent publishes an app, sends only what changed, and hears about missing files", async () => {
-  const app = (await call(publish, { files: { "index.html": '<script type="module" src="app.js"></script><img src="logo.png">', "app.js": "import x from 'preact'" }, note: "Prototype", lifetime: "temporary" }))
+  const app = (await call(publish, { files: { "index.html": "<script type=\"module\" src=\"app.js\"></script><img src=\"logo.png\">", "app.js": "import x from 'preact'" }, note: "Prototype", lifetime: "temporary" }))
   assert.deepEqual(app.structuredContent.warnings, [
-    'index.html loads image or media "logo.png", but logo.png isn\'t in the app.',
-    'app.js imports "preact", a bare module name that browsers can\'t load. Import it from a CDN URL (https://esm.sh/preact) or add an import map.',
+    "index.html loads image or media \"logo.png\", but logo.png isn't in the app.",
+    "app.js imports \"preact\", a bare module name that browsers can't load. Import it from a CDN URL (https://esm.sh/preact) or add an import map.",
   ])
   assert.match(app.content[0].text, /point at nothing in the app/)
   const next = await call(publish, { previous: app.structuredContent.id, files: { "app.js": "import x from 'https://esm.sh/preact'", "logo.png": "" }, note: "Fix imports" })

@@ -65,7 +65,7 @@ async function token(origin = SITE, { name, pick = 0 } = {}) {
 
 function comment(bearer, data, { screenshot, origin = SITE } = {}) {
   const form = new FormData()
-  form.append("data", JSON.stringify({ body: "Make the button bigger", page: "/pricing?plan=pro#faq", selector: "main > button", label: 'button "Buy"', ox: 100, oy: 200, ow: 300, oh: 150, viewport: { width: 1440, height: 900 }, ...data }))
+  form.append("data", JSON.stringify({ body: "Make the button bigger", page: "/pricing?plan=pro#faq", selector: "main > button", label: "button \"Buy\"", ox: 100, oy: 200, ow: 300, oh: 150, viewport: { width: 1440, height: 900 }, ...data }))
   if (screenshot) form.append("screenshot", new Blob([screenshot]), "screenshot")
   return answer(commentsPost, request("/api/review/comments", { method: "POST", headers: { origin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) }, body: form }))
 }
@@ -122,7 +122,7 @@ test("an agent creates one site drop for every preview, and the tag it gets carr
   assert.equal(drop.share, "public_comment")
   const row = sql.prepare("SELECT link, site_url, size, blob_key FROM drops WHERE id = ?").get(drop.id)
   assert.deepEqual({ ...row }, { link: row.link, site_url: PATTERN, size: 0, blob_key: null })
-  assert.equal(drop.script, '<script src="https://drop.example/review.js" defer></script>')
+  assert.equal(drop.script, "<script src=\"https://drop.example/review.js\" defer></script>")
   assert.equal(drop.bookmarklet, reviewBookmarklet("https://drop.example"))
   assert.doesNotMatch(created.content[0].text.split("\n\n")[1], new RegExp(row.link), "the link is the agent's, not the tag's")
   assert.match(created.content[0].text, /preview builds only/)
@@ -295,14 +295,14 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   assert.ok(objects.has(image.blob_key))
   const first = sql.prepare("SELECT * FROM comments WHERE drop_id = ?").get(image.id)
   assert.deepEqual({ kind: first.kind, selector: first.selector, ox: first.ox, oy: first.oy, ow: first.ow, oh: first.oh, label: first.label, quote: first.quote, page: first.page, author_name: first.author_name, author_id: first.author_id },
-    { kind: "image", selector: "body > img", ox: 100, oy: 200, ow: 300, oh: 150, label: "main > button", quote: 'button "Buy"', page: "/pricing?plan=pro#faq", author_name: "Ole (guest)", author_id: null })
+    { kind: "image", selector: "body > img", ox: 100, oy: 200, ow: 300, oh: 150, label: "main > button", quote: "button \"Buy\"", page: "/pricing?plan=pro#faq", author_name: "Ole (guest)", author_id: null })
 
-  const plain = await comment(body.token, { body: "Typo in the footer", page: "/", label: 'a "Pricing" in a sticky header' })
+  const plain = await comment(body.token, { body: "Typo in the footer", page: "/", label: "a \"Pricing\" in a sticky header" })
   assert.equal((await json(plain)).n, 2, "numbered with the screenshots' comments")
   const second = sql.prepare("SELECT * FROM comments WHERE drop_id = 'site'").get()
   assert.equal(second.kind, "area")
   assert.equal(second.selector, "main > button")
-  assert.equal(second.quote, 'a "Pricing" in a sticky header', "the script says when the box is on something that doesn't scroll")
+  assert.equal(second.quote, "a \"Pricing\" in a sticky header", "the script says when the box is on something that doesn't scroll")
 
   // A reply on the screenshot in Drop takes the site's next number.
   state.who = who
@@ -410,7 +410,7 @@ test("read_drop lists a site's comments as page content, and update_drop resolve
   assert.match(text, /Box 10%–40% across, 20%–35% down the screenshot, over button "Buy" \(main > button\)/)
   const [first, second] = read.structuredContent.comments
   assert.match(first.fileUrl, /^https:\/\/drop\.example\/f\/[0-9a-f-]{36}\.png$/)
-  assert.deepEqual(first.element, { selector: "main > button", text: 'button "Buy"' })
+  assert.deepEqual(first.element, { selector: "main > button", text: "button \"Buy\"" })
   assert.equal(second.fileUrl, null)
   assert.equal(read.structuredContent.siteUrl, SITE)
 

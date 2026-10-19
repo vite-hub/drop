@@ -44,9 +44,9 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
             <div class="flex h-full flex-col gap-3 p-4">
               <div class="flex min-h-0 flex-1 flex-col justify-end gap-2.5 overflow-hidden [&>*]:shrink-0 [&>*]:[animation:pop-in_320ms_var(--ease-out)]">
                 <BrainlessClaudeMessage v-if="at('t.folders')" role="user">plan the billing migration and drop it for the team</BrainlessClaudeMessage>
-                <BrainlessClaudeToolCall v-if="at('t.folders')" tool="drop - list_folders (MCP)" result='Plans: "One doc per project. Goal, rollout, risks."' />
+                <BrainlessClaudeToolCall v-if="at('t.folders')" tool="drop - list_folders (MCP)" result="Plans: &quot;One doc per project. Goal, rollout, risks.&quot;" />
                 <template v-if="at('t.drop')">
-                  <BrainlessClaudeToolCall tool="drop - publish (MCP)" arg='folder: "Plans", title: "Billing migration", lifetime: "review"' result="Published: drop.vitehub.dev/d/b1lm (id=b1lm)" />
+                  <BrainlessClaudeToolCall tool="drop - publish (MCP)" arg="folder: &quot;Plans&quot;, title: &quot;Billing migration&quot;, lifetime: &quot;review&quot;" result="Published: drop.vitehub.dev/d/b1lm (id=b1lm)" />
                   <BrainlessClaudeMessage>It's in Plans, laid out the way the folder asks. The team can open it now.</BrainlessClaudeMessage>
                 </template>
               </div>
