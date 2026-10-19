@@ -13,9 +13,9 @@ const siteDialog = useSiteDialog()
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const open = useRowsOpen()
-const { data: trash } = useApi("/api/drops", { key: "trash", query: { trash: 1 }, default: () => [] })
+const { data: trash } = useApi("/api/drops", { key: keys.trash, query: { trash: 1 }, default: () => [] })
 const { data: withMe } = useSharedWithMe()
-const { data: usage } = useApi("/api/usage", { key: "usage" })
+const { data: usage } = useApi("/api/usage", { key: keys.usage })
 const limited = computed(() => usage.value?.enabled && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null))
 const nearLimit = computed(() => usage.value && usageNearLimit(usage.value))
 const atLimit = computed(() => usage.value && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null && quota.used >= quota.limit))
@@ -23,7 +23,7 @@ const storageMiB = computed(() => Math.ceil((usage.value?.bytes.used ?? 0) / MIB
 const FILTERS = ["all", "private", "shared", "with-me", "trash"] as const
 type Filter = typeof FILTERS[number]
 // The tab lives in the URL so the sidebar can link straight to Shared with me.
-const route = useRoute()
+const route = useRoute("drops")
 const filter = computed<Filter>({
   get: () => FILTERS.find(tab => tab === route.query.tab) ?? "all",
   set: tab => void navigateTo({ query: { ...route.query, tab: tab === "all" ? undefined : tab } }, { replace: true }),
@@ -54,7 +54,7 @@ const counts = computed(() => ({
 // Your own drops search on the server, inside every folder; the Trash and Shared with me filter what they list.
 const query = refDebounced(computed(() => search.value.trim()), 200)
 const deep = computed(() => Boolean(query.value) && filter.value !== "trash" && filter.value !== "with-me")
-const { data: found, status: searching } = useApi<DropSummary[]>("/api/drops", { key: "drop-search", query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
+const { data: found, status: searching } = useApi<DropSummary[]>("/api/drops", { key: keys.dropSearch, query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
 
 const visible = computed(() => {
   const words = search.value.trim().toLowerCase()

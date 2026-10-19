@@ -24,7 +24,7 @@ const { data: me } = useMe()
 // The team's folders are the admins' to share.
 const changeable = computed(() => !theirs.value && (!props.drop.teamFolder || me.value?.role === "admin"))
 const choices = computed(() => shareItems(me.value, props.drop))
-const status = computed(() => shareStatus(props.drop))
+const status = computed(() => shareStatus(props.drop, now.value))
 
 const link = useShareUrl(() => props.drop)
 const detail = computed(() => {
@@ -87,7 +87,7 @@ const menu = computed(() => [
       <UIcon :name="open ? 'i-ph-folder-open' : 'i-ph-folder'" class="size-[18px]" />
     </button>
     <span v-else class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default">
-      <UIcon :name="KIND_ICONS[drop.kind] ?? 'i-ph-file'" class="size-[18px]" />
+      <UIcon :name="KIND_ICONS[drop.kind]" class="size-[18px]" />
     </span>
     <div class="min-w-0">
       <NuxtLink class="flex min-w-0 items-center gap-2 after:absolute after:inset-0" :to="`/drops/${drop.id}`">

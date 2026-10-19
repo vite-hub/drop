@@ -14,7 +14,10 @@ definePageMeta({
 const route = useRoute("d-id-slug")
 const { data: me } = await useMe()
 const pinned = computed(() => Number(route.query.v) || undefined)
-const target = await useApi<DropLink>(() => `/api/links/${route.params.id}${pinned.value ? `?v=${pinned.value}` : ""}`, { key: () => `drop-link:${route.params.id}:${pinned.value ?? ""}` })
+const target = await useApi<DropLink>(() => `/api/links/${route.params.id}`, {
+  key: () => keys.dropLink(route.params.id, pinned.value),
+  query: computed(() => (pinned.value ? { v: pinned.value } : {})),
+})
 
 async function settle() {
   const link = target.data.value
@@ -25,7 +28,7 @@ await settle()
 watch(() => target.data.value, settle)
 
 // Until the link resolves (or when it can't), the drop API answers for the key itself and says why it can't open.
-const { drop, comments } = provideDrop(() => target.data.value?.id ?? String(route.params.id))
+const { drop, comments } = provideDrop(() => target.data.value?.id ?? route.params.id)
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
 // A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.
@@ -39,7 +42,7 @@ const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview
     <DropViewer v-if="drop.data.value" :key="drop.data.value.id" public-view />
     <UDashboardPanel v-else id="drop-missing">
       <template #body>
-        <ContentUnavailable :status="drop.error.value?.statusCode ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
+        <ContentUnavailable :status="drop.error.value?.status ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
       </template>
     </UDashboardPanel>
   </template>
@@ -47,5 +50,5 @@ const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview
     <DropViewer :key="drop.data.value.id" public-view />
     <ShortcutsModal />
   </UDashboardGroup>
-  <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.statusCode ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
+  <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.status ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
 </template>

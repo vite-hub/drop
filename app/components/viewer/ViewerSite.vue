@@ -10,7 +10,7 @@ import type { DropDetail, SiteReviewItem } from "#shared/types"
 const props = defineProps<{ drop: DropDetail; publicView: boolean; inset: number }>()
 
 const state = injectDrop()!
-const items = useApi<SiteReviewItem[]>(() => `/api/drops/${props.drop.id}/review`, { key: () => `review:${props.drop.id}`, default: () => [] })
+const items = useApi<SiteReviewItem[]>(() => `/api/drops/${props.drop.id}/review`, { key: () => keys.review(props.drop.id), default: () => [] })
 const notify = useNotify()
 const origin = useRequestURL().origin
 const snippet = reviewSnippet(origin)

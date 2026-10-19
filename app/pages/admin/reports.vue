@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: "dashboard", middleware: "auth" })
 useSeoMeta({ title: "Reports" })
-const { data, refresh, error } = await useApi("/api/admin/reports")
+const { data, refresh, error } = await useApi("/api/admin/reports", { key: keys.adminReports })
 const notify = useNotify()
 const busy = ref(false)
 async function act(id: string, action: "dismiss" | "quarantine" | "ban") {

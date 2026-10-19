@@ -11,9 +11,9 @@ const emit = defineEmits<{ close: [] }>()
 const versionTo = useVersionTo()
 
 const options = { lazy: true, server: false }
-const after = useApi<DropDetail>(() => `/api/drops/${props.version.id}`, { key: () => `version:${props.version.id}`, ...options })
+const after = useApi<DropDetail>(() => `/api/drops/${props.version.id}`, { key: () => keys.version(props.version.id), ...options })
 // The first version has nothing before it; the same request (same key) stands in rather than a conditional fetch.
-const before = useApi<DropDetail>(() => `/api/drops/${props.previous?.id ?? props.version.id}`, { key: () => `version:${props.previous?.id ?? props.version.id}`, ...options })
+const before = useApi<DropDetail>(() => `/api/drops/${props.previous?.id ?? props.version.id}`, { key: () => keys.version(props.previous?.id ?? props.version.id), ...options })
 
 const ready = computed(() => after.data.value && (!props.previous || before.data.value))
 const error = computed(() => after.error.value ?? (props.previous ? before.error.value : null))

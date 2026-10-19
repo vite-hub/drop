@@ -10,8 +10,9 @@ import "vite-hub/ui/styles.css"
 const props = defineProps<{ editor?: Editor; synced: boolean }>()
 const prompt = usePrompt()
 
-// Everyone in this Drop, for "@". Editors are always signed in, and any signed-in person may list members.
-const { data: members } = useApi("/api/members", { key: "members", server: false, lazy: true, default: () => [] })
+// Everyone in this Drop, for "@". Editors are always signed in. The editor only mounts in the browser, and nothing
+// waits on the list.
+const { data: members } = useMemberList()
 const people = computed(() => members.value.filter(member => !member.banned).map(member => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })))
 
 // GitHub's emoji set, loaded with the editor rather than with the page. Custom GitHub images have no character to insert.

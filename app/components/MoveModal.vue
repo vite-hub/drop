@@ -6,7 +6,7 @@ import type { DropSummary } from "#shared/types"
 const props = defineProps<{ drop: Pick<DropSummary, "id" | "title" | "kind" | "parentId"> }>()
 const emit = defineEmits<{ close: [moved: boolean] }>()
 const { move } = useDropActions()
-const { data: folders, status } = useApi<DropSummary[]>("/api/drops", { key: "folders", query: { folders: 1 }, default: () => [], server: false })
+const { data: folders, status } = useApi<DropSummary[]>("/api/drops", { key: keys.folders, query: { folders: 1 }, default: () => [], server: false })
 const busy = ref(false)
 
 const where = (folder: DropSummary) => [...(folder.path ?? []).map(crumb => crumb.title), folder.title].join(" / ")

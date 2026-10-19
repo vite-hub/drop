@@ -5,7 +5,7 @@
  */
 useSeoMeta({ title: "Open the review", robots: "noindex, nofollow" })
 
-const route = useRoute()
+const route = useRoute("review-open")
 const { data: me } = await useMe()
 const ready = useMounted()
 const error = ref("")
@@ -23,7 +23,7 @@ onMounted(async () => {
   }
 })
 
-const signInTo = computed(() => `/signin?redirect=${encodeURIComponent(route.fullPath)}`)
+const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.fullPath } }))
 </script>
 
 <template>

@@ -1,11 +1,14 @@
 import type { Member } from "#shared/types"
 
+/** Everyone in this Drop. Any signed-in person may list them: the Members page, and "@" in the editor. */
+export const useMemberList = () => useApi("/api/members", { key: keys.members, default: () => [] })
+
 /** Who's in this Drop, and the admin actions on them. */
 export function useMembers() {
-  const { data: members, status } = useApi("/api/members", { key: "members", default: () => [] })
+  const { data: members, status } = useMemberList()
   const notify = useNotify()
   const confirm = useConfirm()
-  const reload = () => refreshNuxtData(["members", "me"])
+  const reload = () => refreshNuxtData([keys.members, keys.me])
 
   async function update(member: Member, body: { banned: boolean }, title: string, description?: string) {
     try {

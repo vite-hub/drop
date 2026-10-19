@@ -19,7 +19,12 @@ export const useApi = createUseFetch(() => {
 
 /** The signed-in person, their role, and whether this Drop is personal or a team. Null when signed out. */
 export function useMe() {
-  return useApi("/api/me", { key: "me", default: () => null })
+  return useApi("/api/me", { key: keys.me, default: () => null })
+}
+
+/** How this Drop signs people in. `proxy`: through an oauth2-proxy (read at runtime), so signing in again returns the same account. */
+export function useSignInMethod() {
+  return useApi("/api/sign-in", { key: keys.signIn })
 }
 
 /**
@@ -27,7 +32,7 @@ export function useMe() {
  * handlers) carry the schema's own message in `data.issues`, which beats a generic "Validation failed".
  */
 export function errorText(error: unknown, fallback = "Something went wrong. Try again.") {
-  const value = error as { data?: { code?: string; statusText?: string; message?: string; data?: { issues?: Array<{ message?: string }> } }; statusMessage?: string; message?: string }
+  const value = error as { data?: { code?: string; statusText?: string; message?: string; data?: { issues?: Array<{ message?: string }> } }; statusText?: string; message?: string }
   if (value?.data?.code === "DROP_LIMIT_REACHED") return value.data.message ?? fallback
-  return value?.data?.data?.issues?.[0]?.message ?? value?.data?.statusText ?? value?.statusMessage ?? value?.data?.message ?? value?.message ?? fallback
+  return value?.data?.data?.issues?.[0]?.message ?? value?.data?.statusText ?? value?.statusText ?? value?.data?.message ?? value?.message ?? fallback
 }

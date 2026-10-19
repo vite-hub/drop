@@ -7,7 +7,7 @@ definePageMeta({
   alias: "/home",
   middleware: async (to) => {
     if (to.path !== "/") return
-    const { data: cached } = useNuxtData("me")
+    const { data: cached } = useNuxtData(keys.me)
     const me = cached.value ?? (await useMe()).data.value
     if (me) return navigateTo("/drops", { replace: true })
   },
@@ -41,7 +41,7 @@ useHead({
   }],
 })
 
-const route = useRoute()
+const route = useRoute("index")
 const { signedIn, signInWithGitHub } = useGitHubSignIn()
 
 // `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.

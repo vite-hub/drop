@@ -5,7 +5,7 @@ const props = defineProps<{ status: number; path: string; waitingForReview?: boo
 // Only failed views need the account lookup; successful shared views stay on their existing request path.
 const { data: me } = await useMe()
 // Behind an auth proxy (read at runtime, as on /signin) signing in again only returns the same account.
-const { data: method } = await useApi("/api/sign-in", { key: "sign-in" })
+const { data: method } = await useSignInMethod()
 const message = computed(() => contentUnavailable(props.status, props.path, me.value?.email, props.waitingForReview, Boolean(method.value?.proxy)))
 const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\/([^/]+)\/?$/, "/d/$1"))
 </script>

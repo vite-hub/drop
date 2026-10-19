@@ -10,7 +10,7 @@ useSeoMeta({ title: "Comment on a site", robots: "noindex, nofollow" })
 interface Site { choice: string; title: string; owner: string; address: string }
 interface Issued { token: string; expiresAt: number; origin: string; title: string; name: string }
 
-const route = useRoute()
+const route = useRoute("review-connect")
 const { data: me } = await useMe()
 const ready = useMounted()
 const origin = computed(() => (typeof route.query.origin === "string" ? route.query.origin : ""))
@@ -66,7 +66,7 @@ onMounted(async () => {
   else state.value = "choose"
 })
 
-const signInTo = computed(() => `/signin?redirect=${encodeURIComponent(route.fullPath)}`)
+const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.fullPath } }))
 </script>
 
 <template>

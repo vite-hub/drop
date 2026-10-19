@@ -9,7 +9,7 @@ const shortcutsOpen = useShortcutsOpen()
 const { data: recent } = useDrops()
 const term = ref("")
 const query = refDebounced(computed(() => term.value.trim()), 150)
-const { data: found, status } = useApi<DropSummary[]>("/api/search", { key: "search", query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
+const { data: found, status } = useApi<DropSummary[]>("/api/search", { key: keys.search, query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
 
 /** Where a drop lives: whose it is when it isn't yours, then its folders. */
 function where(drop: DropSummary) {
@@ -17,7 +17,7 @@ function where(drop: DropSummary) {
   return [drop.owner?.name, folders && `in ${folders}`].filter(Boolean).join(" · ") || undefined
 }
 const toItem = (drop: DropSummary): CommandPaletteItem => ({
-  id: drop.id, label: drop.title, suffix: where(drop), description: drop.snippet, icon: KIND_ICONS[drop.kind] ?? "i-ph-file", to: `/drops/${drop.id}`,
+  id: drop.id, label: drop.title, suffix: where(drop), description: drop.snippet, icon: KIND_ICONS[drop.kind], to: `/drops/${drop.id}`,
 })
 
 // Plain links: the three /drops tabs would all read as the current page otherwise.

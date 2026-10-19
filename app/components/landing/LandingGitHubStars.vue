@@ -1,11 +1,7 @@
 <script setup lang="ts">
 // The server shares a cached count across visitors. Hide it until it loads, and on failure.
-const stars = ref<number | null>(null)
-
-onMounted(async () => {
-  const response = await $fetch<{ stars: number | null }>("/api/github-stars").catch(() => ({ stars: null }))
-  stars.value = response.stars
-})
+const { data } = useApi<{ stars: number | null }>("/api/github-stars", { key: keys.githubStars, server: false, lazy: true })
+const stars = computed(() => data.value?.stars ?? null)
 
 const label = computed(() => (stars.value === null ? "" : stars.value >= 1000 ? `${(stars.value / 1000).toFixed(1)}k` : String(stars.value)))
 </script>

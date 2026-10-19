@@ -23,7 +23,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const editing = computed(() => Boolean(documentId.value))
   const people = realtime.people
 
-  const url = (id: string, edit = false) => `${options.publicView ? "/d" : "/drops"}/${id}${edit ? "?edit=1" : ""}`
+  const url = (id: string, edit = false) => ({ path: `${options.publicView ? "/d" : "/drops"}/${id}`, query: edit ? { edit: "1" } : {} })
 
   // The room's extensions exist once its Y.Doc and provider do. Rebuild the editor only for a new room: the extensions
   // list is recomputed on reconnects too, and a rebuild would drop focus mid-sentence.
@@ -100,7 +100,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       realtime.provider.value?.awareness.setLocalStateField("published", { id: next.id, version: next.version, name: me?.name ?? "Someone" } satisfies Published)
       notify.done(`Published v${next.version}`, "The previous version stays in history.")
       // A new version adds bytes and a write, so the plan usage moves too.
-      await refreshNuxtData(["drops", "usage"])
+      await refreshNuxtData([keys.drops, keys.usage])
       // Let the announcement reach the room before this client leaves it.
       await promiseTimeout(300)
       close()

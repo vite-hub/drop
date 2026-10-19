@@ -8,10 +8,8 @@ import type { CommentInput } from "#shared/schemas"
  */
 export function useDrop(id: MaybeRefOrGetter<string>) {
   const notify = useNotify()
-  const dropKey = () => `drop:${toValue(id)}`
-  const commentsKey = () => `comments:${toValue(id)}`
-  const drop = useApi<DropDetail>(() => `/api/drops/${toValue(id)}`, { key: dropKey })
-  const comments = useApi<DropComment[]>(() => `/api/drops/${toValue(id)}/comments`, { key: commentsKey, default: () => [] })
+  const drop = useApi<DropDetail>(() => `/api/drops/${toValue(id)}`, { key: () => keys.drop(toValue(id)) })
+  const comments = useApi<DropComment[]>(() => `/api/drops/${toValue(id)}/comments`, { key: () => keys.comments(toValue(id)), default: () => [] })
 
   async function addComment(input: Omit<CommentInput, "body">, body: string) {
     try {

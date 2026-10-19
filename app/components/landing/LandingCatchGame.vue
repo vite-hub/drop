@@ -49,7 +49,6 @@ const { pause, resume } = useRafFn(({ delta }) => {
       score.value++
       best.value = Math.max(best.value, score.value)
       pops.value.push({ id: item.id, x: item.x })
-      setTimeout(() => (pops.value = pops.value.filter(pop => pop.id !== item.id)), 600)
       return false
     }
     if (item.y > height.value) {
@@ -110,6 +109,7 @@ function key(event: KeyboardEvent) {
       :key="`pop-${pop.id}`"
       class="absolute font-mono text-xs font-semibold text-highlighted [animation:float-up_600ms_var(--ease-out)_both]"
       :style="{ left: `${pop.x * width}px`, bottom: '64px' }"
+      @animationend="pops = pops.filter(other => other.id !== pop.id)"
     >+1</span>
     <DropMark class="absolute bottom-6 left-0 h-10" :style="{ width: `${HAND}px`, transform: `translateX(${hand * width - HAND / 2}px)` }" />
     <p v-if="!manual" class="label-mono absolute inset-x-0 bottom-1.5 text-center text-[10px] text-dimmed">Hover or tap to play</p>

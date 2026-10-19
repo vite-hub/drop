@@ -6,7 +6,7 @@
  */
 useSeoMeta({ title: "Connect an agent", robots: "noindex" })
 
-const route = useRoute()
+const route = useRoute("oauth")
 const { $auth } = useNuxtApp()
 const { loggedIn, user, signIn } = useUserSession($auth)
 const ready = useMounted()
@@ -15,7 +15,7 @@ const clientId = computed(() => (typeof route.query.client_id === "string" ? rou
 const valid = computed(() => Boolean(clientId.value && route.query.sig))
 
 // The agent's name, as it registered itself ("Claude Code", "Codex"…). Readable once signed in.
-const { data: client, execute: loadClient } = useAsyncData("oauth-client", async () => {
+const { data: client, execute: loadClient } = useAsyncData(keys.oauthClient, async () => {
   const { data, error } = await $auth.oauth2.publicClient({ query: { client_id: clientId.value } })
   if (error) throw new Error(error.message || "Couldn't load this agent. Start the connection again.")
   return data
