@@ -2,7 +2,7 @@ import { useServerEnv } from "#vitehub/env/server"
 import { githubOrganization } from "./github-membership.ts"
 
 /** Whether sign-in is delegated to oauth2-proxy, and the cookie it sets. */
-export function authProxy() {
+export function readAuthProxyConfig() {
   let env: ReturnType<typeof useServerEnv>["drop"]
   try {
     env = useServerEnv().drop

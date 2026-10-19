@@ -3,11 +3,9 @@ declare module "cloudflare:workers" {
   export const env: Record<string, unknown>
 }
 
-import type { Identity } from "../server/utils/identity"
-
 declare module "h3" {
   interface H3EventContext {
-    dropIdentity?: Promise<Identity | null>
+    dropIdentity?: Promise<import("../server/utils/identity").Identity | null>
     dropAccessChecked?: boolean
   }
 }

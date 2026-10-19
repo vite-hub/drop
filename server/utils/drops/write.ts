@@ -26,7 +26,6 @@ import { splitFrontmatter } from "#shared/frontmatter"
 import { permissions } from "./access"
 import { findDrop, findDropByBlob, versionChain, storageFailure } from "./query"
 
-export { MAX_FILE_BYTES }
 const TEXT_KINDS = new Set(["markdown", "html"])
 /** `/f/<key>` links in a doc's source, absolute or relative, with or without `?raw`. */
 const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,16})/gi

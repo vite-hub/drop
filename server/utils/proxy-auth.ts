@@ -4,9 +4,9 @@ import { and, eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { account, user } from "../databases/config"
 import { isGitHubMember } from "./github-membership"
-import { authProxy } from "./proxy-auth-config"
+import { readAuthProxyConfig } from "./proxy-auth-config"
 import { roleOf } from "./identity"
-export { authProxy } from "./proxy-auth-config"
+export const authProxy = readAuthProxyConfig
 
 /** Exchange oauth2-proxy's GitHub token for Drop's session. Header names alone prove nothing. */
 export const proxyAuth = () => ({
