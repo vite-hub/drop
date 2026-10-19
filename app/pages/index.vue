@@ -59,7 +59,7 @@ const FEATURES = [
   { icon: "i-ph-clock-counter-clockwise", title: "Version history", body: "Each version gets a number and a note. History shows what it changed, and open comments carry over.", to: "/docs/review#versions" },
   { icon: "i-ph-magnifying-glass", title: "Search everything", body: "Press ⌘K to find a drop by its name or by the words inside a doc, in any folder.", to: "/docs/review#search" },
   { icon: "i-ph-plug", title: "MCP built in", body: "Add one URL to your agent and sign in through the browser. No API keys.", to: "/docs/agents#add-the-server" },
-  { icon: "i-ph-book-open-text", title: "Skills for your agent", body: "They come with the server: publishing for review, before-and-after for pull requests, handoffs, and explainers.", to: "/docs/agents#skill" },
+  { icon: "i-ph-book-open-text", title: "Skills for your agent", body: "They come with the server: publishing for review, before-and-after for pull requests, UI prototypes, handoffs, and explainers.", to: "/docs/agents#skill" },
   { icon: "i-ph-folder-simple", title: "Folders agents follow", body: "A folder's description says what goes in it and how to write it. Agents read it before they publish.", to: "/docs/agents#folders" },
   { icon: "i-ph-code", title: "Code images", body: "Your agent turns a snippet into a highlighted, framed image for a pull request or a post.", to: "/docs/agents#code-images" },
 ]

@@ -42,10 +42,11 @@ export function mcpSkills(): ExtensionPlugin {
   }
 }
 
-// `-32002` is the MCP code for a resource that doesn't exist; a disabled skill's files read the same way.
+// `-32602` is what the 2026-07-28 revision answers for a resource that doesn't exist (clients still accept the older
+// `-32002`); a disabled skill's files read the same way.
 async function read(name: string, path: string) {
   const file = (await findEnabledSkill(name))?.files.find(item => item.path === path)
-  if (!file) throw new McpJsonRpcError(-32002, `No skill file at skill://${name}/${path}.`, { status: 404 })
+  if (!file) throw new McpJsonRpcError(-32602, `No skill file at skill://${name}/${path}.`, { status: 404, data: { uri: `skill://${name}/${path}` } })
   return { contents: [{ uri: `skill://${name}/${path}`, mimeType: file.mimeType, text: file.text }] }
 }
 
@@ -59,22 +60,21 @@ export const skillResources = [
     title: "Skill file",
     description: "A file of one of Drop's enabled Agent Skills.",
     uriTemplate: "skill://{name}/{file}",
-    mimeType: "text/markdown",
     list: async () => (await enabledSkills()).flatMap(skill => skill.files.map(file => ({
       uri: uriOf(skill, file.path),
       name: `${skill.name}/${file.path}`,
       title: file.path === "SKILL.md" ? `${skill.name} skill` : `${skill.name}: ${file.path}`,
       ...(file.path === "SKILL.md" ? { description: skill.description } : {}),
       mimeType: file.mimeType,
+      size: file.bytes.byteLength,
     }))),
     handler: (_uri, { name, file }) => read(name!, file!),
   }),
   defineMcpResource({
     name: "skill-reference",
     title: "Skill reference",
-    description: "A file in a folder of one of Drop's enabled Agent Skills.",
+    description: "A file in a folder of one of Drop's enabled Agent Skills, such as references/ or assets/.",
     uriTemplate: "skill://{name}/{dir}/{file}",
-    mimeType: "text/markdown",
     handler: (_uri, { name, dir, file }) => read(name!, `${dir}/${file}`),
   }),
 ]

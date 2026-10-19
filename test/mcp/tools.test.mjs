@@ -112,6 +112,25 @@ test("a comment on the whole page points at nothing in it, and agents read it as
   assert.match(read.content[0].text, /1\. \[the whole page\]\n {3}The whole plan reads too long\. \(Owner\)/)
 })
 
+test("a comment inside an element with an id says which section it's in, so a prototype's comments name their variant", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(new Request(`https://drop.example/api/drops/${id}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init) }))
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  const html = `<!doctype html><title>Hero</title><body><section id="v-prism" data-variant="Prism"><h1>Plan demand</h1></section><section id="v-glyphs" data-variant="Glyphs"><h1>Plan demand</h1></section></body>`
+  const page = (await call(publish, { html, note: "Which hero?", lifetime: "temporary" })).structuredContent
+  await commentsPost(route(page.id, { kind: "text", selector: "#v-prism > h1", ox: 0, oy: 0, quote: "Plan demand", body: "Too quiet." }))
+  await commentsPost(route(page.id, { kind: "area", selector: "#v-glyphs", label: 'section "Plan demand"', ox: 0, oy: 0, ow: 1000, oh: 500, body: "Keep this one." }))
+  await commentsPost(route(page.id, { kind: "text", selector: "body > p", ox: 0, oy: 0, quote: "Plan", body: "No id above it." }))
+
+  const { text } = (await call(readDrop, { id: page.id })).content[0]
+  assert.match(text, /1\. > Plan demand \(in #v-prism\)\n {3}Too quiet\./)
+  assert.match(text, /2\. \[the area 0%–100% across, 0%–50% down of section "Plan demand"\] \(in #v-glyphs\)\n {3}Keep this one\./)
+  assert.match(text, /3\. > Plan\n {3}No id above it\./)
+})
+
 test("a comment carried to v2 takes replies; the agent answers in the thread and reads it back", async () => {
   const route = (id, init) => {
     const event = new H3Event(new Request(`https://drop.example/api/drops/${id}/comments`, init && { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init) }))

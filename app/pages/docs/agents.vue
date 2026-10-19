@@ -42,6 +42,7 @@ const tools = computed(() => catalog.value.map(item => ({ name: item.uri ?? item
         <li><code>vitehub-drop</code> tells agents how to drop docs, publish apps, read feedback, and write documents people can review.</li>
         <li><code>pr-evidence</code> builds the before and after for a pull request that changes something visible: screenshots with hand-drawn marks and notes, dropped in Drop, with a snippet for the description.</li>
         <li><code>handoff</code> sums up the current conversation in a doc and drops it, so another agent, a colleague, or a new session picks the work up from the link.</li>
+        <li><code>prototype</code> builds a UI several radically different ways in one page with a shared picker, so people switch between the variants, comment, and pick one; each round of feedback becomes the next version.</li>
         <li><code>show-me</code> explains the current topic with diagrams and short docs in Drop. Agents use it only when you ask for it.</li>
       </ul>
       <p>The <strong>Skills</strong> page lists the skills this Drop serves, each with its source on GitHub. An admin can switch a skill off there for everyone; every way of getting skills then leaves it out.</p>

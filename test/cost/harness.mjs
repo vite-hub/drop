@@ -26,7 +26,7 @@ export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/
 }
 registerHooks({
   load(url, context, next) {
-    if (url.endsWith(".css?raw"))
+    if (url.endsWith("?raw"))
       return { format: "module", source: `export default ${JSON.stringify(readFileSync(new URL(url.replace(/\?raw$/, "")), "utf8"))}`, shortCircuit: true }
     if (process.env.DROP_TEST_BASELINE && url.startsWith(root.href)) {
       const path = url.slice(root.href.length)

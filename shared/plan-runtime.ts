@@ -141,6 +141,8 @@ export const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (!el || (m.earlier && !sameAnchor(el, m))) { unplaced.push(m.id); continue; }
         resized.observe(el);
         const r = el.getBoundingClientRect();
+        // A hidden anchor (a closed tab, a prototype variant not shown) draws nothing until it shows again.
+        if (!r.width && !r.height) continue;
         x = r.left + scrollX + (m.ox / 1000) * r.width; y = r.top + scrollY + (m.oy / 1000) * r.height;
         if (m.ow || m.oh) areaBox(marks, x, y, (m.ow / 1000) * r.width, (m.oh / 1000) * r.height, (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
       } else {

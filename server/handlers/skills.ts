@@ -1,11 +1,11 @@
 import { defineHandler, HTTPError } from "h3"
-import { digest, enabledSkills, findEnabledSkill, skillArchive } from "../utils/skills"
+import { digest, enabledSkills, findEnabledSkill, type SkillFile, skillArchive } from "../utils/skills"
 
 const V2 = "/.well-known/agent-skills/"
 const V1 = "/.well-known/skills/"
 
 const json = (body: unknown) => new Response(JSON.stringify(body, null, 2), { headers: { "content-type": "application/json", "cache-control": "public, max-age=60" } })
-const markdown = (text: string) => new Response(text, { headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "public, max-age=60" } })
+const text = (file: SkillFile) => new Response(file.text, { headers: { "content-type": `${file.mimeType}; charset=utf-8`, "cache-control": "public, max-age=60" } })
 
 /**
  * Agent Skills Discovery. v0.2.0 (`/.well-known/agent-skills/`): an index with a `$schema`, and per skill a
@@ -37,6 +37,6 @@ export default defineHandler(async (event) => {
 
   const [name, ...rest] = path.split("/")
   const file = (await findEnabledSkill(name ?? ""))?.files.find(item => item.path === rest.join("/"))
-  if (file) return markdown(file.text)
+  if (file) return text(file)
   throw new HTTPError({ status: 404, statusText: "No such skill file." })
 })

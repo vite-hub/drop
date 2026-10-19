@@ -6,6 +6,8 @@ import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
 import prEvidenceAnnotations from "../../skills/pr-evidence/references/annotations.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
+import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
+import prototypeMd from "../../skills/prototype/SKILL.md?raw"
 import showMeMd from "../../skills/show-me/SKILL.md?raw"
 import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
 import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
@@ -22,7 +24,7 @@ export interface SkillFile { path: string; text: string; bytes: Uint8Array; mime
 export interface Skill { name: string; description: string; frontmatter: Record<string, unknown>; files: SkillFile[] }
 
 const encoder = new TextEncoder()
-const file = (path: string, text: string): SkillFile => ({ path, text, bytes: encoder.encode(text), mimeType: "text/markdown" })
+const file = (path: string, text: string): SkillFile => ({ path, text, bytes: encoder.encode(text), mimeType: path.endsWith(".js") ? "text/javascript" : "text/markdown" })
 
 function frontmatterOf(markdown: string): Record<string, unknown> {
   const block = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]
@@ -39,6 +41,7 @@ export const SKILLS: Skill[] = [
   skill([file("SKILL.md", dropMd), file("references/documents.md", documentsGuide)]),
   skill([file("SKILL.md", handoffMd)]),
   skill([file("SKILL.md", prEvidenceMd), file("references/annotations.md", prEvidenceAnnotations)]),
+  skill([file("SKILL.md", prototypeMd), file("assets/picker.js", prototypePicker)]),
   skill([file("SKILL.md", showMeMd)]),
 ]
 
@@ -83,14 +86,15 @@ export async function digest(bytes: Uint8Array): Promise<string> {
 }
 
 /**
- * A multi-file skill as one .tar.gz (Discovery v0.2.0 `archive`). Fixed mtimes keep the bytes, and so the
- * digest, the same on every isolate; built once per isolate.
+ * A multi-file skill as one .tar.gz (Discovery v0.2.0 `archive`): the skill directory itself, `SKILL.md` at the
+ * archive's root with no wrapper folder, as the spec asks. Fixed mtimes keep the bytes, and so the digest, the same
+ * on every isolate; built once per isolate.
  */
 const archives = new Map<string, Promise<Uint8Array>>()
 export function skillArchive(item: Skill) {
   let archive = archives.get(item.name)
   if (!archive) {
-    archive = createTarGzip(item.files.map(entry => ({ name: `${item.name}/${entry.path}`, data: entry.bytes, attrs: { mtime: 0, mode: "644" } })))
+    archive = createTarGzip(item.files.map(entry => ({ name: entry.path, data: entry.bytes, attrs: { mtime: 0, mode: "644" } })))
     archives.set(item.name, archive)
   }
   return archive

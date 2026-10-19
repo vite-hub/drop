@@ -42,15 +42,20 @@ export type McpDrop = ReturnType<typeof mcpDrop>
 export const dropLine = (drop: McpDrop) =>
   `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : `${drop.kind} v${drop.version}`}${drop.teamFolder ? ", the team's" : ""}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.publicUntil ? ` until ${drop.publicUntil.slice(0, 10)}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
 
-/** Where a comment points, in words: the quoted text, a spot or area as percentages of an image or element, or the whole page. */
-export function commentTarget(comment: Pick<DropComment, "kind" | "quote" | "label" | "ox" | "oy" | "ow" | "oh">) {
+/**
+ * Where a comment points, in words: the quoted text, a spot or area as percentages of an image or element, or the whole
+ * page. An anchor's path starts at its nearest element with an id, which names the section it sits in (`in #v-prism`).
+ */
+export function commentTarget(comment: Pick<DropComment, "kind" | "selector" | "quote" | "label" | "ox" | "oy" | "ow" | "oh">) {
   if (comment.kind === "page") return "[the whole page]"
-  if (comment.kind === "text") return comment.quote ? `> ${comment.quote}` : comment.label ?? ""
+  const section = comment.selector?.match(/^#([a-z][\w-]*)/i)?.[1]
+  const within = section ? ` (in #${section})` : ""
+  if (comment.kind === "text") return `${comment.quote ? `> ${comment.quote}` : comment.label ?? ""}${within}`
   const pct = (n: number) => `${Math.round(n / 10)}%`
   const where = comment.ow || comment.oh
     ? `the area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
     : `the spot ${pct(comment.ox)} across, ${pct(comment.oy)} down`
-  return `[${where} of ${comment.label ?? (comment.kind === "image" ? "an image" : "an element")}]`
+  return `[${where} of ${comment.label ?? (comment.kind === "image" ? "an image" : "an element")}]${within}`
 }
 
 /** `version` is the one being read: a comment written on an earlier version says which. */
