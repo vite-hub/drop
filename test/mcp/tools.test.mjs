@@ -7,6 +7,7 @@ const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: listDrops } = await import("../../server/mcp/tools/list_drops.ts")
 const { default: updateDrop } = await import("../../server/mcp/tools/update_drop.ts")
+const { default: reply } = await import("../../server/mcp/tools/reply.ts")
 const { default: commentsGet } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
@@ -18,7 +19,7 @@ beforeEach(() => {
 })
 
 // Through a real MCP handler, so each input schema validates the call the way clients see it.
-const server = createMcpHandler({ name: "drop-test", version: "1", origin: false, tools: [publish, readDrop, listDrops, updateDrop] })
+const server = createMcpHandler({ name: "drop-test", version: "1", origin: false, tools: [publish, readDrop, reply, listDrops, updateDrop] })
 async function call(tool, input) {
   const request = new H3Event(new Request("https://drop.example/mcp", {
     method: "POST",
@@ -92,6 +93,34 @@ test("open comments follow a doc to its next versions, numbered across them, and
   const v3 = (await call(publish, { previous: v2.id, markdown: "# Plan\n\nShip it on Monday, after QA.", note: "QA first", resolves: [1, 2] })).structuredContent
   assert.deepEqual(v3.resolved, [1, 2])
   assert.deepEqual(sql.prepare("SELECT n, resolved FROM comments ORDER BY n").all().map(row => [row.n, row.resolved]), [[1, 1], [2, 1]])
+})
+
+test("a comment carried to v2 takes replies; the agent answers in the thread and reads it back", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(new Request(`https://drop.example/api/drops/${id}/comments`, init && { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init) }))
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  const v1 = (await call(publish, { markdown: "# Plan\n\nShip it on Friday.", note: "Draft", lifetime: "review" })).structuredContent
+  await commentsPost(route(v1.id, { kind: "text", selector: "p", ox: 0, oy: 0, quote: "Friday", body: "Why Friday?" }))
+  const v2 = (await call(publish, { previous: v1.id, markdown: "# Plan\n\nShip it on Friday, after QA.", note: "QA first" })).structuredContent
+
+  // #1 was written on v1; the thread still takes a reply through v2's chain.
+  const answered = await call(reply, { id: v2.id, comment: 1, body: "QA signs off Thursday, so Friday is the first free day." })
+  assert.equal(answered.structuredContent.comment, 1)
+  assert.equal(answered.structuredContent.reply.authorName, "Owner")
+  assert.equal((await call(reply, { id: v2.id, comment: 9, body: "Nope" })).isError, true, "a missing number fails")
+
+  const [listed] = await commentsGet(route(v2.id))
+  assert.deepEqual(listed.replies.map(item => item.body), ["QA signs off Thursday, so Friday is the first free day."])
+  const read = await call(readDrop, { id: v2.id })
+  assert.match(read.content[0].text, /Why Friday\? \(Owner, on v1\)\n {3}↳ Owner: QA signs off Thursday/)
+  assert.equal(read.structuredContent.comments[0].replies.length, 1)
+
+  // Deleting the comment takes its thread with it.
+  sql.prepare("DELETE FROM comments").run()
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_replies").get().n, 0)
 })
 
 test("update_drop shares, trashes, and restores; the Trash lists separately", async () => {
