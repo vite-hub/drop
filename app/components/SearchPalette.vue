@@ -5,6 +5,7 @@ import type { CommandPaletteGroup, CommandPaletteItem } from "@nuxt/ui"
 import type { DropSummary } from "#shared/types"
 
 const { data: me } = useMe()
+const shortcutsOpen = useShortcutsOpen()
 const { data: recent } = useDrops()
 const term = ref("")
 const query = refDebounced(computed(() => term.value.trim()), 150)
@@ -27,6 +28,7 @@ const pages = computed<CommandPaletteItem[]>(() => [
   { label: "Agents", icon: "i-ph-sparkle", to: "/agents" },
   { label: "Skills", icon: "i-ph-puzzle-piece", to: "/skills" },
   { label: "Members", icon: "i-ph-users", to: "/members" },
+  { label: "Keyboard shortcuts", icon: "i-ph-keyboard", kbds: ["?"], onSelect: () => (shortcutsOpen.value = true) },
   ...(me.value?.role === "admin"
     ? [{ label: "Review shares", icon: "i-ph-seal-check", to: "/admin/review" }, { label: "Reports", icon: "i-ph-flag", to: "/admin/reports" }]
     : []),

@@ -10,6 +10,7 @@
 //
 // ⌘B or the button in its header folds the whole sidebar away, like T3 Code; the pages' top bars then lead with the
 // button that brings it back (SidebarExpand). The sidebar's cookie keeps it folded across visits.
+// ? opens the keyboard shortcuts (ShortcutsModal).
 const route = useRoute()
 const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
@@ -142,5 +143,6 @@ function leaveDocs() {
     <slot />
 
     <SearchPalette />
+    <ShortcutsModal />
   </UDashboardGroup>
 </template>

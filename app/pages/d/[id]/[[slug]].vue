@@ -45,6 +45,7 @@ const waiting = computed(() => (drop.error.value?.data as { data?: { shareReview
   </template>
   <UDashboardGroup v-else-if="drop.data.value" unit="rem" storage="cookie" storage-key="drop-public">
     <DropViewer :key="drop.data.value.id" public-view />
+    <ShortcutsModal />
   </UDashboardGroup>
   <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.statusCode ?? 500" :path="route.fullPath" :waiting-for-review="waiting" />
 </template>

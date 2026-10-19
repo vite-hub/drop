@@ -8,10 +8,12 @@ const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: fals
 const { signOut } = useUserSession(useNuxtApp().$auth)
 // From /api/me, which SSR fetches with the session cookie; the client-side session only exists after hydration.
 const { data: me } = useMe()
+const shortcutsOpen = useShortcutsOpen()
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: "label", slot: "account" as const }],
   [{ label: "Theme", slot: "theme" as const, onSelect: (event: Event) => event.preventDefault() }],
+  [{ label: "Keyboard shortcuts", icon: "i-ph-keyboard", kbds: ["?"], onSelect: () => (shortcutsOpen.value = true) }],
   [{ label: "Sign out", icon: "i-ph-sign-out", onSelect: () => void leave() }],
 ])
 async function leave() {
