@@ -75,7 +75,6 @@ minimumReleaseAgeExclude:
   - nitro-mcp-toolkit@0.4.0
   - miniflare@5.20261006.0-alpha
   - wrangler@4.148.0
-  - comark-annotate@0.0.4
   - '@better-auth/core@1.7.10'
   - '@better-auth/drizzle-adapter@1.7.10'
   - '@better-auth/kysely-adapter@1.7.10'
@@ -85,3 +84,6 @@ minimumReleaseAgeExclude:
   - '@better-auth/prisma-adapter@1.7.10'
   - '@better-auth/telemetry@1.7.10'
   - better-auth@1.7.10
+  - comark-annotate@0.1.0
+  - comark-carousel@0.1.0
+  - comark-zoom@0.1.0
