@@ -17,7 +17,10 @@ const rows = computed(() => [
   <div class="overflow-x-auto rounded-lg border border-default">
     <table class="w-full text-sm">
       <tbody class="divide-y divide-default">
-        <tr v-for="[label, value] in rows" :key="label"><td class="w-44 px-3 py-2 text-muted">{{ label }}</td><td class="px-3 py-2 text-highlighted">{{ value }}</td></tr>
+        <tr v-for="[label, value] in rows" :key="label">
+          <td class="w-44 px-3 py-2 text-muted">{{ label }}</td>
+          <td class="px-3 py-2 text-highlighted">{{ value }}</td>
+        </tr>
         <tr v-if="info.live">
           <td class="px-3 py-2 text-muted">Hosted instance</td>
           <td class="px-3 py-2">

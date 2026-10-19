@@ -15,32 +15,102 @@ import { dropLine, mcpDrop, SHARE_INPUT } from "../format"
 export default defineMcpTool({
   name: "update_drop",
   title: "Update a drop",
-  description: "Change who can open a drop, its title, its link's slug, a folder's description, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; resolve a site's review comments once the site is fixed. A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
+  description:
+    "Change who can open a drop, its title, its link's slug, a folder's description, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; resolve a site's review comments once the site is fixed. A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
   annotations: { idempotentHint: true },
-  inputSchema: toStandardJsonSchema(v.object({
-    id: v.pipe(v.string(), v.description("Drop id, or its link.")),
-    share: v.optional(v.pipe(v.picklist(SHARES), v.description(SHARE_INPUT))),
-    title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
-    slug: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_SLUG), v.description("The readable part of the link, like hipoteca-madrid: lowercase words and dashes. Old links keep working."))),
-    lifetime: v.optional(v.pipe(v.picklist(LIFETIMES), v.description("temporary (14 days after the last visit), review (30 days), or keep (never expires; needs keepReason). Starts a fresh window."))),
-    keepReason: v.optional(v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON), v.description("Why it should be kept, in a sentence or two."))),
-    renew: v.optional(v.pipe(v.boolean(), v.description("Start a fresh window without changing the lifetime."))),
-    trash: v.optional(v.pipe(v.boolean(), v.description("true moves it to the Trash, false restores it (also after it expired). Trash only what the user asked to remove or what you made and no longer need."))),
-    folder: v.optional(v.pipe(v.string(), v.description("Id or link of the folder to move it into, or an empty string to move it out to the top. In a folder it shares and lives with the folder."))),
-    description: v.optional(v.pipe(v.string(), v.maxLength(2000), v.description("Folders the user owns: what goes in it and how (naming, format), which agents read with list_folders to pick it. Empty clears it."))),
-    resolves: v.optional(v.pipe(v.array(v.pipe(v.number(), v.integer())), v.maxLength(90), v.description("Numbers of open comments you addressed, from read_drop. For sites, which have no versions; docs and apps resolve when you publish the next version."))),
-  })),
+  inputSchema: toStandardJsonSchema(
+    v.object({
+      id: v.pipe(v.string(), v.description("Drop id, or its link.")),
+      share: v.optional(v.pipe(v.picklist(SHARES), v.description(SHARE_INPUT))),
+      title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
+      slug: v.optional(
+        v.pipe(
+          v.string(),
+          v.minLength(1),
+          v.maxLength(MAX_SLUG),
+          v.description(
+            "The readable part of the link, like hipoteca-madrid: lowercase words and dashes. Old links keep working.",
+          ),
+        ),
+      ),
+      lifetime: v.optional(
+        v.pipe(
+          v.picklist(LIFETIMES),
+          v.description(
+            "temporary (14 days after the last visit), review (30 days), or keep (never expires; needs keepReason). Starts a fresh window.",
+          ),
+        ),
+      ),
+      keepReason: v.optional(
+        v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON), v.description("Why it should be kept, in a sentence or two.")),
+      ),
+      renew: v.optional(v.pipe(v.boolean(), v.description("Start a fresh window without changing the lifetime."))),
+      trash: v.optional(
+        v.pipe(
+          v.boolean(),
+          v.description(
+            "true moves it to the Trash, false restores it (also after it expired). Trash only what the user asked to remove or what you made and no longer need.",
+          ),
+        ),
+      ),
+      folder: v.optional(
+        v.pipe(
+          v.string(),
+          v.description(
+            "Id or link of the folder to move it into, or an empty string to move it out to the top. In a folder it shares and lives with the folder.",
+          ),
+        ),
+      ),
+      description: v.optional(
+        v.pipe(
+          v.string(),
+          v.maxLength(2000),
+          v.description(
+            "Folders the user owns: what goes in it and how (naming, format), which agents read with list_folders to pick it. Empty clears it.",
+          ),
+        ),
+      ),
+      resolves: v.optional(
+        v.pipe(
+          v.array(v.pipe(v.number(), v.integer())),
+          v.maxLength(90),
+          v.description(
+            "Numbers of open comments you addressed, from read_drop. For sites, which have no versions; docs and apps resolve when you publish the next version.",
+          ),
+        ),
+      ),
+    }),
+  ),
   handler: async ({ id, renew, trash, resolves, ...rest }, event) => {
     const who = await requireIdentity(event)
-    if (rest.slug !== undefined && !slugify(rest.slug)) throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
+    if (rest.slug !== undefined && !slugify(rest.slug))
+      throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
     const drop = await findDropByRef(id, event)
     if (!drop) throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
-    const change: DropChange = { ...rest, ...(renew ? { renew: true } : {}), ...(trash !== undefined ? { trashed: trash } : {}) }
-    if (!Object.keys(change).length && !resolves?.length) throw new HTTPError({ status: 400, message: "Nothing to change." })
-    if (resolves?.length && (isAttachment(drop) || !permissions(drop, who).manage)) throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
-    const updated = mcpDrop(Object.keys(change).length ? await updateDrop(drop, who, change, event) : toSummary(drop), event.url.origin, drop)
+    const change: DropChange = {
+      ...rest,
+      ...(renew ? { renew: true } : {}),
+      ...(trash !== undefined ? { trashed: trash } : {}),
+    }
+    if (!Object.keys(change).length && !resolves?.length)
+      throw new HTTPError({ status: 400, message: "Nothing to change." })
+    if (resolves?.length && (isAttachment(drop) || !permissions(drop, who).manage))
+      throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
+    const updated = mcpDrop(
+      Object.keys(change).length ? await updateDrop(drop, who, change, event) : toSummary(drop),
+      event.url.origin,
+      drop,
+    )
     const resolved = resolves?.length ? await resolveComments(drop, resolves) : []
     const result = { ...updated, ...(resolved.length ? { resolved } : {}) }
-    return { content: [{ type: "text" as const, text: `Updated${resolved.length ? `, resolved ${resolved.map(n => `#${n}`).join(", ")}` : ""}:\n${dropLine(updated)}` }], structuredContent: result }
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Updated${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(updated)}`,
+        },
+      ],
+      structuredContent: result,
+    }
   },
 })

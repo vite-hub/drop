@@ -14,6 +14,9 @@ const AGENTS = [
 /** The agent's mark for a key or actor name ("Claude Code", "codex cli"…), or null for unknown agents. */
 export function agentLogo(name: string): { icon: string; color?: string } | null {
   const needle = name.trim().toLowerCase()
-  return AGENTS.find(agent => agent.names.some(candidate => needle === candidate || needle.startsWith(`${candidate} `))) ?? null
+  return (
+    AGENTS.find((agent) =>
+      agent.names.some((candidate) => needle === candidate || needle.startsWith(`${candidate} `)),
+    ) ?? null
+  )
 }
-

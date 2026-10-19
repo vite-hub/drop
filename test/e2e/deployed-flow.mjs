@@ -27,7 +27,7 @@ await refused.body?.cancel()
 // MCP is an OAuth protected resource: the 401 points at its metadata, which names Drop's authorization server.
 const challenge = await fetch(new URL("/mcp", origin), {
   body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
-  headers: { "content-type": "application/json", "accept": "application/json, text/event-stream" },
+  headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
   method: "POST",
   signal: timeout(),
 })
@@ -39,7 +39,11 @@ const resource = await (await fetch(resourceMetadataUrl, { signal: timeout() }))
 assert.equal(resource.resource, new URL("/mcp", origin).href)
 const issuer = resource.authorization_servers[0]
 assert.equal(issuer, new URL("/api/auth", origin).href)
-const server = await (await fetch(new URL(`/.well-known/oauth-authorization-server${new URL(issuer).pathname}`, origin), { signal: timeout() })).json()
+const server = await (
+  await fetch(new URL(`/.well-known/oauth-authorization-server${new URL(issuer).pathname}`, origin), {
+    signal: timeout(),
+  })
+).json()
 assert.equal(server.issuer, issuer)
 assert.ok(server.registration_endpoint, "dynamic client registration is on")
 assert.ok(server.code_challenge_methods_supported.includes("S256"))
@@ -47,11 +51,18 @@ assert.ok(server.code_challenge_methods_supported.includes("S256"))
 // Agent Skills Discovery v0.2.0: the archive's digest matches the index.
 const index = await (await fetch(new URL("/.well-known/agent-skills/index.json", origin), { signal: timeout() })).json()
 assert.equal(index.$schema, "https://schemas.agentskills.io/discovery/0.2.0/schema.json")
-const archive = new Uint8Array(await (await fetch(new URL(index.skills[0].url, origin), { signal: timeout() })).arrayBuffer())
-const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", archive)), byte => byte.toString(16).padStart(2, "0")).join("")
+const archive = new Uint8Array(
+  await (await fetch(new URL(index.skills[0].url, origin), { signal: timeout() })).arrayBuffer(),
+)
+const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", archive)), (byte) =>
+  byte.toString(16).padStart(2, "0"),
+).join("")
 assert.equal(index.skills[0].digest, `sha256:${hash}`)
 
-assert.equal((await fetch(new URL(`/f/code-images/${Date.now() - 1000}/expired.svg`, origin), { signal: timeout() })).status, 404)
+assert.equal(
+  (await fetch(new URL(`/f/code-images/${Date.now() - 1000}/expired.svg`, origin), { signal: timeout() })).status,
+  404,
+)
 
 if (!token) {
   console.log("Public checks passed. Set DROP_TOKEN to an MCP access token to run the signed-in flow.")
@@ -61,7 +72,9 @@ const auth = { authorization: `Bearer ${token}` }
 
 const form = new FormData()
 form.set("file", new File([await readFile(new URL("../../public/og.png", import.meta.url))], "og.png"))
-const upload = await (await fetch(filesEndpoint, { body: form, headers: auth, method: "POST", signal: timeout() })).json()
+const upload = await (
+  await fetch(filesEndpoint, { body: form, headers: auth, method: "POST", signal: timeout() })
+).json()
 assert.match(new URL(upload.url).pathname, /^\/f\/[0-9a-f-]+\.png$/)
 assert.equal(upload.share, "private")
 
@@ -81,10 +94,16 @@ const share = await fetch(new URL(`/api/drops/${upload.id}`, origin), {
 assert.equal(share.status, 200)
 assert.equal((await fetch(upload.url, { signal: timeout() })).status, 200)
 
-const markdownSource = "---\ntitle: Smoke-test plan\n---\n\n# Smoke-test plan\n\n```mermaid\ngraph LR\n  Upload --> Render\n```\n"
+const markdownSource =
+  "---\ntitle: Smoke-test plan\n---\n\n# Smoke-test plan\n\n```mermaid\ngraph LR\n  Upload --> Render\n```\n"
 const markdownForm = new FormData()
 markdownForm.set("file", new File([markdownSource], "plan.md", { type: "text/markdown" }))
-const markdownUpload = await fetch(filesEndpoint, { body: markdownForm, headers: auth, method: "POST", signal: timeout() })
+const markdownUpload = await fetch(filesEndpoint, {
+  body: markdownForm,
+  headers: auth,
+  method: "POST",
+  signal: timeout(),
+})
 assert.equal(markdownUpload.status, 200)
 
 const markdownUrl = new URL((await markdownUpload.json()).url, origin)
@@ -105,7 +124,10 @@ assert.equal(await markdownRaw.text(), markdownSource)
 
 // Raw HTML never runs on Drop's origin: the blob route serves it under a CSP sandbox.
 const htmlForm = new FormData()
-htmlForm.set("file", new File(["<!doctype html><script>fetch('/api/me')</script>"], "report.html", { type: "text/html" }))
+htmlForm.set(
+  "file",
+  new File(["<!doctype html><script>fetch('/api/me')</script>"], "report.html", { type: "text/html" }),
+)
 const htmlUpload = await fetch(filesEndpoint, { body: htmlForm, headers: auth, method: "POST", signal: timeout() })
 assert.equal(htmlUpload.status, 200)
 const htmlRaw = new URL((await htmlUpload.json()).url, origin)
@@ -115,17 +137,52 @@ assert.equal(htmlRawResponse.status, 200)
 assert.match(htmlRawResponse.headers.get("content-security-policy") ?? "", /^sandbox/)
 
 // MCP (2026-07-28) with the same token; the protocol version rides in each request's _meta.
-const mcp = async (method, params = {}) => (await fetch(new URL("/mcp", origin), {
-  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientInfo": { name: "e2e", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } }),
-  headers: { ...auth, "content-type": "application/json", "accept": "application/json, text/event-stream", "mcp-protocol-version": "2026-07-28", "mcp-method": method, ...(params.name || params.uri ? { "mcp-name": params.name ?? params.uri } : {}) },
-  method: "POST",
-  signal: timeout(),
-})).json()
+const mcp = async (method, params = {}) =>
+  (
+    await fetch(new URL("/mcp", origin), {
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method,
+        params: {
+          ...params,
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": { name: "e2e", version: "1" },
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      }),
+      headers: {
+        ...auth,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": method,
+        ...(params.name || params.uri ? { "mcp-name": params.name ?? params.uri } : {}),
+      },
+      method: "POST",
+      signal: timeout(),
+    })
+  ).json()
 assert.ok((await mcp("server/discover")).result.capabilities.extensions["io.modelcontextprotocol/skills"])
-assert.deepEqual((await mcp("tools/list")).result.tools.map(tool => tool.name), ["publish", "read_drop", "list_drops", "update_drop", "create_code_image"])
-const mcpDrop = (await mcp("tools/call", { name: "publish", arguments: { markdown: "# From MCP", note: "e2e", lifetime: "temporary" } })).result.structuredContent
+assert.deepEqual(
+  (await mcp("tools/list")).result.tools.map((tool) => tool.name),
+  ["publish", "read_drop", "list_drops", "update_drop", "create_code_image"],
+)
+const mcpDrop = (
+  await mcp("tools/call", {
+    name: "publish",
+    arguments: { markdown: "# From MCP", note: "e2e", lifetime: "temporary" },
+  })
+).result.structuredContent
 assert.equal(mcpDrop.share, "private")
-assert.equal((await mcp("tools/call", { name: "update_drop", arguments: { id: mcpDrop.id, trash: true } })).result.structuredContent.status.startsWith("In the Trash"), true)
+assert.equal(
+  (
+    await mcp("tools/call", { name: "update_drop", arguments: { id: mcpDrop.id, trash: true } })
+  ).result.structuredContent.status.startsWith("In the Trash"),
+  true,
+)
 const [skill] = (await mcp("skills/list")).result.skills
 assert.equal(skill.frontmatter.name, "vitehub-drop")
 assert.match((await mcp("resources/read", { uri: skill.uri })).result.contents[0].text, /^---\nname: vitehub-drop/)
@@ -161,5 +218,4 @@ if (cloudflareHost) {
     Buffer.from(await codeImage.arrayBuffer()).subarray(0, 8),
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
   )
-}
-else assert.ok(["image/png", "image/svg+xml"].includes(codeImage.headers.get("content-type")))
+} else assert.ok(["image/png", "image/svg+xml"].includes(codeImage.headers.get("content-type")))

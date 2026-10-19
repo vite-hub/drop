@@ -4,7 +4,11 @@ import { useStorage } from "nitro/storage"
 
 export const MARKDOWN_CACHE_TTL = 60 * 60 * 24 * 30
 
-export interface MarkdownRender { title: string; html: string; source: string }
+export interface MarkdownRender {
+  title: string
+  html: string
+  source: string
+}
 type Render = (text: string) => Promise<{ title: string; html: string }>
 
 /**
@@ -14,11 +18,21 @@ type Render = (text: string) => Promise<{ title: string; html: string }>
  * The event lets the write outlive the response on Workers (`waitUntil`).
  */
 const cached = defineCachedFunction(
-  async (_event: H3Event | undefined, _key: string, source: () => Promise<string>, render: Render): Promise<MarkdownRender> => {
+  async (
+    _event: H3Event | undefined,
+    _key: string,
+    source: () => Promise<string>,
+    render: Render,
+  ): Promise<MarkdownRender> => {
     const text = await source()
-    return { ...await render(text), source: text }
+    return { ...(await render(text)), source: text }
   },
-  { name: "markdown", maxAge: MARKDOWN_CACHE_TTL, swr: false, getKey: (_event: H3Event | undefined, key: string) => key },
+  {
+    name: "markdown",
+    maxAge: MARKDOWN_CACHE_TTL,
+    swr: false,
+    getKey: (_event: H3Event | undefined, key: string) => key,
+  },
 )
 
 export const cachedMarkdown = (key: string, source: () => Promise<string>, render: Render, event?: H3Event) =>
@@ -28,5 +42,7 @@ export async function deleteMarkdownCache(key: string) {
   if (key.startsWith("apps/") || key.startsWith("code-images/")) return
   // Nitro's cached-function key is part of its storage contract; keep this in sync with the `name` above.
   // A spreadsheet's preview (server/utils/spreadsheet.ts) is cached the same way, under its own name.
-  await Promise.all(["markdown", "spreadsheet"].map(name => useStorage("cache").removeItem(`nitro:functions:${name}:${key}.json`)))
+  await Promise.all(
+    ["markdown", "spreadsheet"].map((name) => useStorage("cache").removeItem(`nitro:functions:${name}:${key}.json`)),
+  )
 }

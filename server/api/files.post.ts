@@ -23,8 +23,7 @@ export default defineHandler(async (event) => {
   let form: FormData
   try {
     form = await event.req.formData()
-  }
-  catch {
+  } catch {
     throw new HTTPError({ status: 400, statusText: "Exactly one file is required." })
   }
   const file = form.get("file")
@@ -34,14 +33,18 @@ export default defineHandler(async (event) => {
 
   const folderRef = textValue(form.get("folder"))
   const folder = folderRef ? await requireFolder(folderRef, who, event) : undefined
-  const drop = await createDocDrop(who, {
-    filename: file.name,
-    bytes: new Uint8Array(await file.arrayBuffer()),
-    title: textValue(form.get("title")),
-    slug: textValue(form.get("slug"))?.slice(0, 200),
-    supersedes: textValue(form.get("supersedes")),
-    folder,
-  }, event)
+  const drop = await createDocDrop(
+    who,
+    {
+      filename: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      title: textValue(form.get("title")),
+      slug: textValue(form.get("slug"))?.slice(0, 200),
+      supersedes: textValue(form.get("supersedes")),
+      folder,
+    },
+    event,
+  )
   useLogger(event).set({ drop: { id: drop.id, kind: drop.kind, size: drop.size, version: drop.version } })
   const origin = event.url.origin
   return {

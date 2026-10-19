@@ -15,53 +15,89 @@ const open = useRowsOpen()
 const { data: trash } = useApi("/api/drops", { key: keys.trash, query: { trash: 1 }, default: () => [] })
 const { data: withMe } = useSharedWithMe()
 const { data: usage } = useApi("/api/usage", { key: keys.usage })
-const limited = computed(() => usage.value?.enabled && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null))
+const limited = computed(
+  () =>
+    usage.value?.enabled &&
+    [usage.value.drops, usage.value.bytes, usage.value.writes].some((quota) => quota.limit !== null),
+)
 const nearLimit = computed(() => usage.value && usageNearLimit(usage.value))
-const atLimit = computed(() => usage.value && [usage.value.drops, usage.value.bytes, usage.value.writes].some(quota => quota.limit !== null && quota.used >= quota.limit))
-const storageMiB = computed(() => Math.ceil((usage.value?.bytes.used ?? 0) / MIB * 10) / 10)
+const atLimit = computed(
+  () =>
+    usage.value &&
+    [usage.value.drops, usage.value.bytes, usage.value.writes].some(
+      (quota) => quota.limit !== null && quota.used >= quota.limit,
+    ),
+)
+const storageMiB = computed(() => Math.ceil(((usage.value?.bytes.used ?? 0) / MIB) * 10) / 10)
 const FILTERS = ["all", "private", "shared", "with-me", "trash"] as const
-type Filter = typeof FILTERS[number]
+type Filter = (typeof FILTERS)[number]
 // The tab lives in the URL so the sidebar can link straight to Shared with me.
 const route = useRoute("drops")
 const filter = computed<Filter>({
-  get: () => FILTERS.find(tab => tab === route.query.tab) ?? "all",
-  set: tab => void navigateTo({ query: { ...route.query, tab: tab === "all" ? undefined : tab } }, { replace: true }),
+  get: () => FILTERS.find((tab) => tab === route.query.tab) ?? "all",
+  set: (tab) => void navigateTo({ query: { ...route.query, tab: tab === "all" ? undefined : tab } }, { replace: true }),
 })
 const search = ref("")
 const searchInput = useTemplateRef("searchInput")
 const picker = useFileDialog({ multiple: false, reset: true })
-picker.onChange(files => files?.[0] && void onPick(files[0]))
+picker.onChange((files) => files?.[0] && void onPick(files[0]))
 const now = useRelativeNow()
 const getStartedHidden = useGetStartedHidden()
 
 // The header says what the tab lists: Team, Shared with me and the Trash aren't drops you made. On a team Drop the
 // "with-me" tab is the team's: its folders and what teammates share.
 const description = computed(() => {
-  if (filter.value === "trash") return `Deleted and expired drops. Restore one within ${TRASH_DAYS} days, or it's gone for good.`
-  if (filter.value === "with-me") return team.value ? "The team's folders, and what your teammates and their agents dropped for the team." : "Public links others shared that you opened while signed in."
-  return team.value ? "Docs and apps you and your agents dropped. The team sees them, unless you keep one to yourself." : "Docs and apps you and your agents dropped. Only you see them until you share them."
+  if (filter.value === "trash")
+    return `Deleted and expired drops. Restore one within ${TRASH_DAYS} days, or it's gone for good.`
+  if (filter.value === "with-me")
+    return team.value
+      ? "The team's folders, and what your teammates and their agents dropped for the team."
+      : "Public links others shared that you opened while signed in."
+  return team.value
+    ? "Docs and apps you and your agents dropped. The team sees them, unless you keep one to yourself."
+    : "Docs and apps you and your agents dropped. Only you see them until you share them."
 })
 
 const counts = computed(() => ({
   all: drops.value.length,
-  private: drops.value.filter(drop => drop.share === "private").length,
-  shared: drops.value.filter(drop => drop.share !== "private").length,
+  private: drops.value.filter((drop) => drop.share === "private").length,
+  shared: drops.value.filter((drop) => drop.share !== "private").length,
   withMe: withMe.value.length,
   trash: trash.value.length,
 }))
 
 // Your own drops search on the server, inside every folder; the Trash and Shared with me filter what they list.
-const query = refDebounced(computed(() => search.value.trim()), 200)
+const query = refDebounced(
+  computed(() => search.value.trim()),
+  200,
+)
 const deep = computed(() => Boolean(query.value) && filter.value !== "trash" && filter.value !== "with-me")
-const { data: found, status: searching } = useApi<DropSummary[]>("/api/drops", { key: keys.dropSearch, query: computed(() => ({ q: query.value })), default: () => [], immediate: false, server: false })
+const { data: found, status: searching } = useApi<DropSummary[]>("/api/drops", {
+  key: keys.dropSearch,
+  query: computed(() => ({ q: query.value })),
+  default: () => [],
+  immediate: false,
+  server: false,
+})
 
 const visible = computed(() => {
   const words = search.value.trim().toLowerCase()
-  const list = deep.value ? found.value : filter.value === "trash" ? trash.value : filter.value === "with-me" ? withMe.value : drops.value
+  const list = deep.value
+    ? found.value
+    : filter.value === "trash"
+      ? trash.value
+      : filter.value === "with-me"
+        ? withMe.value
+        : drops.value
   return list
-    .filter(drop => filter.value !== "private" || drop.share === "private")
-    .filter(drop => filter.value !== "shared" || drop.share !== "private")
-    .filter(drop => deep.value || !words || `${drop.title} ${drop.filename} ${drop.actorName} ${drop.owner?.name ?? ""}`.toLowerCase().includes(words))
+    .filter((drop) => filter.value !== "private" || drop.share === "private")
+    .filter((drop) => filter.value !== "shared" || drop.share !== "private")
+    .filter(
+      (drop) =>
+        deep.value ||
+        !words ||
+        `${drop.title} ${drop.filename} ${drop.actorName} ${drop.owner?.name ?? ""}`.toLowerCase().includes(words),
+    )
 })
 
 /**
@@ -83,7 +119,7 @@ const groups = computed(() => {
   const out: Array<{ label: string; drops: DropSummary[] }> = []
   for (const drop of visible.value) {
     // The Trash groups by when things went there, which is also what sets when they're deleted.
-    const name = label(filter.value === "trash" ? drop.trashedAt ?? drop.updatedAt : drop.updatedAt)
+    const name = label(filter.value === "trash" ? (drop.trashedAt ?? drop.updatedAt) : drop.updatedAt)
     const last = out.at(-1)
     if (last?.label === name) last.drops.push(drop)
     else out.push({ label: name, drops: [drop] })
@@ -109,7 +145,7 @@ async function newFolder() {
 
 async function newSite() {
   const input = await siteDialog()
-  const site = input && await createSite(input)
+  const site = input && (await createSite(input))
   if (site) await navigateTo(`/drops/${site.id}`)
 }
 </script>
@@ -118,16 +154,32 @@ async function newSite() {
   <PageShell id="drops" title="Drops" :description="description">
     <template #actions>
       <NewMenu @folder="newFolder" @site="newSite" />
-      <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
+      <UButton
+        color="neutral"
+        icon="i-ph-upload-simple"
+        label="Upload"
+        size="sm"
+        variant="outline"
+        @click="picker.open()"
+      />
     </template>
 
-    <div v-if="usage && limited" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default px-4 py-3" aria-live="polite">
+    <div
+      v-if="usage && limited"
+      class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default px-4 py-3"
+      aria-live="polite"
+    >
       <div>
         <p class="text-sm tabular-nums text-highlighted">
-          {{ usage.drops.used }}/{{ usage.drops.limit ?? '∞' }} drops · {{ storageMiB }}/{{ usage.bytes.limit === null ? '∞' : usage.bytes.limit / MIB }} MiB
+          {{ usage.drops.used }}/{{ usage.drops.limit ?? "∞" }} drops · {{ storageMiB }}/{{
+            usage.bytes.limit === null ? "∞" : usage.bytes.limit / MIB
+          }}
+          MiB
         </p>
         <p class="mt-1 text-xs text-muted">
-          {{ usage.writes.used }}/{{ usage.writes.limit ?? '∞' }} file writes this month<template v-if="nearLimit">. {{ atLimit ? 'At your plan limit.' : 'Near your plan limit.' }}</template>
+          {{ usage.writes.used }}/{{ usage.writes.limit ?? "∞" }} file writes this month<template v-if="nearLimit"
+            >. {{ atLimit ? "At your plan limit." : "Near your plan limit." }}</template
+          >
         </p>
       </div>
       <div v-if="nearLimit" class="flex flex-wrap gap-2">
@@ -145,7 +197,9 @@ async function newSite() {
             { label: `All ${counts.all}`, value: 'all' },
             { label: `Only me ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
             { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-share-network' },
-            team ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-ph-users' } : { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
+            team
+              ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-ph-users' }
+              : { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
             { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-ph-trash' },
           ]"
           size="sm"
@@ -155,8 +209,22 @@ async function newSite() {
       </div>
       <div class="flex w-full items-center gap-2 sm:w-auto">
         <!-- The page description already says how long the Trash keeps things. -->
-        <UButton v-if="filter === 'trash' && trash.length" class="shrink-0" color="error" icon="i-ph-trash" label="Empty Trash" variant="ghost" @click="emptyTrash(trash.length)" />
-        <UInput ref="searchInput" v-model="search" class="w-full sm:w-72" icon="i-ph-magnifying-glass" placeholder="Search drops">
+        <UButton
+          v-if="filter === 'trash' && trash.length"
+          class="shrink-0"
+          color="error"
+          icon="i-ph-trash"
+          label="Empty Trash"
+          variant="ghost"
+          @click="emptyTrash(trash.length)"
+        />
+        <UInput
+          ref="searchInput"
+          v-model="search"
+          class="w-full sm:w-72"
+          icon="i-ph-magnifying-glass"
+          placeholder="Search drops"
+        >
           <template #trailing><UKbd value="/" /></template>
         </UInput>
       </div>
@@ -173,54 +241,101 @@ async function newSite() {
       <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh()" />
     </div>
 
-    <div v-else-if="filter === 'trash' && !trash.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+    <div
+      v-else-if="filter === 'trash' && !trash.length"
+      class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
+    >
       <UIcon name="i-ph-trash" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">The Trash is empty</p>
-      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Deleted and expired drops stay here for {{ TRASH_DAYS }} days, then they're gone for good.</p>
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
+        Deleted and expired drops stay here for {{ TRASH_DAYS }} days, then they're gone for good.
+      </p>
     </div>
 
-    <div v-else-if="filter === 'with-me' && !withMe.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+    <div
+      v-else-if="filter === 'with-me' && !withMe.length"
+      class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
+    >
       <UIcon :name="team ? 'i-ph-users' : 'i-ph-tray'" class="size-6 text-dimmed" />
-      <p class="mt-3 font-medium text-highlighted">{{ team ? "No team folders yet" : "Nothing shared with you yet" }}</p>
-      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
-        {{ team
-          ? me?.role === "admin"
-            ? "Make a folder for each kind of thing the team keeps, like meeting notes or pull request evidence, and say what goes in it. Agents read that to file things there."
-            : "Admins make the team's folders. What your teammates drop for the team shows up here too."
-          : "Public links you open while signed in show up here." }}
+      <p class="mt-3 font-medium text-highlighted">
+        {{ team ? "No team folders yet" : "Nothing shared with you yet" }}
       </p>
-      <UButton v-if="team && me?.role === 'admin'" class="mt-5" color="neutral" icon="i-ph-folder-simple-plus" label="New team folder" @click="newFolder" />
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
+        {{
+          team
+            ? me?.role === "admin"
+              ? "Make a folder for each kind of thing the team keeps, like meeting notes or pull request evidence, and say what goes in it. Agents read that to file things there."
+              : "Admins make the team's folders. What your teammates drop for the team shows up here too."
+            : "Public links you open while signed in show up here."
+        }}
+      </p>
+      <UButton
+        v-if="team && me?.role === 'admin'"
+        class="mt-5"
+        color="neutral"
+        icon="i-ph-folder-simple-plus"
+        label="New team folder"
+        @click="newFolder"
+      />
     </div>
 
     <!-- A first run gets the checklist instead; once it's dismissed, the empty page still says what goes here. -->
-    <GetStarted v-else-if="filter === 'all' && !drops.length && !getStartedHidden" :drops="drops" @site="newSite" @upload="picker.open()" />
+    <GetStarted
+      v-else-if="filter === 'all' && !drops.length && !getStartedHidden"
+      :drops="drops"
+      @site="newSite"
+      @upload="picker.open()"
+    />
 
-    <div v-else-if="filter !== 'trash' && filter !== 'with-me' && !drops.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+    <div
+      v-else-if="filter !== 'trash' && filter !== 'with-me' && !drops.length"
+      class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
+    >
       <UIcon name="i-ph-stack" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing dropped yet</p>
-      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Connect an agent and it drops plans, specs, and small apps here. You can upload a file yourself too.</p>
+      <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
+        Connect an agent and it drops plans, specs, and small apps here. You can upload a file yourself too.
+      </p>
       <div class="mt-5 flex justify-center gap-2">
         <UButton color="neutral" label="Connect an Agent" to="/agents" />
         <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" variant="outline" @click="picker.open()" />
       </div>
     </div>
 
-    <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">{{ deep && searching === 'pending' ? "Searching…" : "No drops match." }}</p>
+    <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">
+      {{ deep && searching === "pending" ? "Searching…" : "No drops match." }}
+    </p>
 
-    <GetStarted v-if="filter === 'all' && drops.length && !search" :drops="drops" @site="newSite" @upload="picker.open()" />
+    <GetStarted
+      v-if="filter === 'all' && drops.length && !search"
+      :drops="drops"
+      @site="newSite"
+      @upload="picker.open()"
+    />
 
     <div v-if="visible.length" class="overflow-hidden rounded-lg border border-default">
       <template v-for="group in groups" :key="group.label">
         <p class="label-mono border-b border-default bg-muted px-4 py-2">{{ group.label }}</p>
         <ul class="divide-y divide-default border-b border-default last:border-b-0">
           <template v-for="drop in group.drops" :key="drop.id">
-            <DropRow :drop="drop" :open="open[drop.id]" @delete="remove(drop)" @restore="restore(drop)" @delete-forever="deleteForever(drop)" @toggle="open[drop.id] = !open[drop.id]" />
+            <DropRow
+              :drop="drop"
+              :open="open[drop.id]"
+              @delete="remove(drop)"
+              @restore="restore(drop)"
+              @delete-forever="deleteForever(drop)"
+              @toggle="open[drop.id] = !open[drop.id]"
+            />
             <!-- A folder opens in place, except in the Trash, where it comes back whole (DropRow shows no toggle there). -->
-            <DropFolderRows v-if="drop.kind === 'folder' && open[drop.id] && !drop.trashedAt" :id="drop.id" :depth="1" :team="drop.teamFolder" />
+            <DropFolderRows
+              v-if="drop.kind === 'folder' && open[drop.id] && !drop.trashedAt"
+              :id="drop.id"
+              :depth="1"
+              :team="drop.teamFolder"
+            />
           </template>
         </ul>
       </template>
     </div>
-
   </PageShell>
 </template>

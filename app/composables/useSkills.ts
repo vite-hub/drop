@@ -8,9 +8,11 @@ export function useSkills() {
   async function setEnabled(skill: Pick<SkillSummary, "name">, enabled: boolean) {
     try {
       await $fetch(`/api/skills/${skill.name}`, { method: "PATCH", body: { enabled } })
-      notify.done(enabled ? `${skill.name} is on` : `${skill.name} is off`, enabled ? "Agents get it over MCP." : "Agents stop getting it within a minute.")
-    }
-    catch (error) {
+      notify.done(
+        enabled ? `${skill.name} is on` : `${skill.name} is off`,
+        enabled ? "Agents get it over MCP." : "Agents stop getting it within a minute.",
+      )
+    } catch (error) {
       notify.fail(`Couldn't change ${skill.name}`, error)
     }
     await refresh()

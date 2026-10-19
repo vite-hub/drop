@@ -4,7 +4,9 @@ const { seconds = 40 } = defineProps<{ seconds?: number }>()
 </script>
 
 <template>
-  <div class="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] motion-reduce:[mask-image:none]">
+  <div
+    class="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] motion-reduce:[mask-image:none]"
+  >
     <div
       class="flex w-max group-hover:[animation-play-state:paused] motion-safe:[animation:marquee_var(--loop)_linear_infinite] motion-reduce:w-auto motion-reduce:flex-wrap"
       :style="{ '--loop': `${seconds}s` }"

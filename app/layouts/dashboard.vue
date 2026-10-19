@@ -29,8 +29,20 @@ const teamOpen = ref(true)
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const workspace = computed(() => [
-  { label: "Agents", icon: "i-ph-sparkle", activeIcon: "i-ph-sparkle-fill", to: "/agents", active: at("/agents") || at("/approve") },
-  { label: "Skills", icon: "i-ph-puzzle-piece", activeIcon: "i-ph-puzzle-piece-fill", to: "/skills", active: at("/skills") },
+  {
+    label: "Agents",
+    icon: "i-ph-sparkle",
+    activeIcon: "i-ph-sparkle-fill",
+    to: "/agents",
+    active: at("/agents") || at("/approve"),
+  },
+  {
+    label: "Skills",
+    icon: "i-ph-puzzle-piece",
+    activeIcon: "i-ph-puzzle-piece-fill",
+    to: "/skills",
+    active: at("/skills"),
+  },
   { label: "Members", icon: "i-ph-users", activeIcon: "i-ph-users-fill", to: "/members", active: at("/members") },
 ])
 
@@ -66,7 +78,13 @@ function leaveDocs() {
       :min-size="12"
       :max-size="20"
       resizable
-      :ui="{ root: ['bg-default', collapsed && 'lg:hidden'], handle: collapsed ? 'lg:hidden' : undefined, header: 'h-12 border-b border-default px-4', body: 'gap-0 p-2', footer: 'border-t border-default p-2' }"
+      :ui="{
+        root: ['bg-default', collapsed && 'lg:hidden'],
+        handle: collapsed ? 'lg:hidden' : undefined,
+        header: 'h-12 border-b border-default px-4',
+        body: 'gap-0 p-2',
+        footer: 'border-t border-default p-2',
+      }"
     >
       <template #header>
         <NuxtLink class="flex items-center gap-2" to="/drops" @click="close">
@@ -89,7 +107,14 @@ function leaveDocs() {
             <!-- The team's folders, your drops, and what's shared with you: the part of this pane that scrolls. -->
             <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <template v-if="team">
-                <SidebarItem active-icon="i-ph-users-fill" :active="onShared" icon="i-ph-users" label="Team" to="/drops?tab=with-me" @navigate="close">
+                <SidebarItem
+                  active-icon="i-ph-users-fill"
+                  :active="onShared"
+                  icon="i-ph-users"
+                  label="Team"
+                  to="/drops?tab=with-me"
+                  @navigate="close"
+                >
                   <button
                     :aria-expanded="teamOpen"
                     :aria-label="teamOpen ? 'Collapse team folders' : 'Expand team folders'"
@@ -97,14 +122,25 @@ function leaveDocs() {
                     type="button"
                     @click="teamOpen = !teamOpen"
                   >
-                    <UIcon name="i-ph-caret-right" class="size-3.5 transition-transform duration-150" :class="teamOpen && 'rotate-90'" />
+                    <UIcon
+                      name="i-ph-caret-right"
+                      class="size-3.5 transition-transform duration-150"
+                      :class="teamOpen && 'rotate-90'"
+                    />
                   </button>
                 </SidebarItem>
                 <div v-if="teamOpen" class="ml-3.5 border-l border-default pl-2">
                   <TeamTree @navigate="close" />
                 </div>
               </template>
-              <SidebarItem active-icon="i-ph-stack-fill" :active="onDrops" icon="i-ph-stack" :label="team ? 'My drops' : 'Drops'" to="/drops" @navigate="close">
+              <SidebarItem
+                active-icon="i-ph-stack-fill"
+                :active="onDrops"
+                icon="i-ph-stack"
+                :label="team ? 'My drops' : 'Drops'"
+                to="/drops"
+                @navigate="close"
+              >
                 <button
                   :aria-expanded="dropsOpen"
                   :aria-label="dropsOpen ? 'Collapse drops' : 'Expand drops'"
@@ -112,25 +148,52 @@ function leaveDocs() {
                   type="button"
                   @click="dropsOpen = !dropsOpen"
                 >
-                  <UIcon name="i-ph-caret-right" class="size-3.5 transition-transform duration-150" :class="dropsOpen && 'rotate-90'" />
+                  <UIcon
+                    name="i-ph-caret-right"
+                    class="size-3.5 transition-transform duration-150"
+                    :class="dropsOpen && 'rotate-90'"
+                  />
                 </button>
               </SidebarItem>
               <div v-if="dropsOpen" class="ml-3.5 border-l border-default pl-2">
                 <DropTree @navigate="close" />
               </div>
-              <SidebarItem v-if="!team" active-icon="i-ph-tray-fill" :active="onShared" icon="i-ph-tray" label="Shared with me" to="/drops?tab=with-me" @navigate="close" />
+              <SidebarItem
+                v-if="!team"
+                active-icon="i-ph-tray-fill"
+                :active="onShared"
+                icon="i-ph-tray"
+                label="Shared with me"
+                to="/drops?tab=with-me"
+                @navigate="close"
+              />
             </nav>
 
             <div class="flex flex-col gap-0.5 border-t border-default pt-2">
               <SidebarItem v-for="link in workspace" :key="link.to" v-bind="link" @navigate="close" />
-              <SidebarItem active-icon="i-ph-book-open-fill" :active="at('/docs')" icon="i-ph-book-open" label="Docs" trailing-icon="i-ph-caret-right" @focusin="preloadDocs" @navigate="openDocs" @pointerenter="preloadDocs" />
+              <SidebarItem
+                active-icon="i-ph-book-open-fill"
+                :active="at('/docs')"
+                icon="i-ph-book-open"
+                label="Docs"
+                trailing-icon="i-ph-caret-right"
+                @focusin="preloadDocs"
+                @navigate="openDocs"
+                @pointerenter="preloadDocs"
+              />
             </div>
           </div>
 
           <!-- The wrapper carries the curtain (main.css): the nav inside scrolls, which would clip it. -->
           <div v-else key="docs" class="sidebar-pane-docs relative z-10 flex min-h-0 w-full min-w-0 bg-default">
             <nav aria-label="Docs" class="flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
-              <SidebarItem active-icon="i-ph-arrow-left" :active="false" icon="i-ph-arrow-left" label="Back" @navigate="leaveDocs" />
+              <SidebarItem
+                active-icon="i-ph-arrow-left"
+                :active="false"
+                icon="i-ph-arrow-left"
+                label="Back"
+                @navigate="leaveDocs"
+              />
               <p class="label-mono mt-2 flex h-8 shrink-0 items-center px-2">Docs</p>
               <DocsTree @navigate="close" />
             </nav>

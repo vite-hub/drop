@@ -1,4 +1,11 @@
-import { type ExtensionPlugin, invalidParamsError, McpJsonRpcError, mcpMethod, parseParams, requireParamString } from "h3-mcp"
+import {
+  type ExtensionPlugin,
+  invalidParamsError,
+  McpJsonRpcError,
+  mcpMethod,
+  parseParams,
+  requireParamString,
+} from "h3-mcp"
 import { defineMcpResource } from "nitro-mcp-toolkit"
 import { digest, enabledSkills, findEnabledSkill, type Skill } from "./skills"
 
@@ -21,7 +28,13 @@ async function entry(skill: Skill) {
   return {
     uri: uriOf(skill, "SKILL.md"),
     frontmatter: skill.frontmatter,
-    resources: await Promise.all(skill.files.map(async file => ({ uri: uriOf(skill, file.path), digest: await digest(file.bytes), size: file.bytes.byteLength }))),
+    resources: await Promise.all(
+      skill.files.map(async (file) => ({
+        uri: uriOf(skill, file.path),
+        digest: await digest(file.bytes),
+        size: file.bytes.byteLength,
+      })),
+    ),
   }
 }
 
@@ -29,15 +42,21 @@ export function mcpSkills(): ExtensionPlugin {
   return {
     id: EXTENSION,
     settings: () => ({ directoryRead: false }),
-    methods: ctx => ({
-      "skills/list": (req, event) => mcpMethod(ctx, req, event, async () => ({ resultType: "complete", skills: await Promise.all((await enabledSkills()).map(entry)), ...CACHE })),
-      "skills/get": (req, event) => mcpMethod(ctx, req, event, async () => {
-        const uri = requireParamString(parseParams(req.params), "uri")
-        const name = uri.match(/^skill:\/\/([^/]+)(?:\/SKILL\.md)?$/)?.[1]
-        const skill = name && await findEnabledSkill(name)
-        if (!skill) throw invalidParamsError(`No skill at ${uri}.`)
-        return { resultType: "complete", skill: await entry(skill), ...CACHE }
-      }),
+    methods: (ctx) => ({
+      "skills/list": (req, event) =>
+        mcpMethod(ctx, req, event, async () => ({
+          resultType: "complete",
+          skills: await Promise.all((await enabledSkills()).map(entry)),
+          ...CACHE,
+        })),
+      "skills/get": (req, event) =>
+        mcpMethod(ctx, req, event, async () => {
+          const uri = requireParamString(parseParams(req.params), "uri")
+          const name = uri.match(/^skill:\/\/([^/]+)(?:\/SKILL\.md)?$/)?.[1]
+          const skill = name && (await findEnabledSkill(name))
+          if (!skill) throw invalidParamsError(`No skill at ${uri}.`)
+          return { resultType: "complete", skill: await entry(skill), ...CACHE }
+        }),
     }),
   }
 }
@@ -45,8 +64,12 @@ export function mcpSkills(): ExtensionPlugin {
 // `-32602` is what the 2026-07-28 revision answers for a resource that doesn't exist (clients still accept the older
 // `-32002`); a disabled skill's files read the same way.
 async function read(name: string, path: string) {
-  const file = (await findEnabledSkill(name))?.files.find(item => item.path === path)
-  if (!file) throw new McpJsonRpcError(-32602, `No skill file at skill://${name}/${path}.`, { status: 404, data: { uri: `skill://${name}/${path}` } })
+  const file = (await findEnabledSkill(name))?.files.find((item) => item.path === path)
+  if (!file)
+    throw new McpJsonRpcError(-32602, `No skill file at skill://${name}/${path}.`, {
+      status: 404,
+      data: { uri: `skill://${name}/${path}` },
+    })
   return { contents: [{ uri: `skill://${name}/${path}`, mimeType: file.mimeType, text: file.text }] }
 }
 
@@ -60,14 +83,17 @@ export const skillResources = [
     title: "Skill file",
     description: "A file of one of Drop's enabled Agent Skills.",
     uriTemplate: "skill://{name}/{file}",
-    list: async () => (await enabledSkills()).flatMap(skill => skill.files.map(file => ({
-      uri: uriOf(skill, file.path),
-      name: `${skill.name}/${file.path}`,
-      title: file.path === "SKILL.md" ? `${skill.name} skill` : `${skill.name}: ${file.path}`,
-      ...(file.path === "SKILL.md" ? { description: skill.description } : {}),
-      mimeType: file.mimeType,
-      size: file.bytes.byteLength,
-    }))),
+    list: async () =>
+      (await enabledSkills()).flatMap((skill) =>
+        skill.files.map((file) => ({
+          uri: uriOf(skill, file.path),
+          name: `${skill.name}/${file.path}`,
+          title: file.path === "SKILL.md" ? `${skill.name} skill` : `${skill.name}: ${file.path}`,
+          ...(file.path === "SKILL.md" ? { description: skill.description } : {}),
+          mimeType: file.mimeType,
+          size: file.bytes.byteLength,
+        })),
+      ),
     handler: (_uri, { name, file }) => read(name!, file!),
   }),
   defineMcpResource({

@@ -15,7 +15,12 @@ import { siteMatches } from "#shared/review"
  * version, not the key itself, because hostnames travel in clear text (DNS, TLS SNI) and the key opens a shared drop. A plain hostname puts
  * every drop on that one origin, sharing storage. Without either, drops keep the opaque sandbox.
  */
-interface ContentConfig { protocol: string; port: string; host: string; perDrop?: { prefix: string; suffix: string } }
+interface ContentConfig {
+  protocol: string
+  port: string
+  host: string
+  perDrop?: { prefix: string; suffix: string }
+}
 
 function configured(event: H3Event): ContentConfig | null {
   const value = useServerEnv(event).drop.contentOrigin.trim()
@@ -25,19 +30,24 @@ function configured(event: H3Event): ContentConfig | null {
   const protocol = `${scheme!.toLowerCase()}:`
   const name = host!.toLowerCase()
   if (!name.includes("*")) {
-    try { return { protocol, port, host: new URL(`${protocol}//${name}`).hostname } }
-    catch { return null }
+    try {
+      return { protocol, port, host: new URL(`${protocol}//${name}`).hostname }
+    } catch {
+      return null
+    }
   }
   // One `*`, inside the first label, with a domain after it.
   const at = name.indexOf("*")
   const firstDot = name.indexOf(".")
   if (name.includes("*", at + 1) || firstDot === -1 || at > firstDot) return null
-  const prefix = name.slice(0, at), suffix = name.slice(at + 1)
+  const prefix = name.slice(0, at),
+    suffix = name.slice(at + 1)
   try {
     const valid = new URL(`${protocol}//${prefix}a${suffix}`)
     if (!valid.hostname) return null
+  } catch {
+    return null
   }
-  catch { return null }
   return { protocol, port, host: name, perDrop: { prefix, suffix } }
 }
 
@@ -50,9 +60,17 @@ const LABEL = "[a-z2-7]{26}"
 async function contentLabel(event: H3Event, dropId: string): Promise<string> {
   // Optional: an environment without the auth secret (the tests' one) still labels drops.
   const secret = useServerEnv(event).auth?.secret?.unseal() || "drop-content-origin"
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(`content-origin:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(`content-origin:${secret}`),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  )
   const bytes = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(dropId)))
-  let bits = 0, value = 0, label = ""
+  let bits = 0,
+    value = 0,
+    label = ""
   for (const byte of bytes) {
     value = (value << 8) | byte
     bits += 8
@@ -68,7 +86,9 @@ async function contentLabel(event: H3Event, dropId: string): Promise<string> {
 export async function contentOrigin(event: H3Event, dropId: string): Promise<string | null> {
   const config = configured(event)
   if (!config) return null
-  const name = config.perDrop ? `${config.perDrop.prefix}${await contentLabel(event, dropId)}${config.perDrop.suffix}` : config.host
+  const name = config.perDrop
+    ? `${config.perDrop.prefix}${await contentLabel(event, dropId)}${config.perDrop.suffix}`
+    : config.host
   const host = `${name}${config.port ? `:${config.port}` : ""}`
   return host === event.url.host ? null : `${config.protocol}//${host}`
 }
@@ -90,7 +110,13 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
   if (new RegExp(`^${escape(prefix)}${LABEL}${escape(suffix)}$`).test(hostname)) return "content"
   // Only when the `*` shares its label with fixed text (`*-drop`): a whole level (`*.example.com`) may also hold Drop.
   if (!prefix && suffix.startsWith(".")) return false
-  return hostname.length > prefix.length + suffix.length && hostname.startsWith(prefix) && hostname.endsWith(suffix) && !hostname.slice(prefix.length, -suffix.length).includes(".") && "stray"
+  return (
+    hostname.length > prefix.length + suffix.length &&
+    hostname.startsWith(prefix) &&
+    hostname.endsWith(suffix) &&
+    !hostname.slice(prefix.length, -suffix.length).includes(".") &&
+    "stray"
+  )
 }
 
 /** Whether this request came in on a content origin rather than Drop itself. */
@@ -124,7 +150,9 @@ export function siteCoversDrop(event: H3Event, siteUrl: string): boolean {
   if (!siteUrl.includes("*")) {
     const { hostname, port } = new URL(siteUrl)
     if (port !== config.port) return false
-    return config.perDrop ? new RegExp(`^${escape(config.perDrop.prefix)}${LABEL}${escape(config.perDrop.suffix)}$`).test(hostname) : hostname === config.host
+    return config.perDrop
+      ? new RegExp(`^${escape(config.perDrop.prefix)}${LABEL}${escape(config.perDrop.suffix)}$`).test(hostname)
+      : hostname === config.host
   }
   // A pattern covers the content origin when it covers any one drop's host on it.
   const sample = config.perDrop ? `${config.perDrop.prefix}${"a".repeat(26)}${config.perDrop.suffix}` : config.host

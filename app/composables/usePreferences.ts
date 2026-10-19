@@ -13,14 +13,19 @@ export function useSidePanel() {
 }
 
 /** Whether the Drops page's Get started checklist was dismissed. A cookie, so a dismissed checklist never flashes in. */
-export const useGetStartedHidden = () => useCookie<boolean>("drop-get-started-hidden", { default: () => false, maxAge: year, sameSite: "lax" })
+export const useGetStartedHidden = () =>
+  useCookie<boolean>("drop-get-started-hidden", { default: () => false, maxAge: year, sameSite: "lax" })
 
 /**
  * Whether the sidebar is folded away (⌘B). The dashboard layout binds it to the sidebar, which keeps it in its cookie;
  * the pages' top bars read it to show the button that brings the sidebar back. It starts from that cookie (Nuxt UI's
  * `<storage-key>-sidebar-<id>`): the sidebar reads it only in its own setup, after the server rendered the layout.
  */
-export const useSidebarCollapsed = () => useState<boolean>("drop-sidebar-collapsed", () => !!useCookie<{ collapsed?: boolean } | null>("drop-sidebar-nav").value?.collapsed)
+export const useSidebarCollapsed = () =>
+  useState<boolean>(
+    "drop-sidebar-collapsed",
+    () => !!useCookie<{ collapsed?: boolean } | null>("drop-sidebar-nav").value?.collapsed,
+  )
 
 /** Which folders and apps are expanded in the sidebar tree. Shared state, so it survives navigation. */
 export const useTreeOpen = () => useState<Record<string, boolean>>("drop-tree-open", () => ({}))
@@ -64,11 +69,12 @@ export function useCopy() {
     async copyLoading(text: Promise<string>, title = "Copied") {
       try {
         if ("ClipboardItem" in globalThis && navigator.clipboard?.write)
-          await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then(value => new Blob([value], { type: "text/plain" })) })])
+          await navigator.clipboard.write([
+            new ClipboardItem({ "text/plain": text.then((value) => new Blob([value], { type: "text/plain" })) }),
+          ])
         else await copy(await text)
         toast.add({ title })
-      }
-      catch {
+      } catch {
         toast.add({ title: "Couldn't copy", color: "error" })
       }
     },

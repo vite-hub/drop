@@ -2,7 +2,7 @@
 import type { HostId } from "../../../scripts/deployment"
 
 const props = defineProps<{ host?: HostId }>()
-const hosts = computed(() => props.host ? [hostById(props.host)] : HOSTS)
+const hosts = computed(() => (props.host ? [hostById(props.host)] : HOSTS))
 </script>
 
 <template>

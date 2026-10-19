@@ -31,7 +31,7 @@ const owner = computed(() => drop.value.isOwner)
 // Signed-in people read a public link inside the app, sidebar included (pages/d/[id]/[[slug]].vue); visitors see it alone.
 const { data: me } = useMe()
 const visitor = computed(() => publicView && !me.value)
-const openCount = computed(() => comments.value.filter(comment => !comment.resolved).length)
+const openCount = computed(() => comments.value.filter((comment) => !comment.resolved).length)
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
@@ -53,8 +53,15 @@ async function restoreDrop() {
 }
 
 // A folder's description (what goes in it) is in Details, for everyone signed in who adds to it.
-const details = computed(() => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !publicView))
-const panel = useViewerPanel({ details, openCount, versions: computed(() => drop.value.versions.length), comments: computed(() => drop.value.kind !== "folder") })
+const details = computed(
+  () => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !publicView),
+)
+const panel = useViewerPanel({
+  details,
+  openCount,
+  versions: computed(() => drop.value.versions.length),
+  comments: computed(() => drop.value.kind !== "folder"),
+})
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const app = useAppFiles(drop)
 const { pages, page } = app
@@ -64,10 +71,16 @@ const editing = live.editing
 // ConnectionStatus waits 1.5 s before it says Reconnecting: a dropped socket usually comes back sooner, and Yjs keeps
 // the edits meanwhile.
 const liveLabels = { connecting: "Connecting", connected: "Live", reconnecting: "Reconnecting" } as const
-const liveLabel = (status: ConnectionStatusState) => (live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status])
+const liveLabel = (status: ConnectionStatusState) =>
+  live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
-const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } = annotations
+const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } =
+  annotations
+function closeLightbox() {
+  lightbox.value = null
+  popover.value = null
+}
 const popoverRef = useTemplateRef<{ fail: () => void; sent: () => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 
@@ -81,7 +94,13 @@ onMounted(() => {
   if (route.query.edit === "1" && drop.value.canEdit) startEdit()
 })
 
-const pageComments = computed(() => (isApp.value ? comments.value.filter(comment => comment.page === page.value || (!comment.page && page.value === pages.value[0])) : comments.value))
+const pageComments = computed(() =>
+  isApp.value
+    ? comments.value.filter(
+        (comment) => comment.page === page.value || (!comment.page && page.value === pages.value[0]),
+      )
+    : comments.value,
+)
 
 // Open comments carry over from earlier versions (server/utils/comments.ts). One is outdated when this version no
 // longer has what it pointed at: the frame couldn't find its text or element (it says which), or the drop is an image,
@@ -90,11 +109,11 @@ const pageComments = computed(() => (isApp.value ? comments.value.filter(comment
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
 // Comments on the whole page have nothing in it to pin to; they live in the panel.
-const pinned = computed(() => pageComments.value.filter(comment => !replaced(comment) && comment.kind !== "page"))
+const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
 // Each tab has its own button in the header, like a toolbar's panes: it opens the panel there, and closes it once open.
-const has = (value: SideTab) => tabs.value.some(item => item.value === value)
+const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
 const showing = (value: SideTab) => panelOpen.value && tab.value === value
 const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
 // A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
@@ -104,19 +123,39 @@ const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
 const inset = computed(() => (floating.value ? FLOATING_INSET : 0))
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced } = useViewerFrame({ drop, frame, app, pinned, inset, annotations })
+const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced } = useViewerFrame({
+  drop,
+  frame,
+  app,
+  pinned,
+  inset,
+  annotations,
+})
 
-const outdated = computed(() => new Set(comments.value.filter(comment => comment.version < drop.value.version && (replaced(comment) || unplaced.value.has(comment.id))).map(comment => comment.id)))
+const outdated = computed(
+  () =>
+    new Set(
+      comments.value
+        .filter(
+          (comment) => comment.version < drop.value.version && (replaced(comment) || unplaced.value.has(comment.id)),
+        )
+        .map((comment) => comment.id),
+    ),
+)
 /** The version whose changes show in place of the document (ViewerDiff), and the one before it. */
 const shownVersion = ref<DropVersion | null>(null)
-const previousVersion = computed(() => (shownVersion.value ? drop.value.versions[drop.value.versions.findIndex(item => item.id === shownVersion.value!.id) + 1] ?? null : null))
+const previousVersion = computed(() =>
+  shownVersion.value
+    ? (drop.value.versions[drop.value.versions.findIndex((item) => item.id === shownVersion.value!.id) + 1] ?? null)
+    : null,
+)
 /** Picking the open version again goes back to the document. Below `lg` the panel is a slideover, so it steps aside. */
 function showVersion(version: DropVersion) {
   shownVersion.value = shownVersion.value?.id === version.id ? null : version
   if (shownVersion.value && !wide.value) mobileSide.value = false
 }
 // The diff belongs to History: another tab goes back to the document.
-watch(tab, value => value !== "history" && (shownVersion.value = null))
+watch(tab, (value) => value !== "history" && (shownVersion.value = null))
 
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
@@ -131,8 +170,16 @@ defineShortcuts({
 
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
-const copyMarkdown = () => copyLoading($fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }), "Copied as Markdown")
-const copyFeedback = () => copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), "Feedback copied as Markdown")
+const copyMarkdown = () =>
+  copyLoading(
+    $fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }),
+    "Copied as Markdown",
+  )
+const copyFeedback = () =>
+  copy(
+    feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version),
+    "Feedback copied as Markdown",
+  )
 function copyLink() {
   if (drop.value.share !== "private") void copy(link.value, "Link copied")
   else shareOpen.value = true
@@ -140,7 +187,10 @@ function copyLink() {
 
 async function submit(body: string) {
   if (popover.value?.type !== "new") return
-  const comment = await state.addComment({ ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
+  const comment = await state.addComment(
+    { ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) },
+    body,
+  )
   if (!comment) return popoverRef.value?.fail()
   popover.value = null
   send({ type: "clear-selection" })
@@ -148,7 +198,12 @@ async function submit(body: string) {
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
 async function addPageComment(body: string) {
-  return Boolean(await state.addComment({ kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) }, body))
+  return Boolean(
+    await state.addComment(
+      { kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) },
+      body,
+    ),
+  )
 }
 
 async function resolve(id: string, resolved: boolean) {
@@ -189,9 +244,10 @@ async function focusComment(comment: DropComment, row?: DOMRect) {
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
-  popover.value = row && wide.value
-    ? { type: "thread", id: comment.id, x: row.left - 360, y: row.top - 8 }
-    : { type: "thread", id: comment.id, x: (top?.left ?? 0) + 16, y: (top?.top ?? 48) + 8 }
+  popover.value =
+    row && wide.value
+      ? { type: "thread", id: comment.id, x: row.left - 360, y: row.top - 8 }
+      : { type: "thread", id: comment.id, x: (top?.left ?? 0) + 16, y: (top?.top ?? 48) + 8 }
 }
 
 // `?comment=<n>` from a copied link: once the frame has placed the pins, open that thread with the comments showing.
@@ -199,8 +255,13 @@ onMounted(async () => {
   const n = Number(route.query.comment)
   if (!n || !["markdown", "image", "html", "app"].includes(drop.value.kind)) return
   await until(ready).toBe(true, { timeout: 10000 })
-  const comment = comments.value.find(item => item.n === n)
-  if (!comment) return notify.info({ title: `Comment #${n} isn't on this version`, icon: "i-ph-chat-circle-slash", color: "neutral" })
+  const comment = comments.value.find((item) => item.n === n)
+  if (!comment)
+    return notify.info({
+      title: `Comment #${n} isn't on this version`,
+      icon: "i-ph-chat-circle-slash",
+      color: "neutral",
+    })
   if (wide.value && has("comments")) panel.show("comments")
   void focusComment(comment)
 })
@@ -211,13 +272,21 @@ async function deleteDrop() {
 
 // The folders above, as breadcrumbs: in the app for people signed in, at their share links on a public page.
 const moveTo = useMoveDialog()
-const crumbTo = (crumb: { id: string; link: string; slug: string }) => (publicView ? dropPath(crumb) : `/drops/${crumb.id}`)
+const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
+  publicView ? dropPath(crumb) : `/drops/${crumb.id}`
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
-const imageComments = computed(() => (lightbox.value ? pageComments.value.filter(comment => comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id)) : []))
+const imageComments = computed(() =>
+  lightbox.value
+    ? pageComments.value.filter(
+        (comment) =>
+          comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id),
+      )
+    : [],
+)
 const threadComment = computed(() => {
   const open = popover.value
-  return open?.type === "thread" ? comments.value.find(comment => comment.id === open.id) : undefined
+  return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
 })
 </script>
 
@@ -230,8 +299,24 @@ const threadComment = computed(() => {
         </template>
       </UTabs>
       <div class="flex items-center gap-1">
-        <UButton v-if="tab === 'comments' && comments.length" aria-label="Copy feedback for your agent" color="neutral" icon="i-ph-sparkle" size="sm" title="Copy feedback for your agent" variant="ghost" @click="copyFeedback" />
-        <UButton aria-label="Close panel" color="neutral" icon="i-ph-x" size="sm" variant="ghost" @click="panel.close" />
+        <UButton
+          v-if="tab === 'comments' && comments.length"
+          aria-label="Copy feedback for your agent"
+          color="neutral"
+          icon="i-ph-sparkle"
+          size="sm"
+          title="Copy feedback for your agent"
+          variant="ghost"
+          @click="copyFeedback"
+        />
+        <UButton
+          aria-label="Close panel"
+          color="neutral"
+          icon="i-ph-x"
+          size="sm"
+          variant="ghost"
+          @click="panel.close"
+        />
       </div>
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto">
@@ -247,14 +332,36 @@ const threadComment = computed(() => {
         @focus="focusComment"
         @resolve="resolve"
       />
-      <ViewerHistory v-else-if="tab === 'history'" :comments="comments" :drop="drop" :selected="shownVersion?.id" @open="showVersion" />
+      <ViewerHistory
+        v-else-if="tab === 'history'"
+        :comments="comments"
+        :drop="drop"
+        :selected="shownVersion?.id"
+        @open="showVersion"
+      />
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
           <ViewerAction icon="i-ph-link" label="Copy link" @click="copyLink" />
-          <ViewerAction v-if="drop.url" icon="i-ph-download-simple" label="Download original" @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })" />
-          <ViewerAction v-if="owner && !trashed" icon="i-ph-folder-simple-plus" label="Move to folder" @click="moveTo({ drop })" />
-          <ViewerAction v-if="drop.canTrash && !trashed" destructive icon="i-ph-trash" label="Move to Trash" @click="deleteDrop" />
+          <ViewerAction
+            v-if="drop.url"
+            icon="i-ph-download-simple"
+            label="Download original"
+            @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })"
+          />
+          <ViewerAction
+            v-if="owner && !trashed"
+            icon="i-ph-folder-simple-plus"
+            label="Move to folder"
+            @click="moveTo({ drop })"
+          />
+          <ViewerAction
+            v-if="drop.canTrash && !trashed"
+            destructive
+            icon="i-ph-trash"
+            label="Move to Trash"
+            @click="deleteDrop"
+          />
         </template>
       </ViewerOverview>
     </div>
@@ -265,60 +372,190 @@ const threadComment = computed(() => {
       <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
           <SidebarExpand v-if="!visitor" />
-          <NuxtLink v-if="visitor" aria-label="Drop" class="grid size-8 place-items-center" to="/"><DropMark class="h-4 w-6" /></NuxtLink>
-          <UButton v-else-if="drop.ancestors.length" :aria-label="`Back to ${drop.ancestors.at(-1)!.title}`" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" :to="crumbTo(drop.ancestors.at(-1)!)" />
-          <UButton v-else aria-label="Back to drops" color="neutral" icon="i-ph-arrow-left" size="sm" variant="ghost" to="/drops" />
+          <NuxtLink v-if="visitor" aria-label="Drop" class="grid size-8 place-items-center" to="/"
+            ><DropMark class="h-4 w-6"
+          /></NuxtLink>
+          <UButton
+            v-else-if="drop.ancestors.length"
+            :aria-label="`Back to ${drop.ancestors.at(-1)!.title}`"
+            color="neutral"
+            icon="i-ph-arrow-left"
+            size="sm"
+            variant="ghost"
+            :to="crumbTo(drop.ancestors.at(-1)!)"
+          />
+          <UButton
+            v-else
+            aria-label="Back to drops"
+            color="neutral"
+            icon="i-ph-arrow-left"
+            size="sm"
+            variant="ghost"
+            to="/drops"
+          />
         </template>
         <template #title>
           <span class="flex min-w-0 items-center gap-2">
-            <nav v-if="drop.ancestors.length" aria-label="Folders" class="hidden min-w-0 shrink items-center gap-1 text-sm text-muted sm:flex">
+            <nav
+              v-if="drop.ancestors.length"
+              aria-label="Folders"
+              class="hidden min-w-0 shrink items-center gap-1 text-sm text-muted sm:flex"
+            >
               <template v-for="crumb in drop.ancestors" :key="crumb.id">
-                <NuxtLink class="max-w-40 truncate transition-colors hover:text-highlighted" :to="crumbTo(crumb)">{{ crumb.title }}</NuxtLink>
+                <NuxtLink class="max-w-40 truncate transition-colors hover:text-highlighted" :to="crumbTo(crumb)">{{
+                  crumb.title
+                }}</NuxtLink>
                 <UIcon name="i-ph-caret-right" class="size-3 shrink-0 text-dimmed" />
               </template>
             </nav>
             <span class="truncate text-sm font-medium">{{ drop.title }}</span>
-            <ConnectionStatus v-if="editing" class="label-mono shrink-0 data-[status=reconnecting]:text-error" :status="live.status.value">
+            <ConnectionStatus
+              v-if="editing"
+              class="label-mono shrink-0 data-[status=reconnecting]:text-error"
+              :status="live.status.value"
+            >
               <ConnectionStatusLabel v-slot="{ state: connection }">{{ liveLabel(connection) }}</ConnectionStatusLabel>
             </ConnectionStatus>
           </span>
         </template>
         <template v-if="editing" #right>
-          <AvatarStack v-if="live.people.value.length" class="mr-1" :max="5" :people="live.people.value" :style="{ '--vh-avatar-size': '1.25rem' }" variant="outline" />
+          <AvatarStack
+            v-if="live.people.value.length"
+            class="mr-1"
+            :max="5"
+            :people="live.people.value"
+            :style="{ '--vh-avatar-size': '1.25rem' }"
+            variant="outline"
+          />
           <UButton color="neutral" label="Close" size="sm" variant="ghost" @click="live.close" />
-          <UButton color="neutral" :disabled="!live.synced.value" label="Publish" :loading="live.publishing.value" size="sm" @click="live.publish()" />
+          <UButton
+            color="neutral"
+            :disabled="!live.synced.value"
+            label="Publish"
+            :loading="live.publishing.value"
+            size="sm"
+            @click="live.publish()"
+          />
         </template>
         <!-- One row of same-size tools: icons only, the pressed state shows the mode, shortcuts live in the tooltips. -->
         <template v-else #right>
           <UTooltip v-if="canDrawArea" :kbds="['R']" text="Comment on an area">
-            <UButton aria-label="Comment on an area" :aria-pressed="areaMode" color="neutral" icon="i-ph-chat-teardrop" size="sm" :variant="areaMode ? 'soft' : 'ghost'" @click="toggleArea" />
+            <UButton
+              aria-label="Comment on an area"
+              :aria-pressed="areaMode"
+              color="neutral"
+              icon="i-ph-chat-teardrop"
+              size="sm"
+              :variant="areaMode ? 'soft' : 'ghost'"
+              @click="toggleArea"
+            />
           </UTooltip>
-          <UTooltip v-if="drop.canEdit || drop.editNote" :kbds="drop.canEdit ? ['E'] : undefined" :text="drop.editNote ?? 'Edit together'">
-            <UButton aria-label="Edit together" color="neutral" :disabled="!drop.canEdit" icon="i-ph-pencil-simple" :loading="live.opening.value" size="sm" variant="ghost" @click="startEdit" />
+          <UTooltip
+            v-if="drop.canEdit || drop.editNote"
+            :kbds="drop.canEdit ? ['E'] : undefined"
+            :text="drop.editNote ?? 'Edit together'"
+          >
+            <UButton
+              aria-label="Edit together"
+              color="neutral"
+              :disabled="!drop.canEdit"
+              icon="i-ph-pencil-simple"
+              :loading="live.opening.value"
+              size="sm"
+              variant="ghost"
+              @click="startEdit"
+            />
           </UTooltip>
           <UTooltip v-if="has('comments')" :kbds="['C']" text="Comments">
-            <UButton :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'" :aria-pressed="showing('comments')" color="neutral" icon="i-ph-chats" :label="openCount ? String(openCount) : undefined" size="sm" :ui="{ label: 'font-mono text-xs tabular-nums' }" :variant="showing('comments') ? 'soft' : 'ghost'" @click="toggleTab('comments')" />
+            <UButton
+              :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
+              :aria-pressed="showing('comments')"
+              color="neutral"
+              icon="i-ph-chats"
+              :label="openCount ? String(openCount) : undefined"
+              size="sm"
+              :ui="{ label: 'font-mono text-xs tabular-nums' }"
+              :variant="showing('comments') ? 'soft' : 'ghost'"
+              @click="toggleTab('comments')"
+            />
           </UTooltip>
           <UTooltip v-if="has('history')" text="History">
-            <UButton aria-label="History" :aria-pressed="showing('history')" color="neutral" icon="i-ph-clock-counter-clockwise" size="sm" :variant="showing('history') ? 'soft' : 'ghost'" @click="toggleTab('history')" />
+            <UButton
+              aria-label="History"
+              :aria-pressed="showing('history')"
+              color="neutral"
+              icon="i-ph-clock-counter-clockwise"
+              size="sm"
+              :variant="showing('history') ? 'soft' : 'ghost'"
+              @click="toggleTab('history')"
+            />
           </UTooltip>
           <UTooltip v-if="has('details')" text="Details">
-            <UButton aria-label="Details" :aria-pressed="showing('details')" color="neutral" icon="i-ph-info" size="sm" :variant="showing('details') ? 'soft' : 'ghost'" @click="toggleTab('details')" />
+            <UButton
+              aria-label="Details"
+              :aria-pressed="showing('details')"
+              color="neutral"
+              icon="i-ph-info"
+              size="sm"
+              :variant="showing('details') ? 'soft' : 'ghost'"
+              @click="toggleTab('details')"
+            />
           </UTooltip>
           <UTooltip v-if="copiesMarkdown" text="Copy as Markdown">
-            <UButton aria-label="Copy as Markdown" color="neutral" icon="i-ph-copy" size="sm" variant="ghost" @click="copyMarkdown" />
+            <UButton
+              aria-label="Copy as Markdown"
+              color="neutral"
+              icon="i-ph-copy"
+              size="sm"
+              variant="ghost"
+              @click="copyMarkdown"
+            />
           </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
-          <USeparator v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length || copiesMarkdown" class="ml-1 h-4" orientation="vertical" />
+          <USeparator
+            v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length || copiesMarkdown"
+            class="ml-1 h-4"
+            orientation="vertical"
+          />
           <UTooltip v-if="!owner" text="Copy link">
-            <UButton aria-label="Copy link" color="neutral" icon="i-ph-link" size="sm" variant="ghost" @click="copy(link, 'Link copied')" />
+            <UButton
+              aria-label="Copy link"
+              color="neutral"
+              icon="i-ph-link"
+              size="sm"
+              variant="ghost"
+              @click="copy(link, 'Link copied')"
+            />
           </UTooltip>
           <!-- Strangers report through the abuse queue; teammates can talk to the owner, so they don't get a flag. -->
           <UTooltip v-if="visitor" text="Report">
-            <UButton aria-label="Report" :to="{ path: '/report', query: { target: `/d/${drop.link}` } }" color="neutral" icon="i-ph-flag" size="sm" variant="ghost" />
+            <UButton
+              aria-label="Report"
+              :to="{ path: '/report', query: { target: `/d/${drop.link}` } }"
+              color="neutral"
+              icon="i-ph-flag"
+              size="sm"
+              variant="ghost"
+            />
           </UTooltip>
-          <UButton v-if="owner" color="neutral" :icon="SHARE_ICONS[drop.share]" :label="drop.share === 'private' && !drop.shareReview ? 'Share' : shareStatus(drop, now)" size="sm" :variant="drop.share === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
-          <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
+          <UButton
+            v-if="owner"
+            color="neutral"
+            :icon="SHARE_ICONS[drop.share]"
+            :label="drop.share === 'private' && !drop.shareReview ? 'Share' : shareStatus(drop, now)"
+            size="sm"
+            :variant="drop.share === 'private' ? 'solid' : 'ghost'"
+            @click="shareOpen = true"
+          />
+          <UButton
+            v-else-if="visitor"
+            class="hidden sm:inline-flex"
+            color="neutral"
+            label="Make Your Own"
+            size="sm"
+            to="/"
+            variant="outline"
+          />
         </template>
       </UDashboardNavbar>
     </template>
@@ -326,10 +563,23 @@ const threadComment = computed(() => {
     <template #body>
       <UAlert
         v-if="owner && trashed"
-        :actions="[{ label: 'Restore', color: 'error', variant: 'outline', size: 'sm', loading: restoring, onClick: restoreDrop }]"
+        :actions="[
+          {
+            label: 'Restore',
+            color: 'error',
+            variant: 'outline',
+            size: 'sm',
+            loading: restoring,
+            onClick: restoreDrop,
+          },
+        ]"
         class="rounded-none border-0 border-b border-default"
         color="error"
-        :description="drop.trashReason === 'expired' ? 'Nobody opened it for a while, so its link stopped working. Only you and admins can see it until you restore it.' : 'Its link stopped working. Only you and admins can see it until you restore it.'"
+        :description="
+          drop.trashReason === 'expired'
+            ? 'Nobody opened it for a while, so its link stopped working. Only you and admins can see it until you restore it.'
+            : 'Its link stopped working. Only you and admins can see it until you restore it.'
+        "
         icon="i-ph-trash"
         orientation="horizontal"
         :title="expiryLabel(drop, now)"
@@ -337,7 +587,9 @@ const threadComment = computed(() => {
       />
       <UAlert
         v-else-if="older"
-        :actions="[{ label: `Open v${latest.version}`, color: 'neutral', variant: 'outline', size: 'sm', to: latestTo }]"
+        :actions="[
+          { label: `Open v${latest.version}`, color: 'neutral', variant: 'outline', size: 'sm', to: latestTo },
+        ]"
         class="rounded-none border-0 border-b border-default"
         color="neutral"
         :description="`v${latest.version} is the latest version.`"
@@ -348,7 +600,15 @@ const threadComment = computed(() => {
       />
       <UAlert
         v-else-if="sentVersion && sentNotice"
-        :actions="[{ label: `View v${sentVersion}`, color: 'neutral', variant: 'outline', size: 'sm', to: dropPath(drop, sentVersion) }]"
+        :actions="[
+          {
+            label: `View v${sentVersion}`,
+            color: 'neutral',
+            variant: 'outline',
+            size: 'sm',
+            to: dropPath(drop, sentVersion),
+          },
+        ]"
         class="rounded-none border-0 border-b border-default"
         close
         color="neutral"
@@ -360,7 +620,9 @@ const threadComment = computed(() => {
         @update:open="sentNotice = $event"
       />
       <div v-if="isApp" class="flex h-9 shrink-0 items-center gap-2 border-b border-default px-3">
-        <span class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted">
+        <span
+          class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted"
+        >
           <UIcon :name="SHARE_ICONS[drop.share]" class="size-3 shrink-0" />
           <span class="truncate">{{ drop.slug || drop.link }}/{{ page === "index.html" ? "" : page }}</span>
         </span>
@@ -370,24 +632,67 @@ const threadComment = computed(() => {
       <div class="relative flex min-h-0 flex-1 flex-col">
         <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
         <!-- The grid keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
-        <ViewerFolder v-else-if="drop.kind === 'folder'" :class="floating && 'pr-96'" :drop="drop" :public-view="publicView" />
-        <ViewerSite v-else-if="drop.kind === 'site'" :drop="drop" :inset="floating ? FLOATING_INSET : 0" :public-view="publicView" />
+        <ViewerFolder
+          v-else-if="drop.kind === 'folder'"
+          :class="floating && 'pr-96'"
+          :drop="drop"
+          :public-view="publicView"
+        />
+        <ViewerSite
+          v-else-if="drop.kind === 'site'"
+          :drop="drop"
+          :inset="floating ? FLOATING_INSET : 0"
+          :public-view="publicView"
+        />
         <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
         <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
           <div>
             <UIcon name="i-ph-file" class="size-8 text-dimmed" />
             <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
             <p class="mt-1 text-sm text-muted">No preview for this file type.</p>
-            <UButton v-if="drop.url" class="mt-4" color="neutral" icon="i-ph-download-simple" label="Download" :to="drop.url" external target="_blank" variant="outline" />
+            <UButton
+              v-if="drop.url"
+              class="mt-4"
+              color="neutral"
+              icon="i-ph-download-simple"
+              label="Download"
+              :to="drop.url"
+              external
+              target="_blank"
+              variant="outline"
+            />
           </div>
         </div>
-        <iframe v-else-if="contentOrigin" :key="frameKey" ref="frame" class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]" :sandbox="CONTENT_SANDBOX" :src="frameSrc" :title="drop.title" />
+        <iframe
+          v-else-if="contentOrigin"
+          :key="frameKey"
+          ref="frame"
+          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+          :sandbox="CONTENT_SANDBOX"
+          :src="frameSrc"
+          :title="drop.title"
+        />
         <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
              backdrop behind it in dark mode. -->
         <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
-        <iframe v-else-if="srcdoc" ref="frame" class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]" data-allow-mismatch="attribute" :sandbox="PREVIEW_SANDBOX" :srcdoc="srcdoc" :title="drop.title" />
+        <iframe
+          v-else-if="srcdoc"
+          ref="frame"
+          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+          data-allow-mismatch="attribute"
+          :sandbox="PREVIEW_SANDBOX"
+          :srcdoc="srcdoc"
+          :title="drop.title"
+        />
 
-        <ViewerDiff v-if="shownVersion && !editing" :key="shownVersion.id" :inset="floating ? FLOATING_INSET : 0" :previous="previousVersion" :version="shownVersion" @close="shownVersion = null" />
+        <ViewerDiff
+          v-if="shownVersion && !editing"
+          :key="shownVersion.id"
+          :inset="floating ? FLOATING_INSET : 0"
+          :previous="previousVersion"
+          :version="shownVersion"
+          @close="shownVersion = null"
+        />
 
         <!-- As tall as its content, so a quiet drop gets a small card. Markdown docs make room for it (FLOATING_INSET). -->
         <aside
@@ -399,7 +704,13 @@ const threadComment = computed(() => {
       </div>
     </template>
   </UDashboardPanel>
-  <USlideover v-if="!wide && !editing" v-model:open="mobileSide" side="right" :ui="{ content: 'max-w-md' }" title="Drop panel">
+  <USlideover
+    v-if="!wide && !editing"
+    v-model:open="mobileSide"
+    side="right"
+    :ui="{ content: 'max-w-md' }"
+    title="Drop panel"
+  >
     <template #content>
       <div class="flex h-full flex-col"><ReuseSide /></div>
     </template>
@@ -408,10 +719,23 @@ const threadComment = computed(() => {
   <div
     v-if="selection && !popover"
     class="fixed z-30 -translate-x-1/2 -translate-y-full"
-    :style="{ left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`, top: `${Math.max(56, selection.rect.top - 8)}px` }"
+    :style="{
+      left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
+      top: `${Math.max(56, selection.rect.top - 8)}px`,
+    }"
   >
-    <div class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]">
-      <UButton color="neutral" icon="i-ph-chat-circle" label="Comment" size="sm" variant="ghost" @click="commentOnSelection" @mousedown.prevent />
+    <div
+      class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]"
+    >
+      <UButton
+        color="neutral"
+        icon="i-ph-chat-circle"
+        label="Comment"
+        size="sm"
+        variant="ghost"
+        @click="commentOnSelection"
+        @mousedown.prevent
+      />
     </div>
   </div>
 
@@ -423,7 +747,7 @@ const threadComment = computed(() => {
     :draft="imageDraft"
     :from="lightbox.from"
     :src="lightbox.src"
-    @close="lightbox = null; popover = null"
+    @close="closeLightbox"
     @pick="pickImage"
     @thread="(id, x, y) => (popover = { type: 'thread', id, x, y })"
   />

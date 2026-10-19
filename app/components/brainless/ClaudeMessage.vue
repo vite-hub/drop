@@ -5,7 +5,10 @@ const { role = "assistant" } = defineProps<{ role?: "user" | "assistant" }>()
 </script>
 
 <template>
-  <div v-if="role === 'user'" class="flex w-full min-w-0 items-baseline bg-[#3a3a3a] font-mono text-[13px] leading-[1.55]">
+  <div
+    v-if="role === 'user'"
+    class="flex w-full min-w-0 items-baseline bg-[#3a3a3a] font-mono text-[13px] leading-[1.55]"
+  >
     <span aria-hidden="true" class="shrink-0 text-[#4e4e4e]">❯</span>
     <span aria-hidden="true" class="inline-block w-[1ch] shrink-0" />
     <span class="min-w-0 flex-1 break-words text-white"><slot /></span>

@@ -19,22 +19,37 @@ import { shareReviewFor } from "./trust"
  * one only when they're team folders an admin makes in the browser. `moving` is a drop already somewhere that would go
  * in, subtree and all; `adding` says a new folder would.
  */
-export async function requireFolder(ref: string, who: Identity, event?: H3Event, moving?: DropRow, adding: "drop" | "folder" = "drop") {
+export async function requireFolder(
+  ref: string,
+  who: Identity,
+  event?: H3Event,
+  moving?: DropRow,
+  adding: "drop" | "folder" = "drop",
+) {
   const folder = await findDropByRef(ref, event)
   const can = folder && permissions(folder, who)
   if (!folder || folder.kind !== "folder" || !can || !(can.manage || (folder.teamFolder && can.view)))
     throw new HTTPError({ status: 404, statusText: `No folder you can add to with id ${ref}.` })
-  if (folder.expired) throw new HTTPError({ status: 409, statusText: `${folder.title} is in the Trash. Restore it first.` })
-  if (moving && (folder.id === moving.id || folder.ancestors?.some(node => node.id === moving.id)))
+  if (folder.expired)
+    throw new HTTPError({ status: 409, statusText: `${folder.title} is in the Trash. Restore it first.` })
+  if (moving && (folder.id === moving.id || folder.ancestors?.some((node) => node.id === moving.id)))
     throw new HTTPError({ status: 400, statusText: "A folder can't go inside itself." })
   const folderGoesIn = adding === "folder" || moving?.kind === "folder"
   if (folder.teamFolder) {
     if (folderGoesIn && !(moving ? moving.teamFolder : isAdminInBrowser(who)))
-      throw new HTTPError({ status: 403, statusText: `Only admins add folders to ${folder.title}, in the browser. Put the drops in it instead.` })
-  }
-  else if (moving && (folder.ownerId !== moving.ownerId || moving.teamFolder))
-    throw new HTTPError({ status: 400, statusText: moving.teamFolder ? "A team folder only goes in another team folder." : "A folder holds its owner's drops only." })
-  if (depthOf(folder) + (moving ? await heightOf(moving) : 1) > MAX_DEPTH) throw new HTTPError({ status: 400, statusText: `Folders nest ${MAX_DEPTH} levels deep at most.` })
+      throw new HTTPError({
+        status: 403,
+        statusText: `Only admins add folders to ${folder.title}, in the browser. Put the drops in it instead.`,
+      })
+  } else if (moving && (folder.ownerId !== moving.ownerId || moving.teamFolder))
+    throw new HTTPError({
+      status: 400,
+      statusText: moving.teamFolder
+        ? "A team folder only goes in another team folder."
+        : "A folder holds its owner's drops only.",
+    })
+  if (depthOf(folder) + (moving ? await heightOf(moving) : 1) > MAX_DEPTH)
+    throw new HTTPError({ status: 400, statusText: `Folders nest ${MAX_DEPTH} levels deep at most.` })
   return folder
 }
 
@@ -51,27 +66,67 @@ export const MAX_FOLDER_DESCRIPTION = 2000
  * A team folder (`team`, or any folder made inside one) is the team's: on a team Drop, admins make it in the browser, it
  * reaches the whole team, and it never expires.
  */
-export async function createFolder(who: Identity, input: LifetimeInput & { title: string; slug?: string; folder?: DropRow; share?: Share; team?: boolean }, event?: H3Event) {
+export async function createFolder(
+  who: Identity,
+  input: LifetimeInput & { title: string; slug?: string; folder?: DropRow; share?: Share; team?: boolean },
+  event?: H3Event,
+) {
   const title = input.title.trim().slice(0, 160) || "Untitled folder"
   const parent = input.folder ?? null
   const team = Boolean(input.team || parent?.teamFolder)
   if (team && (sharePolicy(event).mode !== "team" || !isAdminInBrowser(who)))
-    throw new HTTPError({ status: 403, statusText: sharePolicy(event).mode === "team" ? "Only admins make team folders, in the browser." : "Team folders need a team Drop (DROP_MODE=team)." })
-  if (team && parent && !parent.teamFolder) throw new HTTPError({ status: 400, statusText: "A team folder goes at the top, or in another team folder." })
-  const ownerId = team ? who.userId : parent?.ownerId ?? who.userId
-  const life = parent ? lifetimeFields(who, {}, parent, event) : team ? { lifetime: "keep" as const, keepReason: null } : lifetimeFields(who, input, null, event)
-  const { share, publicUntil } = input.share ? shareFields(input.share, { kind: "folder", teamFolder: team }, event)
-    : { share: team ? "team" as const : defaultShare(sharePolicy(event).mode), publicUntil: null }
+    throw new HTTPError({
+      status: 403,
+      statusText:
+        sharePolicy(event).mode === "team"
+          ? "Only admins make team folders, in the browser."
+          : "Team folders need a team Drop (DROP_MODE=team).",
+    })
+  if (team && parent && !parent.teamFolder)
+    throw new HTTPError({ status: 400, statusText: "A team folder goes at the top, or in another team folder." })
+  const ownerId = team ? who.userId : (parent?.ownerId ?? who.userId)
+  const life = parent
+    ? lifetimeFields(who, {}, parent, event)
+    : team
+      ? { lifetime: "keep" as const, keepReason: null }
+      : lifetimeFields(who, input, null, event)
+  const { share, publicUntil } = input.share
+    ? shareFields(input.share, { kind: "folder", teamFolder: team }, event)
+    : { share: team ? ("team" as const) : defaultShare(sharePolicy(event).mode), publicUntil: null }
   const note = input.note?.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null
   return withDropQuota(ownerId, { drops: 0, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
     const slug = await uniqueSlug(parent?.id ?? null, (input.slug && slugify(input.slug)) || slugify(title))
     const row: DropRow = {
-      id: crypto.randomUUID(), ownerId, kind: "folder", title, filename: `${slug || "folder"}/`,
-      blobKey: null, contentType: null, size: 0, version: 1, supersedesId: null, link: newLink(), slug,
-      share, publicUntil, teamFolder: team, shareReview: isPublic(share) ? await shareReviewFor(ownerId, event) : null, quarantinedAt: null,
-      actorKind: who.actorKind, actorName: who.actorName, createdAt: now, updatedAt: now, lastAccessedAt: now,
-      ...life, note, trashedAt: null, trashReason: null, parentId: parent?.id ?? null, siteUrl: null, publishToken: null,
+      id: crypto.randomUUID(),
+      ownerId,
+      kind: "folder",
+      title,
+      filename: `${slug || "folder"}/`,
+      blobKey: null,
+      contentType: null,
+      size: 0,
+      version: 1,
+      supersedesId: null,
+      link: newLink(),
+      slug,
+      share,
+      publicUntil,
+      teamFolder: team,
+      shareReview: isPublic(share) ? await shareReviewFor(ownerId, event) : null,
+      quarantinedAt: null,
+      actorKind: who.actorKind,
+      actorName: who.actorName,
+      createdAt: now,
+      updatedAt: now,
+      lastAccessedAt: now,
+      ...life,
+      note,
+      trashedAt: null,
+      trashReason: null,
+      parentId: parent?.id ?? null,
+      siteUrl: null,
+      publishToken: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(parent ? [touchFolder(parent.id, now)] : [])])
     return row
@@ -90,6 +145,9 @@ export async function moveNode(drop: DropRow, ref: string | null, who: Identity,
   const own = drop.raw ?? drop
   const slug = await uniqueSlug(target?.id ?? null, own.slug ?? slugify(own.title), own.link)
   const life = target ? {} : { lifetime: drop.lifetime, keepReason: drop.keepReason, lastAccessedAt: now }
-  await db.update(drops).set({ parentId: target?.id ?? null, slug, ...life }).where(sql`${drops.id} IN (${chainOf(drop)})`)
+  await db
+    .update(drops)
+    .set({ parentId: target?.id ?? null, slug, ...life })
+    .where(sql`${drops.id} IN (${chainOf(drop)})`)
   if (target) await touchFolder(target.id, now)
 }

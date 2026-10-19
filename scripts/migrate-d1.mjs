@@ -17,18 +17,27 @@ export async function migrateD1() {
       body: JSON.stringify({ sql }),
     })
     const payload = await response.json()
-    if (!response.ok || payload.success !== true || !Array.isArray(payload.result) || payload.result.some(result => result.success !== true)) {
-      const errors = [...(payload.errors || []), ...(payload.result || []).filter(result => result.error)]
-      throw new Error(`D1 migration failed (${response.status}): ${errors.map(error => error.message || error.error).join("; ")}`)
+    if (
+      !response.ok ||
+      payload.success !== true ||
+      !Array.isArray(payload.result) ||
+      payload.result.some((result) => result.success !== true)
+    ) {
+      const errors = [...(payload.errors || []), ...(payload.result || []).filter((result) => result.error)]
+      throw new Error(
+        `D1 migration failed (${response.status}): ${errors.map((error) => error.message || error.error).join("; ")}`,
+      )
     }
     return payload.result.at(-1)?.results || []
   }
 
   // Use Wrangler's ledger so either migration command can follow the other.
-  await query("CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)")
-  const applied = new Set((await query("SELECT name FROM d1_migrations")).map(row => row.name))
+  await query(
+    "CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
+  )
+  const applied = new Set((await query("SELECT name FROM d1_migrations")).map((row) => row.name))
   const directory = new URL("../server/databases/migrations/", import.meta.url)
-  const files = (await readdir(directory)).filter(name => name.endsWith(".sql")).sort()
+  const files = (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort()
   for (const name of files) {
     if (applied.has(name)) continue
     const sql = await readFile(new URL(name, directory), "utf8")

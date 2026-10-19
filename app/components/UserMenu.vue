@@ -29,7 +29,9 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
 <template>
   <UDropdownMenu
     :items="items"
-    :content="compact ? { side: 'bottom', align: 'end', sideOffset: 6 } : { side: 'top', align: 'start', sideOffset: 6 }"
+    :content="
+      compact ? { side: 'bottom', align: 'end', sideOffset: 6 } : { side: 'top', align: 'start', sideOffset: 6 }
+    "
     :ui="{ content: compact ? 'w-60' : 'w-(--reka-dropdown-menu-trigger-width) min-w-52' }"
   >
     <!-- One trigger element either way: the dropdown's slot hydrates a single node. Compact is just the avatar;
@@ -40,7 +42,12 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
       type="button"
       aria-label="Account menu"
     >
-      <UAvatar :alt="me?.name ?? 'You'" :class="compact ? 'rounded-md' : 'rounded-lg'" :src="me?.image ?? undefined" :size="compact ? 'xs' : 'md'" />
+      <UAvatar
+        :alt="me?.name ?? 'You'"
+        :class="compact ? 'rounded-md' : 'rounded-lg'"
+        :src="me?.image ?? undefined"
+        :size="compact ? 'xs' : 'md'"
+      />
       <template v-if="!compact">
         <span class="min-w-0 flex-1 leading-tight">
           <span class="block truncate text-sm font-medium text-highlighted">{{ me?.name ?? "You" }}</span>

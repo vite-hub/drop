@@ -19,14 +19,42 @@ export const FrameMessage = v.variant("type", [
   // A cleared selection carries nothing else.
   v.variant("clear", [
     v.object({ type: v.literal("selection"), clear: v.literal(true) }),
-    v.object({ type: v.literal("selection"), clear: v.optional(v.literal(false)), quote: v.string(), selector: v.string(), label: v.string(), rect: Rect }),
+    v.object({
+      type: v.literal("selection"),
+      clear: v.optional(v.literal(false)),
+      quote: v.string(),
+      selector: v.string(),
+      label: v.string(),
+      rect: Rect,
+    }),
   ]),
-  v.object({ type: v.literal("image"), src: v.string(), alt: v.string(), selector: v.string(), label: v.string(), rect: v.optional(Rect) }),
-  v.object({ type: v.literal("area"), selector: v.string(), label: v.string(), ox: v.number(), oy: v.number(), ow: v.number(), oh: v.number(), rect: Rect }),
+  v.object({
+    type: v.literal("image"),
+    src: v.string(),
+    alt: v.string(),
+    selector: v.string(),
+    label: v.string(),
+    rect: v.optional(Rect),
+  }),
+  v.object({
+    type: v.literal("area"),
+    selector: v.string(),
+    label: v.string(),
+    ox: v.number(),
+    oy: v.number(),
+    ow: v.number(),
+    oh: v.number(),
+    rect: Rect,
+  }),
   v.object({ type: v.literal("marker"), id: v.string(), clientX: v.number(), clientY: v.number() }),
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
   v.object({ type: v.literal("key"), key: v.picklist(["Escape", "r"]) }),
-  v.object({ type: v.literal("runtime-error"), kind: RuntimeErrorKind, message: v.string(), source: v.optional(v.string()) }),
+  v.object({
+    type: v.literal("runtime-error"),
+    kind: RuntimeErrorKind,
+    message: v.string(),
+    source: v.optional(v.string()),
+  }),
 ])
 
 export type FrameMessage = v.InferOutput<typeof FrameMessage>

@@ -4,9 +4,9 @@ import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
 
 export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site"] as const
-export type DropKind = typeof DROP_KINDS[number]
+export type DropKind = (typeof DROP_KINDS)[number]
 export const ACTOR_KINDS = ["agent", "browser"] as const
-export type ActorKind = typeof ACTOR_KINDS[number]
+export type ActorKind = (typeof ACTOR_KINDS)[number]
 
 export interface DropSummary {
   /** This version. */
@@ -66,12 +66,33 @@ export interface DropSummary {
 }
 
 /** A node on the way to a drop, for breadcrumbs. */
-export interface DropCrumb { id: string; kind: DropKind; title: string; link: string; slug: string }
+export interface DropCrumb {
+  id: string
+  kind: DropKind
+  title: string
+  link: string
+  slug: string
+}
 
-export interface DropVersion { id: string; title: string; version: number; createdAt: number; note: string | null; actorName: string; current?: boolean }
+export interface DropVersion {
+  id: string
+  title: string
+  version: number
+  createdAt: number
+  note: string | null
+  actorName: string
+  current?: boolean
+}
 
 /** A file a doc embeds from this Drop (an image, usually). It belongs to the doc. */
-export interface DropAttachment { id: string; kind: DropKind; title: string; filename: string; size: number; url: string }
+export interface DropAttachment {
+  id: string
+  kind: DropKind
+  title: string
+  filename: string
+  size: number
+  url: string
+}
 
 export interface DropDetail extends DropSummary {
   /** Change its share, name, lifetime, or folder: its owner and admins; a team folder's admins only. */

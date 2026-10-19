@@ -8,7 +8,10 @@ import { MCP_SERVER_INFO } from "#shared/mcp"
  */
 export default defineHandler((event) => {
   const origin = event.url.origin
-  const sections = DOCS_NAV.map(group => `## ${group.title}\n\n${group.links.map(link => `- [${link.label}](${origin}${link.to}.md)`).join("\n")}`)
+  const sections = DOCS_NAV.map(
+    (group) =>
+      `## ${group.title}\n\n${group.links.map((link) => `- [${link.label}](${origin}${link.to}.md)`).join("\n")}`,
+  )
   event.res.headers.set("Content-Type", "text/plain; charset=utf-8")
   event.res.headers.set("Cache-Control", "public, max-age=300")
   return `# ${MCP_SERVER_INFO.title}

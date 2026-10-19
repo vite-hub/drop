@@ -8,14 +8,36 @@ const { folder = true } = defineProps<{ folder?: boolean }>()
 const emit = defineEmits<{ folder: []; site: [] }>()
 
 const items = computed<DropdownMenuItem[]>(() => [
-  ...(folder ? [{ label: "Folder", description: "Groups related drops", icon: "i-ph-folder-simple", onSelect: () => emit("folder") }] : []),
-  { label: "Site review", description: "Comments on a live URL", icon: "i-ph-globe-simple", onSelect: () => emit("site") },
+  ...(folder
+    ? [
+        {
+          label: "Folder",
+          description: "Groups related drops",
+          icon: "i-ph-folder-simple",
+          onSelect: () => emit("folder"),
+        },
+      ]
+    : []),
+  {
+    label: "Site review",
+    description: "Comments on a live URL",
+    icon: "i-ph-globe-simple",
+    onSelect: () => emit("site"),
+  },
 ])
 </script>
 
 <template>
   <UDropdownMenu :items="items" :content="{ align: 'end' }" :ui="{ content: 'w-64' }">
-    <UButton aria-label="New" color="neutral" icon="i-ph-plus" size="sm" trailing-icon="i-ph-caret-down" :ui="{ trailingIcon: 'max-sm:hidden size-3.5 text-dimmed' }" variant="ghost">
+    <UButton
+      aria-label="New"
+      color="neutral"
+      icon="i-ph-plus"
+      size="sm"
+      trailing-icon="i-ph-caret-down"
+      :ui="{ trailingIcon: 'max-sm:hidden size-3.5 text-dimmed' }"
+      variant="ghost"
+    >
       <span class="max-sm:hidden">New</span>
     </UButton>
   </UDropdownMenu>

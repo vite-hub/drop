@@ -5,14 +5,30 @@ const origin = process.env.DROP_QUOTA_TEST_ORIGIN || "http://localhost:3406"
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname), "Quota smoke tests require a local instance")
 let cookie = ""
 async function request(path, method = "GET", body, headers = {}) {
-  const response = await fetch(`${origin}${path}`, { method, headers: { cookie, ...(body && !(body instanceof FormData) ? { "content-type": "application/json" } : {}), ...headers }, body: body ? body instanceof FormData ? body : JSON.stringify(body) : undefined })
+  const response = await fetch(`${origin}${path}`, {
+    method,
+    headers: {
+      cookie,
+      ...(body && !(body instanceof FormData) ? { "content-type": "application/json" } : {}),
+      ...headers,
+    },
+    body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
+  })
   const data = await response.json()
   return { response, data }
 }
 const email = `quota-${crypto.randomUUID()}@example.com`
-const signin = await request("/api/auth/sign-up/email", "POST", { name: "Quota test", email, password: `Quota-test-${crypto.randomUUID()}` }, { origin })
+const signin = await request(
+  "/api/auth/sign-up/email",
+  "POST",
+  { name: "Quota test", email, password: `Quota-test-${crypto.randomUUID()}` },
+  { origin },
+)
 assert.equal(signin.response.status, 200, JSON.stringify(signin.data))
-cookie = signin.response.headers.getSetCookie().map(value => value.split(";")[0]).join("; ")
+cookie = signin.response.headers
+  .getSetCookie()
+  .map((value) => value.split(";")[0])
+  .join("; ")
 assert.ok(cookie)
 const usage = await request("/api/usage")
 assert.equal(usage.data.enabled, true)
@@ -25,7 +41,9 @@ try {
     assert.equal(result.response.status, 200)
     created.push(result.data.id)
   }
-  const app = await request("/api/apps", "POST", { files: { "index.html": "<h1>Quota</h1>", "style.css": "body{color:red}" } })
+  const app = await request("/api/apps", "POST", {
+    files: { "index.html": "<h1>Quota</h1>", "style.css": "body{color:red}" },
+  })
   assert.equal(app.response.status, 200)
   created.push(app.data.id)
   let currentUsage = (await request("/api/usage")).data
@@ -37,7 +55,11 @@ try {
   assert.deepEqual(denied.data.quota, { unit: "drops", used: 3, limit: 3 })
   assert.equal(denied.data.retryable, false)
   assert.equal(denied.data.selfHostUrl, "/docs/self-host")
-  const revision = await request("/api/drops", "POST", { filename: "doc.md", content: "# Revised", supersedes: created[0] })
+  const revision = await request("/api/drops", "POST", {
+    filename: "doc.md",
+    content: "# Revised",
+    supersedes: created[0],
+  })
   assert.equal(revision.response.status, 200)
   created[0] = revision.data.id
   const newApp = await request("/api/apps", "POST", { id: app.data.id, files: { "index.html": "<h1>New</h1>" } })
@@ -47,11 +69,17 @@ try {
   assert.equal(currentUsage.writes.used, 6)
   const expectedBytes = new TextEncoder().encode("# Drop 0\n# Drop 1\n# Revised<h1>New</h1>").byteLength
   assert.equal(currentUsage.bytes.used, expectedBytes)
-  const oversizedApp = await request("/api/apps", "POST", { id: app.data.id, files: { "index.html": "", ...Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`${i}.txt`, ""])) } })
+  const oversizedApp = await request("/api/apps", "POST", {
+    id: app.data.id,
+    files: { "index.html": "", ...Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`${i}.txt`, ""])) },
+  })
   assert.equal(oversizedApp.response.status, 402)
   assert.equal(oversizedApp.data.quota.unit, "appFiles")
   assert.equal((await request("/api/usage")).data.writes.used, 6)
-  const oversizedBytes = await request("/api/apps", "POST", { id: app.data.id, files: { "index.html": "x".repeat(2 * 1024 * 1024 + 1) } })
+  const oversizedBytes = await request("/api/apps", "POST", {
+    id: app.data.id,
+    files: { "index.html": "x".repeat(2 * 1024 * 1024 + 1) },
+  })
   assert.equal(oversizedBytes.response.status, 402)
   assert.equal(oversizedBytes.data.quota.unit, "appBytes")
   const form = new FormData()
@@ -75,7 +103,6 @@ try {
   assert.equal(currentUsage.writes.used, 8)
   assert.ok(currentUsage.bytes.used > expectedBytes)
   console.log("Quota runtime smoke passed: REST/docs/apps/uploads/revisions/code images/deletion")
-}
-finally {
+} finally {
   for (const id of created) await request(`/api/drops/${id}`, "DELETE")
 }

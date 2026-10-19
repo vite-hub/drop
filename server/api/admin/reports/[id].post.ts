@@ -17,20 +17,39 @@ export default defineValidatedHandler({
     if (!report) throw new HTTPError({ status: 404, statusText: "No report with that id." })
     const { action } = await event.req.json()
     if (action === "ban") {
-      if (!report.ownerId || report.ownerId === who.userId) throw new HTTPError({ status: 400, statusText: "This owner cannot be banned." })
-      await authFor(event).api.banUser({ headers: event.req.headers, body: { userId: report.ownerId, banReason: "Abuse report" } })
+      if (!report.ownerId || report.ownerId === who.userId)
+        throw new HTTPError({ status: 400, statusText: "This owner cannot be banned." })
+      await authFor(event).api.banUser({
+        headers: event.req.headers,
+        body: { userId: report.ownerId, banReason: "Abuse report" },
+      })
       await db.update(drops).set({ quarantinedAt: Date.now() }).where(eq(drops.ownerId, report.ownerId))
     }
     if (action === "quarantine" && report.dropId) {
       const drop = await findDrop(report.dropId, event)
-      if (drop) await db.update(drops).set({ quarantinedAt: Date.now() }).where(sql`${drops.id} IN (${chainOf(drop)})`)
+      if (drop)
+        await db
+          .update(drops)
+          .set({ quarantinedAt: Date.now() })
+          .where(sql`${drops.id} IN (${chainOf(drop)})`)
     }
     // Dismissing a report must never undo a quarantine.
     if (report.status === "quarantined" || report.status === "banned") {
       if (action === "dismiss") return { ok: true }
     }
-    await db.update(abuseReports).set({ status: action === "dismiss" ? "dismissed" : action === "ban" ? "banned" : "quarantined", resolvedAt: Date.now(), resolvedBy: who.userId }).where(eq(abuseReports.id, id))
-    useLogger(event).error("Abuse report action", { severity: "high", action: `abuse-${action}`, report: { id, dropId: report.dropId } })
+    await db
+      .update(abuseReports)
+      .set({
+        status: action === "dismiss" ? "dismissed" : action === "ban" ? "banned" : "quarantined",
+        resolvedAt: Date.now(),
+        resolvedBy: who.userId,
+      })
+      .where(eq(abuseReports.id, id))
+    useLogger(event).error("Abuse report action", {
+      severity: "high",
+      action: `abuse-${action}`,
+      report: { id, dropId: report.dropId },
+    })
     return { ok: true }
   },
 })

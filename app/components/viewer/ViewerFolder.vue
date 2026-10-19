@@ -11,7 +11,10 @@ const folderDialog = useFolderDialog()
 const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
 const to = (child: DropSummary) => (props.publicView ? dropPath(child) : `/drops/${child.id}`)
-const meta = (child: DropSummary) => [child.kind === "folder" ? itemCount(child.items ?? 0) : KIND_LABELS[child.kind], child.owner?.name].filter(Boolean).join(" · ")
+const meta = (child: DropSummary) =>
+  [child.kind === "folder" ? itemCount(child.items ?? 0) : KIND_LABELS[child.kind], child.owner?.name]
+    .filter(Boolean)
+    .join(" · ")
 // Search below the folder (ViewerFolderResults): signed-in people only, since it goes through /api/drops.
 const { data: me } = useMe()
 const search = ref("")
@@ -21,19 +24,20 @@ const addsFolders = computed(() => props.drop.isOwner)
 
 async function newFolder() {
   const input = await folderDialog({ inside: props.drop.title })
-  if (input && await createFolder(input.title, props.drop, { description: input.description })) await refreshNuxtData(keys.drop(props.drop.id))
+  if (input && (await createFolder(input.title, props.drop, { description: input.description })))
+    await refreshNuxtData(keys.drop(props.drop.id))
 }
 
 const picker = useFileDialog({ multiple: false, reset: true })
-picker.onChange(files => void uploadPicked(files))
+picker.onChange((files) => void uploadPicked(files))
 async function uploadPicked(files: FileList | null) {
-  const result = files?.[0] && await upload(files[0], props.drop)
+  const result = files?.[0] && (await upload(files[0], props.drop))
   if (result) await navigateTo(`/drops/${result.id}`)
 }
 
 async function newSite() {
   const input = await siteDialog()
-  const site = input && await createSite(input, props.drop)
+  const site = input && (await createSite(input, props.drop))
   if (site) await navigateTo(`/drops/${site.id}`)
 }
 </script>
@@ -43,24 +47,50 @@ async function newSite() {
     <div class="mx-auto w-full max-w-5xl p-4 sm:p-6">
       <!-- Search and the folder's actions share one bar; visitors, who can't search, see how much it holds instead. -->
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <UInput v-if="me && children.length" v-model="search" aria-label="Search this folder" class="w-full sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1" icon="i-ph-magnifying-glass" :placeholder="`Search ${itemCount(children.length)}`" />
+        <UInput
+          v-if="me && children.length"
+          v-model="search"
+          aria-label="Search this folder"
+          class="w-full sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1"
+          icon="i-ph-magnifying-glass"
+          :placeholder="`Search ${itemCount(children.length)}`"
+        />
         <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
         <div v-if="adds" class="flex items-center gap-1">
           <NewMenu :folder="addsFolders" @folder="newFolder" @site="newSite" />
-          <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" size="sm" variant="outline" @click="picker.open()" />
+          <UButton
+            color="neutral"
+            icon="i-ph-upload-simple"
+            label="Upload"
+            size="sm"
+            variant="outline"
+            @click="picker.open()"
+          />
         </div>
       </div>
       <ViewerFolderResults v-if="search.trim()" :folder="drop.id" :public-view="publicView" :query="search" />
       <div v-else-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
         <UIcon name="i-ph-folder-open" class="size-6 text-dimmed" />
         <p class="mt-3 font-medium text-highlighted">Nothing in this folder yet</p>
-        <p class="mx-auto mt-1 max-w-sm text-sm text-muted">Upload a file, ask your agent to publish into {{ drop.title }}, or move a drop here with Move to folder in its menu.</p>
+        <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
+          Upload a file, ask your agent to publish into {{ drop.title }}, or move a drop here with Move to folder in its
+          menu.
+        </p>
       </div>
       <ul v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <li v-for="child in children" :key="child.id">
-          <NuxtLink class="group block overflow-hidden rounded-lg border border-default bg-default transition-colors hover:bg-muted" :to="to(child)">
+          <NuxtLink
+            class="group block overflow-hidden rounded-lg border border-default bg-default transition-colors hover:bg-muted"
+            :to="to(child)"
+          >
             <div class="grid aspect-4/3 place-items-center overflow-hidden border-b border-default bg-elevated">
-              <img v-if="child.thumbnail" :alt="child.title" class="size-full object-cover" loading="lazy" :src="child.thumbnail">
+              <img
+                v-if="child.thumbnail"
+                :alt="child.title"
+                class="size-full object-cover"
+                loading="lazy"
+                :src="child.thumbnail"
+              />
               <UIcon v-else :name="KIND_ICONS[child.kind]" class="size-8 text-dimmed" />
             </div>
             <div class="min-w-0 px-3 py-2.5">

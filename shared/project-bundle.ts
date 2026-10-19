@@ -32,7 +32,8 @@ export const pageUrl = (page: string): string => encodeURI(`/${page.replace(/(^|
 
 export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain"
 
-const dataUrl = (path: string, content: string) => `data:${contentTypeOf(path)};charset=utf-8,${encodeURIComponent(content)}`
+const dataUrl = (path: string, content: string) =>
+  `data:${contentTypeOf(path)};charset=utf-8,${encodeURIComponent(content)}`
 const safeScript = (code: string) => code.replace(/<\/script/gi, "<\\/script")
 
 function inlineCss(files: ProjectFiles, path: string, css: string): string {
@@ -49,10 +50,14 @@ function bundleModule(files: ProjectFiles, path: string, seen: Set<string>): str
   const replace = (specifier: string) => {
     const target = resolvePath(path, specifier)
     if (!target || files[target] === undefined) return specifier
-    return target.endsWith(".json") ? dataUrl(target, files[target]) : `data:text/javascript;charset=utf-8,${encodeURIComponent(bundleModule(files, target, next))}`
+    return target.endsWith(".json")
+      ? dataUrl(target, files[target])
+      : `data:text/javascript;charset=utf-8,${encodeURIComponent(bundleModule(files, target, next))}`
   }
-  return code
-    .replace(/(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.{1,2}\/[^'"]+|\/[^'"]+)\2/g, (_match, lead: string, quote: string, specifier: string) => `${lead}${quote}${replace(specifier)}${quote}`)
+  return code.replace(
+    /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.{1,2}\/[^'"]+|\/[^'"]+)\2/g,
+    (_match, lead: string, quote: string, specifier: string) => `${lead}${quote}${replace(specifier)}${quote}`,
+  )
 }
 
 function pageRuntime(files: ProjectFiles, page: string): string {
@@ -132,19 +137,29 @@ export function buildProjectDocument(files: ProjectFiles, page: string): string 
     .replace(/<link\b[^>]*\brel=["']?stylesheet["']?[^>]*>/gi, (tag) => {
       const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1]
       const target = href ? resolvePath(page, href) : null
-      return target && files[target] !== undefined ? `<style data-file="${target}">${inlineCss(files, target, files[target])}</style>` : tag
+      return target && files[target] !== undefined
+        ? `<style data-file="${target}">${inlineCss(files, target, files[target])}</style>`
+        : tag
     })
-    .replace(/<script\b([^>]*)\bsrc=["']([^"']+)["']([^>]*)><\/script>/gi, (tag, before: string, src: string, after: string) => {
-      const target = resolvePath(page, src)
-      if (!target || files[target] === undefined) return tag
-      const isModule = /type=["']?module/i.test(before + after)
-      const code = isModule ? bundleModule(files, target, new Set()) : files[target]
-      return `<script${isModule ? " type=\"module\"" : ""} data-file="${target}">${safeScript(code)}</script>`
-    })
-    .replace(/(<(?:img|source|image|use)\b[^>]*?\s(?:src|href)=)(["'])([^"']+)\2/gi, (match, lead: string, quote: string, ref: string) => {
-      const target = resolvePath(page, ref)
-      return target && files[target] !== undefined ? `${lead}${quote}${dataUrl(target, files[target])}${quote}` : match
-    })
+    .replace(
+      /<script\b([^>]*)\bsrc=["']([^"']+)["']([^>]*)><\/script>/gi,
+      (tag, before: string, src: string, after: string) => {
+        const target = resolvePath(page, src)
+        if (!target || files[target] === undefined) return tag
+        const isModule = /type=["']?module/i.test(before + after)
+        const code = isModule ? bundleModule(files, target, new Set()) : files[target]
+        return `<script${isModule ? ' type="module"' : ""} data-file="${target}">${safeScript(code)}</script>`
+      },
+    )
+    .replace(
+      /(<(?:img|source|image|use)\b[^>]*?\s(?:src|href)=)(["'])([^"']+)\2/gi,
+      (match, lead: string, quote: string, ref: string) => {
+        const target = resolvePath(page, ref)
+        return target && files[target] !== undefined
+          ? `${lead}${quote}${dataUrl(target, files[target])}${quote}`
+          : match
+      },
+    )
   return prependToHead(html, pageRuntime(files, page))
 }
 
@@ -163,33 +178,39 @@ const LINK_TAGS: [RegExp, string][] = [
 export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
   const all = new Set(paths)
   const pages = paths.filter((path) => path.endsWith(".html"))
-  const importMap = Object.entries(sent).some(([path, text]) => path.endsWith(".html") && /<script\b[^>]*type=["']?importmap/i.test(text))
+  const importMap = Object.entries(sent).some(
+    ([path, text]) => path.endsWith(".html") && /<script\b[^>]*type=["']?importmap/i.test(text),
+  )
   const issues = new Set<string>()
   const check = (from: string, ref: string, what: string, page = false) => {
     if (/[`$]|\{\{/.test(ref)) return
     const target = resolvePath(from, ref.trim())
-    if (target === null || target === "" && !page) return
+    if (target === null || (target === "" && !page)) return
     if (all.has(target) || (page && pageAt(pages, `/${target}`) !== null)) return
-    issues.add(`${from} ${page ? "links to" : `loads ${what}`} "${ref}", but ${target || "index.html"} isn't in the app.`)
+    issues.add(
+      `${from} ${page ? "links to" : `loads ${what}`} "${ref}", but ${target || "index.html"} isn't in the app.`,
+    )
   }
   for (const [path, text] of Object.entries(sent)) {
     if (path.endsWith(".html") || path.endsWith(".htm")) {
       const html = text.replace(/<!--[\s\S]*?-->/g, "")
       for (const [pattern, what] of LINK_TAGS) for (const match of html.matchAll(pattern)) check(path, match[1]!, what)
       for (const match of html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["']/gi)) check(path, match[1]!, "", true)
-      for (const match of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) scanScript(path, match[1]!)
-    }
-    else if (path.endsWith(".css")) {
-      for (const match of text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) if (!match[2]!.startsWith("data:")) check(path, match[2]!, "a file")
-    }
-    else if (/\.m?js$/.test(path)) scanScript(path, text)
+      for (const match of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi))
+        scanScript(path, match[1]!)
+    } else if (path.endsWith(".css")) {
+      for (const match of text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g))
+        if (!match[2]!.startsWith("data:")) check(path, match[2]!, "a file")
+    } else if (/\.m?js$/.test(path)) scanScript(path, text)
   }
   function scanScript(path: string, code: string) {
     for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"]+)\1/g)) {
       const specifier = match[2]!
       if (/^(?:\.{1,2}\/|\/)/.test(specifier)) check(path, specifier, "a module")
       else if (!importMap && !/^[a-z][a-z0-9+.-]*:/i.test(specifier))
-        issues.add(`${path} imports "${specifier}", a bare module name that browsers can't load. Import it from a CDN URL (https://esm.sh/${specifier}) or add an import map.`)
+        issues.add(
+          `${path} imports "${specifier}", a bare module name that browsers can't load. Import it from a CDN URL (https://esm.sh/${specifier}) or add an import map.`,
+        )
     }
     for (const match of code.matchAll(/\bfetch\(\s*(['"])([^'"]+)\1/g)) check(path, match[2]!, "data from")
   }

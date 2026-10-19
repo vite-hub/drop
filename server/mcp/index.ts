@@ -37,29 +37,41 @@ export function mcpFor(origin: string) {
       return Boolean(await identify(event))
     },
   })
-  const mcp = createMcpHandler({
-    ...MCP_SERVER_INFO,
-    description: "Agents publish plans, docs, screenshots, and small apps for review, read the comments, and publish the next version.",
-    websiteUrl: origin,
-    icons: [
-      { src: `${origin}/favicon.svg`, mimeType: "image/svg+xml", sizes: ["any"] },
-      { src: `${origin}/icon.png`, mimeType: "image/png", sizes: ["512x512"] },
-    ],
-    instructions: MCP_INSTRUCTIONS,
-    // MCP clients send no Origin; the access token, not the origin, is the boundary.
-    origin: false,
-    auth: oauth.auth,
-    tools: [publish, readDrop, reply, listDrops, listFolders, updateDrop, createFolder, createCodeImage],
-    prompts: [addressFeedback],
-    resources: skillResources,
-    // Every tool call lands on the request's wide event.
-    onToolCall: ({ name, result, durationMs, event }) => {
-      const log = useLogger(event)
-      const failed = "isError" in result && Boolean(result.isError)
-      log.set({ mcp: { tool: name, durationMs: Math.round(durationMs), isError: failed } })
-      if (failed) log.warn(`MCP tool ${name} failed`, { mcp: { error: result.content?.map(block => ("text" in block ? block.text : "")).join(" ").slice(0, 500) } })
+  const mcp = createMcpHandler(
+    {
+      ...MCP_SERVER_INFO,
+      description:
+        "Agents publish plans, docs, screenshots, and small apps for review, read the comments, and publish the next version.",
+      websiteUrl: origin,
+      icons: [
+        { src: `${origin}/favicon.svg`, mimeType: "image/svg+xml", sizes: ["any"] },
+        { src: `${origin}/icon.png`, mimeType: "image/png", sizes: ["512x512"] },
+      ],
+      instructions: MCP_INSTRUCTIONS,
+      // MCP clients send no Origin; the access token, not the origin, is the boundary.
+      origin: false,
+      auth: oauth.auth,
+      tools: [publish, readDrop, reply, listDrops, listFolders, updateDrop, createFolder, createCodeImage],
+      prompts: [addressFeedback],
+      resources: skillResources,
+      // Every tool call lands on the request's wide event.
+      onToolCall: ({ name, result, durationMs, event }) => {
+        const log = useLogger(event)
+        const failed = "isError" in result && Boolean(result.isError)
+        log.set({ mcp: { tool: name, durationMs: Math.round(durationMs), isError: failed } })
+        if (failed)
+          log.warn(`MCP tool ${name} failed`, {
+            mcp: {
+              error: result.content
+                ?.map((block) => ("text" in block ? block.text : ""))
+                .join(" ")
+                .slice(0, 500),
+            },
+          })
+      },
     },
-  }, { extensionPlugins: [mcpSkills()] })
+    { extensionPlugins: [mcpSkills()] },
+  )
   server = { mcp, oauth }
   servers.set(origin, server)
   return server

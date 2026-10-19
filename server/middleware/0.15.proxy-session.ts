@@ -12,14 +12,18 @@ export default defineHandler(async (event) => {
   if (!proxy.enabled) return
   const token = event.req.headers.get("x-auth-request-access-token")
   if (!token) return // Machine OAuth requests use Drop's bearer tokens, not proxy headers.
-  if (!await isGitHubMember(token)) throw new HTTPError({ status: 403, statusText: "Active organization membership required." })
+  if (!(await isGitHubMember(token)))
+    throw new HTTPError({ status: 403, statusText: "Active organization membership required." })
   if (proxy.cookie && event.url.pathname === "/api/auth/sign-out" && event.req.method === "POST")
     event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
   const auth = authFor(event)
   const current = await auth.api.getSession({ headers: event.req.headers }).catch(() => null)
   if (current) {
-    const [github] = await db.select({ token: account.accessToken }).from(account)
-      .where(and(eq(account.userId, current.user.id), eq(account.providerId, "github"))).limit(1)
+    const [github] = await db
+      .select({ token: account.accessToken })
+      .from(account)
+      .where(and(eq(account.userId, current.user.id), eq(account.providerId, "github")))
+      .limit(1)
     if (github?.token === token) return
   }
   const response = await auth.api.proxySignIn({ headers: event.req.headers, asResponse: true })
@@ -27,8 +31,10 @@ export default defineHandler(async (event) => {
   const cookies = response.headers.getSetCookie()
   for (const cookie of cookies) event.res.headers.append("Set-Cookie", cookie)
   // The current request must see the newly established session as well as the browser's next request.
-  const pairs = cookies.map(cookie => cookie.split(";")[0]!)
-  const replaced = new Set(pairs.map(cookie => cookie.split("=")[0]))
-  const previous = (event.req.headers.get("cookie") ?? "").split(";").filter(cookie => !replaced.has(cookie.trim().split("=")[0]))
+  const pairs = cookies.map((cookie) => cookie.split(";")[0]!)
+  const replaced = new Set(pairs.map((cookie) => cookie.split("=")[0]))
+  const previous = (event.req.headers.get("cookie") ?? "")
+    .split(";")
+    .filter((cookie) => !replaced.has(cookie.trim().split("=")[0]))
   event.req.headers.set("cookie", [...previous, ...pairs].filter(Boolean).join("; "))
 })

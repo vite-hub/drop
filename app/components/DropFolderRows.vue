@@ -19,6 +19,11 @@ const open = useRowsOpen()
       @restore="restore(drop)"
       @toggle="open[drop.id] = !open[drop.id]"
     />
-    <DropFolderRows v-if="drop.kind === 'folder' && open[drop.id]" :id="drop.id" :depth="depth + 1" :team="team || drop.teamFolder" />
+    <DropFolderRows
+      v-if="drop.kind === 'folder' && open[drop.id]"
+      :id="drop.id"
+      :depth="depth + 1"
+      :team="team || drop.teamFolder"
+    />
   </template>
 </template>

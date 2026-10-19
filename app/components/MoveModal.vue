@@ -6,19 +6,38 @@ import type { DropSummary } from "#shared/types"
 const props = defineProps<{ drop: Pick<DropSummary, "id" | "title" | "kind" | "parentId"> }>()
 const emit = defineEmits<{ close: [moved: boolean] }>()
 const { move } = useDropActions()
-const { data: folders, status } = useApi<DropSummary[]>("/api/drops", { key: keys.folders, query: { folders: 1 }, default: () => [], server: false })
+const { data: folders, status } = useApi<DropSummary[]>("/api/drops", {
+  key: keys.folders,
+  query: { folders: 1 },
+  default: () => [],
+  server: false,
+})
 const busy = ref(false)
 
-const where = (folder: DropSummary) => [...(folder.path ?? []).map(crumb => crumb.title), folder.title].join(" / ")
-const groups = computed(() => [{
-  id: "folders",
-  items: [
-    ...(props.drop.parentId ? [{ label: "Top level", description: "Out of every folder", icon: "i-ph-stack", onSelect: () => pick(null) }] : []),
-    ...folders.value
-      .filter(folder => folder.id !== props.drop.id && folder.id !== props.drop.parentId && !folder.path?.some(crumb => crumb.id === props.drop.id))
-      .map(folder => ({ label: folder.title, description: folder.path?.length ? where(folder) : undefined, icon: "i-ph-folder", onSelect: () => pick(folder) })),
-  ],
-}])
+const where = (folder: DropSummary) => [...(folder.path ?? []).map((crumb) => crumb.title), folder.title].join(" / ")
+const groups = computed(() => [
+  {
+    id: "folders",
+    items: [
+      ...(props.drop.parentId
+        ? [{ label: "Top level", description: "Out of every folder", icon: "i-ph-stack", onSelect: () => pick(null) }]
+        : []),
+      ...folders.value
+        .filter(
+          (folder) =>
+            folder.id !== props.drop.id &&
+            folder.id !== props.drop.parentId &&
+            !folder.path?.some((crumb) => crumb.id === props.drop.id),
+        )
+        .map((folder) => ({
+          label: folder.title,
+          description: folder.path?.length ? where(folder) : undefined,
+          icon: "i-ph-folder",
+          onSelect: () => pick(folder),
+        })),
+    ],
+  },
+])
 
 async function pick(folder: DropSummary | null) {
   if (busy.value) return
@@ -30,7 +49,7 @@ async function pick(folder: DropSummary | null) {
 </script>
 
 <template>
-  <UModal :description="drop.title" title="Move to folder" @update:open="open => !open && emit('close', false)">
+  <UModal :description="drop.title" title="Move to folder" @update:open="(open) => !open && emit('close', false)">
     <template #content>
       <UCommandPalette
         close
@@ -38,7 +57,7 @@ async function pick(folder: DropSummary | null) {
         :loading="status === 'pending' || busy"
         placeholder="Find a folder"
         :ui="{ empty: 'py-10 text-sm text-muted' }"
-        @update:open="open => !open && emit('close', false)"
+        @update:open="(open) => !open && emit('close', false)"
       >
         <template #empty>No other folders yet. Create one on the Drops page.</template>
       </UCommandPalette>

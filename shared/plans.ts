@@ -17,5 +17,10 @@ export function titleFromSource(source: string, kind: PlanKind, filename: string
     const title = source.match(/<title>([^<]+)<\/title>/i)?.[1] ?? source.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]
     if (title?.trim()) return title.trim().slice(0, 120)
   }
-  return filename.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").slice(0, 120) || "Untitled"
+  return (
+    filename
+      .replace(/\.[^.]+$/, "")
+      .replace(/[-_]+/g, " ")
+      .slice(0, 120) || "Untitled"
+  )
 }

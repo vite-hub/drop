@@ -9,5 +9,6 @@ defineProps<{ name: string; icon: string; href: string; color?: string }>()
     target="_blank"
     rel="noopener"
     class="mx-px inline-flex items-center gap-1.5 rounded-md bg-elevated px-1.5 align-[-0.15em] leading-[1.5] whitespace-nowrap text-toned ring-1 ring-(--ui-border) transition-colors ring-inset hover:bg-accented hover:text-highlighted"
-  ><UIcon :name="icon" class="size-[0.95em] shrink-0" :style="color ? { color } : undefined" />{{ name }}</a>
+    ><UIcon :name="icon" class="size-[0.95em] shrink-0" :style="color ? { color } : undefined" />{{ name }}</a
+  >
 </template>

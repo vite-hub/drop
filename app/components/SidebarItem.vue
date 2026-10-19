@@ -14,7 +14,10 @@ const NuxtLink = resolveComponent("NuxtLink")
       :is="to ? NuxtLink : 'button'"
       :aria-current="active ? 'page' : undefined"
       class="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-(--ring)"
-      :class="[active ? 'bg-elevated font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted', $slots.default && 'pr-8']"
+      :class="[
+        active ? 'bg-elevated font-medium text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted',
+        $slots.default && 'pr-8',
+      ]"
       :to="to"
       :type="to ? undefined : 'button'"
       @click="emit('navigate')"

@@ -7,6 +7,9 @@ import { files } from "vite-hub/source/files"
  */
 export const content = defineContent({
   sources: {
-    docs: files(import.meta.glob<string>("../content/docs/**/*.md", { query: "?raw", import: "default", eager: true }), { base: "../content/docs" }),
+    docs: files(
+      import.meta.glob<string>("../content/docs/**/*.md", { query: "?raw", import: "default", eager: true }),
+      { base: "../content/docs" },
+    ),
   },
 })

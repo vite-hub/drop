@@ -23,7 +23,12 @@ function target(comment: DropComment) {
 
 /** Open comments as Markdown, ready to paste back to the agent. `version` is the one being viewed. */
 export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
-  const open = comments.filter(comment => !comment.resolved).sort((a, b) => a.n - b.n)
-  const lines = open.map(comment => `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})${comment.replies.map(reply => `\n   ↳ ${reply.authorName}: ${reply.body.replace(/\n/g, "\n     ")}`).join("")}`.replace(/^/, `${comment.n}. `))
+  const open = comments.filter((comment) => !comment.resolved).sort((a, b) => a.n - b.n)
+  const lines = open.map((comment) =>
+    `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${comment.body.replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})${comment.replies.map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body.replace(/\n/g, "\n     ")}`).join("")}`.replace(
+      /^/,
+      `${comment.n}. `,
+    ),
+  )
   return `## Feedback on "${title}"\n\n${url}\n\n${lines.join("\n") || "No open comments."}\n\nDrop a new version that addresses these.`
 }

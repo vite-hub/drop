@@ -7,10 +7,15 @@ useSeoMeta({ title: "Agents" })
 const origin = useRequestURL().origin
 const server = `${origin}/mcp`
 const MCP_SNIPPETS = mcpSnippets(server)
-const clients: TabsItem[] = MCP_CLIENT_IDS.map(value => ({ label: MCP_CLIENTS[value], value }))
+const clients: TabsItem[] = MCP_CLIENT_IDS.map((value) => ({ label: MCP_CLIENTS[value], value }))
 
 // Executor's segmented control: the active tab is a raised white chip, not a filled button.
-const tabsUi = { list: "w-auto", indicator: "bg-default shadow-xs ring ring-default", trigger: "text-sm data-[state=active]:text-highlighted", leadingIcon: "hidden size-3.5 sm:inline-flex" }
+const tabsUi = {
+  list: "w-auto",
+  indicator: "bg-default shadow-xs ring ring-default",
+  trigger: "text-sm data-[state=active]:text-highlighted",
+  leadingIcon: "hidden size-3.5 sm:inline-flex",
+}
 
 const client = ref<McpClient>("claude")
 const { agents, status, disconnect } = useAgents()
@@ -18,30 +23,59 @@ const { copy } = useCopy()
 </script>
 
 <template>
-  <PageShell id="agents" title="Agents" description="Connect an agent over MCP. It signs in through your browser once, and everything it drops starts private.">
+  <PageShell
+    id="agents"
+    title="Agents"
+    description="Connect an agent over MCP. It signs in through your browser once, and everything it drops starts private."
+  >
     <UCard :ui="{ body: 'p-5 sm:p-5' }">
       <h2 class="font-medium text-highlighted">Connect an agent</h2>
       <div class="mt-4 space-y-3">
         <div class="flex items-center gap-2 rounded-md border border-default bg-muted py-1 pr-1 pl-3">
           <span class="label-mono">Server</span>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-highlighted">{{ server }}</span>
-          <UButton aria-label="Copy server URL" color="neutral" icon="i-ph-copy" size="xs" variant="ghost" @click="copy(server, 'Server URL copied')" />
+          <UButton
+            aria-label="Copy server URL"
+            color="neutral"
+            icon="i-ph-copy"
+            size="xs"
+            variant="ghost"
+            @click="copy(server, 'Server URL copied')"
+          />
         </div>
         <div class="-mx-1 overflow-x-auto px-1">
-          <UTabs v-model="client" :items="clients" :content="false" color="neutral" size="sm" :ui="{ ...tabsUi, root: 'w-max' }" />
+          <UTabs
+            v-model="client"
+            :items="clients"
+            :content="false"
+            color="neutral"
+            size="sm"
+            :ui="{ ...tabsUi, root: 'w-max' }"
+          />
         </div>
       </div>
       <AgentsCodeBlock class="mt-4" :code="MCP_SNIPPETS[client]" />
 
       <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
-        <span>{{ MCP_HINTS[client] }} The <NuxtLink to="/skills" class="underline">skills</NuxtLink> come with the server.</span>
+        <span
+          >{{ MCP_HINTS[client] }} The <NuxtLink to="/skills" class="underline">skills</NuxtLink> come with the
+          server.</span
+        >
         <!-- A bare "Template" said nothing about what it copies. -->
         <UTooltip text="A starter HTML plan your agent can fill in and drop">
-          <UButton color="neutral" icon="i-ph-copy" label="Copy Plan Template" size="sm" variant="ghost" @click="copy(PLAN_TEMPLATE, 'Plan template copied')" />
+          <UButton
+            color="neutral"
+            icon="i-ph-copy"
+            label="Copy Plan Template"
+            size="sm"
+            variant="ghost"
+            @click="copy(PLAN_TEMPLATE, 'Plan template copied')"
+          />
         </UTooltip>
       </div>
       <p class="mt-3 border-t border-default pt-3 text-sm text-muted">
-        Once it's connected, ask it for something to review, like “Write a one-page plan for what we're building next and drop it for review.” It answers with the link.
+        Once it's connected, ask it for something to review, like “Write a one-page plan for what we're building next
+        and drop it for review.” It answers with the link.
       </p>
     </UCard>
 
@@ -60,7 +94,9 @@ const { copy } = useCopy()
           </span>
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium text-highlighted">{{ agent.name }}</p>
-            <p v-if="agent.connectedAt" class="truncate text-xs text-muted">Connected <TimeAgo :at="agent.connectedAt" /></p>
+            <p v-if="agent.connectedAt" class="truncate text-xs text-muted">
+              Connected <TimeAgo :at="agent.connectedAt" />
+            </p>
           </div>
           <UButton color="neutral" label="Disconnect" size="sm" variant="ghost" @click="disconnect(agent)" />
         </li>

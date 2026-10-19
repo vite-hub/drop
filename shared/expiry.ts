@@ -7,11 +7,15 @@ export const TEMPORARY_DAYS = 14
 export const TRASH_DAYS = 15
 
 export const LIFETIMES = ["temporary", "review", "keep"] as const
-export type Lifetime = typeof LIFETIMES[number]
+export type Lifetime = (typeof LIFETIMES)[number]
 /** An agent's reason for keeping a drop: a sentence or two. */
 export const MAX_KEEP_REASON = 280
 
-export interface ExpiryRow { createdAt: number; lastAccessedAt: number | null; lifetime: Lifetime }
+export interface ExpiryRow {
+  createdAt: number
+  lastAccessedAt: number | null
+  lifetime: Lifetime
+}
 
 /** Days a drop with this lifetime lives after its last visit; 0 means it never expires. `days` of 0 turns expiry off. */
 export function lifetimeDays(lifetime: Lifetime, days: number) {
@@ -33,8 +37,12 @@ export const daysUntil = (at: number, now: number) => Math.max(0, Math.ceil((at 
 const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`
 
 /** One status line for people and agents alike: "Expires in 6 days", "Kept", "In the Trash, deleting in 2 days". */
-export function expiryLabel(drop: { expiresAt: number | null; lifetime: Lifetime; trashedAt: number | null }, now: number) {
-  if (drop.trashedAt !== null) return `In the Trash, deleting in ${plural(daysUntil(purgesAt(drop.trashedAt), now), "day")}`
+export function expiryLabel(
+  drop: { expiresAt: number | null; lifetime: Lifetime; trashedAt: number | null },
+  now: number,
+) {
+  if (drop.trashedAt !== null)
+    return `In the Trash, deleting in ${plural(daysUntil(purgesAt(drop.trashedAt), now), "day")}`
   if (drop.lifetime === "keep") return "Kept"
   if (drop.expiresAt === null) return "Doesn't expire"
   return `Expires in ${plural(daysUntil(drop.expiresAt, now), "day")}`

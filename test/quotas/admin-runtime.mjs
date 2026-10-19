@@ -7,7 +7,7 @@ import { join } from "node:path"
 const origin = process.env.DROP_QUOTA_TEST_ORIGIN || "http://localhost:3406"
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname))
 const state = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject"
-const file = readdirSync(state).find(name => name.endsWith(".sqlite") && name !== "metadata.sqlite")
+const file = readdirSync(state).find((name) => name.endsWith(".sqlite") && name !== "metadata.sqlite")
 assert.ok(file, "Apply the local D1 migrations first")
 const db = new DatabaseSync(join(state, file))
 db.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=10000")
@@ -15,16 +15,34 @@ let cookie = ""
 const drops = []
 const users = []
 async function request(path, method = "GET", body) {
-  const response = await fetch(`${origin}${path}`, { method, headers: { cookie, origin, ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined })
+  const response = await fetch(`${origin}${path}`, {
+    method,
+    headers: { cookie, origin, ...(body ? { "content-type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  })
   return { status: response.status, data: await response.json() }
 }
 async function signup() {
-  const response = await fetch(`${origin}/api/auth/sign-up/email`, { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify({ email: `quota-plan-${crypto.randomUUID()}@example.com`, password: `Quota-${crypto.randomUUID()}`, name: "Plan test" }) })
+  const response = await fetch(`${origin}/api/auth/sign-up/email`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin },
+    body: JSON.stringify({
+      email: `quota-plan-${crypto.randomUUID()}@example.com`,
+      password: `Quota-${crypto.randomUUID()}`,
+      name: "Plan test",
+    }),
+  })
   const data = await response.json()
   assert.equal(response.status, 200, JSON.stringify(data))
   const id = data.user.id
   users.push(id)
-  return { id, cookie: response.headers.getSetCookie().map(value => value.split(";")[0]).join("; ") }
+  return {
+    id,
+    cookie: response.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .join("; "),
+  }
 }
 try {
   const admin = await signup()
@@ -42,7 +60,10 @@ try {
   const app = await request("/api/apps", "POST", { files: { "index.html": "<h1>Owner</h1>" } })
   assert.equal(app.status, 200)
   drops.push(app.data.id)
-  const fiftyFiles = { "index.html": "<h1>Max</h1>", ...Object.fromEntries(Array.from({ length: 49 }, (_, i) => [`${i}.txt`, ""])) }
+  const fiftyFiles = {
+    "index.html": "<h1>Max</h1>",
+    ...Object.fromEntries(Array.from({ length: 49 }, (_, i) => [`${i}.txt`, ""])),
+  }
   const maxApp = await request("/api/apps", "POST", { files: fiftyFiles })
   assert.equal(maxApp.status, 200, JSON.stringify(maxApp.data))
   assert.equal((await request(`/api/drops/${maxApp.data.id}`, "DELETE")).status, 200)
@@ -53,9 +74,15 @@ try {
   const imageBytes = (await imageResponse.arrayBuffer()).byteLength
   const used = (await request("/api/usage")).data
   const exhausted = crypto.randomUUID()
-  db.prepare("INSERT INTO quota_reservations (id,owner_id,month,drops,bytes,writes,committed,created_at) VALUES (?,?,?,0,0,?,1,?)").run(exhausted, owner.id, used.month, 1000 - used.writes.used, Date.now())
+  db.prepare(
+    "INSERT INTO quota_reservations (id,owner_id,month,drops,bytes,writes,committed,created_at) VALUES (?,?,?,0,0,?,1,?)",
+  ).run(exhausted, owner.id, used.month, 1000 - used.writes.used, Date.now())
   cookie = admin.cookie
-  const denied = await request("/api/drops", "POST", { filename: "doc.md", content: "# Admin edit", supersedes: doc.data.id })
+  const denied = await request("/api/drops", "POST", {
+    filename: "doc.md",
+    content: "# Admin edit",
+    supersedes: doc.data.id,
+  })
   assert.equal(denied.status, 402)
   assert.deepEqual(denied.data.quota, { unit: "writes", used: 1000, limit: 1000 })
   const files = { "index.html": "", ...Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`${i}.txt`, ""])) }
@@ -65,7 +92,11 @@ try {
   assert.equal(appDenied.data.quota.limit, 50)
   assert.equal((await request("/api/usage")).data.writes.used, 0)
   db.prepare("DELETE FROM quota_reservations WHERE id=?").run(exhausted)
-  const revision = await request("/api/drops", "POST", { filename: "doc.md", content: "# Admin edit", supersedes: doc.data.id })
+  const revision = await request("/api/drops", "POST", {
+    filename: "doc.md",
+    content: "# Admin edit",
+    supersedes: doc.data.id,
+  })
   assert.equal(revision.status, 200)
   drops[0] = revision.data.id
   assert.equal((await request("/api/usage")).data.writes.used, 0)
@@ -76,7 +107,9 @@ try {
   assert.equal(billed.writes.used, used.writes.used + 1)
   let previous = null
   let fixtureId
-  const insert = db.prepare("INSERT INTO drops (id,owner_id,kind,title,filename,size,version,supersedes_id,actor_kind,actor_name,created_at,updated_at) VALUES (?,?,'file','History fixture','fixture.txt',0,?,?,'browser','Fixture',0,0)")
+  const insert = db.prepare(
+    "INSERT INTO drops (id,owner_id,kind,title,filename,size,version,supersedes_id,actor_kind,actor_name,created_at,updated_at) VALUES (?,?,'file','History fixture','fixture.txt',0,?,?,'browser','Fixture',0,0)",
+  )
   for (let i = 0; i < 300; i++) {
     fixtureId = crypto.randomUUID()
     insert.run(fixtureId, owner.id, i + 1, previous)
@@ -92,9 +125,10 @@ try {
   assert.equal(afterCleanup.bytes.used, billed.bytes.used - imageBytes)
   assert.equal(afterCleanup.writes.used, billed.writes.used)
   assert.equal((await fetch(image.data.url)).status, 404)
-  console.log("Quota admin smoke passed: instance-wide plan, exhausted monthly budget, owner app cap, admin attribution, 50-file app, full history deletion, retained image cleanup")
-}
-finally {
+  console.log(
+    "Quota admin smoke passed: instance-wide plan, exhausted monthly budget, owner app cap, admin attribution, 50-file app, full history deletion, retained image cleanup",
+  )
+} finally {
   for (const id of drops) await request(`/api/drops/${id}`, "DELETE")
   for (const id of users) db.prepare("DELETE FROM user WHERE id=?").run(id)
   db.close()

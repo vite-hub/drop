@@ -13,7 +13,8 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
   if (expiredLink(drop, who))
     throw new HTTPError({ status: 410, statusText: "This drop expired after nobody opened it for a while." })
-  if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, statusText: "This drop is private, or it was deleted." })
+  if (!drop || !permissions(drop, who).view)
+    throw new HTTPError({ status: 404, statusText: "This drop is private, or it was deleted." })
   event.res.headers.set("Cache-Control", "private, no-store")
   // Signed-in people and agents count here; anonymous visitors count through the page's visit beacon.
   if (who) await Promise.all([recordVisit(event, drop, who, "beacon"), recordSharedVisit(drop, who)])

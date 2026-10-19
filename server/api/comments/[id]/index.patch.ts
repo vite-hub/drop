@@ -11,7 +11,11 @@ import { routeId } from "../../../utils/params"
 export default defineValidatedHandler({
   validate: { body: CommentPatchSchema },
   async handler(event) {
-    const [comment] = await db.select().from(comments).where(eq(comments.id, await routeId(event))).limit(1)
+    const [comment] = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.id, await routeId(event)))
+      .limit(1)
     const drop = comment ? await findDrop(comment.dropId) : null
     const who = await identify(event)
     if (!comment || !drop || !(permissions(drop, who).manage || (who && comment.authorId === who.userId)))

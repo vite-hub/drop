@@ -26,51 +26,72 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   const can = permissions(found, who)
   const onlyTrash = body.trashed === true && Object.keys(body).length === 1
   // Attachments follow their doc; change the doc instead.
-  if (isAttachment(found) || !(can.manage || (onlyTrash && can.trash))) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
+  if (isAttachment(found) || !(can.manage || (onlyTrash && can.trash)))
+    throw new HTTPError({ status: 404, statusText: "No drop with that id." })
   if (body.trashed !== undefined && !can.owner && who.role !== "admin" && !(onlyTrash && can.trash))
     throw new HTTPError({ status: 403, statusText: "Only the drop's owner can move it to the Trash or restore it." })
   // What a folder's description says steers every agent that publishes into it, so people write it, in the browser.
   if (body.description !== undefined && (found.kind !== "folder" || (found.teamFolder && who.actorKind !== "browser")))
-    throw new HTTPError({ status: 400, statusText: found.kind === "folder" ? "People describe team folders, in the browser." : "Only folders have a description." })
+    throw new HTTPError({
+      status: 400,
+      statusText:
+        found.kind === "folder" ? "People describe team folders, in the browser." : "Only folders have a description.",
+    })
   const { days } = expiryPolicy(event)
   const now = Date.now()
   let drop = found
   if (body.trashed === false && drop.expired) {
     // A drop inside a folder in the Trash comes back with the folder.
     const above = parentNode(drop, days)
-    if (above?.expired) throw new HTTPError({ status: 409, statusText: `It's in ${trashedFolder(drop, days).title}, which is in the Trash. Restore that folder.` })
+    if (above?.expired)
+      throw new HTTPError({
+        status: 409,
+        statusText: `It's in ${trashedFolder(drop, days).title}, which is in the Trash. Restore that folder.`,
+      })
     await restoreDrop(drop, now)
     drop = { ...drop, trashedAt: null, trashReason: null, lastAccessedAt: now, expired: false }
-  }
-  else if (drop.expired && Object.keys(body).some(key => key !== "trashed"))
+  } else if (drop.expired && Object.keys(body).some((key) => key !== "trashed"))
     throw new HTTPError({ status: 409, statusText: "This drop is in the Trash. Restore it first." })
   // Moving comes first: the slug below must be unique in the folder it ends up in.
   if (body.folder !== undefined) {
     await moveNode(drop, body.folder || null, who, event)
     drop = (await findDrop(drop.id, event)) ?? drop
   }
-  if (body.lifetime !== undefined && drop.teamFolder) throw new HTTPError({ status: 400, statusText: "A team folder never expires." })
+  if (body.lifetime !== undefined && drop.teamFolder)
+    throw new HTTPError({ status: 400, statusText: "A team folder never expires." })
   if (body.lifetime !== undefined && drop.parentId)
-    throw new HTTPError({ status: 400, statusText: "It lives as long as its folder. Change the folder's lifetime, or move it out first." })
+    throw new HTTPError({
+      status: 400,
+      statusText: "It lives as long as its folder. Change the folder's lifetime, or move it out first.",
+    })
   const own = drop.raw ?? drop
   // Picking Public again on a public drop starts its window over.
   const share: { share?: Share; publicUntil?: number | null; shareReview?: "pending" | "rejected" | null } = {}
   if (body.share !== undefined && (body.share !== own.share || isPublic(body.share))) {
     Object.assign(share, shareFields(body.share, drop, event, now))
     // Going public, or from public to private or the team, is a different share; public to public isn't.
-    if (isPublic(body.share) !== isPublic(own.share)) share.shareReview = isPublic(body.share) ? await shareReviewFor(drop.ownerId, event) : null
+    if (isPublic(body.share) !== isPublic(own.share))
+      share.shareReview = isPublic(body.share) ? await shareReviewFor(drop.ownerId, event) : null
   }
   // The name, and a folder's description, belong to this row alone.
   const title = {
     ...(body.title !== undefined ? { title: body.title } : {}),
-    ...(body.description !== undefined ? { note: body.description.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null } : {}),
+    ...(body.description !== undefined
+      ? { note: body.description.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null }
+      : {}),
   }
-  const life = body.lifetime !== undefined ? lifetimeFields(who, { lifetime: body.lifetime, keepReason: body.keepReason }, drop, event) : {}
+  const life =
+    body.lifetime !== undefined
+      ? lifetimeFields(who, { lifetime: body.lifetime, keepReason: body.keepReason }, drop, event)
+      : {}
   const slug = body.slug !== undefined ? { slug: await uniqueSlug(drop.parentId, slugify(body.slug), own.link) } : {}
   const chainChange = { ...share, ...life, ...slug }
   if (Object.keys(chainChange).length) {
     // A link, its name and its lifetime belong to the document chain, so every version carries the same state.
-    await db.update(drops).set(chainChange).where(sql`${drops.id} IN (${chainOf(drop)})`)
+    await db
+      .update(drops)
+      .set(chainChange)
+      .where(sql`${drops.id} IN (${chainOf(drop)})`)
   }
   if (Object.keys(title).length) await db.update(drops).set(title).where(eq(drops.id, drop.id))
   // Choosing a lifetime starts its window now, so turning a kept drop temporary doesn't expire it on the spot. A drop
@@ -78,7 +99,10 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   const renewed = body.renew || body.lifetime ? { lastAccessedAt: now } : {}
   if (renewed.lastAccessedAt) await renewDrop(rootOf(drop), now)
   if (body.trashed === true && !drop.expired) await trashDrop(drop, now)
-  const trashed = body.trashed === true ? { trashedAt: drop.trashedAt ?? now, trashReason: drop.trashReason ?? "deleted" as const, expired: true } : {}
+  const trashed =
+    body.trashed === true
+      ? { trashedAt: drop.trashedAt ?? now, trashReason: drop.trashReason ?? ("deleted" as const), expired: true }
+      : {}
   // In a folder, the share it ends up with depends on the folders above: read it back.
   if (drop.parentId && Object.keys(share).length) drop = (await findDrop(drop.id, event)) ?? drop
   else drop = { ...drop, ...chainChange, raw: { ...own, ...chainChange } }

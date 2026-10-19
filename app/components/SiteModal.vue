@@ -14,14 +14,23 @@ const placeholder = computed(() => {
   const address = siteAddress(state.url)
   return address ? siteHost(address) : "Acme previews"
 })
-const submit = (event: FormSubmitEvent<v.InferOutput<typeof schema>>) => emit("close", { url: event.data.url, ...(event.data.title ? { title: event.data.title } : {}) })
+const submit = (event: FormSubmitEvent<v.InferOutput<typeof schema>>) =>
+  emit("close", { url: event.data.url, ...(event.data.title ? { title: event.data.title } : {}) })
 </script>
 
 <template>
-  <UModal title="New site review" description="People comment on the live site, and their notes land here with screenshots." @update:open="open => !open && emit('close', null)">
+  <UModal
+    title="New site review"
+    description="People comment on the live site, and their notes land here with screenshots."
+    @update:open="(open) => !open && emit('close', null)"
+  >
     <template #body>
       <UForm :id="formId" class="space-y-4" :schema="schema" :state="state" @submit="submit">
-        <UFormField label="Address" name="url" help="One origin, or a pattern like https://*.preview.example.com that covers every preview.">
+        <UFormField
+          label="Address"
+          name="url"
+          help="One origin, or a pattern like https://*.preview.example.com that covers every preview."
+        >
           <UInput v-model="state.url" autofocus class="w-full font-mono" placeholder="https://*.preview.example.com" />
         </UFormField>
         <UFormField label="Name" name="title" hint="Optional">

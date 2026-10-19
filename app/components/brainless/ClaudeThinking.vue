@@ -27,10 +27,18 @@ useIntervalFn(() => seconds.value++, 1000)
   animation: claude-shine 2.8s linear infinite;
 }
 @keyframes claude-shine {
-  from { background-position: 100% 0 }
-  to { background-position: -100% 0 }
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .claude-verb { animation: none; background-image: none; color: #cd694a }
+  .claude-verb {
+    animation: none;
+    background-image: none;
+    color: #cd694a;
+  }
 }
 </style>

@@ -23,7 +23,8 @@ export default defineHandler(async (event) => {
           throw new HTTPError({ status: 413, statusText: "Client metadata is too large." })
         }
       }
+    } finally {
+      void reader.cancel().catch(() => {})
     }
-    finally { void reader.cancel().catch(() => {}) }
   }
 })

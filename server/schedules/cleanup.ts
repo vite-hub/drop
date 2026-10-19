@@ -23,8 +23,12 @@ export default defineSchedule({
       // Text docs published before search read their words, a batch an hour.
       async () => (await import("../utils/search")).indexMissingTexts(),
     ]
-    for (const step of steps) await step().catch(error => errors.push(error))
+    for (const step of steps) await step().catch((error) => errors.push(error))
     if (errors.length === 1) throw errors[0]
-    if (errors.length) throw new AggregateError(errors, errors.map(error => (error instanceof Error ? error.message : String(error))).join("; "))
+    if (errors.length)
+      throw new AggregateError(
+        errors,
+        errors.map((error) => (error instanceof Error ? error.message : String(error))).join("; "),
+      )
   },
 })

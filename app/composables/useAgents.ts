@@ -7,12 +7,20 @@ export function useAgents() {
   const confirm = useConfirm()
 
   async function disconnect(agent: ConnectedAgent) {
-    if (!await confirm({ title: `Disconnect ${agent.name}?`, description: "It has to ask again before it can drop for you. A token it already holds expires within the hour.", confirmLabel: "Disconnect", destructive: true })) return
+    if (
+      !(await confirm({
+        title: `Disconnect ${agent.name}?`,
+        description:
+          "It has to ask again before it can drop for you. A token it already holds expires within the hour.",
+        confirmLabel: "Disconnect",
+        destructive: true,
+      }))
+    )
+      return
     try {
       await $fetch(`/api/agents/${agent.id}`, { method: "DELETE" })
       notify.done(`${agent.name} disconnected`)
-    }
-    catch (error) {
+    } catch (error) {
       notify.fail(`Couldn't disconnect ${agent.name}`, error)
     }
     await refresh()

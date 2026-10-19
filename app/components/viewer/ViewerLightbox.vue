@@ -15,7 +15,11 @@ const props = defineProps<{
   /** The area being commented on, kept on screen while the popover is open. */
   draft?: Area
 }>()
-const emit = defineEmits<{ close: []; pick: [area: Area, x: number, y: number]; thread: [id: string, x: number, y: number] }>()
+const emit = defineEmits<{
+  close: []
+  pick: [area: Area, x: number, y: number]
+  thread: [id: string, x: number, y: number]
+}>()
 const aspect = ref(16 / 9)
 const root = useTemplateRef<HTMLElement>("root")
 const box = useTemplateRef<HTMLElement>("box")
@@ -45,14 +49,22 @@ async function loaded(event: Event) {
   if (shown.value) return
   await nextTick()
   shown.value = true
-  const from = props.from, to = box.value?.getBoundingClientRect()
+  const from = props.from,
+    to = box.value?.getBoundingClientRect()
   if (!from || !to?.width || !to.height || !animate.value) return
   const easing = "cubic-bezier(0.22, 1, 0.36, 1)"
-  box.value!.animate([
-    { transformOrigin: "0 0", transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})` },
-    { transformOrigin: "0 0", transform: "none" },
-  ], { duration: 250, easing })
-  for (const el of [header.value, backdrop.value]) el?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing })
+  box.value!.animate(
+    [
+      {
+        transformOrigin: "0 0",
+        transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`,
+      },
+      { transformOrigin: "0 0", transform: "none" },
+    ],
+    { duration: 250, easing },
+  )
+  for (const el of [header.value, backdrop.value])
+    el?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing })
 }
 
 let closing = false
@@ -60,13 +72,17 @@ async function close() {
   if (closing) return
   closing = true
   if (!popped && history.state?.dropLightbox) history.back()
-  if (animate.value) await root.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "ease-in" }).finished.catch(() => {})
+  if (animate.value)
+    await root.value
+      ?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "ease-in" })
+      .finished.catch(() => {})
   emit("close")
 }
 
 // Thousandths of the image box. A press that barely moves is a click: a point, not an area.
 const drag = ref<{ x: number; y: number; rect: DOMRect; area?: Area } | null>(null)
-const at = (value: number, start: number, size: number) => Math.min(1000, Math.max(0, Math.round(((value - start) / size) * 1000)))
+const at = (value: number, start: number, size: number) =>
+  Math.min(1000, Math.max(0, Math.round(((value - start) / size) * 1000)))
 
 function press(event: PointerEvent) {
   if (!props.canComment || event.button !== 0) return
@@ -76,23 +92,48 @@ function press(event: PointerEvent) {
 function move(event: PointerEvent) {
   const d = drag.value
   if (!d || (!d.area && Math.hypot(event.clientX - d.x, event.clientY - d.y) < 6)) return
-  const left = at(Math.min(d.x, event.clientX), d.rect.left, d.rect.width), top = at(Math.min(d.y, event.clientY), d.rect.top, d.rect.height)
-  d.area = { ox: left, oy: top, ow: at(Math.max(d.x, event.clientX), d.rect.left, d.rect.width) - left, oh: at(Math.max(d.y, event.clientY), d.rect.top, d.rect.height) - top }
+  const left = at(Math.min(d.x, event.clientX), d.rect.left, d.rect.width),
+    top = at(Math.min(d.y, event.clientY), d.rect.top, d.rect.height)
+  d.area = {
+    ox: left,
+    oy: top,
+    ow: at(Math.max(d.x, event.clientX), d.rect.left, d.rect.width) - left,
+    oh: at(Math.max(d.y, event.clientY), d.rect.top, d.rect.height) - top,
+  }
 }
 function release(event: PointerEvent) {
   const d = drag.value
   if (!d) return
   drag.value = null
-  if (d.area && d.area.ow > 0 && d.area.oh > 0) emit("pick", d.area, Math.min(d.x, event.clientX), Math.max(d.y, event.clientY))
-  else emit("pick", { ox: at(d.x, d.rect.left, d.rect.width), oy: at(d.y, d.rect.top, d.rect.height), ow: 0, oh: 0 }, d.x, d.y)
+  if (d.area && d.area.ow > 0 && d.area.oh > 0)
+    emit("pick", d.area, Math.min(d.x, event.clientX), Math.max(d.y, event.clientY))
+  else
+    emit(
+      "pick",
+      { ox: at(d.x, d.rect.left, d.rect.width), oy: at(d.y, d.rect.top, d.rect.height), ow: 0, oh: 0 },
+      d.x,
+      d.y,
+    )
 }
 
-const areaStyle = (area: Area) => ({ left: `${area.ox / 10}%`, top: `${area.oy / 10}%`, width: `${area.ow / 10}%`, height: `${area.oh / 10}%` })
+const areaStyle = (area: Area) => ({
+  left: `${area.ox / 10}%`,
+  top: `${area.oy / 10}%`,
+  width: `${area.ow / 10}%`,
+  height: `${area.oh / 10}%`,
+})
 const shownDraft = computed(() => drag.value?.area ?? props.draft)
 </script>
 
 <template>
-  <div ref="root" :aria-label="alt || 'Image'" aria-modal="true" class="fixed inset-0 z-30 flex flex-col outline-none" role="dialog" tabindex="-1">
+  <div
+    ref="root"
+    :aria-label="alt || 'Image'"
+    aria-modal="true"
+    class="fixed inset-0 z-30 flex flex-col outline-none"
+    role="dialog"
+    tabindex="-1"
+  >
     <div ref="header" class="flex h-12 shrink-0 items-center gap-3 border-b border-default bg-default px-3">
       <UButton aria-label="Close image" color="neutral" icon="i-ph-x" variant="ghost" @click="close" />
       <span class="truncate text-sm font-medium">{{ alt || "Image" }}</span>
@@ -113,8 +154,19 @@ const shownDraft = computed(() => drag.value?.area ?? props.draft)
         @pointermove="move"
         @pointerup="release"
       >
-        <img :alt="alt" class="absolute inset-0 size-full rounded-md border border-default bg-default object-contain" draggable="false" :src="src" @error="shown = true" @load="loaded">
-        <div v-if="shownDraft" class="pointer-events-none absolute rounded-[3px] border-[1.5px] border-inverted bg-inverted/10" :style="areaStyle(shownDraft)" />
+        <img
+          :alt="alt"
+          class="absolute inset-0 size-full rounded-md border border-default bg-default object-contain"
+          draggable="false"
+          :src="src"
+          @error="shown = true"
+          @load="loaded"
+        />
+        <div
+          v-if="shownDraft"
+          class="pointer-events-none absolute rounded-[3px] border-[1.5px] border-inverted bg-inverted/10"
+          :style="areaStyle(shownDraft)"
+        />
         <template v-for="comment in comments" :key="comment.id">
           <div
             v-if="comment.ow || comment.oh"
@@ -128,7 +180,7 @@ const shownDraft = computed(() => drag.value?.area ?? props.draft)
             :class="comment.resolved ? 'bg-accented text-muted' : 'bg-inverted text-inverted'"
             :style="{ left: `${comment.ox / 10}%`, top: `${comment.oy / 10}%` }"
             type="button"
-            @click="event => emit('thread', comment.id, event.clientX, event.clientY)"
+            @click="(event) => emit('thread', comment.id, event.clientX, event.clientY)"
             @pointerdown.stop
           >
             {{ comment.n }}

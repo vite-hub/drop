@@ -37,8 +37,19 @@ const LANGUAGES = {
 } as const
 
 const LANGUAGE_ALIASES = new Map<string, keyof typeof LANGUAGES>([
-  ["js", "javascript"], ["ts", "typescript"], ["sh", "bash"], ["shell", "bash"], ["zsh", "bash"], ["py", "python"], ["rb", "ruby"],
-  ["rs", "rust"], ["md", "markdown"], ["yml", "yaml"], ["c++", "cpp"], ["cs", "csharp"], ["kt", "kotlin"],
+  ["js", "javascript"],
+  ["ts", "typescript"],
+  ["sh", "bash"],
+  ["shell", "bash"],
+  ["zsh", "bash"],
+  ["py", "python"],
+  ["rb", "ruby"],
+  ["rs", "rust"],
+  ["md", "markdown"],
+  ["yml", "yaml"],
+  ["c++", "cpp"],
+  ["cs", "csharp"],
+  ["kt", "kotlin"],
 ])
 
 const THEMES = {
@@ -49,8 +60,8 @@ const THEMES = {
   "one-dark-pro": () => import("@shikijs/themes/one-dark-pro"),
   "night-owl": () => import("@shikijs/themes/night-owl"),
   "tokyo-night": () => import("@shikijs/themes/tokyo-night"),
-  "dracula": () => import("@shikijs/themes/dracula"),
-  "nord": () => import("@shikijs/themes/nord"),
+  dracula: () => import("@shikijs/themes/dracula"),
+  nord: () => import("@shikijs/themes/nord"),
   "catppuccin-mocha": () => import("@shikijs/themes/catppuccin-mocha"),
 } as const
 
@@ -59,12 +70,19 @@ const DEFAULT_CODE_THEME: CodeTheme = "github-dark"
 
 /** Theme names agents learned from the old Ray.so renderer keep working. */
 const THEME_ALIASES = new Map<string, CodeTheme>([
-  ["nuxt", "vitesse-dark"], ["midnight", "night-owl"], ["vercel", "github-dark"], ["raycast", "one-dark-pro"],
-  ["candy", "dracula"], ["breeze", "github-light"], ["mono", "github-dark"], ["noir", "github-dark"],
+  ["nuxt", "vitesse-dark"],
+  ["midnight", "night-owl"],
+  ["vercel", "github-dark"],
+  ["raycast", "one-dark-pro"],
+  ["candy", "dracula"],
+  ["breeze", "github-light"],
+  ["mono", "github-dark"],
+  ["noir", "github-dark"],
 ])
 
 /** Whether `name` is one of `table`'s own keys, so a name like "constructor" never reaches Object's. */
-const isKeyOf = <T extends object>(table: T, name: string): name is Extract<keyof T, string> => Object.hasOwn(table, name)
+const isKeyOf = <T extends object>(table: T, name: string): name is Extract<keyof T, string> =>
+  Object.hasOwn(table, name)
 
 let highlighter: Promise<HighlighterCore> | undefined
 
@@ -73,13 +91,14 @@ async function prepare(language: string | undefined, theme: string | undefined) 
   const shiki = await highlighter
   const requested = language?.toLowerCase()
   const lang = requested && (isKeyOf(LANGUAGES, requested) ? requested : LANGUAGE_ALIASES.get(requested))
-  const themeName = theme && (isKeyOf(THEMES, theme) ? theme : THEME_ALIASES.get(theme)) || DEFAULT_CODE_THEME
+  const themeName = (theme && (isKeyOf(THEMES, theme) ? theme : THEME_ALIASES.get(theme))) || DEFAULT_CODE_THEME
   if (lang && !shiki.getLoadedLanguages().includes(lang)) await shiki.loadLanguage((await LANGUAGES[lang]()).default)
   if (!shiki.getLoadedThemes().includes(themeName)) await shiki.loadTheme((await THEMES[themeName]()).default)
   return { shiki, lang: lang ?? "text", theme: themeName }
 }
 
-const escapeXml = (value: string) => value.replace(/[<>&"']/g, char => `&${{ "<": "lt", ">": "gt", "&": "amp", "\"": "quot", "'": "apos" }[char]};`)
+const escapeXml = (value: string) =>
+  value.replace(/[<>&"']/g, (char) => `&${{ "<": "lt", ">": "gt", "&": "amp", '"': "quot", "'": "apos" }[char]};`)
 
 const FONT_SIZE = 14
 const LINE_HEIGHT = 22
@@ -95,7 +114,9 @@ function tokenSpan(token: ThemedToken) {
     style & 1 ? `font-style="italic"` : "",
     style & 2 ? `font-weight="bold"` : "",
     style & 4 ? `text-decoration="underline"` : "",
-  ].filter(Boolean).join(" ")
+  ]
+    .filter(Boolean)
+    .join(" ")
   return `<tspan ${attrs}>${escapeXml(token.content)}</tspan>`
 }
 
@@ -104,18 +125,21 @@ export async function renderCodeSvg(input: { code: string; language?: string; th
   const { shiki, lang, theme } = await prepare(input.language, input.theme)
   const code = input.code.replace(/\t/g, "  ").replace(/\s+$/, "")
   const { tokens, bg = "#0d1117", fg = "#e6edf3" } = shiki.codeToTokens(code, { lang, theme })
-  const columns = Math.max(24, ...code.split("\n").map(line => line.length))
+  const columns = Math.max(24, ...code.split("\n").map((line) => line.length))
   const windowWidth = Math.ceil(columns * CHAR_WIDTH) + PADDING * 2
   const windowHeight = BAR + tokens.length * LINE_HEIGHT + PADDING
   const width = windowWidth + FRAME * 2
   const height = windowHeight + FRAME * 2
-  const lines = tokens.map((line, index) => `<text x="${FRAME + PADDING}" y="${FRAME + BAR + 4 + (index + 0.75) * LINE_HEIGHT}" xml:space="preserve">${line.map(tokenSpan).join("")}</text>`)
+  const lines = tokens.map(
+    (line, index) =>
+      `<text x="${FRAME + PADDING}" y="${FRAME + BAR + 4 + (index + 0.75) * LINE_HEIGHT}" xml:space="preserve">${line.map(tokenSpan).join("")}</text>`,
+  )
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
 <defs><linearGradient id="frame" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
 <rect width="${width}" height="${height}" rx="16" fill="url(#frame)"/>
 <rect x="${FRAME}" y="${FRAME}" width="${windowWidth}" height="${windowHeight}" rx="12" fill="${bg}"/>
-${[0, 1, 2].map(dot => `<circle cx="${FRAME + PADDING + dot * 20}" cy="${FRAME + BAR / 2 + 2}" r="6" fill="${["#ff5f57", "#febc2e", "#28c840"][dot]}"/>`).join("")}
+${[0, 1, 2].map((dot) => `<circle cx="${FRAME + PADDING + dot * 20}" cy="${FRAME + BAR / 2 + 2}" r="6" fill="${["#ff5f57", "#febc2e", "#28c840"][dot]}"/>`).join("")}
 <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${FONT_SIZE}" fill="${fg}">
 ${lines.join("\n")}
 </g>

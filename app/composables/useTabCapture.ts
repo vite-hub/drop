@@ -29,7 +29,13 @@ export function useTabCapture() {
     if (stream?.active) return
     // preferCurrentTab and selfBrowserSurface aren't in TypeScript's DOM types yet, so they ride along on a variable
     // (only an object literal written in the call gets excess-property checks).
-    const options = { video: { displaySurface: "browser" }, audio: false, preferCurrentTab: true, selfBrowserSurface: "include", surfaceSwitching: "exclude" } as const
+    const options = {
+      video: { displaySurface: "browser" },
+      audio: false,
+      preferCurrentTab: true,
+      selfBrowserSurface: "include",
+      surfaceSwitching: "exclude",
+    } as const
     stream = await navigator.mediaDevices.getDisplayMedia(options)
     const track = stream.getVideoTracks()[0]!
     track.addEventListener("ended", stop)
@@ -43,7 +49,7 @@ export function useTabCapture() {
   }
 
   function stop() {
-    stream?.getTracks().forEach(track => track.stop())
+    stream?.getTracks().forEach((track) => track.stop())
     stream = video = null
     active.value = false
   }
@@ -57,13 +63,14 @@ export function useTabCapture() {
     const { videoWidth, videoHeight } = video
     const surface = stream.getVideoTracks()[0]!.getSettings().displaySurface
     // Where this window's viewport starts in the capture, and how many captured pixels make one CSS pixel.
-    let left = 0, top = 0, scale = videoWidth / innerWidth
+    let left = 0,
+      top = 0,
+      scale = videoWidth / innerWidth
     if (surface === "window") {
       scale = videoWidth / outerWidth
       left = outerWidth - innerWidth
       top = outerHeight - innerHeight
-    }
-    else if (surface === "monitor") {
+    } else if (surface === "monitor") {
       scale = videoWidth / screen.width
       left = screenX + outerWidth - innerWidth
       top = screenY + outerHeight - innerHeight
@@ -79,7 +86,7 @@ export function useTabCapture() {
     canvas.getContext("2d")!.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh)
     // WebP keeps a full-screen capture well under the 4 MiB limit. Safari can't encode it and hands back a PNG; the
     // server reads the real type from the bytes.
-    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/webp", 0.9))
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9))
     if (!blob) throw new Error("Couldn't encode the screenshot.")
     return blob
   }

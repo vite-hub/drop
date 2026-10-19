@@ -20,19 +20,34 @@ import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
  *
  * Admins switch them on and off for the whole deployment (`skill_settings`); every surface serves only the enabled set.
  */
-export interface SkillFile { path: string; text: string; bytes: Uint8Array<ArrayBuffer>; mimeType: string }
-export interface Skill { name: string; description: string; frontmatter: Record<string, unknown>; files: SkillFile[] }
+export interface SkillFile {
+  path: string
+  text: string
+  bytes: Uint8Array<ArrayBuffer>
+  mimeType: string
+}
+export interface Skill {
+  name: string
+  description: string
+  frontmatter: Record<string, unknown>
+  files: SkillFile[]
+}
 
 const encoder = new TextEncoder()
-const file = (path: string, text: string): SkillFile => ({ path, text, bytes: encoder.encode(text), mimeType: path.endsWith(".js") ? "text/javascript" : "text/markdown" })
+const file = (path: string, text: string): SkillFile => ({
+  path,
+  text,
+  bytes: encoder.encode(text),
+  mimeType: path.endsWith(".js") ? "text/javascript" : "text/markdown",
+})
 
 function frontmatterOf(markdown: string): Record<string, unknown> {
   const block = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]
-  return block ? parseYAML<Record<string, unknown>>(block) ?? {} : {}
+  return block ? (parseYAML<Record<string, unknown>>(block) ?? {}) : {}
 }
 
 function skill(files: SkillFile[]): Skill {
-  const frontmatter = frontmatterOf(files.find(item => item.path === "SKILL.md")!.text)
+  const frontmatter = frontmatterOf(files.find((item) => item.path === "SKILL.md")!.text)
   return { name: String(frontmatter.name), description: String(frontmatter.description), frontmatter, files }
 }
 
@@ -45,7 +60,7 @@ export const SKILLS: Skill[] = [
   skill([file("SKILL.md", showMeMd)]),
 ]
 
-export const findSkill = (name: string) => SKILLS.find(item => item.name === name)
+export const findSkill = (name: string) => SKILLS.find((item) => item.name === name)
 
 // A toggle shows up on this isolate at once; other isolates pick it up within a minute, the same window as the
 // MCP and discovery cache hints.
@@ -55,8 +70,11 @@ let settings: { at: number; disabled: Promise<Set<string>> } | undefined
 /** Names an admin switched off. A skill without a row is enabled. */
 export function disabledSkills(): Promise<Set<string>> {
   if (settings && Date.now() - settings.at < SETTINGS_TTL_MS) return settings.disabled
-  const disabled = db.select({ name: skillSettings.name }).from(skillSettings).where(eq(skillSettings.enabled, false))
-    .then(rows => new Set(rows.map(row => row.name)))
+  const disabled = db
+    .select({ name: skillSettings.name })
+    .from(skillSettings)
+    .where(eq(skillSettings.enabled, false))
+    .then((rows) => new Set(rows.map((row) => row.name)))
   // A failed read must not stick for a minute: drop it so the next request tries again.
   disabled.catch(() => (settings = undefined))
   settings = { at: Date.now(), disabled }
@@ -65,7 +83,7 @@ export function disabledSkills(): Promise<Set<string>> {
 
 export async function enabledSkills(): Promise<Skill[]> {
   const disabled = await disabledSkills()
-  return SKILLS.filter(item => !disabled.has(item.name))
+  return SKILLS.filter((item) => !disabled.has(item.name))
 }
 
 export async function findEnabledSkill(name: string): Promise<Skill | undefined> {
@@ -74,7 +92,9 @@ export async function findEnabledSkill(name: string): Promise<Skill | undefined>
 }
 
 export async function setSkillEnabled(name: string, enabled: boolean, userId: string) {
-  await db.insert(skillSettings).values({ name, enabled, updatedAt: Date.now(), updatedBy: userId })
+  await db
+    .insert(skillSettings)
+    .values({ name, enabled, updatedAt: Date.now(), updatedBy: userId })
     .onConflictDoUpdate({ target: skillSettings.name, set: { enabled, updatedAt: Date.now(), updatedBy: userId } })
   settings = undefined
 }
@@ -82,7 +102,7 @@ export async function setSkillEnabled(name: string, enabled: boolean, userId: st
 /** `sha256:<hex>`, the digest format both the MCP Skills extension and Discovery v0.2.0 use. */
 export async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))
-  return `sha256:${Array.from(hash, byte => byte.toString(16).padStart(2, "0")).join("")}`
+  return `sha256:${Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join("")}`
 }
 
 /**
@@ -95,7 +115,9 @@ export function skillArchive(item: Skill) {
   let archive = archives.get(item.name)
   if (!archive) {
     // Copied once into a plain ArrayBuffer, which Response and crypto.subtle take.
-    archive = createTarGzip(item.files.map(entry => ({ name: entry.path, data: entry.bytes, attrs: { mtime: 0, mode: "644" } }))).then(bytes => new Uint8Array(bytes))
+    archive = createTarGzip(
+      item.files.map((entry) => ({ name: entry.path, data: entry.bytes, attrs: { mtime: 0, mode: "644" } })),
+    ).then((bytes) => new Uint8Array(bytes))
     archives.set(item.name, archive)
   }
   return archive

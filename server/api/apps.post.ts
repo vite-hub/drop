@@ -12,6 +12,12 @@ export default defineValidatedHandler({
   async handler(event) {
     const who = await requireIdentity(event)
     const app = await publishApp(who, await event.req.json(), event)
-    return { id: app.id, version: app.version, page: dropPageUrl(event.url.origin, app), share: app.share, warnings: app.warnings }
+    return {
+      id: app.id,
+      version: app.version,
+      page: dropPageUrl(event.url.origin, app),
+      share: app.share,
+      warnings: app.warnings,
+    }
   },
 })

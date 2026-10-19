@@ -6,12 +6,17 @@ import { daysUntil, purgesAt } from "#shared/expiry"
 
 // A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`). In a team
 // folder (`inTeam`) anyone may move a teammate's drop to the Trash.
-const { drop, depth = 0, open = false, inTeam = false } = defineProps<{ drop: DropSummary; depth?: number; open?: boolean; inTeam?: boolean }>()
+const {
+  drop,
+  depth = 0,
+  open = false,
+  inTeam = false,
+} = defineProps<{ drop: DropSummary; depth?: number; open?: boolean; inTeam?: boolean }>()
 const emit = defineEmits<{ delete: []; restore: []; deleteForever: []; toggle: [] }>()
 const INDENT = ["pl-4", "pl-10", "pl-16", "pl-22", "pl-28", "pl-34", "pl-40", "pl-46"]
 const trashed = computed(() => drop.trashedAt !== null)
 const now = useRelativeNow()
-const purgeDays = computed(() => drop.trashedAt === null ? 0 : daysUntil(purgesAt(drop.trashedAt), now.value))
+const purgeDays = computed(() => (drop.trashedAt === null ? 0 : daysUntil(purgesAt(drop.trashedAt), now.value)))
 const notify = useNotify()
 const { copy } = useCopy()
 const { setShare } = useDropActions()
@@ -28,14 +33,14 @@ const status = computed(() => shareStatus(drop, now.value))
 
 const link = useShareUrl(() => drop)
 const detail = computed(() => {
-  const where = drop.path?.length ? ` · in ${drop.path.map(crumb => crumb.title).join(" / ")}` : ""
+  const where = drop.path?.length ? ` · in ${drop.path.map((crumb) => crumb.title).join(" / ")}` : ""
   if (folder.value) return `${itemCount(drop.items ?? 0)}${where}`
   return `${drop.kind === "app" && drop.paths ? `${drop.filename} · ${drop.paths.length} files` : drop.filename}${where}`
 })
 
 async function pick(next: Share) {
   if (next === drop.share) return true
-  if (!await setShare(drop, next)) return false
+  if (!(await setShare(drop, next))) return false
   notify.done(SHARED_TITLES[next], SHARE_HINTS[next])
   return true
 }
@@ -46,14 +51,36 @@ async function copyLink() {
     const shareAndCopy = (next: Share) => async () => {
       if (await pick(next)) await copyLink()
     }
-    const team = choices.value.some(item => item.value === "team")
-    const canPublic = choices.value.some(item => item.value === "public")
+    const team = choices.value.some((item) => item.value === "team")
+    const canPublic = choices.value.some((item) => item.value === "public")
     notify.info({
       title: "Only you can open this",
-      description: team ? "Share it with the team, or turn on a public link anyone can open." : canPublic ? "Turn on a public link to copy it. Anyone with the link can open it." : "Share it before you copy its link.",
+      description: team
+        ? "Share it with the team, or turn on a public link anyone can open."
+        : canPublic
+          ? "Turn on a public link to copy it. Anyone with the link can open it."
+          : "Share it before you copy its link.",
       actions: [
-        ...(team ? [{ label: "Share with team & copy", color: "neutral" as const, variant: "outline" as const, onClick: shareAndCopy("team") }] : []),
-        ...(canPublic ? [{ label: "Public link & copy", color: "neutral" as const, variant: team ? "ghost" as const : "outline" as const, onClick: shareAndCopy("public") }] : []),
+        ...(team
+          ? [
+              {
+                label: "Share with team & copy",
+                color: "neutral" as const,
+                variant: "outline" as const,
+                onClick: shareAndCopy("team"),
+              },
+            ]
+          : []),
+        ...(canPublic
+          ? [
+              {
+                label: "Public link & copy",
+                color: "neutral" as const,
+                variant: team ? ("ghost" as const) : ("outline" as const),
+                onClick: shareAndCopy("public"),
+              },
+            ]
+          : []),
       ],
     })
     return
@@ -64,18 +91,33 @@ async function copyLink() {
 const menu = computed(() => [
   [
     { label: "Open", icon: "i-ph-eye", to: `/drops/${drop.id}` },
-    { label: isPublic(drop.share) ? "Open public page" : "Open shared page", icon: "i-ph-arrow-square-out", to: dropPath(drop), target: "_blank", disabled: !shared.value },
+    {
+      label: isPublic(drop.share) ? "Open public page" : "Open shared page",
+      icon: "i-ph-arrow-square-out",
+      to: dropPath(drop),
+      target: "_blank",
+      disabled: !shared.value,
+    },
     { label: "Copy link", icon: "i-ph-link", onSelect: copyLink },
   ],
-  ...(changeable.value ? [[
-    { label: "Move to folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: drop }) },
-    { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") },
-  ]] : theirs.value && inTeam ? [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]] : []),
+  ...(changeable.value
+    ? [
+        [
+          { label: "Move to folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: drop }) },
+          { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") },
+        ],
+      ]
+    : theirs.value && inTeam
+      ? [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]]
+      : []),
 ])
 </script>
 
 <template>
-  <li class="group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 py-3 pr-4 transition-colors hover:bg-muted md:grid-cols-[auto_minmax(0,1fr)_8.5rem_8rem_auto]" :class="INDENT[Math.min(depth, INDENT.length - 1)]">
+  <li
+    class="group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 py-3 pr-4 transition-colors hover:bg-muted md:grid-cols-[auto_minmax(0,1fr)_8.5rem_8rem_auto]"
+    :class="INDENT[Math.min(depth, INDENT.length - 1)]"
+  >
     <button
       v-if="folder && drop.items && !trashed"
       :aria-expanded="open"
@@ -86,27 +128,49 @@ const menu = computed(() => [
     >
       <UIcon :name="open ? 'i-ph-folder-open' : 'i-ph-folder'" class="size-[18px]" />
     </button>
-    <span v-else class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default">
+    <span
+      v-else
+      class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default"
+    >
       <UIcon :name="KIND_ICONS[drop.kind]" class="size-[18px]" />
     </span>
     <div class="min-w-0">
       <NuxtLink class="flex min-w-0 items-center gap-2 after:absolute after:inset-0" :to="`/drops/${drop.id}`">
         <span class="truncate font-medium text-highlighted">{{ drop.title }}</span>
-        <UBadge v-if="drop.version > 1" class="hidden sm:inline-flex" color="neutral" icon="i-ph-clock-counter-clockwise" :label="`v${drop.version}`" size="sm" variant="outline" />
+        <UBadge
+          v-if="drop.version > 1"
+          class="hidden sm:inline-flex"
+          color="neutral"
+          icon="i-ph-clock-counter-clockwise"
+          :label="`v${drop.version}`"
+          size="sm"
+          variant="outline"
+        />
         <!-- In the Trash the status column says when it's deleted for good. -->
         <ExpiryBadge v-if="!drop.parentId && !trashed" class="shrink-0" :drop="drop" />
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
-        <template v-if="folder">{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
+        <template v-if="folder"
+          >{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
+        ></template>
         <!-- A site review holds no file: its address says more than "0 B". -->
-        <template v-else-if="drop.kind === 'site'">{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
-        <template v-else><span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size) }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span></template>
+        <template v-else-if="drop.kind === 'site'"
+          >{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
+        ></template>
+        <template v-else
+          ><span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size)
+          }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
+        ></template>
       </p>
       <!-- A search that matched the doc's text, not its name: the words around the match. -->
       <p v-if="drop.snippet" class="mt-1 line-clamp-2 text-sm text-muted">{{ drop.snippet }}</p>
     </div>
     <div class="hidden min-w-0 md:block">
-      <span v-if="drop.owner" class="flex min-w-0 items-center gap-1.5 text-sm text-highlighted" :title="drop.owner.name">
+      <span
+        v-if="drop.owner"
+        class="flex min-w-0 items-center gap-1.5 text-sm text-highlighted"
+        :title="drop.owner.name"
+      >
         <UAvatar :alt="drop.owner.name" class="size-3.5 text-[8px]" :src="drop.owner.image ?? undefined" />
         <span class="truncate">{{ drop.owner.name }}</span>
       </span>
@@ -118,14 +182,22 @@ const menu = computed(() => [
     </div>
     <div v-if="trashed" class="hidden min-w-0 md:block">
       <span class="block text-sm text-highlighted">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
-      <span class="mt-0.5 block text-xs tabular-nums" :class="purgeDays <= 3 ? 'text-error' : 'text-muted'">{{ purgeDays ? `Gone in ${purgeDays}d` : "Gone today" }}</span>
+      <span class="mt-0.5 block text-xs tabular-nums" :class="purgeDays <= 3 ? 'text-error' : 'text-muted'">{{
+        purgeDays ? `Gone in ${purgeDays}d` : "Gone today"
+      }}</span>
     </div>
     <span v-else-if="!changeable" class="hidden items-center gap-1.5 text-sm text-muted md:flex">
       <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5" />{{ drop.teamFolder ? "The team's" : status }}
     </span>
     <!-- Shared through a folder above: the folder's share is changed there, this drop's own on its page. -->
-    <span v-else-if="drop.sharedFrom" class="hidden min-w-0 items-center gap-1.5 text-sm text-muted md:flex" :title="`Shared through ${drop.sharedFrom.title}`">
-      <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5 shrink-0" /><span class="truncate">Via {{ drop.sharedFrom.title }}</span>
+    <span
+      v-else-if="drop.sharedFrom"
+      class="hidden min-w-0 items-center gap-1.5 text-sm text-muted md:flex"
+      :title="`Shared through ${drop.sharedFrom.title}`"
+    >
+      <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5 shrink-0" /><span class="truncate"
+        >Via {{ drop.sharedFrom.title }}</span
+      >
     </span>
     <USelect
       v-else
@@ -143,11 +215,32 @@ const menu = computed(() => [
       <template #default>{{ status }}</template>
     </USelect>
     <div v-if="trashed" class="relative z-10 flex items-center gap-1">
-      <UButton color="neutral" icon="i-ph-arrow-u-up-left" label="Restore" size="sm" variant="outline" @click="emit('restore')" />
-      <UButton :aria-label="`Delete ${drop.title} for good`" color="error" icon="i-ph-trash" size="sm" variant="ghost" @click="emit('deleteForever')" />
+      <UButton
+        color="neutral"
+        icon="i-ph-arrow-u-up-left"
+        label="Restore"
+        size="sm"
+        variant="outline"
+        @click="emit('restore')"
+      />
+      <UButton
+        :aria-label="`Delete ${drop.title} for good`"
+        color="error"
+        icon="i-ph-trash"
+        size="sm"
+        variant="ghost"
+        @click="emit('deleteForever')"
+      />
     </div>
     <div v-else class="relative z-10 flex items-center gap-0.5">
-      <UButton aria-label="Copy link" class="hidden sm:inline-flex" color="neutral" icon="i-ph-link" variant="ghost" @click="copyLink" />
+      <UButton
+        aria-label="Copy link"
+        class="hidden sm:inline-flex"
+        color="neutral"
+        icon="i-ph-link"
+        variant="ghost"
+        @click="copyLink"
+      />
       <UDropdownMenu :items="menu" :content="{ align: 'end' }">
         <UButton :aria-label="`Actions for ${drop.title}`" color="neutral" icon="i-ph-dots-three" variant="ghost" />
       </UDropdownMenu>

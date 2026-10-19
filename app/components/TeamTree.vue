@@ -2,7 +2,7 @@
 // The team's folders, for the sidebar on a team Drop. Each opens to what's in it, like any folder (DropTreeItem).
 const emit = defineEmits<{ navigate: [] }>()
 const { data: shared, status } = useSharedWithMe()
-const folders = computed(() => shared.value.filter(drop => drop.teamFolder))
+const folders = computed(() => shared.value.filter((drop) => drop.teamFolder))
 </script>
 
 <template>

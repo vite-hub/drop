@@ -6,7 +6,15 @@ import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
 import { PUBLISH_BURST, requirePublishBurst } from "./publish-burst"
-import { MAX_APP_BYTES, MAX_APP_FILES, planLimits, quotaFailure, quotaToolFailure, type QuotaFailure, type Usage } from "#shared/quotas"
+import {
+  MAX_APP_BYTES,
+  MAX_APP_FILES,
+  planLimits,
+  quotaFailure,
+  quotaToolFailure,
+  type QuotaFailure,
+  type Usage,
+} from "#shared/quotas"
 import { useServerEnv } from "#vitehub/env/server"
 import { dropFiles, quotaBlobs, quotaReservations } from "../databases/config"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
@@ -23,7 +31,9 @@ export function quotaConfig() {
 }
 
 async function ownerUsage(ownerId: string, month: string) {
-  const [row] = await db.all<{ drops: number; bytes: number; writes: number }>(bindQuotaSQL(usageSQL, [ownerId, month, Date.now() - QUOTA_RESERVATION_TTL_MS]))
+  const [row] = await db.all<{ drops: number; bytes: number; writes: number }>(
+    bindQuotaSQL(usageSQL, [ownerId, month, Date.now() - QUOTA_RESERVATION_TTL_MS]),
+  )
   return row ?? { drops: 0, bytes: 0, writes: 0 }
 }
 
@@ -35,48 +45,85 @@ export async function getUsage(ownerId: string): Promise<Usage> {
   const month = new Date().toISOString().slice(0, 7)
   const used = await ownerUsage(ownerId, month)
   return {
-    enabled: config.enabled, plan, month,
-    drops: { used: used.drops, limit: limits.drops }, bytes: { used: used.bytes, limit: limits.bytes }, writes: { used: used.writes, limit: limits.writes },
-    app: { files: limits.appFiles, bytes: limits.appBytes }, selfHostUrl: "/docs/self-host",
+    enabled: config.enabled,
+    plan,
+    month,
+    drops: { used: used.drops, limit: limits.drops },
+    bytes: { used: used.bytes, limit: limits.bytes },
+    writes: { used: used.writes, limit: limits.writes },
+    app: { files: limits.appFiles, bytes: limits.appBytes },
+    selfHostUrl: "/docs/self-host",
   }
 }
 
 export class DropQuotaError extends HTTPError {
   readonly quotaBody: QuotaFailure
   constructor(body: QuotaFailure) {
-    super({ status: body.retryable ? 429 : 402, message: body.message, data: body, body: { ...body }, headers: body.retryAfterSeconds ? { "Retry-After": String(body.retryAfterSeconds) } : undefined })
+    super({
+      status: body.retryable ? 429 : 402,
+      message: body.message,
+      data: body,
+      body: { ...body },
+      headers: body.retryAfterSeconds ? { "Retry-After": String(body.retryAfterSeconds) } : undefined,
+    })
     this.quotaBody = body
   }
 }
 
 /** MCP limits are ordinary tool results, so agents can act on them without a protocol retry. */
 export async function quotaToolResult<T>(operation: () => Promise<T>) {
-  try { return await operation() }
-  catch (error) {
+  try {
+    return await operation()
+  } catch (error) {
     if (!(error instanceof DropQuotaError)) throw error
     return quotaToolFailure(error.quotaBody)
   }
 }
 
-interface Cost { drops: number; bytes: number; writes: number; targetId?: string; app?: { files: number; bytes: number } }
+interface Cost {
+  drops: number
+  bytes: number
+  writes: number
+  targetId?: string
+  app?: { files: number; bytes: number }
+}
 
 /** Reserve before touching blobs. Transfer to the write ledger in the metadata batch, or release on failure. */
-export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Event | undefined, operation: (quota: { commit: (statements: Statement[], success?: SQL) => Promise<void>; fileInserts: (rows: (typeof dropFiles.$inferInsert)[]) => Statement[] }) => Promise<T>): Promise<T> {
+export async function withDropQuota<T>(
+  ownerId: string,
+  cost: Cost,
+  event: H3Event | undefined,
+  operation: (quota: {
+    commit: (statements: Statement[], success?: SQL) => Promise<void>
+    fileInserts: (rows: (typeof dropFiles.$inferInsert)[]) => Statement[]
+  }) => Promise<T>,
+): Promise<T> {
   const config = quotaConfig()
-  const usage = config.enabled ? await getUsage(ownerId) : {
-    month: new Date().toISOString().slice(0, 7), plan: "unlimited",
-    drops: { limit: null }, bytes: { limit: null }, writes: { limit: null }, app: { files: MAX_APP_FILES, bytes: MAX_APP_BYTES },
-  }
+  const usage = config.enabled
+    ? await getUsage(ownerId)
+    : {
+        month: new Date().toISOString().slice(0, 7),
+        plan: "unlimited",
+        drops: { limit: null },
+        bytes: { limit: null },
+        writes: { limit: null },
+        app: { files: MAX_APP_FILES, bytes: MAX_APP_BYTES },
+      }
   if (cost.app) {
-    if (cost.app.files > usage.app.files) throw new DropQuotaError(quotaFailure("appFiles", cost.app.files, usage.app.files))
-    if (cost.app.bytes > usage.app.bytes) throw new DropQuotaError(quotaFailure("appBytes", cost.app.bytes, usage.app.bytes))
+    if (cost.app.files > usage.app.files)
+      throw new DropQuotaError(quotaFailure("appFiles", cost.app.files, usage.app.files))
+    if (cost.app.bytes > usage.app.bytes)
+      throw new DropQuotaError(quotaFailure("appBytes", cost.app.bytes, usage.app.bytes))
   }
   if (event) {
-    try { await requirePublishBurst(event, ownerId) }
-    catch (error) {
+    try {
+      await requirePublishBurst(event, ownerId)
+    } catch (error) {
       if (HTTPError.isError(error) && error.status === 429) {
         const retryAfter = Number(new Headers(error.headers).get("retry-after"))
-        throw new DropQuotaError(quotaFailure("burstPublishes", PUBLISH_BURST, PUBLISH_BURST, retryAfter > 0 ? Math.ceil(retryAfter) : 60))
+        throw new DropQuotaError(
+          quotaFailure("burstPublishes", PUBLISH_BURST, PUBLISH_BURST, retryAfter > 0 ? Math.ceil(retryAfter) : 60),
+        )
       }
       throw error
     }
@@ -86,16 +133,43 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
   const now = Date.now()
   let reserved: { id: string }[]
   try {
-    reserved = config.enabled ? await db.all<{ id: string }>(bindQuotaSQL(reserveSQL, [
-      ownerId, usage.month, now - QUOTA_RESERVATION_TTL_MS, id, cost.drops, cost.bytes, cost.writes, cost.targetId ?? null, now,
-      usage.drops.limit === null ? 0 : 1, cost.drops, usage.drops.limit ?? 0,
-      usage.bytes.limit === null ? 0 : 1, cost.bytes, usage.bytes.limit ?? 0,
-      usage.writes.limit === null ? 0 : 1, cost.writes, usage.writes.limit ?? 0,
-    ])) : await db.insert(quotaReservations).values({
-      id, ownerId, month: usage.month, drops: cost.drops, bytes: cost.bytes, writes: cost.writes, targetId: null, createdAt: now,
-    }).returning({ id: quotaReservations.id })
-  }
-  catch (error) {
+    reserved = config.enabled
+      ? await db.all<{ id: string }>(
+          bindQuotaSQL(reserveSQL, [
+            ownerId,
+            usage.month,
+            now - QUOTA_RESERVATION_TTL_MS,
+            id,
+            cost.drops,
+            cost.bytes,
+            cost.writes,
+            cost.targetId ?? null,
+            now,
+            usage.drops.limit === null ? 0 : 1,
+            cost.drops,
+            usage.drops.limit ?? 0,
+            usage.bytes.limit === null ? 0 : 1,
+            cost.bytes,
+            usage.bytes.limit ?? 0,
+            usage.writes.limit === null ? 0 : 1,
+            cost.writes,
+            usage.writes.limit ?? 0,
+          ]),
+        )
+      : await db
+          .insert(quotaReservations)
+          .values({
+            id,
+            ownerId,
+            month: usage.month,
+            drops: cost.drops,
+            bytes: cost.bytes,
+            writes: cost.writes,
+            targetId: null,
+            createdAt: now,
+          })
+          .returning({ id: quotaReservations.id })
+  } catch (error) {
     if (/quota_pending_target_idx|quota_reservations.target_id/i.test(String(error)))
       throw new HTTPError({ status: 409, message: "This drop is being published. Wait for that publish to finish." })
     throw error
@@ -108,45 +182,66 @@ export async function withDropQuota<T>(ownerId: string, cost: Cost, event: H3Eve
       if (limit !== null && cost[unit] > 0 && used[unit] + cost[unit] > limit)
         throw new DropQuotaError(quotaFailure(unit, used[unit], limit))
     }
-    throw new HTTPError({ status: 409, message: "Usage changed while publishing. Check usage before publishing again." })
+    throw new HTTPError({
+      status: 409,
+      message: "Usage changed while publishing. Check usage before publishing again.",
+    })
   }
 
   let committed = false
   try {
     const result = await operation({
-      fileInserts: rows => appFileChunks(rows).map(chunk => db.insert(dropFiles).values(chunk)),
+      fileInserts: (rows) => appFileChunks(rows).map((chunk) => db.insert(dropFiles).values(chunk)),
       commit: async (statements, success = sql`1`) => {
         // A failed guard violates the ledger CHECK and rolls back the entire D1 batch.
-        const finish = db.update(quotaReservations).set({ committed: true, drops: 0, bytes: 0, writes: sql`CASE WHEN (${success}) THEN ${quotaReservations.writes} ELSE -1 END` })
-          .where(eq(quotaReservations.id, id)).returning({ id: quotaReservations.id })
+        const finish = db
+          .update(quotaReservations)
+          .set({
+            committed: true,
+            drops: 0,
+            bytes: 0,
+            writes: sql`CASE WHEN (${success}) THEN ${quotaReservations.writes} ELSE -1 END`,
+          })
+          .where(eq(quotaReservations.id, id))
+          .returning({ id: quotaReservations.id })
         const batch: [Statement, ...Statement[]] = [finish]
         batch.unshift(...statements)
         let results
-        try { results = await db.batch(batch) }
-        catch (error) {
+        try {
+          results = await db.batch(batch)
+        } catch (error) {
           if (/CHECK constraint failed.*writes/i.test(String(error)))
-            throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version.", cause: error })
+            throw new HTTPError({
+              status: 409,
+              message: "This drop changed while publishing. Read the latest version.",
+              cause: error,
+            })
           throw error
         }
         const finished = v.safeParse(Finished, results.at(-1))
-        committed = finished.success && finished.output.some(row => row.id === id)
-        if (!committed) throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version." })
+        committed = finished.success && finished.output.some((row) => row.id === id)
+        if (!committed)
+          throw new HTTPError({ status: 409, message: "This drop changed while publishing. Read the latest version." })
       },
     })
     if (!committed) throw new Error("Publishing must commit its quota reservation with its metadata.")
     return result
-  }
-  finally {
+  } finally {
     if (!committed) await db.delete(quotaReservations).where(eq(quotaReservations.id, id))
   }
 }
 
 /** Release crashed publishes without deleting the committed monthly write ledger. */
 export async function cleanupQuotaReservations(now: Date) {
-  const released = await db.delete(quotaReservations).where(and(
-    eq(quotaReservations.committed, false),
-    lt(quotaReservations.createdAt, now.getTime() - QUOTA_RESERVATION_TTL_MS),
-  )).returning()
+  const released = await db
+    .delete(quotaReservations)
+    .where(
+      and(
+        eq(quotaReservations.committed, false),
+        lt(quotaReservations.createdAt, now.getTime() - QUOTA_RESERVATION_TTL_MS),
+      ),
+    )
+    .returning()
   for (const reservation of released)
     log.warn({ action: "quota-reservation-release", reservation, ageMs: now.getTime() - reservation.createdAt })
 }
@@ -160,9 +255,13 @@ async function releaseQuotaBlobs(keys: string[]) {
 /** Retry tracked images first, including a prior deletion whose ledger cleanup failed. */
 export async function cleanupQuotaBlobs(now: Date) {
   for (;;) {
-    const rows = await db.select({ key: quotaBlobs.blobKey }).from(quotaBlobs).where(lte(quotaBlobs.expiresAt, now.getTime())).limit(80)
+    const rows = await db
+      .select({ key: quotaBlobs.blobKey })
+      .from(quotaBlobs)
+      .where(lte(quotaBlobs.expiresAt, now.getTime()))
+      .limit(80)
     if (!rows.length) return
-    const keys = rows.map(row => row.key)
+    const keys = rows.map((row) => row.key)
     const [error] = await blob.del(keys)
     if (error) throw error
     await releaseQuotaBlobs(keys)

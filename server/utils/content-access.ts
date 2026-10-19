@@ -18,8 +18,12 @@ export async function requireBlobAccess(event: H3Event, key: string) {
   if (key.startsWith("apps/") || key.startsWith("drafts/")) throw notFound()
   if (key.startsWith("code-images/")) {
     if (isExpiredCodeImage(key, new Date())) throw notFound()
-    const [image] = await db.select({ ownerId: user.id, banned: user.banned, quarantined: rawFileQuarantine(event.url.pathname) }).from(codeImages)
-      .leftJoin(user, eq(user.id, codeImages.ownerId)).where(eq(codeImages.blobKey, key)).limit(1)
+    const [image] = await db
+      .select({ ownerId: user.id, banned: user.banned, quarantined: rawFileQuarantine(event.url.pathname) })
+      .from(codeImages)
+      .leftJoin(user, eq(user.id, codeImages.ownerId))
+      .where(eq(codeImages.blobKey, key))
+      .limit(1)
     if (!image?.ownerId || image.banned || image.quarantined) throw notFound()
     return
   }

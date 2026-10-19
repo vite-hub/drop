@@ -17,10 +17,16 @@ export default defineValidatedHandler({
     if (action === "approve") {
       await db.batch([
         db.update(user).set({ shareApprovedAt: Date.now() }).where(eq(user.id, id)),
-        db.update(drops).set({ shareReview: null }).where(and(eq(drops.ownerId, id), inArray(drops.share, ["public", "public_comment"]))),
+        db
+          .update(drops)
+          .set({ shareReview: null })
+          .where(and(eq(drops.ownerId, id), inArray(drops.share, ["public", "public_comment"]))),
       ])
-    }
-    else await db.update(drops).set({ shareReview: "rejected" }).where(and(eq(drops.ownerId, id), eq(drops.shareReview, "pending")))
+    } else
+      await db
+        .update(drops)
+        .set({ shareReview: "rejected" })
+        .where(and(eq(drops.ownerId, id), eq(drops.shareReview, "pending")))
     return { ok: true }
   },
 })

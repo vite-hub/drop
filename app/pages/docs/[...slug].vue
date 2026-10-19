@@ -12,11 +12,25 @@ import DocsHostFacts from "~/components/docs/DocsHostFacts.vue"
 // The docs layout comes from the `/docs/**` route rule (nuxt.config.ts).
 
 // Landing stories stand in for screenshots on the Features page, and hydrate only once they scroll into view.
-const LandingDocStory = defineLazyHydrationComponent("visible", () => import("~/components/landing/LandingDocStory.vue"))
-const LandingSiteStory = defineLazyHydrationComponent("visible", () => import("~/components/landing/LandingSiteStory.vue"))
+const LandingDocStory = defineLazyHydrationComponent(
+  "visible",
+  () => import("~/components/landing/LandingDocStory.vue"),
+)
+const LandingSiteStory = defineLazyHydrationComponent(
+  "visible",
+  () => import("~/components/landing/LandingSiteStory.vue"),
+)
 const MD = import.meta.glob<Component>("~/components/docs/md/*.vue", { import: "default", eager: true })
 const components = {
-  ...Object.fromEntries(Object.entries(MD).map(([path, component]) => [path.split("/").pop()!.replace(/\.vue$/, ""), component])),
+  ...Object.fromEntries(
+    Object.entries(MD).map(([path, component]) => [
+      path
+        .split("/")
+        .pop()!
+        .replace(/\.vue$/, ""),
+      component,
+    ]),
+  ),
   DocsDeployButtons,
   DocsEnv,
   DocsFigure,
@@ -29,7 +43,10 @@ const route = useRoute()
 const path = computed(() => `/${[route.params.slug ?? []].flat().join("/")}`.replace(/\/$/, "") || "/")
 // SAFETY: Nuxt's $fetch is ofetch, which the content client calls with a path and fetch options; only its types differ.
 const docs = createContentClient("docs", { fetch: $fetch as never })
-const { data: doc } = await useAsyncData(() => `docs:${path.value}`, () => docs.get(path.value))
+const { data: doc } = await useAsyncData(
+  () => `docs:${path.value}`,
+  () => docs.get(path.value),
+)
 if (!doc.value) throw createError({ status: 404, statusText: "No docs page here." })
 </script>
 

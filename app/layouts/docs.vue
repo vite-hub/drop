@@ -5,10 +5,13 @@ import DashboardLayout from "./dashboard.vue"
 
 const route = useRoute()
 const active = (to: string) => isActivePath(route.path, to)
-const current = computed(() => DOCS_PAGES.find(page => active(page.to)))
+const current = computed(() => DOCS_PAGES.find((page) => active(page.to)))
 const menuOpen = ref(false)
 const sidebarCollapsed = useSidebarCollapsed()
-watch(() => route.path, () => (menuOpen.value = false))
+watch(
+  () => route.path,
+  () => (menuOpen.value = false),
+)
 // From /api/me, which SSR fetches with the session cookie, so the server picks the right shell.
 const { data: me } = await useMe()
 </script>
@@ -39,7 +42,12 @@ const { data: me } = await useMe()
     <div class="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-14">
       <!-- Small screens: the nav folds into a menu above the page. -->
       <div class="border-b border-default py-3 lg:hidden">
-        <button class="flex w-full items-center justify-between text-sm text-muted" type="button" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
+        <button
+          class="flex w-full items-center justify-between text-sm text-muted"
+          type="button"
+          :aria-expanded="menuOpen"
+          @click="menuOpen = !menuOpen"
+        >
           <span>{{ current?.label ?? "Docs" }}</span>
           <UIcon :name="menuOpen ? 'i-ph-caret-up' : 'i-ph-caret-down'" class="size-4" />
         </button>

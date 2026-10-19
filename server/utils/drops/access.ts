@@ -17,13 +17,22 @@ import type { DropRow } from "./types"
  */
 export function permissions(drop: DropRow, who: Identity | null) {
   const admin = Boolean(who && who.role === "admin")
-  if (drop.quarantinedAt) return { owner: false, view: false, comment: false, edit: false, manage: Boolean(who && (who.userId === drop.ownerId || admin)), trash: false }
+  if (drop.quarantinedAt)
+    return {
+      owner: false,
+      view: false,
+      comment: false,
+      edit: false,
+      manage: Boolean(who && (who.userId === drop.ownerId || admin)),
+      trash: false,
+    }
   const owner = Boolean(who && who.userId === drop.ownerId)
   // On a team Drop, a public link waiting for review still reaches the team.
   const held: Share | null = sharePolicy().mode === "team" ? "team" : null
-  const grants = (drop.grants ?? (drop.share === "private" ? [] : [{ share: drop.share }]))
-    .flatMap(grant => (drop.shareReview && isPublic(grant.share) ? (held ? [{ share: held }] : []) : [grant]))
-  const level = drop.expired ? -1 : Math.max(-1, ...grants.map(grant => shareLevel(grant.share, who !== null)))
+  const grants = (drop.grants ?? (drop.share === "private" ? [] : [{ share: drop.share }])).flatMap((grant) =>
+    drop.shareReview && isPublic(grant.share) ? (held ? [{ share: held }] : []) : [grant],
+  )
+  const level = drop.expired ? -1 : Math.max(-1, ...grants.map((grant) => shareLevel(grant.share, who !== null)))
   const available = !drop.ownerBanned
   const live = available && !drop.expired
   const manage = drop.teamFolder ? admin : owner || admin
@@ -44,20 +53,51 @@ export const reaches = (drop: Pick<DropRow, "share" | "grants">, who: Identity |
 
 /** A share that worked until its drop expired. Private drops stay indistinguishable from missing ones. */
 export const expiredLink = (drop: DropRow | null, who: Identity | null) =>
-  Boolean(drop?.expired && reaches(drop, who) && !drop.shareReview && !drop.ownerBanned && !drop.quarantinedAt && !permissions(drop, who).view)
+  Boolean(
+    drop?.expired &&
+    reaches(drop, who) &&
+    !drop.shareReview &&
+    !drop.ownerBanned &&
+    !drop.quarantinedAt &&
+    !permissions(drop, who).view,
+  )
 
 /** A public link the caller would see once an admin approves it. Anyone else gets the usual 404. */
 export const waitingForReview = (drop: DropRow | null, who: Identity | null) =>
-  Boolean(drop && !drop.ownerBanned && !drop.quarantinedAt && reaches(drop, who) && drop.shareReview === "pending" && !permissions(drop, who).view)
+  Boolean(
+    drop &&
+    !drop.ownerBanned &&
+    !drop.quarantinedAt &&
+    reaches(drop, who) &&
+    drop.shareReview === "pending" &&
+    !permissions(drop, who).view,
+  )
 
 export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().days): DropSummary {
   const expires = expiresAt(row, days)
   return {
-    id: row.id, link: row.link ?? row.id, slug: row.slug ?? slugify(row.title), kind: row.kind, title: row.title, filename: row.filename, size: row.size, version: row.version,
-    shareReview: row.shareReview, quarantinedAt: row.quarantinedAt, share: row.share, publicUntil: openUntil(row.raw ?? row),
-    actorKind: row.actorKind, actorName: row.actorName,
-    createdAt: row.createdAt, updatedAt: row.updatedAt, ...(paths ? { paths } : {}),
-    expiresAt: expires, lifetime: row.lifetime, keepReason: row.keepReason, note: row.note, parentId: row.parentId,
+    id: row.id,
+    link: row.link ?? row.id,
+    slug: row.slug ?? slugify(row.title),
+    kind: row.kind,
+    title: row.title,
+    filename: row.filename,
+    size: row.size,
+    version: row.version,
+    shareReview: row.shareReview,
+    quarantinedAt: row.quarantinedAt,
+    share: row.share,
+    publicUntil: openUntil(row.raw ?? row),
+    actorKind: row.actorKind,
+    actorName: row.actorName,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    ...(paths ? { paths } : {}),
+    expiresAt: expires,
+    lifetime: row.lifetime,
+    keepReason: row.keepReason,
+    note: row.note,
+    parentId: row.parentId,
     // Past its window but not yet moved by the hourly cleanup: it's in the Trash already, as of when it expired.
     trashedAt: row.trashedAt ?? (row.expired && expires !== null ? expires : null),
     trashReason: row.trashReason ?? (row.expired ? "expired" : null),
@@ -67,8 +107,14 @@ export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().
 }
 
 /** When the drop's own public link closes, while it's open. */
-const openUntil = (own: typeof drops.$inferSelect) => (isPublic(own.share) && isPublic(shareNow(own)) ? own.publicUntil : null)
+const openUntil = (own: typeof drops.$inferSelect) =>
+  isPublic(own.share) && isPublic(shareNow(own)) ? own.publicUntil : null
 
 /** A node as a breadcrumb. */
-export const toCrumb = (row: typeof drops.$inferSelect): DropCrumb =>
-  ({ id: row.id, kind: row.kind, title: row.title, link: row.link ?? row.id, slug: row.slug ?? slugify(row.title) })
+export const toCrumb = (row: typeof drops.$inferSelect): DropCrumb => ({
+  id: row.id,
+  kind: row.kind,
+  title: row.title,
+  link: row.link ?? row.id,
+  slug: row.slug ?? slugify(row.title),
+})

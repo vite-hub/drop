@@ -13,15 +13,26 @@ export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string
     SELECT ${drops.blobKey} AS blob_key FROM ${drops} WHERE ${drops.id} IN (${chain}) AND ${drops.blobKey} IS NOT NULL
     UNION SELECT ${dropFiles.blobKey} AS blob_key FROM ${dropFiles} WHERE ${dropFiles.dropId} IN (${chain})
   ) AS quota_keys`
-  const queue = db.insert(blobCleanup).select(qb => qb.select({
-    id: sql<string>`${token} || ':' || quota_keys.blob_key`.as("id"),
-    blobKey: sql<string>`quota_keys.blob_key`.as("blob_key"),
-    createdAt: sql<number>`${Date.now()}`.as("created_at"),
-  }).from(keys).where(sql`1`)).onConflictDoNothing()
+  const queue = db
+    .insert(blobCleanup)
+    .select((qb) =>
+      qb
+        .select({
+          id: sql<string>`${token} || ':' || quota_keys.blob_key`.as("id"),
+          blobKey: sql<string>`quota_keys.blob_key`.as("blob_key"),
+          createdAt: sql<number>`${Date.now()}`.as("created_at"),
+        })
+        .from(keys)
+        .where(sql`1`),
+    )
+    .onConflictDoNothing()
   const remove = db.delete(drops).where(sql`${drops.id} IN (${chain})`)
-  const pending = db.select({ key: blobCleanup.blobKey }).from(blobCleanup).where(like(blobCleanup.id, `${token}:%`))
+  const pending = db
+    .select({ key: blobCleanup.blobKey })
+    .from(blobCleanup)
+    .where(like(blobCleanup.id, `${token}:%`))
   const [, , rows] = await db.batch([queue, remove, pending])
   // Cleanup's retry INSERT binds three values per key, below D1's 100-value ceiling.
   for (let offset = 0; offset < rows.length; offset += 25)
-    await deleteKeys(rows.slice(offset, offset + 25).map(item => item.key))
+    await deleteKeys(rows.slice(offset, offset + 25).map((item) => item.key))
 }

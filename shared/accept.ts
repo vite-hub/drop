@@ -5,12 +5,13 @@
  */
 export function prefersMarkdown(accept: string) {
   const ranges = accept.split(",").map((part, index) => {
-    const [type = "", ...params] = part.split(";").map(item => item.trim().toLowerCase())
-    const q = params.find(param => param.startsWith("q="))
+    const [type = "", ...params] = part.split(";").map((item) => item.trim().toLowerCase())
+    const q = params.find((param) => param.startsWith("q="))
     return { type, q: q ? Number(q.slice(2)) || 0 : 1, index }
   })
   type Range = (typeof ranges)[number]
-  const best = (...types: string[]): Range | undefined => ranges.find(range => range.type === types[0]) ?? (types.length > 1 ? best(...types.slice(1)) : undefined)
+  const best = (...types: string[]): Range | undefined =>
+    ranges.find((range) => range.type === types[0]) ?? (types.length > 1 ? best(...types.slice(1)) : undefined)
   const markdown = best("text/markdown")
   if (!markdown || markdown.q === 0) return false
   const html = best("text/html", "text/*", "*/*")

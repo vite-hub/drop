@@ -19,13 +19,21 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
   await requireRateLimit(event, "code-image", { key: who.userId, limit: 10, window: "1m" })
   const format = input.format ?? (PNG_CODE_IMAGES ? "png" : "svg")
   const { svg, width, height } = await renderCodeSvg(input)
-  useLogger(event).set({ codeImage: { format, language: input.language, theme: input.theme, characters: input.code.length } })
+  useLogger(event).set({
+    codeImage: { format, language: input.language, theme: input.theme, characters: input.code.length },
+  })
 
-  const image = format === "png" ? await renderCodePng(event, { svg, width, height, scale: input.scale }) : new Blob([svg], { type: "image/svg+xml" })
+  const image =
+    format === "png"
+      ? await renderCodePng(event, { svg, width, height, scale: input.scale })
+      : new Blob([svg], { type: "image/svg+xml" })
 
   return withDropQuota(who.userId, { drops: 0, bytes: image.size, writes: 1 }, event, async (quota) => {
     const { expiresAt, key } = createCodeImageLocation(format)
-    const [storageError, stored] = await blob.put(key, image, { access: "private", contentType: format === "png" ? "image/png" : "image/svg+xml" })
+    const [storageError, stored] = await blob.put(key, image, {
+      access: "private",
+      contentType: format === "png" ? "image/png" : "image/svg+xml",
+    })
     if (storageError || !stored.url) {
       await blob.del(key)
       throw new HTTPError({ status: 503, statusText: "The code image could not be stored." })
@@ -33,10 +41,11 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
     try {
       await quota.commit([
         db.insert(codeImages).values({ blobKey: key, ownerId: who.userId, expiresAt: expiresAt.getTime() }),
-        db.insert(quotaBlobs).values({ blobKey: key, ownerId: who.userId, size: image.size, expiresAt: expiresAt.getTime() }),
+        db
+          .insert(quotaBlobs)
+          .values({ blobKey: key, ownerId: who.userId, size: image.size, expiresAt: expiresAt.getTime() }),
       ])
-    }
-    catch (error) {
+    } catch (error) {
       await blob.del(key)
       throw error
     }

@@ -19,8 +19,7 @@ export function useGitHubSignIn() {
       const resolved = new URL(value, appOrigin)
       if (resolved.origin !== appOrigin) return "/drops"
       return `${resolved.pathname}${resolved.search}${resolved.hash}`
-    }
-    catch {
+    } catch {
       return "/drops"
     }
   })

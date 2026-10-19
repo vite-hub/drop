@@ -1,4 +1,7 @@
-export function needsShareReview(enabled: boolean, owner?: { role?: string | null; shareApprovedAt?: number | null; banned?: boolean | null }) {
+export function needsShareReview(
+  enabled: boolean,
+  owner?: { role?: string | null; shareApprovedAt?: number | null; banned?: boolean | null },
+) {
   if (!enabled) return false
   return !owner || Boolean(owner.banned) || !(owner.role === "admin" || owner.shareApprovedAt != null)
 }
@@ -12,10 +15,11 @@ export function reportTarget(value: string) {
     if (canonical !== value) return null
     if (value.startsWith("/f/")) {
       const key = decodeURIComponent(value.slice(3))
-      if (key.split("/").some(part => part === "." || part === "..")) return null
+      if (key.split("/").some((part) => part === "." || part === "..")) return null
       return `/f/${key.split("/").map(encodeURIComponent).join("/")}`
     }
     return canonical
+  } catch {
+    return null
   }
-  catch { return null }
 }

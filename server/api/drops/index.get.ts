@@ -11,15 +11,18 @@ import { requireIdentity } from "../../utils/identity"
 export default defineValidatedHandler({
   validate: { query: DropsQuerySchema },
   async handler(event) {
-  const who = await requireIdentity(event)
-  const query = event.url.searchParams
-  const words = query.get("q")?.slice(0, 200) || undefined
-  if (query.has("folder")) {
-    const folder = await findDropByRef(query.get("folder")!, event)
-    if (!folder || folder.kind !== "folder" || !permissions(folder, who).view) throw new HTTPError({ status: 404, statusText: "No folder with that id." })
-    return listFolder(folder, event, { query: words, who })
-  }
-  if (query.has("folders")) return listFolders(who, event)
-  return query.has("shared") ? listSharedWithMe(who, event) : listDrops(who, event, { trash: query.has("trash"), query: words })
+    const who = await requireIdentity(event)
+    const query = event.url.searchParams
+    const words = query.get("q")?.slice(0, 200) || undefined
+    if (query.has("folder")) {
+      const folder = await findDropByRef(query.get("folder")!, event)
+      if (!folder || folder.kind !== "folder" || !permissions(folder, who).view)
+        throw new HTTPError({ status: 404, statusText: "No folder with that id." })
+      return listFolder(folder, event, { query: words, who })
+    }
+    if (query.has("folders")) return listFolders(who, event)
+    return query.has("shared")
+      ? listSharedWithMe(who, event)
+      : listDrops(who, event, { trash: query.has("trash"), query: words })
   },
 })

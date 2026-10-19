@@ -10,12 +10,17 @@ export const MAX_SLUG = 60
 /** A new link key: 12 characters, 60 random bits. Like a drop's id, it's the key to a shared drop. */
 export function newLink() {
   const bytes = crypto.getRandomValues(new Uint8Array(LINK_LENGTH))
-  return Array.from(bytes, byte => ALPHABET[byte & 31]).join("")
+  return Array.from(bytes, (byte) => ALPHABET[byte & 31]).join("")
 }
 
 /** `Hipoteca de 75.000 € a 10 años` → `hipoteca-de-75-000-a-10-anos`. Empty when nothing readable is left. */
 export function slugify(text: string) {
-  const words = text.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+  const words = text
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
   if (words.length <= MAX_SLUG) return words
   const cut = words.slice(0, MAX_SLUG + 1)
   return (cut.includes("-") ? cut.slice(0, cut.lastIndexOf("-")) : cut.slice(0, MAX_SLUG)).replace(/-+$/, "")
@@ -26,4 +31,11 @@ export const dropPath = (drop: { link: string; slug: string }, version?: number)
   `/d/${drop.link}${drop.slug ? `/${drop.slug}` : ""}${version ? `?v=${version}` : ""}`
 
 /** What `/api/links/:key` answers: the version to show, where the doc lives, and the version an old link pointed at. */
-export interface DropLink { id: string; link: string; slug: string; version: number; latest: number; from?: number }
+export interface DropLink {
+  id: string
+  link: string
+  slug: string
+  version: number
+  latest: number
+  from?: number
+}

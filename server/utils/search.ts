@@ -13,7 +13,14 @@ export const MAX_SEARCH_TEXT = 64_000
 /** Kinds whose words are searchable. Plain text files are `markdown` drops. */
 export const SEARCH_KINDS = ["markdown", "html"] as const
 
-const ENTITIES = new Map([["amp", "&"], ["lt", "<"], ["gt", ">"], ["quot", "\""], ["apos", "'"], ["nbsp", " "]])
+const ENTITIES = new Map([
+  ["amp", "&"],
+  ["lt", "<"],
+  ["gt", ">"],
+  ["quot", '"'],
+  ["apos", "'"],
+  ["nbsp", " "],
+])
 
 /**
  * What a reader sees of a doc, as one line of plain text: Markdown without its front matter and markup, HTML without
@@ -23,19 +30,23 @@ export function searchableText(kind: string, source: string) {
   let text = source
   if (kind === "html") {
     // Like a Markdown doc's leading H1, the first <h1> is the title, which search matches on its own.
-    text = text.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|template|svg|head|title)\b[\s\S]*?<\/\1\s*>/gi, " ")
-      .replace(/<h1\b[^>]*>[\s\S]*?<\/h1\s*>/i, " ").replace(/<[^>]*>/g, " ")
+    text = text
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<(script|style|template|svg|head|title)\b[\s\S]*?<\/\1\s*>/gi, " ")
+      .replace(/<h1\b[^>]*>[\s\S]*?<\/h1\s*>/i, " ")
+      .replace(/<[^>]*>/g, " ")
       .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
         if (name[0] === "#") {
           const code = name[1] === "x" || name[1] === "X" ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1))
-          return code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : " "
+          return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : " "
         }
         return ENTITIES.get(name.toLowerCase()) ?? entity
       })
-  }
-  else {
+  } else {
     // A leading H1 is the doc's title, which search matches on its own: snippets start with the words after it.
-    text = splitFrontmatter(text).body.replace(/^\s*#\s[^\n]*\n/, "").replace(/<!--[\s\S]*?-->/g, " ")
+    text = splitFrontmatter(text)
+      .body.replace(/^\s*#\s[^\n]*\n/, "")
+      .replace(/<!--[\s\S]*?-->/g, " ")
       .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1") // links and images keep their text
       .replace(/^\s{0,3}(?:#{1,6}|>+|[-*+]|\d+[.)]|`{3,}\w*|~{3,}\w*)\s?/gm, "") // headings, quotes, list markers, fences
       .replace(/[*_~`|]+/g, " ")
@@ -70,8 +81,11 @@ const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coa
  * One condition per word: the word is in the drop's name, or in its text. SQLite's LIKE ignores ASCII case already, so
  * the text isn't lowered row by row. Needs `drop_texts` left-joined (see `searchHeads`).
  */
-export const matching = (words: string[]) => words.map(word =>
-  sql`(${named} LIKE ${likePattern(word)} ESCAPE '\\' OR ${dropTexts.text} LIKE ${likePattern(word)} ESCAPE '\\')`)
+export const matching = (words: string[]) =>
+  words.map(
+    (word) =>
+      sql`(${named} LIKE ${likePattern(word)} ESCAPE '\\' OR ${dropTexts.text} LIKE ${likePattern(word)} ESCAPE '\\')`,
+  )
 
 /**
  * Words around the first word found in the doc's text, or null when the name alone matches every word. Worked out in
@@ -79,9 +93,15 @@ export const matching = (words: string[]) => words.map(word =>
  */
 function snippetOf(words: string[]): SQL<string | null> {
   if (!words.length) return sql<null>`NULL`
-  const at = sql.join(words.map(word => sql`nullif(instr(lower(${dropTexts.text}), ${word}), 0)`), sql`, `)
+  const at = sql.join(
+    words.map((word) => sql`nullif(instr(lower(${dropTexts.text}), ${word}), 0)`),
+    sql`, `,
+  )
   const position = words.length > 1 ? sql`coalesce(${at})` : at
-  const nameOnly = sql.join(words.map(word => sql`${named} LIKE ${likePattern(word)} ESCAPE '\\'`), sql` AND `)
+  const nameOnly = sql.join(
+    words.map((word) => sql`${named} LIKE ${likePattern(word)} ESCAPE '\\'`),
+    sql` AND `,
+  )
   return sql<string | null>`CASE WHEN ${dropTexts.text} IS NULL OR (${nameOnly}) THEN NULL
     ELSE (SELECT CASE WHEN p IS NULL THEN NULL ELSE (CASE WHEN p > 61 THEN '…' ELSE '' END) || substr(${dropTexts.text}, max(1, p - 60), 180) END FROM (SELECT ${position} AS p)) END`
 }
@@ -101,20 +121,29 @@ export function cleanSnippet(snippet: string | null) {
  * text has them. `where` scopes the rows; it may use `drops` and `drop_heads`.
  */
 export async function searchHeads(where: SQL | undefined, words: string[], limit: number) {
-  const rows = await db.select({ drop: drops, snippet: snippetOf(words) }).from(dropHeads)
-    .innerJoin(drops, eq(drops.id, dropHeads.dropId)).leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
-    .where(and(where, ...matching(words))).orderBy(sql`${dropHeads.updatedAt} DESC`).limit(limit)
-  return rows.map(row => ({ drop: row.drop, snippet: cleanSnippet(row.snippet) }))
+  const rows = await db
+    .select({ drop: drops, snippet: snippetOf(words) })
+    .from(dropHeads)
+    .innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
+    .where(and(where, ...matching(words)))
+    .orderBy(sql`${dropHeads.updatedAt} DESC`)
+    .limit(limit)
+  return rows.map((row) => ({ drop: row.drop, snippet: cleanSnippet(row.snippet) }))
 }
 
 /**
  * The statements that keep a version's text: a row for the new version, and none for the one it replaces. Part of the
  * publish's batch, after the drop's own insert.
  */
-export function textStatements(row: { id: string; kind: string }, source: string | undefined, previousId?: string | null) {
+export function textStatements(
+  row: { id: string; kind: string },
+  source: string | undefined,
+  previousId?: string | null,
+) {
   const statements = []
   if (previousId) statements.push(db.delete(dropTexts).where(eq(dropTexts.dropId, previousId)))
-  if (source !== undefined && SEARCH_KINDS.some(kind => kind === row.kind))
+  if (source !== undefined && SEARCH_KINDS.some((kind) => kind === row.kind))
     statements.push(db.insert(dropTexts).values({ dropId: row.id, text: searchableText(row.kind, source) }))
   return statements
 }
@@ -125,9 +154,13 @@ export function textStatements(row: { id: string; kind: string }, source: string
  * doesn't retry it forever. Returns how many it indexed.
  */
 export async function indexMissingTexts(limit = 100) {
-  const missing = await db.select({ id: drops.id, kind: drops.kind, blobKey: drops.blobKey }).from(dropHeads)
-    .innerJoin(drops, eq(drops.id, dropHeads.dropId)).leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
-    .where(and(isNull(dropTexts.dropId), inArray(drops.kind, [...SEARCH_KINDS]), isNotNull(drops.blobKey))).limit(limit)
+  const missing = await db
+    .select({ id: drops.id, kind: drops.kind, blobKey: drops.blobKey })
+    .from(dropHeads)
+    .innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
+    .where(and(isNull(dropTexts.dropId), inArray(drops.kind, [...SEARCH_KINDS]), isNotNull(drops.blobKey)))
+    .limit(limit)
   let indexed = 0
   for (const doc of missing) {
     const [error, file] = await blob.get(doc.blobKey!)
@@ -138,9 +171,11 @@ export async function indexMissingTexts(limit = 100) {
     let source = ""
     try {
       source = file ? new TextDecoder("utf-8").decode(await file.arrayBuffer()) : ""
-    }
-    catch {}
-    await db.insert(dropTexts).values({ dropId: doc.id, text: searchableText(doc.kind, source) }).onConflictDoNothing()
+    } catch {}
+    await db
+      .insert(dropTexts)
+      .values({ dropId: doc.id, text: searchableText(doc.kind, source) })
+      .onConflictDoNothing()
     indexed++
   }
   return indexed

@@ -13,7 +13,15 @@ export const KIND_ICONS: Record<DropKind, string> = {
   site: "i-ph-globe",
 }
 
-export const KIND_LABELS: Record<DropKind, string> = { markdown: "Markdown", html: "HTML", image: "Image", file: "File", app: "App", folder: "Folder", site: "Site" }
+export const KIND_LABELS: Record<DropKind, string> = {
+  markdown: "Markdown",
+  html: "HTML",
+  image: "Image",
+  file: "File",
+  app: "App",
+  folder: "Folder",
+  site: "Site",
+}
 
 export const VIA_LABELS: Record<ActorKind, string> = { agent: "MCP", browser: "the browser" }
 

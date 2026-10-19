@@ -1,9 +1,17 @@
 // How to add Drop's MCP server to each client. No keys to paste: each client signs in through the browser the
 // first time and keeps the token itself. Used by the Agents page and the docs.
 export const MCP_CLIENT_IDS = ["claude", "claudeai", "chatgpt", "codex", "cursor", "vscode", "any"] as const
-export type McpClient = typeof MCP_CLIENT_IDS[number]
+export type McpClient = (typeof MCP_CLIENT_IDS)[number]
 
-export const MCP_CLIENTS: Record<McpClient, string> = { claude: "Claude Code", claudeai: "Claude", chatgpt: "ChatGPT", codex: "Codex", cursor: "Cursor", vscode: "VS Code", any: "Any client" }
+export const MCP_CLIENTS: Record<McpClient, string> = {
+  claude: "Claude Code",
+  claudeai: "Claude",
+  chatgpt: "ChatGPT",
+  codex: "Codex",
+  cursor: "Cursor",
+  vscode: "VS Code",
+  any: "Any client",
+}
 
 export function mcpSnippets(server: string): Record<McpClient, string> {
   return {
@@ -19,8 +27,10 @@ export function mcpSnippets(server: string): Record<McpClient, string> {
 
 export const MCP_HINTS: Record<McpClient, string> = {
   claude: "Then run /mcp in Claude Code and pick drop to sign in.",
-  claudeai: "In Claude, open Settings → Connectors → Add custom connector, name it Drop, paste this URL, and click Connect to sign in.",
-  chatgpt: "In ChatGPT, open Plugins → Add → Custom MCP server, name it Drop, paste this URL as the Server URL with OAuth, and create it to sign in.",
+  claudeai:
+    "In Claude, open Settings → Connectors → Add custom connector, name it Drop, paste this URL, and click Connect to sign in.",
+  chatgpt:
+    "In ChatGPT, open Plugins → Add → Custom MCP server, name it Drop, paste this URL as the Server URL with OAuth, and create it to sign in.",
   codex: "The login opens Drop in your browser.",
   cursor: "Cursor shows “Needs login” next to drop. Click it to sign in.",
   vscode: "VS Code asks to sign in the first time it starts the server.",

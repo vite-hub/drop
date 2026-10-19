@@ -7,7 +7,9 @@ const copy = () => copyText(code, message)
 
 <template>
   <div class="flex items-start rounded-md border border-default bg-muted">
-    <pre class="min-w-0 flex-1 overflow-x-auto px-3 py-2.5 font-mono text-xs leading-5 text-highlighted"><code>{{ code }}</code></pre>
+    <pre
+      class="min-w-0 flex-1 overflow-x-auto px-3 py-2.5 font-mono text-xs leading-5 text-highlighted"
+    ><code>{{ code }}</code></pre>
     <UButton
       :icon="copied ? 'i-ph-check' : 'i-ph-copy'"
       aria-label="Copy"

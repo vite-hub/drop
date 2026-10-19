@@ -16,7 +16,10 @@ import { textValue } from "#shared/utils/text"
 import { cachedMarkdown } from "./markdown-cache"
 
 // screenshot, compare, and annotation are comark-annotate's: annotated screenshots for PR evidence.
-const ALLOWED_TAGS = "a alert annotation blockquote br callout code compare del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s screenshot span strong table tbody td th thead tip tr ul warning".split(" ")
+const ALLOWED_TAGS =
+  "a alert annotation blockquote br callout code compare del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s screenshot span strong table tbody td th thead tip tr ul warning".split(
+    " ",
+  )
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
 
@@ -41,20 +44,19 @@ const plugins = [
 
 const parseMarkdown = createMarkdownParser({ plugins, registerDefaultPlugins: false })
 
-
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
 function textContent(node: MarkdownNode): string {
   if (!Array.isArray(node)) return node
   const [tag, , ...children] = node
-  return tag === null ? "" : children.map(child => textContent(child)).join("")
+  return tag === null ? "" : children.map((child) => textContent(child)).join("")
 }
 
 function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): string {
   const title = textValue(document.frontmatter.title)?.trim()
   if (title) return title
 
-  const heading = document.nodes.find(node => Array.isArray(node) && node[0] === "h1")
+  const heading = document.nodes.find((node) => Array.isArray(node) && node[0] === "h1")
   return (heading && textContent(heading).trim()) || "Untitled document"
 }
 
@@ -66,8 +68,7 @@ function supersedesHref(input: unknown): string | undefined {
   try {
     const url = new URL(value)
     if (["http:", "https:"].includes(url.protocol)) return url.href
-  }
-  catch {}
+  } catch {}
 }
 
 const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render }) => {
@@ -88,7 +89,7 @@ function createMermaidRenderer(): NodeHandler {
     if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback
 
     const rendered = Mermaid(node)
-    return rendered.startsWith("<div class=\"mermaid\">")
+    return rendered.startsWith('<div class="mermaid">')
       ? rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
       : fallback
   }
@@ -107,10 +108,12 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
   try {
     const document = await parseMarkdown(markdown)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
-    const revision = supersedes ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>` : ""
+    const revision = supersedes
+      ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
+      : ""
     const issues = document.meta.annotateIssues ?? []
     const problems = issues.length
-      ? `<aside class="render-error"><p>This document's annotated screenshots have ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
+      ? `<aside class="render-error"><p>This document's annotated screenshots have ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
       : ""
     const content = await renderHtmlFromDocument(document, {
       components: {
@@ -124,11 +127,16 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
         warning: renderCallout,
       },
     })
-    return { title: documentTitle(document), html: revision + problems + (content || "<p class=\"empty-document\">This document is empty.</p>") }
-  }
-  catch (error) {
+    return {
+      title: documentTitle(document),
+      html: revision + problems + (content || '<p class="empty-document">This document is empty.</p>'),
+    }
+  } catch (error) {
     log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })
-    return { title: "Untitled document", html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>` }
+    return {
+      title: "Untitled document",
+      html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>`,
+    }
   }
 }
 
@@ -139,7 +147,12 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
 export const renderMarkdownCached = (key: string, markdown: () => Promise<string>, event?: H3Event) =>
   cachedMarkdown(key, markdown, renderMarkdownBody, event)
 
-export async function renderMarkdownDocument(markdown: () => Promise<string>, pathname: string, key: string, event?: H3Event): Promise<string> {
+export async function renderMarkdownDocument(
+  markdown: () => Promise<string>,
+  pathname: string,
+  key: string,
+  event?: H3Event,
+): Promise<string> {
   const { title, html: body } = await renderMarkdownCached(key, markdown, event)
   return `<!doctype html>
 <html lang="en">

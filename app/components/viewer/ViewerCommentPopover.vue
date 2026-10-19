@@ -8,7 +8,14 @@ import type { DropComment } from "#shared/types"
 
 type PendingComment = Omit<CommentInput, "body">
 
-const props = defineProps<{ x: number; y: number; pending?: PendingComment; comment?: DropComment; canManage: boolean; canReply: boolean }>()
+const props = defineProps<{
+  x: number
+  y: number
+  pending?: PendingComment
+  comment?: DropComment
+  canManage: boolean
+  canReply: boolean
+}>()
 const emit = defineEmits<{
   submit: [body: string]
   cancel: []
@@ -51,7 +58,18 @@ const thread = useTemplateRef("thread")
 const mayDelete = computed(() => Boolean(props.comment && (props.canManage || props.comment.mine)))
 const menu = computed<DropdownMenuItem[][]>(() => [
   [{ label: "Copy link", icon: "i-ph-link", onSelect: () => props.comment && emit("copyLink", props.comment) }],
-  ...(mayDelete.value ? [[{ label: "Delete thread", icon: "i-ph-trash", color: "error" as const, onSelect: () => props.comment && emit("delete", props.comment.id) }]] : []),
+  ...(mayDelete.value
+    ? [
+        [
+          {
+            label: "Delete thread",
+            icon: "i-ph-trash",
+            color: "error" as const,
+            onSelect: () => props.comment && emit("delete", props.comment.id),
+          },
+        ],
+      ]
+    : []),
 ])
 </script>
 
@@ -71,14 +89,24 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         autoresize
         class="flex-1"
         :maxrows="6"
-        :placeholder="pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'"
+        :placeholder="
+          pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'
+        "
         :rows="1"
         :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
         variant="none"
         @keydown.enter.exact.prevent="send"
         @keydown.esc="emit('cancel')"
       />
-      <UButton aria-label="Send comment" class="size-8 justify-center rounded-full" color="neutral" :disabled="!body.trim()" icon="i-ph-arrow-up" :loading="busy" @click="send" />
+      <UButton
+        aria-label="Send comment"
+        class="size-8 justify-center rounded-full"
+        color="neutral"
+        :disabled="!body.trim()"
+        icon="i-ph-arrow-up"
+        :loading="busy"
+        @click="send"
+      />
     </div>
     <template v-else-if="comment">
       <div class="flex h-10 shrink-0 items-center gap-1 border-b border-default pr-1.5 pl-3">
@@ -104,7 +132,9 @@ const menu = computed<DropdownMenuItem[][]>(() => [
       <div ref="thread" class="min-h-0 flex-1 divide-y divide-default overflow-y-auto">
         <div class="space-y-2 px-3 py-3">
           <ViewerCommentHeader :comment="comment" :numbered="false" />
-          <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">{{ comment.quote }}</p>
+          <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
+            {{ comment.quote }}
+          </p>
           <p class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
         </div>
         <div v-for="reply in comment.replies" :key="reply.id" class="group space-y-1.5 px-3 py-3">
@@ -142,7 +172,15 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           @keydown.enter.exact.prevent="send"
           @keydown.esc="emit('cancel')"
         />
-        <UButton aria-label="Send reply" class="size-8 justify-center rounded-full" color="neutral" :disabled="!body.trim()" icon="i-ph-arrow-up" :loading="busy" @click="send" />
+        <UButton
+          aria-label="Send reply"
+          class="size-8 justify-center rounded-full"
+          color="neutral"
+          :disabled="!body.trim()"
+          icon="i-ph-arrow-up"
+          :loading="busy"
+          @click="send"
+        />
       </div>
     </template>
   </div>

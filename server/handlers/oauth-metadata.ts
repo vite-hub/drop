@@ -15,11 +15,14 @@ export default defineHandler(async (event) => {
     const response = mcpFor(event.url.origin).oauth.metadataHandler(event)
     if (response.status === 204) return response
     // Clients need Drop's display name before they have an access token.
-    return Response.json({
-      ...await response.json(),
-      resource_name: MCP_SERVER_INFO.title,
-      resource_documentation: `${event.url.origin}/docs/agents`,
-    }, { headers: response.headers })
+    return Response.json(
+      {
+        ...(await response.json()),
+        resource_name: MCP_SERVER_INFO.title,
+        resource_documentation: `${event.url.origin}/docs/agents`,
+      },
+      { headers: response.headers },
+    )
   }
   const auth = authFor(event)
   if (path.startsWith("/.well-known/openid-configuration")) return oauthProviderOpenIdConfigMetadata(auth)(event.req)

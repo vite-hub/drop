@@ -50,20 +50,37 @@ export function isHumanVisit(headers: Headers, kind: "beacon" | "document") {
  * that takes an explicit renew. A drop in a folder, or a file a doc embeds, lives as long as the node at the top, so
  * the visit renews that one (its window is the one `row` carries, see ./nodes).
  */
-export async function recordVisit(event: H3Event, row: ExpiryFields & { id: string; ownerId: string; quarantinedAt: number | null; trashedAt: number | null; ancestors?: { id: string; ownerId: string }[] }, who: Identity | null, kind: "beacon" | "document") {
+export async function recordVisit(
+  event: H3Event,
+  row: ExpiryFields & {
+    id: string
+    ownerId: string
+    quarantinedAt: number | null
+    trashedAt: number | null
+    ancestors?: { id: string; ownerId: string }[]
+  },
+  who: Identity | null,
+  kind: "beacon" | "document",
+) {
   const now = Date.now()
   const { days } = expiryPolicy(event)
   if (!days || row.lifetime === "keep" || row.trashedAt || row.quarantinedAt || isExpired(row, now, days)) return
   if ((row.lastAccessedAt ?? row.createdAt) > now - DAY_MS) return
   if (!who && !isHumanVisit(event.req.headers, kind)) return
   try {
-    await renewDrop(row.ancestors?.at(-1) ?? row, now, sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt}) <= ${now - DAY_MS}`)
-  }
-  catch (error) {
+    await renewDrop(
+      row.ancestors?.at(-1) ?? row,
+      now,
+      sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt}) <= ${now - DAY_MS}`,
+    )
+  } catch (error) {
     log.error({ action: "drop-visit", error: String(error) })
   }
 }
 
 /** Starts a fresh window for every version of the drop. */
 export const renewDrop = (row: { id: string; ownerId: string }, now = Date.now(), when = sql`1`) =>
-  db.update(drops).set({ lastAccessedAt: now }).where(and(sql`${drops.id} IN (${chainOf(row)})`, when))
+  db
+    .update(drops)
+    .set({ lastAccessedAt: now })
+    .where(and(sql`${drops.id} IN (${chainOf(row)})`, when))

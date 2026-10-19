@@ -26,37 +26,57 @@ const TEXT_KINDS = new Set(["markdown", "html"])
  * Reuse the joined owner for review policy so each lookup remains one query, plus one for the ancestors of a drop in a
  * folder or a file a doc embeds: it is shared, kept, and trashed with them (see ./nodes).
  */
-async function withOwnerAccess(row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined, event?: H3Event): Promise<DropRow | null> {
+async function withOwnerAccess(
+  row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined,
+  event?: H3Event,
+): Promise<DropRow | null> {
   if (!row) return null
   const ancestors = row.drop.parentId ? (await ancestorsOf([row.drop])).get(row.drop.id)! : []
-  const drop: DropRow = { ...resolveNode(row.drop, ancestors, expiryPolicy(event).days), ownerBanned: !row.owner || Boolean(row.owner.banned) }
-  if (event && drop.shareReview && await shareReviewFor(drop.ownerId, event, row.owner) === null) drop.shareReview = null
+  const drop: DropRow = {
+    ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
+    ownerBanned: !row.owner || Boolean(row.owner.banned),
+  }
+  if (event && drop.shareReview && (await shareReviewFor(drop.ownerId, event, row.owner)) === null)
+    drop.shareReview = null
   return drop
 }
 
 /** Rows as their ancestors make them, with one ancestor query per 90 rows. */
 async function resolveRows(rows: (typeof drops.$inferSelect)[], days: number) {
   const ancestors = await ancestorsOf(rows)
-  return rows.map(row => resolveNode(row, ancestors.get(row.id) ?? [], days))
+  return rows.map((row) => resolveNode(row, ancestors.get(row.id) ?? [], days))
 }
 
 /**
  * Listed rows as summaries: app paths for the owner's apps, how many drops each folder holds, image thumbnails, with
  * `path` the folders each one sits in, up to (not including) `below`, and a search's snippets.
  */
-async function summarize(rows: DropRow[], days: number, options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {}) {
+async function summarize(
+  rows: DropRow[],
+  days: number,
+  options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {},
+) {
   // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
-  const files = options.ownerId && rows.some(row => row.kind === "app")
-    ? await db.select({ dropId: dropFiles.dropId, path: dropFiles.path }).from(dropFiles).innerJoin(dropHeads, eq(dropHeads.dropId, dropFiles.dropId)).where(eq(dropHeads.ownerId, options.ownerId))
-    : []
-  const pathsOf = (id: string) => files.filter(file => file.dropId === id).map(file => file.path).sort()
-  const counts = await itemCounts(rows.flatMap(row => (row.kind === "folder" ? [row.id] : [])))
+  const files =
+    options.ownerId && rows.some((row) => row.kind === "app")
+      ? await db
+          .select({ dropId: dropFiles.dropId, path: dropFiles.path })
+          .from(dropFiles)
+          .innerJoin(dropHeads, eq(dropHeads.dropId, dropFiles.dropId))
+          .where(eq(dropHeads.ownerId, options.ownerId))
+      : []
+  const pathsOf = (id: string) =>
+    files
+      .filter((file) => file.dropId === id)
+      .map((file) => file.path)
+      .sort()
+  const counts = await itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : [])))
   const pathOf = (row: DropRow) => {
     const above = row.ancestors ?? []
-    const stop = options.below ? above.findIndex(node => node.id === options.below) : -1
+    const stop = options.below ? above.findIndex((node) => node.id === options.below) : -1
     return (stop === -1 ? above : above.slice(0, stop)).map(toCrumb).reverse()
   }
-  return rows.map(row => ({
+  return rows.map((row) => ({
     ...toSummary(row, row.kind === "app" ? pathsOf(row.id) : undefined, days),
     ...(row.kind === "folder" ? { items: counts.get(row.id) ?? 0 } : {}),
     ...(row.kind === "image" && row.blobKey ? { thumbnail: `/f/${row.blobKey}` } : {}),
@@ -65,20 +85,31 @@ async function summarize(rows: DropRow[], days: number, options: { ownerId?: str
   }))
 }
 
-const heads = (where: SQL | undefined, limit: number) => db.select({ drop: drops }).from(dropHeads).innerJoin(drops, eq(drops.id, dropHeads.dropId))
-  .where(where).orderBy(desc(dropHeads.updatedAt)).limit(limit).then(rows => rows.map(row => row.drop))
+const heads = (where: SQL | undefined, limit: number) =>
+  db
+    .select({ drop: drops })
+    .from(dropHeads)
+    .innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .where(where)
+    .orderBy(desc(dropHeads.updatedAt))
+    .limit(limit)
+    .then((rows) => rows.map((row) => row.drop))
 
 /** Latest versions in `where`, or with words the ones matching them (name or text), and each match's snippet. */
 async function headsMatching(where: SQL | undefined, words: string[], limit: number) {
   if (!words.length) return { rows: await heads(where, limit), snippets: undefined }
   const found = await searchHeads(where, words, limit)
-  return { rows: found.map(item => item.drop), snippets: new Map(found.map(item => [item.drop.id, item.snippet])) }
+  return { rows: found.map((item) => item.drop), snippets: new Map(found.map((item) => [item.drop.id, item.snippet])) }
 }
 
 /** A drop by its id, or by its share link's key: the doc's latest version. */
 export async function findDrop(id: string, event?: H3Event) {
-  const [row] = await db.select({ drop: drops, owner: user }).from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.id, id)).limit(1)
+  const [row] = await db
+    .select({ drop: drops, owner: user })
+    .from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId))
+    .where(eq(drops.id, id))
+    .limit(1)
   return row ? withOwnerAccess(row, event) : findDropByLink(id, undefined, event)
 }
 
@@ -99,8 +130,12 @@ export async function findDropByLink(link: string, version?: number, event?: H3E
 }
 
 export async function findDropByBlob(key: string, event?: H3Event) {
-  const [row] = await db.select({ drop: drops, owner: user }).from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId)).where(eq(drops.blobKey, key)).limit(1)
+  const [row] = await db
+    .select({ drop: drops, owner: user })
+    .from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId))
+    .where(eq(drops.blobKey, key))
+    .limit(1)
   return withOwnerAccess(row, event)
 }
 
@@ -109,14 +144,22 @@ export async function findDropByBlob(key: string, event?: H3Event) {
  * matches at any depth. Older versions of a doc hide behind their latest, and files a doc embeds hide behind the doc.
  * A folder in the Trash takes its drops along, so only the top-most node in the Trash lists.
  */
-export async function listDrops(who: Identity, event?: H3Event, options: { trash?: boolean; query?: string; limit?: number } = {}): Promise<DropSummary[]> {
+export async function listDrops(
+  who: Identity,
+  event?: H3Event,
+  options: { trash?: boolean; query?: string; limit?: number } = {},
+): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
   // The team's folders list for everyone (listSharedWithMe), not as their creator's.
-  const scope = options.trash ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt))) : words.length ? listedNode : and(isNull(drops.parentId), eq(drops.teamFolder, false))
+  const scope = options.trash
+    ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt)))
+    : words.length
+      ? listedNode
+      : and(isNull(drops.parentId), eq(drops.teamFolder, false))
   const found = await headsMatching(and(eq(dropHeads.ownerId, who.userId), scope), words, options.limit ?? 500)
   const rows = await resolveRows(found.rows, days)
-  const listed = rows.filter(row => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
+  const listed = rows.filter((row) => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
   return summarize(listed, days, { ownerId: who.userId, path: words.length > 0, snippets: found.snippets })
 }
 
@@ -125,7 +168,11 @@ export async function listDrops(who: Identity, event?: H3Event, options: { trash
  * moved to the Trash on their own list there instead. Anyone who may open the folder may open what it holds. A team
  * folder holds everyone's drops; any other folder only its owner's.
  */
-export async function listFolder(folder: DropRow, event?: H3Event, options: { query?: string; who?: Identity | null } = {}): Promise<DropSummary[]> {
+export async function listFolder(
+  folder: DropRow,
+  event?: H3Event,
+  options: { query?: string; who?: Identity | null } = {},
+): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
   const inside = words.length ? inArray(drops.parentId, foldersUnder(folder.id)) : eq(drops.parentId, folder.id)
@@ -133,19 +180,31 @@ export async function listFolder(folder: DropRow, event?: H3Event, options: { qu
   const found = await headsMatching(and(owned, inside, isNull(drops.trashedAt)), words, words.length ? 200 : 500)
   // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
   const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
-  const rows = words.length ? await resolveRows(found.rows, days) : found.rows.map(row => resolveNode(row, above, days))
+  const rows = words.length
+    ? await resolveRows(found.rows, days)
+    : found.rows.map((row) => resolveNode(row, above, days))
   // The owner may open a folder in the Trash, and sees what it holds as it was.
-  const listed = rows.filter(row => folder.expired || !row.expired).map(row => ({ ...row, ownerBanned: folder.ownerBanned }))
-  const summaries = await summarize(listed, days, { ownerId: folder.teamFolder ? undefined : folder.ownerId, path: words.length > 0, below: folder.id, snippets: found.snippets })
+  const listed = rows
+    .filter((row) => folder.expired || !row.expired)
+    .map((row) => ({ ...row, ownerBanned: folder.ownerBanned }))
+  const summaries = await summarize(listed, days, {
+    ownerId: folder.teamFolder ? undefined : folder.ownerId,
+    path: words.length > 0,
+    below: folder.id,
+    snippets: found.snippets,
+  })
   if (!folder.teamFolder) return summaries
   // A team folder holds everyone's drops: each says whose it is, unless it's the reader's own.
-  const ownerIds = [...new Set(listed.map(row => row.ownerId).filter(id => id !== options.who?.userId))]
+  const ownerIds = [...new Set(listed.map((row) => row.ownerId).filter((id) => id !== options.who?.userId))]
   const owners = new Map<string, { name: string; image: string | null }>()
   for (let offset = 0; offset < ownerIds.length; offset += 90)
-    for (const row of await db.select({ id: user.id, name: user.name, image: user.image }).from(user).where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
+    for (const row of await db
+      .select({ id: user.id, name: user.name, image: user.image })
+      .from(user)
+      .where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
       owners.set(row.id, { name: row.name, image: row.image })
-  const ownerOf = new Map(listed.map(row => [row.id, row.ownerId]))
-  return summaries.map(summary => {
+  const ownerOf = new Map(listed.map((row) => [row.id, row.ownerId]))
+  return summaries.map((summary) => {
     const owner = owners.get(ownerOf.get(summary.id)!)
     return owner && !summary.teamFolder ? { ...summary, owner } : summary
   })
@@ -158,8 +217,15 @@ export async function listFolder(folder: DropRow, event?: H3Event, options: { qu
 export async function listFolders(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const mine = and(eq(dropHeads.ownerId, who.userId), eq(drops.teamFolder, false))
-  const rows = await resolveRows(await heads(and(eq(drops.kind, "folder"), or(mine, eq(drops.teamFolder, true))), 500), days)
-  return summarize(rows.filter(row => !row.expired && !row.quarantinedAt), days, { path: true })
+  const rows = await resolveRows(
+    await heads(and(eq(drops.kind, "folder"), or(mine, eq(drops.teamFolder, true))), 500),
+    days,
+  )
+  return summarize(
+    rows.filter((row) => !row.expired && !row.quarantinedAt),
+    days,
+    { path: true },
+  )
 }
 
 /**
@@ -182,22 +248,40 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
   const now = Date.now()
   const team = sharePolicy(event).mode === "team"
   const others = and(ne(drops.ownerId, who.userId), reachableSql(`"drops"`, who, now, event))
-  const rows = await db.select({ drop: drops, ownerName: user.name, ownerImage: user.image }).from(drops)
-    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id)).innerJoin(user, eq(user.id, drops.ownerId))
-    .where(and(
-      team ? or(others, and(eq(drops.teamFolder, true), isNull(drops.parentId))) : others,
-      listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt),
-      sql`coalesce(${user.banned}, 0) = 0`,
-    )).orderBy(desc(drops.updatedAt)).limit(200)
+  const rows = await db
+    .select({ drop: drops, ownerName: user.name, ownerImage: user.image })
+    .from(drops)
+    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
+    .innerJoin(user, eq(user.id, drops.ownerId))
+    .where(
+      and(
+        team ? or(others, and(eq(drops.teamFolder, true), isNull(drops.parentId))) : others,
+        listedNode,
+        isNull(drops.trashedAt),
+        isNull(drops.quarantinedAt),
+        sql`coalesce(${user.banned}, 0) = 0`,
+      ),
+    )
+    .orderBy(desc(drops.updatedAt))
+    .limit(200)
   const { days } = expiryPolicy(event)
-  const ancestors = await ancestorsOf(rows.map(row => row.drop))
-  const listed = new Set(rows.map(row => row.drop.id))
-  const owners = new Map(rows.map(row => [row.drop.id, { name: row.ownerName, image: row.ownerImage }]))
-  const nodes = rows.map(row => resolveNode(row.drop, ancestors.get(row.drop.id) ?? [], days, now))
-    .filter(node => !node.expired && !node.quarantinedAt && (team || !node.shareReview)
-      && !node.ancestors!.some(above => listed.has(above.id) || (team && shareNow(above, now) !== "private")))
+  const ancestors = await ancestorsOf(rows.map((row) => row.drop))
+  const listed = new Set(rows.map((row) => row.drop.id))
+  const owners = new Map(rows.map((row) => [row.drop.id, { name: row.ownerName, image: row.ownerImage }]))
+  const nodes = rows
+    .map((row) => resolveNode(row.drop, ancestors.get(row.drop.id) ?? [], days, now))
+    .filter(
+      (node) =>
+        !node.expired &&
+        !node.quarantinedAt &&
+        (team || !node.shareReview) &&
+        !node.ancestors!.some((above) => listed.has(above.id) || (team && shareNow(above, now) !== "private")),
+    )
     .sort((a, b) => Number(b.teamFolder) - Number(a.teamFolder))
-  return (await summarize(nodes, days)).map(summary => ({ ...summary, ...(summary.teamFolder ? {} : { owner: owners.get(summary.id)! }) }))
+  return (await summarize(nodes, days)).map((summary) => ({
+    ...summary,
+    ...(summary.teamFolder ? {} : { owner: owners.get(summary.id)! }),
+  }))
 }
 
 /**
@@ -217,49 +301,86 @@ async function searchShared(who: Identity, words: string[], limit: number, event
       UNION ALL SELECT d.id, open.depth + 1 FROM drops d JOIN open ON d.parent_id = open.id WHERE d.kind = 'folder' AND open.depth < ${MAX_DEPTH}
     ) SELECT id FROM open
   )`
-  const found = await searchHeads(and(
-    ne(dropHeads.ownerId, who.userId), listedNode, isNull(drops.trashedAt), isNull(drops.quarantinedAt), team ? undefined : isNull(drops.shareReview),
-    or(reachable(`"drops"`), inArray(drops.parentId, openFolders)),
-    sql`EXISTS (SELECT 1 FROM user u WHERE u.id = ${drops.ownerId} AND coalesce(u.banned, 0) = 0)`,
-  ), words, limit)
+  const found = await searchHeads(
+    and(
+      ne(dropHeads.ownerId, who.userId),
+      listedNode,
+      isNull(drops.trashedAt),
+      isNull(drops.quarantinedAt),
+      team ? undefined : isNull(drops.shareReview),
+      or(reachable(`"drops"`), inArray(drops.parentId, openFolders)),
+      sql`EXISTS (SELECT 1 FROM user u WHERE u.id = ${drops.ownerId} AND coalesce(u.banned, 0) = 0)`,
+    ),
+    words,
+    limit,
+  )
   const { days } = expiryPolicy(event)
   // Review, quarantine and the Trash anywhere above hold a drop too: resolving its path says.
-  const nodes = (await resolveRows(found.map(item => item.drop), days)).filter(node => !node.expired && !node.quarantinedAt && permissions(node, who).view)
-  const ownerIds = [...new Set(nodes.map(node => node.ownerId))]
+  const nodes = (
+    await resolveRows(
+      found.map((item) => item.drop),
+      days,
+    )
+  ).filter((node) => !node.expired && !node.quarantinedAt && permissions(node, who).view)
+  const ownerIds = [...new Set(nodes.map((node) => node.ownerId))]
   const owners = new Map<string, { name: string; image: string | null }>()
   for (let offset = 0; offset < ownerIds.length; offset += 90)
-    for (const row of await db.select({ id: user.id, name: user.name, image: user.image }).from(user).where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
+    for (const row of await db
+      .select({ id: user.id, name: user.name, image: user.image })
+      .from(user)
+      .where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
       owners.set(row.id, { name: row.name, image: row.image })
-  const byId = new Map(nodes.map(node => [node.id, node]))
-  const summaries = await summarize(nodes, days, { snippets: new Map(found.map(item => [item.drop.id, item.snippet])) })
-  return summaries.map(summary => ({ ...summary, path: openableAncestors(byId.get(summary.id)!, who, days), owner: owners.get(byId.get(summary.id)!.ownerId)! }))
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const summaries = await summarize(nodes, days, {
+    snippets: new Map(found.map((item) => [item.drop.id, item.snippet])),
+  })
+  return summaries.map((summary) => ({
+    ...summary,
+    path: openableAncestors(byId.get(summary.id)!, who, days),
+    owner: owners.get(byId.get(summary.id)!.ownerId)!,
+  }))
 }
 
 /**
  * Everything you can open that matches a search, for the search palette: your drops at any depth first, then other
  * people's (see `searchShared`). Each list keeps its newest `limit`.
  */
-export async function searchEverything(who: Identity, query: string, event?: H3Event, limit = 30): Promise<DropSummary[]> {
+export async function searchEverything(
+  who: Identity,
+  query: string,
+  event?: H3Event,
+  limit = 30,
+): Promise<DropSummary[]> {
   const words = searchWords(query)
   if (!words.length) return []
-  return [...await listDrops(who, event, { query, limit }), ...await searchShared(who, words, limit, event)]
+  return [...(await listDrops(who, event, { query, limit })), ...(await searchShared(who, words, limit, event))]
 }
 
 /** Remembers a public drop a signed-in person opened, at most once a day per drop. */
 export async function recordSharedVisit(drop: DropRow, who: Identity | null) {
-  if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || !isPublic(drop.share) || isAttachment(drop)) return
+  if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || !isPublic(drop.share) || isAttachment(drop))
+    return
   const at = Date.now()
   try {
-    await db.insert(dropVisits).values({ userId: who.userId, dropId: drop.id, at })
-      .onConflictDoUpdate({ target: [dropVisits.userId, dropVisits.dropId], set: { at }, setWhere: lte(dropVisits.at, at - DAY_MS) })
-  }
-  catch (error) {
+    await db
+      .insert(dropVisits)
+      .values({ userId: who.userId, dropId: drop.id, at })
+      .onConflictDoUpdate({
+        target: [dropVisits.userId, dropVisits.dropId],
+        set: { at },
+        setWhere: lte(dropVisits.at, at - DAY_MS),
+      })
+  } catch (error) {
     log.error({ action: "drop-shared-visit", error: String(error) })
   }
 }
 
 export function storageFailure(error: Error) {
-  log.error({ action: "storage", error: error.message, cause: error.cause instanceof Error ? error.cause.message : error.cause })
+  log.error({
+    action: "storage",
+    error: error.message,
+    cause: error.cause instanceof Error ? error.cause.message : error.cause,
+  })
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 
@@ -281,7 +402,13 @@ async function readBytes(key: string) {
 
 export async function versionChain(row: DropRow) {
   // Follow indexed parent/child links, retaining the existing 50 older / 100 total view bounds.
-  const docs = await db.select().from(drops).where(inArray(drops.id, sql`(
+  const docs = await db
+    .select()
+    .from(drops)
+    .where(
+      inArray(
+        drops.id,
+        sql`(
     WITH RECURSIVE
     older(id, supersedes_id, depth) AS (
       SELECT id, supersedes_id, 0 FROM drops WHERE id = ${row.id} AND owner_id = ${row.ownerId}
@@ -297,11 +424,18 @@ export async function versionChain(row: DropRow) {
     )
     SELECT id FROM older UNION SELECT id FROM newer
   )
-  `))
-  const byId = new Map(docs.map(doc => [doc.id, doc]))
-  const next = new Map(docs.filter(doc => doc.supersedesId).map(doc => [doc.supersedesId!, doc]))
+  `,
+      ),
+    )
+  const byId = new Map(docs.map((doc) => [doc.id, doc]))
+  const next = new Map(docs.filter((doc) => doc.supersedesId).map((doc) => [doc.supersedesId!, doc]))
   const chain = [byId.get(row.id) ?? row]
-  for (let older = chain[0]!.supersedesId; older && byId.has(older) && chain.length < 50; older = byId.get(older)!.supersedesId) chain.push(byId.get(older)!)
+  for (
+    let older = chain[0]!.supersedesId;
+    older && byId.has(older) && chain.length < 50;
+    older = byId.get(older)!.supersedesId
+  )
+    chain.push(byId.get(older)!)
   for (let newer = next.get(row.id); newer && chain.length < 100; newer = next.get(newer.id)) chain.unshift(newer)
   return chain
 }
@@ -312,16 +446,34 @@ export async function versionChain(row: DropRow) {
  * continues the latest text.
  */
 export function liveEditable(row: DropRow, who: Identity | null, versions: DropVersion[]) {
-  return LIVE_EDITING && who?.actorKind === "browser" && permissions(row, who).edit
-    && row.kind === "markdown" && versions[0]?.id === row.id
+  return (
+    LIVE_EDITING &&
+    who?.actorKind === "browser" &&
+    permissions(row, who).edit &&
+    row.kind === "markdown" &&
+    versions[0]?.id === row.id
+  )
 }
 
 /** The version chain, newest first. */
 export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
-  return (await versionChain(row)).map(item => ({ id: item.id, title: item.title, version: item.version, createdAt: item.createdAt, note: item.note, actorName: item.actorName, current: item.id === row.id }))
+  return (await versionChain(row)).map((item) => ({
+    id: item.id,
+    title: item.title,
+    version: item.version,
+    createdAt: item.createdAt,
+    note: item.note,
+    actorName: item.actorName,
+    current: item.id === row.id,
+  }))
 }
 
-export async function dropDetail(row: DropRow, who: Identity | null, origin: string, event?: H3Event): Promise<DropDetail> {
+export async function dropDetail(
+  row: DropRow,
+  who: Identity | null,
+  origin: string,
+  event?: H3Event,
+): Promise<DropDetail> {
   const can = permissions(row, who)
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
@@ -341,10 +493,11 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
   }
   if (row.kind === "app") {
     const files = await db.select().from(dropFiles).where(eq(dropFiles.dropId, row.id))
-    detail.files = Object.fromEntries(await Promise.all(files.map(async file => [file.path, await readText(file.blobKey)] as const)))
-    detail.paths = files.map(file => file.path).sort()
-  }
-  else if (row.blobKey) {
+    detail.files = Object.fromEntries(
+      await Promise.all(files.map(async (file) => [file.path, await readText(file.blobKey)] as const)),
+    )
+    detail.paths = files.map((file) => file.path).sort()
+  } else if (row.blobKey) {
     if (row.kind === "markdown") {
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
@@ -353,8 +506,7 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
         detail.canEdit = false
         detail.editNote = "This doc uses Comark components, which the editor can't keep yet."
       }
-    }
-    else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
+    } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
       const key = row.blobKey
@@ -373,12 +525,28 @@ export async function dropDetail(row: DropRow, who: Identity | null, origin: str
  */
 function openableAncestors(row: DropRow, who: Identity | null, days: number): DropCrumb[] {
   const above = row.ancestors ?? []
-  return above.filter((node, index) => permissions({ ...resolveNode(node, above.slice(index + 1), days), ownerBanned: row.ownerBanned }, who).view)
-    .map(toCrumb).reverse()
+  return above
+    .filter(
+      (node, index) =>
+        permissions({ ...resolveNode(node, above.slice(index + 1), days), ownerBanned: row.ownerBanned }, who).view,
+    )
+    .map(toCrumb)
+    .reverse()
 }
 
 /** Files a doc embeds from this Drop, across every version of the doc. */
 async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachment[]> {
-  const rows = await db.select().from(drops).where(and(sql`${drops.parentId} IN (${chainOf(row)})`, isNotNull(drops.blobKey))).limit(100)
-  return rows.map(item => ({ id: item.id, kind: item.kind, title: item.title, filename: item.filename, size: item.size, url: new URL(`/f/${item.blobKey}`, origin).href }))
+  const rows = await db
+    .select()
+    .from(drops)
+    .where(and(sql`${drops.parentId} IN (${chainOf(row)})`, isNotNull(drops.blobKey)))
+    .limit(100)
+  return rows.map((item) => ({
+    id: item.id,
+    kind: item.kind,
+    title: item.title,
+    filename: item.filename,
+    size: item.size,
+    url: new URL(`/f/${item.blobKey}`, origin).href,
+  }))
 }

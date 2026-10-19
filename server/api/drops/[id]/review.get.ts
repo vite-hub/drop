@@ -8,7 +8,8 @@ import { siteItems } from "../../../utils/review"
 export default defineHandler(async (event) => {
   const drop = await findDrop(await routeId(event), event)
   const who = await identify(event)
-  if (!drop || drop.kind !== "site" || !permissions(drop, who).view) throw new HTTPError({ status: 404, statusText: "No site with that id." })
+  if (!drop || drop.kind !== "site" || !permissions(drop, who).view)
+    throw new HTTPError({ status: 404, statusText: "No site with that id." })
   event.res.headers.set("Cache-Control", "private, no-store")
   return siteItems(drop, who, event.url.origin)
 })

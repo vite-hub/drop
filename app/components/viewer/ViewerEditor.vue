@@ -13,19 +13,28 @@ const prompt = usePrompt()
 // Everyone in this Drop, for "@". Editors are always signed in. The editor only mounts in the browser, and nothing
 // waits on the list.
 const { data: members } = useMemberList()
-const people = computed(() => members.value.filter(member => !member.banned).map(member => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })))
+const people = computed(() =>
+  members.value
+    .filter((member) => !member.banned)
+    .map((member) => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })),
+)
 
 // GitHub's emoji set, loaded with the editor rather than with the page. Custom GitHub images have no character to insert.
 const emojis = shallowRef<EditorEmojiMenuItem[]>([])
 onMounted(async () => {
-  emojis.value = (await import("@tiptap/extension-emoji")).gitHubEmojis.filter(emoji => emoji.emoji)
+  emojis.value = (await import("@tiptap/extension-emoji")).gitHubEmojis.filter((emoji) => emoji.emoji)
 })
 
 async function editLink() {
   const editor = props.editor
   if (!editor) return
   const previous: string | undefined = editor.getAttributes("link").href
-  const href = await prompt({ title: previous ? "Edit link" : "Insert link", label: "URL", initial: previous ?? "", confirmLabel: previous ? "Save" : "Insert" })
+  const href = await prompt({
+    title: previous ? "Edit link" : "Insert link",
+    label: "URL",
+    initial: previous ?? "",
+    confirmLabel: previous ? "Save" : "Insert",
+  })
   if (href === null) return
   const chain = editor.chain().focus().extendMarkRange("link")
   void (href.trim() ? chain.setLink({ href: href.trim() }) : chain.unsetLink()).run()
@@ -52,18 +61,20 @@ const toolbar = computed<EditorToolbarItem[][]>(() => [
 ])
 
 // Only blocks the Realtime schema has (StarterKit, image, table): a block it lacks would vanish on the next checkpoint.
-const blocks: EditorSuggestionMenuItem[][] = [[
-  { type: "label", label: "Blocks" },
-  { kind: "paragraph", label: "Text", icon: "i-ph-text-t" },
-  { kind: "heading", level: 1, label: "Heading 1", icon: "i-ph-text-h-one" },
-  { kind: "heading", level: 2, label: "Heading 2", icon: "i-ph-text-h-two" },
-  { kind: "heading", level: 3, label: "Heading 3", icon: "i-ph-text-h-three" },
-  { kind: "bulletList", label: "Bulleted list", icon: "i-ph-list-bullets" },
-  { kind: "orderedList", label: "Numbered list", icon: "i-ph-list-numbers" },
-  { kind: "blockquote", label: "Quote", icon: "i-ph-quotes" },
-  { kind: "codeBlock", label: "Code block", icon: "i-ph-code-block" },
-  { kind: "horizontalRule", label: "Divider", icon: "i-ph-minus" },
-]]
+const blocks: EditorSuggestionMenuItem[][] = [
+  [
+    { type: "label", label: "Blocks" },
+    { kind: "paragraph", label: "Text", icon: "i-ph-text-t" },
+    { kind: "heading", level: 1, label: "Heading 1", icon: "i-ph-text-h-one" },
+    { kind: "heading", level: 2, label: "Heading 2", icon: "i-ph-text-h-two" },
+    { kind: "heading", level: 3, label: "Heading 3", icon: "i-ph-text-h-three" },
+    { kind: "bulletList", label: "Bulleted list", icon: "i-ph-list-bullets" },
+    { kind: "orderedList", label: "Numbered list", icon: "i-ph-list-numbers" },
+    { kind: "blockquote", label: "Quote", icon: "i-ph-quotes" },
+    { kind: "codeBlock", label: "Code block", icon: "i-ph-code-block" },
+    { kind: "horizontalRule", label: "Divider", icon: "i-ph-minus" },
+  ],
+]
 </script>
 
 <template>

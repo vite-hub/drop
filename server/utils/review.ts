@@ -7,7 +7,15 @@ import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { newLink, slugify } from "#shared/links"
-import { isSitePattern, REVIEW_TOKEN_HOURS, SITE_ADDRESS_RULE, siteAddress, siteAddressesFor, siteHost, siteMatches } from "#shared/review"
+import {
+  isSitePattern,
+  REVIEW_TOKEN_HOURS,
+  SITE_ADDRESS_RULE,
+  siteAddress,
+  siteAddressesFor,
+  siteHost,
+  siteMatches,
+} from "#shared/review"
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
@@ -43,15 +51,21 @@ const Choice = v.object({ c: v.string(), o: v.string(), u: v.nullable(v.string()
 type Choice = v.InferOutput<typeof Choice>
 
 const encoder = new TextEncoder()
-const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
-const unbase64url = (text: string) => Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0))
+const base64url = (bytes: Uint8Array) =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "")
+const unbase64url = (text: string) =>
+  Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (char) => char.charCodeAt(0))
 
 /** AES-GCM under the auth secret, like content-origin labels. Once ViteHub ships VITEHUB_SECRET, `deriveSecret("drop:review-token")`. */
 async function sealKey(event: H3Event) {
   // Optional: an environment without the auth secret (the tests' one) gets the 503 below, not a TypeError.
   const secret = useServerEnv(event).auth?.secret?.unseal()
   // No fallback: a known key would let anyone mint tokens.
-  if (!secret) throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
+  if (!secret)
+    throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`review-token:${secret}`))
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"])
 }
@@ -62,7 +76,13 @@ type SealPurpose = "token" | "choice" | "upload"
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(purpose) }, await sealKey(event), encoder.encode(JSON.stringify(value))))
+  const sealed = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData: encoder.encode(purpose) },
+      await sealKey(event),
+      encoder.encode(JSON.stringify(value)),
+    ),
+  )
   const bytes = new Uint8Array(iv.length + sealed.length)
   bytes.set(iv)
   bytes.set(sealed, iv.length)
@@ -70,16 +90,25 @@ export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly
 }
 
 /** The sealed value, when it was sealed for `purpose` and parses as `schema`. Null for anything else. */
-export async function unseal<T extends v.GenericSchema>(event: H3Event, purpose: SealPurpose, schema: T, text: string, maxLength = 2048): Promise<v.InferOutput<T> | null> {
+export async function unseal<T extends v.GenericSchema>(
+  event: H3Event,
+  purpose: SealPurpose,
+  schema: T,
+  text: string,
+  maxLength = 2048,
+): Promise<v.InferOutput<T> | null> {
   const [version, body, extra] = text.split(".")
   if (version !== "v2" || !body || extra !== undefined || text.length > maxLength) return null
   try {
     const bytes = unbase64url(body)
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12), additionalData: encoder.encode(purpose) }, await sealKey(event), bytes.slice(12))
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: bytes.slice(0, 12), additionalData: encoder.encode(purpose) },
+      await sealKey(event),
+      bytes.slice(12),
+    )
     const parsed = v.safeParse(schema, JSON.parse(new TextDecoder().decode(plain)))
     return parsed.success ? parsed.output : null
-  }
-  catch (error) {
+  } catch (error) {
     if (HTTPError.isError(error)) throw error
     return null
   }
@@ -97,8 +126,13 @@ export async function readReviewToken(event: H3Event, token: string, now = Date.
 }
 
 /** The handle the popup lists a site drop by: good for ten minutes, for this origin and this person only. */
-export const sealChoice = (event: H3Event, site: Pick<DropRow, "id">, origin: string, who: Identity | null, now = Date.now()) =>
-  seal(event, "choice", { c: site.id, o: origin, u: who?.userId ?? null, e: now + 600_000 } satisfies Choice)
+export const sealChoice = (
+  event: H3Event,
+  site: Pick<DropRow, "id">,
+  origin: string,
+  who: Identity | null,
+  now = Date.now(),
+) => seal(event, "choice", { c: site.id, o: origin, u: who?.userId ?? null, e: now + 600_000 } satisfies Choice)
 
 /** The site drop id behind a choice, when it was made for this origin and person and hasn't run out. */
 export async function openChoice(event: H3Event, text: string, origin: string, who: Identity | null, now = Date.now()) {
@@ -109,7 +143,14 @@ export async function openChoice(event: H3Event, text: string, origin: string, w
 /** Site drops whose address covers `origin`, found by equality: the origin itself, or the one pattern that could cover it. */
 function sitesCovering(origin: string) {
   const addresses = siteAddressesFor(origin)
-  return addresses.length ? and(eq(drops.kind, "site"), inArray(drops.siteUrl, addresses), isNull(drops.trashedAt), isNull(drops.quarantinedAt)) : null
+  return addresses.length
+    ? and(
+        eq(drops.kind, "site"),
+        inArray(drops.siteUrl, addresses),
+        isNull(drops.trashedAt),
+        isNull(drops.quarantinedAt),
+      )
+    : null
 }
 
 /**
@@ -119,12 +160,19 @@ function sitesCovering(origin: string) {
 export async function sitesFor(origin: string, who: Identity | null, event?: H3Event) {
   const where = sitesCovering(origin)
   if (!where) return []
-  const rows = await db.select({ id: drops.id, owner: user.name }).from(drops).leftJoin(user, eq(user.id, drops.ownerId))
-    .where(where).orderBy(desc(drops.updatedAt)).limit(50)
-  const found = await Promise.all(rows.map(row => findDrop(row.id, event)))
-  return found.flatMap((site, index) => site?.kind === "site" && site.siteUrl && siteMatches(site.siteUrl, origin) && permissions(site, who).comment
-    ? [{ site, owner: rows[index]!.owner ?? "" }]
-    : [])
+  const rows = await db
+    .select({ id: drops.id, owner: user.name })
+    .from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId))
+    .where(where)
+    .orderBy(desc(drops.updatedAt))
+    .limit(50)
+  const found = await Promise.all(rows.map((row) => findDrop(row.id, event)))
+  return found.flatMap((site, index) =>
+    site?.kind === "site" && site.siteUrl && siteMatches(site.siteUrl, origin) && permissions(site, who).comment
+      ? [{ site, owner: rows[index]!.owner ?? "" }]
+      : [],
+  )
 }
 
 /** Whether any site drop covers `origin`. That much is all a page learns before it has a token. */
@@ -138,7 +186,7 @@ async function covered(origin: string) {
  * link doesn't count, since finding a site by its origin is not having its link.
  */
 export function openable(site: DropRow, who: Identity | null) {
-  const grants = (site.grants ?? [{ share: site.share }]).filter(grant => !isPublic(grant.share))
+  const grants = (site.grants ?? [{ share: site.share }]).filter((grant) => !isPublic(grant.share))
   return permissions({ ...site, grants }, who).view
 }
 
@@ -151,10 +199,22 @@ async function reviewer(claims: ReviewClaims): Promise<Identity | null | false> 
   const [row] = await db.select().from(user).where(eq(user.id, claims.u)).limit(1)
   if (!row || row.banned) return false
   if (githubOrganization()) {
-    const [github] = await db.select({ token: account.accessToken }).from(account).where(and(eq(account.userId, row.id), eq(account.providerId, "github"))).limit(1)
-    if (!await isGitHubMember(github?.token)) return false
+    const [github] = await db
+      .select({ token: account.accessToken })
+      .from(account)
+      .where(and(eq(account.userId, row.id), eq(account.providerId, "github")))
+      .limit(1)
+    if (!(await isGitHubMember(github?.token))) return false
   }
-  return { userId: row.id, name: row.name, email: row.email, image: row.image ?? null, role: roleOf(row), actorKind: "browser", actorName: row.name }
+  return {
+    userId: row.id,
+    name: row.name,
+    email: row.email,
+    image: row.image ?? null,
+    role: roleOf(row),
+    actorKind: "browser",
+    actorName: row.name,
+  }
 }
 
 /**
@@ -176,15 +236,14 @@ export async function reviewSession(event: H3Event) {
     event.res.headers.set("Access-Control-Allow-Origin", origin)
     const who = await reviewer(claims)
     if (who !== false && permissions(site, who).comment) return { site, claims, who }
-  }
-  else if (await covered(origin)) event.res.headers.set("Access-Control-Allow-Origin", origin)
+  } else if (await covered(origin)) event.res.headers.set("Access-Control-Allow-Origin", origin)
   throw new HTTPError({ status: 401, statusText: "Your review session ended. Connect again to comment." })
 }
 
 /** The preflight before a review request, which carries no token yet: allowed for origins some site drop covers. */
 export async function reviewPreflight(event: H3Event) {
   const origin = event.req.headers.get("origin") ?? ""
-  if (!await covered(origin)) throw new HTTPError({ status: 404, statusText: "No site review here." })
+  if (!(await covered(origin))) throw new HTTPError({ status: 404, statusText: "No site review here." })
   return new Response(null, {
     status: 204,
     headers: {
@@ -192,7 +251,7 @@ export async function reviewPreflight(event: H3Event) {
       "Access-Control-Allow-Methods": "GET, POST",
       "Access-Control-Allow-Headers": "authorization, content-type",
       "Access-Control-Max-Age": "600",
-      "Vary": "Origin",
+      Vary: "Origin",
     },
   })
 }
@@ -210,8 +269,9 @@ export const reviewPage = (site: Pick<DropRow, "siteUrl">, origin: string, page:
  */
 export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | unknown) {
   return defineHandler(async (event) => {
-    try { return await handler(event) }
-    catch (error) {
+    try {
+      return await handler(event)
+    } catch (error) {
       if (!HTTPError.isError(error)) throw error
       const headers = new Headers({ "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" })
       for (const name of ["access-control-allow-origin", "vary"]) {
@@ -225,24 +285,58 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
 }
 
 /** A new site drop: no file, just the address people review. In a folder it lives with the folder, like any drop. */
-export async function createSiteDrop(who: Identity, input: LifetimeInput & { url: string; title?: string; slug?: string; share?: Share; folder?: DropRow }, event?: H3Event) {
+export async function createSiteDrop(
+  who: Identity,
+  input: LifetimeInput & { url: string; title?: string; slug?: string; share?: Share; folder?: DropRow },
+  event?: H3Event,
+) {
   const siteUrl = siteAddress(input.url)
   if (!siteUrl) throw new HTTPError({ status: 400, statusText: `That address can't be reviewed. ${SITE_ADDRESS_RULE}` })
-  if (event && siteCoversDrop(event, siteUrl)) throw new HTTPError({ status: 400, statusText: "That address is Drop itself or where it shows drops, which can't be a site to review." })
+  if (event && siteCoversDrop(event, siteUrl))
+    throw new HTTPError({
+      status: 400,
+      statusText: "That address is Drop itself or where it shows drops, which can't be a site to review.",
+    })
   const folder = input.folder ?? null
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
-  const { share, publicUntil } = input.share ? shareFields(input.share, { kind: "site" }, event) : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+  const { share, publicUntil } = input.share
+    ? shareFields(input.share, { kind: "site" }, event)
+    : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
   return withDropQuota(ownerId, { drops: 1, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
     const host = siteHost(siteUrl)
     const title = (input.title?.trim() || host).slice(0, 160)
     const row: DropRow = {
-      id: crypto.randomUUID(), ownerId, kind: "site", title, filename: host, blobKey: null, contentType: null, size: 0,
-      version: 1, supersedesId: null, link: newLink(), slug: await uniqueSlug(folder?.id ?? null, (input.slug && slugify(input.slug)) || slugify(title)),
-      share, publicUntil, teamFolder: false, shareReview: isPublic(share) ? await shareReviewFor(ownerId, event) : null, quarantinedAt: null,
-      actorKind: who.actorKind, actorName: who.actorName, createdAt: now, updatedAt: now, lastAccessedAt: now,
-      ...life, note: input.note?.trim() || null, trashedAt: null, trashReason: null, parentId: folder?.id ?? null, siteUrl, publishToken: null,
+      id: crypto.randomUUID(),
+      ownerId,
+      kind: "site",
+      title,
+      filename: host,
+      blobKey: null,
+      contentType: null,
+      size: 0,
+      version: 1,
+      supersedesId: null,
+      link: newLink(),
+      slug: await uniqueSlug(folder?.id ?? null, (input.slug && slugify(input.slug)) || slugify(title)),
+      share,
+      publicUntil,
+      teamFolder: false,
+      shareReview: isPublic(share) ? await shareReviewFor(ownerId, event) : null,
+      quarantinedAt: null,
+      actorKind: who.actorKind,
+      actorName: who.actorName,
+      createdAt: now,
+      updatedAt: now,
+      lastAccessedAt: now,
+      ...life,
+      note: input.note?.trim() || null,
+      trashedAt: null,
+      trashReason: null,
+      parentId: folder?.id ?? null,
+      siteUrl,
+      publishToken: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     return row
@@ -254,8 +348,8 @@ export type Screenshot = { bytes: Uint8Array; contentType: "image/png" | "image/
 /** The image's real type from its first bytes, whatever the page claimed. Only the three a browser canvas makes. */
 function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | null {
   const at = (offset: number, ...values: number[]) => values.every((value, index) => bytes[offset + index] === value)
-  if (at(0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) return "image/png"
-  if (at(0, 0xFF, 0xD8, 0xFF)) return "image/jpeg"
+  if (at(0, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png"
+  if (at(0, 0xff, 0xd8, 0xff)) return "image/jpeg"
   if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return "image/webp"
   return null
 }
@@ -267,27 +361,36 @@ const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "web
  * script on the site and Drop's own embedded review send it. The screenshot is checked by its bytes, not its claimed
  * type, and at most 4 MiB.
  */
-export async function readReviewComment(event: H3Event): Promise<{ input: ReviewCommentInput; shot: Screenshot | null }> {
+export async function readReviewComment(
+  event: H3Event,
+): Promise<{ input: ReviewCommentInput; shot: Screenshot | null }> {
   if (Number(event.req.headers.get("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024)
     throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
   let form: FormData
-  try { form = await event.req.formData() }
-  catch { throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." }) }
+  try {
+    form = await event.req.formData()
+  } catch {
+    throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." })
+  }
   const data = form.get("data")
   let input: ReviewCommentInput
-  try { input = v.parse(ReviewCommentSchema, JSON.parse(textValue(data) ?? "")) }
-  catch (error) { throw new HTTPError({ status: 400, statusText: v.isValiError(error) ? error.message : "The comment is missing." }) }
+  try {
+    input = v.parse(ReviewCommentSchema, JSON.parse(textValue(data) ?? ""))
+  } catch (error) {
+    throw new HTTPError({ status: 400, statusText: v.isValiError(error) ? error.message : "The comment is missing." })
+  }
 
   const file = form.get("screenshot")
   if (file === null) return { input, shot: null }
   if (!(file instanceof File)) throw new HTTPError({ status: 400, statusText: "The screenshot must be a file." })
-  if (file.size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
+  if (file.size > MAX_FILE_BYTES)
+    throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
   const bytes = new Uint8Array(await file.arrayBuffer())
   const contentType = screenshotType(bytes)
-  if (!contentType) throw new HTTPError({ status: 400, statusText: "The screenshot must be a PNG, JPEG, or WebP image." })
+  if (!contentType)
+    throw new HTTPError({ status: 400, statusText: "The screenshot must be a PNG, JPEG, or WebP image." })
   return { input, shot: { bytes, contentType } }
 }
-
 
 /**
  * Stores what someone sent from the site. With a screenshot, the screenshot becomes a private image of the site (like
@@ -298,60 +401,145 @@ export async function readReviewComment(event: H3Event): Promise<{ input: Review
  * the comment lists show. The comment's own `selector` is its anchor in Drop: the screenshot (`body > img` in the
  * image view), or the element itself on the site. `origin` is the page's, from its token.
  */
-export async function addReviewComment(site: DropRow, author: { who: Identity | null; name: string }, input: ReviewCommentInput, shot: Screenshot | null, origin: string) {
+export async function addReviewComment(
+  site: DropRow,
+  author: { who: Identity | null; name: string },
+  input: ReviewCommentInput,
+  shot: Screenshot | null,
+  origin: string,
+) {
   const now = Date.now()
   const fields = {
-    id: crypto.randomUUID(), body: input.body, page: reviewPage(site, origin, input.page), ox: input.ox, oy: input.oy, ow: input.ow, oh: input.oh,
-    label: input.selector || null, quote: input.label || null,
-    authorId: author.who?.userId ?? null, authorName: author.name, resolved: false, createdAt: now,
+    id: crypto.randomUUID(),
+    body: input.body,
+    page: reviewPage(site, origin, input.page),
+    ox: input.ox,
+    oy: input.oy,
+    ow: input.ow,
+    oh: input.oh,
+    label: input.selector || null,
+    quote: input.label || null,
+    authorId: author.who?.userId ?? null,
+    authorName: author.name,
+    resolved: false,
+    createdAt: now,
   }
   if (!shot) {
-    const [row] = await db.insert(comments).values({ ...fields, dropId: site.id, n: nextCommentNumber(site), kind: "area", selector: input.selector || "body" }).returning()
+    const [row] = await db
+      .insert(comments)
+      .values({
+        ...fields,
+        dropId: site.id,
+        n: nextCommentNumber(site),
+        kind: "area",
+        selector: input.selector || "body",
+      })
+      .returning()
     return row!
   }
   // The site's owner pays for the bytes, as for anything else in their drops. No publish burst: the route's own rate
   // limit is per reviewer, and reviewers shouldn't use up the owner's agents' publishes.
-  return withDropQuota(site.ownerId, { drops: 0, bytes: shot.bytes.byteLength, writes: 1 }, undefined, async (quota) => {
-    const id = crypto.randomUUID()
-    const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
-    const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
-    if (storageError) {
-      log.error({ action: "review-screenshot", error: storageError.message })
-      throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
-    }
-    const path = input.page.replace(/[?#].*$/, "") || "/"
-    const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
-    const image: DropRow = {
-      id, ownerId: site.ownerId, kind: "image", title: `Screenshot of ${where}`.slice(0, 160), filename: `screenshot.${EXTENSIONS[shot.contentType]}`,
-      blobKey: key, contentType: shot.contentType, size: shot.bytes.byteLength, version: 1, supersedesId: null, link: newLink(), slug: "screenshot",
-      share: "private", publicUntil: null, teamFolder: false, shareReview: null, quarantinedAt: null, actorKind: "browser", actorName: author.name,
-      createdAt: now, updatedAt: now, lastAccessedAt: now, lifetime: "review", keepReason: null,
-      note: `${input.viewport.width}x${input.viewport.height} viewport`, trashedAt: null, trashReason: null, parentId: site.id, siteUrl: null, publishToken: null,
-    }
-    try {
-      await quota.commit([
-        db.insert(drops).values(image),
-        db.insert(comments).values({ ...fields, dropId: id, n: nextCommentNumber(image), kind: "image", selector: "body > img" }),
-      ])
-    }
-    catch (error) {
-      await blob.del([key])
-      throw error
-    }
-    const [row] = await db.select().from(comments).where(eq(comments.id, fields.id)).limit(1)
-    return row!
-  })
+  return withDropQuota(
+    site.ownerId,
+    { drops: 0, bytes: shot.bytes.byteLength, writes: 1 },
+    undefined,
+    async (quota) => {
+      const id = crypto.randomUUID()
+      const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
+      const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
+      if (storageError) {
+        log.error({ action: "review-screenshot", error: storageError.message })
+        throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
+      }
+      const path = input.page.replace(/[?#].*$/, "") || "/"
+      const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
+      const image: DropRow = {
+        id,
+        ownerId: site.ownerId,
+        kind: "image",
+        title: `Screenshot of ${where}`.slice(0, 160),
+        filename: `screenshot.${EXTENSIONS[shot.contentType]}`,
+        blobKey: key,
+        contentType: shot.contentType,
+        size: shot.bytes.byteLength,
+        version: 1,
+        supersedesId: null,
+        link: newLink(),
+        slug: "screenshot",
+        share: "private",
+        publicUntil: null,
+        teamFolder: false,
+        shareReview: null,
+        quarantinedAt: null,
+        actorKind: "browser",
+        actorName: author.name,
+        createdAt: now,
+        updatedAt: now,
+        lastAccessedAt: now,
+        lifetime: "review",
+        keepReason: null,
+        note: `${input.viewport.width}x${input.viewport.height} viewport`,
+        trashedAt: null,
+        trashReason: null,
+        parentId: site.id,
+        siteUrl: null,
+        publishToken: null,
+      }
+      try {
+        await quota.commit([
+          db.insert(drops).values(image),
+          db
+            .insert(comments)
+            .values({ ...fields, dropId: id, n: nextCommentNumber(image), kind: "image", selector: "body > img" }),
+        ])
+      } catch (error) {
+        await blob.del([key])
+        throw error
+      }
+      const [row] = await db.select().from(comments).where(eq(comments.id, fields.id)).limit(1)
+      return row!
+    },
+  )
 }
 
 /** The site's review list, newest first, each comment with the screenshot it came with. `page` is as `reviewPage` keeps it. */
-export async function siteItems(site: Pick<DropRow, "id">, who: Identity | null, origin: string, page?: string): Promise<SiteReviewItem[]> {
-  const rows = await db.select({ comment: comments, shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey } })
-    .from(comments).innerJoin(drops, eq(drops.id, comments.dropId))
-    .where(and(sql`${comments.dropId} IN (${siteFamily(site.id)})`, page ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')` : undefined))
-    .orderBy(asc(comments.createdAt)).limit(500)
-  const extras = await commentExtras(rows.map(item => item.comment), siteFamily(site.id))
+export async function siteItems(
+  site: Pick<DropRow, "id">,
+  who: Identity | null,
+  origin: string,
+  page?: string,
+): Promise<SiteReviewItem[]> {
+  const rows = await db
+    .select({
+      comment: comments,
+      shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
+    })
+    .from(comments)
+    .innerJoin(drops, eq(drops.id, comments.dropId))
+    .where(
+      and(
+        sql`${comments.dropId} IN (${siteFamily(site.id)})`,
+        page
+          ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
+          : undefined,
+      ),
+    )
+    .orderBy(asc(comments.createdAt))
+    .limit(500)
+  const extras = await commentExtras(
+    rows.map((item) => item.comment),
+    siteFamily(site.id),
+  )
   return rows.reverse().map(({ comment, shot }) => ({
     ...toComment(comment, who, 1, extras),
-    screenshot: shot.kind === "image" && shot.blobKey ? { id: shot.id, link: shot.link ?? shot.id, slug: shot.slug ?? "screenshot", url: new URL(`/f/${shot.blobKey}`, origin).href } : null,
+    screenshot:
+      shot.kind === "image" && shot.blobKey
+        ? {
+            id: shot.id,
+            link: shot.link ?? shot.id,
+            slug: shot.slug ?? "screenshot",
+            url: new URL(`/f/${shot.blobKey}`, origin).href,
+          }
+        : null,
   }))
 }

@@ -10,11 +10,9 @@ export function useAdminAction(path: (id: string) => string, failure: string, re
     try {
       await $fetch(path(id), { method: "POST", body: { action } })
       await refresh()
-    }
-    catch (cause) {
+    } catch (cause) {
       notify.fail(failure, cause)
-    }
-    finally {
+    } finally {
       busy.value = false
     }
   }

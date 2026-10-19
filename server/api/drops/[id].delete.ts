@@ -13,14 +13,19 @@ import { routeId } from "../../utils/params"
 export default defineValidatedHandler({
   validate: { query: v.object({ forever: v.optional(v.string()) }) },
   async handler(event) {
-  const who = await requireIdentity(event)
-  const drop = await findDrop(await routeId(event), event)
-  const forever = event.url.searchParams.has("forever")
-  const can = drop && permissions(drop, who)
-  if (!drop || !can || isAttachment(drop) || !(forever ? can.manage : can.trash)) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
-  if (!forever) return updateDrop(drop, who, { trashed: true }, event)
-  if (who.actorKind !== "browser") throw new HTTPError({ status: 403, statusText: "Only people can delete a drop for good. Move it to the Trash instead." })
-  await deleteDrop(drop)
-  return { ok: true }
+    const who = await requireIdentity(event)
+    const drop = await findDrop(await routeId(event), event)
+    const forever = event.url.searchParams.has("forever")
+    const can = drop && permissions(drop, who)
+    if (!drop || !can || isAttachment(drop) || !(forever ? can.manage : can.trash))
+      throw new HTTPError({ status: 404, statusText: "No drop with that id." })
+    if (!forever) return updateDrop(drop, who, { trashed: true }, event)
+    if (who.actorKind !== "browser")
+      throw new HTTPError({
+        status: 403,
+        statusText: "Only people can delete a drop for good. Move it to the Trash instead.",
+      })
+    await deleteDrop(drop)
+    return { ok: true }
   },
 })

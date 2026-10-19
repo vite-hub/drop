@@ -23,7 +23,12 @@ const { skills, status, setEnabled } = useSkills()
             <UBadge v-if="!skill.enabled" color="neutral" variant="subtle" size="sm">Off</UBadge>
           </h2>
           <p class="mt-1 max-w-xl text-sm leading-relaxed text-muted">{{ skill.description }}</p>
-          <a class="mt-2 inline-flex items-center gap-1 text-sm font-medium text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 transition-colors hover:decoration-(--ui-text-highlighted)" :href="skill.source" target="_blank" rel="noreferrer">
+          <a
+            class="mt-2 inline-flex items-center gap-1 text-sm font-medium text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 transition-colors hover:decoration-(--ui-text-highlighted)"
+            :href="skill.source"
+            target="_blank"
+            rel="noreferrer"
+          >
             Read on GitHub<UIcon name="i-ph-arrow-up-right" class="size-3.5" />
           </a>
         </div>
@@ -32,7 +37,7 @@ const { skills, status, setEnabled } = useSkills()
           class="mt-0.5"
           :model-value="skill.enabled"
           :aria-label="`${skill.enabled ? 'Turn off' : 'Turn on'} ${skill.name}`"
-          @update:model-value="value => setEnabled(skill, value)"
+          @update:model-value="(value) => setEnabled(skill, value)"
         />
       </li>
     </ul>

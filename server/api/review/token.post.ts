@@ -19,11 +19,26 @@ export default defineValidatedHandler({
     const { origin, choice, name } = await event.req.json()
     const id = await openChoice(event, choice, origin, who)
     const site = id ? await findDrop(id, event) : null
-    if (!site || site.kind !== "site" || !site.siteUrl || !siteMatches(site.siteUrl, origin) || !permissions(site, who).comment)
-      throw new HTTPError({ status: 404, statusText: "You can't comment on this site anymore, or its review was deleted. Press Comment on the site again." })
+    if (
+      !site ||
+      site.kind !== "site" ||
+      !site.siteUrl ||
+      !siteMatches(site.siteUrl, origin) ||
+      !permissions(site, who).comment
+    )
+      throw new HTTPError({
+        status: 404,
+        statusText:
+          "You can't comment on this site anymore, or its review was deleted. Press Comment on the site again.",
+      })
     // A guest's name says it's a guest's, so nobody signs a comment as the site's owner.
     const author = who ? who.name : name?.trim() ? `${name.trim()} (guest)` : "Guest"
-    const { token, expiresAt } = await signReviewToken(event, { d: site.id, u: who?.userId ?? null, n: author, o: origin })
+    const { token, expiresAt } = await signReviewToken(event, {
+      d: site.id,
+      u: who?.userId ?? null,
+      n: author,
+      o: origin,
+    })
     event.res.headers.set("Cache-Control", "no-store")
     return { token, expiresAt, origin, title: site.title, name: author }
   },

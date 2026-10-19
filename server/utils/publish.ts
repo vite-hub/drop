@@ -7,7 +7,16 @@ import { reviewBookmarklet, reviewSnippet } from "#shared/review"
 import { SHARES } from "#shared/share"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
 import { resolveComments } from "./comments"
-import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary, versionChain } from "./drops"
+import {
+  createDocDrop,
+  findDrop,
+  findDropByRef,
+  MAX_FILE_BYTES,
+  permissions,
+  publishApp,
+  toSummary,
+  versionChain,
+} from "./drops"
 import { updateDrop } from "./drop-update"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
@@ -19,24 +28,118 @@ import { signUpload } from "./uploads"
 export const PublishInput = v.object({
   markdown: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A doc in Markdown."))),
   html: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A self-contained HTML page."))),
-  files: v.optional(v.pipe(v.record(v.string(), v.string()), v.description(`A static app: path to UTF-8 contents, with an index.html, at most ${MAX_FILE_BYTES} bytes in all. With previous, send only the files that changed; every other file carries over.`))),
-  removes: v.optional(v.pipe(v.array(v.string()), v.maxLength(200), v.description("With previous and an app: paths to delete from it. A file leaves an app only when it's named here. Pass files: {} to only delete."))),
-  file: v.optional(v.pipe(v.object({
-    name: v.pipe(v.string(), v.description("File name with its extension, e.g. before.png.")),
-    base64: v.optional(v.pipe(v.string(), v.maxLength(Math.ceil(MAX_FILE_BYTES / 3) * 4 + 1024), v.description("The file's bytes, base64-encoded. Only for small files you already hold as text. For a file on disk, such as a screenshot, leave it out."))),
-  }), v.description("Any other file up to 4 MiB: a screenshot, a PDF. Images get pin and area comments. Embed its fileUrl in a doc to make it part of that doc. Without base64 you get an uploadUrl: upload the file with `curl -T <path> '<uploadUrl>'`, which creates the drop and prints it with its fileUrl."))),
-  site: v.optional(v.pipe(v.object({
-    url: v.pipe(v.string(), v.maxLength(300), v.description("The address people review: one origin like https://pr123.preview.example.com, or a pattern like https://*.preview.example.com, where * stands for one label, so one site drop covers every pull request's preview. https, or http on localhost.")),
-  }), v.description("A live website to review in place, such as a preview deploy, staging, or a dev server. People comment on its pages with a bookmarklet, or a script tag in preview builds; their comments arrive here with screenshots."))),
+  files: v.optional(
+    v.pipe(
+      v.record(v.string(), v.string()),
+      v.description(
+        `A static app: path to UTF-8 contents, with an index.html, at most ${MAX_FILE_BYTES} bytes in all. With previous, send only the files that changed; every other file carries over.`,
+      ),
+    ),
+  ),
+  removes: v.optional(
+    v.pipe(
+      v.array(v.string()),
+      v.maxLength(200),
+      v.description(
+        "With previous and an app: paths to delete from it. A file leaves an app only when it's named here. Pass files: {} to only delete.",
+      ),
+    ),
+  ),
+  file: v.optional(
+    v.pipe(
+      v.object({
+        name: v.pipe(v.string(), v.description("File name with its extension, e.g. before.png.")),
+        base64: v.optional(
+          v.pipe(
+            v.string(),
+            v.maxLength(Math.ceil(MAX_FILE_BYTES / 3) * 4 + 1024),
+            v.description(
+              "The file's bytes, base64-encoded. Only for small files you already hold as text. For a file on disk, such as a screenshot, leave it out.",
+            ),
+          ),
+        ),
+      }),
+      v.description(
+        "Any other file up to 4 MiB: a screenshot, a PDF. Images get pin and area comments. Embed its fileUrl in a doc to make it part of that doc. Without base64 you get an uploadUrl: upload the file with `curl -T <path> '<uploadUrl>'`, which creates the drop and prints it with its fileUrl.",
+      ),
+    ),
+  ),
+  site: v.optional(
+    v.pipe(
+      v.object({
+        url: v.pipe(
+          v.string(),
+          v.maxLength(300),
+          v.description(
+            "The address people review: one origin like https://pr123.preview.example.com, or a pattern like https://*.preview.example.com, where * stands for one label, so one site drop covers every pull request's preview. https, or http on localhost.",
+          ),
+        ),
+      }),
+      v.description(
+        "A live website to review in place, such as a preview deploy, staging, or a dev server. People comment on its pages with a bookmarklet, or a script tag in preview builds; their comments arrive here with screenshots.",
+      ),
+    ),
+  ),
   title: v.optional(v.string()),
-  slug: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_SLUG), v.description("The readable part of the drop's link, like hipoteca-madrid: a few lowercase words and dashes that say what it is. Pick one for every new drop. Later versions keep it unless you pass another; old links keep working."))),
-  previous: v.optional(v.pipe(v.string(), v.description("Id or link of the drop this publishes the next version of. It keeps that drop's sharing, lifetime and link unless you pass them. Its link then opens the new version."))),
-  note: v.pipe(v.string(), v.minLength(1), v.maxLength(500), v.description("What this version is or what changed, like a commit message. People see it in the version history.")),
-  lifetime: v.optional(v.pipe(v.picklist(LIFETIMES), v.description("Required for a new drop. temporary: prototypes and one-off answers, gone 14 days after the last visit. review: docs going through feedback, 30 days. keep: never expires, for pull request assets and anything linked from somewhere lasting; needs keepReason."))),
-  keepReason: v.optional(v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON), v.description("Why it should be kept, in a sentence or two (e.g. the pull request it belongs to). The owner sees it."))),
+  slug: v.optional(
+    v.pipe(
+      v.string(),
+      v.minLength(1),
+      v.maxLength(MAX_SLUG),
+      v.description(
+        "The readable part of the drop's link, like hipoteca-madrid: a few lowercase words and dashes that say what it is. Pick one for every new drop. Later versions keep it unless you pass another; old links keep working.",
+      ),
+    ),
+  ),
+  previous: v.optional(
+    v.pipe(
+      v.string(),
+      v.description(
+        "Id or link of the drop this publishes the next version of. It keeps that drop's sharing, lifetime and link unless you pass them. Its link then opens the new version.",
+      ),
+    ),
+  ),
+  note: v.pipe(
+    v.string(),
+    v.minLength(1),
+    v.maxLength(500),
+    v.description("What this version is or what changed, like a commit message. People see it in the version history."),
+  ),
+  lifetime: v.optional(
+    v.pipe(
+      v.picklist(LIFETIMES),
+      v.description(
+        "Required for a new drop. temporary: prototypes and one-off answers, gone 14 days after the last visit. review: docs going through feedback, 30 days. keep: never expires, for pull request assets and anything linked from somewhere lasting; needs keepReason.",
+      ),
+    ),
+  ),
+  keepReason: v.optional(
+    v.pipe(
+      v.string(),
+      v.maxLength(MAX_KEEP_REASON),
+      v.description(
+        "Why it should be kept, in a sentence or two (e.g. the pull request it belongs to). The owner sees it.",
+      ),
+    ),
+  ),
   share: v.optional(v.pipe(v.picklist(SHARES), v.description(SHARE_INPUT))),
-  resolves: v.optional(v.pipe(v.array(v.pipe(v.number(), v.integer())), v.maxLength(90), v.description("Numbers of the open comments this version addresses, from read_drop on previous. Comments written on earlier versions count too. They're marked resolved."))),
-  folder: v.optional(v.pipe(v.string(), v.description("Id or link of the folder to put the drop in: the one list_folders describes as the place for it. It then shares and lives with the folder, so it needs no lifetime. Leave it out when no folder fits; the drop goes at the top. With previous, moves the drop there."))),
+  resolves: v.optional(
+    v.pipe(
+      v.array(v.pipe(v.number(), v.integer())),
+      v.maxLength(90),
+      v.description(
+        "Numbers of the open comments this version addresses, from read_drop on previous. Comments written on earlier versions count too. They're marked resolved.",
+      ),
+    ),
+  ),
+  folder: v.optional(
+    v.pipe(
+      v.string(),
+      v.description(
+        "Id or link of the folder to put the drop in: the one list_folders describes as the place for it. It then shares and lives with the folder, so it needs no lifetime. Leave it out when no folder fits; the drop goes at the top. With previous, moves the drop there.",
+      ),
+    ),
+  ),
 })
 
 export type PublishInput = v.InferOutput<typeof PublishInput>
@@ -46,15 +149,38 @@ export type PublishInput = v.InferOutput<typeof PublishInput>
  * sent to that URL; without them, a file with no base64 gets an upload URL instead of a drop, after the same checks.
  */
 export async function publishInput(who: Identity, input: PublishInput, event: H3Event, upload?: Uint8Array) {
-  const given = (["markdown", "html", "files", "file", "site"] as const).filter(key => input[key] !== undefined)
-  if (given.length !== 1) throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, file, or site." })
-  if (!input.previous && !input.folder && !input.lifetime) throw new HTTPError({ status: 400, message: "Say how long this drop should live: lifetime temporary, review, or keep." })
+  const given = (["markdown", "html", "files", "file", "site"] as const).filter((key) => input[key] !== undefined)
+  if (given.length !== 1)
+    throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, file, or site." })
+  if (!input.previous && !input.folder && !input.lifetime)
+    throw new HTTPError({
+      status: 400,
+      message: "Say how long this drop should live: lifetime temporary, review, or keep.",
+    })
   const folder = input.folder && !input.previous ? await requireFolder(input.folder, who, event) : undefined
-  if (input.slug !== undefined && !slugify(input.slug)) throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
+  if (input.slug !== undefined && !slugify(input.slug))
+    throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
   if (input.site) {
-    if (input.previous || input.resolves || input.removes) throw new HTTPError({ status: 400, message: "A site has no versions. Change it with update_drop, and resolve its comments there." })
-    const row = await createSiteDrop(who, { url: input.site.url, title: input.title, slug: input.slug, folder, share: input.share, lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }, event)
-    const drop = mcpDrop(toSummary(await findDrop(row.id, event) ?? row), event.url.origin)
+    if (input.previous || input.resolves || input.removes)
+      throw new HTTPError({
+        status: 400,
+        message: "A site has no versions. Change it with update_drop, and resolve its comments there.",
+      })
+    const row = await createSiteDrop(
+      who,
+      {
+        url: input.site.url,
+        title: input.title,
+        slug: input.slug,
+        folder,
+        share: input.share,
+        lifetime: input.lifetime,
+        keepReason: input.keepReason,
+        note: input.note,
+      },
+      event,
+    )
+    const drop = mcpDrop(toSummary((await findDrop(row.id, event)) ?? row), event.url.origin)
     const script = reviewSnippet(event.url.origin)
     return {
       text: `Created a site review:\n${dropLine(drop)}\n\nPeople review ${row.siteUrl} with the "Review with Drop" bookmarklet on the drop's page; the site needs no change. To show the Comment button without it, add this tag to the site's preview builds only, never production. It carries no key:\n${script}\n\nComments sent from ${row.siteUrl} land on the drop; read them with read_drop.`,
@@ -62,9 +188,18 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     }
   }
   let previous = input.previous ? await findDropByRef(input.previous, event) : null
-  if (previous?.expired && permissions(previous, who).manage) throw new HTTPError({ status: 409, message: `${input.previous} is in the Trash. Restore it with update_drop first, or publish a new drop.` })
-  if (input.previous && (!previous || !permissions(previous, who).edit)) throw new HTTPError({ status: 404, message: `No drop you can publish to with id ${input.previous}.` })
-  if (previous?.kind === "site") throw new HTTPError({ status: 400, message: "previous is a site, which has no versions. Change it with update_drop." })
+  if (previous?.expired && permissions(previous, who).manage)
+    throw new HTTPError({
+      status: 409,
+      message: `${input.previous} is in the Trash. Restore it with update_drop first, or publish a new drop.`,
+    })
+  if (input.previous && (!previous || !permissions(previous, who).edit))
+    throw new HTTPError({ status: 404, message: `No drop you can publish to with id ${input.previous}.` })
+  if (previous?.kind === "site")
+    throw new HTTPError({
+      status: 400,
+      message: "previous is a site, which has no versions. Change it with update_drop.",
+    })
   if (previous) previous = (await versionChain(previous))[0] ?? previous
   const share = input.share ? { share: input.share } : {}
   const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
@@ -72,12 +207,26 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   let row
   let warnings: string[] = []
   if (input.files) {
-    if (previous && previous.kind !== "app") throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
-    row = await publishApp(who, { id: previous?.id, name: input.title, slug: input.slug, files: input.files, removes: input.removes, folder, ...share, ...life }, event)
+    if (previous && previous.kind !== "app")
+      throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
+    row = await publishApp(
+      who,
+      {
+        id: previous?.id,
+        name: input.title,
+        slug: input.slug,
+        files: input.files,
+        removes: input.removes,
+        folder,
+        ...share,
+        ...life,
+      },
+      event,
+    )
     warnings = row.warnings
-  }
-  else {
-    if (previous?.kind === "app") throw new HTTPError({ status: 400, message: "previous is an app; publish its next version with files." })
+  } else {
+    if (previous?.kind === "app")
+      throw new HTTPError({ status: 400, message: "previous is an app; publish its next version with files." })
     if (input.removes) throw new HTTPError({ status: 400, message: "removes only applies to apps." })
     let filename: string, bytes: Uint8Array
     if (input.file) {
@@ -90,38 +239,69 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
           text: `Upload ${filename} within 15 minutes, once:\ncurl -T <path to ${filename}> '${url}'\nIt creates the drop and prints it as JSON, with fileUrl to embed in a doc.`,
           result: { uploadUrl: url, method: "PUT" as const, expiresAt: new Date(expiresAt).toISOString() },
         }
+      } else {
+        try {
+          bytes = Uint8Array.from(atob(input.file.base64.replace(/\s+/g, "")), (char) => char.charCodeAt(0))
+        } catch {
+          throw new HTTPError({ status: 400, message: "file.base64 isn't valid base64." })
+        }
       }
-      else {
-        try { bytes = Uint8Array.from(atob(input.file.base64.replace(/\s+/g, "")), char => char.charCodeAt(0)) }
-        catch { throw new HTTPError({ status: 400, message: "file.base64 isn't valid base64." }) }
-      }
-    }
-    else {
+    } else {
       const source = (input.markdown ?? input.html)!
       if (!source.trim()) throw new HTTPError({ status: 400, message: "The doc is empty." })
       // A broken annotated screenshot would render with marks in the wrong place; send the agent back to fix it.
       const issues = input.markdown ? await annotationIssues(source) : []
-      if (issues.length) throw new HTTPError({ status: 400, message: `Fix the annotated screenshots and publish again:\n${issues.map(issue => `- ${issue}`).join("\n")}` })
+      if (issues.length)
+        throw new HTTPError({
+          status: 400,
+          message: `Fix the annotated screenshots and publish again:\n${issues.map((issue) => `- ${issue}`).join("\n")}`,
+        })
       // An HTML doc is one file, so anything it loads by relative path is missing.
-      if (input.html) warnings = appLinkIssues({ "doc.html": input.html }, ["doc.html"]).filter(issue => !issue.startsWith("doc.html links to"))
+      if (input.html)
+        warnings = appLinkIssues({ "doc.html": input.html }, ["doc.html"]).filter(
+          (issue) => !issue.startsWith("doc.html links to"),
+        )
       filename = input.html ? "doc.html" : "doc.md"
       bytes = new TextEncoder().encode(source)
     }
     // Markdown and HTML sent as text are named after the link's slug; a file keeps its own name.
-    row = await createDocDrop(who, { filename, bytes, title: input.title, slug: input.slug, nameFromSlug: !input.file, supersedes: previous?.id, folder, ...share, ...life }, event)
+    row = await createDocDrop(
+      who,
+      {
+        filename,
+        bytes,
+        title: input.title,
+        slug: input.slug,
+        nameFromSlug: !input.file,
+        supersedes: previous?.id,
+        folder,
+        ...share,
+        ...life,
+      },
+      event,
+    )
     // The share and the slug apply to every version, like a change on the drop's page.
-    if (previous && (input.share || input.slug)) await updateDrop((await findDrop(row.id, event))!, who, { ...share, ...(input.slug ? { slug: input.slug } : {}) }, event)
+    if (previous && (input.share || input.slug))
+      await updateDrop(
+        (await findDrop(row.id, event))!,
+        who,
+        { ...share, ...(input.slug ? { slug: input.slug } : {}) },
+        event,
+      )
   }
   if (previous && input.folder) await updateDrop((await findDrop(row.id, event))!, who, { folder: input.folder }, event)
 
   // Comments carry over from earlier versions (listComments), so this looks across the whole chain.
   const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves) : []
 
-  const fresh = await findDrop(row.id, event) ?? row
+  const fresh = (await findDrop(row.id, event)) ?? row
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
   const check = warnings.length
-    ? `\n\nThese references point at nothing in the ${input.files ? "app" : "page"}. Fix them and publish again with previous:\n${warnings.map(warning => `- ${warning}`).join("\n")}`
+    ? `\n\nThese references point at nothing in the ${input.files ? "app" : "page"}. Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
     : ""
-  return { text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map(n => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${check}`, result }
+  return {
+    text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${check}`,
+    result,
+  }
 }

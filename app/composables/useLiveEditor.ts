@@ -26,7 +26,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const editing = computed(() => Boolean(documentId.value))
   const people = realtime.people
 
-  const url = (id: string, edit = false) => ({ path: `${options.publicView ? "/d" : "/drops"}/${id}`, query: edit ? { edit: "1" } : {} })
+  const url = (id: string, edit = false) => ({
+    path: `${options.publicView ? "/d" : "/drops"}/${id}`,
+    query: edit ? { edit: "1" } : {},
+  })
 
   // The room's extensions exist once its Y.Doc and provider do. Rebuild the editor only for a new room: the extensions
   // list is recomputed on reconnects too, and a rebuild would drop focus mid-sentence.
@@ -41,7 +44,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
         RealtimeCaret.configure({
           awareness: markRaw(realtime.provider.value.awareness),
-          selectionRender: user => ({ class: "ProseMirror-yjs-selection", style: `background-color: color-mix(in oklab, ${user.color} 18%, transparent)` }),
+          selectionRender: (user) => ({
+            class: "ProseMirror-yjs-selection",
+            style: `background-color: color-mix(in oklab, ${user.color} 18%, transparent)`,
+          }),
         }),
       ],
       autofocus: "end",
@@ -50,36 +56,47 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
 
   // A teammate published: their client leaves `published` on its awareness state before it goes.
   let announced = ""
-  watch(realtime.provider, (provider, _, onCleanup) => {
-    if (!provider) return
-    const check = () => {
-      for (const [clientId, state] of provider.awareness.getStates()) {
-        const parsed = v.safeParse(v.object({ published: PublishedSchema }), state)
-        const published = parsed.success ? parsed.output.published : undefined
-        if (clientId === provider.awareness.clientID || !published || published.id === announced) continue
-        announced = published.id
-        notify.info({
-          title: `${published.name} published v${published.version}`,
-          description: "Keep editing the new version.",
-          icon: "i-ph-arrow-up-right",
-          actions: [{ label: "Open", color: "neutral", variant: "outline", onClick: () => void navigateTo(url(published.id, true)) }],
-        })
+  watch(
+    realtime.provider,
+    (provider, _, onCleanup) => {
+      if (!provider) return
+      const check = () => {
+        for (const [clientId, state] of provider.awareness.getStates()) {
+          const parsed = v.safeParse(v.object({ published: PublishedSchema }), state)
+          const published = parsed.success ? parsed.output.published : undefined
+          if (clientId === provider.awareness.clientID || !published || published.id === announced) continue
+          announced = published.id
+          notify.info({
+            title: `${published.name} published v${published.version}`,
+            description: "Keep editing the new version.",
+            icon: "i-ph-arrow-up-right",
+            actions: [
+              {
+                label: "Open",
+                color: "neutral",
+                variant: "outline",
+                onClick: () => void navigateTo(url(published.id, true)),
+              },
+            ],
+          })
+        }
       }
-    }
-    provider.awareness.on("change", check)
-    onCleanup(() => provider.awareness.off("change", check))
-  }, { flush: "sync" })
+      provider.awareness.on("change", check)
+      onCleanup(() => provider.awareness.off("change", check))
+    },
+    { flush: "sync" },
+  )
 
   async function open() {
     if (editing.value || opening.value || !drop.value.canEdit) return
     opening.value = true
     try {
-      documentId.value = (await $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" })).documentId
-    }
-    catch (error) {
+      documentId.value = (
+        await $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" })
+      ).documentId
+    } catch (error) {
       notify.fail("Couldn't open the editor", error)
-    }
-    finally {
+    } finally {
       opening.value = false
     }
   }
@@ -95,13 +112,20 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     publishing.value = true
     try {
       await realtime.save()
-      const next = await $fetch<DropSummary & { unchanged?: boolean }>(`/api/drops/${drop.value.id}/versions`, { method: "POST", body: { force } })
+      const next = await $fetch<DropSummary & { unchanged?: boolean }>(`/api/drops/${drop.value.id}/versions`, {
+        method: "POST",
+        body: { force },
+      })
       if (next.unchanged) {
         notify.done("Nothing to publish", "The draft matches the published version.")
         return
       }
-      const me = people.value.find(person => person.clientId === realtime.provider.value?.awareness.clientID)
-      realtime.provider.value?.awareness.setLocalStateField("published", { id: next.id, version: next.version, name: me?.name ?? "Someone" } satisfies Published)
+      const me = people.value.find((person) => person.clientId === realtime.provider.value?.awareness.clientID)
+      realtime.provider.value?.awareness.setLocalStateField("published", {
+        id: next.id,
+        version: next.version,
+        name: me?.name ?? "Someone",
+      } satisfies Published)
       notify.done(`Published v${next.version}`, "The previous version stays in history.")
       // A new version adds bytes and a write, so the plan usage moves too.
       await refreshNuxtData([keys.drops, keys.usage])
@@ -109,8 +133,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       await promiseTimeout(300)
       close()
       await navigateTo(url(next.id))
-    }
-    catch (error) {
+    } catch (error) {
       const head = errorData(error, v.object({ head: v.object({ id: v.string(), version: v.number() }) }))?.head
       if (!head) {
         notify.fail("Couldn't publish", error)
@@ -129,15 +152,35 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         title: `v${head.version} is the latest version`,
         description: "Your draft stays here until you publish it.",
         icon: "i-ph-clock-counter-clockwise",
-        actions: [{ label: `Open v${head.version}`, color: "neutral", variant: "outline", onClick: () => { close(); void navigateTo(url(head.id)) } }],
+        actions: [
+          {
+            label: `Open v${head.version}`,
+            color: "neutral",
+            variant: "outline",
+            onClick: () => {
+              close()
+              void navigateTo(url(head.id))
+            },
+          },
+        ],
       })
-    }
-    finally {
+    } finally {
       publishing.value = false
     }
   }
 
   onScopeDispose(close)
 
-  return { editor, editing, opening, publishing, people, status: realtime.status, synced: realtime.synced, open, close, publish }
+  return {
+    editor,
+    editing,
+    opening,
+    publishing,
+    people,
+    status: realtime.status,
+    synced: realtime.synced,
+    open,
+    close,
+    publish,
+  }
 }

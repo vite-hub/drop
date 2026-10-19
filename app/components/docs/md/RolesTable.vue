@@ -7,9 +7,17 @@ import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
 <template>
   <div class="overflow-x-auto rounded-lg border border-default">
     <table>
-      <thead><tr><th>Role</th><th>What they can do</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>What they can do</th>
+        </tr>
+      </thead>
       <tbody>
-        <tr v-for="role in ROLES" :key="role"><td>{{ ROLE_LABELS[role] }}</td><td>{{ ROLE_SUMMARY[role] }}</td></tr>
+        <tr v-for="role in ROLES" :key="role">
+          <td>{{ ROLE_LABELS[role] }}</td>
+          <td>{{ ROLE_SUMMARY[role] }}</td>
+        </tr>
       </tbody>
     </table>
   </div>

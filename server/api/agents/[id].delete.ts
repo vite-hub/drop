@@ -11,9 +11,14 @@ import { routeId } from "../../utils/params"
  */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
-  const [consent] = await db.select().from(oauthConsent).where(and(eq(oauthConsent.id, await routeId(event)), eq(oauthConsent.userId, who.userId))).limit(1)
+  const [consent] = await db
+    .select()
+    .from(oauthConsent)
+    .where(and(eq(oauthConsent.id, await routeId(event)), eq(oauthConsent.userId, who.userId)))
+    .limit(1)
   if (!consent) throw new HTTPError({ status: 404, statusText: "No connected agent with that id." })
-  const mine = (table: typeof oauthRefreshToken | typeof oauthAccessToken) => and(eq(table.clientId, consent.clientId), eq(table.userId, who.userId))
+  const mine = (table: typeof oauthRefreshToken | typeof oauthAccessToken) =>
+    and(eq(table.clientId, consent.clientId), eq(table.userId, who.userId))
   await db.delete(oauthRefreshToken).where(mine(oauthRefreshToken))
   await db.delete(oauthAccessToken).where(mine(oauthAccessToken))
   await db.delete(oauthConsent).where(eq(oauthConsent.id, consent.id))

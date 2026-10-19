@@ -4,7 +4,12 @@ import { injectRuntime } from "#shared/plan-runtime"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 
-type RuntimeReport = { kind: Extract<FrameMessage, { type: "runtime-error" }>["kind"]; message: string; source?: string; page?: string }
+type RuntimeReport = {
+  kind: Extract<FrameMessage, { type: "runtime-error" }>["kind"]
+  message: string
+  source?: string
+  page?: string
+}
 
 /**
  * The frame the drop renders in, and everything that goes over its postMessage bridge (useDropFrame): the document
@@ -22,7 +27,11 @@ export function useViewerFrame(options: {
   inset: Ref<number>
   annotations: ReturnType<typeof useViewerAnnotations>
 }) {
-  const { drop, app: { files, pages, page }, annotations } = options
+  const {
+    drop,
+    app: { files, pages, page },
+    annotations,
+  } = options
   const { copy } = useCopy()
   const colorMode = useColorMode()
   const mounted = useMounted()
@@ -43,7 +52,7 @@ export function useViewerFrame(options: {
   // A plain variable, not a ref: the documents read it when they're built, and opening the panel later must not
   // rebuild (and reload) them. The "inset" message moves the text from there.
   let startInset = 0
-  watch(options.inset, value => (startInset = value), { immediate: true, flush: "sync" })
+  watch(options.inset, (value) => (startInset = value), { immediate: true, flush: "sync" })
   const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset)
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
@@ -53,9 +62,16 @@ export function useViewerFrame(options: {
     // A site review shows the live site itself (ViewerSite), not a document.
     if (!mounted.value || kind === "folder" || kind === "site") return ""
     if (kind === "app") return appDocument(page.value)
-    if (kind === "image") return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
+    if (kind === "image")
+      return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
     if (!attached.ready.value) return ""
-    return planDocument(kind, attached.inline(drop.value.content ?? ""), dark.value, attached.inline(drop.value.html ?? ""), startInset)
+    return planDocument(
+      kind,
+      attached.inline(drop.value.content ?? ""),
+      dark.value,
+      attached.inline(drop.value.html ?? ""),
+      startInset,
+    )
   })
 
   // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
@@ -73,8 +89,9 @@ export function useViewerFrame(options: {
 
   function pageFor(path: string) {
     let decoded = path
-    try { decoded = decodeURIComponent(path) }
-    catch {}
+    try {
+      decoded = decodeURIComponent(path)
+    } catch {}
     return pageAt(pages.value, decoded)
   }
 
@@ -98,14 +115,23 @@ export function useViewerFrame(options: {
   const flushRuntimeReports = useDebounceFn(() => {
     const errors = runtimeReports.splice(0, 20)
     runtimeReports = []
-    if (errors.length) $fetch(`/api/drops/${drop.value.id}/errors`, { method: "POST", body: { version: drop.value.version, errors } }).catch(() => {})
+    if (errors.length)
+      $fetch(`/api/drops/${drop.value.id}/errors`, {
+        method: "POST",
+        body: { version: drop.value.version, errors },
+      }).catch(() => {})
   }, 2000)
 
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, rect) => {
     switch (message.type) {
       case "runtime-error":
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
-          runtimeReports.push({ kind: message.kind, message: message.message.slice(0, 500), source: message.source?.slice(0, 300), ...(isApp.value ? { page: page.value } : {}) })
+          runtimeReports.push({
+            kind: message.kind,
+            message: message.message.slice(0, 500),
+            source: message.source?.slice(0, 300),
+            ...(isApp.value ? { page: page.value } : {}),
+          })
           void flushRuntimeReports()
         }
         return
@@ -145,7 +171,28 @@ export function useViewerFrame(options: {
   })
   watch([ready, options.pinned], () => {
     // `earlier`: the frame also checks that the element is still what the comment pointed at, not just in its place.
-    if (ready.value) send({ type: "markers", markers: options.pinned.value.map(({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version, authorName, authorImage }) => ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, earlier: version < drop.value.version, author: authorName, image: authorImage })) })
+    if (ready.value)
+      send({
+        type: "markers",
+        markers: options.pinned.value.map(
+          ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version, authorName, authorImage }) => ({
+            id,
+            n,
+            kind,
+            selector,
+            ox,
+            oy,
+            ow,
+            oh,
+            quote,
+            label,
+            resolved,
+            earlier: version < drop.value.version,
+            author: authorName,
+            image: authorImage,
+          }),
+        ),
+      })
   })
   watch([ready, annotations.areaMode], () => ready.value && send({ type: "area-mode", on: annotations.areaMode.value }))
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))

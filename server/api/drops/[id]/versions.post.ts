@@ -18,19 +18,34 @@ export default defineValidatedHandler({
   async handler(event) {
     const drop = await findDrop(await routeId(event), event)
     const who = await identify(event)
-    if (!drop || !who || who.actorKind !== "browser" || drop.kind !== "markdown" || !drop.blobKey || !permissions(drop, who).edit)
+    if (
+      !drop ||
+      !who ||
+      who.actorKind !== "browser" ||
+      drop.kind !== "markdown" ||
+      !drop.blobKey ||
+      !permissions(drop, who).edit
+    )
       throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
     await requireRateLimit(event, "drop-version", { key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
     const { force } = await event.req.json()
     const head = (await versionsOf(drop))[0]!
     if (head.id !== drop.id && !force)
-      throw new HTTPError({ status: 409, statusText: `v${head.version} was published while you were editing.`, data: { head: { id: head.id, version: head.version } } })
+      throw new HTTPError({
+        status: 409,
+        statusText: `v${head.version} was published while you were editing.`,
+        data: { head: { id: head.id, version: head.version } },
+      })
     const draft = await readDraft(drop.id)
     if (draft === null) throw new HTTPError({ status: 404, statusText: "There is no draft to publish." })
     const source = await readText(drop.blobKey)
     const content = joinFrontmatter(splitFrontmatter(source).frontmatter, draft)
     if (content === source && head.id === drop.id) return { ...toSummary(drop), unchanged: true }
-    const next = await createDocDrop(who, { filename: drop.filename, bytes: new TextEncoder().encode(content), supersedes: head.id }, event)
+    const next = await createDocDrop(
+      who,
+      { filename: drop.filename, bytes: new TextEncoder().encode(content), supersedes: head.id },
+      event,
+    )
     await deleteDrafts([drop.id])
     return toSummary(next)
   },

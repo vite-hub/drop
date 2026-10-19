@@ -24,7 +24,8 @@ export default defineConfig({
     semi: false,
     printWidth: 120,
     // Docs, skills, and drops are Comark, which oxfmt reads as plain Markdown and breaks. Drizzle writes migrations.
-    ignorePatterns: [...generated, "**/*.md", "server/databases/migrations/**"],
+    // The build copies wrangler.jsonc into JSON that must parse strictly, so it keeps no trailing commas.
+    ignorePatterns: [...generated, "**/*.md", "server/databases/migrations/**", "*.jsonc"],
   },
   lint: {
     plugins: ["eslint", "typescript", "unicorn", "oxc", "vue", "import", "promise", "node"],

@@ -7,7 +7,11 @@ import { type FrameMessage, parseFrameMessage } from "#shared/frame-messages"
  * that isn't one Drop's runtime sends (#shared/frame-messages) is dropped. `rect` is the frame's box, for turning
  * frame coordinates into page ones.
  */
-export function useDropFrame(frame: Readonly<Ref<HTMLIFrameElement | null | undefined>>, origin: MaybeRefOrGetter<string | undefined>, onMessage: (message: FrameMessage, rect: DOMRect) => void) {
+export function useDropFrame(
+  frame: Readonly<Ref<HTMLIFrameElement | null | undefined>>,
+  origin: MaybeRefOrGetter<string | undefined>,
+  onMessage: (message: FrameMessage, rect: DOMRect) => void,
+) {
   const ready = ref(false)
   useEventListener("message", (event: MessageEvent) => {
     if (!frame.value || event.source !== frame.value.contentWindow) return
@@ -17,6 +21,7 @@ export function useDropFrame(frame: Readonly<Ref<HTMLIFrameElement | null | unde
     if (message.type === "ready") ready.value = true
     onMessage(message, frame.value.getBoundingClientRect())
   })
-  const send = (message: Record<string, unknown>) => frame.value?.contentWindow?.postMessage({ __drop: true, ...message }, toValue(origin) || "*")
+  const send = (message: Record<string, unknown>) =>
+    frame.value?.contentWindow?.postMessage({ __drop: true, ...message }, toValue(origin) || "*")
   return { ready, send }
 }

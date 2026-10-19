@@ -17,8 +17,7 @@ onMounted(async () => {
   try {
     const { to } = await openReview(token)
     await navigateTo(to, { replace: true })
-  }
-  catch (cause) {
+  } catch (cause) {
     error.value = errorText(cause, "Couldn't open this review.")
   }
 })
@@ -29,7 +28,10 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
 <template>
   <main class="grid min-h-dvh place-items-center bg-default px-4 py-12">
     <div class="w-full max-w-sm">
-      <NuxtLink class="mb-8 flex items-center justify-center gap-2 font-semibold tracking-tight text-highlighted" to="/">
+      <NuxtLink
+        class="mb-8 flex items-center justify-center gap-2 font-semibold tracking-tight text-highlighted"
+        to="/"
+      >
         <DropMark class="h-5 w-7" />Drop
       </NuxtLink>
       <div class="rounded-xl border border-default bg-default p-6">
@@ -39,8 +41,17 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
         </template>
         <template v-else-if="ready && !me">
           <h1 class="text-lg font-semibold tracking-tight text-highlighted">Sign in to open the review</h1>
-          <p class="mt-2 text-sm leading-relaxed text-muted">The review opens for people it's shared with. Your comments reach its owner either way.</p>
-          <UButton block class="mt-6" color="neutral" icon="i-simple-icons-github" label="Sign in with GitHub" :to="signInTo" />
+          <p class="mt-2 text-sm leading-relaxed text-muted">
+            The review opens for people it's shared with. Your comments reach its owner either way.
+          </p>
+          <UButton
+            block
+            class="mt-6"
+            color="neutral"
+            icon="i-simple-icons-github"
+            label="Sign in with GitHub"
+            :to="signInTo"
+          />
         </template>
         <template v-else>
           <USkeleton class="h-6 w-2/3" />

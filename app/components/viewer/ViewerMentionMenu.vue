@@ -25,9 +25,14 @@ onMounted(async () => {
     items: toRef(() => props.people),
     limit: 8,
     ui,
-    onSelect: (editor, range, person) => void editor.chain().focus().deleteRange(range).insertContent(`@${person.label} `).run(),
+    onSelect: (editor, range, person) =>
+      void editor.chain().focus().deleteRange(range).insertContent(`@${person.label} `).run(),
     renderItem: (person, styles) => [
-      h(UAvatar, { ...person.avatar, size: styles.value.itemLeadingAvatarSize(), class: styles.value.itemLeadingAvatar() }),
+      h(UAvatar, {
+        ...person.avatar,
+        size: styles.value.itemLeadingAvatarSize(),
+        class: styles.value.itemLeadingAvatar(),
+      }),
       h("span", { class: styles.value.itemWrapper() }, [h("span", { class: styles.value.itemLabel() }, person.label)]),
     ],
   })

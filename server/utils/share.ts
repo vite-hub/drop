@@ -13,7 +13,8 @@ export function sharePolicy(event?: H3Event): { mode: DropMode; publicLinkDays: 
   const resolvedMode: DropMode = mode === "team" ? "team" : "personal"
   if (!days) return { mode: resolvedMode, publicLinkDays: resolvedMode === "team" ? 7 : null }
   const value = Number(days)
-  if (!Number.isInteger(value) || value < 0) throw new Error("DROP_PUBLIC_LINK_DAYS must be a whole number of days, or 0 to turn public links off.")
+  if (!Number.isInteger(value) || value < 0)
+    throw new Error("DROP_PUBLIC_LINK_DAYS must be a whole number of days, or 0 to turn public links off.")
   return { mode: resolvedMode, publicLinkDays: value }
 }
 
@@ -25,9 +26,15 @@ export const shareNow = (row: { share: Share; publicUntil: number | null }, now 
  * The columns a share change writes, after checking this Drop offers it for the drop. Making a link public starts its
  * window now; any other share clears it.
  */
-export function shareFields(share: Share, drop: { kind: DropKind; teamFolder?: boolean }, event?: H3Event, now = Date.now()) {
+export function shareFields(
+  share: Share,
+  drop: { kind: DropKind; teamFolder?: boolean },
+  event?: H3Event,
+  now = Date.now(),
+) {
   const { mode, publicLinkDays } = sharePolicy(event)
-  if (!sharesFor(mode, publicLinkDays, drop).includes(share)) throw new HTTPError({ status: 400, statusText: shareRefusal(share, mode) })
+  if (!sharesFor(mode, publicLinkDays, drop).includes(share))
+    throw new HTTPError({ status: 400, statusText: shareRefusal(share, mode) })
   return { share, publicUntil: isPublic(share) ? publicUntilFrom(publicLinkDays, now) : null }
 }
 
@@ -44,6 +51,14 @@ function shareRefusal(share: Share, mode: DropMode) {
  */
 export async function closePublicLinks(at: Date) {
   const { mode } = sharePolicy()
-  await db.update(drops).set({ share: mode === "team" ? "team" : "private", publicUntil: null, shareReview: null })
-    .where(and(inArray(drops.share, ["public", "public_comment"]), isNotNull(drops.publicUntil), lte(drops.publicUntil, at.getTime())))
+  await db
+    .update(drops)
+    .set({ share: mode === "team" ? "team" : "private", publicUntil: null, shareReview: null })
+    .where(
+      and(
+        inArray(drops.share, ["public", "public_comment"]),
+        isNotNull(drops.publicUntil),
+        lte(drops.publicUntil, at.getTime()),
+      ),
+    )
 }

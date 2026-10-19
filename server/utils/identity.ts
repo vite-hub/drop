@@ -32,16 +32,26 @@ type DropAuth = Auth<ReturnType<typeof auth.options>>
  * (GitHub, another provider, email). Everyone else is a member. Outside `nuxt dev` and the runtime tests an unverified
  * email never counts, so nobody becomes an admin by typing someone else's address.
  */
-export const roleOf = (person: { email: string; emailVerified?: boolean | null }, admins = useServerEnv().drop.admins.unseal()): Role =>
-  roleFor(person, admins, import.meta.dev === true || useServerEnv().drop.testSignin)
+export const roleOf = (
+  person: { email: string; emailVerified?: boolean | null },
+  admins = useServerEnv().drop.admins.unseal(),
+): Role => roleFor(person, admins, import.meta.dev === true || useServerEnv().drop.testSignin)
 
 /**
  * Writes the role `DROP_ADMINS` gives someone to their account, for Better Auth's admin endpoints (bans) that read it from
  * there. Drop itself reads `roleOf` on every request, so a change to `DROP_ADMINS` takes effect on restart either way.
  */
 export async function syncRole(userId: string) {
-  const [row] = await db.select({ email: users.email, emailVerified: users.emailVerified, role: users.role }).from(users).where(eq(users.id, userId)).limit(1)
-  if (row && row.role !== roleOf(row)) await db.update(users).set({ role: roleOf(row) }).where(eq(users.id, userId))
+  const [row] = await db
+    .select({ email: users.email, emailVerified: users.emailVerified, role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+  if (row && row.role !== roleOf(row))
+    await db
+      .update(users)
+      .set({ role: roleOf(row) })
+      .where(eq(users.id, userId))
 }
 
 // SAFETY: ViteHub builds this instance from server/auth.ts's definition, the one DropAuth is the type of. Its own type is
@@ -55,12 +65,19 @@ export const bearerFrom = (headers: Headers) => headers.get("authorization")?.ma
 export function identify(event: H3Event): Promise<Identity | null> {
   return (event.context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
     if (who && githubOrganization()) {
-      const [githubAccount] = await db.select({ token: account.accessToken }).from(account)
-        .where(and(eq(account.userId, who.userId), eq(account.providerId, "github"))).limit(1)
-      if (!await isGitHubMember(githubAccount?.token)) return null
+      const [githubAccount] = await db
+        .select({ token: account.accessToken })
+        .from(account)
+        .where(and(eq(account.userId, who.userId), eq(account.providerId, "github")))
+        .limit(1)
+      if (!(await isGitHubMember(githubAccount?.token))) return null
     }
     // Every request's wide event says who made it, never the credential itself.
-    if (who) useLogger(event).set({ user: { id: who.userId, role: who.role }, actor: { kind: who.actorKind, name: who.actorName } })
+    if (who)
+      useLogger(event).set({
+        user: { id: who.userId, role: who.role },
+        actor: { kind: who.actorKind, name: who.actorName },
+      })
     return who
   }))
 }
@@ -68,10 +85,15 @@ export function identify(event: H3Event): Promise<Identity | null> {
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   const token = bearerFrom(event.req.headers)
   if (token) return fromAccessToken(event, token)
-  const session = await authFor(event).api.getSession({ headers: event.req.headers }).catch(() => null)
+  const session = await authFor(event)
+    .api.getSession({ headers: event.req.headers })
+    .catch(() => null)
   if (!session?.user || session.user.banned) return null
   return {
-    userId: session.user.id, name: session.user.name, email: session.user.email, image: session.user.image ?? null,
+    userId: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image ?? null,
     role: roleOf(session.user),
     actorKind: "browser",
     actorName: session.user.name,
@@ -90,16 +112,27 @@ function jwksFor(event: H3Event, fresh = false) {
 /** An MCP client's OAuth access token: a JWT this Drop issued, for this Drop's `/mcp`. */
 async function fromAccessToken(event: H3Event, token: string): Promise<Identity | null> {
   const origin = event.url.origin
-  const verify = async (fresh: boolean) => jwtVerify(token, createLocalJWKSet(await jwksFor(event, fresh)), { issuer: `${origin}/api/auth`, audience: `${origin}/mcp` })
-  const verified = await verify(false).catch(error => (error?.code === "ERR_JWKS_NO_MATCHING_KEY" ? verify(true) : null)).catch(() => null)
+  const verify = async (fresh: boolean) =>
+    jwtVerify(token, createLocalJWKSet(await jwksFor(event, fresh)), {
+      issuer: `${origin}/api/auth`,
+      audience: `${origin}/mcp`,
+    })
+  const verified = await verify(false)
+    .catch((error) => (error?.code === "ERR_JWKS_NO_MATCHING_KEY" ? verify(true) : null))
+    .catch(() => null)
   const payload = verified?.payload
   if (!payload?.sub) return null
   const [user] = await db.select().from(users).where(eq(users.id, payload.sub)).limit(1)
   if (!user || user.banned) return null
   const clientId = textValue(payload.azp) ?? textValue(payload.client_id) ?? null
-  const [client] = clientId ? await db.select({ name: oauthClient.name }).from(oauthClient).where(eq(oauthClient.clientId, clientId)).limit(1) : []
+  const [client] = clientId
+    ? await db.select({ name: oauthClient.name }).from(oauthClient).where(eq(oauthClient.clientId, clientId)).limit(1)
+    : []
   return {
-    userId: user.id, name: user.name, email: user.email, image: user.image ?? null,
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+    image: user.image ?? null,
     role: roleOf(user),
     actorKind: "agent",
     actorName: client?.name || "MCP client",
@@ -109,7 +142,7 @@ async function fromAccessToken(event: H3Event, token: string): Promise<Identity 
 export async function requireIdentity(event: H3Event): Promise<Identity> {
   const who = await identify(event)
   if (who) return who
-  event.res.headers.set("WWW-Authenticate", "Bearer realm=\"drop\"")
+  event.res.headers.set("WWW-Authenticate", 'Bearer realm="drop"')
   throw new HTTPError({ status: 401, statusText: "Sign in, or connect your agent through Drop's MCP server." })
 }
 
@@ -119,6 +152,7 @@ export async function requireIdentity(event: H3Event): Promise<Identity> {
  */
 export async function requireAdmin(event: H3Event): Promise<Identity> {
   const who = await requireIdentity(event)
-  if (who.role !== "admin" || who.actorKind !== "browser") throw new HTTPError({ status: 403, statusText: "Only admins, in the browser, can do that." })
+  if (who.role !== "admin" || who.actorKind !== "browser")
+    throw new HTTPError({ status: 403, statusText: "Only admins, in the browser, can do that." })
   return who
 }

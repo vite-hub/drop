@@ -40,7 +40,7 @@ The first call opens Drop in the user's browser to sign in; there is no key to a
 ## Limits to check first
 
 - An app is static files only: HTML, CSS, JavaScript, JSON, images. There is no server code or database; load libraries from a CDN.
-- An app holds at most ${limits.appFiles} files and ${Math.round(limits.appBytes / MIB * 10) / 10} MiB. A doc or file holds at most 4 MiB.
+- An app holds at most ${limits.appFiles} files and ${Math.round((limits.appBytes / MIB) * 10) / 10} MiB. A doc or file holds at most 4 MiB.
 ${owner}
 - At most 30 publishes a minute. That limit is the only one worth waiting out: the error says how many seconds.
 - Drops start private and expire by their lifetime unless it's \`keep\`.

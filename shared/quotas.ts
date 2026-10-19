@@ -1,7 +1,7 @@
 import * as v from "valibot"
 
 export const PLANS = ["free", "pro", "unlimited"] as const
-export type Plan = typeof PLANS[number]
+export type Plan = (typeof PLANS)[number]
 export const MIB = 1024 * 1024
 export const MAX_APP_FILES = 200
 export const MAX_APP_BYTES = 4 * MIB
@@ -18,7 +18,14 @@ export interface PlanLimits {
 /** Global app safety limits also apply when owner quotas are disabled. */
 export function planLimits(plan: Plan, pro: { drops?: number; bytes?: number; writes?: number } = {}): PlanLimits {
   if (plan === "free") return { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB }
-  if (plan === "pro") return { drops: pro.drops ?? DEFAULT_PRO_LIMITS.drops, bytes: pro.bytes ?? DEFAULT_PRO_LIMITS.bytes, writes: pro.writes ?? DEFAULT_PRO_LIMITS.writes, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
+  if (plan === "pro")
+    return {
+      drops: pro.drops ?? DEFAULT_PRO_LIMITS.drops,
+      bytes: pro.bytes ?? DEFAULT_PRO_LIMITS.bytes,
+      writes: pro.writes ?? DEFAULT_PRO_LIMITS.writes,
+      appFiles: MAX_APP_FILES,
+      appBytes: MAX_APP_BYTES,
+    }
   return { drops: null, bytes: null, writes: null, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
 }
 
@@ -34,7 +41,7 @@ export interface Usage {
 }
 
 const QUOTA_UNITS = ["drops", "bytes", "writes", "appFiles", "appBytes", "burstPublishes"] as const
-export type QuotaUnit = typeof QUOTA_UNITS[number]
+export type QuotaUnit = (typeof QUOTA_UNITS)[number]
 export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
   quota: { unit: QuotaUnit; used: number; limit: number }
@@ -68,15 +75,26 @@ export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retry
   const selfHostUrl = "/docs/self-host"
   if (unit === "burstPublishes") {
     return {
-      code: "DROP_LIMIT_REACHED", quota: { unit, used, limit }, retryable: true, retryAfterSeconds,
-      resetAt: new Date(Date.now() + retryAfterSeconds * 1000).toISOString(), selfHostUrl,
+      code: "DROP_LIMIT_REACHED",
+      quota: { unit, used, limit },
+      retryable: true,
+      retryAfterSeconds,
+      resetAt: new Date(Date.now() + retryAfterSeconds * 1000).toISOString(),
+      selfHostUrl,
       message: `Nothing was created or changed. That's ${limit} publishes in a minute; wait ${retryAfterSeconds} seconds, then publish again.`,
     }
   }
-  const label = { drops: "drops", bytes: "storage", writes: "monthly file writes", appFiles: "app files", appBytes: "app size" }[unit]
-  const amount = unit === "bytes" || unit === "appBytes"
-    ? `${Math.ceil(used / MIB * 10) / 10}/${limit / MIB} MiB`
-    : `${used}/${limit}`
+  const label = {
+    drops: "drops",
+    bytes: "storage",
+    writes: "monthly file writes",
+    appFiles: "app files",
+    appBytes: "app size",
+  }[unit]
+  const amount =
+    unit === "bytes" || unit === "appBytes"
+      ? `${Math.ceil((used / MIB) * 10) / 10}/${limit / MIB} MiB`
+      : `${used}/${limit}`
   const resetAt = unit === "writes" ? nextMonthStart().toISOString() : undefined
   const fix = {
     drops: "Trash drops you no longer need, or ask the user.",
@@ -86,15 +104,22 @@ export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retry
     appBytes: "Publish a smaller app: compress images or load large libraries from a CDN.",
   }[unit]
   return {
-    code: "DROP_LIMIT_REACHED", quota: { unit, used, limit }, retryable: false, ...(resetAt ? { resetAt } : {}), selfHostUrl,
+    code: "DROP_LIMIT_REACHED",
+    quota: { unit, used, limit },
+    retryable: false,
+    ...(resetAt ? { resetAt } : {}),
+    selfHostUrl,
     message: `Nothing was created or changed. Plan limit for ${label}: ${amount}. ${fix} Deploy your own at ${selfHostUrl} for other limits.`,
   }
 }
 
 export function usageNearLimit(usage: Usage): boolean {
-  return usage.enabled && ((usage.drops.limit !== null && usage.drops.used >= Math.ceil(usage.drops.limit * 2 / 3))
-    || (usage.bytes.limit !== null && usage.bytes.used >= usage.bytes.limit * 0.8)
-    || (usage.writes.limit !== null && usage.writes.used >= usage.writes.limit * 0.8))
+  return (
+    usage.enabled &&
+    ((usage.drops.limit !== null && usage.drops.used >= Math.ceil((usage.drops.limit * 2) / 3)) ||
+      (usage.bytes.limit !== null && usage.bytes.used >= usage.bytes.limit * 0.8) ||
+      (usage.writes.limit !== null && usage.writes.used >= usage.writes.limit * 0.8))
+  )
 }
 
 export function quotaToolFailure(body: QuotaFailure) {

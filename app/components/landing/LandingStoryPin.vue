@@ -7,5 +7,6 @@ defineProps<{ n: number; delay?: number }>()
   <span
     class="absolute -top-3 -right-4 grid size-5 place-items-center rounded-full bg-inverted text-[10px] font-semibold text-inverted ring-2 ring-(--ui-bg) [animation:pop-in_300ms_var(--ease-out)_both]"
     :style="{ animationDelay: `${delay ?? 0}ms` }"
-  >{{ n }}</span>
+    >{{ n }}</span
+  >
 </template>

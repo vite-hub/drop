@@ -16,34 +16,47 @@ const description = computed(() => {
   const total = members.value.length || me.value?.members || 1
   return total > 1
     ? `${total} people. Everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}; ${me.value?.mode === "team" ? "what they drop is the team's unless they keep it to themselves" : "their drops stay private to them"}.`
-    // There's no invite flow: say how a teammate gets in, since that's the first thing a new owner looks for here.
-    : `Just you so far. To bring your team in, send them ${host}: everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
+    : // There's no invite flow: say how a teammate gets in, since that's the first thing a new owner looks for here.
+      `Just you so far. To bring your team in, send them ${host}: everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
 })
 
 const rows = computed(() => {
   const needle = search.value.trim().toLowerCase()
   return members.value
-    .filter(member => `${member.name} ${member.email ?? ""}`.toLowerCase().includes(needle))
-    .sort((a, b) => Number(b.you) - Number(a.you) || ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || a.name.localeCompare(b.name))
+    .filter((member) => `${member.name} ${member.email ?? ""}`.toLowerCase().includes(needle))
+    .sort(
+      (a, b) =>
+        Number(b.you) - Number(a.you) || ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || a.name.localeCompare(b.name),
+    )
 })
 
 const statusOf = (member: Member) => (member.banned ? "Banned" : "Active")
 
 function menu(member: Member): DropdownMenuItem[][] {
-  return [[
-    member.banned
-      ? { label: "Unban", icon: "i-ph-arrow-counter-clockwise", onSelect: () => void unban(member) }
-      : { label: "Ban", icon: "i-ph-prohibit", color: "error", onSelect: () => void ban(member) },
-    { label: "Remove", icon: "i-ph-trash", color: "error", onSelect: () => void remove(member) },
-  ]]
+  return [
+    [
+      member.banned
+        ? { label: "Unban", icon: "i-ph-arrow-counter-clockwise", onSelect: () => void unban(member) }
+        : { label: "Ban", icon: "i-ph-prohibit", color: "error", onSelect: () => void ban(member) },
+      { label: "Remove", icon: "i-ph-trash", color: "error", onSelect: () => void remove(member) },
+    ],
+  ]
 }
-
 </script>
 
 <template>
   <PageShell id="members" title="Members" :description="description">
-    <template v-if="admin" #actions><UButton to="/admin/review" label="Review Shares" color="neutral" size="sm" variant="ghost" /><UButton to="/admin/reports" label="Reports" color="neutral" size="sm" variant="ghost" /></template>
-    <div class="mb-6 grid grid-cols-1 divide-y divide-default rounded-lg border border-default sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+    <template v-if="admin" #actions
+      ><UButton to="/admin/review" label="Review Shares" color="neutral" size="sm" variant="ghost" /><UButton
+        to="/admin/reports"
+        label="Reports"
+        color="neutral"
+        size="sm"
+        variant="ghost"
+    /></template>
+    <div
+      class="mb-6 grid grid-cols-1 divide-y divide-default rounded-lg border border-default sm:grid-cols-2 sm:divide-x sm:divide-y-0"
+    >
       <div v-for="role in ROLES" :key="role" class="px-4 py-3">
         <p class="flex items-center gap-2 text-sm font-medium text-highlighted">
           {{ ROLE_LABELS[role] }}
@@ -53,7 +66,14 @@ function menu(member: Member): DropdownMenuItem[][] {
       </div>
     </div>
 
-    <UInput v-if="members.length > 8" v-model="search" class="mb-3 w-full max-w-xs" icon="i-ph-magnifying-glass" placeholder="Search members" size="sm" />
+    <UInput
+      v-if="members.length > 8"
+      v-model="search"
+      class="mb-3 w-full max-w-xs"
+      icon="i-ph-magnifying-glass"
+      placeholder="Search members"
+      size="sm"
+    />
 
     <div class="overflow-hidden rounded-lg border border-default">
       <table class="w-full table-fixed text-sm">
@@ -79,10 +99,18 @@ function menu(member: Member): DropdownMenuItem[][] {
                     {{ member.name }}<span v-if="member.you" class="ml-1.5 font-normal text-muted">(you)</span>
                   </p>
                   <p class="truncate font-mono text-xs text-muted">
-                    {{ member.email }}<template v-if="member.lastActiveAt && !member.you">{{ member.email ? " · " : "" }}<TimeAgo :at="member.lastActiveAt" /></template>
+                    {{ member.email
+                    }}<template v-if="member.lastActiveAt && !member.you"
+                      >{{ member.email ? " · " : "" }}<TimeAgo :at="member.lastActiveAt"
+                    /></template>
                   </p>
                   <p class="mt-1 sm:hidden">
-                    <UBadge :color="member.banned ? 'error' : 'neutral'" :label="statusOf(member)" size="sm" :variant="member.banned ? 'subtle' : 'outline'" />
+                    <UBadge
+                      :color="member.banned ? 'error' : 'neutral'"
+                      :label="statusOf(member)"
+                      size="sm"
+                      :variant="member.banned ? 'subtle' : 'outline'"
+                    />
                   </p>
                 </div>
               </div>
@@ -92,11 +120,22 @@ function menu(member: Member): DropdownMenuItem[][] {
             </td>
             <td class="hidden px-4 py-3 text-right font-mono text-xs md:table-cell">{{ member.drops }}</td>
             <td class="hidden px-4 py-3 sm:table-cell">
-              <UBadge :color="member.banned ? 'error' : 'neutral'" :label="statusOf(member)" size="sm" :variant="member.banned ? 'subtle' : 'outline'" />
+              <UBadge
+                :color="member.banned ? 'error' : 'neutral'"
+                :label="statusOf(member)"
+                size="sm"
+                :variant="member.banned ? 'subtle' : 'outline'"
+              />
             </td>
             <td v-if="admin" class="py-3 pr-2">
               <UDropdownMenu v-if="!member.you" :items="menu(member)" :content="{ align: 'end' }">
-                <UButton :aria-label="`Actions for ${member.name}`" color="neutral" icon="i-ph-dots-three" size="sm" variant="ghost" />
+                <UButton
+                  :aria-label="`Actions for ${member.name}`"
+                  color="neutral"
+                  icon="i-ph-dots-three"
+                  size="sm"
+                  variant="ghost"
+                />
               </UDropdownMenu>
             </td>
           </tr>
@@ -104,8 +143,8 @@ function menu(member: Member): DropdownMenuItem[][] {
       </table>
     </div>
 
-    <p v-if="me" class="mt-3 text-xs text-muted">Admins are the people whose emails are in <code>DROP_ADMINS</code>, set where this Drop is deployed.</p>
-
-
+    <p v-if="me" class="mt-3 text-xs text-muted">
+      Admins are the people whose emails are in <code>DROP_ADMINS</code>, set where this Drop is deployed.
+    </p>
   </PageShell>
 </template>

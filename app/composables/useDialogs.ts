@@ -24,19 +24,19 @@ export function useConfirm() {
 /** `await prompt({ title, label })` instead of window.prompt. Resolves null when cancelled. */
 export function usePrompt() {
   const open = useDialog(PromptModal)
-  return async (props: Parameters<typeof open>[0]) => await open(props) ?? null
+  return async (props: Parameters<typeof open>[0]) => (await open(props)) ?? null
 }
 
 /** `await siteDialog()`: the address and name of a new site review, or null when cancelled. */
 export function useSiteDialog() {
   const open = useDialog(SiteModal)
-  return async () => await open({}) ?? null
+  return async () => (await open({})) ?? null
 }
 
 /** `await folderDialog({ offerTeam })`: a new folder's name, description, and whether it's the team's; null when cancelled. */
 export function useFolderDialog() {
   const open = useDialog(FolderModal)
-  return async (props: Parameters<typeof open>[0] = {}) => await open(props) ?? null
+  return async (props: Parameters<typeof open>[0] = {}) => (await open(props)) ?? null
 }
 
 /** `await moveTo({ drop })`: pick a folder for the drop, or the top. Resolves true once it moved. */

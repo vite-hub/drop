@@ -50,15 +50,31 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     realtime: { authority: "cloudflare" },
   },
   // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job. The deploy build sets it to daily for Hobby.
-  vercel: { preset: "vercel", blob: { ...files, driver: "vercel-blob", access: "private" }, database: d1("vitehub-drop-vercel"), schedule: true },
+  vercel: {
+    preset: "vercel",
+    blob: { ...files, driver: "vercel-blob", access: "private" },
+    database: d1("vitehub-drop-vercel"),
+    schedule: true,
+  },
   // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
-  netlify: { preset: "netlify", blob: files, database: d1("vitehub-drop-netlify"), schedule: { providerOutput: "standalone" } },
+  netlify: {
+    preset: "netlify",
+    blob: files,
+    database: d1("vitehub-drop-netlify"),
+    schedule: { providerOutput: "standalone" },
+  },
   // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). ViteHub's
   // Deno preset has no schedule, so none of the hourly cleanup runs: expired drops and code images stop being served
   // but stay stored, the Trash is never purged, and unused OAuth clients stay registered.
   deno: {
     preset: "deno",
-    blob: { ...files, driver: "s3", bucket: process.env.S3_BUCKET || "drop", endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || "auto" },
+    blob: {
+      ...files,
+      driver: "s3",
+      bucket: process.env.S3_BUCKET || "drop",
+      endpoint: process.env.S3_ENDPOINT,
+      region: process.env.S3_REGION || "auto",
+    },
     database: d1("vitehub-drop-deno"),
   },
   // One Node process: local SQLite or explicit D1, files on disk under .data/, in-memory rate limits, and cleanup on a
@@ -66,7 +82,14 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   vps: {
     preset: "node",
     blob: { ...files, driver: "fs", base: ".data/blob" },
-    database: database === "sqlite" ? { connection: { url: env({ source: env.source("DROP_DATABASE_URL"), default: "file:.data/database/drop.db" }) } } : d1("vitehub-drop-vps"),
+    database:
+      database === "sqlite"
+        ? {
+            connection: {
+              url: env({ source: env.source("DROP_DATABASE_URL"), default: "file:.data/database/drop.db" }),
+            },
+          }
+        : d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: true,
     schedule: { runtime: { driver: "process" } },
@@ -79,10 +102,23 @@ type RouteRule = NonNullable<NuxtConfig["routeRules"]>[string]
 
 // Drops' pages show drops in srcdoc frames, which inherit the page's CSP: no script policy there, only frame-ancestors
 // (shared/csp.ts; app/plugins/csp-boundary.client.ts loads them fresh from a page that has one).
-const DROP_PAGE: RouteRule = { security: { headers: { contentSecurityPolicy: {
-  "base-uri": false, "object-src": false, "form-action": false, "script-src": false, "script-src-attr": false,
-  "style-src": false, "img-src": false, "font-src": false, "frame-ancestors": ["'none'"],
-} } } }
+const DROP_PAGE: RouteRule = {
+  security: {
+    headers: {
+      contentSecurityPolicy: {
+        "base-uri": false,
+        "object-src": false,
+        "form-action": false,
+        "script-src": false,
+        "script-src-attr": false,
+        "style-src": false,
+        "img-src": false,
+        "font-src": false,
+        "frame-ancestors": ["'none'"],
+      },
+    },
+  },
+}
 const SIGNED_IN: RouteRule = { appMiddleware: { auth: true }, appLayout: "dashboard" }
 
 export default defineNuxtConfig({
@@ -93,9 +129,13 @@ export default defineNuxtConfig({
   alias: {
     // PNG code images are a Browser Run screenshot. Browser Run only exists on Cloudflare, and ViteHub only
     // generates its runtime module in builds that enable it, so other hosts get a stub that says so.
-    "#code-image-png": fileURLToPath(new URL(`./server/code-image-png/${host === "cloudflare" ? "browser-run" : "unavailable"}.ts`, import.meta.url)),
+    "#code-image-png": fileURLToPath(
+      new URL(`./server/code-image-png/${host === "cloudflare" ? "browser-run" : "unavailable"}.ts`, import.meta.url),
+    ),
     // Live editing needs Realtime rooms, which only Cloudflare and VPS builds have. The others get a stub that says so.
-    "#live-drafts": fileURLToPath(new URL(`./server/live-drafts/${liveEditing ? "realtime" : "unavailable"}.ts`, import.meta.url)),
+    "#live-drafts": fileURLToPath(
+      new URL(`./server/live-drafts/${liveEditing ? "realtime" : "unavailable"}.ts`, import.meta.url),
+    ),
   },
 
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
@@ -103,7 +143,12 @@ export default defineNuxtConfig({
     vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
   },
 
-  css: ["@fontsource-variable/geist", "@fontsource-variable/geist-mono", "@fontsource/instrument-serif/latin-400-italic.css", "~/assets/css/main.css"],
+  css: [
+    "@fontsource-variable/geist",
+    "@fontsource-variable/geist-mono",
+    "@fontsource/instrument-serif/latin-400-italic.css",
+    "~/assets/css/main.css",
+  ],
   devtools: false,
   compatibilityDate: "2026-07-17",
 
@@ -132,7 +177,17 @@ export default defineNuxtConfig({
       referrerPolicy: "strict-origin-when-cross-origin",
       strictTransportSecurity: { maxAge: 31536000, includeSubdomains: false },
       // Screen capture stays on for Drop itself: reviewing a site inside Drop screenshots it that way.
-      permissionsPolicy: { "camera": [], "microphone": [], "geolocation": [], "payment": [], "usb": [], "serial": [], "hid": [], "display-capture": ["self"], "fullscreen": false },
+      permissionsPolicy: {
+        camera: [],
+        microphone: [],
+        geolocation: [],
+        payment: [],
+        usb: [],
+        serial: [],
+        hid: [],
+        "display-capture": ["self"],
+        fullscreen: false,
+      },
       contentSecurityPolicy: {
         "base-uri": ["'none'"],
         "object-src": ["'none'"],
@@ -150,7 +205,7 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    ...Object.fromEntries(DROP_PAGE_ROUTES.map(route => [route, DROP_PAGE])),
+    ...Object.fromEntries(DROP_PAGE_ROUTES.map((route) => [route, DROP_PAGE])),
     // The signed-in pages and the docs by path, instead of each page's definePageMeta. Nuxt merges every rule a path
     // matches, so `/drops` gets SIGNED_IN from `/drops/**` too. The landing (pages/index.vue) and shared links
     // (pages/d/) pick their own layout in their own middleware.
@@ -202,23 +257,77 @@ export default defineNuxtConfig({
     clientBundle: {
       scan: true,
       icons: [
-        "ph:file-text", "ph:code", "ph:image", "ph:file", "ph:folder", "ph:app-window", "ph:globe", "ph:sparkle", "ph:key", "ph:user",
-        "simple-icons:claude", "simple-icons:openai", "simple-icons:cursor", "simple-icons:githubcopilot", "simple-icons:googlegemini",
-        "simple-icons:windsurf", "simple-icons:zedindustries", "simple-icons:opencode", "simple-icons:githubactions",
+        "ph:file-text",
+        "ph:code",
+        "ph:image",
+        "ph:file",
+        "ph:folder",
+        "ph:app-window",
+        "ph:globe",
+        "ph:sparkle",
+        "ph:key",
+        "ph:user",
+        "simple-icons:claude",
+        "simple-icons:openai",
+        "simple-icons:cursor",
+        "simple-icons:githubcopilot",
+        "simple-icons:googlegemini",
+        "simple-icons:windsurf",
+        "simple-icons:zedindustries",
+        "simple-icons:opencode",
+        "simple-icons:githubactions",
         // Host icons in the docs (app/utils/docs.ts).
-        "simple-icons:cloudflare", "simple-icons:vercel", "simple-icons:netlify", "simple-icons:deno", "ph:hard-drives",
+        "simple-icons:cloudflare",
+        "simple-icons:vercel",
+        "simple-icons:netlify",
+        "simple-icons:deno",
+        "ph:hard-drives",
         // Share states' icons (SHARE_ICONS in shared/share.ts) that no template names.
         "ph:users-three",
         // The Get started checklist's step marks (app/components/GetStarted.vue).
-        "ph:check-circle-fill", "ph:circle",
+        "ph:check-circle-fill",
+        "ph:circle",
         // Nuxt UI's own icons (app.config ui.icons): the scanner reads templates, not app.config, so without these the
         // color-mode toggle, close buttons, carets, and spinners render empty.
-        "ph:arrow-counter-clockwise", "ph:arrow-down", "ph:arrow-left", "ph:arrow-right", "ph:arrow-up", "ph:arrow-up-right",
-        "ph:caret-double-left", "ph:caret-double-right", "ph:caret-down", "ph:caret-left", "ph:caret-right", "ph:caret-up",
-        "ph:check", "ph:check-circle", "ph:circle-notch", "ph:copy", "ph:dots-six-vertical", "ph:dots-three", "ph:eye",
-        "ph:eye-slash", "ph:folder-open", "ph:hash", "ph:info", "ph:lightbulb", "ph:list", "ph:magnifying-glass", "ph:minus",
-        "ph:monitor", "ph:moon", "ph:plus", "ph:sidebar-simple", "ph:star", "ph:stop", "ph:sun", "ph:upload-simple",
-        "ph:warning", "ph:warning-circle", "ph:x", "ph:x-circle",
+        "ph:arrow-counter-clockwise",
+        "ph:arrow-down",
+        "ph:arrow-left",
+        "ph:arrow-right",
+        "ph:arrow-up",
+        "ph:arrow-up-right",
+        "ph:caret-double-left",
+        "ph:caret-double-right",
+        "ph:caret-down",
+        "ph:caret-left",
+        "ph:caret-right",
+        "ph:caret-up",
+        "ph:check",
+        "ph:check-circle",
+        "ph:circle-notch",
+        "ph:copy",
+        "ph:dots-six-vertical",
+        "ph:dots-three",
+        "ph:eye",
+        "ph:eye-slash",
+        "ph:folder-open",
+        "ph:hash",
+        "ph:info",
+        "ph:lightbulb",
+        "ph:list",
+        "ph:magnifying-glass",
+        "ph:minus",
+        "ph:monitor",
+        "ph:moon",
+        "ph:plus",
+        "ph:sidebar-simple",
+        "ph:star",
+        "ph:stop",
+        "ph:sun",
+        "ph:upload-simple",
+        "ph:warning",
+        "ph:warning-circle",
+        "ph:x",
+        "ph:x-circle",
       ],
     },
   },
@@ -229,15 +338,19 @@ export default defineNuxtConfig({
     errorHandler: fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url)),
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.
-    ...(host === "cloudflare" ? { storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } } } : {}),
+    ...(host === "cloudflare"
+      ? { storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } } }
+      : {}),
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
-    modules: [evlog({
-      env: { service: "drop" },
-      exclude: ["/_nuxt/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
-      redact: { paths: ["**.key", "**.secret", "**.password"] },
-    })],
+    modules: [
+      evlog({
+        env: { service: "drop" },
+        exclude: ["/_nuxt/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
+        redact: { paths: ["**.key", "**.secret", "**.password"] },
+      }),
+    ],
     cloudflare: {
       wrangler: {
         name: cloudflareTemplate.name,
@@ -255,7 +368,7 @@ export default defineNuxtConfig({
   serverHandlers: [
     { route: "/.well-known/agent-skills/**", handler: skillsHandler, lazy: true },
     { route: "/.well-known/skills/**", handler: skillsHandler, lazy: true },
-    ...["oauth-protected-resource", "oauth-authorization-server", "openid-configuration"].flatMap(name => [
+    ...["oauth-protected-resource", "oauth-authorization-server", "openid-configuration"].flatMap((name) => [
       { route: `/.well-known/${name}`, handler: oauthMetadataHandler, lazy: true },
       { route: `/.well-known/${name}/**`, handler: oauthMetadataHandler, lazy: true },
     ]),
@@ -263,12 +376,13 @@ export default defineNuxtConfig({
 
   hooks: {
     "nitro:init": function (nitro) {
-      if (host === "cloudflare") nitro.hooks.hook("compiled", () => syncCloudflareTemplate(nitro.options.output.serverDir))
+      if (host === "cloudflare")
+        nitro.hooks.hook("compiled", () => syncCloudflareTemplate(nitro.options.output.serverDir))
     },
     // The CLI nightly adds a dev-only socket-cleanup plugin from @nuxt/cli, which this Nuxt nightly's
     // server import protection rejects. Dev works without it.
     "nitro:config": function (config) {
-      config.plugins = config.plugins?.filter(plugin => !plugin.includes("dev-close-sockets"))
+      config.plugins = config.plugins?.filter((plugin) => !plugin.includes("dev-close-sockets"))
     },
   },
 

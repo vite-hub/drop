@@ -14,10 +14,12 @@ export const useApi = createUseFetch(() => {
   return {
     headers: useRequestHeaders(["cookie"]),
     // SAFETY: the same ofetch instance Nuxt's $fetch is, only with Nitro's in-process fetch; Nuxt's type adds the route typing.
-    $fetch: createFetch({ fetch: async (request, options) => {
-      const { serverFetch } = await import("nitro")
-      return serverFetch(new URL(request instanceof Request ? request.url : request, origin).href, options)
-    } }) as typeof $fetch,
+    $fetch: createFetch({
+      fetch: async (request, options) => {
+        const { serverFetch } = await import("nitro")
+        return serverFetch(new URL(request instanceof Request ? request.url : request, origin).href, options)
+      },
+    }) as typeof $fetch,
   }
 })
 
@@ -36,12 +38,20 @@ const text = v.fallback(v.optional(v.string()), undefined)
 const ApiError = v.object({
   message: text,
   statusText: text,
-  data: v.fallback(v.optional(v.object({
-    code: text,
-    message: text,
-    statusText: text,
-    data: v.fallback(v.optional(v.object({ issues: v.fallback(v.optional(v.array(v.object({ message: text }))), undefined) })), undefined),
-  })), undefined),
+  data: v.fallback(
+    v.optional(
+      v.object({
+        code: text,
+        message: text,
+        statusText: text,
+        data: v.fallback(
+          v.optional(v.object({ issues: v.fallback(v.optional(v.array(v.object({ message: text }))), undefined) })),
+          undefined,
+        ),
+      }),
+    ),
+    undefined,
+  ),
 })
 
 /**
@@ -53,7 +63,14 @@ export function errorText(error: unknown, fallback = "Something went wrong. Try 
   if (!parsed.success) return fallback
   const value = parsed.output
   if (value.data?.code === "DROP_LIMIT_REACHED") return value.data.message ?? fallback
-  return value.data?.data?.issues?.[0]?.message ?? value.data?.statusText ?? value.statusText ?? value.data?.message ?? value.message ?? fallback
+  return (
+    value.data?.data?.issues?.[0]?.message ??
+    value.data?.statusText ??
+    value.statusText ??
+    value.data?.message ??
+    value.message ??
+    fallback
+  )
 }
 
 /** The `data` an API error's body carries (an HTTPError's `data`), when it matches `schema`. */

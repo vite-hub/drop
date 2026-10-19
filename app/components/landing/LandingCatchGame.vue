@@ -26,39 +26,51 @@ let spawnIn = 0
 
 const active = computed(() => manual.value || (props.running && motion.value !== "reduce"))
 
-const { pause, resume } = useRafFn(({ delta }) => {
-  if (!width.value || !height.value) return
-  const dt = Math.min(delta, 50) / 1000
-  spawnIn -= dt
-  if (spawnIn <= 0) {
-    spawnIn = 0.55 + Math.random() * 0.45
-    items.value.push({ id: nextId++, x: 0.06 + Math.random() * 0.88, y: -24, speed: 110 + Math.random() * 90 + score.value * 2, icon: ICONS[nextId % ICONS.length]! })
-  }
-  // On its own, the hand chases whichever file will land first.
-  if (!manual.value) {
-    const lowest = items.value.reduce<Item | undefined>((low, item) => (!low || item.y > low.y ? item : low), undefined)
-    if (lowest) target.value = lowest.x
-  }
-  const step = (520 / width.value) * dt
-  hand.value += Math.max(-step, Math.min(step, target.value - hand.value))
+const { pause, resume } = useRafFn(
+  ({ delta }) => {
+    if (!width.value || !height.value) return
+    const dt = Math.min(delta, 50) / 1000
+    spawnIn -= dt
+    if (spawnIn <= 0) {
+      spawnIn = 0.55 + Math.random() * 0.45
+      items.value.push({
+        id: nextId++,
+        x: 0.06 + Math.random() * 0.88,
+        y: -24,
+        speed: 110 + Math.random() * 90 + score.value * 2,
+        icon: ICONS[nextId % ICONS.length]!,
+      })
+    }
+    // On its own, the hand chases whichever file will land first.
+    if (!manual.value) {
+      const lowest = items.value.reduce<Item | undefined>(
+        (low, item) => (!low || item.y > low.y ? item : low),
+        undefined,
+      )
+      if (lowest) target.value = lowest.x
+    }
+    const step = (520 / width.value) * dt
+    hand.value += Math.max(-step, Math.min(step, target.value - hand.value))
 
-  const handY = height.value - 40
-  for (const item of items.value) item.y += item.speed * dt
-  items.value = items.value.filter((item) => {
-    if (item.y >= handY - 16 && item.y <= handY + 8 && Math.abs((item.x - hand.value) * width.value) < CATCH) {
-      score.value++
-      best.value = Math.max(best.value, score.value)
-      pops.value.push({ id: item.id, x: item.x })
-      return false
-    }
-    if (item.y > height.value) {
-      if (manual.value) score.value = 0
-      return false
-    }
-    return true
-  })
-}, { immediate: false })
-watch(active, value => (value ? resume() : pause()), { immediate: true })
+    const handY = height.value - 40
+    for (const item of items.value) item.y += item.speed * dt
+    items.value = items.value.filter((item) => {
+      if (item.y >= handY - 16 && item.y <= handY + 8 && Math.abs((item.x - hand.value) * width.value) < CATCH) {
+        score.value++
+        best.value = Math.max(best.value, score.value)
+        pops.value.push({ id: item.id, x: item.x })
+        return false
+      }
+      if (item.y > height.value) {
+        if (manual.value) score.value = 0
+        return false
+      }
+      return true
+    })
+  },
+  { immediate: false },
+)
+watch(active, (value) => (value ? resume() : pause()), { immediate: true })
 
 function take() {
   if (!manual.value) {
@@ -93,8 +105,12 @@ function key(event: KeyboardEvent) {
     @keydown="key"
   >
     <div class="absolute inset-x-4 top-3 flex items-center justify-between font-mono text-[11px] text-muted">
-      <span>Score <span class="text-highlighted tabular-nums">{{ score }}</span></span>
-      <span>Best <span class="text-highlighted tabular-nums">{{ best }}</span></span>
+      <span
+        >Score <span class="text-highlighted tabular-nums">{{ score }}</span></span
+      >
+      <span
+        >Best <span class="text-highlighted tabular-nums">{{ best }}</span></span
+      >
     </div>
     <span
       v-for="item in items"
@@ -109,9 +125,15 @@ function key(event: KeyboardEvent) {
       :key="`pop-${pop.id}`"
       class="absolute font-mono text-xs font-semibold text-highlighted [animation:float-up_600ms_var(--ease-out)_both]"
       :style="{ left: `${pop.x * width}px`, bottom: '64px' }"
-      @animationend="pops = pops.filter(other => other.id !== pop.id)"
-    >+1</span>
-    <DropMark class="absolute bottom-6 left-0 h-10" :style="{ width: `${HAND}px`, transform: `translateX(${hand * width - HAND / 2}px)` }" />
-    <p v-if="!manual" class="label-mono absolute inset-x-0 bottom-1.5 text-center text-[10px] text-dimmed">Hover or tap to play</p>
+      @animationend="pops = pops.filter((other) => other.id !== pop.id)"
+      >+1</span
+    >
+    <DropMark
+      class="absolute bottom-6 left-0 h-10"
+      :style="{ width: `${HAND}px`, transform: `translateX(${hand * width - HAND / 2}px)` }"
+    />
+    <p v-if="!manual" class="label-mono absolute inset-x-0 bottom-1.5 text-center text-[10px] text-dimmed">
+      Hover or tap to play
+    </p>
   </div>
 </template>

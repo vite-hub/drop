@@ -5,7 +5,8 @@ import { defineHandler } from "h3"
 const DOC_PATH = /^\/d\/([^/]+?)(?:\/([^/]+?))?(\.md)?$/
 // Fetchers that read a page for a person's chat (ChatGPT, Claude, Perplexity). The doc renders in a frame once the
 // page's script runs, so its HTML alone carries only the title; they get the text instead.
-const AI_FETCHER = /ChatGPT-User|OAI-SearchBot|GPTBot|Claude-User|Claude-SearchBot|ClaudeBot|Perplexity-User|PerplexityBot/i
+const AI_FETCHER =
+  /ChatGPT-User|OAI-SearchBot|GPTBot|Claude-User|Claude-SearchBot|ClaudeBot|Perplexity-User|PerplexityBot/i
 
 /**
  * A doc's share link as Markdown: `/d/<link>/<slug>.md`, or the link itself for a request that prefers
@@ -28,13 +29,17 @@ export default defineHandler(async (event) => {
       const value = event.req.headers.get(name)
       if (value) headers.set(name, value)
     }
-    const response = await event.app!.fetch(Object.assign(new Request(new URL(path, event.url), { headers }), { runtime: event.req.runtime }))
+    const response = await event.app!.fetch(
+      Object.assign(new Request(new URL(path, event.url), { headers }), { runtime: event.req.runtime }),
+    )
     // SAFETY: only Drop's own /api/links and /api/drops routes are read here, and they answer with T.
-    return response.ok ? await response.json() as T : null
+    return response.ok ? ((await response.json()) as T) : null
   }
   const pinned = event.url.searchParams.get("v")
-  const target = await read<DropLink>(`/api/links/${encodeURIComponent(key)}${pinned ? `?v=${encodeURIComponent(pinned)}` : ""}`)
-  const drop = target && await read<DropDetail>(`/api/drops/${target.id}`)
+  const target = await read<DropLink>(
+    `/api/links/${encodeURIComponent(key)}${pinned ? `?v=${encodeURIComponent(pinned)}` : ""}`,
+  )
+  const drop = target && (await read<DropDetail>(`/api/drops/${target.id}`))
   if (!drop) return
   const { dropMarkdown } = await import("../utils/drop-markdown")
   const markdown = dropMarkdown(drop, event.url.origin)
@@ -43,7 +48,7 @@ export default defineHandler(async (event) => {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
       "Cache-Control": "private, no-store",
-      "Vary": "Accept, User-Agent",
+      Vary: "Accept, User-Agent",
       "X-Robots-Tag": "noindex, nofollow",
     },
   })

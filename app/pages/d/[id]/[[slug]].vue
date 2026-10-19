@@ -22,7 +22,10 @@ const target = await useApi<DropLink>(() => `/api/links/${route.params.id}`, {
 async function settle() {
   const link = target.data.value
   if (!link || route.path === dropPath(link)) return
-  await navigateTo({ path: dropPath(link), query: { ...route.query, ...(link.from ? { from: link.from } : {}) } }, { replace: true })
+  await navigateTo(
+    { path: dropPath(link), query: { ...route.query, ...(link.from ? { from: link.from } : {}) } },
+    { replace: true },
+  )
 }
 await settle()
 watch(() => target.data.value, settle)
@@ -32,7 +35,18 @@ const { drop, comments } = provideDrop(() => target.data.value?.id ?? route.para
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
 // The doc renders in a frame once the page's script runs; agents reading the HTML find its text here instead.
-useHeadSafe({ link: () => (["markdown", "html"].includes(drop.data.value?.kind ?? "") ? [{ rel: "alternate", type: "text/markdown", href: `${route.path}.md${pinned.value ? `?v=${pinned.value}` : ""}` }] : []) })
+useHeadSafe({
+  link: () =>
+    ["markdown", "html"].includes(drop.data.value?.kind ?? "")
+      ? [
+          {
+            rel: "alternate",
+            type: "text/markdown",
+            href: `${route.path}.md${pinned.value ? `?v=${pinned.value}` : ""}`,
+          },
+        ]
+      : [],
+})
 // A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.
 onMounted(() => drop.data.value && $fetch(`/api/drops/${drop.data.value.id}/visit`, { method: "POST" }).catch(() => {}))
 const waiting = computed(() => waitingForReview(drop.error.value))
@@ -53,5 +67,11 @@ const here = useHerePath()
     <DropViewer :key="drop.data.value.id" public-view />
     <ShortcutsModal />
   </UDashboardGroup>
-  <ContentUnavailable v-else class="min-h-dvh" :status="drop.error.value?.status ?? 500" :path="here" :waiting-for-review="waiting" />
+  <ContentUnavailable
+    v-else
+    class="min-h-dvh"
+    :status="drop.error.value?.status ?? 500"
+    :path="here"
+    :waiting-for-review="waiting"
+  />
 </template>

@@ -16,7 +16,11 @@ export default defineValidatedHandler({
     const claims = await readReviewToken(event, token)
     const site = claims ? await findDrop(claims.d, event) : null
     if (!who) throw new HTTPError({ status: 401, statusText: "Sign in to open the review." })
-    if (!site || site.kind !== "site" || !openable(site, who)) throw new HTTPError({ status: 404, statusText: "Only people the review is shared with can open it. Your comments still reach its owner." })
+    if (!site || site.kind !== "site" || !openable(site, who))
+      throw new HTTPError({
+        status: 404,
+        statusText: "Only people the review is shared with can open it. Your comments still reach its owner.",
+      })
     event.res.headers.set("Cache-Control", "no-store")
     return { to: `/drops/${site.id}` }
   },

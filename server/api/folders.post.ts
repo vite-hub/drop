@@ -14,6 +14,8 @@ export default defineValidatedHandler({
     const who = await requireIdentity(event)
     const body = await event.req.json()
     const parent = body.folder ? await requireFolder(body.folder, who, event, undefined, "folder") : undefined
-    return toSummary(await createFolder(who, { title: body.title, folder: parent, note: body.description, team: body.team }, event))
+    return toSummary(
+      await createFolder(who, { title: body.title, folder: parent, note: body.description, team: body.team }, event),
+    )
   },
 })

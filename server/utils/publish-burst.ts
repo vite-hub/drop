@@ -8,11 +8,14 @@ export const PUBLISH_BURST = 30
 export async function requirePublishBurst(event: H3Event, ownerId: string) {
   try {
     await requireRateLimit(event, "file-upload", { key: ownerId, limit: 30, window: "1m" })
-  }
-  catch (error) {
+  } catch (error) {
     if (HTTPError.isError(error)) throw error
     if (error instanceof Error && "status" in error && error.status === 429)
-      throw new HTTPError({ status: 429, headers: "headers" in error && error.headers instanceof Headers ? error.headers : undefined, cause: error })
+      throw new HTTPError({
+        status: 429,
+        headers: "headers" in error && error.headers instanceof Headers ? error.headers : undefined,
+        cause: error,
+      })
     throw error
   }
 }

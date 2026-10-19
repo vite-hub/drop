@@ -32,11 +32,12 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
   {
     title: "Editing",
     where: "The live editor",
-    shortcuts: [
-      { keys: ["meta", "s"], label: "Publish the draft as the next version" },
-    ],
+    shortcuts: [{ keys: ["meta", "s"], label: "Publish the draft as the next version" }],
   },
 ]
 
 /** How the docs print a key that isn't a single letter. The docs show a Mac's ⌘ and say Ctrl works elsewhere. */
-export const KEY_LABELS = new Map([["meta", "⌘"], ["escape", "Esc"]])
+export const KEY_LABELS = new Map([
+  ["meta", "⌘"],
+  ["escape", "Esc"],
+])

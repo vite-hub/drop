@@ -5,10 +5,20 @@
 <template>
   <div class="overflow-x-auto rounded-lg border border-default">
     <table>
-      <thead><tr><th>Host</th><th>Database</th><th>Files</th><th>Rate limits</th><th>Code images</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Host</th>
+          <th>Database</th>
+          <th>Files</th>
+          <th>Rate limits</th>
+          <th>Code images</th>
+        </tr>
+      </thead>
       <tbody>
         <tr v-for="host in HOSTS" :key="host.id">
-          <td><NuxtLink :to="`/docs/self-host/${host.id}`">{{ host.name }}</NuxtLink></td>
+          <td>
+            <NuxtLink :to="`/docs/self-host/${host.id}`">{{ host.name }}</NuxtLink>
+          </td>
           <td>{{ host.database }}</td>
           <td>{{ host.files }}</td>
           <td>{{ host.rateLimits }}</td>

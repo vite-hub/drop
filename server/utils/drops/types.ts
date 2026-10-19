@@ -11,4 +11,8 @@ export type DropRow = typeof drops.$inferSelect & {
   sharedFrom?: { id: string; title: string }
 }
 
-export interface LifetimeInput { lifetime?: Lifetime; keepReason?: string; note?: string }
+export interface LifetimeInput {
+  lifetime?: Lifetime
+  keepReason?: string
+  note?: string
+}

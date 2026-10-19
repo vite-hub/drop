@@ -42,7 +42,8 @@ export default defineAuth(({ env, requestOrigin }) => {
   const proxied = authProxy().enabled
   const organization = env.drop.githubOrg.trim()
   const githubOptions = {
-    clientId: proxied ? "" : env.auth.github.clientId.unseal(), clientSecret: proxied ? "" : env.auth.github.clientSecret.unseal(),
+    clientId: proxied ? "" : env.auth.github.clientId.unseal(),
+    clientSecret: proxied ? "" : env.auth.github.clientSecret.unseal(),
     scope: organization ? ["read:org"] : undefined,
   }
   return {
@@ -53,16 +54,24 @@ export default defineAuth(({ env, requestOrigin }) => {
     route: false,
     // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
     // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
-    advanced: requestOrigin.startsWith("https://") ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } } : {},
+    advanced: requestOrigin.startsWith("https://")
+      ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
+      : {},
     disabledPaths: ["/token", ...(proxied ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
     access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
-    socialProviders: proxied ? {} : {
-      github: {
-        ...githubOptions,
-        ...(organization ? { getUserInfo: async (token: GitHubToken) =>
-          await isGitHubMember(token.accessToken) ? github(githubOptions).getUserInfo(token) : null } : {}),
-      },
-    },
+    socialProviders: proxied
+      ? {}
+      : {
+          github: {
+            ...githubOptions,
+            ...(organization
+              ? {
+                  getUserInfo: async (token: GitHubToken) =>
+                    (await isGitHubMember(token.accessToken)) ? github(githubOptions).getUserInfo(token) : null,
+                }
+              : {}),
+          },
+        },
     emailAndPassword: { enabled: import.meta.dev === true || env.drop.testSignin },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
     hooks: { before: nativeClientRegistration },
@@ -73,17 +82,29 @@ export default defineAuth(({ env, requestOrigin }) => {
             if (account.providerId !== "github") return
             // Public GitHub metadata is a review signal; a lookup failure never blocks private use.
             const profile = await fetch(`https://api.github.com/user/${encodeURIComponent(account.accountId)}`, {
-              headers: { "User-Agent": "Drop", Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(3000),
-            }).then(async response => (response.ok ? v.safeParse(GitHubProfile, await response.json()) : null)).catch(() => null)
+              headers: { "User-Agent": "Drop", Accept: "application/vnd.github+json" },
+              signal: AbortSignal.timeout(3000),
+            })
+              .then(async (response) => (response.ok ? v.safeParse(GitHubProfile, await response.json()) : null))
+              .catch(() => null)
             const createdAt = profile?.success ? profile.output.created_at : undefined
             const githubCreatedAt = createdAt ? Date.parse(createdAt) : NaN
-            if (Number.isFinite(githubCreatedAt)) await db.update(users).set({ githubCreatedAt }).where(eq(users.id, account.userId))
+            if (Number.isFinite(githubCreatedAt))
+              await db.update(users).set({ githubCreatedAt }).where(eq(users.id, account.userId))
           },
         },
       },
-      user: { create: { before: async user => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) } },
+      user: {
+        create: { before: async (user) => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) },
+      },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
-      session: { create: { after: async (session) => { await syncRole(session.userId) } } },
+      session: {
+        create: {
+          after: async (session) => {
+            await syncRole(session.userId)
+          },
+        },
+      },
     },
     plugins: [
       proxyAuth(),

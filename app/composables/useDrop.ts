@@ -10,16 +10,21 @@ import * as v from "valibot"
 function useDrop(id: MaybeRefOrGetter<string>) {
   const notify = useNotify()
   const drop = useApi<DropDetail>(() => `/api/drops/${toValue(id)}`, { key: () => keys.drop(toValue(id)) })
-  const comments = useApi<DropComment[]>(() => `/api/drops/${toValue(id)}/comments`, { key: () => keys.comments(toValue(id)), default: () => [] })
+  const comments = useApi<DropComment[]>(() => `/api/drops/${toValue(id)}/comments`, {
+    key: () => keys.comments(toValue(id)),
+    default: () => [],
+  })
 
   async function addComment(input: Omit<CommentInput, "body">, body: string) {
     try {
-      const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, { method: "POST", body: { ...input, body } })
+      const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, {
+        method: "POST",
+        body: { ...input, body },
+      })
       comments.data.value = [...comments.data.value, comment]
       notify.done("Comment added")
       return comment
-    }
-    catch (error) {
+    } catch (error) {
       notify.fail("Couldn't add the comment", error)
     }
   }
@@ -27,11 +32,10 @@ function useDrop(id: MaybeRefOrGetter<string>) {
   // Optimistic: the checkbox flips at once and rolls back if the server says no.
   async function resolveComment(commentId: string, resolved: boolean) {
     const before = comments.data.value
-    comments.data.value = before.map(comment => (comment.id === commentId ? { ...comment, resolved } : comment))
+    comments.data.value = before.map((comment) => (comment.id === commentId ? { ...comment, resolved } : comment))
     try {
       await $fetch(`/api/comments/${commentId}`, { method: "PATCH", body: { resolved } })
-    }
-    catch (error) {
+    } catch (error) {
       comments.data.value = before
       notify.fail("Couldn't update the comment", error)
     }
@@ -40,23 +44,23 @@ function useDrop(id: MaybeRefOrGetter<string>) {
   async function removeComment(commentId: string) {
     try {
       await $fetch(`/api/comments/${commentId}`, { method: "DELETE" })
-      comments.data.value = comments.data.value.filter(comment => comment.id !== commentId)
-    }
-    catch (error) {
+      comments.data.value = comments.data.value.filter((comment) => comment.id !== commentId)
+    } catch (error) {
       notify.fail("Couldn't delete the comment", error)
     }
   }
 
   const setReplies = (commentId: string, change: (replies: CommentReply[]) => CommentReply[]) =>
-    (comments.data.value = comments.data.value.map(comment => (comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment)))
+    (comments.data.value = comments.data.value.map((comment) =>
+      comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment,
+    ))
 
   async function addReply(commentId: string, body: string) {
     try {
       const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, { method: "POST", body: { body } })
-      setReplies(commentId, replies => [...replies, reply])
+      setReplies(commentId, (replies) => [...replies, reply])
       return reply
-    }
-    catch (error) {
+    } catch (error) {
       notify.fail("Couldn't send the reply", error)
     }
   }
@@ -64,9 +68,8 @@ function useDrop(id: MaybeRefOrGetter<string>) {
   async function removeReply(commentId: string, replyId: string) {
     try {
       await $fetch(`/api/replies/${replyId}`, { method: "DELETE" })
-      setReplies(commentId, replies => replies.filter(reply => reply.id !== replyId))
-    }
-    catch (error) {
+      setReplies(commentId, (replies) => replies.filter((reply) => reply.id !== replyId))
+    } catch (error) {
       notify.fail("Couldn't delete the reply", error)
     }
   }
@@ -82,11 +85,14 @@ export function useVersionTo() {
   const route = useRoute()
   const state = injectDrop()!
   return (version: Pick<DropVersion, "id" | "version">) =>
-    route.path.startsWith("/d/") && state.drop.data.value ? dropPath(state.drop.data.value, version.version) : `/drops/${version.id}`
+    route.path.startsWith("/d/") && state.drop.data.value
+      ? dropPath(state.drop.data.value, version.version)
+      : `/drops/${version.id}`
 }
 
 /** The drop API refused because the drop's share waits for the operator's review (server/api/drops/[id].get.ts). */
-export const waitingForReview = (error: unknown) => errorData(error, v.object({ shareReview: v.literal("pending") })) !== undefined
+export const waitingForReview = (error: unknown) =>
+  errorData(error, v.object({ shareReview: v.literal("pending") })) !== undefined
 
 /** Where the visitor is, for the sign-in redirect and the retry link: the path and query, not the hash SSR never sees. */
 export function useHerePath() {

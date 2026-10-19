@@ -16,8 +16,11 @@ const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 /** An origin a site may send from: https, or plain http on this computer, where dev servers run. Null otherwise. */
 function exactOrigin(url: string): string | null {
   let parsed: URL
-  try { parsed = new URL(url.trim()) }
-  catch { return null }
+  try {
+    parsed = new URL(url.trim())
+  } catch {
+    return null
+  }
   if (parsed.username || parsed.password) return null
   if (parsed.protocol === "https:") return parsed.origin
   return parsed.protocol === "http:" && isLocal(parsed.hostname) ? parsed.origin : null
@@ -44,14 +47,16 @@ export function siteAddress(url: string): string | null {
 }
 
 /** What `siteAddress` takes, for the people who typed something else. */
-export const SITE_ADDRESS_RULE = "Use https, or http on localhost. A pattern starts with *. and covers one label, like https://*.preview.example.com."
+export const SITE_ADDRESS_RULE =
+  "Use https, or http on localhost. A pattern starts with *. and covers one label, like https://*.preview.example.com."
 
 /** Whether a page's origin is one the site drop covers (see `siteAddress`). */
 export function siteMatches(address: string, origin: string): boolean {
   if (exactOrigin(origin) !== origin) return false
   if (!address.includes("*")) return address === origin
   const [prefix, suffix] = address.split("*.")
-  if (prefix === undefined || suffix === undefined || !origin.startsWith(prefix) || !origin.endsWith(`.${suffix}`)) return false
+  if (prefix === undefined || suffix === undefined || !origin.startsWith(prefix) || !origin.endsWith(`.${suffix}`))
+    return false
   return LABEL.test(origin.slice(prefix.length, origin.length - suffix.length - 1))
 }
 
@@ -63,7 +68,10 @@ export function siteAddressesFor(origin: string): string[] {
   if (exactOrigin(origin) !== origin) return []
   const { protocol, hostname, port } = new URL(origin)
   const dot = hostname.indexOf(".")
-  const pattern = dot > 0 && !hostname.startsWith("[") ? siteAddress(`${protocol}//*.${hostname.slice(dot + 1)}${port ? `:${port}` : ""}`) : null
+  const pattern =
+    dot > 0 && !hostname.startsWith("[")
+      ? siteAddress(`${protocol}//*.${hostname.slice(dot + 1)}${port ? `:${port}` : ""}`)
+      : null
   return pattern ? [origin, pattern] : [origin]
 }
 

@@ -109,8 +109,13 @@ main {
 
 /* Wide tables. Typeset keeps headers on one line, so a table with several long headers outgrew the column and ran
    off the page. Headers wrap like cells, and a table that still can't fit scrolls inside the column (GitHub's way). */
-.typeset table:not(.typeset-scroll table) { display: block; overflow-x: auto; }
-.typeset thead th { white-space: normal; }
+.typeset table:not(.typeset-scroll table) {
+  display: block;
+  overflow-x: auto;
+}
+.typeset thead th {
+  white-space: normal;
+}
 
 /* A before/after compare takes the room beside the text column, so its screenshots read at about twice the size.
    It keeps clear of the viewer's floating panel on both sides (--drop-inset), and never gets narrower than the text. */

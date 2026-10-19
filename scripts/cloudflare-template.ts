@@ -21,7 +21,10 @@ const Template = v.looseObject({
   secrets: v.looseObject({ required: v.array(v.string()) }),
 })
 
-export const cloudflareTemplate = v.parse(Template, parseJSONC(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8")))
+export const cloudflareTemplate = v.parse(
+  Template,
+  parseJSONC(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8")),
+)
 
 // Nitro merges root and generated Wrangler arrays by concatenating them. Keep one binding
 // per name, with the template's provisioned ids, and preserve the existing D1 build override.

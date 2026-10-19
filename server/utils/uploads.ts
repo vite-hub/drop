@@ -23,12 +23,26 @@ const UPLOAD_MINUTES = 15
 const MAX_TICKET = 8192
 
 // Lazy: publish.ts imports this file, so its schema isn't there yet when this module loads.
-const UploadTicket = v.object({ u: v.string(), k: v.picklist(ACTOR_KINDS), a: v.string(), i: v.lazy(() => PublishInput), j: v.string(), e: v.number() })
+const UploadTicket = v.object({
+  u: v.string(),
+  k: v.picklist(ACTOR_KINDS),
+  a: v.string(),
+  i: v.lazy(() => PublishInput),
+  j: v.string(),
+  e: v.number(),
+})
 type UploadTicket = v.InferOutput<typeof UploadTicket>
 
 export async function signUpload(event: H3Event, who: Identity, input: PublishInput, now = Date.now()) {
   const { base64: _, ...file } = input.file!
-  const ticket: UploadTicket = { u: who.userId, k: who.actorKind, a: who.actorName, i: { ...input, file }, j: crypto.randomUUID(), e: now + UPLOAD_MINUTES * 60_000 }
+  const ticket: UploadTicket = {
+    u: who.userId,
+    k: who.actorKind,
+    a: who.actorName,
+    i: { ...input, file },
+    j: crypto.randomUUID(),
+    e: now + UPLOAD_MINUTES * 60_000,
+  }
   const sealed = await seal(event, "upload", ticket)
   return { url: new URL(`/api/uploads/${sealed}`, event.url.origin).href, expiresAt: ticket.e }
 }
@@ -41,13 +55,19 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
   if (!row || row.banned) return null
   // An organization's Drop only acts for current members, as for any other request.
   if (githubOrganization()) {
-    const [github] = await db.select({ token: account.accessToken }).from(account)
-      .where(and(eq(account.userId, row.id), eq(account.providerId, "github"))).limit(1)
-    if (!await isGitHubMember(github?.token)) return null
+    const [github] = await db
+      .select({ token: account.accessToken })
+      .from(account)
+      .where(and(eq(account.userId, row.id), eq(account.providerId, "github")))
+      .limit(1)
+    if (!(await isGitHubMember(github?.token))) return null
   }
   const role = row.role ?? ""
   const who: Identity = {
-    userId: row.id, name: row.name, email: row.email, image: row.image ?? null,
+    userId: row.id,
+    name: row.name,
+    email: row.email,
+    image: row.image ?? null,
     role: isRole(role) ? role : "member",
     actorKind: ticket.k,
     actorName: ticket.a,

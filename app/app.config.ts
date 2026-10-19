@@ -9,17 +9,49 @@ export default defineAppConfig({
     colors: { primary: "neutral", neutral: "neutral" },
     // Phosphor (the set vite-hub/ui ships) for Nuxt UI's own icons too.
     icons: {
-      arrowDown: "i-ph-arrow-down", arrowLeft: "i-ph-arrow-left", arrowRight: "i-ph-arrow-right", arrowUp: "i-ph-arrow-up",
-      caution: "i-ph-warning-circle", check: "i-ph-check",
-      chevronDoubleLeft: "i-ph-caret-double-left", chevronDoubleRight: "i-ph-caret-double-right",
-      chevronDown: "i-ph-caret-down", chevronLeft: "i-ph-caret-left", chevronRight: "i-ph-caret-right", chevronUp: "i-ph-caret-up",
-      close: "i-ph-x", copy: "i-ph-copy", copyCheck: "i-ph-check", dark: "i-ph-moon", drag: "i-ph-dots-six-vertical",
-      ellipsis: "i-ph-dots-three", error: "i-ph-x-circle", external: "i-ph-arrow-up-right", eye: "i-ph-eye", eyeOff: "i-ph-eye-slash",
-      file: "i-ph-file", folder: "i-ph-folder", folderOpen: "i-ph-folder-open", hash: "i-ph-hash", info: "i-ph-info",
-      light: "i-ph-sun", loading: "i-ph-circle-notch", menu: "i-ph-list", minus: "i-ph-minus",
-      panelClose: "i-ph-sidebar-simple", panelOpen: "i-ph-sidebar-simple", plus: "i-ph-plus", reload: "i-ph-arrow-counter-clockwise",
-      search: "i-ph-magnifying-glass", stop: "i-ph-stop", star: "i-ph-star", success: "i-ph-check-circle", system: "i-ph-monitor",
-      tip: "i-ph-lightbulb", upload: "i-ph-upload-simple", warning: "i-ph-warning",
+      arrowDown: "i-ph-arrow-down",
+      arrowLeft: "i-ph-arrow-left",
+      arrowRight: "i-ph-arrow-right",
+      arrowUp: "i-ph-arrow-up",
+      caution: "i-ph-warning-circle",
+      check: "i-ph-check",
+      chevronDoubleLeft: "i-ph-caret-double-left",
+      chevronDoubleRight: "i-ph-caret-double-right",
+      chevronDown: "i-ph-caret-down",
+      chevronLeft: "i-ph-caret-left",
+      chevronRight: "i-ph-caret-right",
+      chevronUp: "i-ph-caret-up",
+      close: "i-ph-x",
+      copy: "i-ph-copy",
+      copyCheck: "i-ph-check",
+      dark: "i-ph-moon",
+      drag: "i-ph-dots-six-vertical",
+      ellipsis: "i-ph-dots-three",
+      error: "i-ph-x-circle",
+      external: "i-ph-arrow-up-right",
+      eye: "i-ph-eye",
+      eyeOff: "i-ph-eye-slash",
+      file: "i-ph-file",
+      folder: "i-ph-folder",
+      folderOpen: "i-ph-folder-open",
+      hash: "i-ph-hash",
+      info: "i-ph-info",
+      light: "i-ph-sun",
+      loading: "i-ph-circle-notch",
+      menu: "i-ph-list",
+      minus: "i-ph-minus",
+      panelClose: "i-ph-sidebar-simple",
+      panelOpen: "i-ph-sidebar-simple",
+      plus: "i-ph-plus",
+      reload: "i-ph-arrow-counter-clockwise",
+      search: "i-ph-magnifying-glass",
+      stop: "i-ph-stop",
+      star: "i-ph-star",
+      success: "i-ph-check-circle",
+      system: "i-ph-monitor",
+      tip: "i-ph-lightbulb",
+      upload: "i-ph-upload-simple",
+      warning: "i-ph-warning",
     },
     button: {
       variants: {
@@ -59,16 +91,19 @@ export default defineAppConfig({
       slots: { root: "rounded-xl", header: "p-6 pb-0", body: "p-6", footer: "p-6 pt-0" },
     },
     tabs: {
-      compoundVariants: [{
-        color: "neutral",
-        variant: "pill",
-        class: {
-          indicator: "bg-default dark:bg-accented shadow-xs",
-          // Until hydration there is no indicator, and Nuxt UI paints the active tab with `before:bg-inverted`: a solid
-          // black pill with dark text. Paint that fallback like the indicator.
-          trigger: "data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-accented",
+      compoundVariants: [
+        {
+          color: "neutral",
+          variant: "pill",
+          class: {
+            indicator: "bg-default dark:bg-accented shadow-xs",
+            // Until hydration there is no indicator, and Nuxt UI paints the active tab with `before:bg-inverted`: a solid
+            // black pill with dark text. Paint that fallback like the indicator.
+            trigger:
+              "data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-accented",
+          },
         },
-      }],
+      ],
     },
     dropdownMenu: {
       slots: { content: `${floating} p-1`, item: "rounded-md before:rounded-md" },

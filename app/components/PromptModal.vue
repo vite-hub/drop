@@ -4,7 +4,11 @@
 import type { FormSubmitEvent } from "@nuxt/ui"
 import * as v from "valibot"
 
-const { initial = "", confirmLabel = "Add", schema: valueSchema } = defineProps<{
+const {
+  initial = "",
+  confirmLabel = "Add",
+  schema: valueSchema,
+} = defineProps<{
   title: string
   label: string
   placeholder?: string
@@ -20,7 +24,7 @@ const submit = (event: FormSubmitEvent<{ value: string }>) => emit("close", even
 </script>
 
 <template>
-  <UModal :title="title" @update:open="open => !open && emit('close', null)">
+  <UModal :title="title" @update:open="(open) => !open && emit('close', null)">
     <template #body>
       <UForm :id="formId" :schema="schema" :state="state" @submit="submit">
         <UFormField :label="label" name="value">

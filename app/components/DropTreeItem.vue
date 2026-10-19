@@ -11,7 +11,9 @@ const route = useRoute()
 const open = useTreeOpen()
 const file = computed(() => textValue(route.query.file) ?? null)
 const here = computed(() => route.path === `/drops/${props.drop.id}`)
-const expandable = computed(() => props.drop.kind === "app" || (props.drop.kind === "folder" && Boolean(props.drop.items)))
+const expandable = computed(
+  () => props.drop.kind === "app" || (props.drop.kind === "folder" && Boolean(props.drop.items)),
+)
 const expanded = computed(() => open.value[props.drop.id] ?? here.value)
 
 // Yours, or a team folder when you're an admin, as on the Drops page's rows (DropRow).
@@ -29,10 +31,12 @@ async function askRename() {
   })
   if (title && title !== props.drop.title) await rename(props.drop, title)
 }
-const menu = [[
-  { label: "Rename", icon: "i-ph-pencil-simple", onSelect: askRename },
-  { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => void remove(props.drop) },
-]]
+const menu = [
+  [
+    { label: "Rename", icon: "i-ph-pencil-simple", onSelect: askRename },
+    { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => void remove(props.drop) },
+  ],
+]
 
 const row = "group flex h-7 min-w-0 items-center gap-2 rounded-md pl-2 pr-1 text-sm transition-colors"
 const idle = "text-muted hover:bg-elevated hover:text-highlighted"
@@ -44,8 +48,15 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
 <template>
   <li>
     <div :class="[row, here && !(expandable && file) ? active : idle]">
-      <NuxtLink class="flex h-full min-w-0 flex-1 items-center gap-2" :to="`/drops/${drop.id}`" @click="emit('navigate')">
-        <UIcon :name="drop.kind === 'folder' && expanded ? 'i-ph-folder-open' : KIND_ICONS[drop.kind]" class="size-4 shrink-0 text-dimmed" />
+      <NuxtLink
+        class="flex h-full min-w-0 flex-1 items-center gap-2"
+        :to="`/drops/${drop.id}`"
+        @click="emit('navigate')"
+      >
+        <UIcon
+          :name="drop.kind === 'folder' && expanded ? 'i-ph-folder-open' : KIND_ICONS[drop.kind]"
+          class="size-4 shrink-0 text-dimmed"
+        />
         <span class="truncate" :title="drop.title">{{ drop.title }}</span>
       </NuxtLink>
       <UDropdownMenu v-if="changeable" :content="{ align: 'start', side: 'right' }" :items="menu">
@@ -66,7 +77,11 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
         type="button"
         @click="open[drop.id] = !expanded"
       >
-        <UIcon name="i-ph-caret-right" class="size-3.5 transition-transform duration-150" :class="expanded && 'rotate-90'" />
+        <UIcon
+          name="i-ph-caret-right"
+          class="size-3.5 transition-transform duration-150"
+          :class="expanded && 'rotate-90'"
+        />
       </button>
     </div>
     <ul v-if="expandable && expanded" class="ml-3.5 flex flex-col gap-px border-l border-default py-0.5 pl-2">
@@ -74,7 +89,10 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
       <template v-else>
         <li v-for="path in appPages(drop.paths ?? [])" :key="path">
           <NuxtLink
-            :class="['flex h-7 min-w-0 items-center gap-2 rounded-md px-2 font-mono text-xs transition-colors', here && file === path ? active : idle]"
+            :class="[
+              'flex h-7 min-w-0 items-center gap-2 rounded-md px-2 font-mono text-xs transition-colors',
+              here && file === path ? active : idle,
+            ]"
             :to="{ path: `/drops/${drop.id}`, query: { file: path } }"
             @click="emit('navigate')"
           >

@@ -14,7 +14,9 @@ import { draftPath } from "../utils/draft-paths"
 export const LIVE_EDITING = true
 
 const digestOf = async (text: string) =>
-  Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))), byte => byte.toString(16).padStart(2, "0")).join("")
+  Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("")
 
 async function read(key: string) {
   const [error, file] = await blob.get(key)
@@ -48,7 +50,7 @@ export const draftDocument: RealtimeDocumentAdapter = {
 /** Creates the draft from the published body unless one exists. Returns its path, which is also its room's id. */
 export async function ensureDraft(id: string, body: string) {
   const path = draftPath(id)
-  if (await read(path) === null) await write(path, body)
+  if ((await read(path)) === null) await write(path, body)
   return path
 }
 

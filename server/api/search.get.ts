@@ -7,8 +7,8 @@ import { requireIdentity } from "../utils/identity"
 export default defineValidatedHandler({
   validate: { query: SearchQuerySchema },
   async handler(event) {
-  const who = await requireIdentity(event)
-  const query = event.url.searchParams.get("q")?.slice(0, 200) ?? ""
-  return searchEverything(who, query, event)
+    const who = await requireIdentity(event)
+    const query = event.url.searchParams.get("q")?.slice(0, 200) ?? ""
+    return searchEverything(who, query, event)
   },
 })

@@ -5,7 +5,10 @@ export const QUOTA_RESERVATION_TTL_MS = 15 * 60 * 1000
 
 export function bindQuotaSQL(query: string, values: unknown[]): SQL {
   const parts = query.split("?")
-  return sql.join(parts.flatMap((part, index) => index < values.length ? [sql.raw(part), sql`${values[index]}`] : [sql.raw(part)]), sql.raw(""))
+  return sql.join(
+    parts.flatMap((part, index) => (index < values.length ? [sql.raw(part), sql`${values[index]}`] : [sql.raw(part)])),
+    sql.raw(""),
+  )
 }
 
 /** D1 accepts at most 100 bound values in one statement. */

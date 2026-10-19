@@ -4,7 +4,8 @@ const emit = defineEmits<{ navigate: [] }>()
 const route = useRoute()
 const active = (to: string) => isActivePath(route.path, to)
 const open = ref<Record<string, boolean>>({})
-const expanded = (group: (typeof DOCS_NAV)[number]) => open.value[group.title] ?? group.links.some(link => active(link.to))
+const expanded = (group: (typeof DOCS_NAV)[number]) =>
+  open.value[group.title] ?? group.links.some((link) => active(link.to))
 
 const row = "flex h-7 min-w-0 items-center gap-2 rounded-md text-sm transition-colors"
 const idle = "text-muted hover:bg-elevated hover:text-highlighted"
@@ -20,7 +21,11 @@ const idle = "text-muted hover:bg-elevated hover:text-highlighted"
         @click="open[group.title] = !expanded(group)"
       >
         <span class="flex-1 truncate text-left">{{ group.title }}</span>
-        <UIcon name="i-ph-caret-right" class="size-3.5 shrink-0 text-dimmed transition-transform duration-150" :class="expanded(group) && 'rotate-90'" />
+        <UIcon
+          name="i-ph-caret-right"
+          class="size-3.5 shrink-0 text-dimmed transition-transform duration-150"
+          :class="expanded(group) && 'rotate-90'"
+        />
       </button>
       <ul v-if="expanded(group)" class="ml-3.5 flex flex-col gap-px border-l border-default py-0.5 pl-2">
         <li v-for="link in group.links" :key="link.to">

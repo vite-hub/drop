@@ -11,7 +11,12 @@ const here = useHerePath()
   <DropViewer v-if="drop.data.value" :key="drop.data.value.id" />
   <UDashboardPanel v-else id="drop-missing">
     <template #body>
-      <ContentUnavailable v-if="drop.error.value" :status="drop.error.value.status" :path="here" :waiting-for-review="waiting" />
+      <ContentUnavailable
+        v-if="drop.error.value"
+        :status="drop.error.value.status"
+        :path="here"
+        :waiting-for-review="waiting"
+      />
       <p v-else class="m-auto text-sm text-muted">Loading…</p>
     </template>
   </UDashboardPanel>

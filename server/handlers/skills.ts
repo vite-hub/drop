@@ -4,8 +4,14 @@ import { digest, enabledSkills, findEnabledSkill, type SkillFile, skillArchive }
 const V2 = "/.well-known/agent-skills/"
 const V1 = "/.well-known/skills/"
 
-const json = (body: unknown) => new Response(JSON.stringify(body, null, 2), { headers: { "content-type": "application/json", "cache-control": "public, max-age=60" } })
-const text = (file: SkillFile) => new Response(file.text, { headers: { "content-type": `${file.mimeType}; charset=utf-8`, "cache-control": "public, max-age=60" } })
+const json = (body: unknown) =>
+  new Response(JSON.stringify(body, null, 2), {
+    headers: { "content-type": "application/json", "cache-control": "public, max-age=60" },
+  })
+const text = (file: SkillFile) =>
+  new Response(file.text, {
+    headers: { "content-type": `${file.mimeType}; charset=utf-8`, "cache-control": "public, max-age=60" },
+  })
 
 /**
  * Agent Skills Discovery. v0.2.0 (`/.well-known/agent-skills/`): an index with a `$schema`, and per skill a
@@ -20,23 +26,49 @@ export default defineHandler(async (event) => {
 
   if (path === "index.json") {
     const SKILLS = await enabledSkills()
-    if (!v2) return json({ skills: SKILLS.map(skill => ({ name: skill.name, description: skill.description, files: skill.files.map(file => file.path) })) })
+    if (!v2)
+      return json({
+        skills: SKILLS.map((skill) => ({
+          name: skill.name,
+          description: skill.description,
+          files: skill.files.map((file) => file.path),
+        })),
+      })
     return json({
       $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
-      skills: await Promise.all(SKILLS.map(async skill => skill.files.length === 1
-        ? { name: skill.name, type: "skill-md", description: skill.description, url: `${V2}${skill.name}/SKILL.md`, digest: await digest(skill.files[0]!.bytes) }
-        : { name: skill.name, type: "archive", description: skill.description, url: `${V2}${skill.name}.tar.gz`, digest: await digest(await skillArchive(skill)) })),
+      skills: await Promise.all(
+        SKILLS.map(async (skill) =>
+          skill.files.length === 1
+            ? {
+                name: skill.name,
+                type: "skill-md",
+                description: skill.description,
+                url: `${V2}${skill.name}/SKILL.md`,
+                digest: await digest(skill.files[0]!.bytes),
+              }
+            : {
+                name: skill.name,
+                type: "archive",
+                description: skill.description,
+                url: `${V2}${skill.name}.tar.gz`,
+                digest: await digest(await skillArchive(skill)),
+              },
+        ),
+      ),
     })
   }
 
   const archive = v2 ? path.match(/^([a-z0-9-]+)\.tar\.gz$/)?.[1] : undefined
   if (archive) {
     const skill = await findEnabledSkill(archive)
-    if (skill) return new Response(await skillArchive(skill), { headers: { "content-type": "application/gzip", "cache-control": "public, max-age=60" } })
+    if (skill)
+      return new Response(await skillArchive(skill), {
+        headers: { "content-type": "application/gzip", "cache-control": "public, max-age=60" },
+      })
   }
 
   const [name, ...rest] = path.split("/")
-  const file = (await findEnabledSkill(name ?? ""))?.files.find(item => item.path === rest.join("/"))
+  const file = (await findEnabledSkill(name ?? ""))?.files.find((item) => item.path === rest.join("/"))
   if (file) return text(file)
   throw new HTTPError({ status: 404, statusText: "No such skill file." })
 })

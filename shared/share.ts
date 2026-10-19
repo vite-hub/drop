@@ -15,7 +15,13 @@ export type DropMode = "personal" | "team"
 export const SHARES: Share[] = ["private", "team", "team_edit", "public", "public_comment"]
 
 /** One name per state, the same on rows, buttons, menus, and the share dialog. */
-export const SHARE_LABELS: Record<Share, string> = { private: "Only me", team: "Team", team_edit: "Team can edit", public: "Public link", public_comment: "Public, anyone comments" }
+export const SHARE_LABELS: Record<Share, string> = {
+  private: "Only me",
+  team: "Team",
+  team_edit: "Team can edit",
+  public: "Public link",
+  public_comment: "Public, anyone comments",
+}
 export const SHARE_HINTS: Record<Share, string> = {
   private: "Only you. Your connected agents can still read it.",
   team: "Everyone on the team can find it, open it, and comment.",
@@ -23,7 +29,13 @@ export const SHARE_HINTS: Record<Share, string> = {
   public: "Anyone with the link can open it, no sign-in needed. People signed in can comment.",
   public_comment: "Anyone with the link can open it and comment, guests included.",
 }
-export const SHARE_ICONS: Record<Share, string> = { private: "i-ph-lock", team: "i-ph-users", team_edit: "i-ph-users-three", public: "i-ph-globe", public_comment: "i-ph-globe" }
+export const SHARE_ICONS: Record<Share, string> = {
+  private: "i-ph-lock",
+  team: "i-ph-users",
+  team_edit: "i-ph-users-three",
+  public: "i-ph-globe",
+  public_comment: "i-ph-globe",
+}
 
 /** On a folder path the widest share shows; `grants` still keep each one for what it lets the caller do. */
 export const SHARE_RANK: Record<Share, number> = { private: 0, team: 1, team_edit: 2, public: 3, public_comment: 4 }
@@ -56,7 +68,11 @@ export const defaultShare = (mode: DropMode): Share => (mode === "team" ? "team"
  * The states someone may pick for a drop. Team states need a team Drop; editing together needs Markdown (or a folder,
  * for the Markdown in it); a team folder always reaches the team; `publicLinkDays` 0 turns public links off.
  */
-export function sharesFor(mode: DropMode, publicLinkDays: number | null, drop: { kind: DropKind; teamFolder?: boolean }): Share[] {
+export function sharesFor(
+  mode: DropMode,
+  publicLinkDays: number | null,
+  drop: { kind: DropKind; teamFolder?: boolean },
+): Share[] {
   return SHARES.filter((share) => {
     if (share === "private") return !drop.teamFolder
     if (isPublic(share)) return publicLinkDays !== 0
