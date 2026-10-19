@@ -21,6 +21,7 @@ export const keys = {
   abuseContact: "abuse-contact",
   adminReports: "admin-reports",
   adminReview: "admin-review",
+  githubStars: "github-stars",
   drop: (id: string) => `drop:${id}`,
   comments: (id: string) => `comments:${id}`,
   /** The drops directly in a folder. */

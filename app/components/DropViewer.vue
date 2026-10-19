@@ -472,7 +472,7 @@ const threadComment = computed(() => (popover.value?.type === "thread" ? comment
           <UTooltip v-if="visitor" text="Report">
             <UButton aria-label="Report" :to="{ path: '/report', query: { target: `/d/${drop.link}` } }" color="neutral" icon="i-ph-flag" size="sm" variant="ghost" />
           </UTooltip>
-          <UButton v-if="owner" color="neutral" :icon="SHARE_ICONS[drop.share]" :label="drop.share === 'private' && !drop.shareReview ? 'Share' : shareStatus(drop)" size="sm" :variant="drop.share === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
+          <UButton v-if="owner" color="neutral" :icon="SHARE_ICONS[drop.share]" :label="drop.share === 'private' && !drop.shareReview ? 'Share' : shareStatus(drop, now)" size="sm" :variant="drop.share === 'private' ? 'solid' : 'ghost'" @click="shareOpen = true" />
           <UButton v-else-if="visitor" class="hidden sm:inline-flex" color="neutral" label="Make Your Own" size="sm" to="/" variant="outline" />
         </template>
       </UDashboardNavbar>

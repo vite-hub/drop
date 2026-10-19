@@ -10,6 +10,8 @@
 //
 // ⌘B or the button in its header folds the whole sidebar away, like T3 Code; the pages' top bars then lead with the
 // button that brings it back (SidebarExpand). The sidebar's cookie keeps it folded across visits.
+import { promiseTimeout } from "@vueuse/core"
+
 const route = useRoute()
 const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
@@ -35,11 +37,12 @@ const pane = ref<"main" | "docs">(at("/docs") ? "docs" : "main")
 const slide = ref<"forward" | "back">("forward")
 /** As long as `.sidebar-forward-*` / `.sidebar-back-*` in main.css run, so the page opens once the docs pane is in. */
 const SLIDE_MS = 220
+const motion = usePreferredReducedMotion()
 async function openDocs() {
   slide.value = "forward"
   pane.value = "docs"
   if (at("/docs")) return
-  await new Promise(resolve => setTimeout(resolve, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : SLIDE_MS))
+  await promiseTimeout(motion.value === "reduce" ? 0 : SLIDE_MS)
   // Back during the slide cancels the trip.
   if (pane.value === "docs") await navigateTo("/docs")
 }

@@ -37,7 +37,7 @@ const { resume: schedule } = useRafFn(draw, { once: true, immediate: false })
 onMounted(schedule)
 useResizeObserver(canvas, schedule)
 watch(() => colorMode.value, schedule)
-useEventListener(import.meta.client ? window : undefined, "pointermove", (event: PointerEvent) => {
+useEventListener("pointermove", (event: PointerEvent) => {
   if (motion.value === "reduce" || !canvas.value) return
   const rect = canvas.value.getBoundingClientRect()
   pointer.x = event.clientX - rect.left

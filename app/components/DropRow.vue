@@ -24,7 +24,7 @@ const { data: me } = useMe()
 // The team's folders are the admins' to share.
 const changeable = computed(() => !theirs.value && (!props.drop.teamFolder || me.value?.role === "admin"))
 const choices = computed(() => shareItems(me.value, props.drop))
-const status = computed(() => shareStatus(props.drop))
+const status = computed(() => shareStatus(props.drop, now.value))
 
 const link = useShareUrl(() => props.drop)
 const detail = computed(() => {
