@@ -8,6 +8,9 @@ export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder",
 export type DropKind = (typeof DROP_KINDS)[number]
 export const ACTOR_KINDS = ["agent", "browser"] as const
 export type ActorKind = (typeof ACTOR_KINDS)[number]
+/** Who viewed a drop, for its Details: a signed-in person, an anonymous visitor, or an agent. */
+export const VIEWER_KINDS = ["person", "anonymous", "agent"] as const
+export type ViewerKind = (typeof VIEWER_KINDS)[number]
 
 export interface DropSummary {
   /** This version. */
@@ -124,6 +127,8 @@ export interface DropDetail extends DropSummary {
   children?: DropSummary[]
   /** Sites: the origin of the website under review. */
   siteUrl?: string
+  /** Its owner and admins: views of every version, each viewer counted once a day. Their own visits don't count. */
+  views?: Record<ViewerKind, number>
 }
 
 export interface DropComment {

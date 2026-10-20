@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how long it lives.
-// Each row's action sits at its end. Versions have their own tab (ViewerHistory). A folder leads with what goes in it,
-// for the people filing into it and their agents (list_folders); whoever may change the folder edits it in place.
+// Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how many viewed it, how
+// long it lives. Each row's action sits at its end. Versions have their own tab (ViewerHistory). A folder leads with
+// what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
+// it in place.
 import { expiryLabel } from "#shared/expiry"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropDetail } from "#shared/types"
@@ -27,6 +28,19 @@ const access = computed(
     `${shareStatus(props.drop, now.value)}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`,
 )
 const folder = computed(() => props.drop.ancestors.map((crumb) => crumb.title).join(" / "))
+// The owner's view count, then who the views came from, with the icons agents and people get on rows (AgentIcon).
+const views = computed(() => {
+  const counts = props.drop.views
+  if (!counts) return null
+  return {
+    total: counts.person + counts.anonymous + counts.agent,
+    by: [
+      { label: "signed in", icon: "i-mingcute-user-3-line", n: counts.person },
+      { label: "anonymous", icon: "i-mingcute-incognito-mode-line", n: counts.anonymous },
+      { label: "by agents", icon: "i-mingcute-sparkles-line", n: counts.agent },
+    ],
+  }
+})
 
 const { describe } = useDropActions()
 const describable = computed(() => props.drop.kind === "folder" && props.drop.isOwner && !props.drop.trashedAt)
@@ -118,6 +132,23 @@ async function save() {
           <span class="truncate">{{ access }}</span>
         </dd>
         <UButton class="-my-1" color="neutral" label="Change" size="xs" variant="ghost" @click="emit('share')" />
+      </div>
+      <div v-if="views" class="flex items-center gap-3">
+        <dt class="w-20 shrink-0 text-muted">Views</dt>
+        <dd class="flex min-w-0 items-center gap-3 tabular-nums">
+          <span class="text-highlighted">{{ views.total }}</span>
+          <span
+            v-for="part in views.by"
+            :key="part.label"
+            :aria-label="`${part.n} ${part.label}`"
+            class="flex items-center gap-1 text-muted"
+            role="img"
+            :title="`${part.n} ${part.label}`"
+          >
+            <UIcon :name="part.icon" class="size-3.5 shrink-0" />
+            {{ part.n }}
+          </span>
+        </dd>
       </div>
     </dl>
 

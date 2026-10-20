@@ -125,3 +125,9 @@ More in [Code images](/docs/agents#code-images).
 Each drop says how long it lives: Temporary for 14 days after anyone last opened it, Review for 30, or Keep for good. A drop that expires goes to the Trash, where you can restore it for 15 days.
 
 More in [Lifetime and Trash](/docs/review#expiry).
+
+### Views {#views}
+
+**Views** in a drop's Details count how often people and agents opened it, split into signed in, anonymous, and by agents. Only its owner and admins see them, and their agents get them from `read_drop`. Each viewer counts once a day, every version of a doc adds to the same count, and your own visits don't count.
+
+Link previews and crawlers don't count. Drop tells anonymous visitors apart without cookies, by a hash of their address and browser that changes every day and is deleted the next.

@@ -16,6 +16,7 @@ import { chainOf, expiryPolicy } from "../expiry"
 import { ancestorsOf, foldersUnder, isAttachment, itemCounts, listedNode, parentNode, resolveNode } from "../nodes"
 import { shareNow, sharePolicy } from "../share"
 import { searchHeads, searchWords } from "../search"
+import { viewsOf } from "../views"
 import { dropFiles, dropHeads, drops, dropVisits, user } from "../../databases/config"
 import type { Identity } from "../identity"
 import type { DropRow } from "./types"
@@ -516,6 +517,7 @@ export async function dropDetail(
   }
   if (TEXT_KINDS.has(row.kind)) detail.attachments = await attachmentsOf(row, origin)
   if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
+  if (can.manage && !isAttachment(row)) detail.views = await viewsOf(row)
   return detail
 }
 

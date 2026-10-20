@@ -7,6 +7,7 @@ import { identify } from "./identity"
 import { isExpiredCodeImage } from "./code-image"
 import { recordVisit } from "./expiry"
 import { rawFileQuarantine } from "./trust"
+import { countView } from "./views"
 
 const notFound = () => new HTTPError({ status: 404, statusText: "Not found" })
 
@@ -34,5 +35,5 @@ export async function requireBlobAccess(event: H3Event, key: string) {
   const who = publicView ? null : await identify(event)
   if (!publicView && !permissions(drop, who).view) throw notFound()
   // Opening a raw file in the browser is a visit; images embedded elsewhere are not.
-  await recordVisit(event, drop, who, "document")
+  await Promise.all([recordVisit(event, drop, who, "document"), countView(event, drop, who, "document")])
 }

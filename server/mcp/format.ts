@@ -1,5 +1,5 @@
 import { expiryLabel } from "#shared/expiry"
-import type { DropComment, DropSummary } from "#shared/types"
+import type { DropComment, DropSummary, ViewerKind } from "#shared/types"
 import { dropPageUrl, type DropRow } from "../utils/drops"
 
 /** How every tool describes the share input: one state, the same names the pages use. */
@@ -38,6 +38,17 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
 }
 
 export type McpDrop = ReturnType<typeof mcpDrop>
+
+/** A drop's views for its owner's agents, split the way Details shows them. */
+export const mcpViews = (views: Record<ViewerKind, number>) => ({
+  total: views.person + views.anonymous + views.agent,
+  signedIn: views.person,
+  anonymous: views.anonymous,
+  agents: views.agent,
+})
+
+export const viewsLine = (views: ReturnType<typeof mcpViews>) =>
+  `Views: ${views.total} (${views.signedIn} signed in, ${views.anonymous} anonymous, ${views.agents} by agents), each viewer counted once a day`
 
 /** One line per drop for clients that only read text. */
 export const dropLine = (drop: McpDrop) =>

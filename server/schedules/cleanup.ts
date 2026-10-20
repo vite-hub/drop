@@ -4,7 +4,7 @@ import { codeImages } from "../databases/config"
 import { defineSchedule } from "vite-hub/schedule"
 import { cleanupQuotaBlobs, cleanupQuotaReservations } from "../utils/quotas"
 
-/** The hourly cleanup: expired reservations and code images, the Trash, closed public links, unused OAuth clients, and the search index's backlog. */
+/** The hourly cleanup: expired reservations and code images, the Trash, closed public links, unused OAuth clients, yesterday's viewers, and the search index's backlog. */
 export default defineSchedule({
   cron: "0 * * * *",
   async handler({ scheduledAt }) {
@@ -20,6 +20,8 @@ export default defineSchedule({
       async () => (await import("../utils/drops")).deleteExpiredDrops(scheduledAt),
       async () => (await import("../utils/share")).closePublicLinks(scheduledAt),
       async () => (await import("../utils/oauth-cleanup")).cleanupUnusedOAuthClients(scheduledAt),
+      // Who viewed a drop is kept for the day only; the counts stay.
+      async () => (await import("../utils/views")).forgetViewers(scheduledAt),
       // Text docs published before search read their words, a batch an hour.
       async () => (await import("../utils/search")).indexMissingTexts(),
     ]

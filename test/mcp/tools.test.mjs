@@ -362,6 +362,27 @@ test("read_drop shows the errors people's browsers reported for the current app 
   assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
 })
 
+test("read_drop tells the owner's agents how many viewed the drop, and nobody else's", async () => {
+  const doc = (await call(publish, { markdown: "# Plan", share: "public", note: "v1", lifetime: "review" }))
+    .structuredContent
+  const read = await call(readDrop, { id: doc.id })
+  assert.deepEqual(
+    read.structuredContent.views,
+    { total: 1, signedIn: 0, anonymous: 0, agents: 1 },
+    "its own read counts",
+  )
+  assert.match(
+    read.content[0].text,
+    /\nViews: 1 \(0 signed in, 0 anonymous, 1 by agents\), each viewer counted once a day/,
+  )
+
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('reader', 'Reader', 'reader@example.com')").run()
+  state.who = { ...state.who, userId: "reader", name: "Reader", email: "reader@example.com" }
+  const theirs = await call(readDrop, { id: doc.id })
+  assert.equal(theirs.structuredContent.views, undefined)
+  assert.doesNotMatch(theirs.content[0].text, /Views:/)
+})
+
 test("a file without base64 gets an upload URL; curl -T creates the drop once, and a changed ticket does nothing", async () => {
   state.authSecret = "test-secret"
   try {

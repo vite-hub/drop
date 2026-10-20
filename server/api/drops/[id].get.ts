@@ -4,6 +4,7 @@ import { dropDetail, expiredLink, findDrop, permissions, recordSharedVisit, wait
 import { recordVisit } from "../../utils/expiry"
 import { identify } from "../../utils/identity"
 import { routeId } from "../../utils/params"
+import { countView } from "../../utils/views"
 
 /** Owners, editors, admins, and anyone the drop is shared with. Private drops 404 for everyone else. */
 export default defineHandler(async (event) => {
@@ -17,7 +18,12 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 404, statusText: "This drop is private, or it was deleted." })
   event.res.headers.set("Cache-Control", "private, no-store")
   // Signed-in people and agents count here; anonymous visitors count through the page's visit beacon.
-  if (who) await Promise.all([recordVisit(event, drop, who, "beacon"), recordSharedVisit(drop, who)])
+  if (who)
+    await Promise.all([
+      recordVisit(event, drop, who, "beacon"),
+      countView(event, drop, who, "beacon"),
+      recordSharedVisit(drop, who),
+    ])
   const detail = await dropDetail(drop, who, event.url.origin, event)
   // Named after the doc's link, so every version of an HTML doc keeps the browser storage the last one left.
   const frameOrigin = detail.kind === "app" || detail.kind === "html" ? await contentOrigin(event, detail.link) : null

@@ -482,3 +482,33 @@ CREATE TABLE `comment_replies` (
 );
 --> statement-breakpoint
 CREATE INDEX `comment_replies_comment_idx` ON `comment_replies` (`comment_id`,`created_at`);
+--> statement-breakpoint
+-- A drop's views for its Details (server/utils/views.ts): a new viewer of the day counts one view.
+CREATE TABLE `drop_views` (
+	`link` text NOT NULL,
+	`day` integer NOT NULL,
+	`viewer` text NOT NULL,
+	`views` integer NOT NULL,
+	PRIMARY KEY(`link`, `day`, `viewer`)
+);
+--> statement-breakpoint
+CREATE TABLE `drop_viewers` (
+	`link` text NOT NULL,
+	`day` integer NOT NULL,
+	`id` text NOT NULL,
+	`viewer` text NOT NULL,
+	PRIMARY KEY(`link`, `day`, `id`)
+);
+--> statement-breakpoint
+CREATE INDEX `drop_viewers_day_idx` ON `drop_viewers` (`day`);--> statement-breakpoint
+CREATE TRIGGER `drop_viewers_count` AFTER INSERT ON `drop_viewers` BEGIN
+  INSERT OR IGNORE INTO `drop_views` (`link`, `day`, `viewer`, `views`) VALUES (NEW.link, NEW.day, NEW.viewer, 0);
+  UPDATE `drop_views` SET `views` = `views` + 1 WHERE `link` = NEW.link AND `day` = NEW.day AND `viewer` = NEW.viewer;
+END;
+--> statement-breakpoint
+-- The count goes with the doc's last version. A drop from before links were per doc is keyed on its id.
+CREATE TRIGGER `drop_views_drop_delete` AFTER DELETE ON `drops`
+WHEN NOT EXISTS (SELECT 1 FROM drops d WHERE d.link = OLD.link) BEGIN
+  DELETE FROM `drop_views` WHERE `link` = coalesce(OLD.link, OLD.id);
+  DELETE FROM `drop_viewers` WHERE `link` = coalesce(OLD.link, OLD.id);
+END;

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { ACTOR_KINDS, DROP_KINDS } from "../../shared/types.ts"
+import { ACTOR_KINDS, DROP_KINDS, VIEWER_KINDS } from "../../shared/types.ts"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
@@ -112,6 +112,36 @@ export const dropVisits = sqliteTable(
     at: integer("at").notNull(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.dropId] }), index("drop_visits_drop_idx").on(table.dropId)],
+)
+
+/**
+ * A drop's views a day, by who viewed it: signed-in people, anonymous visitors, or agents. Keyed on the doc's link,
+ * so every version adds to one count. A trigger on `drop_viewers` counts each viewer once a day.
+ */
+export const dropViews = sqliteTable(
+  "drop_views",
+  {
+    link: text("link").notNull(),
+    day: integer("day").notNull(),
+    viewer: text("viewer", { enum: VIEWER_KINDS }).notNull(),
+    views: integer("views").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.link, table.day, table.viewer] })],
+)
+
+/**
+ * Who viewed a drop today: a user id, an agent, or an anonymous visitor's hash under a key of the day and the link
+ * (./utils/views.ts). Inserting a new row counts a view; the hourly cleanup deletes earlier days.
+ */
+export const dropViewers = sqliteTable(
+  "drop_viewers",
+  {
+    link: text("link").notNull(),
+    day: integer("day").notNull(),
+    id: text("id").notNull(),
+    viewer: text("viewer", { enum: VIEWER_KINDS }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.link, table.day, table.id] }), index("drop_viewers_day_idx").on(table.day)],
 )
 
 /** Files of an app drop. Publishing a new version replaces the set. */
