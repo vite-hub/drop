@@ -6,7 +6,7 @@ import { db } from "vite-hub/database/drizzle"
 import { isRole } from "#shared/roles"
 import { ACTOR_KINDS } from "#shared/types"
 import { account, user as users } from "../databases/config"
-import { githubOrganization, isGitHubMember } from "./github-membership"
+import { isGitHubMember, membersOnly } from "./github-membership"
 import type { Identity } from "./identity"
 import { PublishInput } from "./publish"
 import { seal, unseal } from "./review"
@@ -53,8 +53,8 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
   if (!ticket || ticket.e <= now || !ticket.i.file) return null
   const [row] = await db.select().from(users).where(eq(users.id, ticket.u)).limit(1)
   if (!row || row.banned) return null
-  // An organization's Drop only acts for current members, as for any other request.
-  if (githubOrganization()) {
+  // A members-only Drop only acts for current members, as for any other request.
+  if (membersOnly()) {
     const [github] = await db
       .select({ token: account.accessToken })
       .from(account)

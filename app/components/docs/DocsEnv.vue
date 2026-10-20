@@ -12,6 +12,10 @@ const COMMON: Array<[string, string]> = [
     "Optional. team for a Drop one team runs: everyone signed in is a teammate, and new drops start shared with the Team. Defaults to personal.",
   ],
   [
+    "DROP_GITHUB_USERS",
+    "Optional. GitHub logins, comma-separated. Only they sign in, open shared links, and use MCP; nobody else gets in.",
+  ],
+  [
     "DROP_PUBLIC_LINK_DAYS",
     "Optional. Days a public link stays open. Empty: 7 on a team Drop, no limit on a personal one. 0 turns public links off.",
   ],

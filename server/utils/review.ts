@@ -23,7 +23,7 @@ import { account, comments, drops, user } from "../databases/config"
 import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions } from "./drops"
-import { githubOrganization, isGitHubMember } from "./github-membership"
+import { isGitHubMember, membersOnly } from "./github-membership"
 import { type Identity, roleOf } from "./identity"
 import { DropQuotaError, withDropQuota } from "./quotas"
 import { shareFields, sharePolicy } from "./share"
@@ -191,14 +191,14 @@ export function openable(site: DropRow, who: Identity | null) {
 }
 
 /**
- * The person behind a token, as they are now: a ban or a lost organization membership ends their review session
+ * The person behind a token, as they are now: a ban or lost membership (organization or list) ends their review session
  * before the token runs out. Null for a guest.
  */
 async function reviewer(claims: ReviewClaims): Promise<Identity | null | false> {
-  if (!claims.u) return githubOrganization() ? false : null
+  if (!claims.u) return membersOnly() ? false : null
   const [row] = await db.select().from(user).where(eq(user.id, claims.u)).limit(1)
   if (!row || row.banned) return false
-  if (githubOrganization()) {
+  if (membersOnly()) {
     const [github] = await db
       .select({ token: account.accessToken })
       .from(account)

@@ -6,7 +6,7 @@ import { createLocalJWKSet, type JSONWebKeySet, jwtVerify } from "jose"
 import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
 import { account, oauthClient, user as users } from "../databases/config"
-import { githubOrganization, isGitHubMember } from "./github-membership"
+import { isGitHubMember, membersOnly } from "./github-membership"
 import { useServerEnv } from "#vitehub/env/server"
 import { type Role, roleFor } from "#shared/roles"
 import type { ActorKind } from "#shared/types"
@@ -64,7 +64,7 @@ export const bearerFrom = (headers: Headers) => headers.get("authorization")?.ma
 /** Who is calling. Resolved once per request (middleware and route share it). */
 export function identify(event: H3Event): Promise<Identity | null> {
   return (event.context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
-    if (who && githubOrganization()) {
+    if (who && membersOnly()) {
       const [githubAccount] = await db
         .select({ token: account.accessToken })
         .from(account)

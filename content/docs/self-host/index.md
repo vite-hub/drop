@@ -22,7 +22,7 @@ Then set these on the deployment:
 
 Drop reads its settings when it runs, so a change needs a restart, not a rebuild. Only the host and database are fixed at build time. Each setting also answers to a `VITEHUB_` name, such as `VITEHUB_DROP_GITHUB_ORG`, which wins when both are set. Booleans take `true`, `false`, `1`, or `0`; an invalid value stops Drop with an error naming the setting.
 
-- **Who signs in.** Anyone with a GitHub account, as a Member. `DROP_GITHUB_ORG` requires active membership of that organization for publishing and viewing, shared links and MCP included; sign-in then asks for `read:org`.
+- **Who signs in.** Anyone with a GitHub account, as a Member. `DROP_GITHUB_USERS` lets in only the GitHub logins it lists, such as `DROP_GITHUB_USERS=octocat,hubot`, for publishing and viewing, shared links and MCP included. `DROP_GITHUB_ORG` requires active membership of that organization instead; sign-in then asks for `read:org`. With both, members of the organization and the people listed get in.
 - **Who is Admin.** `DROP_ADMINS` lists admin emails, separated by commas or spaces, in any case. Whoever signs in with one, by a method that verified the email, is Admin. Restart to apply a change. In `nuxt dev` and with `DROP_TEST_SIGNIN`, an unverified email counts too.
 - **Roles come only from that list.** Admins ban and unban members on the Members page.
 - **Other sign-in.** Change the Better Auth options in `server/auth.ts`, or [reuse an existing GitHub oauth2-proxy](/docs/self-host/vps#auth-proxy).
@@ -32,7 +32,7 @@ Drop reads its settings when it runs, so a change needs a restart, not a rebuild
 
 ## Team mode {#team-mode}
 
-A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, and people share them by public link. `DROP_MODE=team` makes it a Drop one team runs for itself, usually behind `DROP_GITHUB_ORG` or [oauth2-proxy](/docs/self-host/vps#auth-proxy). Everyone signed in is then a teammate:
+A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, and people share them by public link. `DROP_MODE=team` makes it a Drop one team runs for itself, usually behind `DROP_GITHUB_USERS`, `DROP_GITHUB_ORG`, or [oauth2-proxy](/docs/self-host/vps#auth-proxy). Everyone signed in is then a teammate:
 
 - New drops start shared with the Team.
 - The sidebar leads with the **Team** tab: the team's folders, then teammates' drops shared with the team.

@@ -25,7 +25,8 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  * Drop signs in with GitHub. To use another provider, swap `socialProviders` (Google, GitLab, Discord…),
  * or add `emailAndPassword: { enabled: true }`, then set its secrets in nuxt.config.ts `vite.env.server.auth`.
  *
- * Anyone with a GitHub account can sign in and joins as a member. `DROP_ADMINS` lists the admins by email: whoever
+ * Anyone with a GitHub account can sign in and joins as a member, unless `DROP_GITHUB_USERS` or `DROP_GITHUB_ORG` limits
+ * who may (server/utils/github-membership.ts). `DROP_ADMINS` lists the admins by email: whoever
  * signs in with one of those emails, verified by the sign-in method, is an admin, so swapping GitHub for another
  * provider keeps them. `roleOf` decides on every request; each new session writes it down for Better Auth's admin
  * endpoints. Nobody else changes roles.
@@ -41,6 +42,7 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
 export default defineAuth(({ env, requestOrigin }) => {
   const proxied = authProxy().enabled
   const organization = env.drop.githubOrg.trim()
+  const membersOnly = Boolean(organization || env.drop.githubUsers.trim())
   const githubOptions = {
     clientId: proxied ? "" : env.auth.github.clientId.unseal(),
     clientSecret: proxied ? "" : env.auth.github.clientSecret.unseal(),
@@ -64,7 +66,7 @@ export default defineAuth(({ env, requestOrigin }) => {
       : {
           github: {
             ...githubOptions,
-            ...(organization
+            ...(membersOnly
               ? {
                   getUserInfo: async (token: GitHubToken) =>
                     (await isGitHubMember(token.accessToken)) ? github(githubOptions).getUserInfo(token) : null,
