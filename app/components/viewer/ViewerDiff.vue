@@ -6,8 +6,8 @@ import { diffHunks, diffLines } from "#shared/line-diff"
 import type { DropDetail, DropVersion } from "#shared/types"
 
 /** `inset`: room to leave on the right for the floating panel, in pixels. */
-const props = defineProps<{ version: DropVersion; previous: DropVersion | null; inset: number }>()
-const emit = defineEmits<{ close: [] }>()
+const props = defineProps<{ version: DropVersion; previous: DropVersion | null; inset: number; copied?: boolean }>()
+const emit = defineEmits<{ close: []; copyLink: [] }>()
 const versionTo = useVersionTo()
 
 const options = { lazy: true, server: false }
@@ -46,9 +46,22 @@ const counts = computed(() => ({
 <template>
   <section :aria-label="`What changed in v${version.version}`" class="absolute inset-0 z-10 flex flex-col bg-default">
     <div
-      class="flex h-10 shrink-0 items-center gap-2 border-b border-default pr-2 pl-4 text-sm"
+      class="flex h-10 shrink-0 items-center gap-2 border-b border-default pr-2 pl-2 text-sm"
       :style="{ paddingRight: inset ? `${inset}px` : undefined }"
     >
+      <!-- The way back leads the bar with a label, where it reads first; Esc and the browser's Back do the same. -->
+      <UTooltip :kbds="['Esc']" text="Back to the document">
+        <UButton
+          class="shrink-0"
+          color="neutral"
+          icon="i-mingcute-arrow-left-line"
+          label="Document"
+          size="xs"
+          variant="ghost"
+          @click="emit('close')"
+        />
+      </UTooltip>
+      <USeparator class="h-4" orientation="vertical" />
       <span class="font-medium text-highlighted">v{{ version.version }}</span>
       <span class="shrink-0 text-muted">{{ previous ? `vs v${previous.version}` : "first version" }}</span>
       <span v-if="ready && text" class="shrink-0 font-mono text-xs"
@@ -65,14 +78,15 @@ const counts = computed(() => ({
         :to="versionTo(version)"
         variant="ghost"
       />
-      <UTooltip :kbds="['Esc']" text="Back to the document">
+      <UTooltip text="Copy link to these changes">
         <UButton
-          aria-label="Back to the document"
+          aria-label="Copy link to these changes"
+          class="shrink-0"
           color="neutral"
-          icon="i-mingcute-close-line"
+          :icon="copied ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
           size="xs"
           variant="ghost"
-          @click="emit('close')"
+          @click="emit('copyLink')"
         />
       </UTooltip>
     </div>

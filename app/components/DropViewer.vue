@@ -119,6 +119,11 @@ const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
 const showing = (value: SideTab) => panelOpen.value && tab.value === value
 const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
+// A `?changes=` link opens with History beside the diff, as if the version had been picked there.
+if (route.query.changes && has("history")) {
+  tab.value = "history"
+  sideOpen.value = true
+}
 // A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
 const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 /** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
@@ -145,20 +150,40 @@ const outdated = computed(
         .map((comment) => comment.id),
     ),
 )
-/** The version whose changes show in place of the document (ViewerDiff), and the one before it. */
-const shownVersion = ref<DropVersion | null>(null)
+/**
+ * The version whose changes show in place of the document (ViewerDiff), and the one before it. It lives in the address
+ * (`?changes=<n>`), so the link opens the same diff and the browser's Back returns to the document.
+ */
+const router = useRouter()
+const setQuery = useSetQuery()
+const shownVersion = computed(() => {
+  const n = Number(route.query.changes)
+  return (n && drop.value.versions.find((item) => item.version === n)) || null
+})
 const previousVersion = computed(() =>
   shownVersion.value
     ? (drop.value.versions[drop.value.versions.findIndex((item) => item.id === shownVersion.value!.id) + 1] ?? null)
     : null,
 )
+// Opening a diff from the document adds a history entry; moving between versions replaces it, so one Back always
+// lands on the document. Closing steps back over that entry rather than adding another one.
+let pushedChanges = false
+watch(shownVersion, (value) => !value && (pushedChanges = false))
 /** Picking the open version again goes back to the document. Below `lg` the panel is a slideover, so it steps aside. */
 function showVersion(version: DropVersion) {
-  shownVersion.value = shownVersion.value?.id === version.id ? null : version
-  if (shownVersion.value && !wide.value) mobileSide.value = false
+  if (shownVersion.value?.id === version.id) return closeChanges()
+  const opening = !shownVersion.value
+  void setQuery({ changes: version.version }, { push: opening })
+  if (opening) pushedChanges = true
+  if (!wide.value) mobileSide.value = false
+}
+function closeChanges() {
+  if (!shownVersion.value) return
+  if (pushedChanges) return router.back()
+  void setQuery({ changes: undefined })
 }
 // The diff belongs to History: another tab goes back to the document.
-watch(tab, (value) => value !== "history" && (shownVersion.value = null))
+watch(tab, (value) => value !== "history" && closeChanges())
 
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
@@ -170,7 +195,7 @@ defineShortcuts({
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
-    shownVersion.value = null
+    closeChanges()
     annotations.dismiss()
   },
 })
@@ -291,6 +316,12 @@ function copyCommentLink(comment: DropComment) {
   url.searchParams.set("comment", String(comment.n))
   void copy(url.href, { announce: "Link to the comment copied" })
 }
+/** The drop's link with the diff showing: it opens the same changes, History beside them. */
+function copyChangesLink(version: DropVersion) {
+  const url = new URL(link.value)
+  url.searchParams.set("changes", String(version.version))
+  void copy(url.href, { key: "changes", announce: "Link to the changes copied" })
+}
 
 /**
  * Scroll the document to the comment and open its thread there: the frame reports the pin, like a click on it. A comment
@@ -351,6 +382,11 @@ const threadComment = computed(() => {
   const open = popover.value
   return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
 })
+// The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
+watch(
+  () => threadComment.value?.n,
+  (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
+)
 </script>
 
 <template>
@@ -718,8 +754,10 @@ const threadComment = computed(() => {
           :key="shownVersion.id"
           :inset="floating ? FLOATING_INSET : 0"
           :previous="previousVersion"
+          :copied="copied('changes')"
           :version="shownVersion"
-          @close="shownVersion = null"
+          @close="closeChanges"
+          @copy-link="copyChangesLink(shownVersion)"
         />
 
         <!-- As tall as its content, so a quiet drop gets a small card. Markdown docs make room for it (FLOATING_INSET). -->
