@@ -83,9 +83,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const LAYERS = '<div class="marks"></div><div class="draft"></div>';
   shadow.innerHTML = STYLE + LAYERS;
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
-  // MingCute's copy and check, as in Drop's own buttons.
-  const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
-  const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
+  // MingCute's copy and check, at the 1.75 stroke of Drop's own buttons (app.config icon.customize).
+  const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
+  const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
   const pageStyle = document.createElement("style");
   pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}img{cursor:zoom-in}";
   let markers = [], active = null;

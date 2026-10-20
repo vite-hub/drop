@@ -5,6 +5,12 @@ const floating = "bg-default ring ring-default rounded-lg shadow-md"
 const surface = `${floating} [animation:pop-in_120ms_var(--ease-out)]`
 
 export default defineAppConfig({
+  // MingCute draws in 2px strokes, a third heavier than the 14px labels beside its icons; 1.75 sits between that and
+  // Phosphor's 1.5. A global hook keeps each icon's class name, so the server render and hydration agree. In CSS mode
+  // Iconify passes only the body, not the prefix; the other sets (Phosphor, simple-icons) are fills with no stroke.
+  icon: {
+    customize: (content: string) => content.replaceAll('stroke-width="2"', 'stroke-width="1.75"'),
+  },
   ui: {
     colors: { primary: "neutral", neutral: "neutral" },
     // MingCute for Nuxt UI's own icons too. vite-hub's own parts keep the Phosphor they ship with.

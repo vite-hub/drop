@@ -31,7 +31,7 @@ export const SHARE_HINTS: Record<Share, string> = {
 }
 export const SHARE_ICONS: Record<Share, string> = {
   private: "i-mingcute-lock-line",
-  team: "i-mingcute-group-line",
+  team: "i-mingcute-group-2-line",
   team_edit: "i-mingcute-group-3-line",
   public: "i-mingcute-world-2-line",
   public_comment: "i-mingcute-world-2-line",

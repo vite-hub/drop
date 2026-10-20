@@ -4,9 +4,9 @@ import type { ActorKind, DropKind } from "#shared/types"
 export const formatBytes = (bytes: number) => prettyBytes(bytes)
 
 export const KIND_ICONS: Record<DropKind, string> = {
-  markdown: "i-mingcute-document-line",
+  markdown: "i-mingcute-document-2-line",
   html: "i-mingcute-code-line",
-  image: "i-mingcute-pic-line",
+  image: "i-mingcute-pic-2-line",
   file: "i-mingcute-file-line",
   app: "i-mingcute-layout-line",
   folder: "i-mingcute-folder-line",

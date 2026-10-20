@@ -84,7 +84,7 @@ const FEATURES = [
     to: "/docs/features#sharing",
   },
   {
-    icon: "i-mingcute-group-line",
+    icon: "i-mingcute-group-2-line",
     title: "Edit together",
     body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version.",
     to: "/docs/features#edit",
@@ -131,7 +131,7 @@ const FEATURES = [
 const USE_CASES = [
   {
     id: "docs",
-    icon: "i-mingcute-document-line",
+    icon: "i-mingcute-document-2-line",
     label: "Plans and docs",
     title: ["Write the plan ", "together", "."],
     body: "Your agent drops the plan in the folder that fits. The team edits it live, publishes the next version, and History shows what changed.",
@@ -392,7 +392,7 @@ const HOSTED = [
             >
               <div class="w-64 rounded-lg border border-default bg-default shadow-sm">
                 <div class="flex items-center gap-2 border-b border-default px-3 py-2">
-                  <UIcon name="i-mingcute-document-line" class="size-3.5 text-muted" />
+                  <UIcon name="i-mingcute-document-2-line" class="size-3.5 text-muted" />
                   <span class="font-mono text-xs text-toned">launch-plan.md</span>
                   <span
                     class="ml-auto inline-flex items-center gap-1 rounded-sm border border-default px-1.5 text-xs text-muted"

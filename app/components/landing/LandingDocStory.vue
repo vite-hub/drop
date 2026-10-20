@@ -142,7 +142,7 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                   /></span>
                   <span
                     class="ml-1 flex items-center gap-1.5 rounded-md border border-default px-2 py-1 text-xs text-highlighted"
-                    ><UIcon name="i-mingcute-group-line" class="size-3.5" /> Team</span
+                    ><UIcon name="i-mingcute-group-2-line" class="size-3.5" /> Team</span
                   >
                 </div>
               </div>

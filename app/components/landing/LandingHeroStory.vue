@@ -226,7 +226,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
               <div class="relative flex h-full flex-col">
                 <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm">
                   <DropMark class="h-3.5 shrink-0" />
-                  <UIcon name="i-mingcute-document-line" class="size-4 text-muted" />
+                  <UIcon name="i-mingcute-document-2-line" class="size-4 text-muted" />
                   <span class="font-medium text-highlighted">launch-plan.md</span>
                   <span
                     :key="String(v2)"

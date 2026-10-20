@@ -248,7 +248,7 @@ const box = (item: SiteReviewItem) => ({
               </span>
             </NuxtLink>
             <div v-else class="flex h-56 flex-col items-center justify-center gap-2 bg-muted text-sm text-muted">
-              <UIcon name="i-mingcute-pic-line" class="size-6 text-dimmed" />
+              <UIcon name="i-mingcute-pic-2-line" class="size-6 text-dimmed" />
               No screenshot from this page
             </div>
             <div class="space-y-2 border-t border-default p-3">

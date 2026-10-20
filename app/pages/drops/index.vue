@@ -198,7 +198,7 @@ async function newSite() {
             { label: `Only me ${counts.private}`, value: 'private', icon: 'i-mingcute-lock-line' },
             { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-mingcute-share-2-line' },
             team
-              ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-mingcute-group-line' }
+              ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-mingcute-group-2-line' }
               : { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-mingcute-inbox-line' },
             { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-mingcute-delete-2-line' },
           ]"
@@ -256,7 +256,7 @@ async function newSite() {
       v-else-if="filter === 'with-me' && !withMe.length"
       class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
     >
-      <UIcon :name="team ? 'i-mingcute-group-line' : 'i-mingcute-inbox-line'" class="size-6 text-dimmed" />
+      <UIcon :name="team ? 'i-mingcute-group-2-line' : 'i-mingcute-inbox-line'" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">
         {{ team ? "No team folders yet" : "Nothing shared with you yet" }}
       </p>

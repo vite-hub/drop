@@ -50,8 +50,8 @@ const workspace = computed(() => [
   },
   {
     label: "Members",
-    icon: "i-mingcute-group-line",
-    activeIcon: "i-mingcute-group-fill",
+    icon: "i-mingcute-group-2-line",
+    activeIcon: "i-mingcute-group-2-fill",
     to: "/members",
     active: at("/members"),
     count: me.value?.reviews,
@@ -124,10 +124,10 @@ function leaveDocs() {
             <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <template v-if="team">
                 <SidebarItem
-                  active-icon="i-mingcute-group-fill"
+                  active-icon="i-mingcute-group-2-fill"
                   :active="onShared"
                   :count="withMe.length"
-                  icon="i-mingcute-group-line"
+                  icon="i-mingcute-group-2-line"
                   label="Team"
                   to="/drops?tab=with-me"
                   @navigate="close"

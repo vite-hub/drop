@@ -264,9 +264,9 @@ export default defineNuxtConfig({
     clientBundle: {
       scan: true,
       icons: [
-        "mingcute:document-line",
+        "mingcute:document-2-line",
         "mingcute:code-line",
-        "mingcute:pic-line",
+        "mingcute:pic-2-line",
         "mingcute:file-line",
         "mingcute:folder-line",
         "mingcute:layout-line",
@@ -288,7 +288,7 @@ export default defineNuxtConfig({
         "simple-icons:vercel",
         "simple-icons:netlify",
         "simple-icons:deno",
-        "mingcute:server-line",
+        "mingcute:server-2-line",
         // Share states' icons (SHARE_ICONS in shared/share.ts) that no template names.
         "mingcute:group-3-line",
         // The Get started checklist's step marks (app/components/GetStarted.vue).

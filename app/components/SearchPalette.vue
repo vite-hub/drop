@@ -42,7 +42,7 @@ const pages = computed<CommandPaletteItem[]>(() =>
     { label: "Trash", icon: "i-mingcute-delete-2-line", to: "/drops?tab=trash" },
     { label: "Agents", icon: "i-mingcute-sparkles-line", to: "/agents" },
     { label: "Skills", icon: "i-mingcute-plugin-2-line", to: "/skills" },
-    { label: "Members", icon: "i-mingcute-group-line", to: "/members" },
+    { label: "Members", icon: "i-mingcute-group-2-line", to: "/members" },
     {
       label: "Keyboard shortcuts",
       icon: "i-mingcute-keyboard-line",
