@@ -37,7 +37,7 @@ function measure() {
     const element = view.nodeDOM(pos)
     if (element instanceof HTMLElement) {
       const rect = element.getBoundingClientRect()
-      const info = typeof node.attrs.language === "string" ? node.attrs.language.trim() : ""
+      const info = textValue(node.attrs.language)?.trim() ?? ""
       next.push({
         element,
         top: rect.top - box.top,
@@ -72,7 +72,7 @@ onMounted(() => {
 onBeforeUnmount(() => props.editor.off("update", measure))
 // Wrapping, images loading, and the window resizing move blocks without an edit.
 useResizeObserver(
-  () => props.editor.view.dom as HTMLElement,
+  () => props.editor.view.dom,
   () => measure(),
 )
 </script>

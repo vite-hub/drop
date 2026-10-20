@@ -44,12 +44,13 @@ const highlight = () => ({
       async (node) => {
         if (!Array.isArray(node) || node.length !== 3) return
         const [, attrs, code] = node
-        if (!Array.isArray(code) || code[0] !== "code" || code.length !== 3 || typeof code[2] !== "string") return
+        if (!Array.isArray(code) || code[0] !== "code" || code.length !== 3) return
+        const source = textValue(code[2])
         const language = codeLanguage(textValue(attrs.language))
-        if (!language || (budget -= code[2].length) < 0) return
+        if (source === undefined || !language || (budget -= source.length) < 0) return
 
         const { shiki, lang } = await loadHighlighter(language, ["github-light", "github-dark"])
-        const { tokens } = shiki.codeToTokens(code[2], { lang, themes: { light: "github-light", dark: "github-dark" } })
+        const { tokens } = shiki.codeToTokens(source, { lang, themes: { light: "github-light", dark: "github-dark" } })
         const highlighted = new Set(Array.isArray(attrs.highlights) ? attrs.highlights : [])
         const lines = tokens.flatMap((line, index) => [
           ...(index ? ["\n"] : []),
@@ -60,6 +61,7 @@ const highlight = () => ({
           ],
         ])
         attrs.class = "shiki"
+        // SAFETY: each line is a Comark element, ["span", attributes, ...children], whose children are strings or more spans.
         code.splice(2, 1, ...(lines as typeof code))
       },
     )
