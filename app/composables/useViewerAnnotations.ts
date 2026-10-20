@@ -150,7 +150,6 @@ export function useViewerAnnotations(options: {
     selection,
     lightbox,
     popover,
-    commenting,
     areaMode,
     canDrawArea,
     draftingArea,

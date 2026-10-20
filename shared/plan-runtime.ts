@@ -58,7 +58,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
 /**
  * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
  * Select text to comment on it; click an image to zoom and comment on a spot; in area mode (Drop's R), drag a rectangle.
- * Comark's own zoom, such as an annotated screenshot's, takes the same clicks and drags on its screenshots.
+ * Comark's own zoom, such as an annotated screenshot's, shows the comments on what it zooms and takes areas drawn on it.
  * Commented text is highlighted with the CSS Custom Highlight API and everything else draws in a shadow root, so the
  * author's DOM is never modified.
  */
@@ -87,8 +87,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const COPY_ICON = '<svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M216 32H88a8 8 0 0 0-8 8v40H40a8 8 0 0 0-8 8v128a8 8 0 0 0 8 8h128a8 8 0 0 0 8-8v-40h40a8 8 0 0 0 8-8V40a8 8 0 0 0-8-8m-56 176H48V96h112Zm48-48h-32V88a8 8 0 0 0-8-8H96V48h112Z"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="m229.66 77.66l-128 128a8 8 0 0 1-11.32 0l-56-56a8 8 0 0 1 11.32-11.32L96 188.69L218.34 66.34a8 8 0 0 1 11.32 11.32"/></svg>';
   const pageStyle = document.createElement("style");
-  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}img{cursor:zoom-in}" +
-    ".cz-dialog[data-drop-comment] .cz-item img{cursor:crosshair;touch-action:none}@media (max-width:40rem){[data-drop-hint]{display:none}}";
+  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}img{cursor:zoom-in}";
   let markers = [], active = null;
   const highlights = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
 
@@ -130,7 +129,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // Comark's zoom (comark-zoom) shows a copy of an item, such as an annotated screenshot, with a layer over the copy.
   // While it's open, comments draw and are written on the copy and anchor to the original on the page.
-  let zoom = null, zoomHost = null, canComment = false;
+  let zoom = null, zoomHost = null;
   function zoomRoot() {
     // The copy sits inside an empty copy of the item's context, when the item names one the page has.
     const item = zoom.item, context = item.getAttribute("data-zoom-context");
@@ -174,7 +173,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const b = inLayer({ left, top, width: right - left, height: bottom - top });
     areaBox(box, b.left, b.top, b.width, b.height);
   }
-  // The zoomed screenshot under a point: comments in the zoom are on images, like the ones Drop's own lightbox takes.
+  // The zoomed screenshot under a point: an area drawn on it is a comment on the image, like the ones Drop's lightbox takes.
   function shotAt(x, y) {
     if (!zoom) return null;
     return Array.from(zoom.content.querySelectorAll("img")).find((img) => {
@@ -193,24 +192,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (right > left || bottom > top) zoomDraft(left, top, right, bottom); else zoomDraft();
     post({ type: "area", kind: "image", selector: pathOf(img), label: img.getAttribute("alt") || "image", ox, oy, ow: thousandths(right, r.left, r.width) - ox, oh: thousandths(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
   }
-  // A hint in the zoom's header and a crosshair over its screenshots, while the reader can comment.
-  function markZoom() {
-    if (!zoom) return;
-    const on = canComment && Boolean(zoom.content.querySelector("img"));
-    zoom.dialog.toggleAttribute("data-drop-comment", on);
-    const close = zoom.header.querySelector(".cz-close");
-    let hint = zoom.header.querySelector("[data-drop-hint]");
-    if (on && !hint) {
-      hint = document.createElement("span");
-      hint.setAttribute("data-drop-hint", "");
-      hint.textContent = "Click a spot or drag an area to comment";
-      hint.style.cssText = "margin-left:auto;color:var(--cz-muted);font-size:12px;white-space:nowrap";
-      zoom.header.insertBefore(hint, close);
-    }
-    if (!on && hint) hint.remove();
-    if (close) close.style.marginLeft = on ? ".5rem" : "";
-  }
-
   /**
    * Whether an element still is what a comment from an earlier version pointed at. The selector is a position in the
    * page, so it also matches whatever took that place; the label (tag and first words, or the image's alt) tells.
@@ -338,18 +319,17 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // Area mode: a crosshair layer over the page. Drag a rectangle; it anchors to the smallest element that holds it.
   let drawing = null;
   function finishArea(left, top, right, bottom) {
-    // Over the zoom, an area is on the screenshot under it; anything else there is a copy and can't take a comment.
-    if (zoom) {
-      const shot = shotAt((left + right) / 2, (top + bottom) / 2);
-      if (shot) commentOnShot(shot, left, top, right, bottom);
-      return;
-    }
-    const el = anchorFor(left, top, right, bottom, host), r = el.getBoundingClientRect();
+    // Over the zoom, an area on a screenshot is on that image; anywhere else it anchors to the original of the copy under it.
+    const shot = zoom && shotAt((left + right) / 2, (top + bottom) / 2);
+    if (shot) return commentOnShot(shot, left, top, right, bottom);
+    const under = anchorFor(left, top, right, bottom, host), el = zoom ? originalOf(under) : under;
+    if (!el) return;
+    const r = under.getBoundingClientRect();
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
-    // Keep the drawn rectangle on the page while the comment is written; Drop clears it.
+    // Keep the drawn rectangle on the page, or the zoom, while the comment is written; Drop clears it.
     draft.innerHTML = "";
-    areaBox(draft, left + scrollX, top + scrollY, right - left, bottom - top);
-    post({ type: "area", selector: pathOf(el), label: labelOf(el), ox, oy, ow: thousandths(right, r.left, r.width) - ox, oh: thousandths(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
+    if (zoom) zoomDraft(left, top, right, bottom); else areaBox(draft, left + scrollX, top + scrollY, right - left, bottom - top);
+    post({ type: "area", selector: pathOf(el), label: labelOf(under), ox, oy, ow: thousandths(right, r.left, r.width) - ox, oh: thousandths(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
   }
   function setAreaMode(on) {
     if (on === Boolean(drawing)) return;
@@ -386,40 +366,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     shadow.appendChild(drawing);
   }
 
-  // In the zoom, a click on a screenshot comments on that spot and a drag on an area of it, as in Drop's lightbox.
-  let pressed = null;
-  document.addEventListener("pointerdown", (e) => {
-    if (!zoom || !canComment || drawing || e.button !== 0 || !zoom.content.contains(e.target) || e.target.closest("a,button")) return;
-    const shot = shotAt(e.clientX, e.clientY);
-    if (!shot) return;
-    // No text selection or image drag: the press is a comment.
-    e.preventDefault();
-    pressed = { x: e.clientX, y: e.clientY, shot, moved: false };
-  }, true);
-  document.addEventListener("pointermove", (e) => {
-    if (!pressed) return;
-    if (!pressed.moved && Math.max(Math.abs(e.clientX - pressed.x), Math.abs(e.clientY - pressed.y)) < 6) return;
-    pressed.moved = true;
-    zoomDraft(Math.min(pressed.x, e.clientX), Math.min(pressed.y, e.clientY), Math.max(pressed.x, e.clientX), Math.max(pressed.y, e.clientY));
-  });
-  document.addEventListener("pointerup", (e) => {
-    if (!pressed) return;
-    const p = pressed;
-    pressed = null;
-    if (!zoom) return;
-    if (p.moved) commentOnShot(p.shot, Math.min(p.x, e.clientX), Math.min(p.y, e.clientY), Math.max(p.x, e.clientX), Math.max(p.y, e.clientY));
-    else commentOnShot(p.shot, p.x, p.y, p.x, p.y);
-  });
-  document.addEventListener("pointercancel", () => { if (pressed) { pressed = null; zoomDraft(); } });
   const onZoom = (e) => {
     zoom = e.detail && e.detail.layer && e.detail.content && e.detail.item ? e.detail : null;
-    pressed = null;
-    markZoom();
     render();
   };
   document.addEventListener("comark-zoom:open", onZoom);
   document.addEventListener("comark-zoom:change", onZoom);
-  document.addEventListener("comark-zoom:close", () => { zoom = zoomHost = pressed = null; render(); });
+  document.addEventListener("comark-zoom:close", () => { zoom = zoomHost = null; render(); });
 
   window.addEventListener("message", (e) => {
     const m = e.data;
@@ -428,8 +381,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); }
     if (m.type === "area-mode") setAreaMode(Boolean(m.on));
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
-    // Whether the reader may comment, so the zoom only takes clicks as comments when they can.
-    if (m.type === "commenting") { canComment = Boolean(m.on); markZoom(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
     if (m.type === "inset") { document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px"); render(); }
     if (m.type === "focus") {
@@ -444,6 +395,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       setTimeout(() => { active = null; render(); }, 2200);
     }
   });
+  // Escape while drawing only leaves area mode: caught first, so Comark's zoom under the crosshair stays open.
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !drawing) return;
+    e.stopPropagation();
+    setAreaMode(false);
+    post({ type: "key", key: "Escape" });
+  }, true);
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { setAreaMode(false); post({ type: "key", key: "Escape" }); }
     // Drop's area shortcut, for when the page has focus. Never while typing, and never once the page used the key.

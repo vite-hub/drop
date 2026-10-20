@@ -38,7 +38,7 @@ export const FrameMessage = v.variant("type", [
   }),
   v.object({
     type: v.literal("area"),
-    // "image": drawn on a screenshot in Comark's zoom, so a click without a drag is a point on it.
+    // "image": drawn on a screenshot in Comark's zoom, which anchors to the image as Drop's lightbox does.
     kind: v.optional(v.picklist(["area", "image"])),
     selector: v.string(),
     label: v.string(),
