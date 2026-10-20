@@ -17,12 +17,16 @@ export function videoType(filename: string): string | undefined {
   return type?.startsWith("video/") ? type : undefined
 }
 
-/** An HTML doc's <title> or first <h1>, else the filename. (Markdown titles come from Comark's parse.) */
-export function titleFromSource(source: string, kind: string, filename: string): string {
+/**
+ * An HTML doc's <title> or first <h1>, else `fallback` (the title of the version it replaces), else the filename.
+ * (Markdown titles come from Comark's parse.)
+ */
+export function titleFromSource(source: string, kind: string, filename: string, fallback?: string): string {
   if (kind === "html") {
     const title = source.match(/<title>([^<]+)<\/title>/i)?.[1] ?? source.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]
     if (title?.trim()) return title.trim().slice(0, 120)
   }
+  if (fallback?.trim()) return fallback
   return (
     filename
       .replace(/\.[^.]+$/, "")

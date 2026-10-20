@@ -493,4 +493,15 @@ test("an agent publishes a board, reads its outline, and edits it", async () => 
   assert.match((await call(viewBoard, { id: board.id, frame: "nope" })).message, /No frame nope\. Frames: flow/)
   // Search finds a board by the words on it.
   assert.match((await call(listDrops, { query: "create a team" })).content[0].text, /Onboarding/)
+
+  // A next version that doesn't name itself keeps the board's title instead of becoming "board".
+  const next = (
+    await call(publish, {
+      previous: board.id,
+      board: { items: [{ id: "again", type: "note", text: "Second sketch" }] },
+      note: "Second sketch",
+    })
+  ).structuredContent
+  assert.equal(next.version, 2)
+  assert.equal(next.title, "Onboarding")
 })

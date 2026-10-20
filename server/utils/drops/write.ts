@@ -247,7 +247,12 @@ export async function createDocDrop(
       }
       const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
       const now = Date.now()
-      const title = (input.title?.trim() || markdownTitle || titleFromSource(text ?? "", kind, filename)).slice(0, 160)
+      // A version that doesn't name itself keeps its drop's title: a board or a file has only its filename to offer.
+      const title = (
+        input.title?.trim() ||
+        markdownTitle ||
+        titleFromSource(text ?? "", kind, filename, previous?.title)
+      ).slice(0, 160)
       const named = (input.slug && slugify(input.slug)) || previous?.slug || slugify(title)
       const slug = named === previous?.slug ? named : await uniqueSlug(parentId, named, previous?.link)
       if (input.nameFromSlug) filename = `${slug || "doc"}${extension}`

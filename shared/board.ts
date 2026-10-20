@@ -162,6 +162,32 @@ function sizeOf(shape: Shape) {
   return { w: 0, h: 0 }
 }
 
+// tldraw measures a note's or a shape's words in the browser when someone types them, and grows the shape down to
+// fit (growY). Words an agent sends never meet a browser, so estimate what tldraw would measure: the draw font at
+// size m is 22px with a 1.35 line height, about 12.5px a character, inside 16px of padding. Long words break, so the
+// estimate errs tall, and tldraw measures it exactly the next time someone edits the words.
+const LABEL = { line: 22 * 1.35, padding: 16, char: 12.5 }
+
+/** How far a note or shape of w×h must grow down to hold its words. */
+export function labelGrowth(text: string, w: number, h: number) {
+  if (!text.trim()) return 0
+  const perLine = Math.max(1, Math.floor((w - LABEL.padding * 2) / LABEL.char))
+  let lines = 0
+  for (const paragraph of text.split("\n")) {
+    lines++
+    let used = 0
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      if (used && used + 1 + word.length > perLine) {
+        lines++
+        used = 0
+      }
+      lines += Math.ceil(word.length / perLine) - 1
+      used = (used ? used + 1 : 0) + (word.length % perLine || perLine)
+    }
+  }
+  return Math.max(0, Math.ceil(lines * LABEL.line + LABEL.padding * 2 - h))
+}
+
 /** The plain text of a tldraw rich text value. */
 export function plainText(rich: unknown): string {
   const walk = (node: any): string =>
@@ -193,6 +219,32 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
   for (const item of added) if (item.in) children.set(item.in, [...(children.get(item.in) ?? []), item])
   let row = contentBottom(board)
 
+  // A frame's grid is four across, and each row is as tall as its tallest item, words included.
+  const gridRows = (kids: BoardItem[]) => {
+    const rows: number[] = []
+    kids.forEach((kid, slot) => {
+      const { h, growY } = itemSize(kid)
+      rows[Math.floor(slot / 4)] = Math.max(rows[Math.floor(slot / 4)] ?? 0, h + growY)
+    })
+    return rows.length ? rows : [NOTE]
+  }
+  const itemSize = (item: BoardItem): { w: number; h: number; growY: number } => {
+    if (item.type === "frame") {
+      const kids = children.get(item.id) ?? []
+      const columns = Math.min(Math.max(kids.length, 1), 4)
+      return {
+        w: item.w ?? columns * (NOTE + GAP) + GAP,
+        h: item.h ?? gridRows(kids).reduce((sum, height) => sum + height + GAP, GAP * 2),
+        growY: 0,
+      }
+    }
+    if (item.type === "text") return { w: item.w ?? NOTE, h: item.h ?? 40, growY: 0 }
+    // A note is always 200 wide and grows down; a box or ellipse grows down past the height it was given.
+    const w = item.type === "note" ? NOTE : (item.w ?? NOTE)
+    const h = item.type === "note" ? NOTE : (item.h ?? NOTE)
+    return { w, h, growY: labelGrowth(item.text ?? "", w, h) }
+  }
+
   for (const item of added) {
     const id = shapeId(item.id)
     if (!/^[\w-]{1,64}$/.test(shortId(id))) fail(`Item id "${item.id}" may only use letters, digits, _ and -.`)
@@ -202,26 +254,19 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
     if (item.in && parent?.type !== "frame") fail(`"${item.in}", which "${item.id}" goes in, isn't a frame.`)
     const siblings = item.in ? (children.get(item.in) ?? []) : []
     const slot = siblings.indexOf(item)
-    const kids = item.type === "frame" ? (children.get(item.id) ?? []) : []
-    const columns = Math.min(Math.max(kids.length, 1), 4)
-    const size =
-      item.type === "frame"
-        ? {
-            w: item.w ?? columns * (NOTE + GAP) + GAP,
-            h: item.h ?? Math.ceil(Math.max(kids.length, 1) / 4) * (NOTE + GAP) + GAP * 2,
-          }
-        : { w: item.w ?? NOTE, h: item.h ?? (item.type === "text" ? 40 : NOTE) }
+    const size = itemSize(item)
     // Without x/y: items in a frame fill its grid, four across; loose items and frames start a row below the board.
     let x = item.x
     let y = item.y
     if (x === undefined || y === undefined) {
       if (item.in && slot >= 0) {
+        const above = gridRows(siblings).slice(0, Math.floor(slot / 4))
         x ??= GAP + (slot % 4) * (NOTE + GAP)
-        y ??= GAP * 1.5 + Math.floor(slot / 4) * (NOTE + GAP)
+        y ??= above.reduce((sum, height) => sum + height + GAP, GAP * 1.5)
       } else {
         x ??= 0
         y ??= row
-        row = y + size.h + GAP * 2
+        row = y + size.h + size.growY + GAP * 2
       }
     }
     const index = getIndexAbove(
@@ -262,6 +307,11 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
     if (change.color !== undefined && "color" in next.props) next.props.color = change.color
     if (change.w !== undefined && "w" in next.props) next.props.w = change.w
     if (change.h !== undefined && "h" in next.props) next.props.h = change.h
+    if ("growY" in next.props && (change.text !== undefined || change.w !== undefined || change.h !== undefined))
+      next.props.growY =
+        next.type === "note"
+          ? labelGrowth(plainText(next.props.richText), NOTE, NOTE)
+          : labelGrowth(plainText(next.props.richText), next.props.w, next.props.h)
     next.meta = { ...next.meta, editedBy: author }
     put.set(id, validateRecord(next))
   }
@@ -364,14 +414,17 @@ const ARROW = {
 }
 const ARROW_BINDING = { isPrecise: false, isExact: false, normalizedAnchor: { x: 0.5, y: 0.5 }, snap: "none" }
 
-function shapeProps(item: BoardItem, size: { w: number; h: number }): { type: string; props: Record<string, unknown> } {
+function shapeProps(
+  item: BoardItem,
+  size: { w: number; h: number; growY: number },
+): { type: string; props: Record<string, unknown> } {
   const color = item.color ?? (item.type === "note" ? "yellow" : "black")
   const richText = toRichText(item.text ?? "")
   switch (item.type) {
     case "note":
       return {
         type: "note",
-        props: { ...DEFAULTS, color, richText, fontSizeAdjustment: 1, textLastEditedBy: null },
+        props: { ...DEFAULTS, color, richText, growY: size.growY, fontSizeAdjustment: 1, textLastEditedBy: null },
       }
     case "text":
       return {
@@ -392,6 +445,7 @@ function shapeProps(item: BoardItem, size: { w: number; h: number }): { type: st
           flipY: false,
           w: size.w,
           h: size.h,
+          growY: size.growY,
           color,
           richText,
         },

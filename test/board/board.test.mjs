@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { applyChanges, boardChanges, boardOutline, emptyBoard, parseBoard } from "../../shared/board.ts"
+import { applyChanges, boardChanges, boardOutline, emptyBoard, labelGrowth, parseBoard } from "../../shared/board.ts"
 
 const flow = {
   add: [
@@ -40,4 +40,42 @@ test("bad input names the item", () => {
   assert.throws(() => boardChanges(emptyBoard(), { add: [{ id: "a", type: "note", in: "nope" }] }, "x"), /"nope"/)
   assert.throws(() => boardChanges(emptyBoard(), { edges: [{ from: "a", to: "b" }] }, "x"), /"a"/)
   assert.throws(() => boardChanges(emptyBoard(), { add: [{ id: "a b", type: "note" }] }, "x"), /letters, digits/)
+})
+
+test("a note or box grows down to hold its words, and a frame's grid makes room for it", () => {
+  const long =
+    "CAUSA: con pnpm son dependencias de @antfu/eslint-config, no de tu proyecto. Dos nombres mal adivinados: @eslint/markdown y @eslint-community/eslint-plugin-eslint-comments"
+  assert.equal(labelGrowth("Sign up", 200, 200), 0)
+  assert.ok(labelGrowth(long, 200, 200) > 200)
+  // A wider box needs fewer lines than a note.
+  assert.ok(labelGrowth(long, 300, 200) < labelGrowth(long, 200, 200))
+
+  const board = applyChanges(
+    emptyBoard(),
+    ...Object.values(
+      boardChanges(
+        emptyBoard(),
+        {
+          add: [
+            { id: "f", type: "frame", text: "Trap 2" },
+            ...["a", "b", "c", "d"].map((id) => ({ id, type: "note", text: id === "b" ? long : id, in: "f" })),
+            { id: "e", type: "note", text: "below", in: "f" },
+            { id: "box", type: "box", text: long, w: 300, h: 100 },
+          ],
+        },
+        "Claude",
+      ),
+    ),
+  )
+  const grown = 200 + labelGrowth(long, 200, 200)
+  const outline = boardOutline(board)
+  assert.match(outline, new RegExp(`note b ".*" \\(280,60 200×${grown}\\)`))
+  // The second row starts below the tallest note of the first, and the frame holds both rows.
+  assert.match(outline, new RegExp(`note e "below" \\(40,${60 + grown + 40} 200×200\\)`))
+  assert.match(outline, new RegExp(`frame f "Trap 2" \\(0,0 1000×${grown + 200 + 3 * 40 + 40}\\)`))
+  assert.match(outline, new RegExp(`rectangle box ".*" \\(\\d+,\\d+ 300×${100 + labelGrowth(long, 300, 100)}\\)`))
+
+  // New words get a new size.
+  const { put } = boardChanges(board, { update: [{ id: "b", text: "short" }] }, "Claude")
+  assert.equal(put[0].props.growY, 0)
 })
