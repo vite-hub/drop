@@ -119,7 +119,7 @@ const tabsUi = {
             <p>
               Ask your agent for something to review. It answers with the link, and the drop lands here, private to you.
             </p>
-            <AgentsCodeBlock :code="PROMPT" message="Prompt copied" />
+            <AgentsCodeBlock :code="PROMPT" />
             <p class="flex flex-wrap items-center gap-2">
               Or drop a Markdown, HTML, or image file yourself.
               <UButton

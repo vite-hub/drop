@@ -166,7 +166,7 @@ const box = (item: SiteReviewItem) => ({
           this review shared with them to comment. On a preview with a strict Content Security Policy, also allow
           {{ origin }} there.
         </p>
-        <AgentsCodeBlock :code="snippet" message="Tag copied" />
+        <AgentsCodeBlock :code="snippet" />
       </section>
 
       <section v-if="drop.canComment" class="space-y-3">

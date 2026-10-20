@@ -19,7 +19,7 @@ const tabsUi = {
 
 const client = ref<McpClient>("claude")
 const { agents, status, disconnect } = useAgents()
-const { copy } = useCopy()
+const { copy, copied } = useCopy()
 </script>
 
 <template>
@@ -37,10 +37,10 @@ const { copy } = useCopy()
           <UButton
             aria-label="Copy server URL"
             color="neutral"
-            icon="i-ph-copy"
+            :icon="copied('server') ? 'i-ph-check' : 'i-ph-copy'"
             size="xs"
             variant="ghost"
-            @click="copy(server, 'Server URL copied')"
+            @click="copy(server, { key: 'server' })"
           />
         </div>
         <div class="-mx-1 overflow-x-auto px-1">
@@ -65,11 +65,11 @@ const { copy } = useCopy()
         <UTooltip text="A starter HTML plan your agent can fill in and drop">
           <UButton
             color="neutral"
-            icon="i-ph-copy"
-            label="Copy Plan Template"
+            :icon="copied('template') ? 'i-ph-check' : 'i-ph-copy'"
+            :label="copied('template') ? 'Copied' : 'Copy Plan Template'"
             size="sm"
             variant="ghost"
-            @click="copy(PLAN_TEMPLATE, 'Plan template copied')"
+            @click="copy(PLAN_TEMPLATE, { key: 'template' })"
           />
         </UTooltip>
       </div>

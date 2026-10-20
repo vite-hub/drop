@@ -41,7 +41,8 @@ async function run(action: () => Promise<boolean>, done?: string) {
   if ((await action()) && done) notify.done(done)
   busy.value = false
 }
-const choose = (lifetime: Lifetime) => run(() => setLifetime(props.drop, { lifetime }), `Lifetime: ${lifetime}`)
+// The control shows the new lifetime; renewing, which may not change what it says, gets a toast.
+const choose = (lifetime: Lifetime) => run(() => setLifetime(props.drop, { lifetime }))
 </script>
 
 <template>

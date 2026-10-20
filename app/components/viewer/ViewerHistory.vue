@@ -7,10 +7,10 @@ import type { DropComment, DropDetail, DropVersion } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; comments: DropComment[]; selected?: string }>()
 const emit = defineEmits<{ open: [version: DropVersion] }>()
-const { copy } = useCopy()
+const { copy, copied } = useCopy()
 const origin = useRequestURL().origin
 const copyLink = (version: DropVersion) =>
-  copy(`${origin}${dropPath(props.drop, version.version)}`, `Link to v${version.version} copied`)
+  copy(`${origin}${dropPath(props.drop, version.version)}`, { key: version.id })
 
 // Comments come up to the version being viewed (listComments), so later versions have none to count here.
 function talk(version: DropVersion) {
@@ -62,7 +62,7 @@ function talk(version: DropVersion) {
           :aria-label="`Copy link to v${version.version}`"
           class="absolute top-1.5 right-1.5 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-visible:opacity-100"
           color="neutral"
-          icon="i-ph-link"
+          :icon="copied(version.id) ? 'i-ph-check' : 'i-ph-link'"
           size="xs"
           variant="ghost"
           @click="copyLink(version)"

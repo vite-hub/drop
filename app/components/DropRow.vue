@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isPublic, type Share, SHARE_HINTS, SHARE_ICONS } from "#shared/share"
+import { isPublic, type Share, SHARE_ICONS } from "#shared/share"
 import type { DropSummary } from "#shared/types"
 import { dropPath } from "#shared/links"
 import { daysUntil, purgesAt } from "#shared/expiry"
@@ -18,7 +18,7 @@ const trashed = computed(() => drop.trashedAt !== null)
 const now = useRelativeNow()
 const purgeDays = computed(() => (drop.trashedAt === null ? 0 : daysUntil(purgesAt(drop.trashedAt), now.value)))
 const notify = useNotify()
-const { copy } = useCopy()
+const { copy, copied } = useCopy()
 const { setShare } = useDropActions()
 const moveTo = useMoveDialog()
 const folder = computed(() => drop.kind === "folder")
@@ -38,18 +38,15 @@ const detail = computed(() => {
   return `${drop.kind === "app" && drop.paths ? `${drop.filename} · ${drop.paths.length} files` : drop.filename}${where}`
 })
 
-async function pick(next: Share) {
-  if (next === drop.share) return true
-  if (!(await setShare(drop, next))) return false
-  notify.done(SHARED_TITLES[next], SHARE_HINTS[next])
-  return true
-}
+// The row's share menu shows the new choice, so picking one doesn't toast.
+const pick = (next: Share) => next === drop.share || setShare(drop, next)
 
-async function copyLink() {
+/** The link button shows a check once it copied; from the menu, which closes, `announce` says it in a toast. */
+async function copyLink(announce?: string) {
   // Copying never widens a share on its own: the toast says who each choice lets in, and the team comes first.
   if (!shared.value && changeable.value) {
     const shareAndCopy = (next: Share) => async () => {
-      if (await pick(next)) await copyLink()
+      if (await pick(next)) await copy(link.value, { announce: `${SHARED_TITLES[next]}. Link copied` })
     }
     const team = choices.value.some((item) => item.value === "team")
     const canPublic = choices.value.some((item) => item.value === "public")
@@ -85,7 +82,7 @@ async function copyLink() {
     })
     return
   }
-  await copy(link.value, "Link copied")
+  await copy(link.value, { announce })
 }
 
 const menu = computed(() => [
@@ -98,7 +95,7 @@ const menu = computed(() => [
       target: "_blank",
       disabled: !shared.value,
     },
-    { label: "Copy link", icon: "i-ph-link", onSelect: copyLink },
+    { label: "Copy link", icon: "i-ph-link", onSelect: () => void copyLink("Link copied") },
   ],
   ...(changeable.value
     ? [
@@ -237,9 +234,9 @@ const menu = computed(() => [
         aria-label="Copy link"
         class="hidden sm:inline-flex"
         color="neutral"
-        icon="i-ph-link"
+        :icon="copied() ? 'i-ph-check' : 'i-ph-link'"
         variant="ghost"
-        @click="copyLink"
+        @click="copyLink()"
       />
       <UDropdownMenu :items="menu" :content="{ align: 'end' }">
         <UButton :aria-label="`Actions for ${drop.title}`" color="neutral" icon="i-ph-dots-three" variant="ghost" />

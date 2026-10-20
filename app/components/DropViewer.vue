@@ -21,7 +21,7 @@ const comments = computed(() => state.comments.data.value)
 
 const route = useRoute()
 const notify = useNotify()
-const { copy, copyLoading } = useCopy()
+const { copy, copyLoading, copied } = useCopy()
 const { remove, restore } = useDropActions()
 const [DefineSide, ReuseSide] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
@@ -83,7 +83,7 @@ function closeLightbox() {
   lightbox.value = null
   popover.value = null
 }
-const popoverRef = useTemplateRef<{ fail: () => void; sent: () => Promise<void> }>("popoverRef")
+const popoverRef = useTemplateRef<{ fail: (reason?: string) => void; sent: () => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 
 function startEdit() {
@@ -175,38 +175,29 @@ const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.val
 const copyMarkdown = () =>
   copyLoading(
     $fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }),
-    "Copied as Markdown",
+    { key: "markdown" },
   )
 const copyFeedback = () =>
-  copy(
-    feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version),
-    "Feedback copied as Markdown",
-  )
+  copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
 function copyLink() {
-  if (drop.value.share !== "private") void copy(link.value, "Link copied")
+  if (drop.value.share !== "private") void copy(link.value, { key: "link" })
   else shareOpen.value = true
 }
 
 async function submit(body: string) {
   if (popover.value?.type !== "new") return
-  const comment = await state.addComment(
-    { ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) },
-    body,
-  )
-  if (!comment) return popoverRef.value?.fail()
+  const sent = await state.addComment({ ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
+  if (!("value" in sent)) return popoverRef.value?.fail(sent.error)
   popover.value = null
   send({ type: "clear-selection" })
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
-async function addPageComment(body: string) {
-  return Boolean(
-    await state.addComment(
-      { kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) },
-      body,
-    ),
+const addPageComment = (body: string) =>
+  state.addComment(
+    { kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) },
+    body,
   )
-}
 
 async function resolve(id: string, resolved: boolean) {
   popover.value = null
@@ -219,16 +210,17 @@ async function removeComment(id: string) {
 }
 
 async function reply(id: string, body: string) {
-  if (await state.addReply(id, body)) await popoverRef.value?.sent()
-  else popoverRef.value?.fail()
+  const sent = await state.addReply(id, body)
+  if ("value" in sent) await popoverRef.value?.sent()
+  else popoverRef.value?.fail(sent.error)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
-// it works for whoever can open the drop.
+// it works for whoever can open the drop. The menu that copied it closes, so a toast says it was copied.
 function copyCommentLink(comment: DropComment) {
   const url = new URL(link.value)
   url.searchParams.set("comment", String(comment.n))
-  void copy(url.href, "Link to the comment copied")
+  void copy(url.href, { announce: "Link to the comment copied" })
 }
 
 /**
@@ -305,7 +297,7 @@ const threadComment = computed(() => {
           v-if="tab === 'comments' && comments.length"
           aria-label="Copy feedback for your agent"
           color="neutral"
-          icon="i-ph-sparkle"
+          :icon="copied('feedback') ? 'i-ph-check' : 'i-ph-sparkle'"
           size="sm"
           title="Copy feedback for your agent"
           variant="ghost"
@@ -344,7 +336,11 @@ const threadComment = computed(() => {
 
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
-          <ViewerAction icon="i-ph-link" label="Copy link" @click="copyLink" />
+          <ViewerAction
+            :icon="copied('link') ? 'i-ph-check' : 'i-ph-link'"
+            :label="copied('link') ? 'Link copied' : 'Copy link'"
+            @click="copyLink"
+          />
           <ViewerAction
             v-if="drop.url"
             icon="i-ph-download-simple"
@@ -507,7 +503,7 @@ const threadComment = computed(() => {
             <UButton
               aria-label="Copy as Markdown"
               color="neutral"
-              icon="i-ph-copy"
+              :icon="copied('markdown') ? 'i-ph-check' : 'i-ph-copy'"
               size="sm"
               variant="ghost"
               @click="copyMarkdown"
@@ -523,10 +519,10 @@ const threadComment = computed(() => {
             <UButton
               aria-label="Copy link"
               color="neutral"
-              icon="i-ph-link"
+              :icon="copied('link') ? 'i-ph-check' : 'i-ph-link'"
               size="sm"
               variant="ghost"
-              @click="copy(link, 'Link copied')"
+              @click="copy(link, { key: 'link' })"
             />
           </UTooltip>
           <!-- Strangers report through the abuse queue; teammates can talk to the owner, so they don't get a flag. -->

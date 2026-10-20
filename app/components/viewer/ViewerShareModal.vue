@@ -16,9 +16,11 @@ const url = useShareUrl(() => props.drop)
 const choices = computed(() => shareItems(me.value, props.drop))
 const days = computed(() => me.value?.publicLinkDays)
 
+// The card above shows the new choice and what it means; only renewing, which may not change what it says, gets a toast.
 async function pick(next: Share) {
-  if ((next === own.value && !isPublic(next)) || !(await setShare(props.drop, next))) return
-  notify.done(next === own.value ? "Public link renewed" : SHARED_TITLES[next], SHARE_HINTS[next])
+  const renew = next === own.value
+  if ((renew && !isPublic(next)) || !(await setShare(props.drop, next))) return
+  if (renew) notify.done("Public link renewed", SHARE_HINTS[next])
 }
 </script>
 
@@ -79,10 +81,10 @@ async function pick(next: Share) {
           aria-label="Copy link"
           color="neutral"
           :disabled="!shared"
-          :icon="copied ? 'i-ph-check' : 'i-ph-copy'"
+          :icon="copied() ? 'i-ph-check' : 'i-ph-copy'"
           size="sm"
           variant="ghost"
-          @click="copy(url, 'Link copied')"
+          @click="copy(url)"
         />
       </div>
       <p v-if="shared && !isPublic(drop.share)" class="mt-2 text-xs text-muted">

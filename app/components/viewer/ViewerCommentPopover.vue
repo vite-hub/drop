@@ -27,6 +27,9 @@ const emit = defineEmits<{
 }>()
 const body = ref("")
 const busy = ref(false)
+// Why the last send failed, under the box that sent it; editing the text clears it.
+const error = ref<string>()
+watch(body, () => (error.value = undefined))
 const viewport = useWindowSize()
 const card = useTemplateRef("card")
 const { height } = useElementSize(card)
@@ -45,7 +48,10 @@ function send() {
   else emit("submit", body.value)
 }
 defineExpose({
-  fail: () => (busy.value = false),
+  fail: (reason?: string) => {
+    busy.value = false
+    error.value = reason
+  },
   /** A reply went through: clear the box for the next one, and show it at the bottom of the thread. */
   sent: async () => {
     busy.value = false
@@ -81,33 +87,36 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     :class="pending ? 'p-1.5 pl-2.5' : 'max-h-[min(32rem,calc(100dvh-4.5rem))]'"
     :style="style"
   >
-    <div v-if="pending" class="flex items-end gap-2">
-      <UTextarea
-        v-model="body"
-        aria-label="Comment"
-        autofocus
-        autoresize
-        class="flex-1"
-        :maxrows="6"
-        :placeholder="
-          pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'
-        "
-        :rows="1"
-        :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
-        variant="none"
-        @keydown.enter.exact.prevent="send"
-        @keydown.esc="emit('cancel')"
-      />
-      <UButton
-        aria-label="Send comment"
-        class="size-8 justify-center rounded-full"
-        color="neutral"
-        :disabled="!body.trim()"
-        icon="i-ph-arrow-up"
-        :loading="busy"
-        @click="send"
-      />
-    </div>
+    <template v-if="pending">
+      <div class="flex items-end gap-2">
+        <UTextarea
+          v-model="body"
+          aria-label="Comment"
+          autofocus
+          autoresize
+          class="flex-1"
+          :maxrows="6"
+          :placeholder="
+            pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'
+          "
+          :rows="1"
+          :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
+          variant="none"
+          @keydown.enter.exact.prevent="send"
+          @keydown.esc="emit('cancel')"
+        />
+        <UButton
+          aria-label="Send comment"
+          class="size-8 justify-center rounded-full"
+          color="neutral"
+          :disabled="!body.trim()"
+          icon="i-ph-arrow-up"
+          :loading="busy"
+          @click="send"
+        />
+      </div>
+      <p v-if="error" class="px-1 pt-1 pb-0.5 text-xs text-error" role="alert">{{ error }}</p>
+    </template>
     <template v-else-if="comment">
       <div class="flex h-10 shrink-0 items-center gap-1 border-b border-default pr-1.5 pl-3">
         <span class="label-mono">Comment #{{ comment.n }}</span>
@@ -182,6 +191,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           @click="send"
         />
       </div>
+      <p v-if="canReply && error" class="px-3 pb-2 text-xs text-error" role="alert">{{ error }}</p>
     </template>
   </div>
 </template>

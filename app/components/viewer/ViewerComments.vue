@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { DropComment, DropVersion } from "#shared/types"
+import type { Sent } from "~/composables/useDrop"
 
-// `addPageComment` posts a comment on the page as a whole, written in the box at the bottom; it says whether it went
-// through, so the box only clears then. `focus` carries the row's box for those comments, which have no pin to open at.
+// `addPageComment` posts a comment on the page as a whole, written in the box at the bottom; the box only clears once it
+// went through, and says why under it when it didn't. `focus` carries the row's box for those comments, which have no pin to open at.
 const props = defineProps<{
   comments: DropComment[]
   canComment: boolean
@@ -10,7 +11,7 @@ const props = defineProps<{
   version: number
   versions: DropVersion[]
   outdated: Set<string>
-  addPageComment: (body: string) => Promise<boolean>
+  addPageComment: (body: string) => Promise<Sent<DropComment>>
 }>()
 const emit = defineEmits<{ focus: [comment: DropComment, row: DOMRect]; resolve: [id: string, resolved: boolean] }>()
 const filter = ref<"open" | "resolved">("open")
@@ -39,13 +40,16 @@ const repliers = (comment: DropComment) => [
 
 const pageBody = ref("")
 const sending = ref(false)
+const pageError = ref<string>()
+watch(pageBody, () => (pageError.value = undefined))
 async function sendPageComment() {
   if (!pageBody.value.trim() || sending.value) return
   sending.value = true
-  if (await props.addPageComment(pageBody.value)) {
+  const sent = await props.addPageComment(pageBody.value)
+  if ("value" in sent) {
     pageBody.value = ""
     filter.value = "open"
-  }
+  } else pageError.value = sent.error
   sending.value = false
 }
 </script>
@@ -161,5 +165,6 @@ async function sendPageComment() {
         @click="sendPageComment"
       />
     </div>
+    <p v-if="canComment && pageError" class="shrink-0 px-3 pb-2 text-xs text-error" role="alert">{{ pageError }}</p>
   </div>
 </template>

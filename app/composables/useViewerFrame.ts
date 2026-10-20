@@ -150,7 +150,7 @@ export function useViewerFrame(options: {
         if (isApp.value) page.value = message.path
         return
       case "copy":
-        return void copy(message.text, "Code copied")
+        return void copy(message.text)
       case "unplaced":
         unplaced.value = new Set(message.ids)
         return

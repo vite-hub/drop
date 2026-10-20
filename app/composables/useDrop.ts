@@ -3,6 +3,9 @@ import type { CommentReply, DropComment, DropDetail, DropVersion } from "#shared
 import type { CommentInput } from "#shared/schemas"
 import * as v from "valibot"
 
+/** What a comment box waits on: what it posted, or the sentence to show under it (none when the plan-limit dialog says it). */
+export type Sent<T> = { value: T } | { error?: string }
+
 /**
  * One drop and its comments, with the actions the viewer needs. Keys follow the id, so the cache
  * stays right when the router reuses the page for another drop (the next version, for instance).
@@ -15,17 +18,17 @@ function useDrop(id: MaybeRefOrGetter<string>) {
     default: () => [],
   })
 
-  async function addComment(input: Omit<CommentInput, "body">, body: string) {
+  // No toast either way: the new pin shows it went through, and a failure shows under the box that sent it.
+  async function addComment(input: Omit<CommentInput, "body">, body: string): Promise<Sent<DropComment>> {
     try {
       const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, {
         method: "POST",
         body: { ...input, body },
       })
       comments.data.value = [...comments.data.value, comment]
-      notify.done("Comment added")
-      return comment
+      return { value: comment }
     } catch (error) {
-      notify.fail("Couldn't add the comment", error)
+      return { error: notify.problem(error) }
     }
   }
 
@@ -55,13 +58,13 @@ function useDrop(id: MaybeRefOrGetter<string>) {
       comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment,
     ))
 
-  async function addReply(commentId: string, body: string) {
+  async function addReply(commentId: string, body: string): Promise<Sent<CommentReply>> {
     try {
       const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, { method: "POST", body: { body } })
       setReplies(commentId, (replies) => [...replies, reply])
-      return reply
+      return { value: reply }
     } catch (error) {
-      notify.fail("Couldn't send the reply", error)
+      return { error: notify.problem(error) }
     }
   }
 

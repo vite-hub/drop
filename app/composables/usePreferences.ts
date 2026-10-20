@@ -52,31 +52,49 @@ export function useRelativeNow() {
   return now
 }
 
-/** Copy with a toast; `copied` flips for a moment so buttons can show a check. */
+/**
+ * Copy without a toast: the button that copied shows a check while `copied(key)` holds, for a moment. A copy whose
+ * button goes away with the click (a menu item) passes `announce`, and a toast says it instead. A failure toasts.
+ */
 export function useCopy() {
   const toast = useToast()
-  const { copy, copied } = useClipboard({ copiedDuring: 1400, legacy: true })
+  const { copy: write } = useClipboard({ legacy: true })
+  const last = ref<string>()
+  const { start } = useTimeoutFn(() => (last.value = undefined), 1400, { immediate: false })
+  type Options = { key?: string; announce?: string }
+  function done({ key = "", announce }: Options) {
+    last.value = key
+    start()
+    if (announce) toast.add({ title: announce, icon: "i-ph-check" })
+  }
+  function failed(error: unknown) {
+    reportClientError("copy", error)
+    toast.add({ title: "Couldn't copy", color: "error", icon: "i-ph-warning-circle" })
+  }
   return {
-    copied,
-    copy: async (text: string, title = "Copied") => {
-      await copy(text)
-      toast.add({ title })
+    copied: (key = "") => last.value === key,
+    copy: async (text: string, options: Options = {}) => {
+      try {
+        await write(text)
+        done(options)
+      } catch (error) {
+        failed(error)
+      }
     },
     /**
      * Copy text that's still loading. Safari only lets a click write the clipboard straight away, so where it can the
      * write starts now and the browser waits for the text.
      */
-    async copyLoading(text: Promise<string>, title = "Copied") {
+    copyLoading: async (text: Promise<string>, options: Options = {}) => {
       try {
         if ("ClipboardItem" in globalThis && navigator.clipboard?.write)
           await navigator.clipboard.write([
             new ClipboardItem({ "text/plain": text.then((value) => new Blob([value], { type: "text/plain" })) }),
           ])
-        else await copy(await text)
-        toast.add({ title })
+        else await write(await text)
+        done(options)
       } catch (error) {
-        reportClientError("copy", error)
-        toast.add({ title: "Couldn't copy", color: "error" })
+        failed(error)
       }
     },
   }

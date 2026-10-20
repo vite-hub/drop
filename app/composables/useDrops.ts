@@ -238,13 +238,12 @@ export function useDropActions() {
     }
   }
 
-  /** A folder's description: what goes in it and how, which agents read to pick it. */
+  /** A folder's description: what goes in it and how, which agents read to pick it. Saved, it shows in place of the editor. */
   async function describe(folder: Pick<DropSummary, "id">, description: string) {
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${folder.id}`, { method: "PATCH", body: { description } })
       patch(folder.id, result)
       await refreshNuxtData([keys.drop(folder.id), keys.sharedWithMe])
-      notify.done("Description saved")
       return true
     } catch (error) {
       notify.fail("Couldn't save the description", error)
