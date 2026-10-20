@@ -195,6 +195,10 @@ export function useViewerFrame(options: {
       })
   })
   watch([ready, annotations.areaMode], () => ready.value && send({ type: "area-mode", on: annotations.areaMode.value }))
+  watch(
+    [ready, annotations.commenting],
+    () => ready.value && send({ type: "commenting", on: annotations.commenting.value }),
+  )
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
   watch([ready, options.inset], () => ready.value && send({ type: "inset", right: options.inset.value }))
 

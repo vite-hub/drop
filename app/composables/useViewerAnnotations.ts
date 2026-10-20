@@ -56,8 +56,11 @@ export function useViewerAnnotations(options: {
     if (areaMode.value && !options.wide.value) options.mobileSide.value = false
   }
   watch(canDrawArea, (value) => !value && (areaMode.value = false))
-  // The frame keeps the drawn rectangle while its comment is written; it drops it once the popover goes.
-  const draftingArea = computed(() => popover.value?.type === "new" && popover.value.pending.kind === "area")
+  // The frame keeps the drawn rectangle while its comment is written, on the page or a zoomed screenshot; it drops it
+  // once the popover goes.
+  const draftingArea = computed(
+    () => popover.value?.type === "new" && ["area", "image"].includes(popover.value.pending.kind),
+  )
 
   /** Escape: close whatever is open. */
   function dismiss() {
@@ -94,10 +97,10 @@ export function useViewerAnnotations(options: {
     if (message.type === "area") {
       areaMode.value = false
       if (commenting.value) {
-        const { selector, label, ox, oy, ow, oh } = message
+        const { kind = "area", selector, label, ox, oy, ow, oh } = message
         popover.value = {
           type: "new",
-          pending: { kind: "area", selector, label, ox, oy, ow, oh },
+          pending: { kind, selector, label, ox, oy, ow, oh },
           x: frame.left + message.rect.left,
           y: frame.top + message.rect.bottom,
         }
@@ -147,6 +150,7 @@ export function useViewerAnnotations(options: {
     selection,
     lightbox,
     popover,
+    commenting,
     areaMode,
     canDrawArea,
     draftingArea,
