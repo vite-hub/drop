@@ -46,7 +46,8 @@ test("a note or box grows down to hold its words, and a frame's grid makes room 
   const long =
     "CAUSA: con pnpm son dependencias de @antfu/eslint-config, no de tu proyecto. Dos nombres mal adivinados: @eslint/markdown y @eslint-community/eslint-plugin-eslint-comments"
   assert.equal(labelGrowth("Sign up", 200, 200), 0)
-  assert.ok(labelGrowth(long, 200, 200) > 200)
+  // About seven lines of small sans type: the note grows by most of its own height.
+  assert.ok(labelGrowth(long, 200, 200) > 100)
   // A wider box needs fewer lines than a note.
   assert.ok(labelGrowth(long, 300, 200) < labelGrowth(long, 200, 200))
 

@@ -74,12 +74,14 @@ export interface BoardEdit {
 const PAGE_ID = "page:page"
 const NOTE = 200
 const GAP = 40
+// Agents write paragraphs where people scribble a few words, so their items use tldraw's plain small type instead
+// of the large hand-drawn default. People can still switch any of them in the style panel.
 const DEFAULTS = {
   richText: toRichText(""),
   color: "black",
   labelColor: "black",
-  size: "m",
-  font: "draw",
+  size: "s",
+  font: "sans",
   align: "middle",
   verticalAlign: "middle",
   growY: 0,
@@ -163,10 +165,10 @@ function sizeOf(shape: Shape) {
 }
 
 // tldraw measures a note's or a shape's words in the browser when someone types them, and grows the shape down to
-// fit (growY). Words an agent sends never meet a browser, so estimate what tldraw would measure: the draw font at
-// size m is 22px with a 1.35 line height, about 12.5px a character, inside 16px of padding. Long words break, so the
-// estimate errs tall, and tldraw measures it exactly the next time someone edits the words.
-const LABEL = { line: 22 * 1.35, padding: 16, char: 12.5 }
+// fit (growY). Words an agent sends never meet a browser, so estimate what tldraw would measure: agents' items use
+// the sans font at size s (DEFAULTS), 18px with a 1.35 line height, about 10px a character, inside 16px of padding.
+// Long words break, so the estimate errs tall; the first browser to open the board fits it exactly (ViewerBoard).
+const LABEL = { line: 18 * 1.35, padding: 16, char: 10 }
 
 /** How far a note or shape of w×h must grow down to hold its words. */
 export function labelGrowth(text: string, w: number, h: number) {
@@ -429,7 +431,7 @@ function shapeProps(
     case "text":
       return {
         type: "text",
-        props: { color, size: "m", w: size.w, font: "draw", textAlign: "start", autoSize: !item.w, scale: 1, richText },
+        props: { color, size: "s", w: size.w, font: "sans", textAlign: "start", autoSize: !item.w, scale: 1, richText },
       }
     case "frame":
       return { type: "frame", props: { w: size.w, h: size.h, name: item.text ?? "", color } }

@@ -40,6 +40,8 @@ onMounted(async () => {
         // menu; on narrow screens tldraw shows them above the toolbar instead, outside this panel.
         components: { MainMenu: null, PageMenu: null, MenuPanel: null },
         onMount: (editor) => {
+          // In dev, the editor on window lets a browser session inspect and drive the board.
+          if (import.meta.dev) Object.assign(window, { boardEditor: editor })
           unmount = sync(editor, data.snapshot.store, data.canEdit)
           state.value = "ready"
         },
@@ -138,11 +140,63 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
       if (gone.length) editor.store.remove(gone as never)
       if (changed.length) editor.store.put(changed as never)
     })
+    await fitText(new Set(changed.map((record) => record.id)))
     // An agent's edit shows in its next view_board too.
     clearTimeout(imageTimer)
     imageTimer = setTimeout(() => void images(), 4000)
   }
   const poll = setInterval(() => void pull(), 3000)
+
+  // tldraw fits a note or shape to its text when a person types it. Items an agent wrote on the server skipped that,
+  // so long text spilled out of a fixed square: run the same fitting, then grow the agent's frames around what's in
+  // them (a frame clips its contents). It measures text, and tldraw's faces arrive after the board opens (the first
+  // measurement came out several lines short), so it runs again whenever the browser finishes loading fonts.
+  async function fitText(only?: Set<string>) {
+    await Promise.all(
+      ["tldraw_draw", "tldraw_sans", "tldraw_serif", "tldraw_mono"].map((family) =>
+        document.fonts.load(`16px ${family}`).catch(() => []),
+      ),
+    )
+    const agents = editor.getCurrentPageShapes().filter((shape) => shape.meta?.agent && (!only || only.has(shape.id)))
+    const fitted = agents
+      .map((shape) => editor.getShapeUtil(shape).onBeforeCreate?.(shape))
+      .filter((shape) => shape !== undefined)
+    const apply = (updates: { id: string; type: string; props: object }[]) => {
+      if (!updates.length) return
+      // People who can draw store the fit, so view_board's images and other readers get it too; others fit locally.
+      if (canEdit) editor.run(() => editor.updateShapes(updates as never), { history: "ignore" })
+      else
+        editor.store.mergeRemoteChanges(() =>
+          editor.store.put(
+            updates.map((update) => {
+              const shape = editor.getShape(update.id as never)!
+              return { ...shape, props: { ...shape.props, ...update.props } } as typeof shape
+            }),
+          ),
+        )
+    }
+    apply(fitted.map(({ id, type, props }) => ({ id, type, props })))
+    const frames = editor
+      .getCurrentPageShapes()
+      .filter((shape) => shape.type === "frame" && shape.meta?.agent) as import("tldraw").TLFrameShape[]
+    apply(
+      frames.flatMap((frame) => {
+        const box = editor.getShapePageBounds(frame)
+        const kids = editor.getSortedChildIdsForParent(frame.id).map((child) => editor.getShapePageBounds(child))
+        if (!box || !kids.length) return []
+        const w = Math.max(frame.props.w, ...kids.map((kid) => (kid ? kid.maxX - box.x + 40 : 0)))
+        const h = Math.max(frame.props.h, ...kids.map((kid) => (kid ? kid.maxY - box.y + 40 : 0)))
+        return w > frame.props.w || h > frame.props.h ? [{ id: frame.id, type: "frame", props: { w, h } }] : []
+      }),
+    )
+  }
+  const refit = () => void fitText()
+  document.fonts.addEventListener("loadingdone", refit)
+  // Open on the whole board, never zoomed past 100%: wide frames otherwise start off screen.
+  void fitText().then(() => {
+    editor.zoomToFit()
+    if (editor.getZoomLevel() > 1) editor.resetZoom(editor.getViewportScreenCenter())
+  })
 
   async function images() {
     if (!canEdit) return
@@ -180,6 +234,7 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
   window.addEventListener("pagehide", flush)
   return () => {
     window.removeEventListener("pagehide", flush)
+    document.fonts.removeEventListener("loadingdone", refit)
     clearInterval(poll)
     clearTimeout(imageTimer)
     if (put.size || removed.size) void save()
