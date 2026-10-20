@@ -1,71 +1,11 @@
-import { createHighlighterCore, type HighlighterCore, type ThemedToken } from "shiki/core"
-import { createJavaScriptRegexEngine } from "shiki/engine/javascript"
+import type { ThemedToken } from "shiki/core"
+import { type CodeTheme, isCodeTheme, loadHighlighter } from "#shared/highlighter"
 
 /**
  * Code images, rendered here instead of scraped from another site: Shiki tokenizes the code, and the tokens
  * become a self-contained SVG with a ray.so-style window. PNGs are a browser screenshot of that SVG.
- * The JavaScript regex engine keeps the Worker free of WASM; languages and themes load on first use.
  */
 
-const LANGUAGES = {
-  bash: () => import("@shikijs/langs/bash"),
-  c: () => import("@shikijs/langs/c"),
-  cpp: () => import("@shikijs/langs/cpp"),
-  csharp: () => import("@shikijs/langs/csharp"),
-  css: () => import("@shikijs/langs/css"),
-  diff: () => import("@shikijs/langs/diff"),
-  go: () => import("@shikijs/langs/go"),
-  graphql: () => import("@shikijs/langs/graphql"),
-  html: () => import("@shikijs/langs/html"),
-  java: () => import("@shikijs/langs/java"),
-  javascript: () => import("@shikijs/langs/javascript"),
-  json: () => import("@shikijs/langs/json"),
-  jsx: () => import("@shikijs/langs/jsx"),
-  kotlin: () => import("@shikijs/langs/kotlin"),
-  markdown: () => import("@shikijs/langs/markdown"),
-  php: () => import("@shikijs/langs/php"),
-  python: () => import("@shikijs/langs/python"),
-  ruby: () => import("@shikijs/langs/ruby"),
-  rust: () => import("@shikijs/langs/rust"),
-  sql: () => import("@shikijs/langs/sql"),
-  swift: () => import("@shikijs/langs/swift"),
-  toml: () => import("@shikijs/langs/toml"),
-  tsx: () => import("@shikijs/langs/tsx"),
-  typescript: () => import("@shikijs/langs/typescript"),
-  vue: () => import("@shikijs/langs/vue"),
-  yaml: () => import("@shikijs/langs/yaml"),
-} as const
-
-const LANGUAGE_ALIASES = new Map<string, keyof typeof LANGUAGES>([
-  ["js", "javascript"],
-  ["ts", "typescript"],
-  ["sh", "bash"],
-  ["shell", "bash"],
-  ["zsh", "bash"],
-  ["py", "python"],
-  ["rb", "ruby"],
-  ["rs", "rust"],
-  ["md", "markdown"],
-  ["yml", "yaml"],
-  ["c++", "cpp"],
-  ["cs", "csharp"],
-  ["kt", "kotlin"],
-])
-
-const THEMES = {
-  "github-dark": () => import("@shikijs/themes/github-dark"),
-  "github-light": () => import("@shikijs/themes/github-light"),
-  "vitesse-dark": () => import("@shikijs/themes/vitesse-dark"),
-  "vitesse-light": () => import("@shikijs/themes/vitesse-light"),
-  "one-dark-pro": () => import("@shikijs/themes/one-dark-pro"),
-  "night-owl": () => import("@shikijs/themes/night-owl"),
-  "tokyo-night": () => import("@shikijs/themes/tokyo-night"),
-  dracula: () => import("@shikijs/themes/dracula"),
-  nord: () => import("@shikijs/themes/nord"),
-  "catppuccin-mocha": () => import("@shikijs/themes/catppuccin-mocha"),
-} as const
-
-type CodeTheme = keyof typeof THEMES
 const DEFAULT_CODE_THEME: CodeTheme = "github-dark"
 
 /** Theme names agents learned from the old Ray.so renderer keep working. */
@@ -80,21 +20,10 @@ const THEME_ALIASES = new Map<string, CodeTheme>([
   ["noir", "github-dark"],
 ])
 
-/** Whether `name` is one of `table`'s own keys, so a name like "constructor" never reaches Object's. */
-const isKeyOf = <T extends object>(table: T, name: string): name is Extract<keyof T, string> =>
-  Object.hasOwn(table, name)
-
-let highlighter: Promise<HighlighterCore> | undefined
-
 async function prepare(language: string | undefined, theme: string | undefined) {
-  highlighter ??= createHighlighterCore({ themes: [], langs: [], engine: createJavaScriptRegexEngine() })
-  const shiki = await highlighter
-  const requested = language?.toLowerCase()
-  const lang = requested && (isKeyOf(LANGUAGES, requested) ? requested : LANGUAGE_ALIASES.get(requested))
-  const themeName = (theme && (isKeyOf(THEMES, theme) ? theme : THEME_ALIASES.get(theme))) || DEFAULT_CODE_THEME
-  if (lang && !shiki.getLoadedLanguages().includes(lang)) await shiki.loadLanguage((await LANGUAGES[lang]()).default)
-  if (!shiki.getLoadedThemes().includes(themeName)) await shiki.loadTheme((await THEMES[themeName]()).default)
-  return { shiki, lang: lang ?? "text", theme: themeName }
+  const themeName = (theme && (isCodeTheme(theme) ? theme : THEME_ALIASES.get(theme))) || DEFAULT_CODE_THEME
+  const { shiki, lang } = await loadHighlighter(language, [themeName])
+  return { shiki, lang, theme: themeName }
 }
 
 const escapeXml = (value: string) =>

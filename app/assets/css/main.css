@@ -300,6 +300,18 @@
   }
 }
 
+/* Room above the code for its language select (ViewerCodeLanguages.vue). */
+.drop-doc .ProseMirror pre {
+  padding-top: 2.5em;
+}
+
+/* Code blocks carry Shiki's light colors inline and its dark ones as --shiki-dark (app/utils/code-highlight.ts). */
+.dark .drop-doc .shiki-token {
+  color: var(--shiki-dark) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+}
+
 /* Other people's carets come from vite-hub/ui/styles.css. Drop sets their name pill in its mono face. */
 .drop-doc .collaboration-carets__label {
   font: 500 11px/1.4 var(--font-mono);

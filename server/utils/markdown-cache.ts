@@ -31,6 +31,8 @@ const cached = defineCachedFunction(
     name: "markdown",
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
+    // Change this when the renderer's output changes (2: Shiki code blocks): every cached render rerenders on its next read.
+    integrity: "2",
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
 )

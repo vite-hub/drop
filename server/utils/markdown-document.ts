@@ -9,10 +9,13 @@ import frontmatter from "@comark/html/plugins/frontmatter"
 import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
+import { visitAsync } from "@comark/html/utils"
 import annotate, { components as annotations } from "comark-annotate/html"
 import { escapeUTF8 as escapeHtml } from "entities"
+import { stringifyTokenStyle } from "shiki/core"
 import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
+import { codeLanguage, loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
 
 // screenshot, compare, and annotation are comark-annotate's: annotated screenshots for PR evidence.
@@ -22,6 +25,46 @@ const ALLOWED_TAGS =
   )
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
+const MAX_HIGHLIGHTED_CHARACTERS = 200_000
+
+type MarkdownTree = Parameters<typeof visitAsync>[0]
+
+/**
+ * Shiki colors for code blocks in a language Drop knows: GitHub light inline, GitHub dark as `--shiki-dark` for the
+ * viewer's dark mode. It runs after `security`, and everything it adds comes from Shiki's tokens of the escaped code.
+ * Past MAX_HIGHLIGHTED_CHARACTERS the rest stay plain, so a huge dump can't eat the Worker's CPU.
+ */
+const highlight = () => ({
+  name: "highlight",
+  async post(state: { tree: MarkdownTree }) {
+    let budget = MAX_HIGHLIGHTED_CHARACTERS
+    await visitAsync(
+      state.tree,
+      (node) => Array.isArray(node) && node[0] === "pre",
+      async (node) => {
+        if (!Array.isArray(node) || node.length !== 3) return
+        const [, attrs, code] = node
+        if (!Array.isArray(code) || code[0] !== "code" || code.length !== 3 || typeof code[2] !== "string") return
+        const language = codeLanguage(textValue(attrs.language))
+        if (!language || (budget -= code[2].length) < 0) return
+
+        const { shiki, lang } = await loadHighlighter(language, ["github-light", "github-dark"])
+        const { tokens } = shiki.codeToTokens(code[2], { lang, themes: { light: "github-light", dark: "github-dark" } })
+        const highlighted = new Set(Array.isArray(attrs.highlights) ? attrs.highlights : [])
+        const lines = tokens.flatMap((line, index) => [
+          ...(index ? ["\n"] : []),
+          [
+            "span",
+            { class: highlighted.has(index + 1) ? "line highlight" : "line" },
+            ...line.map((token) => ["span", { style: stringifyTokenStyle(token.htmlStyle ?? {}) }, token.content]),
+          ],
+        ])
+        attrs.class = "shiki"
+        code.splice(2, 1, ...(lines as typeof code))
+      },
+    )
+  },
+})
 
 const plugins = [
   frontmatter(),
@@ -40,6 +83,7 @@ const plugins = [
       ...children,
     ],
   }),
+  highlight(),
 ] as const
 
 const parseMarkdown = createMarkdownParser({ plugins, registerDefaultPlugins: false })

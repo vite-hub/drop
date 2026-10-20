@@ -41,6 +41,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     editor.value = new Editor({
       extensions: [
         ...extensions,
+        CodeHighlight,
         Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
         RealtimeCaret.configure({
           awareness: markRaw(realtime.provider.value.awareness),

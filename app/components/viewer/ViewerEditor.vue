@@ -79,7 +79,7 @@ const blocks: EditorSuggestionMenuItem[][] = [
 
 <template>
   <div class="drop-doc min-h-0 flex-1 overflow-y-auto">
-    <main class="mx-auto max-w-[46rem] px-6 pt-14 pb-24">
+    <main class="relative mx-auto max-w-[46rem] px-6 pt-14 pb-24">
       <!-- The header says how the connection is going; here the doc's shape stands in until its text arrives. -->
       <div v-if="!editor || !synced" aria-live="polite" class="space-y-4">
         <p class="sr-only">Loading the doc</p>
@@ -89,6 +89,7 @@ const blocks: EditorSuggestionMenuItem[][] = [
         <USkeleton class="h-4 w-4/5" />
       </div>
       <EditorContent v-show="editor && synced" class="typeset" :editor="editor" />
+      <ViewerCodeLanguages v-if="editor && synced" :editor="editor" />
     </main>
     <template v-if="editor">
       <UEditorToolbar :editor="editor" :items="toolbar" layout="bubble" />
