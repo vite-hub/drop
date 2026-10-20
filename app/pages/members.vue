@@ -12,10 +12,11 @@ const admin = computed(() => me.value?.role === "admin")
 const search = ref("")
 const host = useRequestURL().host
 
+// The heading carries the count, so the description says what it means.
+const total = computed(() => members.value.length || me.value?.members || 1)
 const description = computed(() => {
-  const total = members.value.length || me.value?.members || 1
-  return total > 1
-    ? `${total} people. Everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}; ${me.value?.mode === "team" ? "what they drop is the team's unless they keep it to themselves" : "their drops stay private to them"}.`
+  return total.value > 1
+    ? `Everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}; ${me.value?.mode === "team" ? "what they drop is the team's unless they keep it to themselves" : "their drops stay private to them"}.`
     : // There's no invite flow: say how a teammate gets in, since that's the first thing a new owner looks for here.
       `Just you so far. To bring your team in, send them ${host}: everyone who signs in joins as ${ROLE_LABELS[DEFAULT_ROLE]}.`
 })
@@ -45,7 +46,7 @@ function menu(member: Member): DropdownMenuItem[][] {
 </script>
 
 <template>
-  <PageShell id="members" title="Members" :description="description">
+  <PageShell id="members" title="Members" :count="total" :description="description">
     <template v-if="admin" #actions
       ><UButton to="/admin/review" label="Review Shares" color="neutral" size="sm" variant="ghost" /><UButton
         to="/admin/reports"

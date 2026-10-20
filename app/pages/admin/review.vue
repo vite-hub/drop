@@ -1,12 +1,25 @@
 <script setup lang="ts">
 useSeoMeta({ title: "Review" })
-const { data, refresh, error } = await useApi("/api/admin/review", { key: keys.adminReview })
+const { data, error } = await useApi("/api/admin/review", { key: keys.adminReview })
 const now = useRelativeNow()
-const { busy, run } = useAdminAction((id) => `/api/admin/review/${id}`, "Could not review member", refresh)
+// The sidebar's Members count comes from /api/me, so it reloads with the queue.
+const { busy, run } = useAdminAction(
+  (id) => `/api/admin/review/${id}`,
+  "Could not review member",
+  () => refreshNuxtData([keys.adminReview, keys.me]),
+)
+const pending = computed(() =>
+  data.value?.flatMap((member) => member.shares).filter((s) => s.shareReview === "pending"),
+)
 const review = (id: string, action: "approve" | "reject") => run(id, action)
 </script>
 <template>
-  <PageShell id="review" title="Review" description="Approve a member's pending shares and future public shares.">
+  <PageShell
+    id="review"
+    title="Review"
+    :count="pending?.length"
+    description="Approve a member's pending shares and future public shares."
+  >
     <template #actions
       ><UButton to="/members" label="Members" color="neutral" size="sm" variant="ghost" /><UButton
         to="/admin/reports"

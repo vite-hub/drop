@@ -270,6 +270,17 @@ test("/api/me reads the maintained member counter after inserts and deletes", as
   assert.equal((await meHandler(event("/api/me"))).members, 1)
 })
 
+test("/api/me counts the public shares waiting for review, for admins only", async () => {
+  insertDrop("waiting", { share: "public", share_review: "pending" })
+  insertDrop("waiting-comments", { share: "public_comment", share_review: "pending" })
+  insertDrop("rejected", { share: "public", share_review: "rejected" })
+  insertDrop("unlisted", { share: "private", share_review: "pending" })
+  state.who = who
+  assert.equal((await meHandler(event("/api/me"))).reviews, undefined)
+  state.who = { ...who, role: "admin" }
+  assert.equal((await meHandler(event("/api/me"))).reviews, 2)
+})
+
 test("app publishing keeps only the latest file set, as the docs promise", async () => {
   const first = await publishApp(who, { files: { "index.html": "first", "old.js": "old", "keep.css": "a{}" } })
   const keys = () => [...state.objects.keys()]

@@ -3,7 +3,19 @@
 // Both icon names are literals at the call site, so the icon bundle's scanner sees them. The slot is SidebarMenuAction:
 // a control on the row's right edge, beside the link rather than inside it. Without `to` the row is a button, for rows
 // that do something before (or instead of) navigating, like Docs sliding the sidebar over.
-defineProps<{ to?: string; label: string; icon: string; activeIcon: string; active: boolean; trailingIcon?: string }>()
+// `count` ends the row in mono, like Executor v2's nav; `alert` marks one that waits on you, with `countLabel` saying
+// what it counts to screen readers.
+defineProps<{
+  to?: string
+  label: string
+  icon: string
+  activeIcon: string
+  active: boolean
+  trailingIcon?: string
+  count?: number
+  countLabel?: string
+  alert?: boolean
+}>()
 const emit = defineEmits<{ navigate: [] }>()
 const NuxtLink = resolveComponent("NuxtLink")
 </script>
@@ -24,6 +36,13 @@ const NuxtLink = resolveComponent("NuxtLink")
     >
       <UIcon :name="active ? activeIcon : icon" class="size-4 shrink-0" />
       <span class="truncate">{{ label }}</span>
+      <span
+        v-if="count"
+        class="ml-auto shrink-0 font-mono text-xs font-normal tabular-nums"
+        :class="alert ? 'rounded-sm bg-inverted px-1 text-inverted' : 'text-dimmed'"
+        ><span :aria-hidden="countLabel ? true : undefined">{{ count }}</span
+        ><span v-if="countLabel" class="sr-only">, {{ countLabel }}</span></span
+      >
       <UIcon v-if="trailingIcon" :name="trailingIcon" class="ml-auto size-3.5 shrink-0 text-dimmed" />
     </component>
     <div v-if="$slots.default" class="absolute inset-y-0 right-1 flex items-center"><slot /></div>

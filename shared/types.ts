@@ -214,4 +214,6 @@ export interface Viewer {
   /** Days a public link stays open before it closes (null: until changed, 0: public links are off). */
   publicLinkDays: number | null
   members: number
+  /** Admins only: public shares waiting for their review (/admin/review). */
+  reviews?: number
 }

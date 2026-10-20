@@ -9,7 +9,12 @@ const { skills, status, setEnabled } = useSkills()
 </script>
 
 <template>
-  <PageShell id="skills" title="Skills" description="Instructions your agents load over MCP, alongside Drop's tools.">
+  <PageShell
+    id="skills"
+    title="Skills"
+    :count="status === 'pending' && !skills.length ? undefined : skills.length"
+    description="Instructions your agents load over MCP, alongside Drop's tools."
+  >
     <div v-if="status === 'pending' && !skills.length" class="space-y-3">
       <USkeleton v-for="n in 3" :key="n" class="h-20 w-full" />
     </div>

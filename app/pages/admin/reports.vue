@@ -8,6 +8,7 @@ const act = (id: string, action: "dismiss" | "quarantine" | "ban") => run(id, ac
   <PageShell
     id="reports"
     title="Reports"
+    :count="data?.length"
     description="Quarantine stops serving a drop, including its older versions. Ban stops all the owner's drops."
   >
     <template #actions

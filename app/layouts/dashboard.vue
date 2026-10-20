@@ -28,6 +28,11 @@ const dropsOpen = ref(true)
 const teamOpen = ref(true)
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
+// Rows end in a count like Executor v2's nav: muted totals for what you have, and a marked one for what waits on you.
+// Both are the keyed caches the trees and the Drops page read; only a personal Drop's Shared with me, which no tree
+// shows, costs a fetch of its own.
+const { data: drops } = useDrops()
+const { data: withMe } = useSharedWithMe()
 const workspace = computed(() => [
   {
     label: "Agents",
@@ -43,7 +48,16 @@ const workspace = computed(() => [
     to: "/skills",
     active: at("/skills"),
   },
-  { label: "Members", icon: "i-ph-users", activeIcon: "i-ph-users-fill", to: "/members", active: at("/members") },
+  {
+    label: "Members",
+    icon: "i-ph-users",
+    activeIcon: "i-ph-users-fill",
+    to: "/members",
+    active: at("/members"),
+    count: me.value?.reviews,
+    countLabel: "shares to review",
+    alert: true,
+  },
 ])
 
 // The policies live outside /docs but sit in its nav.
@@ -112,6 +126,7 @@ function leaveDocs() {
                 <SidebarItem
                   active-icon="i-ph-users-fill"
                   :active="onShared"
+                  :count="withMe.length"
                   icon="i-ph-users"
                   label="Team"
                   to="/drops?tab=with-me"
@@ -138,6 +153,7 @@ function leaveDocs() {
               <SidebarItem
                 active-icon="i-ph-stack-fill"
                 :active="onDrops"
+                :count="drops.length"
                 icon="i-ph-stack"
                 :label="team ? 'My drops' : 'Drops'"
                 to="/drops"
@@ -164,6 +180,7 @@ function leaveDocs() {
                 v-if="!team"
                 active-icon="i-ph-tray-fill"
                 :active="onShared"
+                :count="withMe.length"
                 icon="i-ph-tray"
                 label="Shared with me"
                 to="/drops?tab=with-me"
