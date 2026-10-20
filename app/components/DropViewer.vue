@@ -114,8 +114,8 @@ const replaced = (comment: DropComment) => drop.value.kind === "image" && commen
 const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
-// Comments and History have their own buttons in the header, like a toolbar's panes: each opens the panel there, and
-// closes it once open. Details is used less, so it sits in the More menu (and on I).
+// Comments has its own button in the header: it opens the panel there, and closes it once open. History and Details
+// open from More, the panel's tabs, or H and I.
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
 const showing = (value: SideTab) => panelOpen.value && tab.value === value
 const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
@@ -166,6 +166,8 @@ defineShortcuts({
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
+  l: () => !editing.value && copyLink("Link copied"),
+  m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
     shownVersion.value = null
@@ -182,45 +184,59 @@ const copyMarkdown = (announce?: string) =>
   )
 const copyFeedback = () =>
   copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
+// A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies.
 function copyLink(announce?: string) {
-  if (drop.value.share !== "private") void copy(link.value, { key: "link", announce })
-  else shareOpen.value = true
+  if (owner.value && drop.value.share === "private") shareOpen.value = true
+  else void copy(link.value, { key: "link", announce })
 }
-// What the header doesn't need at hand: copying, Details, and for strangers, Report. The menu closes on copy, so a
-// toast says it worked. A teammate's private drop still copies its link: only the owner shares it first.
-const moreMenu = computed(() => [
+// The header keeps Edit, Comments and Copy link; the rest lives in More, each with its key. The menu closes on copy, so
+// a toast says it worked.
+const moreMenu = computed(() =>
   [
-    {
-      label: "Copy link",
-      icon: "i-ph-link",
-      onSelect: () =>
-        owner.value ? copyLink("Link copied") : void copy(link.value, { key: "link", announce: "Link copied" }),
-    },
+    [
+      ...(canDrawArea.value
+        ? [
+            {
+              label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
+              icon: "i-ph-chat-teardrop",
+              kbds: ["r"],
+              onSelect: toggleArea,
+            },
+          ]
+        : []),
+      ...(has("history")
+        ? [
+            {
+              label: "History",
+              icon: "i-ph-clock-counter-clockwise",
+              kbds: ["h"],
+              onSelect: () => panel.show("history"),
+            },
+          ]
+        : []),
+      ...(has("details")
+        ? [{ label: "Details", icon: "i-ph-info", kbds: ["i"], onSelect: () => panel.show("details") }]
+        : []),
+    ],
     ...(copiesMarkdown.value
       ? [
-          {
-            label: "Copy as Markdown",
-            icon: "i-ph-file-md",
-            onSelect: () => void copyMarkdown("Markdown copied"),
-          },
+          [
+            {
+              label: "Copy as Markdown",
+              icon: "i-ph-file-md",
+              kbds: ["m"],
+              onSelect: () => void copyMarkdown("Markdown copied"),
+            },
+          ],
         ]
       : []),
-  ],
-  ...(has("details")
-    ? [[{ label: "Details", icon: "i-ph-info", kbds: ["i"], onSelect: () => panel.show("details") }]]
-    : []),
-  ...(visitor.value
-    ? [
-        [
-          {
-            label: "Report",
-            icon: "i-ph-flag",
-            to: { path: "/report", query: { target: `/d/${drop.value.link}` } },
-          },
-        ],
-      ]
-    : []),
-])
+    // Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it.
+    ...(visitor.value
+      ? [[{ label: "Report", icon: "i-ph-flag", to: { path: "/report", query: { target: `/d/${drop.value.link}` } } }]]
+      : []),
+  ].filter((group) => group.length),
+)
+const moreActive = computed(() => areaMode.value || showing("history") || showing("details"))
 
 async function submit(body: string) {
   if (popover.value?.type !== "new") return
@@ -473,19 +489,8 @@ const threadComment = computed(() => {
             @click="live.publish()"
           />
         </template>
-        <!-- One row of same-size tools: icons only, the pressed state shows the mode, shortcuts live in the tooltips. -->
+        <!-- Three tools at hand and More for the rest: icons only, shortcuts in the tooltips and the menu. -->
         <template v-else #right>
-          <UTooltip v-if="canDrawArea" :kbds="['R']" text="Comment on an area">
-            <UButton
-              aria-label="Comment on an area"
-              :aria-pressed="areaMode"
-              color="neutral"
-              icon="i-ph-chat-teardrop"
-              size="sm"
-              :variant="areaMode ? 'soft' : 'ghost'"
-              @click="toggleArea"
-            />
-          </UTooltip>
           <UTooltip
             v-if="drop.canEdit || drop.editNote"
             :kbds="drop.canEdit ? ['E'] : undefined"
@@ -515,33 +520,28 @@ const threadComment = computed(() => {
               @click="toggleTab('comments')"
             />
           </UTooltip>
-          <UTooltip v-if="has('history')" :kbds="['H']" text="History">
+          <UTooltip :kbds="['L']" text="Copy link">
             <UButton
-              aria-label="History"
-              :aria-pressed="showing('history')"
+              aria-label="Copy link"
               color="neutral"
-              icon="i-ph-clock-counter-clockwise"
+              :icon="copied('link') ? 'i-ph-check' : 'i-ph-link'"
               size="sm"
-              :variant="showing('history') ? 'soft' : 'ghost'"
-              @click="toggleTab('history')"
+              variant="ghost"
+              @click="copyLink()"
             />
           </UTooltip>
-          <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
-          <USeparator
-            v-if="canDrawArea || drop.canEdit || drop.editNote || has('comments') || has('history')"
-            class="ml-1 h-4"
-            orientation="vertical"
-          />
-          <!-- Strangers report through the abuse queue, in this menu; teammates can talk to the owner, so they don't get it. -->
-          <UDropdownMenu :content="{ align: 'end' }" :items="moreMenu">
+          <UDropdownMenu v-if="moreMenu.length" :content="{ align: 'end' }" :items="moreMenu">
             <UButton
               aria-label="More"
+              :aria-pressed="moreActive"
               color="neutral"
               icon="i-ph-dots-three"
               size="sm"
-              :variant="showing('details') ? 'soft' : 'ghost'"
+              :variant="moreActive ? 'soft' : 'ghost'"
             />
           </UDropdownMenu>
+          <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
+          <USeparator v-if="owner || visitor" class="ml-1 h-4" orientation="vertical" />
           <UButton
             v-if="owner"
             color="neutral"
