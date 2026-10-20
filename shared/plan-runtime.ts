@@ -128,50 +128,52 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
 
   // Comark's zoom (comark-zoom) shows a copy of an item, such as an annotated screenshot, with a layer over the copy.
-  // While it's open, comments draw and are written on the copy and anchor to the original on the page.
-  let zoom = null, zoomHost = null;
-  function zoomRoot() {
-    // The copy sits inside an empty copy of the item's context, when the item names one the page has.
-    const item = zoom.item, context = item.getAttribute("data-zoom-context");
-    return context && item.parentElement && item.parentElement.closest(context) ? zoom.content.firstElementChild : zoom.content;
-  }
-  // The copy has the item's tree, so the same child positions lead from one to the other.
-  function across(el, from, to) {
-    if (!el || !from || !to || !from.contains(el)) return null;
-    const path = [];
-    for (let at = el; at !== from; at = at.parentElement) path.unshift(Array.prototype.indexOf.call(at.parentElement.children, at));
-    let out = to;
-    for (const index of path) out = out && out.children[index];
-    return out || null;
-  }
-  const copyOf = (el) => (zoom ? across(el, zoom.item, zoomRoot()) : null);
-  const originalOf = (el) => (zoom ? across(el, zoomRoot(), zoom.item) : null);
-  // A shadow root in the zoom's layer. The layer scales with the copy, so pins and areas follow it as it zooms in and out.
-  function zoomLayer() {
-    if (!zoom || !zoom.layer || !zoom.layer.isConnected) return null;
-    if (!zoomHost || zoomHost.parentElement !== zoom.layer) {
-      zoomHost = document.createElement("drop-comments");
-      zoomHost.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;";
-      zoomHost.attachShadow({ mode: "open" }).innerHTML = STYLE + LAYERS;
-      zoom.layer.appendChild(zoomHost);
+  // While it's open, comments draw and are written on the copy and anchor to the original on the page; the zoom maps its
+  // copies (the item's, and its notes beside it) to the page and back.
+  let zoom = null;
+  const copyOf = (el) => (zoom && el ? zoom.copyOf(el) : null);
+  const originalOf = (el) => (zoom && el ? zoom.originalOf(el) : null);
+  // A shadow root in the zoom: in its layer, which scales with the copy, so pins and areas follow it as it zooms in and
+  // out; or in its aside, the notes beside the copy, which would cover the layer's pins there and doesn't scale.
+  function zoomShadow(box) {
+    if (!zoom || !box || !box.isConnected) return null;
+    let host = Array.from(box.children).find((el) => el.localName === "drop-comments");
+    if (!host) {
+      host = document.createElement("drop-comments");
+      host.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;";
+      host.attachShadow({ mode: "open" }).innerHTML = STYLE + LAYERS;
+      box.appendChild(host);
     }
-    const scale = parseFloat((/scale\(([\d.]+)\)/.exec(zoom.layer.parentElement.style.transform) || [])[1]) || 1;
-    zoomHost.style.setProperty("--drop-z", String(1 / scale));
-    return zoomHost.shadowRoot;
+    if (box === zoom.layer) {
+      const scale = parseFloat((/scale\(([\d.]+)\)/.exec(box.parentElement.style.transform) || [])[1]) || 1;
+      host.style.setProperty("--drop-z", String(1 / scale));
+    }
+    return host.shadowRoot;
   }
+  const zoomLayer = () => zoom && zoomShadow(zoom.layer);
+  const zoomAside = () => zoom && zoom.aside && zoomShadow(zoom.aside);
   // A viewport rectangle in the layer's own pixels, before its scale.
   function inLayer(r) {
     const box = zoom.layer.getBoundingClientRect(), k = box.width / (zoom.layer.offsetWidth || 1) || 1;
     return { left: (r.left - box.left) / k, top: (r.top - box.top) / k, width: r.width / k, height: r.height / k };
   }
+  // A viewport rectangle in the aside's pixels, which scroll with its notes.
+  function inAside(r) {
+    const aside = zoom.aside, box = aside.getBoundingClientRect();
+    return { left: r.left - box.left + aside.scrollLeft, top: r.top - box.top + aside.scrollTop, width: r.width, height: r.height };
+  }
+  function overAside(x, y) {
+    const box = zoom && zoom.aside && zoom.aside.getBoundingClientRect();
+    return Boolean(box && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom);
+  }
   function zoomDraft(left, top, right, bottom) {
-    const layer = zoomLayer();
-    if (!layer) return;
-    const box = layer.querySelector(".draft");
-    box.innerHTML = "";
+    const layer = zoomLayer(), aside = zoomAside();
+    for (const root of [layer, aside]) if (root) root.querySelector(".draft").innerHTML = "";
     if (left === undefined) return;
-    const b = inLayer({ left, top, width: right - left, height: bottom - top });
-    areaBox(box, b.left, b.top, b.width, b.height);
+    const r = { left, top, width: right - left, height: bottom - top };
+    const beside = aside && overAside((left + right) / 2, (top + bottom) / 2);
+    const b = beside ? inAside(r) : inLayer(r), root = beside ? aside : layer;
+    if (root) areaBox(root.querySelector(".draft"), b.left, b.top, b.width, b.height);
   }
   // The zoomed screenshot under a point: an area drawn on it is a comment on the image, like the ones Drop's lightbox takes.
   function shotAt(x, y) {
@@ -206,7 +208,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function render() {
     marks.innerHTML = "";
     const layer = zoom && zoomLayer(), zoomMarks = layer && layer.querySelector(".marks");
+    const aside = zoomMarks && zoomAside(), asideMarks = aside && aside.querySelector(".marks");
     if (zoomMarks) zoomMarks.innerHTML = "";
+    if (asideMarks) asideMarks.innerHTML = "";
     const open = [], done = [], act = [], unplaced = [];
     for (const m of markers) {
       let x, y, into = marks;
@@ -221,8 +225,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         // While zoomed, only what the zoom shows draws, on its copy: the page's pins would float over the zoom.
         const copy = zoom && zoomMarks && copyOf(el);
         if (zoom && !copy) continue;
-        const b = copy ? inLayer(copy.getBoundingClientRect()) : { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height };
-        if (copy) into = zoomMarks;
+        const beside = copy && asideMarks && zoom.aside.contains(copy);
+        const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(copy.getBoundingClientRect()) : inLayer(copy.getBoundingClientRect());
+        if (copy) into = beside ? asideMarks : zoomMarks;
         x = b.left + (m.ox / 1000) * b.width; y = b.top + (m.oy / 1000) * b.height;
         if (m.ow || m.oh) areaBox(into, x, y, (m.ow / 1000) * b.width, (m.oh / 1000) * b.height, (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
       } else {
@@ -367,12 +372,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
 
   const onZoom = (e) => {
-    zoom = e.detail && e.detail.layer && e.detail.content && e.detail.item ? e.detail : null;
+    zoom = e.detail && e.detail.layer && e.detail.content && e.detail.item && e.detail.copyOf ? e.detail : null;
     render();
   };
   document.addEventListener("comark-zoom:open", onZoom);
   document.addEventListener("comark-zoom:change", onZoom);
-  document.addEventListener("comark-zoom:close", () => { zoom = zoomHost = null; render(); });
+  document.addEventListener("comark-zoom:close", () => { zoom = null; render(); });
 
   window.addEventListener("message", (e) => {
     const m = e.data;

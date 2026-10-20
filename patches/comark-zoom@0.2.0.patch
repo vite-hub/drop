@@ -1,0 +1,247 @@
+diff --git a/dist/client-B1MFKRIv.d.mts b/dist/client-bjK4rm1b.d.mts
+similarity index 77%
+rename from dist/client-B1MFKRIv.d.mts
+rename to dist/client-bjK4rm1b.d.mts
+index 8703fc13b5d81eec34fc03bbebe5cd29d2a27c5c..4f801cad03cb8707806a86eee3b8edb7ed4600d6 100644
+--- a/dist/client-B1MFKRIv.d.mts
++++ b/dist/client-bjK4rm1b.d.mts
+@@ -14,12 +14,18 @@ interface ZoomDetail {
+   /** A layer over the zoomed content, sized to it. Draw pins or outlines here. */
+   layer: HTMLElement;
+   footer: HTMLElement;
+-  /** The zoomed copy of the item. */
++  /** The zoomed copy of the item. Copies of its `data-zoom-context` ancestors sit around it. */
+   content: HTMLElement;
++  /** The column beside the zoomed content that holds a copy of the item's `data-zoom-aside`, or null when it has none. */
++  aside: HTMLElement | null;
+   /** The item on the page that is shown. */
+   item: HTMLElement;
+   index: number;
+   items: HTMLElement[];
++  /** The copy in the zoomed view of an element of the item or its aside, or null when it isn't one of them. */
++  copyOf(node: Element): Element | null;
++  /** The element on the page that a node of the zoomed copy or the aside copies, or null when it isn't one of them. */
++  originalOf(node: Element): Element | null;
+ }
+ declare global {
+   interface Window {
+diff --git a/dist/client.d.mts b/dist/client.d.mts
+index 06caab397369a6a42daae5d5d5ce8d9094d66b75..ed90c526d1f1b8b00fae13d32ea789deb2a0df9e 100644
+--- a/dist/client.d.mts
++++ b/dist/client.d.mts
+@@ -1,2 +1,2 @@
+-import { i as css, n as theme, r as ZoomDetail, t as start } from "./client-B1MFKRIv.mjs";
++import { i as css, n as theme, r as ZoomDetail, t as start } from "./client-bjK4rm1b.mjs";
+ export { type ZoomDetail, css, start, theme };
+\ No newline at end of file
+diff --git a/dist/client.mjs b/dist/client.mjs
+index 18873091a7c02e4384b19e1fb15b8cd0408d6f7d..7f397d2a6a4927e40ff3ad63fb33070e6adea5f6 100644
+--- a/dist/client.mjs
++++ b/dist/client.mjs
+@@ -1,4 +1,4 @@
+-import { n as theme, r as script, t as css } from "./styles-BkFYRzfD.mjs";
++import { n as theme, r as script, t as css } from "./styles-D73TRk4x.mjs";
+ //#region src/client.ts
+ /**
+ * Starts zoom for every `[data-zoom]` element on the page and returns a function that stops it. Every caller shares one
+diff --git a/dist/html.d.mts b/dist/html.d.mts
+index 1d648a7372a4d5f2f6a05786395efaef79923898..f31153b28998d6ad9f2be88160e6ddaa2d498699 100644
+--- a/dist/html.d.mts
++++ b/dist/html.d.mts
+@@ -1,4 +1,4 @@
+-import { r as ZoomDetail } from "./client-B1MFKRIv.mjs";
++import { r as ZoomDetail } from "./client-bjK4rm1b.mjs";
+ import _default, { RUNTIME_TAG, ZoomOptions } from "./index.mjs";
+ import { NodeHandler, State } from "comark";
+ //#region src/html.d.ts
+diff --git a/dist/html.mjs b/dist/html.mjs
+index 448e6e120260249e44fe0c45f52dfd7e2a114e40..0afdb39e3b7d8e6287016ea296c9b8504d15a7c5 100644
+--- a/dist/html.mjs
++++ b/dist/html.mjs
+@@ -1,5 +1,5 @@
+ import src_default, { RUNTIME_TAG } from "./index.mjs";
+-import { r as script, t as css } from "./styles-BkFYRzfD.mjs";
++import { r as script, t as css } from "./styles-D73TRk4x.mjs";
+ import { escapeHtml } from "comark/utils";
+ //#region src/html.ts
+ const started = /* @__PURE__ */ new WeakSet();
+diff --git a/dist/react.d.mts b/dist/react.d.mts
+index b9c5d2e9b790fa32c295ffe92ade4eb624339405..612a536286e496d182e2d430b0505338cad8e6c1 100644
+--- a/dist/react.d.mts
++++ b/dist/react.d.mts
+@@ -1,4 +1,4 @@
+-import { r as ZoomDetail } from "./client-B1MFKRIv.mjs";
++import { r as ZoomDetail } from "./client-bjK4rm1b.mjs";
+ import _default, { RUNTIME_TAG, ZoomOptions } from "./index.mjs";
+ import { ReactNode } from "react";
+ //#region src/react.d.ts
+diff --git a/dist/style.css b/dist/style.css
+index 8fd8e305f393d3f4c53ff442af9b9d09ab5eedd4..7e93ddc3d6697f7404a6ac4f643472a9f117605d 100644
+--- a/dist/style.css
++++ b/dist/style.css
+@@ -1 +1 @@
+-@layer comark{:where(.cz-dialog,[data-zoom]){--_comark-background:var(--comark-background,var(--background,#fff));--_comark-foreground:var(--comark-foreground,var(--foreground,#0a0a0a));--_comark-muted:var(--comark-muted,var(--muted-foreground,#737373));--_comark-border:var(--comark-border,var(--border,#e5e5e5));--_comark-accent:var(--comark-accent,var(--accent,#f5f5f5));--_comark-ring:var(--comark-ring,var(--ring,#a1a1a1));--_comark-radius:var(--comark-radius,var(--radius,.625rem));--_comark-font:var(--comark-font,var(--font-sans,ui-sans-serif,system-ui,sans-serif))}@media (prefers-color-scheme:dark){:where(.cz-dialog,[data-zoom]){--_comark-background:var(--comark-background,var(--background,#0a0a0a));--_comark-foreground:var(--comark-foreground,var(--foreground,#fafafa));--_comark-muted:var(--comark-muted,var(--muted-foreground,#a1a1a1));--_comark-border:var(--comark-border,var(--border,rgb(255 255 255/.1)));--_comark-accent:var(--comark-accent,var(--accent,#262626));--_comark-ring:var(--comark-ring,var(--ring,#737373))}}[data-zoom]{cursor:zoom-in}[data-zoom]:focus-visible{outline:2px solid var(--_comark-ring);outline-offset:3px}.cz-dialog{position:fixed;inset:0;z-index:2147483000;display:grid;grid-template-rows:auto minmax(0,1fr) auto;color:var(--_comark-foreground);font:13px/1.4 var(--_comark-font);outline:none}.cz-backdrop{position:absolute;inset:0;background:color-mix(in srgb,var(--_comark-background) 96%,transparent)}.cz-header{position:relative;display:flex;gap:.75rem;align-items:center;min-height:2.75rem;padding:0 .5rem 0 1rem}.cz-title{overflow:hidden;font-weight:500;white-space:nowrap;text-overflow:ellipsis}.cz-count{color:var(--_comark-muted);font-variant-numeric:tabular-nums}.cz-dialog button{display:inline-grid;place-items:center;border:0;border-radius:calc(var(--_comark-radius) - 2px);background:none;color:inherit;font:inherit;cursor:pointer}.cz-dialog button:focus-visible{outline:2px solid var(--_comark-ring);outline-offset:1px}.cz-close{width:2.25rem;height:2.25rem;margin-left:auto;font-size:18px}.cz-close:hover,.cz-nav:hover{background:var(--_comark-accent)}.cz-stage{position:relative;display:grid;place-items:center;overflow:hidden}.cz-item{position:relative;transform-origin:center;cursor:auto}.cz-item img,.cz-thumb img{max-width:100%;height:auto}.cz-item>img,.cz-thumb>div>img{display:block;width:100%}.cz-layer{position:absolute;inset:0;pointer-events:none}.cz-layer>*{pointer-events:auto}.cz-nav{position:absolute;top:50%;width:2.5rem;height:2.5rem;font-size:22px;transform:translateY(-50%)}.cz-prev{left:.5rem}.cz-next{right:.5rem}.cz-footer{position:relative}.cz-strip{display:flex;gap:.5rem;justify-content:center;overflow-x:auto;padding:.75rem 1rem 1rem}.cz-strip .cz-thumb{position:relative;flex:none;width:6rem;height:4rem;overflow:hidden;border:1px solid var(--_comark-border);border-radius:calc(var(--_comark-radius) - 2px);opacity:.55;transition:opacity .15s}.cz-thumb:hover{opacity:.85}.cz-thumb[aria-current=true]{opacity:1;border-color:var(--_comark-foreground)}.cz-thumb>div{position:absolute;top:0;left:0;transform-origin:0 0;pointer-events:none}}
+\ No newline at end of file
++@layer comark{:where(.cz-dialog,[data-zoom]){--_comark-background:var(--comark-background,var(--background,#fff));--_comark-foreground:var(--comark-foreground,var(--foreground,#0a0a0a));--_comark-muted:var(--comark-muted,var(--muted-foreground,#737373));--_comark-border:var(--comark-border,var(--border,#e5e5e5));--_comark-accent:var(--comark-accent,var(--accent,#f5f5f5));--_comark-ring:var(--comark-ring,var(--ring,#a1a1a1));--_comark-radius:var(--comark-radius,var(--radius,.625rem));--_comark-font:var(--comark-font,var(--font-sans,ui-sans-serif,system-ui,sans-serif))}@media (prefers-color-scheme:dark){:where(.cz-dialog,[data-zoom]){--_comark-background:var(--comark-background,var(--background,#0a0a0a));--_comark-foreground:var(--comark-foreground,var(--foreground,#fafafa));--_comark-muted:var(--comark-muted,var(--muted-foreground,#a1a1a1));--_comark-border:var(--comark-border,var(--border,rgb(255 255 255/.1)));--_comark-accent:var(--comark-accent,var(--accent,#262626));--_comark-ring:var(--comark-ring,var(--ring,#737373))}}[data-zoom]{cursor:zoom-in}[data-zoom]:focus-visible{outline:2px solid var(--_comark-ring);outline-offset:3px}.cz-dialog{position:fixed;inset:0;z-index:2147483000;display:grid;grid-template-rows:auto minmax(0,1fr) auto;color:var(--_comark-foreground);font:13px/1.4 var(--_comark-font);outline:none}.cz-backdrop{position:absolute;inset:0;background:color-mix(in srgb,var(--_comark-background) 96%,transparent)}.cz-header{position:relative;display:flex;gap:.75rem;align-items:center;min-height:2.75rem;padding:0 .5rem 0 1rem}.cz-title{overflow:hidden;font-weight:500;white-space:nowrap;text-overflow:ellipsis}.cz-count{color:var(--_comark-muted);font-variant-numeric:tabular-nums}.cz-dialog button{display:inline-grid;place-items:center;border:0;border-radius:calc(var(--_comark-radius) - 2px);background:none;color:inherit;font:inherit;cursor:pointer}.cz-dialog button:focus-visible{outline:2px solid var(--_comark-ring);outline-offset:1px}.cz-close{width:2.25rem;height:2.25rem;margin-left:auto;font-size:18px}.cz-close:hover,.cz-nav:hover{background:var(--_comark-accent)}.cz-stage{position:relative;display:grid;place-items:center;overflow:hidden}.cz-item{position:relative;transform-origin:center;cursor:auto}.cz-item img,.cz-thumb img{max-width:100%;height:auto}.cz-item>img,.cz-thumb>div>img{display:block;width:100%}.cz-layer{position:absolute;inset:0;pointer-events:none}.cz-layer>*{pointer-events:auto}.cz-nav{position:absolute;top:50%;width:2.5rem;height:2.5rem;font-size:22px;transform:translateY(-50%)}.cz-prev{left:.5rem}.cz-next{right:.5rem}.cz-footer{position:relative}.cz-header,.cz-footer{grid-column:1/-1}.cz-header{grid-row:1}.cz-stage{grid-row:2;grid-column:1}.cz-footer{grid-row:3}.cz-aside{display:none}.cz-dialog[data-aside]{grid-template-columns:minmax(0,1fr) minmax(14rem,22rem)}.cz-dialog[data-aside] .cz-aside{position:relative;display:block;grid-row:2;grid-column:2;align-self:center;max-height:100%;overflow:auto;padding:1rem 1.5rem 1rem .5rem}@media (max-width:48rem){.cz-dialog[data-aside]{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto}.cz-dialog[data-aside] .cz-aside{grid-row:3;grid-column:1;align-self:auto;max-height:30vh;padding:.5rem 1rem}.cz-dialog[data-aside] .cz-footer{grid-row:4}}.cz-strip{display:flex;gap:.5rem;justify-content:center;overflow-x:auto;padding:.75rem 1rem 1rem}.cz-strip .cz-thumb{position:relative;flex:none;width:6rem;height:4rem;overflow:hidden;border:1px solid var(--_comark-border);border-radius:calc(var(--_comark-radius) - 2px);opacity:.55;transition:opacity .15s}.cz-thumb:hover{opacity:.85}.cz-thumb[aria-current=true]{opacity:1;border-color:var(--_comark-foreground)}.cz-thumb>div{position:absolute;top:0;left:0;transform-origin:0 0;pointer-events:none}}
+\ No newline at end of file
+diff --git a/dist/styles-BkFYRzfD.mjs b/dist/styles-D73TRk4x.mjs
+similarity index 87%
+rename from dist/styles-BkFYRzfD.mjs
+rename to dist/styles-D73TRk4x.mjs
+index 95e0f0ebbbdab47aa29d31a30d460b2ffb96840e..330dd873cbf7d557da80eee4a11bf58eb751ba1f 100644
+--- a/dist/styles-BkFYRzfD.mjs
++++ b/dist/styles-D73TRk4x.mjs
+@@ -85,21 +85,50 @@ function script(css) {
+ 		probe.remove();
+ 		return scaled ? String(parseFloat(page.lineHeight) / size) : page.lineHeight;
+ 	}
+-	function copy(item, into) {
+-		const clone = strip(item.cloneNode(true));
++	function contexts(item) {
+ 		const selector = item.getAttribute("data-zoom-context");
+-		const context = selector ? item.parentElement?.closest(selector) : null;
+-		const parent = (context ?? item).parentElement;
++		const found = [];
++		if (selector) {
++			for (let up = item.parentElement; up; up = up.parentElement) if (up.matches(selector)) found.unshift(up);
++		}
++		return found;
++	}
++	function copy(item, into, node = item) {
++		const clone = strip(node.cloneNode(true));
++		const around = contexts(item);
++		const parent = (around[0] ?? item).parentElement;
+ 		if (parent) {
+ 			const page = getComputedStyle(parent);
+ 			for (const name of INHERITED) into.style.setProperty(name, page.getPropertyValue(name));
+ 			into.style.lineHeight = lineHeight(parent, page);
+ 		}
+-		if (!context) return into.append(clone);
+-		const shell = strip(context.cloneNode(false));
+-		shell.style.color = "inherit";
+-		shell.append(clone);
+-		into.append(shell);
++		let inner = into;
++		for (const context of around) {
++			const shell = strip(context.cloneNode(false));
++			shell.style.color = "inherit";
++			inner.append(shell);
++			inner = shell;
++		}
++		inner.append(clone);
++		return clone;
++	}
++	function asideOf(item) {
++		const selector = item.getAttribute("data-zoom-aside");
++		const scope = contexts(item).at(-1) ?? item.parentElement;
++		if (!selector || !scope) return null;
++		return [...scope.querySelectorAll(selector)].find((node) => !item.contains(node) && !node.contains(item)) ?? null;
++	}
++	function across(pairs, node, from) {
++		for (const pair of pairs) {
++			const start = pair[from];
++			if (!start.contains(node)) continue;
++			const path = [];
++			for (let at = node; at !== start && at.parentElement; at = at.parentElement) path.unshift([...at.parentElement.children].indexOf(at));
++			let out = pair[from === 0 ? 1 : 0];
++			for (const index of path) out = out?.children[index];
++			return out ?? null;
++		}
++		return null;
+ 	}
+ 	function measure(item) {
+ 		const rect = item.getBoundingClientRect();
+@@ -115,10 +144,13 @@ function script(css) {
+ 			header: current.header,
+ 			footer: current.footer,
+ 			layer: current.frame.querySelector(".cz-layer"),
+-			content: current.frame.firstElementChild,
++			content: current.pairs[0][1],
++			aside: current.aside.firstElementChild ? current.aside : null,
+ 			item: current.items[current.index],
+ 			index: current.index,
+-			items: current.items
++			items: current.items,
++			copyOf: (node) => across(current.pairs, node, 0),
++			originalOf: (node) => across(current.pairs, node, 1)
+ 		};
+ 	}
+ 	function place(current) {
+@@ -160,8 +192,12 @@ function script(css) {
+ 	function render(current) {
+ 		const item = current.items[current.index];
+ 		current.frame.replaceChildren();
+-		copy(item, current.frame);
++		current.pairs = [[item, copy(item, current.frame)]];
+ 		current.frame.append(el("div", "cz-layer"));
++		const aside = asideOf(item);
++		current.aside.replaceChildren();
++		current.dialog.toggleAttribute("data-aside", Boolean(aside));
++		if (aside) current.pairs.push([aside, copy(item, current.aside, aside)]);
+ 		for (const image of current.frame.querySelectorAll("img")) {
+ 			image.loading = "eager";
+ 			image.addEventListener("load", () => showing(current, image) && place(current));
+@@ -265,17 +301,20 @@ function script(css) {
+ 		const stage = el("div", "cz-stage");
+ 		const frame = el("div", "cz-item");
+ 		stage.append(frame);
++		const aside = el("div", "cz-aside");
+ 		const footer = el("div", "cz-footer");
+ 		const backdrop = el("div", "cz-backdrop");
+-		dialog.append(backdrop, header, stage, footer);
++		dialog.append(backdrop, header, stage, aside, footer);
+ 		const current = {
+ 			dialog,
+ 			header,
+ 			title,
+ 			count,
+ 			stage,
++			aside,
+ 			footer,
+ 			frame,
++			pairs: [],
+ 			items,
+ 			index: Math.max(0, items.indexOf(item)),
+ 			scale: 1,
+@@ -334,6 +373,7 @@ function script(css) {
+ 			for (const part of [
+ 				backdrop,
+ 				header,
++				aside,
+ 				footer
+ 			]) part.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+ 		}
+@@ -355,7 +395,7 @@ function script(css) {
+ 			for (const animation of current.frame.getAnimations()) animation.cancel();
+ 			const to = item.getBoundingClientRect();
+ 			const visible = to.bottom > 0 && to.top < innerHeight;
+-			const animations = [...current.dialog.querySelectorAll(".cz-backdrop,.cz-header,.cz-footer,.cz-nav")].map((part) => part.animate([{ opacity: 1 }, { opacity: 0 }], {
++			const animations = [...current.dialog.querySelectorAll(".cz-backdrop,.cz-header,.cz-aside,.cz-footer,.cz-nav")].map((part) => part.animate([{ opacity: 1 }, { opacity: 0 }], {
+ 				duration: 180,
+ 				fill: "forwards"
+ 			}));
+@@ -522,6 +562,14 @@ const css = `@layer comark{${[
+ 	".cz-prev{left:.5rem}",
+ 	".cz-next{right:.5rem}",
+ 	".cz-footer{position:relative}",
++	".cz-header,.cz-footer{grid-column:1/-1}",
++	".cz-header{grid-row:1}",
++	".cz-stage{grid-row:2;grid-column:1}",
++	".cz-footer{grid-row:3}",
++	".cz-aside{display:none}",
++	".cz-dialog[data-aside]{grid-template-columns:minmax(0,1fr) minmax(14rem,22rem)}",
++	".cz-dialog[data-aside] .cz-aside{position:relative;display:block;grid-row:2;grid-column:2;align-self:center;max-height:100%;overflow:auto;padding:1rem 1.5rem 1rem .5rem}",
++	"@media (max-width:48rem){.cz-dialog[data-aside]{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto}.cz-dialog[data-aside] .cz-aside{grid-row:3;grid-column:1;align-self:auto;max-height:30vh;padding:.5rem 1rem}.cz-dialog[data-aside] .cz-footer{grid-row:4}}",
+ 	".cz-strip{display:flex;gap:.5rem;justify-content:center;overflow-x:auto;padding:.75rem 1rem 1rem}",
+ 	".cz-strip .cz-thumb{position:relative;flex:none;width:6rem;height:4rem;overflow:hidden;border:1px solid var(--_comark-border);border-radius:calc(var(--_comark-radius) - 2px);opacity:.55;transition:opacity .15s}",
+ 	".cz-thumb:hover{opacity:.85}",
+diff --git a/dist/vue.d.mts b/dist/vue.d.mts
+index 51caa81183d9d2a84509f90bafe202c709895e95..629e9ef3f934b50f3aec5353376f417a829a6f59 100644
+--- a/dist/vue.d.mts
++++ b/dist/vue.d.mts
+@@ -1,4 +1,4 @@
+-import { r as ZoomDetail } from "./client-B1MFKRIv.mjs";
++import { r as ZoomDetail } from "./client-bjK4rm1b.mjs";
+ import _default, { RUNTIME_TAG, ZoomOptions } from "./index.mjs";
+ //#region src/vue.d.ts
+ /** `::zoom` for `@comark/vue`. */

@@ -34,7 +34,7 @@ The screenshots are the evidence; the text only points into them. Pick:
 
 Use `red` for what was wrong, `green` for the fix, and the default blue to point something out. Every mark sits on the change, and its note says in a few words what changed or what is wrong, not just "here". Keep to about six marks per screenshot. The full syntax is in [references/annotations.md](references/annotations.md).
 
-Above the screenshots, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `url`, not in the text. No tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
+Above the screenshots, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `href`, not in the text. No tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
 
 ## Publish
 

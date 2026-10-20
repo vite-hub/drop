@@ -4,7 +4,7 @@ Drop renders these components with [comark-annotate](https://comark-annotate.onm
 
 ```md
 ::compare
-:::screenshot{src="https://example.com/before.png" alt="Filter toolbar wrapping onto a second row" viewport="1440x900" url="https://pr12.preview.example.com/plan"}
+:::screenshot{src="https://example.com/before.png" alt="Filter toolbar wrapping onto a second row" viewport="1440x900" href="https://pr12.preview.example.com/plan"}
 ::::annotation{x=3.6 y=20.6 w=92.9 h=31.4 color="red"}
 Five filters don't fit, so the toolbar wraps and pushes the table down.
 ::::
@@ -28,8 +28,8 @@ Accuracy now counts returns.
 | --- | --- |
 | `src` | Image URL. Required. |
 | `alt` | What the screenshot shows. Required. |
-| `label` | Heading for the screenshot. A compare labels its two sides Before and After by default. |
-| `url` | The page you captured, shown as a link. |
+| `title` | Heading above the image, and the title of its zoomed view. A compare labels its two sides Before and After by default. |
+| `href` | The page you captured, linked by its host next to the title. |
 | `viewport` | Capture size, like `1440x900`. A compare reports an issue when the two sides differ. |
 
 Other content inside the block becomes the caption.

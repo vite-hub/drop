@@ -36,3 +36,18 @@ test("footnotes link to their definition and back", async () => {
   assert.match(html, /<sup class="footnote-ref"><a href="#fn-src" id="fnref-src">\[1\]<\/a><\/sup>/)
   assert.match(html, /<li id="fn-src">The source\. <a href="#fnref-src" class="footnote-backref">/)
 })
+
+test("a doc written before comark-annotate 0.2 keeps its screenshot's url and label, without a problem", async () => {
+  const markdown = [
+    '::compare{label="Toolbar"}',
+    ':::screenshot{src="/before.png" alt="Before" label="Wrapped" url="https://pr12.example.com/plan"}',
+    ":::",
+    ':::screenshot{src="/after.png" alt="After"}',
+    ":::",
+    "::",
+  ].join("\n")
+  const { html } = await renderMarkdownCached("legacy-props.md", async () => markdown)
+  assert.doesNotMatch(html, /render-error/)
+  assert.match(html, /href="https:\/\/pr12\.example\.com\/plan"/)
+  assert.match(html, /Wrapped/)
+})

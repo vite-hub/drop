@@ -98,7 +98,24 @@ const plugins = [
   highlight(),
 ] as const
 
-const parseMarkdown = createMarkdownParser({ plugins, registerDefaultPlugins: false })
+const parse = createMarkdownParser({ plugins, registerDefaultPlugins: false })
+
+/**
+ * comark-annotate 0.2 renamed two props that Drop's pr-evidence skill taught agents before it: a screenshot's `url` is
+ * `href`, and `label` is `title` on a screenshot or a compare. Published docs never change, so their old names are
+ * read as the new ones, on the block's own line, rather than reported as problems.
+ */
+const LEGACY_BLOCK = /^(\s*:{2,}(screenshot|compare)\{)(.*)$/gm
+const renameLegacyProps = (markdown: string) =>
+  markdown.replace(LEGACY_BLOCK, (_, open: string, block: string, props: string) => {
+    const legacy = block === "screenshot" ? /(^|\s)(url|label)=/g : /(^|\s)(label)=/g
+    return (
+      open +
+      props.replace(legacy, (_prop, space: string, name: string) => `${space}${name === "url" ? "href" : "title"}=`)
+    )
+  })
+
+const parseMarkdown = (markdown: string) => parse(renameLegacyProps(markdown))
 
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
@@ -157,7 +174,7 @@ function createMermaidRenderer(): NodeHandler {
  */
 /** Problems with a document's annotated screenshots, one readable sentence each. Empty when it has none. */
 export async function annotationIssues(markdown: string): Promise<string[]> {
-  return (await parseMarkdown(markdown)).meta.annotateIssues ?? []
+  return (await parseMarkdown(markdown)).meta.issues ?? []
 }
 
 async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string }> {
@@ -167,7 +184,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
     const revision = supersedes
       ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
       : ""
-    const issues = document.meta.annotateIssues ?? []
+    const issues = document.meta.issues ?? []
     const problems = issues.length
       ? `<aside class="render-error"><p>This document's annotated screenshots have ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
       : ""

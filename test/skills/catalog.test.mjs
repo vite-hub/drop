@@ -30,7 +30,7 @@ test("pr-evidence's annotation example is valid comark-annotate", async () => {
   const example = reference.match(/```md\n([\s\S]*?)\n```/)?.[1]
   assert.ok(example)
   const document = await createMarkdownParser({ plugins: [annotate()] })(example)
-  assert.deepEqual(document.meta.annotateIssues, [])
+  assert.deepEqual(document.meta.issues, [])
 })
 
 test("show-me's annotated screenshot example is valid comark-annotate", async () => {
@@ -38,5 +38,5 @@ test("show-me's annotated screenshot example is valid comark-annotate", async ()
   const example = skill.match(/```md\n([\s\S]*?)\n```/)?.[1]
   assert.ok(example)
   const document = await createMarkdownParser({ plugins: [annotate()] })(example)
-  assert.deepEqual(document.meta.annotateIssues, [])
+  assert.deepEqual(document.meta.issues, [])
 })
