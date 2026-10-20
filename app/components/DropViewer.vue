@@ -183,6 +183,18 @@ function copyLink() {
   if (drop.value.share !== "private") void copy(link.value, { key: "link" })
   else shareOpen.value = true
 }
+// One Copy menu in the navbar instead of a button per format, so the row doesn't grow. A teammate's private drop still
+// copies its link: only the owner shares it first.
+const copyMenu = computed(() => [
+  [
+    {
+      label: "Copy link",
+      icon: "i-ph-link",
+      onSelect: () => (owner.value ? copyLink() : void copy(link.value, { key: "link" })),
+    },
+    ...(copiesMarkdown.value ? [{ label: "Copy as Markdown", icon: "i-ph-file-md", onSelect: copyMarkdown }] : []),
+  ],
+])
 
 async function submit(body: string) {
   if (popover.value?.type !== "new") return
@@ -499,32 +511,22 @@ const threadComment = computed(() => {
               @click="toggleTab('details')"
             />
           </UTooltip>
-          <UTooltip v-if="copiesMarkdown" text="Copy as Markdown">
-            <UButton
-              aria-label="Copy as Markdown"
-              color="neutral"
-              :icon="copied('markdown') ? 'i-ph-check' : 'i-ph-copy'"
-              size="sm"
-              variant="ghost"
-              @click="copyMarkdown"
-            />
-          </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
           <USeparator
-            v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length || copiesMarkdown"
+            v-if="canDrawArea || drop.canEdit || drop.editNote || tabs.length"
             class="ml-1 h-4"
             orientation="vertical"
           />
-          <UTooltip v-if="!owner" text="Copy link">
+          <!-- The menu closes on copy, so the button itself turns into the check. -->
+          <UDropdownMenu :content="{ align: 'end' }" :items="copyMenu">
             <UButton
-              aria-label="Copy link"
+              aria-label="Copy"
               color="neutral"
-              :icon="copied('link') ? 'i-ph-check' : 'i-ph-link'"
+              :icon="copied('link') || copied('markdown') ? 'i-ph-check' : 'i-ph-copy'"
               size="sm"
               variant="ghost"
-              @click="copy(link, { key: 'link' })"
             />
-          </UTooltip>
+          </UDropdownMenu>
           <!-- Strangers report through the abuse queue; teammates can talk to the owner, so they don't get a flag. -->
           <UTooltip v-if="visitor" text="Report">
             <UButton
