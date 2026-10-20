@@ -86,9 +86,9 @@ minimumReleaseAgeExclude:
   - "@better-auth/prisma-adapter@1.7.10"
   - "@better-auth/telemetry@1.7.10"
   - better-auth@1.7.10
-  - comark-annotate@0.1.0
-  - comark-carousel@0.1.0
-  - comark-zoom@0.1.0
+  - comark-annotate@0.1.2
+  - comark-carousel@0.1.2
+  - comark-zoom@0.1.2
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0
