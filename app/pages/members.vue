@@ -37,9 +37,9 @@ function menu(member: Member): DropdownMenuItem[][] {
   return [
     [
       member.banned
-        ? { label: "Unban", icon: "i-ph-arrow-counter-clockwise", onSelect: () => void unban(member) }
-        : { label: "Ban", icon: "i-ph-prohibit", color: "error", onSelect: () => void ban(member) },
-      { label: "Remove", icon: "i-ph-trash", color: "error", onSelect: () => void remove(member) },
+        ? { label: "Unban", icon: "i-mingcute-refresh-anticlockwise-1-line", onSelect: () => void unban(member) }
+        : { label: "Ban", icon: "i-mingcute-forbid-circle-line", color: "error", onSelect: () => void ban(member) },
+      { label: "Remove", icon: "i-mingcute-delete-2-line", color: "error", onSelect: () => void remove(member) },
     ],
   ]
 }
@@ -71,7 +71,7 @@ function menu(member: Member): DropdownMenuItem[][] {
       v-if="members.length > 8"
       v-model="search"
       class="mb-3 w-full max-w-xs"
-      icon="i-ph-magnifying-glass"
+      icon="i-mingcute-search-line"
       placeholder="Search members"
       size="sm"
     />
@@ -133,7 +133,7 @@ function menu(member: Member): DropdownMenuItem[][] {
                 <UButton
                   :aria-label="`Actions for ${member.name}`"
                   color="neutral"
-                  icon="i-ph-dots-three"
+                  icon="i-mingcute-more-1-line"
                   size="sm"
                   variant="ghost"
                 />

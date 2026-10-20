@@ -28,7 +28,7 @@ async function pick(next: Share) {
   <UModal v-model:open="open" :description="drop.title" title="Share drop">
     <template #body>
       <p v-if="drop.sharedFrom" class="mb-3 flex items-start gap-2 text-sm text-muted">
-        <UIcon name="i-ph-folder" class="mt-0.5 size-4 shrink-0" />
+        <UIcon name="i-mingcute-folder-line" class="mt-0.5 size-4 shrink-0" />
         <span
           >Shared through {{ drop.sharedFrom.title }} ({{ SHARE_LABELS[drop.share] }}). Its own share below can only
           reach wider.</span
@@ -81,7 +81,7 @@ async function pick(next: Share) {
           aria-label="Copy link"
           color="neutral"
           :disabled="!shared"
-          :icon="copied() ? 'i-ph-check' : 'i-ph-copy'"
+          :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
           size="sm"
           variant="ghost"
           @click="copy(url)"

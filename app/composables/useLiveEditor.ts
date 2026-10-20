@@ -70,7 +70,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
           notify.info({
             title: `${published.name} published v${published.version}`,
             description: "Keep editing the new version.",
-            icon: "i-ph-arrow-up-right",
+            icon: "i-mingcute-arrow-right-up-line",
             actions: [
               {
                 label: "Open",
@@ -152,7 +152,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       notify.info({
         title: `v${head.version} is the latest version`,
         description: "Your draft stays here until you publish it.",
-        icon: "i-ph-clock-counter-clockwise",
+        icon: "i-mingcute-history-line",
         actions: [
           {
             label: `Open v${head.version}`,

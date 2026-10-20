@@ -36,22 +36,22 @@ const { data: withMe } = useSharedWithMe()
 const workspace = computed(() => [
   {
     label: "Agents",
-    icon: "i-ph-sparkle",
-    activeIcon: "i-ph-sparkle-fill",
+    icon: "i-mingcute-sparkles-line",
+    activeIcon: "i-mingcute-sparkles-fill",
     to: "/agents",
     active: at("/agents") || at("/approve"),
   },
   {
     label: "Skills",
-    icon: "i-ph-puzzle-piece",
-    activeIcon: "i-ph-puzzle-piece-fill",
+    icon: "i-mingcute-plugin-2-line",
+    activeIcon: "i-mingcute-plugin-2-fill",
     to: "/skills",
     active: at("/skills"),
   },
   {
     label: "Members",
-    icon: "i-ph-users",
-    activeIcon: "i-ph-users-fill",
+    icon: "i-mingcute-group-line",
+    activeIcon: "i-mingcute-group-fill",
     to: "/members",
     active: at("/members"),
     count: me.value?.reviews,
@@ -124,10 +124,10 @@ function leaveDocs() {
             <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <template v-if="team">
                 <SidebarItem
-                  active-icon="i-ph-users-fill"
+                  active-icon="i-mingcute-group-fill"
                   :active="onShared"
                   :count="withMe.length"
-                  icon="i-ph-users"
+                  icon="i-mingcute-group-line"
                   label="Team"
                   to="/drops?tab=with-me"
                   @navigate="close"
@@ -140,7 +140,7 @@ function leaveDocs() {
                     @click="teamOpen = !teamOpen"
                   >
                     <UIcon
-                      name="i-ph-caret-right"
+                      name="i-mingcute-right-line"
                       class="size-3.5 transition-transform duration-150"
                       :class="teamOpen && 'rotate-90'"
                     />
@@ -151,10 +151,10 @@ function leaveDocs() {
                 </div>
               </template>
               <SidebarItem
-                active-icon="i-ph-stack-fill"
+                active-icon="i-mingcute-layers-fill"
                 :active="onDrops"
                 :count="drops.length"
-                icon="i-ph-stack"
+                icon="i-mingcute-layers-line"
                 :label="team ? 'My drops' : 'Drops'"
                 to="/drops"
                 @navigate="close"
@@ -167,7 +167,7 @@ function leaveDocs() {
                   @click="dropsOpen = !dropsOpen"
                 >
                   <UIcon
-                    name="i-ph-caret-right"
+                    name="i-mingcute-right-line"
                     class="size-3.5 transition-transform duration-150"
                     :class="dropsOpen && 'rotate-90'"
                   />
@@ -178,10 +178,10 @@ function leaveDocs() {
               </div>
               <SidebarItem
                 v-if="!team"
-                active-icon="i-ph-tray-fill"
+                active-icon="i-mingcute-inbox-fill"
                 :active="onShared"
                 :count="withMe.length"
-                icon="i-ph-tray"
+                icon="i-mingcute-inbox-line"
                 label="Shared with me"
                 to="/drops?tab=with-me"
                 @navigate="close"
@@ -191,11 +191,11 @@ function leaveDocs() {
             <div class="flex flex-col gap-0.5 border-t border-default pt-2">
               <SidebarItem v-for="link in workspace" :key="link.to" v-bind="link" @navigate="close" />
               <SidebarItem
-                active-icon="i-ph-book-open-fill"
+                active-icon="i-mingcute-book-6-fill"
                 :active="inDocs"
-                icon="i-ph-book-open"
+                icon="i-mingcute-book-6-line"
                 label="Docs"
-                trailing-icon="i-ph-caret-right"
+                trailing-icon="i-mingcute-right-line"
                 @focusin="preloadDocs"
                 @navigate="openDocs"
                 @pointerenter="preloadDocs"
@@ -207,9 +207,9 @@ function leaveDocs() {
           <div v-else key="docs" class="sidebar-pane-docs relative z-10 flex min-h-0 w-full min-w-0 bg-default">
             <nav aria-label="Docs" class="flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <SidebarItem
-                active-icon="i-ph-arrow-left"
+                active-icon="i-mingcute-arrow-left-line"
                 :active="false"
-                icon="i-ph-arrow-left"
+                icon="i-mingcute-arrow-left-line"
                 label="Back"
                 @navigate="leaveDocs"
               />

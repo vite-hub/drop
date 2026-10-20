@@ -17,7 +17,13 @@ const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\
     <div class="max-w-md">
       <span class="mx-auto grid size-12 place-items-center rounded-full bg-elevated text-muted"
         ><UIcon
-          :name="status >= 500 || status === 429 ? 'i-ph-warning-circle' : status === 410 ? 'i-ph-clock' : 'i-ph-lock'"
+          :name="
+            status >= 500 || status === 429
+              ? 'i-mingcute-warning-line'
+              : status === 410
+                ? 'i-mingcute-time-line'
+                : 'i-mingcute-lock-line'
+          "
           class="size-5"
       /></span>
       <h1 class="mt-5 text-xl font-semibold text-highlighted">{{ message.title }}</h1>

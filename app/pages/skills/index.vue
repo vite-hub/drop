@@ -34,7 +34,7 @@ const { skills, status, setEnabled } = useSkills()
             target="_blank"
             rel="noreferrer"
           >
-            Read on GitHub<UIcon name="i-ph-arrow-up-right" class="size-3.5" />
+            Read on GitHub<UIcon name="i-mingcute-arrow-right-up-line" class="size-3.5" />
           </a>
         </div>
         <USwitch

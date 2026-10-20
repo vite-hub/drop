@@ -173,7 +173,7 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
 
         <template v-else-if="state === 'done'">
           <div class="flex items-center gap-3">
-            <UIcon name="i-ph-check-circle" class="size-6 shrink-0 text-muted" />
+            <UIcon name="i-mingcute-check-circle-line" class="size-6 shrink-0 text-muted" />
             <h1 class="text-lg font-semibold tracking-tight text-highlighted">Connected</h1>
           </div>
           <p class="mt-2 text-sm leading-relaxed text-muted">

@@ -37,20 +37,25 @@ const toItem = (drop: DropSummary): CommandPaletteItem => ({
 // Plain links: the three /drops tabs would all read as the current page otherwise.
 const pages = computed<CommandPaletteItem[]>(() =>
   [
-    { label: "Drops", icon: "i-ph-stack", to: "/drops" },
-    { label: "Shared with me", icon: "i-ph-tray", to: "/drops?tab=with-me" },
-    { label: "Trash", icon: "i-ph-trash", to: "/drops?tab=trash" },
-    { label: "Agents", icon: "i-ph-sparkle", to: "/agents" },
-    { label: "Skills", icon: "i-ph-puzzle-piece", to: "/skills" },
-    { label: "Members", icon: "i-ph-users", to: "/members" },
-    { label: "Keyboard shortcuts", icon: "i-ph-keyboard", kbds: ["?"], onSelect: () => (shortcutsOpen.value = true) },
+    { label: "Drops", icon: "i-mingcute-layers-line", to: "/drops" },
+    { label: "Shared with me", icon: "i-mingcute-inbox-line", to: "/drops?tab=with-me" },
+    { label: "Trash", icon: "i-mingcute-delete-2-line", to: "/drops?tab=trash" },
+    { label: "Agents", icon: "i-mingcute-sparkles-line", to: "/agents" },
+    { label: "Skills", icon: "i-mingcute-plugin-2-line", to: "/skills" },
+    { label: "Members", icon: "i-mingcute-group-line", to: "/members" },
+    {
+      label: "Keyboard shortcuts",
+      icon: "i-mingcute-keyboard-line",
+      kbds: ["?"],
+      onSelect: () => (shortcutsOpen.value = true),
+    },
     ...(me.value?.role === "admin"
       ? [
-          { label: "Review shares", icon: "i-ph-seal-check", to: "/admin/review" },
-          { label: "Reports", icon: "i-ph-flag", to: "/admin/reports" },
+          { label: "Review shares", icon: "i-mingcute-safety-certificate-line", to: "/admin/review" },
+          { label: "Reports", icon: "i-mingcute-flag-1-line", to: "/admin/reports" },
         ]
       : []),
-    ...DOCS_PAGES.map((page) => ({ label: page.label, suffix: "Docs", icon: "i-ph-book-open", to: page.to })),
+    ...DOCS_PAGES.map((page) => ({ label: page.label, suffix: "Docs", icon: "i-mingcute-book-6-line", to: page.to })),
   ].map((page) => ({ ...page, active: false })),
 )
 

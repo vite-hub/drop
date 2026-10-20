@@ -3,7 +3,9 @@
 const props = defineProps<{ name: string; kind?: string }>()
 const logo = computed(() => agentLogo(props.name))
 const fallback = computed(
-  () => ({ agent: "i-ph-sparkle", browser: "i-ph-user" })[props.kind ?? "browser"] ?? "i-ph-user",
+  () =>
+    ({ agent: "i-mingcute-sparkles-line", browser: "i-mingcute-user-3-line" })[props.kind ?? "browser"] ??
+    "i-mingcute-user-3-line",
 )
 </script>
 

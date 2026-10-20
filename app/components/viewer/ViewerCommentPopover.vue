@@ -63,13 +63,19 @@ defineExpose({
 const thread = useTemplateRef("thread")
 const mayDelete = computed(() => Boolean(props.comment && (props.canManage || props.comment.mine)))
 const menu = computed<DropdownMenuItem[][]>(() => [
-  [{ label: "Copy link", icon: "i-ph-link", onSelect: () => props.comment && emit("copyLink", props.comment) }],
+  [
+    {
+      label: "Copy link",
+      icon: "i-mingcute-link-line",
+      onSelect: () => props.comment && emit("copyLink", props.comment),
+    },
+  ],
   ...(mayDelete.value
     ? [
         [
           {
             label: "Delete thread",
-            icon: "i-ph-trash",
+            icon: "i-mingcute-delete-2-line",
             color: "error" as const,
             onSelect: () => props.comment && emit("delete", props.comment.id),
           },
@@ -110,7 +116,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           class="size-8 justify-center rounded-full"
           color="neutral"
           :disabled="!body.trim()"
-          icon="i-ph-arrow-up"
+          icon="i-mingcute-arrow-up-line"
           :loading="busy"
           @click="send"
         />
@@ -126,16 +132,23 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           <UButton
             :aria-label="comment.resolved ? 'Reopen' : 'Resolve'"
             color="neutral"
-            :icon="comment.resolved ? 'i-ph-arrow-u-up-left' : 'i-ph-check-circle'"
+            :icon="comment.resolved ? 'i-mingcute-back-line' : 'i-mingcute-check-circle-line'"
             size="sm"
             variant="ghost"
             @click="emit('resolve', comment.id, !comment.resolved)"
           />
         </UTooltip>
         <UDropdownMenu :content="{ align: 'end' }" :items="menu">
-          <UButton aria-label="More" color="neutral" icon="i-ph-dots-three" size="sm" variant="ghost" />
+          <UButton aria-label="More" color="neutral" icon="i-mingcute-more-1-line" size="sm" variant="ghost" />
         </UDropdownMenu>
-        <UButton aria-label="Close" color="neutral" icon="i-ph-x" size="sm" variant="ghost" @click="emit('cancel')" />
+        <UButton
+          aria-label="Close"
+          color="neutral"
+          icon="i-mingcute-close-line"
+          size="sm"
+          variant="ghost"
+          @click="emit('cancel')"
+        />
       </div>
 
       <div ref="thread" class="min-h-0 flex-1 divide-y divide-default overflow-y-auto">
@@ -156,7 +169,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
               aria-label="Delete reply"
               class="ml-auto opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
               color="neutral"
-              icon="i-ph-trash"
+              icon="i-mingcute-delete-2-line"
               size="xs"
               variant="ghost"
               @click="emit('deleteReply', comment.id, reply.id)"
@@ -186,7 +199,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           class="size-8 justify-center rounded-full"
           color="neutral"
           :disabled="!body.trim()"
-          icon="i-ph-arrow-up"
+          icon="i-mingcute-arrow-up-line"
           :loading="busy"
           @click="send"
         />

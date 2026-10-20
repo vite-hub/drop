@@ -91,7 +91,7 @@ useResizeObserver(
       :ui="{ content: 'min-w-44' }"
       size="xs"
       variant="ghost"
-      trailing-icon="i-ph-caret-down"
+      trailing-icon="i-mingcute-down-line"
       aria-label="Code language"
       class="pointer-events-auto absolute w-auto text-muted hover:text-default"
       :style="{ top: `${block.top + 4}px`, right: `${block.right + 4}px` }"

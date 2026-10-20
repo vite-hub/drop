@@ -22,7 +22,7 @@ const idle = "text-muted hover:bg-elevated hover:text-highlighted"
       >
         <span class="flex-1 truncate text-left">{{ group.title }}</span>
         <UIcon
-          name="i-ph-caret-right"
+          name="i-mingcute-right-line"
           class="size-3.5 shrink-0 text-dimmed transition-transform duration-150"
           :class="expanded(group) && 'rotate-90'"
         />

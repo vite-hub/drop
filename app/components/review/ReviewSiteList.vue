@@ -17,7 +17,7 @@ defineEmits<{ pick: [site: { choice: string; title: string; owner: string; addre
         type="button"
         @click="$emit('pick', site)"
       >
-        <UIcon name="i-ph-globe" class="size-4 shrink-0 text-muted" />
+        <UIcon name="i-mingcute-world-2-line" class="size-4 shrink-0 text-muted" />
         <span class="min-w-0 flex-1">
           <span class="block truncate text-sm font-medium text-highlighted">{{ site.title }}</span>
           <span class="block truncate text-xs text-muted"
@@ -27,10 +27,10 @@ defineEmits<{ pick: [site: { choice: string; title: string; owner: string; addre
         </span>
         <UIcon
           v-if="pending === site.choice"
-          name="i-ph-circle-notch"
+          name="i-mingcute-loading-line"
           class="size-4 shrink-0 animate-spin text-muted"
         />
-        <UIcon v-else name="i-ph-caret-right" class="size-4 shrink-0 text-dimmed" />
+        <UIcon v-else name="i-mingcute-right-line" class="size-4 shrink-0 text-dimmed" />
       </button>
     </li>
   </ul>

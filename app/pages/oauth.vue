@@ -137,7 +137,7 @@ async function answer(accept: boolean) {
               :key="item"
               class="flex gap-2"
             >
-              <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+              <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
             </li>
           </ul>
           <p v-if="destination?.local" class="mt-4 text-xs leading-relaxed text-muted">

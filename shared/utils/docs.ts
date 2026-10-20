@@ -65,7 +65,7 @@ export const HOSTS: HostDetails[] = [
   {
     id: "vps",
     name: "VPS",
-    icon: "i-ph-hard-drives",
+    icon: "i-mingcute-server-line",
     database: "Local SQLite or D1",
     files: "Local disk",
     rateLimits: "In memory",

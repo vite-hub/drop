@@ -117,7 +117,7 @@ const click = computed(() => (beat.value === "p.tab" ? BEATS[index.value]![1] - 
                 </p>
                 <div class="mt-2 flex items-center gap-2 text-muted">
                   <span class="flex items-center gap-1 rounded-full bg-inverted px-2 py-0.5 font-medium text-inverted"
-                    ><UIcon name="i-ph-git-pull-request" class="size-3" />Open</span
+                    ><UIcon name="i-mingcute-git-pull-request-line" class="size-3" />Open</span
                   >
                   <span
                     ><span class="font-medium text-highlighted">maxi</span> wants to merge 1 commit into
@@ -201,7 +201,7 @@ const click = computed(() => (beat.value === "p.tab" ? BEATS[index.value]![1] - 
                   class="flex items-center gap-2 rounded-lg border border-default px-3 py-2 [animation:pop-in_360ms_var(--ease-out)]"
                 >
                   <span class="grid size-5 place-items-center rounded-full bg-[#1a7f37] text-white"
-                    ><UIcon name="i-ph-check" class="size-3"
+                    ><UIcon name="i-mingcute-check-line" class="size-3"
                   /></span>
                   <span
                     ><span class="font-medium text-highlighted">ana</span
@@ -210,7 +210,7 @@ const click = computed(() => (beat.value === "p.tab" ? BEATS[index.value]![1] - 
                 </div>
                 <div class="overflow-hidden rounded-lg border border-default font-mono text-[11px] leading-[1.7]">
                   <div class="flex items-center gap-2 border-b border-default bg-muted px-3 py-2 font-sans">
-                    <UIcon name="i-ph-caret-down" class="size-3.5 text-muted" />
+                    <UIcon name="i-mingcute-down-line" class="size-3.5 text-muted" />
                     <span class="font-mono text-highlighted">app/components/PricingCard.vue</span>
                     <span class="ml-1 flex gap-px"
                       ><span class="size-2 bg-[#1a7f37]" /><span class="size-2 bg-[#cf222e]" /><span

@@ -156,7 +156,7 @@ async function newSite() {
       <NewMenu @folder="newFolder" @site="newSite" />
       <UButton
         color="neutral"
-        icon="i-ph-upload-simple"
+        icon="i-mingcute-upload-2-line"
         label="Upload"
         size="sm"
         variant="outline"
@@ -195,12 +195,12 @@ async function newSite() {
           :content="false"
           :items="[
             { label: `All ${counts.all}`, value: 'all' },
-            { label: `Only me ${counts.private}`, value: 'private', icon: 'i-ph-lock' },
-            { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-ph-share-network' },
+            { label: `Only me ${counts.private}`, value: 'private', icon: 'i-mingcute-lock-line' },
+            { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-mingcute-share-2-line' },
             team
-              ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-ph-users' }
-              : { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-ph-tray' },
-            { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-ph-trash' },
+              ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-mingcute-group-line' }
+              : { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-mingcute-inbox-line' },
+            { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-mingcute-delete-2-line' },
           ]"
           size="sm"
           color="neutral"
@@ -213,7 +213,7 @@ async function newSite() {
           v-if="filter === 'trash' && trash.length"
           class="shrink-0"
           color="error"
-          icon="i-ph-trash"
+          icon="i-mingcute-delete-2-line"
           label="Empty Trash"
           variant="ghost"
           @click="emptyTrash(trash.length)"
@@ -222,7 +222,7 @@ async function newSite() {
           ref="searchInput"
           v-model="search"
           class="w-full sm:w-72"
-          icon="i-ph-magnifying-glass"
+          icon="i-mingcute-search-line"
           placeholder="Search drops"
         >
           <template #trailing><UKbd value="/" /></template>
@@ -235,7 +235,7 @@ async function newSite() {
     </div>
 
     <div v-else-if="error" class="rounded-lg border border-dashed border-default px-6 py-16 text-center" role="alert">
-      <UIcon name="i-ph-warning-circle" class="size-6 text-error" />
+      <UIcon name="i-mingcute-warning-line" class="size-6 text-error" />
       <p class="mt-3 font-medium text-highlighted">Couldn't load your drops</p>
       <p class="mt-1 text-sm text-muted">Try again in a moment.</p>
       <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh()" />
@@ -245,7 +245,7 @@ async function newSite() {
       v-else-if="filter === 'trash' && !trash.length"
       class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
     >
-      <UIcon name="i-ph-trash" class="size-6 text-dimmed" />
+      <UIcon name="i-mingcute-delete-2-line" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">The Trash is empty</p>
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
         Deleted and expired drops stay here for {{ TRASH_DAYS }} days, then they're gone for good.
@@ -256,7 +256,7 @@ async function newSite() {
       v-else-if="filter === 'with-me' && !withMe.length"
       class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
     >
-      <UIcon :name="team ? 'i-ph-users' : 'i-ph-tray'" class="size-6 text-dimmed" />
+      <UIcon :name="team ? 'i-mingcute-group-line' : 'i-mingcute-inbox-line'" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">
         {{ team ? "No team folders yet" : "Nothing shared with you yet" }}
       </p>
@@ -273,7 +273,7 @@ async function newSite() {
         v-if="team && me?.role === 'admin'"
         class="mt-5"
         color="neutral"
-        icon="i-ph-folder-simple-plus"
+        icon="i-mingcute-new-folder-line"
         label="New team folder"
         @click="newFolder"
       />
@@ -291,14 +291,20 @@ async function newSite() {
       v-else-if="filter !== 'trash' && filter !== 'with-me' && !drops.length"
       class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
     >
-      <UIcon name="i-ph-stack" class="size-6 text-dimmed" />
+      <UIcon name="i-mingcute-layers-line" class="size-6 text-dimmed" />
       <p class="mt-3 font-medium text-highlighted">Nothing dropped yet</p>
       <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
         Connect an agent and it drops plans, specs, and small apps here. You can upload a file yourself too.
       </p>
       <div class="mt-5 flex justify-center gap-2">
         <UButton color="neutral" label="Connect an Agent" to="/agents" />
-        <UButton color="neutral" icon="i-ph-upload-simple" label="Upload" variant="outline" @click="picker.open()" />
+        <UButton
+          color="neutral"
+          icon="i-mingcute-upload-2-line"
+          label="Upload"
+          variant="outline"
+          @click="picker.open()"
+        />
       </div>
     </div>
 

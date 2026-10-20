@@ -12,7 +12,7 @@ const copy = () => copyText(code)
       class="min-w-0 flex-1 overflow-x-auto px-3 py-2.5 font-mono text-xs leading-5 text-highlighted"
     ><code>{{ code }}</code></pre>
     <UButton
-      :icon="copied() ? 'i-ph-check' : 'i-ph-copy'"
+      :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
       aria-label="Copy"
       class="m-1 shrink-0"
       color="neutral"

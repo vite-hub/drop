@@ -40,7 +40,14 @@ watch(open, async (now) => {
             <h2 id="shortcuts-title" class="text-sm font-medium text-highlighted">Keyboard shortcuts</h2>
             <p class="mt-0.5 text-xs text-muted">Press <UKbd value="?" /> to open this again, Esc to close it.</p>
           </div>
-          <UButton aria-label="Close" color="neutral" icon="i-ph-x" size="sm" variant="ghost" @click="open = false" />
+          <UButton
+            aria-label="Close"
+            color="neutral"
+            icon="i-mingcute-close-line"
+            size="sm"
+            variant="ghost"
+            @click="open = false"
+          />
         </header>
         <div class="space-y-5 overflow-y-auto px-5 py-4">
           <section v-for="group in SHORTCUT_GROUPS" :key="group.title">

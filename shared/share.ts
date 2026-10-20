@@ -30,11 +30,11 @@ export const SHARE_HINTS: Record<Share, string> = {
   public_comment: "Anyone with the link can open it and comment, guests included.",
 }
 export const SHARE_ICONS: Record<Share, string> = {
-  private: "i-ph-lock",
-  team: "i-ph-users",
-  team_edit: "i-ph-users-three",
-  public: "i-ph-globe",
-  public_comment: "i-ph-globe",
+  private: "i-mingcute-lock-line",
+  team: "i-mingcute-group-line",
+  team_edit: "i-mingcute-group-3-line",
+  public: "i-mingcute-world-2-line",
+  public_comment: "i-mingcute-world-2-line",
 }
 
 /** On a folder path the widest share shows; `grants` still keep each one for what it lets the caller do. */

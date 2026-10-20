@@ -60,67 +60,67 @@ const LOOP = ["Your agent drops a draft", "You comment on the exact spot", "Your
 // screenshot on the Features docs page.
 const FEATURES = [
   {
-    icon: "i-ph-sparkle",
+    icon: "i-mingcute-sparkles-line",
     title: "Agents make the changes",
     body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand.",
     to: "/docs/features#agents",
   },
   {
-    icon: "i-ph-stack",
+    icon: "i-mingcute-layers-line",
     title: "Docs and apps",
     body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link.",
     to: "/docs/features#apps",
   },
   {
-    icon: "i-ph-chat-circle",
+    icon: "i-mingcute-chat-1-line",
     title: "Comments on the exact spot",
     body: "Select a sentence, zoom into a screenshot, or drag a box. Reply in threads, or copy everything back as Markdown.",
     to: "/docs/features#comments",
   },
   {
-    icon: "i-ph-lock",
+    icon: "i-mingcute-lock-line",
     title: "Private until shared",
     body: "Share with the team or make a link. Pick what it allows: view, comment, or edit.",
     to: "/docs/features#sharing",
   },
   {
-    icon: "i-ph-users",
+    icon: "i-mingcute-group-line",
     title: "Edit together",
     body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version.",
     to: "/docs/features#edit",
   },
   {
-    icon: "i-ph-clock-counter-clockwise",
+    icon: "i-mingcute-history-line",
     title: "Version history",
     body: "Each version gets a number and a note. History shows what it changed, and open comments carry over.",
     to: "/docs/features#versions",
   },
   {
-    icon: "i-ph-magnifying-glass",
+    icon: "i-mingcute-search-line",
     title: "Search everything",
     body: "Press ⌘K to find a drop by its name or by the words inside a doc, in any folder.",
     to: "/docs/features#search",
   },
   {
-    icon: "i-ph-plug",
+    icon: "i-mingcute-plugin-line",
     title: "MCP built in",
     body: "Add one URL to your agent and sign in through the browser. No API keys.",
     to: "/docs/features#agents",
   },
   {
-    icon: "i-ph-book-open-text",
+    icon: "i-mingcute-book-5-line",
     title: "Skills for your agent",
     body: "They come with the server: publishing for review, before-and-after for pull requests, UI prototypes, handoffs, and explainers.",
     to: "/docs/features#skills",
   },
   {
-    icon: "i-ph-folder-simple",
+    icon: "i-mingcute-folder-line",
     title: "Folders agents follow",
     body: "A folder's description says what goes in it and how to write it. Agents read it before they publish.",
     to: "/docs/features#folders",
   },
   {
-    icon: "i-ph-code",
+    icon: "i-mingcute-code-line",
     title: "Code images",
     body: "Your agent turns a snippet into a highlighted, framed image for a pull request or a post.",
     to: "/docs/features#code-images",
@@ -131,7 +131,7 @@ const FEATURES = [
 const USE_CASES = [
   {
     id: "docs",
-    icon: "i-ph-file-text",
+    icon: "i-mingcute-document-line",
     label: "Plans and docs",
     title: ["Write the plan ", "together", "."],
     body: "Your agent drops the plan in the folder that fits. The team edits it live, publishes the next version, and History shows what changed.",
@@ -139,7 +139,7 @@ const USE_CASES = [
   },
   {
     id: "pr",
-    icon: "i-ph-git-pull-request",
+    icon: "i-mingcute-git-pull-request-line",
     label: "Pull requests",
     title: ["Put the before and after in every ", "pull request", "."],
     body: "Claude Code drops the screenshots with its notes and links them from the PR. Reviewers see what changed, then read the diff.",
@@ -147,7 +147,7 @@ const USE_CASES = [
   },
   {
     id: "app",
-    icon: "i-ph-app-window",
+    icon: "i-mingcute-layout-line",
     label: "Vibe-coded apps",
     title: ["Ship the thing you ", "just made", "."],
     body: "Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.",
@@ -155,7 +155,7 @@ const USE_CASES = [
   },
   {
     id: "site",
-    icon: "i-ph-browser",
+    icon: "i-mingcute-web-line",
     label: "Live sites",
     title: ["Comment on the ", "running site", "."],
     body: "Point a review at your preview deploys. People press Comment on the page itself and drag a box. The note lands in Drop with a screenshot, and your agent fixes it.",
@@ -207,7 +207,7 @@ const HOSTED = [
                   >MCP</span
                 >
                 Connect Claude Code, Codex, or any agent
-                <UIcon name="i-ph-arrow-right" class="size-3" />
+                <UIcon name="i-mingcute-arrow-right-line" class="size-3" />
               </NuxtLink>
               <h1
                 class="max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted"
@@ -237,7 +237,7 @@ const HOSTED = [
                   size="lg"
                   class="h-10 px-4"
                   label="Open Drop"
-                  trailing-icon="i-ph-arrow-right"
+                  trailing-icon="i-mingcute-arrow-right-line"
                   to="/drops"
                 />
                 <UButton
@@ -363,7 +363,7 @@ const HOSTED = [
               <span class="flex items-center justify-between">
                 <UIcon :name="feature.icon" class="size-4 text-muted" />
                 <UIcon
-                  name="i-ph-arrow-up-right"
+                  name="i-mingcute-arrow-right-up-line"
                   class="size-3.5 text-dimmed opacity-0 transition-opacity group-hover:opacity-100"
                 />
               </span>
@@ -392,11 +392,11 @@ const HOSTED = [
             >
               <div class="w-64 rounded-lg border border-default bg-default shadow-sm">
                 <div class="flex items-center gap-2 border-b border-default px-3 py-2">
-                  <UIcon name="i-ph-file-text" class="size-3.5 text-muted" />
+                  <UIcon name="i-mingcute-document-line" class="size-3.5 text-muted" />
                   <span class="font-mono text-xs text-toned">launch-plan.md</span>
                   <span
                     class="ml-auto inline-flex items-center gap-1 rounded-sm border border-default px-1.5 text-xs text-muted"
-                    ><UIcon name="i-ph-lock-simple" class="size-3" />Private</span
+                    ><UIcon name="i-mingcute-lock-line" class="size-3" />Private</span
                   >
                 </div>
                 <div class="space-y-2 px-3 py-3">
@@ -408,7 +408,7 @@ const HOSTED = [
               <div
                 class="absolute right-6 bottom-5 flex items-center gap-1.5 rounded-md border border-default bg-default px-2 py-1 text-xs text-toned shadow-md"
               >
-                <UIcon name="i-ph-globe-simple" class="size-3.5" />Anyone with the link
+                <UIcon name="i-mingcute-globe-line" class="size-3.5" />Anyone with the link
               </div>
             </div>
             <div class="flex-1 px-4 pt-5 pb-4">
@@ -419,7 +419,7 @@ const HOSTED = [
               </p>
               <ul class="mt-4 space-y-2 text-sm">
                 <li v-for="item in HOSTED" :key="item" class="flex gap-2">
-                  <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+                  <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
                 </li>
               </ul>
             </div>
@@ -453,7 +453,7 @@ const HOSTED = [
               </p>
               <ul class="mt-4 space-y-2 text-sm">
                 <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
-                  <UIcon name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+                  <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
                 </li>
               </ul>
             </div>

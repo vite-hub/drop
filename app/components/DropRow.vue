@@ -87,25 +87,25 @@ async function copyLink(announce?: string) {
 
 const menu = computed(() => [
   [
-    { label: "Open", icon: "i-ph-eye", to: `/drops/${drop.id}` },
+    { label: "Open", icon: "i-mingcute-eye-2-line", to: `/drops/${drop.id}` },
     {
       label: isPublic(drop.share) ? "Open public page" : "Open shared page",
-      icon: "i-ph-arrow-square-out",
+      icon: "i-mingcute-external-link-line",
       to: dropPath(drop),
       target: "_blank",
       disabled: !shared.value,
     },
-    { label: "Copy link", icon: "i-ph-link", onSelect: () => void copyLink("Link copied") },
+    { label: "Copy link", icon: "i-mingcute-link-line", onSelect: () => void copyLink("Link copied") },
   ],
   ...(changeable.value
     ? [
         [
-          { label: "Move to folder", icon: "i-ph-folder-simple-plus", onSelect: () => void moveTo({ drop: drop }) },
-          { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") },
+          { label: "Move to folder", icon: "i-mingcute-new-folder-line", onSelect: () => void moveTo({ drop: drop }) },
+          { label: "Move to Trash", icon: "i-mingcute-delete-2-line", onSelect: () => emit("delete") },
         ],
       ]
     : theirs.value && inTeam
-      ? [[{ label: "Move to Trash", icon: "i-ph-trash", onSelect: () => emit("delete") }]]
+      ? [[{ label: "Move to Trash", icon: "i-mingcute-delete-2-line", onSelect: () => emit("delete") }]]
       : []),
 ])
 </script>
@@ -123,7 +123,7 @@ const menu = computed(() => [
       type="button"
       @click="emit('toggle')"
     >
-      <UIcon :name="open ? 'i-ph-folder-open' : 'i-ph-folder'" class="size-[18px]" />
+      <UIcon :name="open ? 'i-mingcute-folder-open-line' : 'i-mingcute-folder-line'" class="size-[18px]" />
     </button>
     <span
       v-else
@@ -138,7 +138,7 @@ const menu = computed(() => [
           v-if="drop.version > 1"
           class="hidden sm:inline-flex"
           color="neutral"
-          icon="i-ph-clock-counter-clockwise"
+          icon="i-mingcute-history-line"
           :label="`v${drop.version}`"
           size="sm"
           variant="outline"
@@ -214,7 +214,7 @@ const menu = computed(() => [
     <div v-if="trashed" class="relative z-10 flex items-center gap-1">
       <UButton
         color="neutral"
-        icon="i-ph-arrow-u-up-left"
+        icon="i-mingcute-back-line"
         label="Restore"
         size="sm"
         variant="outline"
@@ -223,7 +223,7 @@ const menu = computed(() => [
       <UButton
         :aria-label="`Delete ${drop.title} for good`"
         color="error"
-        icon="i-ph-trash"
+        icon="i-mingcute-delete-2-line"
         size="sm"
         variant="ghost"
         @click="emit('deleteForever')"
@@ -234,12 +234,17 @@ const menu = computed(() => [
         aria-label="Copy link"
         class="hidden sm:inline-flex"
         color="neutral"
-        :icon="copied() ? 'i-ph-check' : 'i-ph-link'"
+        :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
         variant="ghost"
         @click="copyLink()"
       />
       <UDropdownMenu :items="menu" :content="{ align: 'end' }">
-        <UButton :aria-label="`Actions for ${drop.title}`" color="neutral" icon="i-ph-dots-three" variant="ghost" />
+        <UButton
+          :aria-label="`Actions for ${drop.title}`"
+          color="neutral"
+          icon="i-mingcute-more-1-line"
+          variant="ghost"
+        />
       </UDropdownMenu>
     </div>
   </li>

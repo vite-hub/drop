@@ -133,7 +133,7 @@ export function useDropActions() {
       notify.info({
         title: "Moved to the Trash",
         description: `${drop.title} can be restored for ${TRASH_DAYS} days.`,
-        icon: "i-ph-trash",
+        icon: "i-mingcute-delete-2-line",
         actions: [{ label: "Undo", color: "neutral", variant: "outline", onClick: () => void restore(drop) }],
       })
       return true

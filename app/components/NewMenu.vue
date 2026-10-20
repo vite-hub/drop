@@ -13,7 +13,7 @@ const items = computed<DropdownMenuItem[]>(() => [
         {
           label: "Folder",
           description: "Groups related drops",
-          icon: "i-ph-folder-simple",
+          icon: "i-mingcute-folder-line",
           onSelect: () => emit("folder"),
         },
       ]
@@ -21,7 +21,7 @@ const items = computed<DropdownMenuItem[]>(() => [
   {
     label: "Site review",
     description: "Comments on a live URL",
-    icon: "i-ph-globe-simple",
+    icon: "i-mingcute-globe-line",
     onSelect: () => emit("site"),
   },
 ])
@@ -32,9 +32,9 @@ const items = computed<DropdownMenuItem[]>(() => [
     <UButton
       aria-label="New"
       color="neutral"
-      icon="i-ph-plus"
+      icon="i-mingcute-add-line"
       size="sm"
-      trailing-icon="i-ph-caret-down"
+      trailing-icon="i-mingcute-down-line"
       :ui="{ trailingIcon: 'max-sm:hidden size-3.5 text-dimmed' }"
       variant="ghost"
     >

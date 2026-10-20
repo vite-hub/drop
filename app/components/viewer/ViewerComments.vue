@@ -83,7 +83,7 @@ async function sendPageComment() {
         >
           <ViewerCommentHeader :comment="comment" :current="version" />
           <p v-if="comment.kind === 'page'" class="flex items-center gap-1.5 text-xs text-muted">
-            <UIcon name="i-ph-browser" class="size-3.5" />Whole page
+            <UIcon name="i-mingcute-web-line" class="size-3.5" />Whole page
           </p>
           <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
@@ -160,7 +160,7 @@ async function sendPageComment() {
         class="size-8 justify-center rounded-full"
         color="neutral"
         :disabled="!pageBody.trim()"
-        icon="i-ph-arrow-up"
+        icon="i-mingcute-arrow-up-line"
         :loading="sending"
         @click="sendPageComment"
       />

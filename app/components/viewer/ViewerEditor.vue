@@ -42,21 +42,26 @@ async function editLink() {
 
 const toolbar = computed<EditorToolbarItem[][]>(() => [
   [
-    { kind: "mark", mark: "bold", icon: "i-ph-text-b", "aria-label": "Bold" },
-    { kind: "mark", mark: "italic", icon: "i-ph-text-italic", "aria-label": "Italic" },
-    { kind: "mark", mark: "strike", icon: "i-ph-text-strikethrough", "aria-label": "Strikethrough" },
-    { kind: "mark", mark: "code", icon: "i-ph-code", "aria-label": "Code" },
-    { icon: "i-ph-link", "aria-label": "Link", active: props.editor?.isActive("link"), onClick: () => void editLink() },
+    { kind: "mark", mark: "bold", icon: "i-mingcute-bold-line", "aria-label": "Bold" },
+    { kind: "mark", mark: "italic", icon: "i-mingcute-italic-line", "aria-label": "Italic" },
+    { kind: "mark", mark: "strike", icon: "i-mingcute-strikethrough-line", "aria-label": "Strikethrough" },
+    { kind: "mark", mark: "code", icon: "i-mingcute-code-line", "aria-label": "Code" },
+    {
+      icon: "i-mingcute-link-line",
+      "aria-label": "Link",
+      active: props.editor?.isActive("link"),
+      onClick: () => void editLink(),
+    },
   ],
   [
-    { kind: "heading", level: 1, icon: "i-ph-text-h-one", "aria-label": "Heading 1" },
-    { kind: "heading", level: 2, icon: "i-ph-text-h-two", "aria-label": "Heading 2" },
-    { kind: "heading", level: 3, icon: "i-ph-text-h-three", "aria-label": "Heading 3" },
+    { kind: "heading", level: 1, icon: "i-mingcute-heading-1-line", "aria-label": "Heading 1" },
+    { kind: "heading", level: 2, icon: "i-mingcute-heading-2-line", "aria-label": "Heading 2" },
+    { kind: "heading", level: 3, icon: "i-mingcute-heading-3-line", "aria-label": "Heading 3" },
   ],
   [
-    { kind: "bulletList", icon: "i-ph-list-bullets", "aria-label": "Bulleted list" },
-    { kind: "orderedList", icon: "i-ph-list-numbers", "aria-label": "Numbered list" },
-    { kind: "blockquote", icon: "i-ph-quotes", "aria-label": "Quote" },
+    { kind: "bulletList", icon: "i-mingcute-list-check-line", "aria-label": "Bulleted list" },
+    { kind: "orderedList", icon: "i-mingcute-list-ordered-line", "aria-label": "Numbered list" },
+    { kind: "blockquote", icon: "i-mingcute-blockquote-line", "aria-label": "Quote" },
   ],
 ])
 
@@ -64,15 +69,15 @@ const toolbar = computed<EditorToolbarItem[][]>(() => [
 const blocks: EditorSuggestionMenuItem[][] = [
   [
     { type: "label", label: "Blocks" },
-    { kind: "paragraph", label: "Text", icon: "i-ph-text-t" },
-    { kind: "heading", level: 1, label: "Heading 1", icon: "i-ph-text-h-one" },
-    { kind: "heading", level: 2, label: "Heading 2", icon: "i-ph-text-h-two" },
-    { kind: "heading", level: 3, label: "Heading 3", icon: "i-ph-text-h-three" },
-    { kind: "bulletList", label: "Bulleted list", icon: "i-ph-list-bullets" },
-    { kind: "orderedList", label: "Numbered list", icon: "i-ph-list-numbers" },
-    { kind: "blockquote", label: "Quote", icon: "i-ph-quotes" },
-    { kind: "codeBlock", label: "Code block", icon: "i-ph-code-block" },
-    { kind: "horizontalRule", label: "Divider", icon: "i-ph-minus" },
+    { kind: "paragraph", label: "Text", icon: "i-mingcute-text-line" },
+    { kind: "heading", level: 1, label: "Heading 1", icon: "i-mingcute-heading-1-line" },
+    { kind: "heading", level: 2, label: "Heading 2", icon: "i-mingcute-heading-2-line" },
+    { kind: "heading", level: 3, label: "Heading 3", icon: "i-mingcute-heading-3-line" },
+    { kind: "bulletList", label: "Bulleted list", icon: "i-mingcute-list-check-line" },
+    { kind: "orderedList", label: "Numbered list", icon: "i-mingcute-list-ordered-line" },
+    { kind: "blockquote", label: "Quote", icon: "i-mingcute-blockquote-line" },
+    { kind: "codeBlock", label: "Code block", icon: "i-mingcute-terminal-box-line" },
+    { kind: "horizontalRule", label: "Divider", icon: "i-mingcute-minimize-line" },
   ],
 ]
 </script>
@@ -96,7 +101,7 @@ const blocks: EditorSuggestionMenuItem[][] = [
       <UEditorSuggestionMenu :editor="editor" :items="blocks" />
       <UEditorEmojiMenu :editor="editor" :items="emojis" :limit="24" />
       <ViewerMentionMenu :editor="editor" :people="people" />
-      <UEditorDragHandle :editor="editor" icon="i-ph-dots-six-vertical" />
+      <UEditorDragHandle :editor="editor" icon="i-mingcute-dots-line" />
     </template>
   </div>
 </template>

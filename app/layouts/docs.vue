@@ -57,7 +57,7 @@ watch(() => route.hash, scrollToHash, { flush: "post" })
           @click="menuOpen = !menuOpen"
         >
           <span>{{ current?.label ?? "Docs" }}</span>
-          <UIcon :name="menuOpen ? 'i-ph-caret-up' : 'i-ph-caret-down'" class="size-4" />
+          <UIcon :name="menuOpen ? 'i-mingcute-up-line' : 'i-mingcute-down-line'" class="size-4" />
         </button>
         <DocsNav v-if="menuOpen" class="pt-4 pb-2" />
       </div>

@@ -4,13 +4,13 @@ import type { ActorKind, DropKind } from "#shared/types"
 export const formatBytes = (bytes: number) => prettyBytes(bytes)
 
 export const KIND_ICONS: Record<DropKind, string> = {
-  markdown: "i-ph-file-text",
-  html: "i-ph-code",
-  image: "i-ph-image",
-  file: "i-ph-file",
-  app: "i-ph-app-window",
-  folder: "i-ph-folder",
-  site: "i-ph-globe",
+  markdown: "i-mingcute-document-line",
+  html: "i-mingcute-code-line",
+  image: "i-mingcute-pic-line",
+  file: "i-mingcute-file-line",
+  app: "i-mingcute-layout-line",
+  folder: "i-mingcute-folder-line",
+  site: "i-mingcute-world-2-line",
 }
 
 export const KIND_LABELS: Record<DropKind, string> = {

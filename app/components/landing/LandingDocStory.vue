@@ -127,22 +127,22 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                     data-cursor="edit"
                     class="grid size-7 place-items-center rounded-md text-muted"
                     :class="editing && 'bg-elevated text-highlighted'"
-                    ><UIcon name="i-ph-pencil-simple" class="size-4"
+                    ><UIcon name="i-mingcute-pencil-line" class="size-4"
                   /></span>
                   <span
                     class="grid size-7 place-items-center rounded-md text-muted"
                     :class="!history && !editing && 'bg-elevated text-highlighted'"
-                    ><UIcon name="i-ph-chat-circle" class="size-4"
+                    ><UIcon name="i-mingcute-chat-1-line" class="size-4"
                   /></span>
                   <span
                     data-cursor="history"
                     class="grid size-7 place-items-center rounded-md text-muted"
                     :class="history && 'bg-elevated text-highlighted'"
-                    ><UIcon name="i-ph-clock-counter-clockwise" class="size-4"
+                    ><UIcon name="i-mingcute-history-line" class="size-4"
                   /></span>
                   <span
                     class="ml-1 flex items-center gap-1.5 rounded-md border border-default px-2 py-1 text-xs text-highlighted"
-                    ><UIcon name="i-ph-users" class="size-3.5" /> Team</span
+                    ><UIcon name="i-mingcute-group-line" class="size-3.5" /> Team</span
                   >
                 </div>
               </div>
@@ -152,7 +152,7 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                 v-if="editing"
                 class="flex h-9 shrink-0 items-center gap-2 border-b border-default bg-muted px-4 text-xs [animation:fade-in_300ms_ease-out]"
               >
-                <UIcon name="i-ph-pencil-simple" class="size-3.5 text-muted" />
+                <UIcon name="i-mingcute-pencil-line" class="size-3.5 text-muted" />
                 <span class="text-highlighted">Editing together</span>
                 <span class="text-dimmed">· {{ at("e.type") ? "Draft saved" : "Draft" }}</span>
                 <span
@@ -169,7 +169,7 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                   class="min-w-0 px-7 py-6 text-[13px] leading-relaxed [animation:fade-in_300ms_ease-out]"
                 >
                   <p class="flex items-center gap-2 text-xs text-muted">
-                    <UIcon name="i-ph-arrow-left" class="size-3.5" /> What changed in
+                    <UIcon name="i-mingcute-arrow-left-line" class="size-3.5" /> What changed in
                     <span class="font-mono text-highlighted">v2</span>
                   </p>
                   <h4 class="mt-5 text-sm font-semibold text-highlighted">Rollout</h4>
@@ -243,7 +243,7 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                     v-if="at('e.done') && !history"
                     class="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-default bg-default px-3 py-2 text-xs text-highlighted shadow-lg [animation:pop-in_360ms_var(--ease-out)]"
                   >
-                    <UIcon name="i-ph-check-circle" class="size-4" /> Published v2
+                    <UIcon name="i-mingcute-check-circle-line" class="size-4" /> Published v2
                   </p>
                 </article>
 

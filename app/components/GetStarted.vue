@@ -65,7 +65,7 @@ const tabsUi = {
         aria-label="Hide get started"
         class="ml-auto"
         color="neutral"
-        icon="i-ph-x"
+        icon="i-mingcute-close-line"
         size="xs"
         variant="ghost"
         @click="hidden = true"
@@ -81,15 +81,15 @@ const tabsUi = {
           type="button"
           @click="toggle(step.id)"
         >
-          <UIcon v-if="step.done" name="i-ph-check-circle-fill" class="size-5 shrink-0 text-highlighted" />
-          <UIcon v-else name="i-ph-circle" class="size-5 shrink-0 text-dimmed" />
+          <UIcon v-if="step.done" name="i-mingcute-check-circle-fill" class="size-5 shrink-0 text-highlighted" />
+          <UIcon v-else name="i-mingcute-round-line" class="size-5 shrink-0 text-dimmed" />
           <span class="text-sm" :class="step.done ? 'text-muted line-through' : 'font-medium text-highlighted'">{{
             step.title
           }}</span>
           <span v-if="step.optional" class="text-xs text-muted">Optional</span>
           <UIcon
             v-if="!step.done"
-            name="i-ph-caret-down"
+            name="i-mingcute-down-line"
             class="ml-auto size-4 text-dimmed transition-transform"
             :class="active === step.id && 'rotate-180'"
           />
@@ -124,7 +124,7 @@ const tabsUi = {
               Or drop a Markdown, HTML, or image file yourself.
               <UButton
                 color="neutral"
-                icon="i-ph-upload-simple"
+                icon="i-mingcute-upload-2-line"
                 label="Upload a file"
                 size="xs"
                 variant="outline"
@@ -148,7 +148,7 @@ const tabsUi = {
               :label="`Open ${firstDoc.title}`"
               size="xs"
               :to="`/drops/${firstDoc.id}`"
-              trailing-icon="i-ph-arrow-right"
+              trailing-icon="i-mingcute-arrow-right-line"
               variant="outline"
             />
             <p v-else>Drop something first.</p>
@@ -161,7 +161,7 @@ const tabsUi = {
             </p>
             <UButton
               color="neutral"
-              icon="i-ph-globe-simple"
+              icon="i-mingcute-globe-line"
               label="New Site Review"
               size="xs"
               variant="outline"

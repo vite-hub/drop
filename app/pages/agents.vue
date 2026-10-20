@@ -37,7 +37,7 @@ const { copy, copied } = useCopy()
           <UButton
             aria-label="Copy server URL"
             color="neutral"
-            :icon="copied('server') ? 'i-ph-check' : 'i-ph-copy'"
+            :icon="copied('server') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
             size="xs"
             variant="ghost"
             @click="copy(server, { key: 'server' })"
@@ -65,7 +65,7 @@ const { copy, copied } = useCopy()
         <UTooltip text="A starter HTML plan your agent can fill in and drop">
           <UButton
             color="neutral"
-            :icon="copied('template') ? 'i-ph-check' : 'i-ph-copy'"
+            :icon="copied('template') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
             :label="copied('template') ? 'Copied' : 'Copy Plan Template'"
             size="sm"
             variant="ghost"

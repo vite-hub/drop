@@ -111,14 +111,14 @@ const box = (item: SiteReviewItem) => ({
           <span
             class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1.5 font-mono text-sm text-highlighted"
           >
-            <UIcon name="i-ph-globe" class="size-4 shrink-0 text-muted" />
+            <UIcon name="i-mingcute-world-2-line" class="size-4 shrink-0 text-muted" />
             <span class="truncate">{{ drop.siteUrl }}</span>
           </span>
           <UButton
             v-if="siteLink"
             color="neutral"
             external
-            icon="i-ph-arrow-square-out"
+            icon="i-mingcute-external-link-line"
             label="Open site"
             target="_blank"
             :to="siteLink"
@@ -140,7 +140,7 @@ const box = (item: SiteReviewItem) => ({
           <UInput
             v-model="address"
             class="min-w-0 flex-1"
-            icon="i-ph-globe"
+            icon="i-mingcute-world-2-line"
             :placeholder="example"
             spellcheck="false"
             aria-label="Address to review"
@@ -149,7 +149,7 @@ const box = (item: SiteReviewItem) => ({
             color="neutral"
             :disabled="!addressCovered"
             label="Open here"
-            trailing-icon="i-ph-arrow-right"
+            trailing-icon="i-mingcute-arrow-right-line"
             type="submit"
           />
         </form>
@@ -179,7 +179,7 @@ const box = (item: SiteReviewItem) => ({
               :href="bookmarklet"
               @click.prevent="notify.done('Drag it to your bookmarks bar', 'Then click it on any page of the site.')"
             >
-              <UIcon name="i-ph-chat-circle" class="size-4 text-muted" />Review with Drop
+              <UIcon name="i-mingcute-chat-1-line" class="size-4 text-muted" />Review with Drop
             </a>
             <div class="flex gap-1" role="group" aria-label="Your browser">
               <UButton
@@ -218,7 +218,7 @@ const box = (item: SiteReviewItem) => ({
           v-if="!items.data.value.length"
           class="rounded-lg border border-dashed border-default px-4 py-10 text-center"
         >
-          <UIcon name="i-ph-chat-circle" class="size-6 text-dimmed" />
+          <UIcon name="i-mingcute-chat-1-line" class="size-6 text-dimmed" />
           <p class="mt-3 font-medium text-highlighted">Nothing sent from {{ host }} yet</p>
           <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
             Open it here and press Comment, or use the bookmarklet on the site. Each note shows up here with its
@@ -248,7 +248,7 @@ const box = (item: SiteReviewItem) => ({
               </span>
             </NuxtLink>
             <div v-else class="flex h-56 flex-col items-center justify-center gap-2 bg-muted text-sm text-muted">
-              <UIcon name="i-ph-image-broken" class="size-6 text-dimmed" />
+              <UIcon name="i-mingcute-pic-line" class="size-6 text-dimmed" />
               No screenshot from this page
             </div>
             <div class="space-y-2 border-t border-default p-3">

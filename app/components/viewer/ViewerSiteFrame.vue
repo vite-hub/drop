@@ -53,7 +53,7 @@ async function comment() {
       title: "This browser can't capture the screen",
       description: "Use the bookmarklet on the site instead.",
       color: "error",
-      icon: "i-ph-warning-circle",
+      icon: "i-mingcute-warning-line",
     })
     return
   }
@@ -176,7 +176,7 @@ onBeforeUnmount(discard)
     <div class="flex h-12 shrink-0 items-center gap-2 border-b border-default px-3">
       <UButton
         color="neutral"
-        icon="i-ph-arrow-left"
+        icon="i-mingcute-arrow-left-line"
         variant="ghost"
         aria-label="Back to the site's comments"
         @click="emit('close')"
@@ -187,7 +187,7 @@ onBeforeUnmount(discard)
           class="w-full"
           :color="valid ? 'neutral' : 'error'"
           :highlight="!valid"
-          icon="i-ph-globe"
+          icon="i-mingcute-world-2-line"
           size="sm"
           aria-label="Address of the page under review"
           spellcheck="false"
@@ -196,7 +196,7 @@ onBeforeUnmount(discard)
       <UButton
         color="neutral"
         :variant="drawing ? 'solid' : 'outline'"
-        icon="i-ph-chat-circle"
+        icon="i-mingcute-chat-1-line"
         :label="drawing ? 'Drawing…' : 'Comment'"
         @click="comment"
       />

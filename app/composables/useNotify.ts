@@ -19,10 +19,10 @@ export function useNotify() {
     void refreshNuxtData(keys.usage)
   }
   return {
-    done: (title: string, description?: string) => toast.add({ title, description, icon: "i-ph-check" }),
+    done: (title: string, description?: string) => toast.add({ title, description, icon: "i-mingcute-check-line" }),
     fail: (title: string, error: unknown) => {
       const description = problem(error)
-      if (description) toast.add({ title, description, color: "error", icon: "i-ph-warning-circle" })
+      if (description) toast.add({ title, description, color: "error", icon: "i-mingcute-warning-line" })
     },
     problem,
     info: toast.add,

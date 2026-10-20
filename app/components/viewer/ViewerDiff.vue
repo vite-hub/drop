@@ -69,7 +69,7 @@ const counts = computed(() => ({
         <UButton
           aria-label="Back to the document"
           color="neutral"
-          icon="i-ph-x"
+          icon="i-mingcute-close-line"
           size="xs"
           variant="ghost"
           @click="emit('close')"
@@ -144,7 +144,7 @@ const counts = computed(() => ({
             v-if="side.url"
             aria-label="Download"
             color="neutral"
-            icon="i-ph-download-simple"
+            icon="i-mingcute-download-2-line"
             size="xs"
             :to="side.url"
             external

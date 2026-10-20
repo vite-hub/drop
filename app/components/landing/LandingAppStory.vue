@@ -82,13 +82,13 @@ function play() {
           <div class="flex h-full flex-col">
             <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm" aria-hidden="true">
               <DropMark class="h-3.5 shrink-0" />
-              <UIcon name="i-ph-folder" class="size-4 text-muted" />
+              <UIcon name="i-mingcute-folder-line" class="size-4 text-muted" />
               <span class="font-medium text-highlighted">catch/</span>
               <span class="rounded-md border border-default px-1.5 py-0.5 font-mono text-[11px] text-muted">v1</span>
               <span class="rounded-md bg-elevated px-1.5 py-0.5 text-[11px] text-muted">App</span>
               <span
                 class="ml-auto flex items-center gap-1.5 rounded-md border border-default px-2 py-1 text-xs text-highlighted"
-                ><UIcon name="i-ph-globe" class="size-3.5" /> Share</span
+                ><UIcon name="i-mingcute-world-2-line" class="size-3.5" /> Share</span
               >
             </div>
             <LandingCatchGame class="min-h-0 flex-1" :running="live && playing" @play="play" />

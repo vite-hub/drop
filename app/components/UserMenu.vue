@@ -13,8 +13,15 @@ const shortcutsOpen = useShortcutsOpen()
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: "label", slot: "account" as const }],
   [{ label: "Theme", slot: "theme" as const, onSelect: (event: Event) => event.preventDefault() }],
-  [{ label: "Keyboard shortcuts", icon: "i-ph-keyboard", kbds: ["?"], onSelect: () => (shortcutsOpen.value = true) }],
-  [{ label: "Sign out", icon: "i-ph-sign-out", onSelect: () => void leave() }],
+  [
+    {
+      label: "Keyboard shortcuts",
+      icon: "i-mingcute-keyboard-line",
+      kbds: ["?"],
+      onSelect: () => (shortcutsOpen.value = true),
+    },
+  ],
+  [{ label: "Sign out", icon: "i-mingcute-exit-line", onSelect: () => void leave() }],
 ])
 async function leave() {
   await signOut()
@@ -53,7 +60,7 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
           <span class="block truncate text-sm font-medium text-highlighted">{{ me?.name ?? "You" }}</span>
           <span class="block truncate text-xs text-muted">{{ roleLabel }}</span>
         </span>
-        <UIcon name="i-ph-caret-up-down" class="size-4 shrink-0 text-dimmed" />
+        <UIcon name="i-mingcute-selector-vertical-line" class="size-4 shrink-0 text-dimmed" />
       </template>
     </button>
 

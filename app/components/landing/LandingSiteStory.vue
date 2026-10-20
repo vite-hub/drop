@@ -191,7 +191,7 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                 <span
                   data-cursor="comment"
                   class="flex h-7 items-center gap-1.5 rounded-md bg-inverted px-2.5 font-medium text-inverted"
-                  ><UIcon name="i-ph-chat-circle" class="size-3.5" />Comment</span
+                  ><UIcon name="i-mingcute-chat-1-line" class="size-3.5" />Comment</span
                 >
                 <span
                   v-if="at('s.sent') && !fixed"

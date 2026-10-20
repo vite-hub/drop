@@ -226,7 +226,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
               <div class="relative flex h-full flex-col">
                 <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm">
                   <DropMark class="h-3.5 shrink-0" />
-                  <UIcon name="i-ph-file-text" class="size-4 text-muted" />
+                  <UIcon name="i-mingcute-document-line" class="size-4 text-muted" />
                   <span class="font-medium text-highlighted">launch-plan.md</span>
                   <span
                     :key="String(v2)"
@@ -251,7 +251,8 @@ function pick(item: (typeof CHAPTERS)[number]) {
                       data-cursor="share"
                       class="flex items-center gap-1.5 rounded-md border border-default px-2 py-1 text-xs text-highlighted"
                     >
-                      <UIcon :name="shared ? 'i-ph-globe' : 'i-ph-lock'" class="size-3.5" /> Share
+                      <UIcon :name="shared ? 'i-mingcute-world-2-line' : 'i-mingcute-lock-line'" class="size-3.5" />
+                      Share
                     </span>
                   </div>
                 </div>
@@ -405,7 +406,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                     <div class="mt-3 divide-y divide-default rounded-lg border border-default">
                       <div class="flex items-center gap-3 p-3">
                         <span class="grid size-8 place-items-center rounded-md bg-elevated text-muted"
-                          ><UIcon :name="shared ? 'i-ph-globe' : 'i-ph-lock'" class="size-4"
+                          ><UIcon :name="shared ? 'i-mingcute-world-2-line' : 'i-mingcute-lock-line'" class="size-4"
                         /></span>
                         <div class="min-w-0 flex-1">
                           <p class="text-sm font-medium text-highlighted">
@@ -457,7 +458,7 @@ function pick(item: (typeof CHAPTERS)[number]) {
                     >
                       <span class="min-w-0 flex-1 truncate font-mono text-xs">drop.vitehub.dev/d/m8r2</span>
                       <span data-cursor="copy" class="grid size-6 place-items-center rounded text-highlighted"
-                        ><UIcon :name="copied ? 'i-ph-check' : 'i-ph-copy'" class="size-3.5"
+                        ><UIcon :name="copied ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'" class="size-3.5"
                       /></span>
                     </div>
                   </div>
@@ -567,7 +568,11 @@ function pick(item: (typeof CHAPTERS)[number]) {
                   ]"
                 >
                   <BrainlessClaudeLogo v-if="app.id === 'terminal'" class="h-3.5" />
-                  <UIcon v-else-if="app.id === 'browser'" name="i-ph-compass" class="size-5 text-highlighted" />
+                  <UIcon
+                    v-else-if="app.id === 'browser'"
+                    name="i-mingcute-compass-line"
+                    class="size-5 text-highlighted"
+                  />
                   <UIcon v-else name="i-simple-icons-slack" class="size-5 text-highlighted" />
                 </span>
                 <span

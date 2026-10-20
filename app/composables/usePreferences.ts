@@ -65,11 +65,11 @@ export function useCopy() {
   function done({ key = "", announce }: Options) {
     last.value = key
     start()
-    if (announce) toast.add({ title: announce, icon: "i-ph-check" })
+    if (announce) toast.add({ title: announce, icon: "i-mingcute-check-line" })
   }
   function failed(error: unknown) {
     reportClientError("copy", error)
-    toast.add({ title: "Couldn't copy", color: "error", icon: "i-ph-warning-circle" })
+    toast.add({ title: "Couldn't copy", color: "error", icon: "i-mingcute-warning-line" })
   }
   return {
     copied: (key = "") => last.value === key,

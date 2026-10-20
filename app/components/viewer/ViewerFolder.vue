@@ -52,7 +52,7 @@ async function newSite() {
           v-model="search"
           aria-label="Search this folder"
           class="w-full sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1"
-          icon="i-ph-magnifying-glass"
+          icon="i-mingcute-search-line"
           :placeholder="`Search ${itemCount(children.length)}`"
         />
         <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
@@ -60,7 +60,7 @@ async function newSite() {
           <NewMenu :folder="addsFolders" @folder="newFolder" @site="newSite" />
           <UButton
             color="neutral"
-            icon="i-ph-upload-simple"
+            icon="i-mingcute-upload-2-line"
             label="Upload"
             size="sm"
             variant="outline"
@@ -70,7 +70,7 @@ async function newSite() {
       </div>
       <ViewerFolderResults v-if="search.trim()" :folder="drop.id" :public-view="publicView" :query="search" />
       <div v-else-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
-        <UIcon name="i-ph-folder-open" class="size-6 text-dimmed" />
+        <UIcon name="i-mingcute-folder-open-line" class="size-6 text-dimmed" />
         <p class="mt-3 font-medium text-highlighted">Nothing in this folder yet</p>
         <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
           Upload a file, ask your agent to publish into {{ drop.title }}, or move a drop here with Move to folder in its

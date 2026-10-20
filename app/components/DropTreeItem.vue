@@ -33,8 +33,8 @@ async function askRename() {
 }
 const menu = [
   [
-    { label: "Rename", icon: "i-ph-pencil-simple", onSelect: askRename },
-    { label: "Move to Trash", icon: "i-ph-trash", onSelect: () => void remove(props.drop) },
+    { label: "Rename", icon: "i-mingcute-pencil-line", onSelect: askRename },
+    { label: "Move to Trash", icon: "i-mingcute-delete-2-line", onSelect: () => void remove(props.drop) },
   ],
 ]
 
@@ -54,7 +54,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
         @click="emit('navigate')"
       >
         <UIcon
-          :name="drop.kind === 'folder' && expanded ? 'i-ph-folder-open' : KIND_ICONS[drop.kind]"
+          :name="drop.kind === 'folder' && expanded ? 'i-mingcute-folder-open-line' : KIND_ICONS[drop.kind]"
           class="size-4 shrink-0 text-dimmed"
         />
         <span class="truncate" :title="drop.title">{{ drop.title }}</span>
@@ -66,7 +66,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
           :class="reveal"
           type="button"
         >
-          <UIcon name="i-ph-dots-three" class="size-3.5" />
+          <UIcon name="i-mingcute-more-1-line" class="size-3.5" />
         </button>
       </UDropdownMenu>
       <button
@@ -78,7 +78,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
         @click="open[drop.id] = !expanded"
       >
         <UIcon
-          name="i-ph-caret-right"
+          name="i-mingcute-right-line"
           class="size-3.5 transition-transform duration-150"
           :class="expanded && 'rotate-90'"
         />

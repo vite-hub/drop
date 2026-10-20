@@ -35,7 +35,7 @@ const COMMANDS = ["npx giget gh:vite-hub/drop my-drop", "cd my-drop && pnpm inst
             </p>
           </li>
           <li class="flex gap-3">
-            <UIcon name="i-ph-database" class="mt-0.5 size-4 shrink-0 text-highlighted" />
+            <UIcon name="i-mingcute-storage-line" class="mt-0.5 size-4 shrink-0 text-highlighted" />
             <p>Data lives in Cloudflare D1, or in SQLite on your own server.</p>
           </li>
         </ul>

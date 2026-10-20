@@ -198,7 +198,7 @@ const moreMenu = computed(() =>
         ? [
             {
               label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
-              icon: "i-ph-chat-teardrop",
+              icon: "i-mingcute-message-1-line",
               kbds: ["r"],
               onSelect: toggleArea,
             },
@@ -208,14 +208,21 @@ const moreMenu = computed(() =>
         ? [
             {
               label: "History",
-              icon: "i-ph-clock-counter-clockwise",
+              icon: "i-mingcute-history-line",
               kbds: ["h"],
               onSelect: () => panel.show("history"),
             },
           ]
         : []),
       ...(has("details")
-        ? [{ label: "Details", icon: "i-ph-info", kbds: ["i"], onSelect: () => panel.show("details") }]
+        ? [
+            {
+              label: "Details",
+              icon: "i-mingcute-information-line",
+              kbds: ["i"],
+              onSelect: () => panel.show("details"),
+            },
+          ]
         : []),
     ],
     ...(copiesMarkdown.value
@@ -223,7 +230,7 @@ const moreMenu = computed(() =>
           [
             {
               label: "Copy as Markdown",
-              icon: "i-ph-file-md",
+              icon: "i-mingcute-markdown-line",
               kbds: ["m"],
               onSelect: () => void copyMarkdown("Markdown copied"),
             },
@@ -232,7 +239,15 @@ const moreMenu = computed(() =>
       : []),
     // Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it.
     ...(visitor.value
-      ? [[{ label: "Report", icon: "i-ph-flag", to: { path: "/report", query: { target: `/d/${drop.value.link}` } } }]]
+      ? [
+          [
+            {
+              label: "Report",
+              icon: "i-mingcute-flag-1-line",
+              to: { path: "/report", query: { target: `/d/${drop.value.link}` } },
+            },
+          ],
+        ]
       : []),
   ].filter((group) => group.length),
 )
@@ -307,7 +322,7 @@ onMounted(async () => {
   if (!comment)
     return notify.info({
       title: `Comment #${n} isn't on this version`,
-      icon: "i-ph-chat-circle-slash",
+      icon: "i-mingcute-chat-1-line",
       color: "neutral",
     })
   if (wide.value && has("comments")) panel.show("comments")
@@ -351,7 +366,7 @@ const threadComment = computed(() => {
           v-if="tab === 'comments' && comments.length"
           aria-label="Copy feedback for your agent"
           color="neutral"
-          :icon="copied('feedback') ? 'i-ph-check' : 'i-ph-sparkle'"
+          :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-sparkles-line'"
           size="sm"
           title="Copy feedback for your agent"
           variant="ghost"
@@ -360,7 +375,7 @@ const threadComment = computed(() => {
         <UButton
           aria-label="Close panel"
           color="neutral"
-          icon="i-ph-x"
+          icon="i-mingcute-close-line"
           size="sm"
           variant="ghost"
           @click="panel.close"
@@ -391,26 +406,26 @@ const threadComment = computed(() => {
       <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
         <template #actions>
           <ViewerAction
-            :icon="copied('link') ? 'i-ph-check' : 'i-ph-link'"
+            :icon="copied('link') ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
             :label="copied('link') ? 'Link copied' : 'Copy link'"
             @click="copyLink()"
           />
           <ViewerAction
             v-if="drop.url"
-            icon="i-ph-download-simple"
+            icon="i-mingcute-download-2-line"
             label="Download original"
             @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })"
           />
           <ViewerAction
             v-if="owner && !trashed"
-            icon="i-ph-folder-simple-plus"
+            icon="i-mingcute-new-folder-line"
             label="Move to folder"
             @click="moveTo({ drop })"
           />
           <ViewerAction
             v-if="drop.canTrash && !trashed"
             destructive
-            icon="i-ph-trash"
+            icon="i-mingcute-delete-2-line"
             label="Move to Trash"
             @click="deleteDrop"
           />
@@ -431,7 +446,7 @@ const threadComment = computed(() => {
             v-else-if="drop.ancestors.length"
             :aria-label="`Back to ${drop.ancestors.at(-1)!.title}`"
             color="neutral"
-            icon="i-ph-arrow-left"
+            icon="i-mingcute-arrow-left-line"
             size="sm"
             variant="ghost"
             :to="crumbTo(drop.ancestors.at(-1)!)"
@@ -440,7 +455,7 @@ const threadComment = computed(() => {
             v-else
             aria-label="Back to drops"
             color="neutral"
-            icon="i-ph-arrow-left"
+            icon="i-mingcute-arrow-left-line"
             size="sm"
             variant="ghost"
             to="/drops"
@@ -457,7 +472,7 @@ const threadComment = computed(() => {
                 <NuxtLink class="max-w-40 truncate transition-colors hover:text-highlighted" :to="crumbTo(crumb)">{{
                   crumb.title
                 }}</NuxtLink>
-                <UIcon name="i-ph-caret-right" class="size-3 shrink-0 text-dimmed" />
+                <UIcon name="i-mingcute-right-line" class="size-3 shrink-0 text-dimmed" />
               </template>
             </nav>
             <span class="truncate text-sm font-medium">{{ drop.title }}</span>
@@ -500,7 +515,7 @@ const threadComment = computed(() => {
               aria-label="Edit together"
               color="neutral"
               :disabled="!drop.canEdit"
-              icon="i-ph-pencil-simple"
+              icon="i-mingcute-pencil-line"
               :loading="live.opening.value"
               size="sm"
               variant="ghost"
@@ -512,7 +527,7 @@ const threadComment = computed(() => {
               :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
               :aria-pressed="showing('comments')"
               color="neutral"
-              icon="i-ph-chats"
+              icon="i-mingcute-chat-3-line"
               :label="openCount ? String(openCount) : undefined"
               size="sm"
               :ui="{ label: 'font-mono text-xs tabular-nums' }"
@@ -524,7 +539,7 @@ const threadComment = computed(() => {
             <UButton
               aria-label="Copy link"
               color="neutral"
-              :icon="copied('link') ? 'i-ph-check' : 'i-ph-link'"
+              :icon="copied('link') ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
               size="sm"
               variant="ghost"
               @click="copyLink()"
@@ -535,7 +550,7 @@ const threadComment = computed(() => {
               aria-label="More"
               :aria-pressed="moreActive"
               color="neutral"
-              icon="i-ph-dots-three"
+              icon="i-mingcute-more-1-line"
               size="sm"
               :variant="moreActive ? 'soft' : 'ghost'"
             />
@@ -584,7 +599,7 @@ const threadComment = computed(() => {
             ? 'Nobody opened it for a while, so its link stopped working. Only you and admins can see it until you restore it.'
             : 'Its link stopped working. Only you and admins can see it until you restore it.'
         "
-        icon="i-ph-trash"
+        icon="i-mingcute-delete-2-line"
         orientation="horizontal"
         :title="expiryLabel(drop, now)"
         variant="subtle"
@@ -597,7 +612,7 @@ const threadComment = computed(() => {
         class="rounded-none border-0 border-b border-default"
         color="neutral"
         :description="`v${latest.version} is the latest version.`"
-        icon="i-ph-clock-counter-clockwise"
+        icon="i-mingcute-history-line"
         orientation="horizontal"
         :title="`You're reading v${drop.version}`"
         variant="subtle"
@@ -617,7 +632,7 @@ const threadComment = computed(() => {
         close
         color="neutral"
         :description="`The link you opened pointed at v${sentVersion}. This is v${drop.version}, the latest.`"
-        icon="i-ph-arrow-up-right"
+        icon="i-mingcute-arrow-right-up-line"
         orientation="horizontal"
         title="Updated since this link was shared"
         variant="subtle"
@@ -652,14 +667,14 @@ const threadComment = computed(() => {
         <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
         <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
           <div>
-            <UIcon name="i-ph-file" class="size-8 text-dimmed" />
+            <UIcon name="i-mingcute-file-line" class="size-8 text-dimmed" />
             <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
             <p class="mt-1 text-sm text-muted">No preview for this file type.</p>
             <UButton
               v-if="drop.url"
               class="mt-4"
               color="neutral"
-              icon="i-ph-download-simple"
+              icon="i-mingcute-download-2-line"
               label="Download"
               :to="drop.url"
               external
@@ -736,7 +751,7 @@ const threadComment = computed(() => {
     >
       <UButton
         color="neutral"
-        icon="i-ph-chat-circle"
+        icon="i-mingcute-chat-1-line"
         label="Comment"
         size="sm"
         variant="ghost"

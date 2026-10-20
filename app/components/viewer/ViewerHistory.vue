@@ -55,14 +55,14 @@ function talk(version: DropVersion) {
             ></span
           >
         </span>
-        <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-ph-caret-right" />
+        <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-mingcute-right-line" />
       </button>
       <UTooltip :text="`Copy link to v${version.version}`">
         <UButton
           :aria-label="`Copy link to v${version.version}`"
           class="absolute top-1.5 right-1.5 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-visible:opacity-100"
           color="neutral"
-          :icon="copied(version.id) ? 'i-ph-check' : 'i-ph-link'"
+          :icon="copied(version.id) ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
           size="xs"
           variant="ghost"
           @click="copyLink(version)"

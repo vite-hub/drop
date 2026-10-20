@@ -20,7 +20,14 @@ const groups = computed(() => [
     id: "folders",
     items: [
       ...(props.drop.parentId
-        ? [{ label: "Top level", description: "Out of every folder", icon: "i-ph-stack", onSelect: () => pick(null) }]
+        ? [
+            {
+              label: "Top level",
+              description: "Out of every folder",
+              icon: "i-mingcute-layers-line",
+              onSelect: () => pick(null),
+            },
+          ]
         : []),
       ...folders.value
         .filter(
@@ -32,7 +39,7 @@ const groups = computed(() => [
         .map((folder) => ({
           label: folder.title,
           description: folder.path?.length ? where(folder) : undefined,
-          icon: "i-ph-folder",
+          icon: "i-mingcute-folder-line",
           onSelect: () => pick(folder),
         })),
     ],
