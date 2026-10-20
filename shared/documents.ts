@@ -90,14 +90,16 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   });
   document.body.append(host);
 
-  // The text ends 1.5rem inside <main>; 1rem past main's edge makes a 2.5rem gap.
+  // The text ends 1.5rem inside <main>. The outline keeps 4rem clear of it, closing to 2.5rem only when its full
+  // 15rem width needs the room, and never drifts further out on wide screens.
   function place() {
-    const left = main.getBoundingClientRect().right + 16;
+    const text = main.getBoundingClientRect().right - 24;
     const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--drop-inset")) || 0;
-    const room = innerWidth - inset - left - 24;
-    host.toggleAttribute("data-fits", room >= 176);
-    host.style.left = left + "px";
-    host.style.width = Math.min(room, 240) + "px";
+    const space = innerWidth - inset - 24 - text;
+    const gap = Math.min(64, Math.max(40, space - 240));
+    host.toggleAttribute("data-fits", space - gap >= 176);
+    host.style.left = text + gap + "px";
+    host.style.width = Math.min(space - gap, 240) + "px";
   }
   function mark() {
     let current = 0;
