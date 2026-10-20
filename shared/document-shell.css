@@ -124,3 +124,9 @@ main {
   width: var(--ca-wide);
   margin-inline: calc((100% - var(--ca-wide)) / 2);
 }
+
+/* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.
+   The backdrop still fills the frame. */
+.cz-dialog {
+  padding-right: var(--drop-inset, 0px);
+}
