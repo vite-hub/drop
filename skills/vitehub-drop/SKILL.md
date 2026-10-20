@@ -15,7 +15,7 @@ Before publishing something new, call `list_folders` and pick its folder (see [F
 
 `publish` takes exactly one of:
 
-- `markdown`: a doc. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md).
+- `markdown`: a doc. Before publishing Markdown, HTML, a prompt, or a `SKILL.md` file, follow [the document guide](references/documents.md). Write Markdown with only the syntax in [the Markdown reference](references/markdown.md).
 - `html`: a self-contained HTML page.
 - `files`: a small static app, files keyed by path with an `index.html`. Relative links, ES modules, and `fetch("data.json")` work like on any static host. There is no server code: import libraries from a CDN URL such as `https://esm.sh/preact`, since bare imports like `"preact"` don't load in a browser.
 - `file`: any other file up to 4 MiB. Use it for screenshots: people pin comments on an image or drag an area on it. For a file on disk, pass only `{ name }`: `publish` answers with an `uploadUrl`, good for 15 minutes and one upload. Run `curl -T <path> '<uploadUrl>'`; it creates the drop and prints it as JSON, with its `fileUrl`. Pass `{ name, base64 }` only for a few bytes you already hold as text.

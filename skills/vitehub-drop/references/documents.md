@@ -75,56 +75,9 @@ Drop renders HTML in a browser sandbox. Inline and HTTPS scripts, styles, fonts,
 
 Keep one local path while drafting. Publish each finished revision with `previous`, so reviewers see the history. Open the document in a browser when the user asks to inspect it.
 
-## Markdown and Comark
+## Markdown
 
-Use standard Markdown tables, task lists, alerts, and the supported Comark syntax. Drop renders Markdown as HTML and escapes raw HTML.
-
-For the full Comark authoring model, find [Comark on skills.sh](https://skills.sh/search?q=comark) or read its official [skill source](https://comark.dev/.well-known/skills/comark/SKILL.md). This Drop reference remains usable when that skill is not installed.
-
-### Alerts
-
-```md
-> [!NOTE]
-> This explains a constraint that changes the plan.
-```
-
-### Mermaid
-
-Use a fenced Mermaid diagram when it makes a relationship or flow easier to read:
-
-````md
-```mermaid
-graph LR
-  Draft --> Review --> Published
-```
-````
-
-Prefer one diagram per document. Drop bounds rendering work and shows oversized or invalid diagrams as source text.
-
-### Comark callouts
-
-Use a callout for a named decision or constraint:
-
-```md
-::callout{type="decision"}
-Keep the existing endpoint.
-::
-```
-
-Supported callout names are `alert`, `callout`, `info`, `note`, `tip`, and `warning`. Unknown components remain readable but do not receive custom presentation.
-
-### Frontmatter and revisions
-
-Set a title when the first heading is not the document title. Add `supersedes` only when the reader needs a visible revision chain.
-
-```md
----
-title: Publish permanent plans
-supersedes: 8823cfa1-fcf7-4503-993b-32457f92f885
----
-```
-
-The previous version stays readable, and the drop page shows the whole history.
+Drop renders a fixed set of Markdown and Comark syntax. Write a Markdown doc with [the Markdown reference](markdown.md): alerts, Mermaid, footnotes, code, annotated screenshots, front matter, and what Drop doesn't render.
 
 ## Remove machine writing
 

@@ -10,6 +10,7 @@ import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
 import prototypeMd from "../../skills/prototype/SKILL.md?raw"
 import showMeMd from "../../skills/show-me/SKILL.md?raw"
 import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
+import markdownGuide from "../../skills/vitehub-drop/references/markdown.md?raw"
 import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
 
 /**
@@ -53,7 +54,11 @@ function skill(files: SkillFile[]): Skill {
 
 /** Every built-in skill, enabled or not. Only the admin UI should see the disabled ones. */
 export const SKILLS: Skill[] = [
-  skill([file("SKILL.md", dropMd), file("references/documents.md", documentsGuide)]),
+  skill([
+    file("SKILL.md", dropMd),
+    file("references/documents.md", documentsGuide),
+    file("references/markdown.md", markdownGuide),
+  ]),
   skill([file("SKILL.md", handoffMd)]),
   skill([file("SKILL.md", prEvidenceMd), file("references/annotations.md", prEvidenceAnnotations)]),
   skill([file("SKILL.md", prototypeMd), file("assets/picker.js", prototypePicker)]),
