@@ -14,6 +14,14 @@ watch(
 )
 // From /api/me, which SSR fetches with the session cookie, so the server picks the right shell.
 const { data: me } = await useMe()
+
+// Signed in, the page scrolls inside the dashboard panel, not the window, so the router's scroll to a #section misses.
+function scrollToHash() {
+  if (me.value && route.hash) document.getElementById(decodeURIComponent(route.hash.slice(1)))?.scrollIntoView()
+}
+onMounted(scrollToHash)
+onScopeDispose(useNuxtApp().hook("page:finish", () => nextTick(scrollToHash)))
+watch(() => route.hash, scrollToHash, { flush: "post" })
 </script>
 
 <template>

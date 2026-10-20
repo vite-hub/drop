@@ -1,16 +1,12 @@
 <script setup lang="ts">
 // Legal template. The instance owner must review and adapt this source before offering a public service.
-useSeoMeta({
-  title: "Acceptable use",
-  description:
-    "What you may not upload or share on Drop: phishing, malware, spam, illegal content, and copyright infringement.",
-})
 </script>
 <template>
-  <div class="flex min-h-dvh flex-col">
-    <SiteHeader />
-    <main class="mx-auto w-full flex-1 max-w-2xl space-y-5 px-6 py-12">
-      <h1 class="text-2xl font-semibold">Acceptable use</h1>
+  <DocsPage
+    title="Acceptable use"
+    lead="What you may not upload or share on Drop: phishing, malware, spam, illegal content, and copyright infringement."
+  >
+    <div class="docs-prose">
       <p>
         Do not upload or share phishing pages, malware, crypto drainers, spam, illegal content, or content that
         infringes copyright. Do not use Drop to steal credentials, deceive people, or evade an account suspension.
@@ -21,10 +17,9 @@ useSeoMeta({
       </p>
       <p>The operator may quarantine content and ban accounts that break these rules.</p>
       <p>
-        <NuxtLink to="/report" class="underline">Report a drop</NuxtLink> or read the
-        <NuxtLink to="/abuse" class="underline">copyright and abuse contact</NuxtLink> page.
+        <NuxtLink to="/report">Report a drop</NuxtLink> or read the
+        <NuxtLink to="/abuse">copyright and abuse contact</NuxtLink> page.
       </p>
-    </main>
-    <SiteFooter />
-  </div>
+    </div>
+  </DocsPage>
 </template>

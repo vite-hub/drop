@@ -313,7 +313,6 @@ const HOSTED = [
           class="mb-10 grid items-end gap-x-12 gap-y-3 lg:mb-12 lg:grid-cols-2"
         >
           <div>
-            <p class="label-mono mb-3">{{ item.label }}</p>
             <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">
               {{ item.title[0]
               }}<em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">{{

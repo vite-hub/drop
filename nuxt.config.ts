@@ -215,6 +215,10 @@ export default defineNuxtConfig({
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
     "/docs/**": { appLayout: "docs" },
+    // The policies sit in the docs nav, so they keep its sidebar.
+    "/terms": { appLayout: "docs" },
+    "/acceptable-use": { appLayout: "docs" },
+    "/abuse": { appLayout: "docs" },
   },
 
   experimental: { typescriptPlugin: true },

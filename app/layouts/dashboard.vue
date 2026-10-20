@@ -46,7 +46,9 @@ const workspace = computed(() => [
   { label: "Members", icon: "i-ph-users", activeIcon: "i-ph-users-fill", to: "/members", active: at("/members") },
 ])
 
-const pane = ref<"main" | "docs">(at("/docs") ? "docs" : "main")
+// The policies live outside /docs but sit in its nav.
+const inDocs = computed(() => at("/docs") || DOCS_PAGES.some((page) => isActivePath(route.path, page.to)))
+const pane = ref<"main" | "docs">(inDocs.value ? "docs" : "main")
 const slide = ref<"forward" | "back">("forward")
 /** As long as `.sidebar-forward-*` / `.sidebar-back-*` in main.css run, so the page opens once the docs pane is in. */
 const SLIDE_MS = 220
@@ -54,7 +56,7 @@ const motion = usePreferredReducedMotion()
 async function openDocs() {
   slide.value = "forward"
   pane.value = "docs"
-  if (at("/docs")) return
+  if (inDocs.value) return
   await promiseTimeout(motion.value === "reduce" ? 0 : SLIDE_MS)
   // Back during the slide cancels the trip.
   if (pane.value === "docs") await navigateTo("/docs")
@@ -173,7 +175,7 @@ function leaveDocs() {
               <SidebarItem v-for="link in workspace" :key="link.to" v-bind="link" @navigate="close" />
               <SidebarItem
                 active-icon="i-ph-book-open-fill"
-                :active="at('/docs')"
+                :active="inDocs"
                 icon="i-ph-book-open"
                 label="Docs"
                 trailing-icon="i-ph-caret-right"

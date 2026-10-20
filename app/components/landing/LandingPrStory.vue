@@ -204,8 +204,8 @@ const click = computed(() => (beat.value === "p.tab" ? BEATS[index.value]![1] - 
                     ><UIcon name="i-ph-check" class="size-3"
                   /></span>
                   <span
-                    ><span class="font-medium text-highlighted">ana</span>
-                    <span class="text-muted">approved these changes</span></span
+                    ><span class="font-medium text-highlighted">ana</span
+                    ><span class="text-muted"> approved these changes</span></span
                   >
                 </div>
                 <div class="overflow-hidden rounded-lg border border-default font-mono text-[11px] leading-[1.7]">
