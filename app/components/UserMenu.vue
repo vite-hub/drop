@@ -44,8 +44,12 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
     <!-- One trigger element either way: the dropdown's slot hydrates a single node. Compact is just the avatar;
          otherwise shadcn's NavUser, a large sidebar button with the avatar, name and role. -->
     <button
-      class="flex cursor-pointer items-center rounded-md transition-colors hover:bg-elevated data-[state=open]:bg-elevated"
-      :class="compact ? 'size-8 justify-center' : 'h-12 w-full gap-2 px-2 text-left'"
+      class="flex cursor-pointer items-center rounded-md transition-colors"
+      :class="
+        compact
+          ? 'size-8 justify-center hover:bg-elevated data-[state=open]:bg-elevated'
+          : 'h-12 w-full gap-2 px-2 text-left hover:bg-accented/60 data-[state=open]:bg-accented'
+      "
       type="button"
       aria-label="Account menu"
     >

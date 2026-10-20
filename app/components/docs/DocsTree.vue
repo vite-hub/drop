@@ -8,7 +8,7 @@ const expanded = (group: (typeof DOCS_NAV)[number]) =>
   open.value[group.title] ?? group.links.some((link) => active(link.to))
 
 const row = "flex h-7 min-w-0 items-center gap-2 rounded-md text-sm transition-colors"
-const idle = "text-muted hover:bg-elevated hover:text-highlighted"
+const idle = "text-muted hover:bg-accented/60 hover:text-highlighted"
 </script>
 
 <template>
@@ -31,7 +31,7 @@ const idle = "text-muted hover:bg-elevated hover:text-highlighted"
         <li v-for="link in group.links" :key="link.to">
           <NuxtLink
             :aria-current="active(link.to) ? 'page' : undefined"
-            :class="[row, 'px-2', active(link.to) ? 'bg-elevated text-highlighted' : idle]"
+            :class="[row, 'px-2', active(link.to) ? 'bg-accented text-highlighted' : idle]"
             :to="link.to"
             @click="emit('navigate')"
           >

@@ -7,7 +7,6 @@ const route = useRoute()
 const active = (to: string) => isActivePath(route.path, to)
 const current = computed(() => DOCS_PAGES.find((page) => active(page.to)))
 const menuOpen = ref(false)
-const sidebarCollapsed = useSidebarCollapsed()
 watch(
   () => route.path,
   () => (menuOpen.value = false),
@@ -28,16 +27,24 @@ watch(() => route.hash, scrollToHash, { flush: "post" })
   <DashboardLayout v-if="me">
     <UDashboardPanel id="docs" :ui="{ body: 'p-0 sm:p-0 gap-0' }">
       <template #header>
-        <!-- Wide screens show it only to bring back a folded sidebar. -->
-        <UDashboardNavbar :class="!sidebarCollapsed && 'lg:hidden'" :title="current?.label ?? 'Docs'">
-          <template #leading>
+        <!-- The h-12 bar of every app page (PageShell), here a breadcrumb: the page's own h1 is in the prose, so the
+             bar's #left replaces its title h1. The menu toggle sits outside #left. -->
+        <UDashboardNavbar :ui="{ root: 'h-12 gap-2 px-4 lg:px-6' }">
+          <template #left>
             <SidebarExpand />
+            <p class="flex min-w-0 items-center gap-1.5 text-sm">
+              <span class="text-muted">Docs</span>
+              <template v-if="current">
+                <UIcon name="i-mingcute-right-line" class="size-3.5 shrink-0 text-dimmed" />
+                <span class="truncate font-medium text-highlighted">{{ current.label }}</span>
+              </template>
+            </p>
           </template>
         </UDashboardNavbar>
       </template>
       <template #body>
         <!-- The sidebar's Docs item carries the section nav, so the page is prose alone. -->
-        <main class="mx-auto w-full max-w-3xl px-6 pt-10 pb-20 lg:px-8 lg:pt-14">
+        <main class="mx-auto w-full max-w-3xl px-6 pt-6 pb-20 lg:px-8">
           <slot />
         </main>
       </template>

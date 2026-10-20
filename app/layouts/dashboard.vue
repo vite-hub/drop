@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// shadcn's sidebar (sidebar-07) on Executor's flat console: one background, a hairline between sidebar and page, your
-// search above the drops, Drops folding open into their tree like Google Drive's My Drive (apps are folders), the
-// workspace pages and Docs at the bottom, and the account menu (NavUser) opening upward.
+// shadcn's sidebar (sidebar-07) on Executor's flat console: one step lighter or darker than the page (bg-muted, at
+// shadcn's --sidebar lightness), a hairline between sidebar and page, your search above the drops, Drops folding open
+// into their tree like Google Drive's My Drive (apps are folders), the workspace pages and Docs at the bottom, and the
+// account menu (NavUser) opening upward.
 //
 // Docs is a pane of its own: picking it slides everything under Search out to the left and the docs nav in from the
 // right, with Back at its top; Back slides the other way and stays on the page. The logo, Search and the account menu
@@ -95,7 +96,8 @@ function leaveDocs() {
       :max-size="20"
       resizable
       :ui="{
-        root: ['bg-default', collapsed && 'lg:hidden'],
+        root: ['bg-muted', collapsed && 'lg:hidden'],
+        content: 'bg-muted',
         handle: collapsed ? 'lg:hidden' : undefined,
         header: 'h-12 border-b border-default px-4',
         body: 'gap-0 p-2',
@@ -119,7 +121,7 @@ function leaveDocs() {
       <!-- Everything between Search and the account menu: the main pane or the docs pane, sliding past each other. -->
       <div class="relative -mx-2 flex min-h-0 flex-1 overflow-hidden">
         <Transition :name="`sidebar-${slide}`">
-          <div v-if="pane === 'main'" key="main" class="flex min-h-0 w-full min-w-0 flex-col bg-default px-2">
+          <div v-if="pane === 'main'" key="main" class="flex min-h-0 w-full min-w-0 flex-col bg-muted px-2">
             <!-- The team's folders, your drops, and what's shared with you: the part of this pane that scrolls. -->
             <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <template v-if="team">
@@ -204,7 +206,7 @@ function leaveDocs() {
           </div>
 
           <!-- The wrapper carries the curtain (main.css): the nav inside scrolls, which would clip it. -->
-          <div v-else key="docs" class="sidebar-pane-docs relative z-10 flex min-h-0 w-full min-w-0 bg-default">
+          <div v-else key="docs" class="sidebar-pane-docs relative z-10 flex min-h-0 w-full min-w-0 bg-muted">
             <nav aria-label="Docs" class="flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <SidebarItem
                 active-icon="i-mingcute-arrow-left-line"

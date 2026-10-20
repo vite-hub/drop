@@ -39,8 +39,8 @@ const menu = [
 ]
 
 const row = "group flex h-7 min-w-0 items-center gap-2 rounded-md pl-2 pr-1 text-sm transition-colors"
-const idle = "text-muted hover:bg-elevated hover:text-highlighted"
-const active = "bg-elevated text-highlighted"
+const idle = "text-muted hover:bg-accented/60 hover:text-highlighted"
+const active = "bg-accented text-highlighted"
 // Hidden until the row is hovered or focused, so titles keep the width; touch screens always show it.
 const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open]:grid pointer-coarse:grid"
 </script>

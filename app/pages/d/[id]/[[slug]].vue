@@ -58,6 +58,22 @@ const here = useHerePath()
   <template v-if="me">
     <DropViewer v-if="drop.data.value" :key="drop.data.value.id" public-view />
     <UDashboardPanel v-else id="drop-missing">
+      <template #header>
+        <!-- The viewer's bar while it loads or can't open, so the page keeps its line and doesn't jump. -->
+        <UDashboardNavbar :ui="{ root: 'h-12 gap-2 px-2 sm:px-3' }">
+          <template #left>
+            <SidebarExpand />
+            <UButton
+              aria-label="Back to drops"
+              color="neutral"
+              icon="i-mingcute-arrow-left-line"
+              size="sm"
+              variant="ghost"
+              to="/drops"
+            />
+          </template>
+        </UDashboardNavbar>
+      </template>
       <template #body>
         <ContentUnavailable :status="drop.error.value?.status ?? 500" :path="here" :waiting-for-review="waiting" />
       </template>
