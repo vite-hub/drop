@@ -1,0 +1,82 @@
+diff --git a/dist/drivers/memory.mjs b/dist/drivers/memory.mjs
+index ad1c55bfb2bcec29898bc285b0ddf3de8fdf4464..97b161aea8f87711905b0c6be91b35820dd816e0 100644
+--- a/dist/drivers/memory.mjs
++++ b/dist/drivers/memory.mjs
+@@ -57,17 +57,28 @@ function _clearTimer(timers, key) {
+ 		timers.delete(key);
+ 	}
+ }
++// Backport of unjs/unstorage#845: delays above 2^31-1 ms overflow to 1 ms, so long TTLs are split into chunks.
++const MAX_TIMER_DELAY = 2 ** 31 - 1;
+ function _scheduleExpiry(data, timers, key, ttl) {
+-	if (!ttl) {
++	if (!ttl || !Number.isFinite(ttl)) {
+ 		return;
+ 	}
+-	const ttlMs = ttl * 1e3;
+-	const timer = setTimeout(() => {
+-		data.delete(key);
+-		timers.delete(key);
+-	}, ttlMs);
+-	if (timer && typeof timer === "object" && "unref" in timer) {
+-		timer.unref();
+-	}
+-	timers.set(key, timer);
++	let remaining = ttl * 1e3;
++	const schedule = () => {
++		const delay = Math.min(remaining, MAX_TIMER_DELAY);
++		remaining -= delay;
++		const timer = setTimeout(() => {
++			if (remaining > 0) {
++				schedule();
++				return;
++			}
++			data.delete(key);
++			timers.delete(key);
++		}, delay);
++		if (timer && typeof timer === "object" && "unref" in timer) {
++			timer.unref();
++		}
++		timers.set(key, timer);
++	};
++	schedule();
+ }
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 76e41fc2294d1da63d547badcba806534b37c9e9..9d4ec961c412bacd76bcfd60a569f36b423c3706 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -54,15 +54,26 @@ function _clearTimer(timers, key) {
+ 		timers.delete(key);
+ 	}
+ }
++// Backport of unjs/unstorage#845: delays above 2^31-1 ms overflow to 1 ms, so long TTLs are split into chunks.
++const MAX_TIMER_DELAY = 2 ** 31 - 1;
+ function _scheduleExpiry(data, timers, key, ttl) {
+-	if (!ttl) return;
+-	const ttlMs = ttl * 1e3;
+-	const timer = setTimeout(() => {
+-		data.delete(key);
+-		timers.delete(key);
+-	}, ttlMs);
+-	if (timer && typeof timer === "object" && "unref" in timer) timer.unref();
+-	timers.set(key, timer);
++	if (!ttl || !Number.isFinite(ttl)) return;
++	let remaining = ttl * 1e3;
++	const schedule = () => {
++		const delay = Math.min(remaining, MAX_TIMER_DELAY);
++		remaining -= delay;
++		const timer = setTimeout(() => {
++			if (remaining > 0) {
++				schedule();
++				return;
++			}
++			data.delete(key);
++			timers.delete(key);
++		}, delay);
++		if (timer && typeof timer === "object" && "unref" in timer) timer.unref();
++		timers.set(key, timer);
++	};
++	schedule();
+ }
+ //#endregion
+ //#region src/storage.ts

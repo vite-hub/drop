@@ -57,6 +57,9 @@ patchedDependencies:
   # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
   # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
   vite-doctor@0.0.12: patches/vite-doctor@0.0.12.patch
+  # Nitro's memory cache (Node hosts like Quiver) dropped every render with a 30-day TTL at once: a setTimeout over
+  # 2^31-1 ms fires after 1 ms. Backport of unjs/unstorage#845 (in 2.0.0-alpha.11; Nitro pins alpha.7).
+  unstorage@2.0.0-alpha.7: patches/unstorage@2.0.0-alpha.7.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:

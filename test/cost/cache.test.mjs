@@ -35,6 +35,23 @@ test("KV writes physically expire in 30 days through the actual unstorage driver
   }
 })
 
+test("off Cloudflare the memory cache keeps a 30-day render instead of dropping it at once", async () => {
+  // Nitro's default cache storage on Node. Unpatched, unstorage turns the TTL into a setTimeout above 2^31-1 ms, which
+  // Node fires after 1 ms (TimeoutOverflowWarning), so every render was thrown away (patches/unstorage@*.patch).
+  const require = createRequire(import.meta.resolve("nitro/package.json"))
+  const { createStorage } = await import(pathToFileURL(require.resolve("unstorage")))
+  const previous = state.storage
+  state.storage = createStorage()
+  try {
+    await cachedMarkdown("doc.md", async () => "source", render)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    assert.ok(await state.storage.getItem(KEY), "the render should still be cached")
+  } finally {
+    state.storage.dispose()
+    state.storage = previous
+  }
+})
+
 test("expired memory/filesystem entries refetch and rerender rather than serving stale HTML", async () => {
   const first = await cachedMarkdown("doc.md", async () => "first", render)
   assert.equal(first.source, "first")
