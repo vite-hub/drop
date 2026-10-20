@@ -74,7 +74,8 @@ export function useCopy() {
           ])
         else await copy(await text)
         toast.add({ title })
-      } catch {
+      } catch (error) {
+        reportClientError("copy", error)
         toast.add({ title: "Couldn't copy", color: "error" })
       }
     },

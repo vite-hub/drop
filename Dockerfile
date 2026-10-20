@@ -16,6 +16,8 @@ ENV DROP_DATABASE=$DROP_DATABASE
 RUN pnpm install --frozen-lockfile && pnpm build && node --input-type=module -e 'import { writeFileSync } from "node:fs"; import { deployment } from "./scripts/deployment.ts"; writeFileSync(".output/drop-database", deployment().database)'
 # Nitro's native dependency tracing needs the platform binary next to its JavaScript package.
 RUN mkdir -p .output/server/node_modules/@libsql && cp -r node_modules/.pnpm/@libsql+linux-*/node_modules/@libsql/* .output/server/node_modules/@libsql/
+# The same for mdream, which turns an HTML page into Markdown (Copy as Markdown, agents reading `.md`).
+RUN cp -rL "$(dirname "$(readlink -f node_modules/mdream)")/@mdream" .output/server/node_modules/
 
 FROM node:24-bookworm-slim
 WORKDIR /app

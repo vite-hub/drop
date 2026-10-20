@@ -42,7 +42,7 @@ export default defineHandler(async (event) => {
   const drop = target && (await read<DropDetail>(`/api/drops/${target.id}`))
   if (!drop) return
   const { dropMarkdown } = await import("../utils/drop-markdown")
-  const markdown = dropMarkdown(drop, event.url.origin)
+  const markdown = await dropMarkdown(drop, event.url.origin)
   if (markdown === null) return
   return new Response(event.req.method === "HEAD" ? null : markdown, {
     headers: {
