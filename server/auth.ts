@@ -10,6 +10,7 @@ import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { nativeClientRegistration } from "./utils/oauth-clients"
 import { isGitHubMember } from "./utils/github-membership"
+import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 
@@ -25,10 +26,11 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  * Drop signs in with GitHub. To use another provider, swap `socialProviders` (Google, GitLab, Discord…),
  * or add `emailAndPassword: { enabled: true }`, then set its secrets in nuxt.config.ts `vite.env.server.auth`.
  *
- * Anyone with a GitHub account can sign in and joins as a member. `DROP_ADMINS` lists the admins by email: whoever
- * signs in with one of those emails, verified by the sign-in method, is an admin, so swapping GitHub for another
- * provider keeps them. `roleOf` decides on every request; each new session writes it down for Better Auth's admin
- * endpoints. Nobody else changes roles.
+ * Anyone with a GitHub account can sign in and joins as a member. `DROP_MEMBERS`, when set, lists by email the only
+ * people who may (admins always may); `DROP_GITHUB_ORG` limits it to an organization. `DROP_ADMINS` lists the admins
+ * by email. Whoever signs in with one of those emails, verified by the sign-in method, is a member or an admin, so
+ * swapping GitHub for another provider keeps both lists. `roleOf` decides on every request; each new session writes
+ * it down for Better Auth's admin endpoints. Nobody else changes roles.
  *
  * Agents have no keys. Drop is an OAuth 2.1 authorization server for its own MCP endpoint (`oauthProvider`):
  * an MCP client registers itself, opens the browser once, and the person approves it on /oauth (signing in
@@ -95,11 +97,24 @@ export default defineAuth(({ env, requestOrigin }) => {
         },
       },
       user: {
-        create: { before: async (user) => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) },
+        // Nobody outside DROP_MEMBERS gets an account, so the Members page lists only the people it lets in.
+        create: {
+          before: async (user) =>
+            isListedMember(user) ? { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } } : false,
+        },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
         create: {
+          // Someone taken off DROP_MEMBERS since they joined can't sign in again.
+          before: async (session) => {
+            const [person] = await db
+              .select({ email: users.email, emailVerified: users.emailVerified })
+              .from(users)
+              .where(eq(users.id, session.userId))
+              .limit(1)
+            if (!person || !isListedMember(person)) return false
+          },
           after: async (session) => {
             await syncRole(session.userId)
           },

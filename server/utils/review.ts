@@ -19,12 +19,12 @@ import {
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
-import { account, comments, drops, user } from "../databases/config"
+import { comments, drops, user } from "../databases/config"
 import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions } from "./drops"
-import { githubOrganization, isGitHubMember } from "./github-membership"
 import { type Identity, roleOf } from "./identity"
+import { isMember, membersOnly } from "./members"
 import { DropQuotaError, withDropQuota } from "./quotas"
 import { shareFields, sharePolicy } from "./share"
 import { shareReviewFor } from "./trust"
@@ -191,21 +191,14 @@ export function openable(site: DropRow, who: Identity | null) {
 }
 
 /**
- * The person behind a token, as they are now: a ban or a lost organization membership ends their review session
+ * The person behind a token, as they are now: a ban or a lost membership ends their review session
  * before the token runs out. Null for a guest.
  */
 async function reviewer(claims: ReviewClaims): Promise<Identity | null | false> {
-  if (!claims.u) return githubOrganization() ? false : null
+  if (!claims.u) return membersOnly() ? false : null
   const [row] = await db.select().from(user).where(eq(user.id, claims.u)).limit(1)
   if (!row || row.banned) return false
-  if (githubOrganization()) {
-    const [github] = await db
-      .select({ token: account.accessToken })
-      .from(account)
-      .where(and(eq(account.userId, row.id), eq(account.providerId, "github")))
-      .limit(1)
-    if (!(await isGitHubMember(github?.token))) return false
-  }
+  if (!(await isMember(row.id))) return false
   return {
     userId: row.id,
     name: row.name,
