@@ -18,6 +18,9 @@ overrides:
   # Nuxt's payload serializer; 5.9.3+ fixes several uneval/stringify advisories.
   devalue: ^5.9.4
   vite@*: "catalog:"
+  # tldraw's @tiptap/react asks for ^3.12; without these, adding it moved Nuxt UI's menus to 3.32 beside core 3.31.4.
+  "@tiptap/extension-bubble-menu": 3.31.4
+  "@tiptap/extension-floating-menu": 3.31.4
 
 patchedDependencies:
   # Keeps the Server Env resolver in Auth's global state. In dev, editing anything server/auth.ts imports re-ran the

@@ -6,7 +6,7 @@ import { dropPath } from "#shared/links"
 import type { DropDetail, DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView?: boolean }>()
-const { createFolder, createSite, upload } = useDropActions()
+const { createBoard, createFolder, createSite, upload } = useDropActions()
 const folderDialog = useFolderDialog()
 const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
@@ -35,6 +35,11 @@ async function uploadPicked(files: FileList | null) {
   if (result) await navigateTo(`/drops/${result.id}`)
 }
 
+async function newBoard() {
+  const board = await createBoard(props.drop)
+  if (board) await navigateTo(`/drops/${board.id}`)
+}
+
 async function newSite() {
   const input = await siteDialog()
   const site = input && (await createSite(input, props.drop))
@@ -57,7 +62,7 @@ async function newSite() {
         />
         <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
         <div v-if="adds" class="flex items-center gap-1">
-          <NewMenu :folder="addsFolders" @folder="newFolder" @site="newSite" />
+          <NewMenu :folder="addsFolders" @board="newBoard" @folder="newFolder" @site="newSite" />
           <UButton
             color="neutral"
             icon="i-mingcute-upload-2-line"

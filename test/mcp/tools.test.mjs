@@ -9,6 +9,8 @@ const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts"
 const { default: listDrops } = await import("../../server/mcp/tools/list_drops.ts")
 const { default: updateDrop } = await import("../../server/mcp/tools/update_drop.ts")
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
+const { default: editBoard } = await import("../../server/mcp/tools/edit_board.ts")
+const { default: viewBoard } = await import("../../server/mcp/tools/view_board.ts")
 const { default: commentsGet } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
@@ -24,7 +26,7 @@ const server = createMcpHandler({
   name: "drop-test",
   version: "1",
   origin: false,
-  tools: [publish, readDrop, reply, listDrops, updateDrop],
+  tools: [publish, readDrop, reply, listDrops, updateDrop, editBoard, viewBoard],
 })
 async function call(tool, input) {
   const request = new H3Event(
@@ -435,4 +437,60 @@ test("tools/list publishes every tool's input schema", async () => {
   const body = JSON.parse(text.startsWith("{") ? text : text.match(/^data: (.+)$/m)[1])
   assert.equal(body.error, undefined, body.error?.message)
   assert.deepEqual(body.result.tools.map((tool) => tool.name).sort(), tools.map((tool) => tool.name).sort())
+})
+
+test("an agent publishes a board, reads its outline, and edits it", async () => {
+  const board = (
+    await call(publish, {
+      board: {
+        items: [
+          { id: "flow", type: "frame", text: "Onboarding flow" },
+          { id: "signup", type: "note", text: "Sign up", in: "flow" },
+          { id: "team", type: "note", text: "Pick a team", in: "flow" },
+        ],
+        edges: [{ from: "signup", to: "team", label: "invite?" }],
+      },
+      title: "Onboarding",
+      note: "First sketch",
+      lifetime: "review",
+    })
+  ).structuredContent
+  assert.equal(board.kind, "board")
+
+  const read = await call(readDrop, { id: board.id })
+  const outline = read.content[0].text
+  assert.match(outline, /frame flow "Onboarding flow" .* by Claude Code/)
+  assert.match(outline, /arrow \S+: signup "Sign up" → team "Pick a team" "invite\?"/)
+
+  const edited = await call(editBoard, {
+    id: board.id,
+    add: [{ id: "solo", type: "note", text: "Solo users skip this", in: "flow", color: "green" }],
+    update: [{ id: "team", text: "Pick or create a team" }],
+  })
+  assert.match(edited.content[0].text, /note solo "Solo users skip this"/)
+  assert.match(edited.content[0].text, /note team "Pick or create a team"/)
+  assert.match(
+    (await call(editBoard, { id: board.id, add: [{ id: "x", type: "note", in: "nope" }] })).message,
+    /"nope"/,
+  )
+
+  // No browser has rendered it yet, so there's no image; the answer says how to get one.
+  assert.match((await call(viewBoard, { id: board.id })).content[0].text, /No image yet/)
+
+  // Once a browser has sent its renders, the agent sees the whole board, or one frame by its id.
+  const { findDrop } = await import("../../server/utils/drops.ts")
+  const { storeBoardImages } = await import("../../server/utils/boards.ts")
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+  await storeBoardImages(await findDrop(board.id), [
+    { frame: "overview", png },
+    { frame: "flow", png },
+    { frame: "not-a-frame", png },
+  ])
+  const whole = await call(viewBoard, { id: board.id })
+  assert.deepEqual(whole.content[0], { type: "image", data: png, mimeType: "image/png" })
+  assert.match(whole.content[1].text, /The whole board\. Frames: flow "Onboarding flow"/)
+  assert.equal((await call(viewBoard, { id: board.id, frame: "flow" })).content[0].type, "image")
+  assert.match((await call(viewBoard, { id: board.id, frame: "nope" })).message, /No frame nope\. Frames: flow/)
+  // Search finds a board by the words on it.
+  assert.match((await call(listDrops, { query: "create a team" })).content[0].text, /Onboarding/)
 })

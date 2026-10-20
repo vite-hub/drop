@@ -5,7 +5,9 @@ import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues } from "#shared/project-bundle"
 import { reviewBookmarklet, reviewSnippet } from "#shared/review"
 import { SHARES } from "#shared/share"
+import { BoardInput } from "../mcp/board"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
+import { applyChanges, boardChanges, emptyBoard } from "#shared/board"
 import { resolveComments } from "./comments"
 import {
   createDocDrop,
@@ -80,6 +82,7 @@ export const PublishInput = v.object({
       ),
     ),
   ),
+  board: v.optional(BoardInput),
   title: v.optional(v.string()),
   slug: v.optional(
     v.pipe(
@@ -149,9 +152,11 @@ export type PublishInput = v.InferOutput<typeof PublishInput>
  * sent to that URL; without them, a file with no base64 gets an upload URL instead of a drop, after the same checks.
  */
 export async function publishInput(who: Identity, input: PublishInput, event: H3Event, upload?: Uint8Array) {
-  const given = (["markdown", "html", "files", "file", "site"] as const).filter((key) => input[key] !== undefined)
+  const given = (["markdown", "html", "files", "file", "site", "board"] as const).filter(
+    (key) => input[key] !== undefined,
+  )
   if (given.length !== 1)
-    throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, file, or site." })
+    throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, file, site, or board." })
   if (!input.previous && !input.folder && !input.lifetime)
     throw new HTTPError({
       status: 400,
@@ -246,6 +251,18 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
           throw new HTTPError({ status: 400, message: "file.base64 isn't valid base64." })
         }
       }
+    } else if (input.board) {
+      if (previous && previous.kind !== "board")
+        throw new HTTPError({ status: 400, message: "previous isn't a board; publish a board only to a board." })
+      const board = emptyBoard()
+      try {
+        const { put, remove } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
+        applyChanges(board, put, remove)
+      } catch (error) {
+        throw new HTTPError({ status: 400, message: (error as Error).message })
+      }
+      filename = "board.tldr"
+      bytes = new TextEncoder().encode(JSON.stringify(board))
     } else {
       const source = (input.markdown ?? input.html)!
       if (!source.trim()) throw new HTTPError({ status: 400, message: "The doc is empty." })

@@ -6,12 +6,14 @@ import { mcpSkills, skillResources } from "../utils/mcp-skills"
 import addressFeedback from "./prompts/address_feedback"
 import createCodeImage from "./tools/create_code_image"
 import createFolder from "./tools/create_folder"
+import editBoard from "./tools/edit_board"
 import listDrops from "./tools/list_drops"
 import listFolders from "./tools/list_folders"
 import publish from "./tools/publish"
 import readDrop from "./tools/read_drop"
 import reply from "./tools/reply"
 import updateDrop from "./tools/update_drop"
+import viewBoard from "./tools/view_board"
 
 /**
  * Drop's MCP server (nitro-mcp-toolkit on h3-mcp): the 2026-07-28 revision plus the 2025 ones, one file per
@@ -51,7 +53,18 @@ export function mcpFor(origin: string) {
       // MCP clients send no Origin; the access token, not the origin, is the boundary.
       origin: false,
       auth: oauth.auth,
-      tools: [publish, readDrop, reply, listDrops, listFolders, updateDrop, createFolder, createCodeImage],
+      tools: [
+        publish,
+        readDrop,
+        reply,
+        listDrops,
+        listFolders,
+        updateDrop,
+        createFolder,
+        createCodeImage,
+        editBoard,
+        viewBoard,
+      ],
       prompts: [addressFeedback],
       resources: skillResources,
       // Every tool call lands on the request's wide event.

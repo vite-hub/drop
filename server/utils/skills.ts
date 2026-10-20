@@ -7,8 +7,10 @@ import handoffMd from "../../skills/handoff/SKILL.md?raw"
 import prEvidenceAnnotations from "../../skills/pr-evidence/references/annotations.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
 import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
+import prototypeCanvas from "../../skills/prototype/references/canvas.md?raw"
 import prototypeMd from "../../skills/prototype/SKILL.md?raw"
 import showMeMd from "../../skills/show-me/SKILL.md?raw"
+import boardGuide from "../../skills/vitehub-drop/references/board.md?raw"
 import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
 import markdownGuide from "../../skills/vitehub-drop/references/markdown.md?raw"
 import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
@@ -58,10 +60,15 @@ export const SKILLS: Skill[] = [
     file("SKILL.md", dropMd),
     file("references/documents.md", documentsGuide),
     file("references/markdown.md", markdownGuide),
+    file("references/board.md", boardGuide),
   ]),
   skill([file("SKILL.md", handoffMd)]),
   skill([file("SKILL.md", prEvidenceMd), file("references/annotations.md", prEvidenceAnnotations)]),
-  skill([file("SKILL.md", prototypeMd), file("assets/picker.js", prototypePicker)]),
+  skill([
+    file("SKILL.md", prototypeMd),
+    file("assets/picker.js", prototypePicker),
+    file("references/canvas.md", prototypeCanvas),
+  ]),
   skill([file("SKILL.md", showMeMd)]),
 ]
 

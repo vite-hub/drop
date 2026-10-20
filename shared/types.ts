@@ -3,7 +3,7 @@ import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
 
-export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site"] as const
+export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site", "board"] as const
 export type DropKind = (typeof DROP_KINDS)[number]
 export const ACTOR_KINDS = ["agent", "browser"] as const
 export type ActorKind = (typeof ACTOR_KINDS)[number]

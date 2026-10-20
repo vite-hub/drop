@@ -3,6 +3,7 @@ import { log } from "evlog"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { dropHeads, drops, dropTexts } from "../databases/config"
+import { boardText, parseBoard } from "#shared/board"
 import { splitFrontmatter } from "#shared/frontmatter"
 
 // Search matches a drop's title, file name and slug, and the words of a text doc, kept in `drop_texts` for latest
@@ -11,7 +12,7 @@ import { splitFrontmatter } from "#shared/frontmatter"
 /** Text docs keep this many characters for search; the rest of a long doc isn't searchable. */
 export const MAX_SEARCH_TEXT = 64_000
 /** Kinds whose words are searchable. Plain text files are `markdown` drops. */
-export const SEARCH_KINDS = ["markdown", "html"] as const
+export const SEARCH_KINDS = ["markdown", "html", "board"] as const
 
 const ENTITIES = new Map([
   ["amp", "&"],
@@ -28,7 +29,14 @@ const ENTITIES = new Map([
  */
 export function searchableText(kind: string, source: string) {
   let text = source
-  if (kind === "html") {
+  if (kind === "board") {
+    // A board's source is its tldraw snapshot; its words are in the notes, texts, shapes and frame names.
+    try {
+      text = boardText(parseBoard(source))
+    } catch {
+      text = ""
+    }
+  } else if (kind === "html") {
     // Like a Markdown doc's leading H1, the first <h1> is the title, which search matches on its own.
     text = text
       .replace(/<!--[\s\S]*?-->/g, " ")

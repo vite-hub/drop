@@ -6,7 +6,7 @@ import type { DropSummary } from "#shared/types"
 useSeoMeta({ title: "Drops" })
 
 const { data: drops, status, error, refresh } = useDrops()
-const { upload, remove, restore, deleteForever, emptyTrash, createFolder, createSite } = useDropActions()
+const { upload, remove, restore, deleteForever, emptyTrash, createFolder, createSite, createBoard } = useDropActions()
 const folderDialog = useFolderDialog()
 const siteDialog = useSiteDialog()
 const { data: me } = useMe()
@@ -143,6 +143,11 @@ async function newFolder() {
   if (folder?.teamFolder && filter.value !== "with-me") filter.value = "with-me"
 }
 
+async function newBoard() {
+  const board = await createBoard()
+  if (board) await navigateTo(`/drops/${board.id}`)
+}
+
 async function newSite() {
   const input = await siteDialog()
   const site = input && (await createSite(input))
@@ -153,7 +158,7 @@ async function newSite() {
 <template>
   <PageShell id="drops" title="Drops" :description="description">
     <template #actions>
-      <NewMenu @folder="newFolder" @site="newSite" />
+      <NewMenu @board="newBoard" @folder="newFolder" @site="newSite" />
       <UButton
         color="neutral"
         icon="i-mingcute-upload-2-line"

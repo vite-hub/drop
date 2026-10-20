@@ -153,7 +153,8 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-07-17",
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
-  runtimeConfig: { seoIndex: false },
+  // tldraw needs a license key in production (NUXT_PUBLIC_TLDRAW_LICENSE_KEY); without one, boards show its watermark.
+  runtimeConfig: { seoIndex: false, public: { tldrawLicenseKey: "" } },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
   // check, and body limits, so the module's request middlewares stay off.
@@ -271,6 +272,7 @@ export default defineNuxtConfig({
         "mingcute:folder-line",
         "mingcute:layout-line",
         "mingcute:world-2-line",
+        "mingcute:drawing-board-line",
         "mingcute:sparkles-line",
         "mingcute:key-2-line",
         "mingcute:user-3-line",

@@ -4,6 +4,8 @@ import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { isSitePattern, reviewSnippet } from "#shared/review"
 import type { SiteReviewItem } from "#shared/types"
+import { boardOutline } from "#shared/board"
+import { readBoard } from "../../utils/boards"
 import { listComments } from "../../utils/comments"
 import { dropDetail, findDropByRef, permissions } from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
@@ -16,7 +18,7 @@ export default defineMcpTool({
   name: "read_drop",
   title: "Read a drop",
   description:
-    "Read a drop: a doc's source or every file of an app, its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. Address the open comments and errors in the next version (publish with previous and resolves); a comment's replies follow it (↳), and reply answers in its thread. For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; fix the site, then resolve them with update_drop.",
+    "Read a drop: a doc's source or every file of an app, its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. For a board, an outline of its frames, items and arrows, with who added each. Address the open comments and errors in the next version (publish with previous and resolves); a comment's replies follow it (↳), and reply answers in its thread. For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; fix the site, then resolve them with update_drop.",
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(
     v.object({
@@ -70,6 +72,9 @@ export default defineMcpTool({
         },
       }
     }
+    // A board reads as an outline of its frames, items and arrows; view_board shows what the outline can't.
+    if (drop.kind === "board")
+      detail.content = `${boardOutline(await readBoard(drop))}\n\nCall view_board to see the board or one frame as an image, and edit_board to change it.`
     const errors = drop.kind === "app" || drop.kind === "html" ? await runtimeErrors(drop.id, drop.version) : []
     const children = detail.children?.map((child) => mcpDrop(child, event.url.origin))
     const folder = detail.ancestors.map((crumb) => crumb.title).join(" / ")

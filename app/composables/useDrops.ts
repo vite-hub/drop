@@ -238,6 +238,22 @@ export function useDropActions() {
     }
   }
 
+  /** A new empty board, in `parent` when given. */
+  async function createBoard(parent?: Pick<DropSummary, "id">) {
+    try {
+      const board = await $fetch<DropSummary>("/api/drops", {
+        method: "POST",
+        // An empty .tldr becomes an empty board on the server.
+        body: { filename: "board.tldr", title: "Untitled board", content: "" },
+      })
+      if (parent) await $fetch(`/api/drops/${board.id}`, { method: "PATCH", body: { folder: parent.id } })
+      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+      return board
+    } catch (error) {
+      notify.fail("Couldn't create the board", error)
+    }
+  }
+
   /** A folder's description: what goes in it and how, which agents read to pick it. Saved, it shows in place of the editor. */
   async function describe(folder: Pick<DropSummary, "id">, description: string) {
     try {
@@ -279,6 +295,7 @@ export function useDropActions() {
     emptyTrash,
     createFolder,
     createSite,
+    createBoard,
     describe,
     move,
   }

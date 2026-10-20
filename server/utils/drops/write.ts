@@ -7,6 +7,7 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
+import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
 import { renderMarkdownCached } from "../markdown-document"
 import { deleteMarkdownCache } from "../markdown-cache"
@@ -20,6 +21,7 @@ import { chainOf, expiryPolicy, renewDrop } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
 import { sharePolicy, shareFields } from "../share"
 import { textStatements } from "../search"
+import type { DropKind } from "#shared/types"
 import type { DropRow, LifetimeInput } from "./types"
 import { MAX_FILE_BYTES } from "#shared/schemas"
 import { MAX_APP_FILES } from "#shared/quotas"
@@ -153,7 +155,7 @@ export async function createDocDrop(
     throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   let filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
   const extension = filename.match(/\.[a-z0-9]{1,16}$/i)?.[0].toLowerCase() ?? ""
-  let kind = kindFromFilename(filename)
+  let kind: DropKind = kindFromFilename(filename)
   let contentType = detectContentType(input.bytes) ?? "application/octet-stream"
   let text: string | undefined
   if ([".md", ".markdown", ".html", ".htm", ".txt"].includes(extension)) {
@@ -166,6 +168,18 @@ export async function createDocDrop(
       })
     }
     contentType = kind === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8"
+  }
+  if (extension === BOARD_EXTENSION) {
+    // An empty .tldr starts an empty board (the New menu's Board).
+    if (!input.bytes.byteLength) input = { ...input, bytes: new TextEncoder().encode(JSON.stringify(emptyBoard())) }
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(input.bytes)
+      parseBoard(text)
+    } catch {
+      throw new HTTPError({ status: 400, statusText: "That isn't a board this Drop can read." })
+    }
+    kind = "board"
+    contentType = BOARD_CONTENT_TYPE
   }
   if (kind === "file" && contentType.startsWith("image/")) kind = "image"
   // The bytes only tell images and PDFs apart; files are served with nosniff, so a video needs its type to play.

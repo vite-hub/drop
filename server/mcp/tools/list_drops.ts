@@ -29,7 +29,7 @@ export default defineMcpTool({
           v.description("Id or link of a folder: list or search only what's inside it, subfolders included."),
         ),
       ),
-      kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "folder", "site"])),
+      kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "folder", "site", "board"])),
       shared: v.optional(
         v.pipe(v.boolean(), v.description("true for shared drops only, false for private ones only.")),
       ),

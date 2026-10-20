@@ -30,8 +30,9 @@ Build a single self-contained HTML page. Each variant is a `<section>` directly 
 
 - `id` is `v-` and the label in lowercase words and dashes. Every other id inside a variant starts with the variant's id (`v-prism-pricing`), so each comment's anchor names its variant.
 - Use the same real content in every variant: the product's copy, plausible data, the page around the part that varies. Lorem ipsum hides the question.
-- Load libraries from a CDN URL such as `https://esm.sh/three`. A variant that animates listens for `variantchange` on `document` (`event.detail.id`) and pauses while hidden.
+- Load libraries from a CDN URL such as `https://esm.sh/three`. A variant that animates listens for `variantchange` on `document` and runs only while `event.detail.visible` includes its id.
 - End `<body>` with a `<script>` holding [assets/picker.js](assets/picker.js), copied unchanged. It shows one variant at a time, switches with its bar, the ← and → keys, or 1–9, and remembers the last one. Every prototype gets the same picker, so reviewers learn it once.
+- When the variants should be compared side by side at their real sizes (a phone beside a desktop, or more than four variants), give each section a size and open the page in the canvas. See [references/canvas.md](references/canvas.md).
 
 If you can open a browser, open the page locally and step through every variant: each renders, the console is clean, and the picker lists them all.
 

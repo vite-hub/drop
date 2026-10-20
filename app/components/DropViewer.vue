@@ -663,6 +663,12 @@ const threadComment = computed(() => {
           :inset="floating ? FLOATING_INSET : 0"
           :public-view="publicView"
         />
+        <LazyViewerBoard
+          v-else-if="drop.kind === 'board'"
+          :key="drop.id"
+          :drop="drop"
+          :inset="floating ? FLOATING_INSET : 0"
+        />
         <ViewerVideo v-else-if="video && drop.url" :inset="inset" :src="drop.url" :title="drop.title" :type="video" />
         <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
         <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">

@@ -60,7 +60,7 @@ export function useViewerFrame(options: {
   const srcdoc = computed(() => {
     const { kind } = drop.value
     // A site review shows the live site itself (ViewerSite), not a document.
-    if (!mounted.value || kind === "folder" || kind === "site") return ""
+    if (!mounted.value || kind === "folder" || kind === "site" || kind === "board") return ""
     if (kind === "app") return appDocument(page.value)
     if (kind === "image")
       return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
