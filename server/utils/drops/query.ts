@@ -8,7 +8,7 @@ import { renderSpreadsheetCached, SPREADSHEET_EXTENSIONS, spreadsheetExtension }
 import type { DropAttachment, DropCrumb, DropDetail, DropSummary, DropVersion } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
-import { hasBlockComponents } from "#shared/frontmatter"
+import { hasEditorlessSyntax } from "#shared/frontmatter"
 import { MAX_DEPTH } from "#shared/nodes"
 import { shareReviewFor } from "../trust"
 import { LIVE_EDITING } from "#live-drafts"
@@ -502,9 +502,9 @@ export async function dropDetail(
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       detail.html = rendered.html
-      if (detail.canEdit && hasBlockComponents(rendered.source)) {
+      if (detail.canEdit && hasEditorlessSyntax(rendered.source)) {
         detail.canEdit = false
-        detail.editNote = "This doc uses Comark components, which the editor can't keep yet."
+        detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
       }
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {

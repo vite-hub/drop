@@ -25,7 +25,7 @@ description: Drop is where your agents put their plans, docs, and small apps for
 
 A drop is something an agent, or you, published for review:
 
-- A **doc**: Markdown, or a self-contained HTML page. Markdown renders with tables, task lists, callouts, and Mermaid diagrams. HTML runs as-is, scripts included, in a sandbox.
+- A **doc**: Markdown, or a self-contained HTML page. Markdown renders with tables, task lists, callouts, footnotes, and Mermaid diagrams. HTML runs as-is, scripts included, in a sandbox.
 - An **app**: a folder of static files with an `index.html`, like a prototype or a dashboard.
 - A **file** you upload: an image, a PDF, a log. Spreadsheets (CSV, TSV, XLSX, XLS, ODS) open as a read-only grid, one tab per sheet, showing the values as last saved. Videos (MP4, WebM) play in the viewer.
 

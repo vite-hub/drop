@@ -14,5 +14,9 @@ export function joinFrontmatter(frontmatter: string, body: string) {
   return (meta ? `${meta.replace(/(?:\r?\n)*$/, "\n")}\n` : "") + body.replace(/^(?:\r?\n)+/, "")
 }
 
-/** Comark block components (`::name` … `::`) have no editor node; editing would lose them, so those docs stay read-only. */
-export const hasBlockComponents = (markdown: string) => /^\s*:{2,}[a-z]/im.test(splitFrontmatter(markdown).body)
+/**
+ * Comark block components (`::name` … `::`) and footnotes (`[^1]: …`) have no editor node; editing would lose them,
+ * so those docs stay read-only.
+ */
+export const hasEditorlessSyntax = (markdown: string) =>
+  /^\s*(?::{2,}[a-z]|\[\^[^\]\s]+\]:)/im.test(splitFrontmatter(markdown).body)

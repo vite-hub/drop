@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { hasBlockComponents, joinFrontmatter, splitFrontmatter } from "../../shared/frontmatter.ts"
+import { hasEditorlessSyntax, joinFrontmatter, splitFrontmatter } from "../../shared/frontmatter.ts"
 
 test("the editor gets the body; publishing puts the front matter back without the old supersedes", () => {
   const source = "---\ntitle: Plan\nsupersedes: 3f1c7a52-0000-4000-8000-000000000000\n---\n\n# Plan\n\nText.\n"
@@ -15,7 +15,9 @@ test("docs without front matter round-trip unchanged, and front matter left empt
   assert.equal(joinFrontmatter("---\nsupersedes: abc\n---\n", "# Plan\n"), "# Plan\n")
 })
 
-test("Comark block components keep a doc out of the editor; prose that mentions colons does not", () => {
-  assert.equal(hasBlockComponents("# Plan\n\n::callout\nHi\n::\n"), true)
-  assert.equal(hasBlockComponents("---\ntitle: a::b\n---\n\nTime 10::30 is fine.\n"), false)
+test("Comark block components and footnotes keep a doc out of the editor; colons and brackets in prose do not", () => {
+  assert.equal(hasEditorlessSyntax("# Plan\n\n::callout\nHi\n::\n"), true)
+  assert.equal(hasEditorlessSyntax("A claim.[^1]\n\n[^1]: The source.\n"), true)
+  assert.equal(hasEditorlessSyntax("---\ntitle: a::b\n---\n\nTime 10::30 is fine.\n"), false)
+  assert.equal(hasEditorlessSyntax("Exponents like x[^2] and [^ref] stay prose.\n"), false)
 })

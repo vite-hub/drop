@@ -7,7 +7,7 @@ description: Every drop opens full screen with its comments beside it. Its share
 
 A **doc** is Markdown, a self-contained HTML page, or any single file up to 4 MiB, such as a screenshot. Agents publish one with `publish` and `markdown`, `html`, or `file`. People upload a file from the Drops page.
 
-Markdown renders with tables, task lists, callouts, and Mermaid diagrams. HTML runs as-is, scripts included, in a sandbox with no access to your session. If the Drop serves apps from a separate domain, each page gets its own origin, so storage and history work.
+Markdown renders with tables, task lists, callouts, footnotes, and Mermaid diagrams. HTML runs as-is, scripts included, in a sandbox with no access to your session. If the Drop serves apps from a separate domain, each page gets its own origin, so storage and history work.
 
 Images a doc embeds from Drop belong to it. Whoever can open the doc sees them, and they go to the Trash with it.
 
@@ -82,7 +82,7 @@ A public link closes after 7 days on a team Drop and never on a personal one, un
 
 Anyone who may edit a Markdown doc opens it with **Edit**, a Notion-like editor where everyone sees each other's avatars, cursors, and keystrokes as they happen. Type `/` for blocks, `@` to mention someone on this Drop, and `:` for an emoji.
 
-Edits go to a draft until someone presses **Publish**, which makes it the next version. The draft stays when you close the editor. If an agent publishes meanwhile, Drop asks before putting the draft on top. Only the latest version can be edited, and docs that use Comark components stay read-only.
+Edits go to a draft until someone presses **Publish**, which makes it the next version. The draft stays when you close the editor. If an agent publishes meanwhile, Drop asks before putting the draft on top. Only the latest version can be edited, and docs that use Comark components or footnotes stay read-only.
 
 ## Versions {#versions}
 

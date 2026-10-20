@@ -5,6 +5,7 @@ import { log } from "evlog"
 import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
 import components from "@comark/html/plugins/components"
+import footnotes from "@comark/html/plugins/footnotes"
 import frontmatter from "@comark/html/plugins/frontmatter"
 import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
@@ -18,11 +19,19 @@ import { textValue } from "#shared/utils/text"
 import { codeLanguage, loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
 
-// screenshot, compare, and annotation are comark-annotate's: annotated screenshots for PR evidence.
-const ALLOWED_TAGS =
-  "a alert annotation blockquote br callout code compare del em h1 h2 h3 h4 h5 h6 hr img info input li mermaid note ol p pre s screenshot span strong table tbody td th thead tip tr ul warning".split(
+/**
+ * The components Markdown may use, beyond plain HTML. The security plugin also checks an alert's kind (`> [!CAUTION]`
+ * is `<blockquote as="caution">`) against this list. screenshot, compare, and annotation are comark-annotate's:
+ * annotated screenshots for PR evidence. skills/vitehub-drop/references/markdown.md documents each one for agents.
+ */
+export const COMPONENT_TAGS =
+  "alert annotation callout caution compare important info mermaid note screenshot tip warning".split(" ")
+const ALLOWED_TAGS = [
+  ..."a blockquote br code del em h1 h2 h3 h4 h5 h6 hr img input li ol p pre s section span strong sup table tbody td th thead tr ul".split(
     " ",
-  )
+  ),
+  ...COMPONENT_TAGS,
+]
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
 const MAX_HIGHLIGHTED_CHARACTERS = 200_000
@@ -72,6 +81,7 @@ const plugins = [
   frontmatter(),
   alert(),
   taskList(),
+  footnotes(),
   components(),
   mermaid({ theme: "zinc-light" }),
   annotate(),
@@ -142,7 +152,7 @@ function createMermaidRenderer(): NodeHandler {
 }
 
 /**
- * The one Markdown renderer: Comark with front matter, alerts, task lists, server-rendered Mermaid SVG, and a
+ * The one Markdown renderer: Comark with front matter, alerts, task lists, footnotes, server-rendered Mermaid SVG, and a
  * tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
  */
 /** Problems with a document's annotated screenshots, one readable sentence each. Empty when it has none. */
@@ -166,6 +176,8 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
         ...annotations,
         alert: renderCallout,
         callout: renderCallout,
+        caution: renderCallout,
+        important: renderCallout,
         info: renderCallout,
         mermaid: createMermaidRenderer(),
         note: renderCallout,
