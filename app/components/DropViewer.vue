@@ -114,10 +114,23 @@ const replaced = (comment: DropComment) => drop.value.kind === "image" && commen
 const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
-// Each tab has its own button in the header, like a toolbar's panes: it opens the panel there, and closes it once open.
+// One button in the header opens the panel on its first tab (Comments, unless it's a folder) and closes it from any
+// tab; the panel's own tabs and the H and I keys reach History and Details.
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
-const showing = (value: SideTab) => panelOpen.value && tab.value === value
-const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
+const PANEL_ICONS: Record<SideTab, string> = {
+  comments: "i-ph-chats",
+  history: "i-ph-clock-counter-clockwise",
+  details: "i-ph-info",
+}
+const firstTab = computed(() => tabs.value[0])
+const panelLabel = computed(() => {
+  const first = firstTab.value
+  return first?.value === "comments" && openCount.value ? `Comments, ${openCount.value} open` : first?.label
+})
+function togglePanel() {
+  if (panelOpen.value) panel.close()
+  else if (firstTab.value) panel.show(firstTab.value.value)
+}
 // A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
 const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 /** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
@@ -162,6 +175,8 @@ watch(tab, (value) => value !== "history" && (shownVersion.value = null))
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
   e: () => !editing.value && drop.value.canEdit && startEdit(),
+  h: () => !editing.value && has("history") && panel.show("history"),
+  i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
@@ -476,39 +491,21 @@ const threadComment = computed(() => {
               @click="startEdit"
             />
           </UTooltip>
-          <UTooltip v-if="has('comments')" :kbds="['C']" text="Comments">
+          <UTooltip
+            v-if="firstTab"
+            :kbds="{ comments: ['C'], history: ['H'], details: ['I'] }[firstTab.value]"
+            :text="firstTab.label"
+          >
             <UButton
-              :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
-              :aria-pressed="showing('comments')"
+              :aria-label="panelLabel"
+              :aria-pressed="panelOpen"
               color="neutral"
-              icon="i-ph-chats"
-              :label="openCount ? String(openCount) : undefined"
+              :icon="PANEL_ICONS[firstTab.value]"
+              :label="firstTab.value === 'comments' && openCount ? String(openCount) : undefined"
               size="sm"
               :ui="{ label: 'font-mono text-xs tabular-nums' }"
-              :variant="showing('comments') ? 'soft' : 'ghost'"
-              @click="toggleTab('comments')"
-            />
-          </UTooltip>
-          <UTooltip v-if="has('history')" text="History">
-            <UButton
-              aria-label="History"
-              :aria-pressed="showing('history')"
-              color="neutral"
-              icon="i-ph-clock-counter-clockwise"
-              size="sm"
-              :variant="showing('history') ? 'soft' : 'ghost'"
-              @click="toggleTab('history')"
-            />
-          </UTooltip>
-          <UTooltip v-if="has('details')" text="Details">
-            <UButton
-              aria-label="Details"
-              :aria-pressed="showing('details')"
-              color="neutral"
-              icon="i-ph-info"
-              size="sm"
-              :variant="showing('details') ? 'soft' : 'ghost'"
-              @click="toggleTab('details')"
+              :variant="panelOpen ? 'soft' : 'ghost'"
+              @click="togglePanel"
             />
           </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->

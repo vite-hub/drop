@@ -24,6 +24,8 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
     where: "A drop's page",
     shortcuts: [
       { keys: ["c"], label: "Open the comments" },
+      { keys: ["h"], label: "Open the history", where: "A doc with more than one version" },
+      { keys: ["i"], label: "Open the details", where: "A drop you manage" },
       { keys: ["r"], label: "Comment on an area" },
       { keys: ["e"], label: "Edit together" },
       { keys: ["escape"], label: "Close a comment, leave area mode, or go back from a version" },
