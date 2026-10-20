@@ -9,6 +9,13 @@ export const PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-pop
  */
 export const CONTENT_SANDBOX = `${PREVIEW_SANDBOX} allow-same-origin`
 
+/**
+ * What a frame may do beyond its sandbox. Only Markdown docs may write to the clipboard, so comark-annotate's Copy
+ * button works: Drop renders them itself, escaping raw HTML, so their only scripts are Drop's and Comark's. HTML docs
+ * and apps run whatever their author wrote, and writing to a reader's clipboard is how paste-jacking works.
+ */
+export const frameAllow = (kind: string) => (kind === "markdown" ? "clipboard-write" : undefined)
+
 const pct = (n: number) => `${(n / 10).toFixed(0)}%`
 
 /** What a comment points at: its quote, the page, or an element and where on it. */
