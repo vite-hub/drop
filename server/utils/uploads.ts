@@ -1,13 +1,13 @@
-import { and, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { useStorage } from "nitro/storage"
 import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import { isRole } from "#shared/roles"
 import { ACTOR_KINDS } from "#shared/types"
-import { account, user as users } from "../databases/config"
-import { isGitHubMember, membersOnly } from "./github-membership"
+import { user as users } from "../databases/config"
 import type { Identity } from "./identity"
+import { isMember } from "./members"
 import { PublishInput } from "./publish"
 import { seal, unseal } from "./review"
 
@@ -54,14 +54,7 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
   const [row] = await db.select().from(users).where(eq(users.id, ticket.u)).limit(1)
   if (!row || row.banned) return null
   // A members-only Drop only acts for current members, as for any other request.
-  if (membersOnly()) {
-    const [github] = await db
-      .select({ token: account.accessToken })
-      .from(account)
-      .where(and(eq(account.userId, row.id), eq(account.providerId, "github")))
-      .limit(1)
-    if (!(await isGitHubMember(github?.token))) return null
-  }
+  if (!(await isMember(row.id))) return null
   const role = row.role ?? ""
   const who: Identity = {
     userId: row.id,

@@ -415,10 +415,10 @@ export default defineNuxtConfig({
           // Days a public link stays open: empty for the mode's default (team 7, personal until changed), 0 turns them off.
           publicLinkDays: env({ source: env.source("DROP_PUBLIC_LINK_DAYS"), default: "" }),
           // Only active members of this GitHub organization may sign in, open shared links, or use MCP.
+          // Emails of the only people who may sign in, open shared links, or use MCP, comma-separated; admins always may.
+          // Verified by any sign-in method, like DROP_ADMINS. Empty lets anyone in.
+          members: env({ secret: true, source: env.source("DROP_MEMBERS"), default: "" }),
           githubOrg: env({ source: env.source("DROP_GITHUB_ORG"), default: "" }),
-          // Only these GitHub logins (comma-separated) may sign in, open shared links, or use MCP. With DROP_GITHUB_ORG too,
-          // its members may as well.
-          githubUsers: env({ source: env.source("DROP_GITHUB_USERS"), default: "" }),
           // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
           authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
           authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),

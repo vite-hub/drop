@@ -1,5 +1,5 @@
 import { defineHandler } from "h3"
-import { membersOnly } from "../utils/github-membership"
+import { membersOnly } from "../utils/members"
 
 /** Members-only Drops never serve content to anonymous visitors, including shared files. */
 export default defineHandler(async (event) => {
