@@ -12,11 +12,12 @@ import {
   planLimits,
   quotaFailure,
   quotaToolFailure,
+  type Plan,
   type QuotaFailure,
   type Usage,
 } from "#shared/quotas"
 import { useServerEnv } from "#vitehub/env/server"
-import { dropFiles, quotaBlobs, quotaReservations } from "../databases/config"
+import { dropFiles, quotaBlobs, quotaReservations, user } from "../databases/config"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
 type Statement = BatchItem<"sqlite">
@@ -37,10 +38,15 @@ async function ownerUsage(ownerId: string, month: string) {
   return row ?? { drops: 0, bytes: 0, writes: 0 }
 }
 
+/** A member's plan: the tier an admin gave them on the Members page, else DROP_DEFAULT_PLAN. */
+export function planOf(stored: string | null | undefined): Plan {
+  return stored === "free" || stored === "pro" ? stored : quotaConfig().defaultPlan
+}
+
 export async function getUsage(ownerId: string): Promise<Usage> {
   const config = quotaConfig()
-  // One plan for everyone, from DROP_DEFAULT_PLAN. Operators change limits in env, not per member.
-  const plan = config.defaultPlan
+  const [owner] = await db.select({ plan: user.plan }).from(user).where(eq(user.id, ownerId)).limit(1)
+  const plan = planOf(owner?.plan)
   const limits = planLimits(config.enabled ? plan : "unlimited", config.pro)
   const month = new Date().toISOString().slice(0, 7)
   const used = await ownerUsage(ownerId, month)

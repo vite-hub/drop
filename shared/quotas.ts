@@ -2,6 +2,9 @@ import * as v from "valibot"
 
 export const PLANS = ["free", "pro", "unlimited"] as const
 export type Plan = (typeof PLANS)[number]
+/** What an admin picks per member on the Members page. `unlimited` stays an operator's DROP_DEFAULT_PLAN. */
+export const TIERS = ["free", "pro"] as const
+export type Tier = (typeof TIERS)[number]
 export const MIB = 1024 * 1024
 export const MAX_APP_FILES = 200
 export const MAX_APP_BYTES = 4 * MIB

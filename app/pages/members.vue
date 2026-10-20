@@ -2,12 +2,13 @@
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { Member } from "#shared/types"
 import { DEFAULT_ROLE, ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
+import { TIERS, type Tier } from "#shared/quotas"
 
 useSeoMeta({ title: "Members" })
 
 // Anyone who signs in joins as a Member; DROP_ADMINS names the admins by email, so nobody changes roles here.
 const { data: me } = useMe()
-const { members, status, ban, unban, remove } = useMembers()
+const { members, status, ban, unban, remove, setPlan } = useMembers()
 const admin = computed(() => me.value?.role === "admin")
 const search = ref("")
 const host = useRequestURL().host
@@ -32,6 +33,9 @@ const rows = computed(() => {
 })
 
 const statusOf = (member: Member) => (member.banned ? "Banned" : "Active")
+// Plans show only while this Drop has quotas; then admins move people between Free and Pro.
+const plans = computed(() => members.value.some((member) => member.plan))
+const tierItems = TIERS.map((value) => ({ label: PLAN_LABELS[value], value }))
 
 function menu(member: Member): DropdownMenuItem[][] {
   return [
@@ -82,6 +86,7 @@ function menu(member: Member): DropdownMenuItem[][] {
           <tr class="border-b border-default text-left text-xs text-muted">
             <th class="px-4 py-2.5 font-medium">Member</th>
             <th class="w-28 px-2 py-2.5 font-medium sm:w-36 sm:px-4">Role</th>
+            <th v-if="plans" class="w-24 px-2 py-2.5 font-medium sm:w-28 sm:px-4">Plan</th>
             <th class="hidden w-20 px-4 py-2.5 text-right font-medium md:table-cell">Drops</th>
             <th class="hidden w-24 px-4 py-2.5 font-medium sm:table-cell">Status</th>
             <th v-if="admin" class="w-11" />
@@ -118,6 +123,20 @@ function menu(member: Member): DropdownMenuItem[][] {
             </td>
             <td class="px-2 py-3 sm:px-4">
               <span>{{ ROLE_LABELS[member.role] }}</span>
+            </td>
+            <td v-if="plans" class="px-2 py-3 sm:px-4">
+              <USelect
+                v-if="admin && member.plan !== 'unlimited'"
+                :aria-label="`Plan for ${member.name}`"
+                class="w-full"
+                color="neutral"
+                :items="tierItems"
+                :model-value="member.plan ?? undefined"
+                size="sm"
+                variant="ghost"
+                @update:model-value="(value) => setPlan(member, value as Tier)"
+              />
+              <span v-else-if="member.plan">{{ PLAN_LABELS[member.plan] }}</span>
             </td>
             <td class="hidden px-4 py-3 text-right font-mono text-xs md:table-cell">{{ member.drops }}</td>
             <td class="hidden px-4 py-3 sm:table-cell">

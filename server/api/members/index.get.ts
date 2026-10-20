@@ -4,6 +4,7 @@ import { db } from "vite-hub/database/drizzle"
 import { session, user } from "../../databases/config"
 import type { Member } from "#shared/types"
 import { requireIdentity, roleOf } from "../../utils/identity"
+import { planOf, quotaConfig } from "../../utils/quotas"
 
 /** Everyone in this Drop. Anyone signed in can see who's here; only admins see emails and ban people. Roles come from DROP_ADMINS. */
 export default defineHandler(async (event): Promise<Member[]> => {
@@ -28,12 +29,14 @@ export default defineHandler(async (event): Promise<Member[]> => {
     .from(user)
     .orderBy(desc(user.createdAt))
     .limit(500)
+  const quotas = quotaConfig().enabled
   return users.map((member) => ({
     id: member.id,
     name: member.name,
     email: who.role === "admin" || member.id === who.userId ? member.email : null,
     image: member.image ?? null,
     role: roleOf(member),
+    plan: quotas ? planOf(member.plan) : null,
     banned: Boolean(member.banned),
     drops: member.drops,
     lastActiveAt: member.seen ? new Date(member.seen).getTime() : null,

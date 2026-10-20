@@ -50,9 +50,10 @@ try {
   // Only the test fixture changes the role directly.
   db.prepare("UPDATE user SET role='admin' WHERE id=?").run(admin.id)
   cookie = admin.cookie
-  // Plans come from DROP_DEFAULT_PLAN only: the members API ignores a per-member plan.
-  assert.equal((await request(`/api/members/${owner.id}`, "PATCH", { plan: "unlimited" })).status, 200)
-  assert.equal((await request("/api/usage")).data.plan, "free")
+  // Admins move a member between Free and Pro through Better Auth's admin plugin; there's no Unlimited tier.
+  assert.equal((await request(`/api/members/${owner.id}`, "PATCH", { plan: "unlimited" })).status, 400)
+  assert.equal((await request(`/api/members/${admin.id}`, "PATCH", { plan: "pro" })).status, 200)
+  assert.equal((await request("/api/usage")).data.plan, "pro")
   cookie = owner.cookie
   const doc = await request("/api/drops", "POST", { filename: "doc.md", content: "# Owner" })
   assert.equal(doc.status, 200)
@@ -126,7 +127,7 @@ try {
   assert.equal(afterCleanup.writes.used, billed.writes.used)
   assert.equal((await fetch(image.data.url)).status, 404)
   console.log(
-    "Quota admin smoke passed: instance-wide plan, exhausted monthly budget, owner app cap, admin attribution, 50-file app, full history deletion, retained image cleanup",
+    "Quota admin smoke passed: per-member plan, exhausted monthly budget, owner app cap, admin attribution, 50-file app, full history deletion, retained image cleanup",
   )
 } finally {
   for (const id of drops) await request(`/api/drops/${id}`, "DELETE")

@@ -1,5 +1,6 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
 import type { Lifetime } from "./expiry"
+import type { Plan } from "./quotas"
 import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
 
@@ -178,6 +179,8 @@ export interface Member {
   email: string | null
   image: string | null
   role: Role
+  /** Their limits: the tier an admin gave them, else this Drop's default plan. Null when quotas are off. */
+  plan: Plan | null
   banned: boolean
   drops: number
   /** Null until they first sign in. */

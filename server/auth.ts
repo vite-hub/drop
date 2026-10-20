@@ -76,6 +76,8 @@ export default defineAuth(({ env, requestOrigin }) => {
         },
     emailAndPassword: { enabled: import.meta.dev === true || env.drop.testSignin },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
+    // Free or Pro (shared/quotas.ts TIERS). Only admins set it, from the Members page through the admin plugin.
+    user: { additionalFields: { plan: { type: ["free", "pro"], required: false, input: false } } },
     hooks: { before: nativeClientRegistration },
     databaseHooks: {
       account: {
