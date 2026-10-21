@@ -10,6 +10,7 @@ Drop renders only the syntax on this page. Comark and GitHub support more, but h
 | Code | [a fenced block with its language](#code) |
 | Progress on a list of steps | a task list: `- [x] done`, `- [ ] next` |
 | A screenshot with marks, or a before and after | [an annotated screenshot](#annotated-screenshots) |
+| A code change, before and after | [a diff](#code-changes) |
 
 Headings, lists, tables, links, `~~strikethrough~~`, and `![alt](https://…)` images work as in GitHub. A bare `https://` URL becomes a link.
 
@@ -43,7 +44,7 @@ const url = drop.url
 ```
 ````
 
-Use a common language name or alias such as `ts`, `py`, or `sh`. An unknown language or a missing one gives plain text. `{2}` highlights line 2. `{1,3-5}` highlights lines 1 and 3 to 5.
+Use a common language name or alias such as `ts`, `py`, or `sh`. An unknown language or a missing one gives plain text. `{2}` highlights line 2. `{1,3-5}` highlights lines 1 and 3 to 5. To show how code changed, write [a diff](#code-changes).
 
 ## Mermaid
 
@@ -77,6 +78,21 @@ Save sits below the fold on a laptop screen.
 ```
 
 `::screenshot` marks areas of an image, and `::compare` puts two screenshots side by side as before and after. `src` takes an `https://` URL or the `fileUrl` of an image published with `file`. Before you write marks or a comparison, read the full syntax in [the annotation reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/annotations.md). When the syntax is wrong, `publish` fails and lists every problem.
+
+## Code changes
+
+````md
+::diff{line=14}
+```ts [server/api/drops.get.ts]
+const limit = 20
+```
+```ts
+const limit = Number(getQuery(event).limit ?? 20)
+```
+::
+````
+
+`::diff` shows one file's lines before and after, with the file, line numbers, and the changed words marked. Copy real lines from the change. The full syntax is in [the annotation reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/annotations.md#diff).
 
 ## Front matter
 

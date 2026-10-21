@@ -1,11 +1,11 @@
 ---
 name: pr-evidence
-description: Builds pull-request evidence for UI changes, with before and after screenshots, hand-drawn marks, and notes written in Markdown, then drops it into Drop and comments its link on the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
+description: Builds pull-request evidence in Markdown, before and after screenshots with hand-drawn marks for a UI change or the changed lines for a code change, then drops it into Drop and comments its link on the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
 ---
 
 # Pull-request evidence
 
-Show reviewers what changed on screen, marked up so they don't have to hunt for it. You write Markdown with comark-annotate components; Drop renders it as a page with hand-drawn marks, numbered notes, and arrows.
+Show reviewers what changed on screen, marked up so they don't have to hunt for it. You write Markdown with comark-annotate components; Drop renders it as a page with hand-drawn marks, numbered notes, and arrows. When nothing changes on screen, as in a refactor, the code is the evidence: skip [Capture](#capture) and show it as [a code change](#code-changes).
 
 ## Where it lives
 
@@ -33,12 +33,17 @@ The screenshots are the evidence; the text only points into them. Pick:
 - A `::compare` of before and after, when the change is the point.
 - One `::screenshot`, when a single state shows it.
 - Side notes (`side="top"`, `"left"`, or `"right"`) with `mark="none"` for the two or three points that matter most; other notes stay numbered under the image.
+- A `::diff`, when the code is the point. See [Code changes](#code-changes).
 
 Use `red` for what was wrong, `green` for the fix, and the default blue to point something out. Mark the change at its own size: the bar, field, or label that changed. What stayed the same goes unmarked; the steps line says how the screen was set up. Keep to about six marks per screenshot, fewer in a compare. Each note says in a few words what changed or what is wrong, in the words the screen shows, so the reader can check it against the image; a value the screenshot doesn't show stays out of the note. The full syntax is in [references/annotations.md](references/annotations.md).
 
 Above the screenshots, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `href`, not in the text. No tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
 
 The doc shows the change; how the work went (the checks you ran, retries, CI counts, who has reviewed) belongs in your report to the user. When you're asked to put that report in the doc, end it with one `## For <name>` section of at most five bullets: the verdict first (ready, or blocked and why), the cause in one sentence, each decision they have to make as a question, and anything you couldn't check. A side question gets its answer in one line there.
+
+### Code changes
+
+A `::diff` shows one file's lines before and after, the way a review shows a suggested change. Copy the lines from the pull request's diff, a few around the change, and set `line` to where they start in the file, so a reviewer can find them. One diff shows one file: a change that adds a component and uses it is two diffs, the new file first with an empty before block. When the same change repeats across files, show one of them and name the others in the line above it, like "The same change in Forecast, Alerts, and 11 more pages." That line also says what the change does. The syntax is in [references/annotations.md](references/annotations.md#diff).
 
 ## Publish
 

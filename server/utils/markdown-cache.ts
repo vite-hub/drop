@@ -32,8 +32,9 @@ const cached = defineCachedFunction(
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
     // Change this when the renderer's output changes (2: Shiki code blocks, 3: comark-annotate zooms a screenshot's stage
-    // with its notes beside it): every cached render rerenders on its next read.
-    integrity: "3",
+    // with its notes beside it, 4: ::diff renders instead of an unsupported component): every cached render rerenders on
+    // its next read.
+    integrity: "4",
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
 )

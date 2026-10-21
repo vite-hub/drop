@@ -25,12 +25,15 @@ for (const name of names) {
   })
 }
 
-test("pr-evidence's annotation example is valid comark-annotate", async () => {
+test("pr-evidence's annotation examples are valid comark-annotate", async () => {
   const reference = await readFile(new URL("pr-evidence/references/annotations.md", root), "utf8")
-  const example = reference.match(/```md\n([\s\S]*?)\n```/)?.[1]
-  assert.ok(example)
-  const document = await createMarkdownParser({ plugins: [annotate()] })(example)
-  assert.deepEqual(document.meta.issues, [])
+  // Fenced `md` examples, including ````md fences that wrap a ``` block.
+  const examples = [...reference.matchAll(/^(`{3,})md\n([\s\S]*?)\n\1$/gm)].map((match) => match[2])
+  assert.equal(examples.length, 2)
+  for (const example of examples) {
+    const document = await createMarkdownParser({ plugins: [annotate()] })(example)
+    assert.deepEqual(document.meta.issues, [], example)
+  }
 })
 
 test("show-me's annotated screenshot example is valid comark-annotate", async () => {
