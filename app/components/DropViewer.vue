@@ -194,6 +194,7 @@ defineShortcuts({
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
   l: () => !editing.value && copyLink("Link copied"),
+  d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
@@ -201,6 +202,17 @@ defineShortcuts({
     annotations.dismiss()
   },
 })
+
+// An uploaded file or image is the thing itself, so its download sits in the bar; Drop's own kinds keep it in the menu.
+const downloadsInBar = computed(() => Boolean(drop.value.url) && ["file", "image"].includes(drop.value.kind))
+/** Saves the stored file under its uploaded name; the raw URL is same-origin, so `download` names it. */
+function download() {
+  if (!drop.value.url) return
+  const anchor = document.createElement("a")
+  anchor.href = drop.value.url
+  anchor.download = drop.value.filename
+  anchor.click()
+}
 
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
@@ -252,18 +264,21 @@ const moreMenu = computed(() =>
           ]
         : []),
     ],
-    ...(copiesMarkdown.value
-      ? [
-          [
+    [
+      ...(copiesMarkdown.value
+        ? [
             {
               label: "Copy as Markdown",
               icon: "i-mingcute-markdown-line",
               kbds: ["m"],
               onSelect: () => void copyMarkdown("Markdown copied"),
             },
-          ],
-        ]
-      : []),
+          ]
+        : []),
+      ...(drop.value.url && !downloadsInBar.value
+        ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
+        : []),
+    ],
     // Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it.
     ...(visitor.value
       ? [
@@ -417,6 +432,9 @@ offerToPalette("drop", () => {
       ? [{ label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => panel.show("details") }]
       : []),
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
+    ...(drop.value.url
+      ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
+      : []),
     ...(drop.value.resources ?? []).map((resource) => ({
       label: `Open ${resourceLabel(resource)}`,
       icon: "i-mingcute-external-link-line",
@@ -533,7 +551,7 @@ watch(
             v-if="drop.url"
             icon="i-mingcute-download-2-line"
             label="Download original"
-            @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })"
+            @click="download"
           />
           <ViewerAction
             v-if="owner && !trashed"
@@ -666,6 +684,16 @@ watch(
               size="sm"
               variant="ghost"
               @click="copyLink()"
+            />
+          </UTooltip>
+          <UTooltip v-if="downloadsInBar" :kbds="['D']" :text="`Download ${drop.filename}`">
+            <UButton
+              aria-label="Download"
+              color="neutral"
+              icon="i-mingcute-download-2-line"
+              size="sm"
+              variant="ghost"
+              @click="download"
             />
           </UTooltip>
           <UDropdownMenu v-if="moreMenu.length" :content="{ align: 'end' }" :items="moreMenu">
@@ -805,10 +833,8 @@ watch(
               color="neutral"
               icon="i-mingcute-download-2-line"
               label="Download"
-              :to="drop.url"
-              external
-              target="_blank"
               variant="outline"
+              @click="download"
             />
           </div>
         </div>
