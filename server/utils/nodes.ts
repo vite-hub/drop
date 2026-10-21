@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, like, or, sql } from "drizzle-orm"
+import { and, eq, inArray, isNull, like, or, type SQL, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { MAX_SLUG } from "#shared/links"
 import { MAX_DEPTH } from "#shared/nodes"
@@ -46,6 +46,25 @@ export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"
       )
     for (const row of found) byId.set(row.id, row)
   }
+  return walkUp(rows, byId)
+}
+
+/**
+ * The id `hit` selects (a query for at most one id) and the ids of every node above it, so a lookup reads a drop and its
+ * ancestors in one query instead of two in a row. `walkUp` walks them the way `ancestorsOf` does.
+ */
+export const withAncestors = (hit: SQL) => sql`(
+  WITH RECURSIVE up(id, depth) AS (
+    SELECT id, 0 FROM drops WHERE id = (${hit})
+    UNION ALL SELECT d.parent_id, up.depth + 1 FROM drops d JOIN up ON d.id = up.id WHERE d.parent_id IS NOT NULL AND up.depth < ${MAX_WALK}
+  ) SELECT id FROM up
+)`
+
+/** Each row's ancestors, nearest first, keyed by the row's id, from the nodes `byId` holds. */
+export function walkUp(
+  rows: (Pick<Row, "id" | "parentId" | "ownerId"> & { teamFolder?: boolean })[],
+  byId: Map<string, Row>,
+) {
   const result = new Map<string, Row[]>()
   for (const row of rows) {
     const path: Row[] = []

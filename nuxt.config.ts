@@ -14,8 +14,9 @@ const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-meta
 const { host, database } = deployment()
 const liveEditing = host === "cloudflare" || host === "vps"
 
-// The blob handler also handles conditional requests; keep its policy aligned with the access gate.
-const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-store" } } }
+// The browser keeps a file but asks again on every use: the access gate runs each time, and an unchanged file answers
+// 304 without its bytes (the blob handler handles conditional requests). server/plugins/content-headers.ts agrees.
+const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-cache" } } }
 
 // D1's HTTP driver works from every host. The account and API token are read at runtime.
 const d1 = (fallback: string) => ({
@@ -370,6 +371,9 @@ export default defineNuxtConfig({
       wrangler: {
         name: cloudflareTemplate.name,
         observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } },
+        // A page waits on D1 queries one after another, each a round trip from wherever the Worker runs. Smart
+        // Placement runs it near the database when that's faster; static assets are still served from the edge.
+        placement: { mode: "smart" },
       },
     },
     // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.

@@ -72,7 +72,7 @@ export function useTeams() {
   /** Stripe Checkout for the Team plan, one seat per member; Stripe sends them back to the team's page. */
   const upgrade = async (id: string, annual = false) => {
     const team = await full(id)
-    const seats = team.members.length + team.invitations.filter((invitation) => invitation.status === "pending").length
+    const seats = team.members.length + team.invitations.filter((invite) => invite.status === "pending").length
     return unwrap(
       $auth.subscription.upgrade({
         plan: "team",

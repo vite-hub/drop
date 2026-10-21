@@ -1,9 +1,7 @@
 import { promiseTimeout } from "@vueuse/core"
-import { Placeholder } from "@tiptap/extension-placeholder"
-import { Editor } from "@tiptap/vue-3"
 import * as v from "valibot"
-import { RealtimeCaret } from "vite-hub/realtime/vue"
 import type { DropDetail, DropSummary } from "#shared/types"
+import type { LiveRoom } from "~/utils/live-room"
 
 // What a publishing client leaves on its awareness state. Other clients set it, so it's parsed, not trusted.
 const PublishedSchema = v.object({ id: v.string(), version: v.number(), name: v.string() })
@@ -20,45 +18,24 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const documentId = ref<string>()
   const opening = ref(false)
   const publishing = ref(false)
-  // Carets come from RealtimeCaret below, with a lighter selection tint than its default.
-  const realtime = useRealtimeTiptap("drops", documentId, { enabled: () => Boolean(documentId.value), carets: false })
-  const editor = shallowRef<Editor>()
+  // The room and its editor load the first time someone opens the editor (~/utils/live-room), so readers never
+  // download Yjs or Tiptap. They run in a scope of this component's: leaving the page leaves the room.
+  const scope = effectScope()
+  const room = shallowRef<LiveRoom>()
+  const realtime = computed(() => room.value?.realtime)
+  const editor = computed(() => room.value?.editor.value)
   const editing = computed(() => Boolean(documentId.value))
-  const people = realtime.people
+  const people = computed(() => realtime.value?.people.value ?? [])
 
   const url = (id: string, edit = false) => ({
     path: `${options.publicView ? "/d" : "/drops"}/${id}`,
     query: edit ? { edit: "1" } : {},
   })
 
-  // The room's extensions exist once its Y.Doc and provider do. Rebuild the editor only for a new room: the extensions
-  // list is recomputed on reconnects too, and a rebuild would drop focus mid-sentence.
-  watch([realtime.document, realtime.provider], () => {
-    editor.value?.destroy()
-    editor.value = undefined
-    const extensions = realtime.extensions.value
-    if (!extensions.length || !realtime.provider.value) return
-    editor.value = new Editor({
-      extensions: [
-        ...extensions,
-        CodeHighlight,
-        Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
-        RealtimeCaret.configure({
-          awareness: markRaw(realtime.provider.value.awareness),
-          selectionRender: (user) => ({
-            class: "ProseMirror-yjs-selection",
-            style: `background-color: color-mix(in oklab, ${user.color} 18%, transparent)`,
-          }),
-        }),
-      ],
-      autofocus: "end",
-    })
-  })
-
   // A teammate published: their client leaves `published` on its awareness state before it goes.
   let announced = ""
   watch(
-    realtime.provider,
+    () => realtime.value?.provider.value,
     (provider, _, onCleanup) => {
       if (!provider) return
       const check = () => {
@@ -92,9 +69,12 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     if (editing.value || opening.value || !drop.value.canEdit) return
     opening.value = true
     try {
-      documentId.value = (
-        await $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" })
-      ).documentId
+      const [{ joinLiveRoom }, { documentId: id }] = await Promise.all([
+        import("~/utils/live-room"),
+        $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" }),
+      ])
+      room.value ??= scope.run(() => joinLiveRoom(documentId))
+      documentId.value = id
     } catch (error) {
       notify.fail("Couldn't open the editor", error)
     } finally {
@@ -103,8 +83,8 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   }
 
   function close() {
-    editor.value?.destroy()
-    editor.value = undefined
+    room.value?.editor.value?.destroy()
+    if (room.value) room.value.editor.value = undefined
     documentId.value = undefined
   }
 
@@ -112,7 +92,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     if (!editing.value || publishing.value) return
     publishing.value = true
     try {
-      await realtime.save()
+      await realtime.value?.save()
       const next = await $fetch<DropSummary & { unchanged?: boolean }>(`/api/drops/${drop.value.id}/versions`, {
         method: "POST",
         body: { force },
@@ -121,8 +101,9 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         notify.done("Nothing to publish", "The draft matches the published version.")
         return
       }
-      const me = people.value.find((person) => person.clientId === realtime.provider.value?.awareness.clientID)
-      realtime.provider.value?.awareness.setLocalStateField("published", {
+      const awareness = realtime.value?.provider.value?.awareness
+      const me = people.value.find((person) => person.clientId === awareness?.clientID)
+      awareness?.setLocalStateField("published", {
         id: next.id,
         version: next.version,
         name: me?.name ?? "Someone",
@@ -178,8 +159,8 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     opening,
     publishing,
     people,
-    status: realtime.status,
-    synced: realtime.synced,
+    status: computed(() => realtime.value?.status.value ?? "disconnected"),
+    synced: computed(() => realtime.value?.synced.value ?? false),
     open,
     close,
     publish,
