@@ -314,7 +314,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (to) to.scrollIntoView({ block: "start" }); else if (!id) scrollTo(0, 0);
       return;
     }
-    if (!img || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
+    // An image still on its way (data-drop-image) has nothing to zoom yet.
+    if (!img || img.dataset.dropImage || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
     e.preventDefault(); e.stopPropagation();
     // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
     const r = img.getBoundingClientRect();

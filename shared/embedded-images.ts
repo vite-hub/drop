@@ -19,3 +19,22 @@ export function embeddedImagePaths(sources: string[], host: string, attachments:
   }
   return [...paths].slice(0, MAX_IMAGES)
 }
+
+const ONE_FILE_LINK = new RegExp(`^${FILE_LINK.source}$`, "i")
+// A transparent pixel holds the image's place until the viewer sends it.
+const PENDING_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+
+/**
+ * `html` with every `<img>` that shows one of `paths` waiting for it: a placeholder for its source and the path on
+ * `data-drop-image`. The doc's frame asks the viewer for each one as it nears the screen (DEFERRED_IMAGES_SCRIPT in
+ * ./documents), so the text shows at once and images nobody scrolls to are never fetched.
+ */
+export function deferImages(html: string, paths: string[]) {
+  const wanted = new Set(paths)
+  return html.replace(/<img\b[^>]*>/gi, (tag) =>
+    tag.replace(/\ssrc="([^"]*)"/i, (attribute, src: string) => {
+      const path = src.match(ONE_FILE_LINK)?.[1]
+      return path && wanted.has(path) ? ` src="${PENDING_IMAGE}" data-drop-image="${path}"` : attribute
+    }),
+  )
+}

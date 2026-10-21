@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { embeddedImagePaths } from "../../shared/embedded-images.ts"
+import { deferImages, embeddedImagePaths } from "../../shared/embedded-images.ts"
 
 const a = "11111111-1111-4111-8111-111111111111"
 const b = "22222222-2222-4222-8222-222222222222"
@@ -26,4 +26,18 @@ test("the same image twice is fetched once, and a long doc stops at 60", () => {
   const markdown = ids.map((id) => `![](/f/${id}.png)`).join("\n")
   assert.equal(embeddedImagePaths([markdown, markdown], "drop.quiver.dk").length, 60)
   assert.deepEqual(embeddedImagePaths([`![](/f/${a}.png)`, `<img src="/f/${a}.png">`], "x"), [`/f/${a}.png`])
+})
+
+test("a Markdown doc's images wait in the frame, keyed by path; other images and links stay as they are", () => {
+  const html = `<p><img src="https://drop.quiver.dk/f/${a}.png" alt="Before" loading="lazy"> <img src="/f/${b}.webp?raw" alt=""></p><a href="/f/${a}.png">full size</a><img src="https://example.com/x.png"><img src="/f/${c}.png">`
+  const deferred = deferImages(html, [`/f/${a}.png`, `/f/${b}.webp`])
+  assert.match(
+    deferred,
+    new RegExp(`<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png" alt="Before" loading="lazy">`),
+  )
+  assert.match(deferred, new RegExp(`<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp" alt="">`))
+  assert.match(
+    deferred,
+    new RegExp(`<a href="/f/${a}.png">full size</a><img src="https://example.com/x.png"><img src="/f/${c}.png">$`),
+  )
 })
