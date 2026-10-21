@@ -8,7 +8,10 @@ import { faviconUrls } from "#shared/resources"
 const MARKS = { "github.com": "i-simple-icons-github" } satisfies Record<string, string>
 
 const props = defineProps<{ url: string }>()
-const mark = computed(() => MARKS[new URL(props.url).hostname.replace(/^www\./, "")])
+const mark = computed(() => {
+  const hostname = new URL(props.url).hostname.replace(/^www\./, "")
+  return MARKS[hostname as keyof typeof MARKS]
+})
 const tries = computed(() => faviconUrls(props.url))
 const index = ref(0)
 const mounted = useMounted()
