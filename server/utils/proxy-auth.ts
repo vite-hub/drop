@@ -18,7 +18,6 @@ const GitHubUser = v.object({
   avatar_url: v.optional(v.string()),
 })
 const GitHubEmails = v.array(v.object({ email: v.string(), primary: v.boolean(), verified: v.boolean() }))
-const Banned = v.object({ banned: v.literal(true) })
 
 /** Exchange oauth2-proxy's GitHub token for Drop's session. Header names alone prove nothing. */
 export const proxyAuth = () => ({
@@ -85,7 +84,8 @@ export const proxyAuth = () => ({
           .where(and(eq(user.id, userId), eq(user.email, email)))
           .catch(() => {})
       const member = await ctx.context.internalAdapter.findUserById(userId)
-      if (!member || v.is(Banned, member)) throw new APIError("FORBIDDEN", { message: "Account unavailable." })
+      if (!member) throw new APIError("FORBIDDEN", { message: "Account unavailable." })
+      // The admin plugin refuses a banned member's session.
       const session = await ctx.context.internalAdapter.createSession(userId)
       if (!session) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Session unavailable." })
       await setSessionCookie(ctx, { session, user: member })

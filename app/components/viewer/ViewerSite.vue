@@ -3,7 +3,7 @@
 // or the optional tag in preview builds), and what people sent from its pages, newest first. Each screenshot opens as
 // its own image, where the box shows and the thread continues.
 import { dropPath } from "#shared/links"
-import { isSitePattern, reviewBookmarklet, reviewSnippet, siteHost, siteMatches } from "#shared/review"
+import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
 import type { DropDetail, SiteReviewItem } from "#shared/types"
 
 /** `inset`: room to leave on the right for the floating panel, in pixels. */
@@ -78,13 +78,7 @@ const steps = computed<Step[]>(() => {
 // Review it here: the address to open in ViewerSiteFrame. A pattern starts empty, since each preview has its own.
 const address = ref("")
 watch(siteLink, (link) => (address.value ||= link ?? ""), { immediate: true })
-const addressCovered = computed(() => {
-  try {
-    return Boolean(props.drop.siteUrl) && siteMatches(props.drop.siteUrl!, new URL(address.value).origin)
-  } catch {
-    return false
-  }
-})
+const addressCovered = computed(() => siteCovers(props.drop.siteUrl, address.value))
 const example = computed(() => props.drop.siteUrl?.replace("*", "pr123") ?? "")
 const framed = ref<string | null>(null)
 function openHere() {

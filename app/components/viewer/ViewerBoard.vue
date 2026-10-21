@@ -16,7 +16,8 @@ const saving = ref(false)
 const readOnly = ref(true)
 
 type Records = Record<string, { id: string; typeName: string; [key: string]: unknown }>
-let unmount: (() => void) | undefined
+let root: import("react-dom/client").Root | undefined
+let left = false
 
 onMounted(async () => {
   const id = props.drop.id
@@ -28,8 +29,10 @@ onMounted(async () => {
       $fetch<{ snapshot: { schema: unknown; store: Records }; canEdit: boolean }>(`/api/drops/${id}/board`),
       import("tldraw/tldraw.css"),
     ])
+    // The reader left while tldraw loaded: there's no host to mount in any more.
+    if (left) return
     readOnly.value = !data.canEdit
-    const root = createRoot(host.value!)
+    root = createRoot(host.value!)
     root.render(
       createElement(tl.Tldraw, {
         // SAFETY: the server stores only snapshots tldraw's schema accepted and migrated (server/utils/boards.ts).
@@ -40,25 +43,26 @@ onMounted(async () => {
         // the top-left panel with only undo, redo, delete and duplicate, which have shortcuts and sit in the context
         // menu; on narrow screens tldraw shows them above the toolbar instead, outside this panel.
         components: { MainMenu: null, PageMenu: null, MenuPanel: null },
+        // tldraw calls this once its editor exists, after render() has returned, and calls what it returns when the
+        // editor goes: root.unmount() below stops the sync too.
         onMount: (editor) => {
           // In dev, the editor on window lets a browser session inspect and drive the board.
           if (import.meta.dev) Object.assign(window, { boardEditor: editor })
-          unmount = sync(editor, data.snapshot.store, data.canEdit)
+          const stop = sync(editor, data.snapshot.store, data.canEdit)
           state.value = "ready"
+          return stop
         },
       }),
     )
-    const stop = unmount
-    unmount = () => {
-      stop?.()
-      root.unmount()
-    }
   } catch (error) {
     console.error(error)
     state.value = "failed"
   }
 })
-onBeforeUnmount(() => unmount?.())
+onBeforeUnmount(() => {
+  left = true
+  root?.unmount()
+})
 
 async function toBase64(blob: Blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer())

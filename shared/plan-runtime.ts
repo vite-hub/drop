@@ -314,6 +314,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (to) to.scrollIntoView({ block: "start" }); else if (!id) scrollTo(0, 0);
       return;
     }
+    // A link to another site would load it inside the frame, where most sites (GitHub among them) refuse to show.
+    const away = !img && target && target.closest("a[href]");
+    if (away && !host.contains(away) && !away.target && /^https?:$/.test(away.protocol) && away.origin !== location.origin) {
+      away.target = "_blank";
+      away.relList.add("noopener");
+      return;
+    }
     if (!img || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
     e.preventDefault(); e.stopPropagation();
     // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
@@ -388,6 +395,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
     if (m.type === "inset") { document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px"); render(); }
+    // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
+    if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     if (m.type === "focus") {
       active = m.id; render();
       const dot = Array.from(marks.children).find((d) => d.classList.contains("pulse"));

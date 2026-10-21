@@ -30,15 +30,33 @@ const access = computed(
 )
 const folder = computed(() => props.drop.ancestors.map((crumb) => crumb.title).join(" / "))
 // The owner's view count, then who the views came from, with the icons agents and people get on rows (AgentIcon).
+// Hovering a number says what it counts, as server/utils/views.ts counts it.
 const views = computed(() => {
   const counts = props.drop.views
   if (!counts) return null
+  const total = counts.person + counts.anonymous + counts.agent
   return {
-    total: counts.person + counts.anonymous + counts.agent,
+    total,
+    tip: `${total} ${total === 1 ? "view" : "views"}: each viewer counts once a day, the owner's own visits don't`,
     by: [
-      { label: "signed in", icon: "i-mingcute-user-3-line", n: counts.person },
-      { label: "anonymous", icon: "i-mingcute-incognito-mode-line", n: counts.anonymous },
-      { label: "by agents", icon: "i-mingcute-sparkles-line", n: counts.agent },
+      {
+        label: "signed in",
+        icon: "i-mingcute-user-3-line",
+        n: counts.person,
+        tip: `${counts.person} by people signed in`,
+      },
+      {
+        label: "anonymous",
+        icon: "i-mingcute-incognito-mode-line",
+        n: counts.anonymous,
+        tip: `${counts.anonymous} by visitors not signed in`,
+      },
+      {
+        label: "by agents",
+        icon: "i-mingcute-sparkles-line",
+        n: counts.agent,
+        tip: `${counts.agent} by agents reading it, yours included`,
+      },
     ],
   }
 })
@@ -154,39 +172,36 @@ async function save() {
       <div v-if="views" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Views</dt>
         <dd class="flex min-w-0 items-center gap-3 tabular-nums">
-          <span class="text-highlighted">{{ views.total }}</span>
-          <span
-            v-for="part in views.by"
-            :key="part.label"
-            :aria-label="`${part.n} ${part.label}`"
-            class="flex items-center gap-1 text-muted"
-            role="img"
-            :title="`${part.n} ${part.label}`"
-          >
-            <UIcon :name="part.icon" class="size-3.5 shrink-0" />
-            {{ part.n }}
-          </span>
+          <UTooltip :text="views.tip">
+            <span class="text-highlighted">{{ views.total }}</span>
+          </UTooltip>
+          <UTooltip v-for="part in views.by" :key="part.label" :text="part.tip">
+            <span :aria-label="`${part.n} ${part.label}`" class="flex items-center gap-1 text-muted" role="img">
+              <UIcon :name="part.icon" class="size-3.5 shrink-0" />
+              {{ part.n }}
+            </span>
+          </UTooltip>
         </dd>
       </div>
-    </dl>
-
-    <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
-    <!-- The team's folders never expire, so there's nothing to choose. -->
-    <dl v-if="drop.teamFolder" class="text-sm">
-      <div class="flex items-center gap-3">
+      <!-- The team's folders never expire, so there's nothing to choose. -->
+      <div v-if="drop.teamFolder" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Lifetime</dt>
         <dd class="min-w-0 truncate text-highlighted">Kept: the team's folders never expire</dd>
       </div>
-    </dl>
-    <ViewerLifetime v-else-if="drop.isOwner && !drop.parentId" :drop="drop" />
-    <dl v-else-if="drop.isOwner && drop.ancestors.length && me?.expiry.days" class="text-sm">
-      <div class="flex items-center gap-3">
+      <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
+      <div
+        v-else-if="drop.isOwner && drop.parentId && drop.ancestors.length && me?.expiry.days"
+        class="flex items-center gap-3"
+      >
         <dt class="w-20 shrink-0 text-muted">Lifetime</dt>
         <dd class="min-w-0 truncate text-highlighted tabular-nums">
           {{ expiryLabel(drop, now) }}, with {{ drop.ancestors[0]!.title }}
         </dd>
       </div>
     </dl>
+
+    <!-- A drop at the top chooses its own lifetime, so it gets the full control below Details. -->
+    <ViewerLifetime v-if="!drop.teamFolder && drop.isOwner && !drop.parentId" :drop="drop" />
 
     <section v-if="$slots.actions" class="-mx-2 border-t border-default pt-3">
       <slot name="actions" />
