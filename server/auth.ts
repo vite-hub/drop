@@ -10,7 +10,7 @@ import { defineAuth } from "vite-hub/auth"
 import { db, schema } from "vite-hub/database/drizzle"
 import { member, user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
-import { nativeClientRegistration } from "./utils/oauth-clients"
+import { clientRegistrationLimits } from "./utils/oauth-clients"
 import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
@@ -33,7 +33,8 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  * people who may (admins always may); `DROP_GITHUB_ORG` limits it to an organization. `DROP_ADMINS` lists the admins
  * by email. Whoever signs in with one of those emails, verified by the sign-in method, is a member or an admin, so
  * swapping GitHub for another provider keeps both lists. `roleOf` decides on every request; each new session writes
- * it down for Better Auth's admin endpoints. Nobody else changes roles.
+ * it down for Better Auth's admin endpoints. Nobody else changes roles, so the admin plugin's set-role is off, and so is
+ * its impersonation, which Drop doesn't offer.
  *
  * Agents have no keys. Drop is an OAuth 2.1 authorization server for its own MCP endpoint (`oauthProvider`):
  * an MCP client registers itself, opens the browser once, and the person approves it on /oauth (signing in
@@ -67,7 +68,13 @@ export default defineAuth(({ env, requestOrigin }) => {
     advanced: requestOrigin.startsWith("https://")
       ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
       : {},
-    disabledPaths: ["/token", ...(proxied ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
+    disabledPaths: [
+      "/token",
+      "/admin/set-role",
+      "/admin/impersonate-user",
+      "/admin/stop-impersonating",
+      ...(proxied ? ["/sign-in/social", "/callback/github", "/link-social"] : []),
+    ],
     access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
     socialProviders: proxied
       ? {}
@@ -86,7 +93,7 @@ export default defineAuth(({ env, requestOrigin }) => {
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
     // Free or Pro (shared/quotas.ts TIERS). Only admins set it, from the Members page through the admin plugin.
     user: { additionalFields: { plan: { type: ["free", "pro"], required: false, input: false } } },
-    hooks: { before: nativeClientRegistration },
+    hooks: { before: clientRegistrationLimits },
     databaseHooks: {
       account: {
         create: {
@@ -133,7 +140,7 @@ export default defineAuth(({ env, requestOrigin }) => {
     },
     plugins: [
       proxyAuth(),
-      admin({ ac, roles, defaultRole: "member", adminRoles: ["admin"] }),
+      admin({ ac, roles, defaultRole: "member" }),
       jwt(),
       ...(teams
         ? [
@@ -200,6 +207,8 @@ export default defineAuth(({ env, requestOrigin }) => {
         enforcePerClientResources: false,
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
+        // MCP clients register loopback or private-use redirects without `application_type`; register them as native.
+        clientRegistrationDefaultApplicationType: "infer",
       }),
     ],
   }

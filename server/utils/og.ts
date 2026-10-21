@@ -4,6 +4,7 @@ import { dropTexts } from "../databases/config"
 import type { DropKind } from "#shared/types"
 import { SEARCH_KINDS, searchableText } from "./search"
 import type { DropRow } from "./drops/types"
+import { escapeUTF8 as escapeHtml } from "entities"
 
 // A shared link's preview (Open Graph): the drop's title, a line of what it says, and a card image of both.
 
@@ -52,9 +53,6 @@ const CARD_KINDS: Record<DropKind, string> = {
   site: "Site review",
   board: "Board",
 }
-
-const escapeHtml = (value: string) =>
-  value.replace(/[<>&"']/g, (char) => `&${{ "<": "lt", ">": "gt", "&": "amp", '"': "quot", "'": "#39" }[char]};`)
 
 export interface OgCard {
   title: string

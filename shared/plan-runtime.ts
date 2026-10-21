@@ -314,6 +314,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (to) to.scrollIntoView({ block: "start" }); else if (!id) scrollTo(0, 0);
       return;
     }
+    // A link to another site would load it inside the frame, where most sites (GitHub among them) refuse to show.
+    const away = !img && target && target.closest("a[href]");
+    if (away && !host.contains(away) && !away.target && /^https?:$/.test(away.protocol) && away.origin !== location.origin) {
+      away.target = "_blank";
+      away.relList.add("noopener");
+      return;
+    }
     if (!img || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
     e.preventDefault(); e.stopPropagation();
     // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
