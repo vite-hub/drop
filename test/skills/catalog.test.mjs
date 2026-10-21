@@ -30,7 +30,9 @@ for (const name of names) {
 
 test("pr-evidence serves comark-annotate's skill, without its front matter and with the CLI pinned", async () => {
   const { findSkill } = await import("../../server/utils/skills.ts")
-  const { version } = JSON.parse(await readFile(new URL("../../node_modules/comark-annotate/package.json", import.meta.url), "utf8"))
+  const { version } = JSON.parse(
+    await readFile(new URL("../../node_modules/comark-annotate/package.json", import.meta.url), "utf8"),
+  )
   const reference = findSkill("pr-evidence").files.find((item) => item.path === "references/annotations.md").text
   assert.match(reference, /^# /)
   assert.match(reference, /::compare/)
