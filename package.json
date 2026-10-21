@@ -1,6 +1,7 @@
 {
   "name": "vitehub-drop",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "build": "nuxt build",
@@ -42,7 +43,6 @@
     "@tiptap/pm": "3.31.4",
     "@tiptap/vue-3": "3.31.4",
     "@tiptap/y-tiptap": "3.0.9",
-    "@tldraw/store": "5.5.2",
     "@tldraw/tlschema": "5.5.2",
     "@tldraw/utils": "5.5.2",
     "@valibot/to-json-schema": "^1.8.0",

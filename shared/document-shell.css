@@ -118,9 +118,20 @@ main {
 }
 
 /* A before/after compare takes the room beside the text column, so its screenshots read at about twice the size.
-   It keeps clear of the viewer's floating panel on both sides (--drop-inset), and never gets narrower than the text. */
-.typeset .ca-compare {
-  --ca-wide: max(100%, min(72rem, 100vw - 2 * var(--drop-inset, 0px) - 3rem));
+   It centers on the column, which sits --drop-shift left of the page's middle, and keeps 1.5rem clear of the page's
+   left edge and of what covers its right: the viewer's floating panel and the outline's column (--drop-right). It never
+   gets narrower than the text. A heading right above it spans the same width, so it starts where Before does and
+   reads as the compare's title. The first compare has the annotation styles between the two. */
+.typeset .ca-compare,
+.typeset :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare) {
+  --ca-wide: max(
+    100%,
+    min(
+      72rem,
+      100vw - 2 * var(--drop-right, 0px) + var(--drop-shift, 0px) - 3rem,
+      100vw - var(--drop-shift, 0px) - 3rem
+    )
+  );
   width: var(--ca-wide);
   margin-inline: calc((100% - var(--ca-wide)) / 2);
 }

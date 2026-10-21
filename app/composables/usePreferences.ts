@@ -27,6 +27,27 @@ export const useSidebarCollapsed = () =>
     () => !!useCookie<{ collapsed?: boolean } | null>("drop-sidebar-nav").value?.collapsed,
   )
 
+/**
+ * Whether the app opened on a drop's link, from a pull request or a chat. That first page reads without the sidebar,
+ * whatever ⌘B saved, and leaves the saved choice alone: the sidebar comes back on the next page, with ⌘B, or with Show
+ * sidebar. Decided on the server, so the page renders without it.
+ */
+export const useOpenedOnLink = () =>
+  useState<boolean>("drop-opened-on-link", () => import.meta.server && useRoute().name === "d-id-slug")
+
+/** Whether the sidebar is out of sight, folded or skipped on a link, and the ⌘B toggle that shows it or folds it. */
+export function useSidebarHidden() {
+  const collapsed = useSidebarCollapsed()
+  const onLink = useOpenedOnLink()
+  const hidden = computed(() => collapsed.value || onLink.value)
+  function toggle() {
+    const fold = !hidden.value
+    onLink.value = false
+    collapsed.value = fold
+  }
+  return { hidden, toggle }
+}
+
 /** Which folders and apps are expanded in the sidebar tree. Shared state, so it survives navigation. */
 export const useTreeOpen = () => useState<Record<string, boolean>>("drop-tree-open", () => ({}))
 

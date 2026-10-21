@@ -12,12 +12,13 @@ import {
   toRichText,
 } from "@tldraw/tlschema"
 import { getIndexAbove, ZERO_INDEX_KEY } from "@tldraw/utils"
+import * as v from "valibot"
 
 export const BOARD_EXTENSION = ".tldr"
 export const BOARD_CONTENT_TYPE = "application/vnd.tldraw+json"
 
 /** tldraw's own schema: the editor validates with the same one, so records written here load as they are. */
-export const boardSchema = createTLSchema()
+const boardSchema = createTLSchema()
 
 type BoardRecord = { id: string; typeName: string; [key: string]: unknown }
 /** A tldraw store snapshot, as `getSnapshot(editor.store).document` returns it. */
@@ -57,7 +58,7 @@ export interface BoardItem {
   h?: number
   color?: (typeof BOARD_COLORS)[number]
 }
-export interface BoardEdge {
+interface BoardEdge {
   from: string
   to: string
   label?: string
@@ -92,35 +93,49 @@ const DEFAULTS = {
 /** A board with one empty page. */
 export function emptyBoard(): BoardSnapshot {
   const document = DocumentRecordType.create({ id: TLDOCUMENT_ID })
+  // SAFETY: tldraw brands page ids and index keys; "page:page" and "a1" are valid ones, the first page tldraw makes.
   const page = PageRecordType.create({ id: PAGE_ID as never, name: "Page 1", index: "a1" as never })
   return {
     schema: boardSchema.serialize(),
+    // SAFETY: both are plain records with id and typeName.
+    // doctor-disable-next-line typescript/evidence/no-chained-type-assertions -- tldraw's record interfaces lack BoardRecord's index signature, though every record is a plain object with id and typeName
     store: { [document.id]: document as unknown as BoardRecord, [page.id]: page as unknown as BoardRecord },
   }
 }
 
+const StoredBoard = v.object({
+  schema: v.record(v.string(), v.unknown()),
+  store: v.record(v.string(), v.looseObject({ id: v.string(), typeName: v.string() })),
+})
+
 /** Parses a stored board and migrates it to the current tldraw schema. Throws on anything else. */
 export function parseBoard(text: string): BoardSnapshot {
-  const parsed = JSON.parse(text) as BoardSnapshot
-  if (!parsed || typeof parsed !== "object" || !parsed.store || !parsed.schema) throw new Error("Not a board.")
-  const result = boardSchema.migrateStoreSnapshot(parsed as never)
+  const parsed = v.safeParse(StoredBoard, JSON.parse(text))
+  if (!parsed.success) throw new Error("Not a board.")
+  // SAFETY: migrateStoreSnapshot checks the schema's version and migrates every record, and returns an error otherwise.
+  const result = boardSchema.migrateStoreSnapshot(parsed.output as never)
   if (result.type === "error") throw new Error(`This board can't be read (${result.reason}).`)
+  // SAFETY: the migrated store holds tldraw records, plain objects with id and typeName.
+  // doctor-disable-next-line typescript/evidence/no-chained-type-assertions -- tldraw's record interfaces lack BoardRecord's index signature, though every record is a plain object with id and typeName
   return { schema: boardSchema.serialize(), store: result.value as unknown as BoardSnapshot["store"] }
 }
 
 /** Checks one record against tldraw's schema. Throws with tldraw's message when it doesn't fit. */
 export function validateRecord(record: BoardRecord) {
+  // SAFETY: boardSchema.types maps each type name to its record type, and each has validate; indexing by any string
+  // needs the record form, and an unknown name comes back undefined.
   const type = (boardSchema.types as Record<string, { validate(record: unknown): unknown }>)[record.typeName]
   if (!type) throw new Error(`Unknown record type ${record.typeName}`)
+  // SAFETY: validate returns the record it was given once it fits the schema, and throws otherwise.
   return type.validate(record) as BoardRecord
 }
 
-export const shapeId = (id: string) => (id.startsWith("shape:") ? id : (createShapeId(id) as string))
+const shapeId = (id: string): string => (id.startsWith("shape:") ? id : createShapeId(id))
 /** The id agents see and use: the shape's without its `shape:` prefix. */
-export const shortId = (id: string) => id.replace(/^shape:/, "")
+const shortId = (id: string) => id.replace(/^shape:/, "")
 
 const shapes = (board: BoardSnapshot) =>
-  Object.values(board.store).filter((record) => record.typeName === "shape") as Shape[]
+  Object.values(board.store).filter((record): record is Shape => record.typeName === "shape")
 interface Shape extends BoardRecord {
   type: string
   x: number
@@ -133,22 +148,24 @@ interface Shape extends BoardRecord {
 
 function pageOf(board: BoardSnapshot) {
   const pages = Object.values(board.store).filter((record) => record.typeName === "page")
-  return (pages.sort((a, b) => String(a.index).localeCompare(String(b.index)))[0]?.id ?? PAGE_ID) as string
+  return pages.sort((a, b) => String(a.index).localeCompare(String(b.index)))[0]?.id ?? PAGE_ID
 }
 
 function topIndex(board: BoardSnapshot, parentId: string) {
   return shapes(board)
     .filter((shape) => shape.parentId === parentId)
-    .reduce((top, shape) => (shape.index > top ? shape.index : top), ZERO_INDEX_KEY as string)
+    .reduce<string>((top, shape) => (shape.index > top ? shape.index : top), ZERO_INDEX_KEY)
 }
 
 /** A shape's box on the page: its own position plus every frame's above it. Rotation is ignored. */
-export function pageBounds(board: BoardSnapshot, shape: Shape) {
+function pageBounds(board: BoardSnapshot, shape: Shape) {
   let x = shape.x
   let y = shape.y
+  // SAFETY: a shape's parent is a page or a shape; the loop stops at the page, so `parent` is a shape inside it.
   for (let parent = board.store[shape.parentId] as Shape | undefined; parent?.typeName === "shape";) {
     x += parent.x
     y += parent.y
+    // SAFETY: as above, a shape's parent is a page or a shape.
     parent = board.store[parent.parentId] as Shape | undefined
   }
   const { w, h } = sizeOf(shape)
@@ -158,8 +175,10 @@ export function pageBounds(board: BoardSnapshot, shape: Shape) {
 function sizeOf(shape: Shape) {
   const scale = shape.props.scale ?? 1
   if (shape.type === "note") return { w: NOTE * scale, h: (NOTE + (shape.props.growY ?? 0)) * scale }
+  // doctor-disable-next-line typescript/strict/no-runtime-typeof -- tldraw's schema validated these props; only some shape types have a size
   if (typeof shape.props.w === "number" && typeof shape.props.h === "number")
     return { w: shape.props.w * scale, h: (shape.props.h + (shape.props.growY ?? 0)) * scale }
+  // doctor-disable-next-line typescript/strict/no-runtime-typeof -- tldraw's schema validated these props; only some shape types have a size
   if (typeof shape.props.w === "number") return { w: shape.props.w * scale, h: 40 * scale }
   return { w: 0, h: 0 }
 }
@@ -190,14 +209,15 @@ export function labelGrowth(text: string, w: number, h: number) {
   return Math.max(0, Math.ceil(lines * LABEL.line + LABEL.padding * 2 - h))
 }
 
+const walk = (node: any): string =>
+  node?.type === "text"
+    ? String(node.text ?? "")
+    : Array.isArray(node?.content)
+      ? node.content.map(walk).join(node.type === "doc" ? "\n" : "")
+      : ""
+
 /** The plain text of a tldraw rich text value. */
-export function plainText(rich: unknown): string {
-  const walk = (node: any): string =>
-    node?.type === "text"
-      ? String(node.text ?? "")
-      : Array.isArray(node?.content)
-        ? node.content.map(walk).join(node.type === "doc" ? "\n" : "")
-        : ""
+function plainText(rich: unknown): string {
   return walk(rich).trim()
 }
 
@@ -205,15 +225,17 @@ function textOf(shape: Shape) {
   return shape.type === "frame" ? String(shape.props.name ?? "") : plainText(shape.props.richText)
 }
 
+const fail = (message: string): never => {
+  throw new Error(message)
+}
+
 /** A board edit as tldraw records to put and ids to remove. Throws, naming the item, when one doesn't fit. */
 export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: string) {
   const put = new Map<string, BoardRecord>()
   const remove = new Set<string>()
   const page = pageOf(board)
+  // SAFETY: called only with shape ids (shapeId), whose records are shapes.
   const current = (id: string) => (put.get(id) ?? board.store[id]) as Shape | undefined
-  const fail = (message: string): never => {
-    throw new Error(message)
-  }
 
   // Frames first, so items placed in a frame added in the same edit find it.
   const added = [...(edit.add ?? [])].sort((a, b) => Number(b.type === "frame") - Number(a.type === "frame"))
@@ -271,6 +293,7 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
         row = y + size.h + size.growY + GAP * 2
       }
     }
+    // SAFETY: topIndex returns a shape's index, a valid index key, or ZERO_INDEX_KEY.
     const index = getIndexAbove(
       topIndex({ ...board, store: { ...board.store, ...Object.fromEntries(put) } }, parentId) as never,
     )
@@ -298,7 +321,7 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
     const id = shapeId(change.id)
     const shape = current(id)
     if (!shape) fail(`The board has no item "${change.id}".`)
-    const next = structuredClone(shape!) as Shape
+    const next = structuredClone(shape!)
     if (change.x !== undefined) next.x = change.x
     if (change.y !== undefined) next.y = change.y
     if (change.text !== undefined) {
@@ -328,7 +351,7 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
     const b = pageBounds(merged, to!)
     const start = { x: a.x + a.w / 2, y: a.y + a.h / 2 }
     const end = { x: b.x + b.w / 2, y: b.y + b.h / 2 }
-    const id = createShapeId() as string
+    const id: string = createShapeId()
     put.set(
       id,
       validateRecord({
@@ -338,6 +361,7 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
         x: start.x,
         y: start.y,
         rotation: 0,
+        // SAFETY: topIndex returns a shape's index, a valid index key, or ZERO_INDEX_KEY.
         index: getIndexAbove(topIndex(merged, page) as never),
         parentId: page,
         isLocked: false,
@@ -355,7 +379,7 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
       ["start", from!],
       ["end", to!],
     ] as const) {
-      const binding = createBindingId() as string
+      const binding: string = createBindingId()
       put.set(
         binding,
         validateRecord({
@@ -469,7 +493,7 @@ interface Binding extends BoardRecord {
   props: { terminal: "start" | "end" }
 }
 const bindings = (board: BoardSnapshot) =>
-  Object.values(board.store).filter((record) => record.typeName === "binding") as Binding[]
+  Object.values(board.store).filter((record): record is Binding => record.typeName === "binding")
 
 /** A frame on the board, for the per-frame images agents look at. */
 export function boardFrames(board: BoardSnapshot) {
@@ -494,6 +518,7 @@ export function boardOutline(board: BoardSnapshot) {
     arrows.set(binding.fromId, ends)
   }
   const name = (id?: string) => {
+    // SAFETY: arrows bind to shapes, so binding.toId names a shape.
     const shape = id ? (board.store[id] as Shape | undefined) : undefined
     if (!shape) return "nothing"
     const text = textOf(shape)
@@ -501,6 +526,7 @@ export function boardOutline(board: BoardSnapshot) {
   }
   const line = (shape: Shape, depth: number): string[] => {
     const box = pageBounds(board, shape)
+    // doctor-disable-next-line typescript/strict/no-runtime-typeof -- meta is free-form in tldraw's schema; Drop writes author as a string
     const by = typeof shape.meta?.author === "string" ? ` by ${shape.meta.author}` : ""
     const at = `(${round(box.x)},${round(box.y)}${box.w ? ` ${round(box.w)}×${round(box.h)}` : ""})`
     const pad = "  ".repeat(depth)
@@ -513,8 +539,7 @@ export function boardOutline(board: BoardSnapshot) {
     } else if (shape.type === "frame") {
       head = `frame ${shortId(shape.id)} "${text || "Untitled frame"}" ${at}${by}`
     } else {
-      const kind =
-        shape.type === "geo" ? String(shape.props.geo) : shape.type === "draw" ? "drawing" : (shape.type as string)
+      const kind = shape.type === "geo" ? String(shape.props.geo) : shape.type === "draw" ? "drawing" : shape.type
       head = `${kind} ${shortId(shape.id)}${text ? ` "${clip(text, 400)}"` : ""} ${at}${by}`
     }
     const inner = all

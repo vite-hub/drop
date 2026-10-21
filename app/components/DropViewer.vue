@@ -7,6 +7,7 @@
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
+import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion } from "#shared/types"
@@ -132,7 +133,7 @@ const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
 const inset = computed(() => (floating.value ? FLOATING_INSET : 0))
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced } = useViewerFrame({
+const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath } = useViewerFrame({
   drop,
   frame,
   app,
@@ -186,6 +187,25 @@ function closeChanges() {
 // The diff belongs to History: another tab goes back to the document.
 watch(tab, (value) => value !== "history" && closeChanges())
 
+// Apps and HTML pages open alone in another window (ViewerPresent): a deck for the projector, which Slidev's presenter
+// view in this frame then drives.
+const presents = computed(() => isApp.value || drop.value.kind === "html")
+function openWindow() {
+  const query = new URLSearchParams({ present: "" })
+  if (older.value) query.set("v", String(drop.value.version))
+  if (isApp.value && page.value !== "index.html") query.set("file", page.value)
+  window.open(`${dropPath(drop.value)}?${query}`, "_blank", "popup")
+}
+// A Slidev build (its runtime under assets/slidev/) presents in one step: the deck alone in a new window for the
+// projector, and Slidev's own presenter view (notes, next slide, timer) in this frame, which drives that window.
+const slidev = computed(
+  () => isApp.value && Boolean(drop.value.paths?.some((path) => path.startsWith("assets/slidev/"))),
+)
+function present() {
+  openWindow()
+  openPath("/presenter/1")
+}
+
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
   e: () => !editing.value && drop.value.canEdit && startEdit(),
@@ -193,6 +213,7 @@ defineShortcuts({
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
   l: () => !editing.value && copyLink("Link copied"),
+  d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
@@ -200,6 +221,17 @@ defineShortcuts({
     annotations.dismiss()
   },
 })
+
+// An uploaded file or image is the thing itself, so its download sits in the bar; Drop's own kinds keep it in the menu.
+const downloadsInBar = computed(() => Boolean(drop.value.url) && ["file", "image"].includes(drop.value.kind))
+/** Saves the stored file under its uploaded name; the raw URL is same-origin, so `download` names it. */
+function download() {
+  if (!drop.value.url) return
+  const anchor = document.createElement("a")
+  anchor.href = drop.value.url
+  anchor.download = drop.value.filename
+  anchor.click()
+}
 
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
@@ -220,6 +252,9 @@ function copyLink(announce?: string) {
 const moreMenu = computed(() =>
   [
     [
+      ...(presents.value
+        ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
+        : []),
       ...(canDrawArea.value
         ? [
             {
@@ -251,18 +286,21 @@ const moreMenu = computed(() =>
           ]
         : []),
     ],
-    ...(copiesMarkdown.value
-      ? [
-          [
+    [
+      ...(copiesMarkdown.value
+        ? [
             {
               label: "Copy as Markdown",
               icon: "i-mingcute-markdown-line",
               kbds: ["m"],
               onSelect: () => void copyMarkdown("Markdown copied"),
             },
-          ],
-        ]
-      : []),
+          ]
+        : []),
+      ...(drop.value.url && !downloadsInBar.value
+        ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
+        : []),
+    ],
     // Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it.
     ...(visitor.value
       ? [
@@ -416,6 +454,21 @@ offerToPalette("drop", () => {
       ? [{ label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => panel.show("details") }]
       : []),
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
+    ...(drop.value.url
+      ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
+      : []),
+    ...(slidev.value && contentOrigin.value
+      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
+      : []),
+    ...(presents.value
+      ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
+      : []),
+    ...(drop.value.resources ?? []).map((resource) => ({
+      label: `Open ${resourceLabel(resource)}`,
+      icon: "i-mingcute-external-link-line",
+      to: resource.url,
+      target: "_blank",
+    })),
     ...(copiesMarkdown.value
       ? [
           {
@@ -522,12 +575,7 @@ watch(
             :label="copied('link') ? 'Link copied' : 'Copy link'"
             @click="copyLink()"
           />
-          <ViewerAction
-            v-if="drop.url"
-            icon="i-mingcute-download-2-line"
-            label="Download original"
-            @click="navigateTo(drop.url, { external: true, open: { target: '_blank' } })"
-          />
+          <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
           <ViewerAction
             v-if="owner && !trashed"
             icon="i-mingcute-new-folder-line"
@@ -597,6 +645,10 @@ watch(
             </ConnectionStatus>
           </span>
         </template>
+        <!-- After the title, not in it: the heading stays the drop's name. -->
+        <template v-if="drop.resources && !editing" #trailing>
+          <ViewerResources :resources="drop.resources" />
+        </template>
         <template v-if="editing" #right>
           <AvatarStack
             v-if="live.people.value.length"
@@ -618,6 +670,16 @@ watch(
         </template>
         <!-- Three tools at hand and More for the rest: icons only, shortcuts in the tooltips and the menu. -->
         <template v-else #right>
+          <UTooltip v-if="slidev && contentOrigin" text="Deck in a new window, presenter view here">
+            <UButton
+              color="neutral"
+              icon="i-mingcute-presentation-2-line"
+              label="Present"
+              size="sm"
+              variant="ghost"
+              @click="present"
+            />
+          </UTooltip>
           <UTooltip
             v-if="drop.canEdit || drop.editNote"
             :kbds="drop.canEdit ? ['E'] : undefined"
@@ -655,6 +717,16 @@ watch(
               size="sm"
               variant="ghost"
               @click="copyLink()"
+            />
+          </UTooltip>
+          <UTooltip v-if="downloadsInBar" :kbds="['D']" :text="`Download ${drop.filename}`">
+            <UButton
+              aria-label="Download"
+              color="neutral"
+              icon="i-mingcute-download-2-line"
+              size="sm"
+              variant="ghost"
+              @click="download"
             />
           </UTooltip>
           <UDropdownMenu v-if="moreMenu.length" :content="{ align: 'end' }" :items="moreMenu">
@@ -794,10 +866,8 @@ watch(
               color="neutral"
               icon="i-mingcute-download-2-line"
               label="Download"
-              :to="drop.url"
-              external
-              target="_blank"
               variant="outline"
+              @click="download"
             />
           </div>
         </div>

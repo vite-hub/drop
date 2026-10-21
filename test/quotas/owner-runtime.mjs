@@ -71,14 +71,14 @@ try {
   assert.equal(currentUsage.bytes.used, expectedBytes)
   const oversizedApp = await request("/api/apps", "POST", {
     id: app.data.id,
-    files: { "index.html": "", ...Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`${i}.txt`, ""])) },
+    files: { "index.html": "", ...Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`${i}.txt`, ""])) },
   })
   assert.equal(oversizedApp.response.status, 402)
   assert.equal(oversizedApp.data.quota.unit, "appFiles")
   assert.equal((await request("/api/usage")).data.writes.used, 6)
   const oversizedBytes = await request("/api/apps", "POST", {
     id: app.data.id,
-    files: { "index.html": "x".repeat(2 * 1024 * 1024 + 1) },
+    files: { "index.html": "x".repeat(10 * 1024 * 1024 + 1) },
   })
   assert.equal(oversizedBytes.response.status, 402)
   assert.equal(oversizedBytes.data.quota.unit, "appBytes")

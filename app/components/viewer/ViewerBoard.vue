@@ -32,6 +32,7 @@ onMounted(async () => {
     const root = createRoot(host.value!)
     root.render(
       createElement(tl.Tldraw, {
+        // SAFETY: the server stores only snapshots tldraw's schema accepted and migrated (server/utils/boards.ts).
         snapshot: { document: data.snapshot } as never,
         licenseKey: config.public.tldrawLicenseKey || undefined,
         // Drop's header already names the board and holds its menu. A board has one page, the one agents read, so
@@ -59,6 +60,13 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => unmount?.())
 
+async function toBase64(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  let binary = ""
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(binary)
+}
+
 function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolean) {
   const id = props.drop.id
   editor.updateInstanceState({ isReadonly: !canEdit })
@@ -82,6 +90,7 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
   const stopListen = editor.store.listen(
     ({ changes }) => {
       for (const record of [...Object.values(changes.added), ...Object.values(changes.updated).map(([, to]) => to)]) {
+        // SAFETY: tldraw's records are plain objects with id and typeName, what Records holds.
         put.set(record.id, record as never)
         removed.delete(record.id)
       }
@@ -108,6 +117,7 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
     removed.clear()
     saving.value = true
     try {
+      // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- a save, from tldraw's onMount in the browser
       await $fetch(`/api/drops/${id}/board`, { method: "POST", body })
       for (const record of body.put) known[record.id] = record
       for (const gone of body.remove) delete known[gone]
@@ -137,8 +147,10 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
     known = structuredClone(remote)
     if (!changed.length && !gone.length) return
     editor.store.mergeRemoteChanges(() => {
-      if (gone.length) editor.store.remove(gone as never)
-      if (changed.length) editor.store.put(changed as never)
+      // SAFETY: the server stores only records its tldraw schema accepted (server/utils/boards.ts), under their ids.
+      editor.store.remove(gone as never)
+      // SAFETY: the same: records tldraw's schema accepted.
+      editor.store.put(changed as never)
     })
     await fitText(new Set(changed.map((record) => record.id)))
     // An agent's edit shows in its next view_board too.
@@ -154,6 +166,7 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
   async function fitText(only?: Set<string>) {
     await Promise.all(
       ["tldraw_draw", "tldraw_sans", "tldraw_serif", "tldraw_mono"].map((family) =>
+        // doctor-disable-next-line nuxt/hydration/no-browser-global-in-universal-code -- runs from tldraw's onMount, in the browser
         document.fonts.load(`16px ${family}`).catch(() => []),
       ),
     )
@@ -164,21 +177,25 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
     const apply = (updates: { id: string; type: string; props: object }[]) => {
       if (!updates.length) return
       // People who can draw store the fit, so view_board's images and other readers get it too; others fit locally.
-      if (canEdit) editor.run(() => editor.updateShapes(updates as never), { history: "ignore" })
-      else
+      if (canEdit) {
+        // SAFETY: each update is a shape's own id and type with props tldraw's onBeforeCreate or its frame fit computed.
+        editor.run(() => editor.updateShapes(updates as never), { history: "ignore" })
+      } else
         editor.store.mergeRemoteChanges(() =>
           editor.store.put(
             updates.map((update) => {
+              // SAFETY: update.id came from a shape on this page a moment ago.
               const shape = editor.getShape(update.id as never)!
+              // SAFETY: update.props are props of this shape's own type, so the merge is still that shape.
               return { ...shape, props: { ...shape.props, ...update.props } } as typeof shape
             }),
           ),
         )
     }
-    apply(fitted.map(({ id, type, props }) => ({ id, type, props })))
+    apply(fitted.map((shape) => ({ id: shape.id, type: shape.type, props: shape.props })))
     const frames = editor
       .getCurrentPageShapes()
-      .filter((shape) => shape.type === "frame" && shape.meta?.agent) as import("tldraw").TLFrameShape[]
+      .filter((shape): shape is import("tldraw").TLFrameShape => shape.type === "frame" && Boolean(shape.meta?.agent))
     apply(
       frames.flatMap((frame) => {
         const box = editor.getShapePageBounds(frame)
@@ -193,21 +210,16 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
   const refit = () => void fitText()
   document.fonts.addEventListener("loadingdone", refit)
   // Open on the whole board, never zoomed past 100%: wide frames otherwise start off screen.
-  void fitText().then(() => {
+  const openWhole = () => {
     editor.zoomToFit()
     if (editor.getZoomLevel() > 1) editor.resetZoom(editor.getViewportScreenCenter())
-  })
+  }
+  void fitText().then(openWhole)
 
   async function images() {
     if (!canEdit) return
     const shapes = [...editor.getCurrentPageShapeIds()]
     if (!shapes.length) return
-    const toBase64 = async (blob: Blob) => {
-      const bytes = new Uint8Array(await blob.arrayBuffer())
-      let binary = ""
-      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-      return btoa(binary)
-    }
     // At most 1600 px on the long side: readable for a model, small enough to send.
     const render = async (ids: typeof shapes) => {
       const bounds = editor.getShapesPageBounds(ids)
@@ -216,12 +228,16 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
       return toBase64(blob)
     }
     try {
+      const page = editor.getCurrentPageId()
       const frames = shapes
-        .map((shape) => editor.getShape(shape)!)
-        .filter((shape) => shape.type === "frame" && shape.parentId === editor.getCurrentPageId())
+        .flatMap((shapeId) => {
+          const shape = editor.getShape(shapeId)
+          return shape?.type === "frame" && shape.parentId === page ? [shape] : []
+        })
         .slice(0, 20)
       const out = [{ frame: "overview", png: await render(shapes) }]
       for (const frame of frames) out.push({ frame: frame.id.replace(/^shape:/, ""), png: await render([frame.id]) })
+      // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- an upload, from tldraw's onMount in the browser
       await $fetch(`/api/drops/${id}/board/images`, { method: "POST", body: { images: out } })
     } catch (error) {
       console.error("Board images failed", error)

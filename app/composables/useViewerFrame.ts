@@ -86,6 +86,12 @@ export function useViewerFrame(options: {
     frameKey.value++
   }
   onMounted(reloadFrame)
+  /** Loads `path` in the content frame, as if the app went there itself: a Slidev deck's presenter view, say. */
+  function openPath(path: string) {
+    if (!contentOrigin.value) return
+    frameSrc.value = contentOrigin.value + path
+    frameKey.value++
+  }
 
   function pageFor(path: string) {
     let decoded = path
@@ -137,7 +143,8 @@ export function useViewerFrame(options: {
         return
       case "host":
         frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
-        return send({ type: "document", html: frameDocument })
+        // The grant lets this app's origin serve it its other files (server/utils/app-files.ts).
+        return send({ type: "document", html: frameDocument, grant: drop.value.contentGrant })
       case "frame-request": {
         if (!isApp.value) return
         const target = pageFor(message.path)
@@ -198,5 +205,5 @@ export function useViewerFrame(options: {
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
   watch([ready, options.inset], () => ready.value && send({ type: "inset", right: options.inset.value }))
 
-  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced }
+  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath }
 }

@@ -10,13 +10,14 @@ import { SHARES } from "#shared/share"
 import { type DropChange, updateDrop } from "../../utils/drop-update"
 import { requireIdentity } from "../../utils/identity"
 import { isAttachment } from "../../utils/nodes"
+import { resourceList, ResourcesInput, saveResources } from "../../utils/resources"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../format"
 
 export default defineMcpTool({
   name: "update_drop",
   title: "Update a drop",
   description:
-    "Change who can open a drop, its title, its link's slug, a folder's description, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; resolve a site's review comments once the site is fixed. A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
+    "Change who can open a drop, its title, its link's slug, a folder's description, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; replace the links it shows at the top; resolve a site's review comments once the site is fixed. A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
   annotations: { idempotentHint: true },
   inputSchema: toStandardJsonSchema(
     v.object({
@@ -70,6 +71,14 @@ export default defineMcpTool({
           ),
         ),
       ),
+      resources: v.optional(
+        v.pipe(
+          ResourcesInput,
+          v.description(
+            "Every link the drop should show at the top of its page, in order, replacing the ones it has: its pull request, that PR's preview. read_drop lists the current ones. [] removes them all.",
+          ),
+        ),
+      ),
       resolves: v.optional(
         v.pipe(
           v.array(v.pipe(v.number(), v.integer())),
@@ -81,7 +90,7 @@ export default defineMcpTool({
       ),
     }),
   ),
-  handler: async ({ id, renew, trash, resolves, ...rest }, event) => {
+  handler: async ({ id, renew, trash, resolves, resources, ...rest }, event) => {
     const who = await requireIdentity(event)
     if (rest.slug !== undefined && !slugify(rest.slug))
       throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
@@ -92,22 +101,29 @@ export default defineMcpTool({
       ...(renew ? { renew: true } : {}),
       ...(trash !== undefined ? { trashed: trash } : {}),
     }
-    if (!Object.keys(change).length && !resolves?.length)
+    if (!Object.keys(change).length && !resolves?.length && !resources)
       throw new HTTPError({ status: 400, message: "Nothing to change." })
     if (resolves?.length && (isAttachment(drop) || !permissions(drop, who).manage))
       throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
+    // Whoever may publish its next version may set its links, as publish does.
+    const links = resources && resourceList(resources)
+    if (links && (isAttachment(drop) || !permissions(drop, who).edit))
+      throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
+    if (links && drop.expired && trash !== false)
+      throw new HTTPError({ status: 409, message: "This drop is in the Trash. Restore it first." })
     const updated = mcpDrop(
       Object.keys(change).length ? await updateDrop(drop, who, change, event) : toSummary(drop),
       event.url.origin,
       drop,
     )
+    if (links) await saveResources(drop, links)
     const resolved = resolves?.length ? await resolveComments(drop, resolves) : []
     const result = { ...updated, ...(resolved.length ? { resolved } : {}) }
     return {
       content: [
         {
           type: "text" as const,
-          text: `Updated${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(updated)}`,
+          text: `Updated${links ? `, ${links.length ? `${links.length} ${links.length === 1 ? "link" : "links"}` : "no links"} at the top` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(updated)}`,
         },
       ],
       structuredContent: result,

@@ -71,7 +71,7 @@ async function sealKey(event: H3Event) {
 }
 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
-type SealPurpose = "token" | "choice" | "upload"
+type SealPurpose = "token" | "choice" | "upload" | "app-files"
 
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {

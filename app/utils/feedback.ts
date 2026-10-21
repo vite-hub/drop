@@ -14,7 +14,14 @@ export const CONTENT_SANDBOX = `${PREVIEW_SANDBOX} allow-same-origin`
  * button works: Drop renders them itself, escaping raw HTML, so their only scripts are Drop's and Comark's. HTML docs
  * and apps run whatever their author wrote, and writing to a reader's clipboard is how paste-jacking works.
  */
-export const frameAllow = (kind: string) => (kind === "markdown" ? "clipboard-write" : undefined)
+export const frameAllow = (kind: string) =>
+  kind === "markdown" ? "clipboard-write" : kind === "app" || kind === "html" ? PRESENT_ALLOW : undefined
+
+/**
+ * What apps and HTML docs get instead, so a deck presents as on its own host (Slidev's fullscreen button, its Screen
+ * Mirror, a screen that stays on). The browser announces fullscreen and asks before anyone's screen is captured.
+ */
+const PRESENT_ALLOW = "fullscreen; display-capture; screen-wake-lock"
 
 const pct = (n: number) => `${(n / 10).toFixed(0)}%`
 

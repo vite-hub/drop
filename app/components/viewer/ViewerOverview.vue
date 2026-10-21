@@ -4,6 +4,7 @@
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
 // it in place.
 import { expiryLabel } from "#shared/expiry"
+import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropDetail } from "#shared/types"
 
@@ -124,6 +125,23 @@ async function save() {
       <div v-if="folder" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Folder</dt>
         <dd class="min-w-0 truncate text-highlighted" :title="folder">{{ folder }}</dd>
+      </div>
+      <div v-if="drop.resources" class="flex items-start gap-3">
+        <dt class="w-20 shrink-0 text-muted">Links</dt>
+        <dd class="min-w-0 flex-1 space-y-1.5">
+          <a
+            v-for="resource in drop.resources"
+            :key="resource.url"
+            class="flex min-w-0 items-center gap-1.5 text-highlighted hover:underline"
+            :href="resource.url"
+            rel="noopener noreferrer"
+            target="_blank"
+            :title="resource.url"
+          >
+            <ViewerResourceIcon :url="resource.url" />
+            <span class="truncate">{{ resourceLabel(resource) }}</span>
+          </a>
+        </dd>
       </div>
       <div v-if="drop.isOwner" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Access</dt>

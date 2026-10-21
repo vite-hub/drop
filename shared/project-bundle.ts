@@ -32,6 +32,10 @@ export const pageUrl = (page: string): string => encodeURI(`/${page.replace(/(^|
 
 export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain"
 
+/** Files the viewer and agents read as text. The rest (fonts, images, wasm) only a browser loads. */
+export const isTextFile = (path: string): boolean =>
+  /^(text\/|application\/(javascript|json|xml|manifest\+json)|image\/svg\+xml)/.test(contentTypeOf(path))
+
 const dataUrl = (path: string, content: string) =>
   `data:${contentTypeOf(path)};charset=utf-8,${encodeURIComponent(content)}`
 const safeScript = (code: string) => code.replace(/<\/script/gi, "<\\/script")
@@ -163,6 +167,9 @@ export function buildProjectDocument(files: ProjectFiles, page: string): string 
   return prependToHead(html, pageRuntime(files, page))
 }
 
+/** What a bare import names: a package, maybe scoped, maybe with a subpath, like `preact` or `@vue/reactivity/dist`. */
+const PACKAGE = /^(?:@[a-z0-9][\w.~-]*\/)?[a-z0-9][\w.~-]*(?:\/[\w.~@-]+)*$/i
+
 const LINK_TAGS: [RegExp, string][] = [
   [/<script\b[^>]*\bsrc=["']([^"']+)["']/gi, "script"],
   [/<link\b[^>]*\bhref=["']([^"']+)["']/gi, "stylesheet or icon"],
@@ -204,10 +211,11 @@ export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
     } else if (/\.m?js$/.test(path)) scanScript(path, text)
   }
   function scanScript(path: string, code: string) {
-    for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"]+)\1/g)) {
+    // `from` and `import` as keywords, not inside a name like "show-from" in a bundle's CSS classes.
+    for (const match of code.matchAll(/(?<![\w$.-])(?:from\s*|import\s*\(\s*|import\s+)(['"])([^'"\n]+)\1/g)) {
       const specifier = match[2]!
       if (/^(?:\.{1,2}\/|\/)/.test(specifier)) check(path, specifier, "a module")
-      else if (!importMap && !/^[a-z][a-z0-9+.-]*:/i.test(specifier))
+      else if (!importMap && PACKAGE.test(specifier))
         issues.add(
           `${path} imports "${specifier}", a bare module name that browsers can't load. Import it from a CDN URL (https://esm.sh/${specifier}) or add an import map.`,
         )

@@ -51,21 +51,28 @@ export async function writeBoard(
     try {
       ;({ put, remove } = boardChanges(board, change.edit, change.who.actorName))
     } catch (error) {
-      throw new HTTPError({ status: 400, message: (error as Error).message })
+      throw new HTTPError({ status: 400, message: error instanceof Error ? error.message : String(error) })
     }
   } else {
+    // doctor-disable-next-line typescript/strict/no-runtime-typeof -- the request body is unchecked JSON; tldraw's schema checks each record below
     remove = (change.remove ?? []).filter((id) => typeof id === "string" && !SESSION.test(id))
     put = []
     for (const record of change.put ?? []) {
       // Cameras, pointers and selection are each person's own; only the document is shared.
+      // doctor-disable-next-line typescript/strict/no-runtime-typeof -- the request body is unchecked JSON; validateRecord checks the rest
       if (typeof record.id !== "string" || SESSION.test(record.id)) continue
       try {
+        // SAFETY: validateRecord checks the record against tldraw's schema and throws when it doesn't fit.
         put.push(validateRecord(record as never))
       } catch (error) {
-        throw new HTTPError({ status: 400, statusText: `Invalid record ${record.id}: ${(error as Error).message}` })
+        throw new HTTPError({
+          status: 400,
+          statusText: `Invalid record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
+        })
       }
     }
   }
+  // SAFETY: every record in put passed validateRecord or came from boardChanges, which validates its own.
   applyChanges(board, put as never, remove)
   const text = JSON.stringify(board)
   const bytes = new TextEncoder().encode(text)
