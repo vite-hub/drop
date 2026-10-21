@@ -1,5 +1,5 @@
 import type { H3Event } from "h3"
-import { useServerEnv } from "#vitehub/env/server"
+import { deriveSecret, useServerEnv } from "#vitehub/env/server"
 import { siteMatches } from "#shared/review"
 
 /**
@@ -54,15 +54,14 @@ function configured(event: H3Event): ContentConfig | null {
 const LABEL = "[a-z2-7]{26}"
 
 /**
- * A DNS label for `dropId`: 26 base32 characters of an HMAC under the auth secret. Stable, and says nothing about the id.
- * Once ViteHub ships VITEHUB_SECRET (vite-hub/vitehub#2308), key it with `deriveSecret("drop:content-origin")` instead.
+ * A DNS label for `dropId`: 26 base32 characters of an HMAC under ViteHub's `deriveSecret("drop:content-origin")`, from
+ * VITEHUB_SECRET. Stable, and says nothing about the id.
  */
 async function contentLabel(event: H3Event, dropId: string): Promise<string> {
-  // Optional: an environment without the auth secret (the tests' one) still labels drops.
-  const secret = useServerEnv(event).auth?.secret?.unseal() || "drop-content-origin"
+  const secret = await deriveSecret("drop:content-origin", event)
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(`content-origin:${secret}`),
+    new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

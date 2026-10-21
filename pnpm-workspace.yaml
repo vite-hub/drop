@@ -23,22 +23,8 @@ overrides:
   "@tiptap/extension-floating-menu": 3.31.4
 
 patchedDependencies:
-  # Keeps the Server Env resolver in Auth's global state. In dev, editing anything server/auth.ts imports re-ran the
-  # module and dropped it, so signed-in requests failed on `env.drop` until /api/auth ran again (vite-hub/vitehub#2469).
-  "@vite-hub/auth@0.0.4": patches/@vite-hub__auth@0.0.4.patch
-  # Under `nuxt dev` (cloudflare-dev), the Blob plugin stored unenv's process.env proxy as globalThis.__env__, which
-  # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings
-  # (vite-hub/vitehub#2468). Its serve() also answers a single byte Range with a 206, so videos seek (and play in Safari).
+  # serve() answers a single byte Range with a 206, so videos seek (and play in Safari). Not upstream yet.
   "@vite-hub/blob@0.0.4": patches/@vite-hub__blob@0.0.4.patch
-  # `vitehub schedule run` returned 500 under `nuxt dev` (ssrLoadModule needs a runnable ssr environment) and ran
-  # outside Nitro elsewhere. Runs Static Schedules through the Nitro dev handler, imports registry definitions by
-  # absolute path (the app/ Vite root broke relative ones), and reloads the registry on HMR (vite-hub/vitehub#2473).
-  "@vite-hub/schedule@0.0.4": patches/@vite-hub__schedule@0.0.4.patch
-  # files(): a Source over files bundled at build time, so the docs' Content runs on Workers without a file system.
-  # The vite-hub patch adds its `vite-hub/source/files` export (vite-hub/vitehub#2627).
-  "@vite-hub/source@0.0.4": patches/@vite-hub__source@0.0.4.patch
-  # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461 (still open).
-  "@vite-hub/ui@0.0.4": patches/@vite-hub__ui@0.0.4.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
@@ -52,11 +38,6 @@ patchedDependencies:
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
   # basic auth without sendError or a Node request, and request middlewares registered only for features in use.
   nuxt-security@2.6.0: patches/nuxt-security@2.6.0.patch
-  # Forwards vite-hub/ui/avatar-stack, connection-status, and sync-status to the patched @vite-hub/ui (#2461), and
-  # copies its collaboration CSS into vite-hub/ui/styles.css, a separate file; without it the avatars render full size.
-  # Keeps Rate Limit in memory under `nuxt dev`: the preset pinned the Cloudflare provider, whose bindings exist only
-  # in the built wrangler.json, so every limited route returned 500 in dev (vite-hub/vitehub#2467).
-  vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
   # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
   # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
   vite-doctor@0.0.12: patches/vite-doctor@0.0.12.patch
