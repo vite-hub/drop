@@ -13,3 +13,6 @@ export async function readDraft(_id: string): Promise<string | null> {
 }
 
 export async function deleteDrafts(_ids: string[]) {}
+
+// Without rooms, readers find a new version when they open the link again.
+export async function refreshLatest(_link: string) {}

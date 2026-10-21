@@ -156,8 +156,9 @@ export default defineNuxtConfig({
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   // tldraw needs a license key in production (NUXT_PUBLIC_TLDRAW_LICENSE_KEY); without one, boards show its watermark.
+  // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
   // doctor-disable-next-line nuxt/runtime/no-secret-in-public-config -- tldraw license keys are public: the browser runs tldraw and checks the key against the domain.
-  runtimeConfig: { seoIndex: false, public: { tldrawLicenseKey: "" } },
+  runtimeConfig: { seoIndex: false, public: { tldrawLicenseKey: "", realtime: liveEditing } },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
   // check, and body limits, so the module's request middlewares stay off.
