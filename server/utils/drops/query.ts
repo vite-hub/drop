@@ -400,21 +400,16 @@ export function storageFailure(error: Error) {
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 
-export async function readText(key: string) {
+async function readFile(key: string) {
   const [error, file] = await blob.get(key)
-  if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  if (error) throw storageFailure(error)
+  if (error && error.code !== "BLOB_NOT_FOUND") throw storageFailure(error)
   if (!file) throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  return await file.text()
+  return file
 }
 
-async function readBytes(key: string) {
-  const [error, file] = await blob.get(key)
-  if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  if (error) throw storageFailure(error)
-  if (!file) throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  return new Uint8Array(await file.arrayBuffer())
-}
+export const readText = async (key: string) => (await readFile(key)).text()
+
+const readBytes = async (key: string) => new Uint8Array(await (await readFile(key)).arrayBuffer())
 
 export async function versionChain(row: DropRow) {
   // Follow indexed parent/child links, retaining the existing 50 older / 100 total view bounds.

@@ -60,6 +60,11 @@ export function siteMatches(address: string, origin: string): boolean {
   return LABEL.test(origin.slice(prefix.length, origin.length - suffix.length - 1))
 }
 
+/** Whether the site drop's `siteUrl` covers the page at `address`, any URL typed in the viewer. */
+export function siteCovers(siteUrl: string | null | undefined, address: string): boolean {
+  return !!siteUrl && URL.canParse(address) && siteMatches(siteUrl, new URL(address).origin)
+}
+
 /**
  * Every address that covers `origin`: the origin itself and the one pattern that could, so a lookup finds the site
  * drops for a page by equality. Empty for anything that isn't an origin a site may send from.

@@ -11,7 +11,8 @@ const ready = useMounted()
 const error = ref("")
 
 onMounted(async () => {
-  const token = decodeURIComponent(route.hash.slice(1))
+  // The router has decoded the hash already.
+  const token = route.hash.slice(1)
   if (!token) return (error.value = "Press Comment on the site first, then open the review from there.")
   if (!me.value) return
   try {

@@ -2,10 +2,9 @@
 import { contentUnavailable } from "#shared/content-unavailable"
 
 const props = defineProps<{ status: number; path: string; waitingForReview?: boolean }>()
-// Only failed views need the account lookup; successful shared views stay on their existing request path.
-const { data: me } = await useMe()
-// Behind an auth proxy (read at runtime, as on /signin) signing in again only returns the same account.
-const { data: method } = await useSignInMethod()
+// Only failed views need the account lookup; successful shared views stay on their existing request path. Behind an
+// auth proxy (read at runtime, as on /signin) signing in again only returns the same account. Both requests go at once.
+const [{ data: me }, { data: method }] = await Promise.all([useMe(), useSignInMethod()])
 const message = computed(() =>
   contentUnavailable(props.status, props.path, me.value?.email, props.waitingForReview, Boolean(method.value?.proxy)),
 )
