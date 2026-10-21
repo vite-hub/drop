@@ -38,11 +38,15 @@ const dropsOpen = ref(true)
 const teamOpen = ref(true)
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
+// A personal Drop with teams lists each team you're on, its folders below it.
+const teams = computed(() => me.value?.teams ?? null)
 // Rows end in a count like Executor v2's nav: muted totals for what you have, and a marked one for what waits on you.
 // Both are the keyed caches the trees and the Drops page read; only a personal Drop's Shared with me, which no tree
 // shows, costs a fetch of its own.
 const { data: drops } = useDrops()
-const { data: withMe } = useSharedWithMe()
+const { data: shared } = useSharedWithMe()
+// A personal Drop's teams list their folders under Teams, not under Shared with me.
+const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
 const workspace = computed(() => [
   {
     label: "Agents",
@@ -197,6 +201,27 @@ function leaveDocs() {
                 to="/drops?tab=with-me"
                 @navigate="close"
               />
+              <template v-if="teams">
+                <SidebarItem
+                  active-icon="i-mingcute-group-2-fill"
+                  :active="route.path === '/teams'"
+                  :count="teams.length"
+                  icon="i-mingcute-group-2-line"
+                  label="Teams"
+                  to="/teams"
+                  @navigate="close"
+                />
+                <div v-for="item in teams" :key="item.id" class="ml-3.5 border-l border-default pl-2">
+                  <NuxtLink
+                    class="flex h-7 items-center rounded-md px-2 text-xs font-medium text-muted hover:bg-accented/60 hover:text-highlighted"
+                    :class="at(`/teams/${item.id}`) && 'text-highlighted'"
+                    :to="`/teams/${item.id}`"
+                    @click="close"
+                    >{{ item.name }}</NuxtLink
+                  >
+                  <TeamTree :team="item.id" @navigate="close" />
+                </div>
+              </template>
             </nav>
 
             <div class="flex flex-col gap-0.5 border-t border-default pt-2">

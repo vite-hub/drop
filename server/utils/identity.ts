@@ -7,6 +7,7 @@ import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
 import { oauthClient, user as users } from "../databases/config"
 import { isMember } from "./members"
+import { type TeamRole, teamsOf } from "./teams"
 import { useServerEnv } from "#vitehub/env/server"
 import { type Role, roleFor } from "#shared/roles"
 import type { ActorKind } from "#shared/types"
@@ -23,6 +24,8 @@ export interface Identity {
   actorKind: ActorKind
   /** Shown on drops: the MCP client's name (often the agent, like "Claude Code") or the person's name. */
   actorName: string
+  /** The teams they're on and their role on each, on a personal Drop with teams (./teams.ts). */
+  teams?: Record<string, TeamRole>
 }
 
 type DropAuth = Auth<ReturnType<typeof auth.options>>
@@ -65,6 +68,7 @@ export const bearerFrom = (headers: Headers) => headers.get("authorization")?.ma
 export function identify(event: H3Event): Promise<Identity | null> {
   return (event.context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
     if (who && !(await isMember(who.userId))) return null
+    if (who) who.teams = await teamsOf(who.userId, event)
     // Every request's wide event says who made it, never the credential itself.
     if (who)
       useLogger(event).set({

@@ -25,7 +25,7 @@ import {
   walkUp,
   withAncestors,
 } from "../nodes"
-import { shareNow, sharePolicy } from "../share"
+import { modeFor, shareNow, sharePolicy } from "../share"
 import { searchHeads, searchWords } from "../search"
 import { resourcesOf } from "../resources"
 import { viewsOf } from "../views"
@@ -234,7 +234,7 @@ export async function listFolders(who: Identity, event?: H3Event): Promise<DropS
   const { days } = expiryPolicy(event)
   const mine = and(eq(dropHeads.ownerId, who.userId), eq(drops.teamFolder, false))
   const rows = await resolveRows(
-    await heads(and(eq(drops.kind, "folder"), or(mine, eq(drops.teamFolder, true))), 500),
+    await heads(and(eq(drops.kind, "folder"), or(mine, teamFolderSql(`"drops"`, who, event))), 500),
     days,
   )
   return summarize(
@@ -242,6 +242,21 @@ export async function listFolders(who: Identity, event?: H3Event): Promise<DropS
     days,
     { path: true },
   )
+}
+
+/**
+ * SQL for a team folder, at table alias `node`, on the caller's team: every one on a team Drop, and on a personal Drop
+ * the ones of the teams they're on.
+ */
+function teamFolderSql(node: string, who: Identity, event?: H3Event) {
+  const at = sql.raw(node)
+  if (sharePolicy(event).mode === "team") return sql`(${at}.team_folder = 1)`
+  const teams = Object.keys(who.teams ?? {})
+  if (!teams.length) return sql`0`
+  return sql`(${at}.team_folder = 1 AND ${at}.team_id IN (${sql.join(
+    teams.map((team) => sql`${team}`),
+    sql`, `,
+  )}))`
 }
 
 /**
@@ -262,7 +277,6 @@ function reachableSql(node: string, who: Identity, now: number, event?: H3Event)
  */
 export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const now = Date.now()
-  const team = sharePolicy(event).mode === "team"
   const others = and(ne(drops.ownerId, who.userId), reachableSql(`"drops"`, who, now, event))
   const rows = await db
     .select({ drop: drops, ownerName: user.name, ownerImage: user.image })
@@ -271,7 +285,7 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
     .innerJoin(user, eq(user.id, drops.ownerId))
     .where(
       and(
-        team ? or(others, and(eq(drops.teamFolder, true), isNull(drops.parentId))) : others,
+        or(others, and(teamFolderSql(`"drops"`, who, event), isNull(drops.parentId))),
         listedNode,
         isNull(drops.trashedAt),
         isNull(drops.quarantinedAt),
@@ -290,8 +304,11 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
       (node) =>
         !node.expired &&
         !node.quarantinedAt &&
-        (team || !node.shareReview) &&
-        !node.ancestors!.some((above) => listed.has(above.id) || (team && shareNow(above, now) !== "private")),
+        (modeFor(node, event) === "team" || !node.shareReview) &&
+        !node.ancestors!.some(
+          (above) =>
+            listed.has(above.id) || (modeFor(node, event) === "team" && shareNow(above, now, "team") !== "private"),
+        ),
     )
     .sort((a, b) => Number(b.teamFolder) - Number(a.teamFolder))
   return (await summarize(nodes, days)).map((summary) => ({
@@ -312,7 +329,7 @@ async function searchShared(who: Identity, words: string[], limit: number, event
   // Folders that open to you, yours aside, and the team's, whoever made them: what's in them opens through them.
   const openFolders = sql`(
     WITH RECURSIVE open(id, depth) AS (
-      SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND ((d.owner_id != ${who.userId} AND ${reachable("d")}) OR d.team_folder = 1)
+      SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND ((d.owner_id != ${who.userId} AND ${reachable("d")}) OR ${teamFolderSql("d", who, event)})
         AND d.trashed_at IS NULL AND d.quarantined_at IS NULL
       UNION ALL SELECT d.id, open.depth + 1 FROM drops d JOIN open ON d.parent_id = open.id WHERE d.kind = 'folder' AND open.depth < ${MAX_DEPTH}
     ) SELECT id FROM open
