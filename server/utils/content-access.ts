@@ -29,10 +29,11 @@ export async function requireBlobAccess(event: H3Event, key: string) {
     return
   }
 
-  const drop = await findDropByBlob(key, event)
+  // Only a file that isn't public needs to know who asks, but asking alongside the lookup keeps that to one round trip.
+  const [drop, caller] = await Promise.all([findDropByBlob(key, event), identify(event)])
   if (!drop || drop.ownerBanned || drop.quarantinedAt) throw notFound()
   const publicView = permissions(drop, null).view
-  const who = publicView ? null : await identify(event)
+  const who = publicView ? null : caller
   if (!publicView && !permissions(drop, who).view) throw notFound()
   // Opening a raw file in the browser is a visit; images embedded elsewhere are not.
   await Promise.all([recordVisit(event, drop, who, "document"), countView(event, drop, who, "document")])
