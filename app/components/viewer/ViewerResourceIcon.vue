@@ -4,7 +4,11 @@
 // an image the server rendered can fail before the page hydrates, and its error would never reach the handler.
 import { faviconUrls } from "#shared/resources"
 
+// Sites whose favicon is a black mark, lost on the dark theme: their Simple Icons mark takes the text color instead.
+const MARKS: Record<string, string> = { "github.com": "i-simple-icons-github" }
+
 const props = defineProps<{ url: string }>()
+const mark = computed(() => MARKS[new URL(props.url).hostname.replace(/^www\./, "")])
 const tries = computed(() => faviconUrls(props.url))
 const index = ref(0)
 const mounted = useMounted()
@@ -15,7 +19,8 @@ watch(
 </script>
 
 <template>
-  <span v-if="!mounted" class="size-4 shrink-0" />
+  <UIcon v-if="mark" class="size-4 shrink-0 text-muted" :name="mark" />
+  <span v-else-if="!mounted" class="size-4 shrink-0" />
   <img
     v-else-if="index < tries.length"
     :key="tries[index]"
