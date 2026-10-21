@@ -238,6 +238,21 @@ export function useDropActions() {
     }
   }
 
+  /** A new empty Markdown doc, in `parent` when given. */
+  async function createDoc(parent?: Pick<DropSummary, "id">) {
+    try {
+      const doc = await $fetch<DropSummary>("/api/drops", {
+        method: "POST",
+        body: { filename: "untitled.md", title: "Untitled doc", content: "" },
+      })
+      if (parent) await $fetch(`/api/drops/${doc.id}`, { method: "PATCH", body: { folder: parent.id } })
+      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+      return doc
+    } catch (error) {
+      notify.fail("Couldn't create the doc", error)
+    }
+  }
+
   /** A new empty board, in `parent` when given. */
   async function createBoard(parent?: Pick<DropSummary, "id">) {
     try {
@@ -295,6 +310,7 @@ export function useDropActions() {
     emptyTrash,
     createFolder,
     createSite,
+    createDoc,
     createBoard,
     describe,
     move,

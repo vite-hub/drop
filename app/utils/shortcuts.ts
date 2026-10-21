@@ -14,7 +14,7 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
     where: "Any page, signed in",
     shortcuts: [
       { keys: ["?"], label: "Show keyboard shortcuts" },
-      { keys: ["meta", "k"], label: "Search drops, docs, and pages" },
+      { keys: ["meta", "k"], label: "Search drops, docs, and pages, or make a new drop" },
       { keys: ["meta", "b"], label: "Hide or show the sidebar" },
       { keys: ["/"], label: "Search the Drops page", where: "The Drops page" },
     ],

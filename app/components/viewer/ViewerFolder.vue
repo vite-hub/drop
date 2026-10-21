@@ -6,7 +6,7 @@ import { dropPath } from "#shared/links"
 import type { DropDetail, DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView?: boolean }>()
-const { createBoard, createFolder, createSite, upload } = useDropActions()
+const { createBoard, createDoc, createFolder, createSite, upload } = useDropActions()
 const folderDialog = useFolderDialog()
 const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
@@ -33,6 +33,11 @@ picker.onChange((files) => void uploadPicked(files))
 async function uploadPicked(files: FileList | null) {
   const result = files?.[0] && (await upload(files[0], props.drop))
   if (result) await navigateTo(`/drops/${result.id}`)
+}
+
+async function newDoc() {
+  const doc = await createDoc(props.drop)
+  if (doc) await navigateTo(`/drops/${doc.id}?edit=1`)
 }
 
 async function newBoard() {
@@ -62,7 +67,7 @@ async function newSite() {
         />
         <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
         <div v-if="adds" class="flex items-center gap-1">
-          <NewMenu :folder="addsFolders" @board="newBoard" @folder="newFolder" @site="newSite" />
+          <NewMenu :folder="addsFolders" @board="newBoard" @doc="newDoc" @folder="newFolder" @site="newSite" />
           <UButton
             color="neutral"
             icon="i-mingcute-upload-2-line"
