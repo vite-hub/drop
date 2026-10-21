@@ -23,5 +23,6 @@ test("a file with an ETag is kept and revalidated; its 304 keeps that policy", (
 test("rendered documents, errors, and share pages are never kept", () => {
   assert.equal(respond(`/f/${key}.md`), "private, no-store")
   assert.equal(respond(`/f/${key}.png`, { status: 404 }), "private, no-store")
+  assert.equal(respond(`/f/${key}.png`, { status: 416, headers: { ETag: '"abc"' } }), "private, no-store")
   assert.equal(respond("/d/abc/slug", { headers: { ETag: '"abc"' } }), "private, no-store")
 })

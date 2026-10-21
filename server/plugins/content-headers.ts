@@ -17,7 +17,9 @@ export default definePlugin((app) => {
       // Shared content is checked again on every request. A file with an ETag stays in the browser and is revalidated,
       // so a screenshot opened twice comes back as a 304 without its bytes; pages, errors, and rendered documents
       // aren't kept at all.
-      const revalidated = path.startsWith("/f/") && (response.status === 304 || response.headers.has("ETag"))
+      const revalidated =
+        path.startsWith("/f/") &&
+        (response.status === 304 || (response.status >= 200 && response.status < 300 && response.headers.has("ETag")))
       response.headers.set("Cache-Control", revalidated ? "private, no-cache" : "private, no-store")
       return
     }
