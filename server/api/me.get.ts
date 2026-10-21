@@ -2,11 +2,12 @@
 import { and, count, eq, inArray } from "drizzle-orm"
 import { defineHandler } from "h3"
 import { db } from "vite-hub/database/drizzle"
-import { drops, workspaceStats } from "../databases/config"
+import { drops, organization, workspaceStats } from "../databases/config"
 import type { Viewer } from "#shared/types"
 import { expiryPolicy } from "../utils/expiry"
 import { identify } from "../utils/identity"
 import { sharePolicy } from "../utils/share"
+import { billingConfig, paidTeams, teamsEnabled } from "../utils/teams"
 
 export default defineHandler(async (event): Promise<Viewer | null> => {
   const who = await identify(event)
@@ -22,6 +23,18 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
           .where(and(inArray(drops.share, ["public", "public_comment"]), eq(drops.shareReview, "pending")))
       : []
   const { mode, publicLinkDays } = sharePolicy(event)
+  const ids = Object.keys(who.teams ?? {})
+  const rows = ids.length
+    ? await db
+        .select({ id: organization.id, name: organization.name, slug: organization.slug })
+        .from(organization)
+        .where(inArray(organization.id, ids))
+    : []
+  const billing = billingConfig(event)
+  const paid = billing.enabled ? await paidTeams(ids) : new Set<string>()
+  const teams = rows
+    .map((item) => ({ ...item, role: who.teams![item.id]!, paid: paid.has(item.id) }))
+    .sort((a, b) => a.name.localeCompare(b.name))
   return {
     id: who.userId,
     name: who.name,
@@ -33,5 +46,9 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
     publicLinkDays,
     members,
     ...(pending && { reviews: pending.n }),
+    ...(teamsEnabled(event) ? { teams } : {}),
+    ...(billing.enabled
+      ? { billing: { freeMembers: billing.freeMembers, annual: Boolean(billing.annualPriceId) }, paid: paid.size > 0 }
+      : {}),
   }
 })

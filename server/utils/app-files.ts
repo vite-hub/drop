@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm"
-import type { H3Event } from "h3"
+import { useLogger } from "evlog/nitro/v3"
+import { getCookie, type H3Event } from "h3"
 import * as v from "valibot"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
@@ -25,7 +26,7 @@ export const appFilesGrant = (event: H3Event, link: string, now = Date.now()) =>
 
 /** The file this request on a content origin asks for, or null when it carries no valid grant for this origin's app. */
 export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Response | null> {
-  const sealed = event.req.headers.get("cookie")?.match(/(?:^|;\s*)drop_grant=([\w.-]+)/)?.[1]
+  const sealed = getCookie(event, "drop_grant")
   const grant = sealed ? await unseal(event, "app-files", Grant, sealed, 512) : null
   if (!grant || grant.e <= now) return null
   if (!(await onOwnOrigin(event, grant.l))) return null
@@ -58,6 +59,14 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
   }
   if (event.req.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers })
   const [error, body] = await blob.get(file.blobKey)
-  if (error || !body) return null
+  // Not the cacheable 404 a missing file gets: the store failing is brief, and a cached miss would outlast it.
+  if (error && error.code !== "BLOB_NOT_FOUND") {
+    useLogger(event).error(error, { action: "storage" })
+    return new Response("File storage is temporarily unavailable.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5" },
+    })
+  }
+  if (!body) return null
   return new Response(event.req.method === "HEAD" ? null : body.stream(), { headers })
 }

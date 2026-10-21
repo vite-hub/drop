@@ -47,6 +47,30 @@ DROP_GITHUB_ORG=your-org
 DROP_PUBLIC_LINK_DAYS=7
 ```
 
+## Teams on a personal Drop {#teams}
+
+`DROP_TEAMS=true` lets people on a personal Drop make teams on **Teams**. A team works like a small team Drop inside yours: its owner and admins invite people by email and make its folders, and drops in those folders reach its members and their agents, nobody else. Drop sends no email, so whoever invites copies the link and sends it; the invitee joins by opening it, signed in with that email.
+
+| Variable | What it does |
+| --- | --- |
+| [DROP_TEAMS]{.font-mono .text-xs} | Set true to turn teams on. Ignored on a team Drop, which is one team already. |
+| [DROP_FREE_TEAM_MEMBERS]{.font-mono .text-xs} | Members a team has before it needs a subscription, invitations included. Defaults to 3. Applies only with billing on. |
+| [DROP_FREE_KEPT]{.font-mono .text-xs} | Drops the Free plan keeps forever at once. Defaults to 10. Applies only with `DROP_QUOTAS=true`. |
+
+### Bill teams through Stripe {#billing}
+
+With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan and can't make new boards, since tldraw's free license doesn't cover paid use. `/pricing` shows the plans; without billing it's a 404.
+
+| Variable | What it does |
+| --- | --- |
+| [STRIPE_SECRET_KEY]{.font-mono .text-xs} | Your Stripe secret key. |
+| [STRIPE_WEBHOOK_SECRET]{.font-mono .text-xs} | The signing secret of a webhook to `<origin>/api/auth/stripe/webhook` that sends `checkout.session.completed` and the `customer.subscription.*` events. |
+| [STRIPE_TEAM_PRICE_ID]{.font-mono .text-xs} | A recurring per-unit price for one member. |
+| [STRIPE_TEAM_ANNUAL_PRICE_ID]{.font-mono .text-xs} | Optional: its yearly price, which adds a Pay yearly button. |
+| [STRIPE_MANAGED_PAYMENTS]{.font-mono .text-xs} | Defaults to true: Stripe sells as merchant of record and files sales tax and VAT. Turn Managed Payments on in Stripe and give the product an eligible tax code. Set false to sell under your own account. |
+
+Billing turns on once teams are on and the key, the webhook secret, and the price are all set.
+
 ## Give apps their own domain {#content-origin}
 
 Apps and HTML docs run their own scripts, so by default Drop shows them in a sandbox with no origin, away from Drop and the reader's session. The sandbox also blocks `localStorage`, cookies, and URL changes. Drop swaps in temporary storage, but an app that routes by its URL breaks.

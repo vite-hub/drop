@@ -13,7 +13,7 @@ import {
   validateRecord,
 } from "#shared/board"
 import { drops } from "../databases/config"
-import { type DropRow, MAX_FILE_BYTES, readText, storageFailure } from "./drops"
+import { type DropRow, escapesFolder, MAX_FILE_BYTES, readText, storageFailure } from "./drops"
 import type { Identity } from "./identity"
 import { textStatements } from "./search"
 
@@ -67,7 +67,7 @@ export async function writeBoard(
       } catch (error) {
         throw new HTTPError({
           status: 400,
-          statusText: `Invalid record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
+          message: `Invalid record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
         })
       }
     }
@@ -93,7 +93,9 @@ const SESSION = /^(camera|instance|instance_page_state|pointer|instance_presence
 // Images: the browser that saves a board renders the overview and each frame as PNG (tldraw only renders in a
 // browser) and sends them here, so agents can look at drawings the outline can only locate.
 
-const imageKey = (drop: DropRow, name: string) => `boards/${drop.link}/${name}.png`
+// Frame ids come from the board's records, which may name any string: one that would leave the board's folder once the
+// blob store decodes it gets no image.
+const imageKey = (drop: DropRow, name: string) => (escapesFolder(name) ? null : `boards/${drop.link}/${name}.png`)
 export const OVERVIEW = "overview"
 
 export async function storeBoardImages(drop: DropRow, images: { frame: string; png: string }[]) {
@@ -103,17 +105,22 @@ export async function storeBoardImages(drop: DropRow, images: { frame: string; p
     if (image.frame !== OVERVIEW && !frames.has(image.frame)) continue
     const bytes = Uint8Array.from(atob(image.png), (char) => char.charCodeAt(0))
     // A PNG starts with these 8 bytes; anything else isn't stored.
-    if (bytes.byteLength > MAX_FILE_BYTES || bytes[0] !== 0x89 || bytes[1] !== 0x50) continue
-    const [error] = await blob.put(imageKey(drop, image.frame), bytes, { access: "private", contentType: "image/png" })
+    const key = imageKey(drop, image.frame)
+    if (!key || bytes.byteLength > MAX_FILE_BYTES || bytes[0] !== 0x89 || bytes[1] !== 0x50) continue
+    const [error] = await blob.put(key, bytes, { access: "private", contentType: "image/png" })
     if (error) throw storageFailure(error)
   }
 }
 
 /** The stored PNG of the overview or a frame, base64-encoded for an MCP image result, or null before any was sent. */
 export async function boardImage(drop: DropRow, frame: string) {
-  const [error, file] = await blob.get(imageKey(drop, frame))
-  if (error?.code === "BLOB_NOT_FOUND" || !file) return null
+  const key = imageKey(drop, frame)
+  if (!key) return null
+  const [error, file] = await blob.get(key)
+  if (error?.code === "BLOB_NOT_FOUND") return null
+  // Any other error is the store failing, which must not read as "no image yet".
   if (error) throw storageFailure(error)
+  if (!file) return null
   const bytes = new Uint8Array(await file.arrayBuffer())
   let binary = ""
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
