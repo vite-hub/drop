@@ -359,3 +359,22 @@ index 874b0536711ec482871afb44b3fd550c9314c766..f5e93ae1300d2e6de2b1e9facd94fe3d
  }
  function name(nodes, data) {
  	const shots = [];
+--- a/package.json
++++ b/package.json
+@@ -34,7 +34,8 @@
+   "exports": {
+     ".": "./dist/index.mjs",
+     "./html": "./dist/html.mjs",
+-    "./package.json": "./package.json"
++    "./package.json": "./package.json",
++    "./skills/*": "./skills/*"
+   },
+   "publishConfig": {
+     "access": "public",
+@@ -57,4 +58,4 @@
+     "dev": "tsdown --watch",
+     "doctor": "vite-doctor . --no-cache --max-warnings 0 --format text"
+   }
+-}
+\ No newline at end of file
++}
