@@ -131,7 +131,7 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 
-The schema is one file, `0000_init.sql`, which creates a new database. A database from an earlier release doesn't pick up later schema changes on its own: apply them by hand. After you change the schema in `server/databases/`, `pnpm db:generate` writes the next migration.
+`0000_init.sql` creates a new database, and each later numbered migration changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/`, `pnpm db:generate` writes the next migration.
 
 ## Pick a host {#hosts}
 
