@@ -343,8 +343,30 @@ function cleanPath(path: string) {
     .split("/")
     .filter((part) => part && part !== "." && part !== "..")
     .join("/")
-  if (!clean || clean.length > 300) throw new HTTPError({ status: 400, statusText: `Invalid file path: ${path}` })
+  if (!clean || clean.length > 300 || escapesFolder(clean))
+    throw new HTTPError({ status: 400, message: `Invalid file path: ${path}` })
   return clean
+}
+
+/**
+ * Whether a blob key part climbs out of its folder once decoded. ViteHub's blob store percent-decodes every key before
+ * its driver sees it, so `%2e%2e/` is `../`, which the fs driver resolves; a URL-based driver (S3) may decode again.
+ * Either way an app's file could land on another drop's blob.
+ */
+export function escapesFolder(path: string) {
+  let decoded = path
+  for (let round = 0; round < 3; round++) {
+    let next = decoded
+    try {
+      next = decodeURIComponent(decoded)
+    } catch {}
+    if (next === decoded) break
+    decoded = next
+  }
+  return decoded
+    .replace(/\\/g, "/")
+    .split("/")
+    .some((part) => part === "." || part === "..")
 }
 
 /**
@@ -380,7 +402,7 @@ export async function publishApp(
   if (clash.length)
     throw new HTTPError({
       status: 400,
-      statusText: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.`,
+      message: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.`,
     })
   if (input.replace && removes.length)
     throw new HTTPError({ status: 400, statusText: "An archive replaces the whole app, so it takes no removes." })
@@ -439,7 +461,7 @@ export async function publishApp(
   if (stale.length)
     throw new HTTPError({
       status: 400,
-      statusText: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
+      message: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
     })
   // Files the agent neither sent nor removed carry over, blob and all: no new write, no new bytes. An archive keeps none.
   const sent = new Set(entries.map(([path]) => path))

@@ -10,6 +10,7 @@ import { deployment, type Host } from "./scripts/deployment.ts"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
+const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
 const liveEditing = host === "cloudflare" || host === "vps"
@@ -216,6 +217,8 @@ export default defineNuxtConfig({
     "/members": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
+    // Never cached, like /f/ and /d/ (server/plugins/content-headers.ts sets theirs).
+    "/signin": { headers: { "cache-control": "private, no-store" } },
     "/docs/**": { appLayout: "docs" },
     // The policies sit in the docs nav, so they keep its sidebar.
     "/terms": { appLayout: "docs" },
@@ -348,7 +351,6 @@ export default defineNuxtConfig({
   nitro: {
     // Drizzle applies the existing migration journal before a local Node instance serves requests.
     plugins: database === "sqlite" ? [fileURLToPath(new URL("./server/database-migrate.ts", import.meta.url))] : [],
-    errorHandler: fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url)),
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.
     ...(host === "cloudflare"
@@ -396,6 +398,10 @@ export default defineNuxtConfig({
     // server import protection rejects. Dev works without it.
     "nitro:config": function (config) {
       config.plugins = config.plugins?.filter((plugin) => !plugin.includes("dev-close-sockets"))
+      // Raw files and share pages get their own error page (server/handlers/content-error.ts); everything else keeps
+      // Nuxt's, which renders app/error.vue. Nuxt only adds its handler when nitro.errorHandler is unset, so ours goes
+      // in front of it here instead.
+      config.errorHandler = [contentErrorHandler, ...[config.errorHandler ?? []].flat()]
     },
   },
 

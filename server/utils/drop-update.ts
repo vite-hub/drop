@@ -46,7 +46,7 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
     if (above?.expired)
       throw new HTTPError({
         status: 409,
-        statusText: `It's in ${trashedFolder(drop, days).title}, which is in the Trash. Restore that folder.`,
+        message: `It's in ${trashedFolder(drop, days).title}, which is in the Trash. Restore that folder.`,
       })
     await restoreDrop(drop, now)
     drop = { ...drop, trashedAt: null, trashReason: null, lastAccessedAt: now, expired: false }
