@@ -80,7 +80,7 @@ index d3b625c6f98be0b06b1bb3a0ed51004dfec1177a..44682acf7eb78153883659c076f7d2e8
 @@ -1,6 +1,65 @@
 -import { createAuthClient } from "better-auth/vue";
 -import { computed } from "vue";
-+import { computed, getCurrentScope, shallowRef, watch } from "vue";
++import { computed, getCurrentInstance, getCurrentScope, shallowRef, watch } from "vue";
  //#region src/vue.ts
 +const LOAD = Symbol.for("vitehub.auth.client.load");
 +/** The state of a client hook, such as `useSession()`, before Better Auth's client has loaded. */
@@ -102,8 +102,13 @@ index d3b625c6f98be0b06b1bb3a0ed51004dfec1177a..44682acf7eb78153883659c076f7d2e8
 +	const load = () => loaded ??= import("better-auth/vue").then((module) => module.createAuthClient(options));
 +	function hook(name, args) {
 +		const scope = getCurrentScope();
++		const nuxtApp = getCurrentInstance()?.appContext.config.globalProperties.$nuxt;
 +		const real = (client) => Reflect.get(client, name)(...args);
-+		if (typeof args[0] === "function") return load().then((client) => runIn(scope, () => real(client)));
++		if (typeof args[0] === "function") {
++			const callback = args[0];
++			args[0] = (...callbackArgs) => runIn(scope, () => callback(...callbackArgs), nuxtApp);
++			return load().then((client) => runIn(scope, () => real(client), nuxtApp));
++		}
 +		const pending = pendingState(async (...query) => {
 +			await load();
 +			const current = state.value;
@@ -113,7 +118,7 @@ index d3b625c6f98be0b06b1bb3a0ed51004dfec1177a..44682acf7eb78153883659c076f7d2e8
 +		if (!("window" in globalThis)) return state;
 +		load().then((client) => {
 +			if (scope && !scope.active) return;
-+			runIn(scope, () => watch(real(client), (value) => state.value = value, { immediate: true }));
++			runIn(scope, () => watch(real(client), (value) => state.value = value, { immediate: true }), nuxtApp);
 +		});
 +		return state;
 +	}
@@ -134,8 +139,9 @@ index d3b625c6f98be0b06b1bb3a0ed51004dfec1177a..44682acf7eb78153883659c076f7d2e8
 +	return call([]);
 +};
 +/** Run `run` in the scope the hook was called in, so its watchers stop with the component that called it. */
-+function runIn(scope, run) {
-+	return scope ? scope.run(run) : run();
++function runIn(scope, run, nuxtApp) {
++	const inScope = () => scope ? scope.run(run) : run();
++	return nuxtApp?.runWithContext ? nuxtApp.runWithContext(inScope) : inScope();
 +}
 +/** Better Auth's own Vue client behind one that `createAuthClient()` returned, once it has loaded. */
 +async function loadAuthClient(client) {
