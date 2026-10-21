@@ -88,6 +88,13 @@ export interface DropVersion {
   current?: boolean
 }
 
+/** A link a drop points to, like its pull request. Every version of the drop shows the same ones (#shared/resources). */
+export interface DropResource {
+  url: string
+  /** What it is, like "PR #123". Without one, the page shows the link's host. */
+  title?: string
+}
+
 /** A file a doc embeds from this Drop (an image, usually). It belongs to the doc. */
 export interface DropAttachment {
   id: string
@@ -131,6 +138,8 @@ export interface DropDetail extends DropSummary {
   siteUrl?: string
   /** Its owner and admins: views of every version, each viewer counted once a day. Their own visits don't count. */
   views?: Record<ViewerKind, number>
+  /** Links it points to, like its pull request and that PR's preview, in the order they were added. */
+  resources?: DropResource[]
 }
 
 export interface DropComment {

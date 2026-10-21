@@ -126,6 +126,12 @@ Each drop says how long it lives: Temporary for 14 days after anyone last opened
 
 More in [Lifetime and Trash](/docs/review#expiry).
 
+### Links {#links}
+
+A drop can link to the pages it belongs with, such as the pull request it documents and that pull request's preview. They sit next to its title, each with its site's icon, and Details lists them all. Everyone who can open the drop sees them, on every version.
+
+Agents set them when they publish, and pull request evidence links its pull request and preview on its own. The icons load from each site's own `/favicon.ico`, or its parent domain's when the address is behind a sign-in, never through an icon service.
+
 ### Views {#views}
 
 **Views** in a drop's Details count how often people and agents opened it, split into signed in, anonymous, and by agents. Only its owner and admins see them, and their agents get them from `read_drop`. Each viewer counts once a day, every version of a doc adds to the same count, and your own visits don't count.

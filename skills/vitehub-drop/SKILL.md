@@ -41,6 +41,8 @@ Make a drop public only when the user asks, or when people outside the Drop must
 
 Pass `slug` on every new drop: a few lowercase words and dashes that say what it is, such as `hipoteca-madrid`. The link reads `/d/<key>/<slug>`, and Markdown and HTML sent as text are named after it. `publish` answers with that link (`url`). It stays the same for every later version and always opens the latest one; `?v=2` pins a version. Do not repeat a successful call: every success creates another drop or version. Docs and apps are limited to 4 MiB.
 
+Pass `resources` when the drop belongs with pages elsewhere, such as the pull request it documents, that pull request's preview, or the issue: a list of `{ url, title }`, up to 8, `https` (or `http` on localhost). They show at the top of the drop's page with each site's icon, for everyone who can open it, and every version shows the same ones. Give each a short `title` like `PR #123` or `Preview`; without one the page shows the host. With `previous`, the ones you pass are added, and a link already there keeps its place, so pass them again freely. `read_drop` lists them under `Links:`.
+
 For an app or HTML page, the answer can include `warnings`: scripts, stylesheets, images, imports, `fetch()` paths, or links that point at nothing in what you published. Fix them and publish the next version before you hand over the link.
 
 When you're done, tell the user the link, who can open it, how long it lives (`status` says when it expires), and what you checked: the warnings you fixed, and anything you couldn't.
@@ -85,7 +87,7 @@ To have people comment on a running website (a pull request's preview deploy, st
 
 `list_drops` lists the user's drops at the top (filter with `kind`, `shared`; `query` searches inside folders too), one folder with `folder`, their Trash with `trash: true`, or with `sharedWithMe: true` the team's folders and teammates' drops on a team Drop, or the public links the user opened on a personal one, plus plan usage.
 
-`update_drop` changes `share`, `title`, `slug`, `lifetime`, `folder`, or the `description` of the user's own folder; `renew: true` starts a fresh window; `trash: true` moves a drop to the Trash, where it stays restorable for 15 days, and `trash: false` restores it, also after it expired. Trash only what the user asked to remove, or what you made and no longer need. Only people delete for good.
+`update_drop` changes `share`, `title`, `slug`, `lifetime`, `folder`, or the `description` of the user's own folder; `resources` replaces the links at the top with the list you pass (`[]` removes them); `renew: true` starts a fresh window; `trash: true` moves a drop to the Trash, where it stays restorable for 15 days, and `trash: false` restores it, also after it expired. Trash only what the user asked to remove, or what you made and no longer need. Only people delete for good.
 
 ## Render code
 

@@ -24,6 +24,7 @@ import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
 import { annotationIssues } from "./markdown-document"
 import { createSiteDrop } from "./review"
+import { addedResources, resourceList, ResourcesInput, saveResources } from "./resources"
 import { signUpload } from "./uploads"
 
 // No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
@@ -135,6 +136,14 @@ export const PublishInput = v.object({
       ),
     ),
   ),
+  resources: v.optional(
+    v.pipe(
+      ResourcesInput,
+      v.description(
+        "Links the drop belongs with, shown with their sites' icons at the top of its page: the pull request it documents, that PR's preview deploy, the issue. Every version shows the same ones. With previous, these are added to the drop's links; one already there keeps its place, so pass them again freely. Replace or clear them with update_drop.",
+      ),
+    ),
+  ),
   folder: v.optional(
     v.pipe(
       v.string(),
@@ -165,12 +174,20 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const folder = input.folder && !input.previous ? await requireFolder(input.folder, who, event) : undefined
   if (input.slug !== undefined && !slugify(input.slug))
     throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
+  const links = input.resources ? resourceList(input.resources) : undefined
+  // The upload URL carries the call, and room in it is short.
+  if (links && input.file && input.file.base64 === undefined && !upload)
+    throw new HTTPError({
+      status: 400,
+      message: "Put resources on the doc that embeds the file, or set them with update_drop once it's uploaded.",
+    })
   if (input.site) {
     if (input.previous || input.resolves || input.removes)
       throw new HTTPError({
         status: 400,
         message: "A site has no versions. Change it with update_drop, and resolve its comments there.",
       })
+    const resources = links && (await addedResources(null, links))
     const row = await createSiteDrop(
       who,
       {
@@ -185,6 +202,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       },
       event,
     )
+    if (resources) await saveResources(row, resources)
     const drop = mcpDrop(toSummary((await findDrop(row.id, event)) ?? row), event.url.origin)
     const script = reviewSnippet(event.url.origin)
     return {
@@ -206,6 +224,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       message: "previous is a site, which has no versions. Change it with update_drop.",
     })
   if (previous) previous = (await versionChain(previous))[0] ?? previous
+  const resources = links && (await addedResources(previous, links))
   const share = input.share ? { share: input.share } : {}
   const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
 
@@ -312,6 +331,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves) : []
 
   const fresh = (await findDrop(row.id, event)) ?? row
+  if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
   const check = warnings.length

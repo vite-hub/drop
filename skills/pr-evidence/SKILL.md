@@ -38,7 +38,7 @@ Above the screenshots, write one line with the steps to reach the screen. Each p
 
 ## Publish
 
-1. Write the doc from these rules and fresh captures each time. For a next version, read the earlier one only for its open comments; don't start from its text or its conclusions. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), and a `note`. Open the returned page.
+1. Write the doc from these rules and fresh captures each time. For a next version, read the earlier one only for its open comments; don't start from its text or its conclusions. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), a `note`, and `resources`: the pull request's URL with the title `PR #<number>`, and the after preview's URL with the title `Preview`. They show with their sites' icons at the top of the page. Pass them again with each version; one already there isn't added twice. Open the returned page.
 2. Take a screenshot of it and check that every mark sits on its target and every number matches its note. Fix and publish again with `previous` until it does. If a mark can't be verified, say so in the report.
 3. Give the user the link and a snippet for the pull request body, placed where the repository's pull request rules say:
 

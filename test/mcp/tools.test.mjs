@@ -383,6 +383,75 @@ test("read_drop tells the owner's agents how many viewed the drop, and nobody el
   assert.doesNotMatch(theirs.content[0].text, /Views:/)
 })
 
+test("an agent links a drop to its pull request and preview; publishing again adds without doubling", async () => {
+  const pr = "https://github.com/acme/portal/pull/42"
+  const bad = await call(publish, {
+    markdown: "# Evidence",
+    note: "v1",
+    lifetime: "review",
+    resources: [{ url: "http://example.com/pr" }],
+  })
+  assert.match(bad.message, /isn't a link: use https/)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0, "nothing is published")
+
+  const doc = (
+    await call(publish, {
+      markdown: "# Evidence",
+      share: "public",
+      note: "v1",
+      lifetime: "review",
+      resources: [{ url: pr, title: "PR #42" }, { url: `${pr}#top` }, { url: pr }],
+    })
+  ).structuredContent
+  const v2 = (
+    await call(publish, {
+      markdown: "# Evidence 2",
+      previous: doc.id,
+      note: "v2",
+      resources: [{ url: pr }, { url: "https://pr42-demo.preview.quiver.dk", title: "Preview" }],
+    })
+  ).structuredContent
+  const linked = [
+    { url: pr, title: "PR #42" },
+    { url: `${pr}#top` },
+    { url: "https://pr42-demo.preview.quiver.dk/", title: "Preview" },
+  ]
+  const read = await call(readDrop, { id: v2.id })
+  assert.deepEqual(read.structuredContent.resources, linked, "the PR keeps its place and its title")
+  assert.match(read.content[0].text, /\nLinks:\n- PR #42: https:\/\/github\.com\/acme\/portal\/pull\/42\n/)
+  assert.deepEqual(
+    (await call(readDrop, { id: doc.id })).structuredContent.resources,
+    linked,
+    "every version shows them",
+  )
+
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('reader', 'Reader', 'reader@example.com')").run()
+  const agent = state.who
+  state.who = { ...agent, userId: "reader", name: "Reader", email: "reader@example.com" }
+  assert.deepEqual((await call(readDrop, { id: v2.id })).structuredContent.resources, linked, "anyone who can open it")
+  assert.match((await call(updateDrop, { id: v2.id, resources: [] })).message, /No drop/, "only who may publish to it")
+  state.who = agent
+
+  const tooMany = Array.from({ length: 6 }, (_, n) => ({ url: `https://example.com/${n}` }))
+  assert.match(
+    (await call(publish, { markdown: "# 3", previous: v2.id, note: "v3", resources: tooMany })).message,
+    /at most 8/,
+  )
+  const replaced = await call(updateDrop, { id: v2.id, resources: [{ url: "https://linear.app/acme/issue/ACM-7" }] })
+  assert.match(replaced.content[0].text, /^Updated, 1 link at the top:/)
+  assert.deepEqual((await call(readDrop, { id: v2.id })).structuredContent.resources, [
+    { url: "https://linear.app/acme/issue/ACM-7" },
+  ])
+  await call(updateDrop, { id: v2.id, resources: [] })
+  assert.equal((await call(readDrop, { id: v2.id })).structuredContent.resources, undefined)
+
+  await call(updateDrop, { id: v2.id, resources: [{ url: pr }] })
+  sql.prepare("DELETE FROM drops WHERE id = ?").run(v2.id)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 1, "they stay while a version does")
+  sql.prepare("DELETE FROM drops WHERE id = ?").run(doc.id)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 0, "and go with the last one")
+})
+
 test("a file without base64 gets an upload URL; curl -T creates the drop once, and a changed ticket does nothing", async () => {
   state.authSecret = "test-secret"
   try {
