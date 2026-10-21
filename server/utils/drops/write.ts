@@ -356,6 +356,7 @@ function cleanPath(path: string) {
 export function escapesFolder(path: string) {
   let decoded = path
   for (let round = 0; round < 3; round++) {
+    if (/%(?:2f|5c)/i.test(decoded)) return true
     let next = decoded
     try {
       next = decodeURIComponent(decoded)

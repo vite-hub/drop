@@ -313,7 +313,15 @@ test("app publishing keeps only the latest file set, as the docs promise", async
 
 test("an app's file path can't climb out of its folder through an escape the blob store decodes", async () => {
   const before = [...state.objects.keys()]
-  for (const path of ["%2e%2e/%2e%2e/%2e%2e/victim.md", "a/%2E%2E/%2e%2e/b.js", "%252e%252e/x.js", "..%5c..%5cx.js"])
+  for (const path of [
+    "%2e%2e/%2e%2e/%2e%2e/victim.md",
+    "a/%2E%2E/%2e%2e/b.js",
+    "%252e%252e/x.js",
+    "..%5c..%5cx.js",
+    "a%2fb.js",
+    "a%5cb.js",
+    "a%252fb.js",
+  ])
     await assert.rejects(
       publishApp(who, { files: { "index.html": "app", [path]: "x" } }),
       (error) => error.status === 400 && /Invalid file path/.test(error.message),
