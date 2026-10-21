@@ -9,9 +9,12 @@ const DOCUMENT_EXTRA_CSS =
   CALLOUT_CSS +
   `
 /* The text moves left only as far as it must to clear the viewer's floating panel (--drop-inset). Once the column
-   can't fit beside it, the column narrows: the panel never covers the text. */
+   can't fit beside it, the column narrows: the panel never covers the text. The outline can set --drop-outline and
+   --drop-shift itself, to keep a column of its own (OUTLINE_SCRIPT); a compare keeps clear of both (document-shell.css). */
 body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out;
-  padding-right: clamp(0px, calc(2 * var(--drop-inset, 0px) + 46rem - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem))); }
+  --drop-right: calc(var(--drop-inset, 0px) + var(--drop-outline, 0px));
+  --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + 46rem - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
+  padding-right: var(--drop-shift); }
 main { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 .task-list-item { list-style: none; margin-left: -1.25rem; }
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
@@ -90,11 +93,32 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   });
   document.body.append(host);
 
-  // The text ends 1.5rem inside <main>. The outline keeps 4rem clear of it, closing to 2.5rem only when its full
-  // 15rem width needs the room, and never drifts further out on wide screens.
+  // A compare spreads past the text into the room beside it, where the outline goes. So in a doc with one, the outline
+  // keeps a 200px column 4rem right of the compares, and the text moves left only as far as that needs (like for the
+  // viewer's panel). It only shows while the compares keep at least the text's width.
+  const wide = document.querySelector(".typeset .ca-compare");
+  const column = 264;
+  const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
+    const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
+    if (wide) {
+      const fits = innerWidth - inset - column - 48 >= main.getBoundingClientRect().width;
+      const body = document.body.style;
+      if (fits) {
+        body.setProperty("--drop-outline", column + "px");
+        body.setProperty("--drop-shift", "clamp(0px, calc(2 * " + right + " + 75rem - 100vw), calc" + right + ")");
+      } else {
+        body.removeProperty("--drop-outline");
+        body.removeProperty("--drop-shift");
+      }
+      host.toggleAttribute("data-fits", fits);
+      host.style.left = Math.min(wide.getBoundingClientRect().right + 64, innerWidth - inset - 224) + "px";
+      host.style.width = "200px";
+      return;
+    }
+    // The text ends 1.5rem inside <main>. The outline keeps 4rem clear of it, closing to 2.5rem only when its full
+    // 15rem width needs the room, and never drifts further out on wide screens.
     const text = main.getBoundingClientRect().right - 24;
-    const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--drop-inset")) || 0;
     const space = innerWidth - inset - 24 - text;
     const gap = Math.min(64, Math.max(40, space - 240));
     host.toggleAttribute("data-fits", space - gap >= 176);
@@ -106,7 +130,11 @@ const OUTLINE_SCRIPT = String.raw`(() => {
     headings.forEach((heading, index) => { if (heading.getBoundingClientRect().top <= 96) current = index; });
     links.forEach((link, index) => index === current ? link.setAttribute("aria-current", "location") : link.removeAttribute("aria-current"));
   }
+  // The column opens without sliding the text over on load.
+  document.body.style.transition = "none";
   place();
+  void document.body.offsetWidth;
+  document.body.style.transition = "";
   mark();
   addEventListener("resize", place);
   addEventListener("scroll", mark, { passive: true });
