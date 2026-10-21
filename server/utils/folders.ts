@@ -9,9 +9,10 @@ import { type DropRow, findDropByRef, lifetimeFields, type LifetimeInput, permis
 import { chainOf } from "./expiry"
 import type { Identity } from "./identity"
 import { depthOf, heightOf, touchFolder, uniqueSlug } from "./nodes"
-import { withDropQuota } from "./quotas"
-import { shareFields, sharePolicy } from "./share"
+import { requireKeepSlot, withDropQuota } from "./quotas"
+import { modeFor, shareFields, sharePolicy } from "./share"
 import { shareReviewFor } from "./trust"
+import { runsTeam, teamOf, teamsEnabled } from "./teams"
 
 /**
  * The folder `ref` names (its id, its link's key, or its share link) when the caller may put something in it: their own
@@ -29,18 +30,20 @@ export async function requireFolder(
   const folder = await findDropByRef(ref, event)
   const can = folder && permissions(folder, who)
   if (!folder || folder.kind !== "folder" || !can || !(can.manage || (folder.teamFolder && can.view)))
-    throw new HTTPError({ status: 404, statusText: `No folder you can add to with id ${ref}.` })
+    throw new HTTPError({ status: 404, message: `No folder you can add to with id ${ref}.` })
   if (folder.expired)
-    throw new HTTPError({ status: 409, statusText: `${folder.title} is in the Trash. Restore it first.` })
+    throw new HTTPError({ status: 409, message: `${folder.title} is in the Trash. Restore it first.` })
   if (moving && (folder.id === moving.id || folder.ancestors?.some((node) => node.id === moving.id)))
     throw new HTTPError({ status: 400, statusText: "A folder can't go inside itself." })
   const folderGoesIn = adding === "folder" || moving?.kind === "folder"
   if (folder.teamFolder) {
-    if (folderGoesIn && !(moving ? moving.teamFolder : isAdminInBrowser(who)))
+    if (folderGoesIn && !(moving ? moving.teamFolder : keepsTeamFolders(who, teamOf(folder))))
       throw new HTTPError({
         status: 403,
-        statusText: `Only admins add folders to ${folder.title}, in the browser. Put the drops in it instead.`,
+        statusText: `Only ${teamOf(folder) ? "the team's owner and admins" : "admins"} add folders to ${folder.title}, in the browser. Put the drops in it instead.`,
       })
+    if (moving?.teamFolder && teamOf(moving) !== teamOf(folder))
+      throw new HTTPError({ status: 400, statusText: "A team folder stays with its team." })
   } else if (moving && (folder.ownerId !== moving.ownerId || moving.teamFolder))
     throw new HTTPError({
       status: 400,
@@ -53,7 +56,9 @@ export async function requireFolder(
   return folder
 }
 
-const isAdminInBrowser = (who: Identity) => who.role === "admin" && who.actorKind === "browser"
+/** Who makes a team's folders, in the browser: on a team Drop its admins; on a personal one the team's owner and admins. */
+const keepsTeamFolders = (who: Identity, team: string | null) =>
+  who.actorKind === "browser" && (team ? runsTeam(team, who) || who.role === "admin" : who.role === "admin")
 
 /** The longest a folder's description may be: a few paragraphs on what goes in it and how. */
 export const MAX_FOLDER_DESCRIPTION = 2000
@@ -64,23 +69,39 @@ export const MAX_FOLDER_DESCRIPTION = 2000
  * It isn't a drop for the plan's count.
  *
  * A team folder (`team`, or any folder made inside one) is the team's: on a team Drop, admins make it in the browser, it
- * reaches the whole team, and it never expires.
+ * reaches the whole team, and it never expires. On a personal Drop with teams, `teamId` names the team: its owner and
+ * admins make its folders, which reach its members only.
  */
 export async function createFolder(
   who: Identity,
-  input: LifetimeInput & { title: string; slug?: string; folder?: DropRow; share?: Share; team?: boolean },
+  input: LifetimeInput & {
+    title: string
+    slug?: string
+    folder?: DropRow
+    share?: Share
+    team?: boolean
+    teamId?: string
+  },
   event?: H3Event,
 ) {
   const title = input.title.trim().slice(0, 160) || "Untitled folder"
   const parent = input.folder ?? null
-  const team = Boolean(input.team || parent?.teamFolder)
-  if (team && (sharePolicy(event).mode !== "team" || !isAdminInBrowser(who)))
+  const team = Boolean(input.team || input.teamId || parent?.teamFolder)
+  const teamDrop = sharePolicy(event).mode === "team"
+  const teamId = teamDrop ? null : parent?.teamFolder ? teamOf(parent) : (input.teamId ?? null)
+  if (team && !teamDrop && (!teamsEnabled(event) || !teamId))
     throw new HTTPError({
       status: 403,
-      statusText:
-        sharePolicy(event).mode === "team"
-          ? "Only admins make team folders, in the browser."
-          : "Team folders need a team Drop (DROP_MODE=team).",
+      statusText: teamsEnabled(event)
+        ? "Say which team the folder is for."
+        : "Team folders need a team Drop (DROP_MODE=team), or teams (DROP_TEAMS).",
+    })
+  if (team && !keepsTeamFolders(who, teamId))
+    throw new HTTPError({
+      status: 403,
+      statusText: teamId
+        ? "Only the team's owner and admins make its folders, in the browser."
+        : "Only admins make team folders, in the browser.",
     })
   if (team && parent && !parent.teamFolder)
     throw new HTTPError({ status: 400, statusText: "A team folder goes at the top, or in another team folder." })
@@ -90,9 +111,14 @@ export async function createFolder(
     : team
       ? { lifetime: "keep" as const, keepReason: null }
       : lifetimeFields(who, input, null, event)
+  await requireKeepSlot(ownerId, life, false, !parent && !team)
   const { share, publicUntil } = input.share
-    ? shareFields(input.share, { kind: "folder", teamFolder: team }, event)
-    : { share: team ? ("team" as const) : defaultShare(sharePolicy(event).mode), publicUntil: null }
+    ? shareFields(
+        input.share,
+        { kind: "folder", teamFolder: team, team: Boolean(teamId) || modeFor(parent, event) === "team" },
+        event,
+      )
+    : { share: team ? ("team" as const) : defaultShare(modeFor(parent, event)), publicUntil: null }
   const note = input.note?.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null
   return withDropQuota(ownerId, { drops: 0, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
@@ -113,6 +139,7 @@ export async function createFolder(
       share,
       publicUntil,
       teamFolder: team,
+      teamId,
       shareReview: isPublic(share) ? await shareReviewFor(ownerId, event) : null,
       quarantinedAt: null,
       actorKind: who.actorKind,

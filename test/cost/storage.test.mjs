@@ -51,3 +51,31 @@ for (const [name, read] of Object.entries(reads)) {
     })
   }
 }
+
+test("a report of a share link with a malformed escape is a 404, not a crash", async () => {
+  const request = new H3Event(
+    new Request("https://drop.example/api/reports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target: "/d/%E0", reason: "spam", details: "Unwanted content" }),
+    }),
+  )
+  request.context.log = { set() {}, error() {} }
+  await assert.rejects(report(request), (error) => error.status === 404)
+})
+
+test("a board image reads a missing object as none yet and a storage failure as 503", async () => {
+  const { boardImage } = await import("../../server/utils/boards.ts")
+  const original = state.blob.get
+  try {
+    state.blob.get = async () => [null, null]
+    assert.equal(await boardImage({ link: "board" }, "overview"), null)
+    state.blob.get = async () => [Object.assign(new Error("provider unavailable"), { code: "BLOB_OPERATION_FAILED" })]
+    await assert.rejects(boardImage({ link: "board" }, "overview"), (error) => error.status === 503)
+    // A frame id that climbs out of the board's folder once decoded has no image, and nothing is read.
+    state.blob.get = async () => assert.fail("read a key outside the board")
+    assert.equal(await boardImage({ link: "board" }, "%2e%2e/%2e%2e/x"), null)
+  } finally {
+    state.blob.get = original
+  }
+})

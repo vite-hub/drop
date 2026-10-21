@@ -68,6 +68,15 @@ export function useViewerFrame(options: {
     if (kind === "app") return appDocument(page.value)
     if (kind === "image")
       return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
+    if (attached.deferred.value)
+      return planDocument(
+        kind,
+        drop.value.content ?? "",
+        dark.value,
+        attached.defer(drop.value.html ?? ""),
+        startInset,
+        startWidth,
+      )
     if (!attached.ready.value) return ""
     return planDocument(
       kind,
@@ -163,6 +172,11 @@ export function useViewerFrame(options: {
         return
       case "copy":
         return void copy(message.text)
+      case "images":
+        // Each as soon as it's read, so the first one on screen doesn't wait for the rest.
+        for (const path of message.paths)
+          void attached.load(path).then((url) => url && send({ type: "image-data", path, url }))
+        return
       case "unplaced":
         unplaced.value = new Set(message.ids)
         return

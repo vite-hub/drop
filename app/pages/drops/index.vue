@@ -14,7 +14,9 @@ const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const open = useRowsOpen()
 const { data: trash } = useApi("/api/drops", { key: keys.trash, query: { trash: 1 }, default: () => [] })
-const { data: withMe } = useSharedWithMe()
+const { data: shared } = useSharedWithMe()
+// A personal Drop's teams list their folders under Teams, not here.
+const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
 const { data: usage } = useApi("/api/usage", { key: keys.usage })
 const limited = computed(
   () =>
