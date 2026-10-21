@@ -21,9 +21,9 @@ import { cachedMarkdown } from "./markdown-cache"
 
 /**
  * The components Markdown may use, beyond plain HTML. The security plugin also checks an alert's kind (`> [!CAUTION]`
- * is `<blockquote as="caution">`) against this list. screenshot, compare, diff, and annotation are comark-annotate's:
- * annotated screenshots and code changes for PR evidence. skills/vitehub-drop/references/markdown.md documents each
- * one for agents.
+ * is `<blockquote as="caution">`) against this list. screenshot, compare, and annotation are comark-annotate's, and diff
+ * is comark-diff's: annotated screenshots and code changes for PR evidence. skills/vitehub-drop/references/markdown.md
+ * documents each one for agents.
  */
 export const COMPONENT_TAGS =
   "alert annotation callout caution compare diff important info mermaid note screenshot tip warning".split(" ")

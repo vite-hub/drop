@@ -1,6 +1,6 @@
 # Annotation syntax
 
-Drop renders these components with [comark-annotate](https://comark-annotate.onmax.me).
+Drop renders these components with [comark-annotate](https://comark.onmax.me/annotate/) and [comark-diff](https://comark.onmax.me/diff/).
 
 ```md
 ::compare
