@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, lte, sql, type SQL } from "drizzle-orm"
+import { and, count, eq, inArray, isNull, lt, lte, sql, type SQL } from "drizzle-orm"
 import type { BatchItem } from "drizzle-orm/batch"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
@@ -17,7 +17,8 @@ import {
   type Usage,
 } from "#shared/quotas"
 import { useServerEnv } from "#vitehub/env/server"
-import { dropFiles, quotaBlobs, quotaReservations, user } from "../databases/config"
+import { dropFiles, dropHeads, drops, quotaBlobs, quotaReservations, user } from "../databases/config"
+import { isPaying } from "./teams"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
 type Statement = BatchItem<"sqlite">
@@ -27,8 +28,8 @@ const Finished = v.array(v.object({ id: v.string() }))
 
 /** `DROP_QUOTAS`, `DROP_DEFAULT_PLAN`, and the `DROP_PRO_*` limits, typed and validated by Server Env. */
 export function quotaConfig() {
-  const { enabled, plan, proDrops, proBytes, proWrites } = useServerEnv().drop.quotas
-  return { enabled, defaultPlan: plan, pro: { drops: proDrops, bytes: proBytes, writes: proWrites } }
+  const { enabled, plan, proDrops, proBytes, proWrites, freeKept } = useServerEnv().drop.quotas
+  return { enabled, defaultPlan: plan, pro: { drops: proDrops, bytes: proBytes, writes: proWrites }, freeKept }
 }
 
 async function ownerUsage(ownerId: string, month: string) {
@@ -43,11 +44,34 @@ export function planOf(stored: string | null | undefined): Plan {
   return stored === "free" || stored === "pro" ? stored : quotaConfig().defaultPlan
 }
 
+/** Drops kept forever at once: the owner's own at the top, not their team folders, nor drops in the Trash. */
+async function keptCount(ownerId: string) {
+  const [row] = await db
+    .select({ kept: count() })
+    .from(drops)
+    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
+    .where(
+      and(
+        eq(dropHeads.ownerId, ownerId),
+        eq(drops.lifetime, "keep"),
+        isNull(drops.parentId),
+        eq(drops.teamFolder, false),
+        isNull(drops.trashedAt),
+      ),
+    )
+  return row?.kept ?? 0
+}
+
+/**
+ * Someone's plan and what they've used of it. A team that pays puts each member on Pro (./teams.ts); an admin's Pro on
+ * the Members page, or DROP_DEFAULT_PLAN, applies otherwise.
+ */
 export async function getUsage(ownerId: string): Promise<Usage> {
   const config = quotaConfig()
   const [owner] = await db.select({ plan: user.plan }).from(user).where(eq(user.id, ownerId)).limit(1)
-  const plan = planOf(owner?.plan)
-  const limits = planLimits(config.enabled ? plan : "unlimited", config.pro)
+  const paid = await isPaying(ownerId)
+  const plan = paid && planOf(owner?.plan) === "free" ? "pro" : planOf(owner?.plan)
+  const limits = planLimits(config.enabled ? plan : "unlimited", config.pro, config.freeKept)
   const month = new Date().toISOString().slice(0, 7)
   const used = await ownerUsage(ownerId, month)
   return {
@@ -57,9 +81,22 @@ export async function getUsage(ownerId: string): Promise<Usage> {
     drops: { used: used.drops, limit: limits.drops },
     bytes: { used: used.bytes, limit: limits.bytes },
     writes: { used: used.writes, limit: limits.writes },
+    kept: { used: limits.kept === null ? 0 : await keptCount(ownerId), limit: limits.kept },
     app: { files: limits.appFiles, bytes: limits.appBytes },
+    paid,
     selfHostUrl: "/docs/self-host",
   }
+}
+
+/**
+ * Refuses keeping one more drop forever past the plan's limit. `already` says the drop is kept now, so keeping it
+ * again (a new version, a renewal) never counts twice. Folders hand their lifetime down, so only drops at the top count.
+ */
+export async function requireKeepSlot(ownerId: string, life: { lifetime: string }, already: boolean, top: boolean) {
+  if (life.lifetime !== "keep" || already || !top || !quotaConfig().enabled) return
+  const usage = await getUsage(ownerId)
+  if (usage.kept.limit !== null && usage.kept.used >= usage.kept.limit)
+    throw new DropQuotaError(quotaFailure("kept", usage.kept.used, usage.kept.limit))
 }
 
 export class DropQuotaError extends HTTPError {

@@ -6,7 +6,7 @@ import { type Share, SHARE_RANK } from "#shared/share"
 import { dropHeads, drops } from "../databases/config"
 import type { DropRow } from "./drops"
 import { isExpired } from "./expiry"
-import { shareNow } from "./share"
+import { shareNow, sharePolicy } from "./share"
 
 // Every drop is a node: it may sit in a folder, and the files a doc embeds hang off the doc. A node takes the widest
 // share on its path, the strictest review and quarantine, and the lifetime and Trash of the top-most node. Reads work
@@ -77,7 +77,13 @@ export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"
  * everything below it there. `raw` keeps the row's own values, which is what changing it edits.
  */
 export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date.now()): DropRow {
-  const own = shareNow(row, now)
+  // Inside a team's folders, a personal Drop shares like a team one (./share.ts modeFor). Team folders only sit under
+  // team folders, so one anywhere on the path puts the whole path in the team.
+  const mode =
+    sharePolicy().mode === "team" || [row, ...ancestors].some((node) => node.teamFolder && node.teamId)
+      ? "team"
+      : "personal"
+  const own = shareNow(row, now, mode)
   if (!ancestors.length)
     return {
       ...row,
@@ -88,7 +94,7 @@ export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date
       expired: Boolean(row.trashedAt) || isExpired(row, now, days),
     }
   const path = [row, ...ancestors]
-  const shares = path.map((node) => shareNow(node, now))
+  const shares = path.map((node) => shareNow(node, now, mode))
   const root = ancestors.at(-1)!
   const widestAt = shares.reduce(
     (best, share, index) => (SHARE_RANK[share] > SHARE_RANK[shares[best]!] ? index : best),

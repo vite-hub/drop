@@ -4,7 +4,7 @@ import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
-import { DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
+import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
 
@@ -214,6 +214,7 @@ export default defineNuxtConfig({
     "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
     "/agents": SIGNED_IN,
     "/members": SIGNED_IN,
+    "/teams/**": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
     "/docs/**": { appLayout: "docs" },
@@ -221,6 +222,7 @@ export default defineNuxtConfig({
     "/terms": { appLayout: "docs" },
     "/acceptable-use": { appLayout: "docs" },
     "/abuse": { appLayout: "docs" },
+    "/pricing": { appLayout: "docs" },
   },
 
   experimental: { typescriptPlugin: true },
@@ -445,6 +447,25 @@ export default defineNuxtConfig({
             proDrops: env.number({ source: env.source("DROP_PRO_DROPS"), default: DEFAULT_PRO_LIMITS.drops }),
             proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
             proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
+            // Drops a Free plan keeps forever at once; Pro keeps any number.
+            freeKept: env.number({ source: env.source("DROP_FREE_KEPT"), default: DEFAULT_FREE_KEPT }),
+          },
+          // Teams on a personal Drop: people make a team, invite others, and share its folders with them (server/utils/teams.ts).
+          teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
+          // Paid teams through Stripe. Billing is on once the key, the webhook secret, and the per-member price are all set.
+          billing: {
+            stripeSecretKey: env({ secret: true, source: env.source("STRIPE_SECRET_KEY"), default: "" }),
+            stripeWebhookSecret: env({ secret: true, source: env.source("STRIPE_WEBHOOK_SECRET"), default: "" }),
+            // A recurring price per member (quantity = members), and optionally its yearly one.
+            priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
+            annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),
+            // Members a team has before it needs a subscription.
+            freeMembers: env.number({
+              source: env.source("DROP_FREE_TEAM_MEMBERS"),
+              default: DEFAULT_FREE_TEAM_MEMBERS,
+            }),
+            // Stripe as merchant of record, which files sales tax and VAT. Turn off to sell under your own account.
+            managedPayments: env.boolean({ source: env.source("STRIPE_MANAGED_PAYMENTS"), default: true }),
           },
         },
       },

@@ -11,6 +11,8 @@ export const keys = {
   usage: "usage",
   /** Every folder you may move a drop into (MoveModal). */
   folders: "folders",
+  /** A team's members and invitations (pages/teams/[id].vue). */
+  team: (id: string) => `team:${id}`,
   search: "search",
   dropSearch: "drop-search",
   members: "members",

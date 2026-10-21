@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.7.10",
+    "@better-auth/stripe": "1.7.10",
     "@comark/html": "0.7.0",
     "@comark/vue": "0.7.0",
     "@fontsource-variable/geist": "^5.3.0",
@@ -74,6 +75,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "shiki": "^4.5.0",
+    "stripe": "22.6.2",
     "tailwindcss": "4.3.3",
     "tldraw": "5.5.2",
     "valibot": "^1.4.2",
