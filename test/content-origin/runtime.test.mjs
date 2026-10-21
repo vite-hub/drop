@@ -104,7 +104,7 @@ test("the content origin serves only the frame host, at any path, and nothing of
     )
     assert.equal(response.status, 200, path)
     const html = await response.text()
-    assert.match(html, /document\.write\(message\.html\)/)
+    assert.match(html, /document\.write\(message\.html\.slice\(0, at\) \+ hold/)
     assert.match(html, /event\.source !== parent/)
     assert.doesNotMatch(html, /__NUXT__|_nuxt/)
     assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow")
@@ -273,6 +273,8 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
         open: () => written.push(`open after ${cookies.length} cookies`),
         write() {},
         close() {},
+        querySelector: () => null,
+        querySelectorAll: () => [],
       },
     })
     onMessage({ source: parent, data: { __drop: true, type: "document", html: "<p>", grant } })
@@ -283,6 +285,76 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
   assert.deepEqual(written, ["open after 1 cookies"])
   assert.deepEqual(run("v2.x; Domain=vitehub.dev").cookies, [], "nothing that could add cookie attributes")
   assert.deepEqual(run(undefined).cookies, [])
+})
+
+test("the frame host keeps a written page hidden until its stylesheets load, fail, or take 3 seconds", () => {
+  const script = FRAME_HOST_HTML.match(/<script>([\s\S]*)<\/script>/)[1]
+  const run = (html, links = []) => {
+    let written = ""
+    let held = false
+    let onMessage
+    const timers = []
+    const parent = { postMessage() {} }
+    runInNewContext(script, {
+      parent,
+      window: {},
+      isSecureContext: true,
+      location: { protocol: "https:", pathname: "/" },
+      addEventListener: (_type, handler) => (onMessage = handler),
+      matchMedia: (media) => ({ matches: media !== "print" }),
+      setTimeout: (callback, ms) => timers.push({ callback, ms }),
+      document: {
+        body: {},
+        open() {},
+        write: (value) => ((written += value), (held = value.includes("data-drop-hold"))),
+        close() {},
+        querySelector: () => (held ? { remove: () => (held = false) } : null),
+        querySelectorAll: () => links,
+      },
+    })
+    onMessage({ source: parent, data: { __drop: true, type: "document", html } })
+    return { written: () => written, held: () => held, timers }
+  }
+  const link = (props = {}) => {
+    const listeners = {}
+    return {
+      sheet: null,
+      disabled: false,
+      media: "",
+      ...props,
+      addEventListener: (type, handler) => (listeners[type] = handler),
+      fire: (type) => listeners[type]?.(),
+    }
+  }
+
+  const hold = "<style data-drop-hold>html{visibility:hidden!important}</style>"
+  assert.equal(
+    run('<!doctype html><html><head lang="x"><title>A</title></head><header></header>').written(),
+    `<!doctype html><html><head lang="x">${hold}<title>A</title></head><header></header>`,
+  )
+  assert.equal(run("<!DOCTYPE html><header>A</header>").written(), `<!DOCTYPE html>${hold}<header>A</header>`)
+  assert.equal(run("<p>A</p>").written(), `${hold}<p>A</p>`)
+  assert.equal(run("<p>A</p>").held(), false, "nothing to wait for")
+
+  const css = link()
+  const broken = link()
+  const page = run("<head></head>", [
+    css,
+    broken,
+    link({ media: "print" }),
+    link({ disabled: true }),
+    link({ sheet: {} }),
+  ])
+  assert.equal(page.held(), true)
+  css.fire("load")
+  assert.equal(page.held(), true, "one stylesheet still loading")
+  broken.fire("error")
+  assert.equal(page.held(), false)
+
+  const slow = run("<head></head>", [link()])
+  assert.equal(slow.timers[0].ms, 3000)
+  slow.timers[0].callback()
+  assert.equal(slow.held(), false)
 })
 
 test("an app on a shared content origin or none gets no grant, and its text files for the viewer to inline", async () => {
