@@ -45,6 +45,11 @@ test("a Markdown doc's images wait in the frame, keyed by path; other images and
 test("srcset candidates are deferred and srcset-only images get a placeholder", () => {
   const html = `<img src="/fallback.png" srcset="/f/${a}.png 1x, /f/${b}.webp 2x" sizes="50vw"><img srcset="/f/${b}.webp 1x, /f/${c}.png 2x" sizes="100vw">`
   const deferred = deferImages(html, [`/f/${a}.png`, `/f/${b}.webp`])
-  assert.match(deferred, new RegExp(`<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png"><img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp">`))
+  assert.match(
+    deferred,
+    new RegExp(
+      `<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png"><img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp">`,
+    ),
+  )
   assert.doesNotMatch(deferred, /srcset|sizes/)
 })
