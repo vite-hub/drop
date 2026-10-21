@@ -52,7 +52,7 @@ pnpm dev          # http://localhost:3000, sign in at /?signin=1
 
 Built with [ViteHub](https://vitehub.dev) (auth, database, blob), [Comark](https://github.com/comarkdown/comark), [Shiki](https://shiki.style), [nitro-mcp-toolkit](https://github.com/nuxt-modules/mcp-toolkit), and [evlog](https://www.evlog.dev).
 
-The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The `handoff` skill is adapted from Matt Pocock's [handoff skill](https://github.com/mattpocock/skills/blob/main/skills/productivity/handoff/SKILL.md), `show-me` from HumanLayer's [show-me skill](https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md), both MIT, and `prototype` follows the loop of Matt Pocock's [prototype skill](https://github.com/mattpocock/skills/blob/main/skills/engineering/prototype/SKILL.md).
+The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](https://iconify.design/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The `handoff` skill is adapted from Matt Pocock's [handoff skill](https://github.com/mattpocock/skills/blob/main/skills/productivity/handoff/SKILL.md), `show-me` from HumanLayer's [show-me skill](https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md), both MIT, and `prototype` follows the loop of Matt Pocock's [prototype skill](https://github.com/mattpocock/skills/blob/main/skills/engineering/prototype/SKILL.md). The `slidev` skill is Slidev's own ([skills/slidev](https://github.com/slidevjs/slidev/tree/main/skills/slidev), MIT), copied unchanged at `73053ab` by `scripts/sync-slidev-skill.mjs`.
 
 ## License
 

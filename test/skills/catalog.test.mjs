@@ -10,8 +10,8 @@ const names = (await readdir(root, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
 
-test("ships the five built-in skills", () => {
-  assert.deepEqual(names.sort(), ["handoff", "pr-evidence", "prototype", "show-me", "vitehub-drop"])
+test("ships the built-in skills and Slidev's own", () => {
+  assert.deepEqual(names.sort(), ["handoff", "pr-evidence", "prototype", "show-me", "slidev", "vitehub-drop"])
 })
 
 for (const name of names) {

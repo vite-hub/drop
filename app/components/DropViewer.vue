@@ -564,12 +564,7 @@ watch(
             :label="copied('link') ? 'Link copied' : 'Copy link'"
             @click="copyLink()"
           />
-          <ViewerAction
-            v-if="drop.url"
-            icon="i-mingcute-download-2-line"
-            label="Download original"
-            @click="download"
-          />
+          <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
           <ViewerAction
             v-if="owner && !trashed"
             icon="i-mingcute-new-folder-line"

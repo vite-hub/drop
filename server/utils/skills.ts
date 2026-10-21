@@ -15,8 +15,16 @@ import documentsGuide from "../../skills/vitehub-drop/references/documents.md?ra
 import markdownGuide from "../../skills/vitehub-drop/references/markdown.md?raw"
 import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
 
+// Slidev's own skill, copied from slidevjs/slidev by scripts/sync-slidev-skill.mjs: its SKILL.md and every reference.
+const slidevFiles = import.meta.glob<string>("../../skills/slidev/**/*.md", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+})
+
 /**
- * Drop's built-in Agent Skills, defined once (the files under skills/) and served three ways:
+ * Drop's built-in Agent Skills, defined once (the files under skills/) and served three ways. `slidev` is Slidev's own,
+ * copied as it is, so vitehub-drop can send deck work there:
  * - MCP: the Skills extension (SEP-2640), as `skill://` resources (server/mcp, server/utils/mcp-skills.ts)
  * - Agent Skills Discovery v0.2.0 at /.well-known/agent-skills/ (index with digests, archive for multi-file skills)
  * - Discovery v0.1.0 at /.well-known/skills/, which `npx skills add` still reads
@@ -70,6 +78,11 @@ export const SKILLS: Skill[] = [
     file("references/canvas.md", prototypeCanvas),
   ]),
   skill([file("SKILL.md", showMeMd)]),
+  skill(
+    Object.entries(slidevFiles)
+      .map(([path, text]) => file(path.replace("../../skills/slidev/", ""), text))
+      .sort((a, b) => Number(b.path === "SKILL.md") - Number(a.path === "SKILL.md") || a.path.localeCompare(b.path)),
+  ),
 ]
 
 export const findSkill = (name: string) => SKILLS.find((item) => item.name === name)
