@@ -25,12 +25,14 @@ for (const name of names) {
   })
 }
 
-test("pr-evidence's annotation example is valid comark-annotate", async () => {
-  const reference = await readFile(new URL("pr-evidence/references/annotations.md", root), "utf8")
-  const example = reference.match(/```md\n([\s\S]*?)\n```/)?.[1]
-  assert.ok(example)
-  const document = await createMarkdownParser({ plugins: [annotate()] })(example)
-  assert.deepEqual(document.meta.issues, [])
+test("pr-evidence serves comark-annotate's skill, without its front matter and with the CLI pinned", async () => {
+  const { findSkill } = await import("../../server/utils/skills.ts")
+  const { version } = JSON.parse(await readFile(new URL("../../node_modules/comark-annotate/package.json", import.meta.url), "utf8"))
+  const reference = findSkill("pr-evidence").files.find((item) => item.path === "references/annotations.md").text
+  assert.match(reference, /^# /)
+  assert.match(reference, /::compare/)
+  assert.ok(reference.includes(`npx comark-annotate@${version} check`))
+  assert.ok(!/npx comark-annotate /.test(reference))
 })
 
 test("show-me's annotated screenshot example is valid comark-annotate", async () => {

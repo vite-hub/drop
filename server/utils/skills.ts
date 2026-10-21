@@ -2,9 +2,10 @@ import { parseYAML } from "confbox/yaml"
 import { eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { createTarGzip } from "nanotar"
+import annotateSkill from "comark-annotate/skills/comark-annotate/SKILL.md?raw"
+import { version as annotateVersion } from "comark-annotate/package.json"
 import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
-import prEvidenceAnnotations from "../../skills/pr-evidence/references/annotations.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
 import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
 import prototypeCanvas from "../../skills/prototype/references/canvas.md?raw"
@@ -53,6 +54,12 @@ function skill(files: SkillFile[]): Skill {
   const frontmatter = frontmatterOf(files.find((item) => item.path === "SKILL.md")!.text)
   return { name: String(frontmatter.name), description: String(frontmatter.description), frontmatter, files }
 }
+
+// pr-evidence's annotation reference is comark-annotate's own skill, from the version Drop renders with, so it never
+// describes syntax Drop can't draw. Its CLI commands get the same version, since a bare npx would run the latest.
+const prEvidenceAnnotations = annotateSkill
+  .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "")
+  .replaceAll("npx comark-annotate ", `npx comark-annotate@${annotateVersion} `)
 
 /** Every built-in skill, enabled or not. Only the admin UI should see the disabled ones. */
 export const SKILLS: Skill[] = [
