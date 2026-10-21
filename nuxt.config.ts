@@ -158,7 +158,8 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-07-17",
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
-  // tldraw needs a license key in production (NUXT_PUBLIC_TLDRAW_LICENSE_KEY); without one, boards show its watermark.
+  // tldraw needs a license key in production (NUXT_PUBLIC_TLDRAW_LICENSE_KEY): without one, tldraw hides a board 5 s after
+  // it opens on any domain but localhost (its LicenseProvider), so boards look fine in `nuxt dev` and vanish when deployed.
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
   // doctor-disable-next-line nuxt/runtime/no-secret-in-public-config -- tldraw license keys are public: the browser runs tldraw and checks the key against the domain.
   runtimeConfig: { seoIndex: false, public: { tldrawLicenseKey: "", realtime: liveEditing } },

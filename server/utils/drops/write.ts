@@ -7,7 +7,7 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
-import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard } from "#shared/board"
+import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
 import { renderMarkdownCached } from "../markdown-document"
 import { refreshLatest } from "#live-drafts"
@@ -172,11 +172,14 @@ export async function createDocDrop(
     contentType = kind === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8"
   }
   if (extension === BOARD_EXTENSION) {
-    // An empty .tldr starts an empty board (the New menu's Board).
-    if (!input.bytes.byteLength) input = { ...input, bytes: new TextEncoder().encode(JSON.stringify(emptyBoard())) }
+    // An empty .tldr starts an empty board (the New menu's Board). Any other is stored as a tldraw file of the current
+    // schema, without the uploader's own camera and selection.
     try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(input.bytes)
-      parseBoard(text)
+      const board = input.bytes.byteLength
+        ? parseBoard(new TextDecoder("utf-8", { fatal: true }).decode(input.bytes))
+        : emptyBoard()
+      text = serializeBoard(board)
+      input = { ...input, bytes: new TextEncoder().encode(text) }
     } catch {
       throw new HTTPError({ status: 400, statusText: "That isn't a board this Drop can read." })
     }
