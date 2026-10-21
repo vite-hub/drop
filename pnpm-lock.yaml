@@ -18,6 +18,7 @@ overrides:
   '@tiptap/extension-floating-menu': 3.31.4
 
 patchedDependencies:
+  # Keep both database and realtime patches in the merged lockfile.
   '@vite-hub/auth@0.0.4': b0feba1a568c262a254b5fe155f1ae66e7064863177811ca8eb757b3f16abff2
   '@vite-hub/blob@0.0.4': a2895ce880cf310374262c911e8de15334695d50117960be6ce6501e0d99813b
   '@vite-hub/database@0.0.4': f036432747bcbf06de55b4c5666a18e4cc2c5ed513f76122db50f76206f0a9ba
