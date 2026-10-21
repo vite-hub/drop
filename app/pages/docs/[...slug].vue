@@ -47,7 +47,9 @@ const { data: doc } = await useAsyncData(
   () => `docs:${path.value}`,
   () => docs.get(path.value),
 )
-if (!doc.value) throw createError({ status: 404, statusText: "No docs page here." })
+// Fatal, or a link followed in the browser to a page that isn't there would only log the error: Nuxt shows its error
+// page for a client-side error only when it is fatal.
+if (!doc.value) throw createError({ status: 404, statusText: "No docs page here.", fatal: true })
 </script>
 
 <template>

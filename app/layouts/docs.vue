@@ -15,8 +15,9 @@ watch(
 const { data: me } = await useMe()
 
 // Signed in, the page scrolls inside the dashboard panel, not the window, so the router's scroll to a #section misses.
+// The router has decoded the hash already; decoding it again throws on a `%`.
 function scrollToHash() {
-  if (me.value && route.hash) document.getElementById(decodeURIComponent(route.hash.slice(1)))?.scrollIntoView()
+  if (me.value && route.hash) document.getElementById(route.hash.slice(1))?.scrollIntoView()
 }
 onMounted(scrollToHash)
 onScopeDispose(useNuxtApp().hook("page:finish", () => nextTick(scrollToHash)))
