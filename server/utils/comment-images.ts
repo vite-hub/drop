@@ -95,7 +95,7 @@ export async function readCommentBody<T extends v.GenericSchema>(
 
 /** An image of `parent`'s, stored as `key`: private, since it follows its parent's sharing. */
 export function imageDrop(
-  parent: Pick<DropRow, "id" | "ownerId">,
+  parent: Pick<DropRow, "id" | "ownerId" | "teamId">,
   image: { key: string; contentType: string; size: number; filename: string; title: string; note?: string | null },
   actorName: string,
   now = Date.now(),
@@ -136,6 +136,7 @@ export function imageDrop(
     parentId: parent.id,
     siteUrl: null,
     publishToken: null,
+    teamId: parent.teamId,
   }
 }
 
