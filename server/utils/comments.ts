@@ -8,7 +8,7 @@ import type { Identity } from "./identity"
 
 export type CommentRow = typeof comments.$inferSelect
 
-export type ReplyRow = typeof commentReplies.$inferSelect
+type ReplyRow = typeof commentReplies.$inferSelect
 /** What toComment adds from other tables: the authors' pictures by user id, and each comment's replies. */
 export type CommentExtras = { images: Map<string, string | null>; replies: Map<string, ReplyRow[]> }
 
