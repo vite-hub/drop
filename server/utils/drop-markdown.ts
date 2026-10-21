@@ -1,7 +1,6 @@
 import { FILE_LINK } from "#shared/embedded-images"
 import type { DropDetail } from "#shared/types"
 
-
 /**
  * A Markdown doc or a single HTML page as Markdown, for agents and for "Copy as Markdown". A Markdown doc is its own
  * source; an HTML page goes through mdream. Links to the drop's files become absolute, so the copy works anywhere.
