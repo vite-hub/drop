@@ -1,13 +1,8 @@
 import { defineHandler, HTTPError } from "h3"
 
+/** Dynamic client registration is open to anyone, so it's rate limited and its metadata kept small. */
 export default defineHandler(async (event) => {
-  const path = event.url.pathname
-  if (path.startsWith("/f/") || path.startsWith("/d/")) {
-    event.res.headers.set("X-Robots-Tag", "noindex, nofollow")
-    event.res.headers.set("Cache-Control", "private, no-store")
-  }
-  if (path === "/signin") event.res.headers.set("Cache-Control", "private, no-store")
-  if (path.replace(/\/+$/, "") !== "/api/auth/oauth2/register" || event.req.method !== "POST") return
+  if (event.url.pathname.replace(/\/+$/, "") !== "/api/auth/oauth2/register" || event.req.method !== "POST") return
   const { requireRateLimit } = await import("vite-hub/rate-limit")
   await requireRateLimit(event, "oauth-register", { limit: 10, window: "1m" })
   const reader = event.req.clone().body?.getReader()
