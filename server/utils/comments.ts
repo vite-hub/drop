@@ -64,19 +64,27 @@ export async function authorImages(rows: Pick<CommentRow, "authorId">[]) {
 
 /**
  * The replies and pictures for comments on the drops `dropIds` selects (a subquery, so no list of ids to bind).
- * Replies come oldest first, grouped by comment.
+ * Replies come oldest first, grouped by comment. Both read from the subquery alone, so they go with the comments' own
+ * query rather than after it.
  */
-export async function commentExtras(rows: CommentRow[], dropIds: SQL) {
-  const replies = rows.length
-    ? await db
-        .select()
-        .from(commentReplies)
-        .where(sql`${commentReplies.commentId} IN (SELECT id FROM comments WHERE drop_id IN (${dropIds}))`)
-        .orderBy(asc(commentReplies.createdAt))
-    : []
+export async function commentExtras(dropIds: SQL): Promise<CommentExtras> {
+  const commented = sql`SELECT id FROM comments WHERE drop_id IN (${dropIds})`
+  const [replies, people] = await Promise.all([
+    db
+      .select()
+      .from(commentReplies)
+      .where(sql`${commentReplies.commentId} IN (${commented})`)
+      .orderBy(asc(commentReplies.createdAt)),
+    db
+      .select({ id: user.id, image: user.image })
+      .from(user)
+      .where(
+        sql`${user.id} IN (SELECT author_id FROM comments WHERE drop_id IN (${dropIds}) UNION SELECT author_id FROM comment_replies WHERE comment_id IN (${commented}))`,
+      ),
+  ])
   const byComment = new Map<string, ReplyRow[]>()
   for (const reply of replies) byComment.set(reply.commentId, [...(byComment.get(reply.commentId) ?? []), reply])
-  return { images: await authorImages([...rows, ...replies]), replies: byComment }
+  return { images: new Map(people.map((person) => [person.id, person.image])), replies: byComment }
 }
 
 /**
@@ -96,24 +104,25 @@ const siteOf = (row: Pick<DropRow, "id" | "kind" | "parentId">) => (row.kind ===
  */
 export async function listComments(row: Pick<DropRow, "id" | "ownerId" | "version" | "kind">, who: Identity | null) {
   if (row.kind === "site") {
-    const rows = await db
-      .select()
-      .from(comments)
-      .where(sql`${comments.dropId} IN (${siteFamily(row.id)})`)
-      .orderBy(asc(comments.n))
-    const extras = await commentExtras(rows, siteFamily(row.id))
+    const [rows, extras] = await Promise.all([
+      db
+        .select()
+        .from(comments)
+        .where(sql`${comments.dropId} IN (${siteFamily(row.id)})`)
+        .orderBy(asc(comments.n)),
+      commentExtras(siteFamily(row.id)),
+    ])
     return rows.map((item) => toComment(item, who, 1, extras))
   }
-  const rows = await db
-    .select({ comment: comments, version: drops.version })
-    .from(comments)
-    .innerJoin(drops, eq(drops.id, comments.dropId))
-    .where(and(sql`${comments.dropId} IN (${chainOf(row)})`, lte(drops.version, row.version)))
-    .orderBy(asc(comments.n), asc(drops.version))
-  const extras = await commentExtras(
-    rows.map((item) => item.comment),
-    chainOf(row),
-  )
+  const [rows, extras] = await Promise.all([
+    db
+      .select({ comment: comments, version: drops.version })
+      .from(comments)
+      .innerJoin(drops, eq(drops.id, comments.dropId))
+      .where(and(sql`${comments.dropId} IN (${chainOf(row)})`, lte(drops.version, row.version)))
+      .orderBy(asc(comments.n), asc(drops.version)),
+    commentExtras(chainOf(row)),
+  ])
   return rows.map((item) => toComment(item.comment, who, item.version, extras))
 }
 

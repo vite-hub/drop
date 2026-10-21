@@ -502,27 +502,26 @@ export async function siteItems(
   origin: string,
   page?: string,
 ): Promise<SiteReviewItem[]> {
-  const rows = await db
-    .select({
-      comment: comments,
-      shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
-    })
-    .from(comments)
-    .innerJoin(drops, eq(drops.id, comments.dropId))
-    .where(
-      and(
-        sql`${comments.dropId} IN (${siteFamily(site.id)})`,
-        page
-          ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
-          : undefined,
-      ),
-    )
-    .orderBy(asc(comments.createdAt))
-    .limit(500)
-  const extras = await commentExtras(
-    rows.map((item) => item.comment),
-    siteFamily(site.id),
-  )
+  const [rows, extras] = await Promise.all([
+    db
+      .select({
+        comment: comments,
+        shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
+      })
+      .from(comments)
+      .innerJoin(drops, eq(drops.id, comments.dropId))
+      .where(
+        and(
+          sql`${comments.dropId} IN (${siteFamily(site.id)})`,
+          page
+            ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
+            : undefined,
+        ),
+      )
+      .orderBy(asc(comments.createdAt))
+      .limit(500),
+    commentExtras(siteFamily(site.id)),
+  ])
   return rows.reverse().map(({ comment, shot }) => ({
     ...toComment(comment, who, 1, extras),
     screenshot:
