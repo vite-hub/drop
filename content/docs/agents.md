@@ -26,7 +26,7 @@ Clients that discover the issuer directly find it at `/.well-known/oauth-authori
 Drop's skills come with the server through the MCP Skills extension (`skills/list` and `skill://` resources), so connected clients that support skills load them on their own:
 
 - `vitehub-drop` tells agents how to drop docs, publish apps, read feedback, and write documents people can review.
-- `pr-evidence` builds the before and after for a pull request that changes something visible: screenshots with hand-drawn marks and notes, dropped in Drop, with a snippet for the description.
+- `pr-evidence` builds the before and after for a pull request that changes something visible: screenshots with hand-drawn marks and notes, dropped in Drop, and a comment on the pull request that links to it.
 - `handoff` sums up the current conversation in a doc and drops it, so another agent, a colleague, or a new session picks the work up from the link.
 - `prototype` builds a UI several radically different ways in one page with a shared picker, so people switch between the variants, comment, and pick one; each round of feedback becomes the next version.
 - `show-me` explains the current topic with diagrams and short docs in Drop. Agents use it only when you ask for it.

@@ -1,6 +1,6 @@
 ---
 name: pr-evidence
-description: Builds pull-request evidence for UI changes, with before and after screenshots, hand-drawn marks, and notes written in Markdown, then drops it into Drop and returns a link and a snippet for the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
+description: Builds pull-request evidence for UI changes, with before and after screenshots, hand-drawn marks, and notes written in Markdown, then drops it into Drop and comments its link on the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
 ---
 
 # Pull-request evidence
@@ -40,10 +40,12 @@ Above the screenshots, write one line with the steps to reach the screen. Each p
 
 1. Write the doc from these rules and fresh captures each time. For a next version, read the earlier one only for its open comments; don't start from its text or its conclusions. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), a `note`, and `resources`: the pull request's URL with the title `PR #<number>`, and the after preview's URL with the title `Preview`. They show with their sites' icons at the top of the page. Pass them again with each version; one already there isn't added twice. Open the returned page.
 2. Take a screenshot of it and check that every mark sits on its target and every number matches its note. Fix and publish again with `previous` until it does. If a mark can't be verified, say so in the report.
-3. Give the user the link and a snippet for the pull request body, placed where the repository's pull request rules say:
+3. Comment the link on the pull request, so the pull request leads to the doc as the doc leads to it:
 
    ```md
    [Before/after on Drop](<link>)
    ```
+
+   Read its description and comments first. If the link is already there, as after an earlier version, leave it: it always opens the latest version. If the repository's pull request rules say where evidence goes, such as the description, put it there instead. Post with `gh pr comment <pull request URL> --body '<snippet>'` or the GitHub tool you have; if you can't post, give the user the snippet. Tell the user where it went.
 
 The doc is a public link, so anyone with the pull request can open it. On some Drops public links close after a few days (`publicUntil` says when); tell the user the date if there is one.
