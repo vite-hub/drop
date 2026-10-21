@@ -187,6 +187,16 @@ function closeChanges() {
 // The diff belongs to History: another tab goes back to the document.
 watch(tab, (value) => value !== "history" && closeChanges())
 
+// Apps and HTML pages open alone in another window (ViewerPresent): a deck for the projector, which Slidev's presenter
+// view in this frame then drives.
+const presents = computed(() => isApp.value || drop.value.kind === "html")
+function openWindow() {
+  const query = new URLSearchParams({ present: "" })
+  if (older.value) query.set("v", String(drop.value.version))
+  if (isApp.value && page.value !== "index.html") query.set("file", page.value)
+  window.open(`${dropPath(drop.value)}?${query}`, "_blank", "popup")
+}
+
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
   e: () => !editing.value && drop.value.canEdit && startEdit(),
@@ -195,6 +205,7 @@ defineShortcuts({
   r: toggleArea,
   l: () => !editing.value && copyLink("Link copied"),
   d: () => !editing.value && download(),
+  o: () => presents.value && openWindow(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
@@ -233,6 +244,9 @@ function copyLink(announce?: string) {
 const moreMenu = computed(() =>
   [
     [
+      ...(presents.value
+        ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", kbds: ["o"], onSelect: openWindow }]
+        : []),
       ...(canDrawArea.value
         ? [
             {
@@ -434,6 +448,9 @@ offerToPalette("drop", () => {
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
     ...(drop.value.url
       ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
+      : []),
+    ...(presents.value
+      ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", kbds: ["o"], onSelect: openWindow }]
       : []),
     ...(drop.value.resources ?? []).map((resource) => ({
       label: `Open ${resourceLabel(resource)}`,

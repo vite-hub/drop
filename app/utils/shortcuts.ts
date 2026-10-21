@@ -30,6 +30,7 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
       { keys: ["e"], label: "Edit together" },
       { keys: ["l"], label: "Copy the link" },
       { keys: ["m"], label: "Copy as Markdown", where: "A doc or a single HTML page" },
+      { keys: ["o"], label: "Open in a new window, to present it", where: "An app or a single HTML page" },
       { keys: ["escape"], label: "Close a comment, leave area mode, or go back from a version" },
     ],
   },

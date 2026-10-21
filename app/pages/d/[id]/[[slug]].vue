@@ -7,15 +7,17 @@ import { type DropLink, dropPath } from "#shared/links"
 import { isPublic } from "#shared/share"
 
 definePageMeta({
-  middleware: async () => {
+  middleware: async (to) => {
     const { data: me } = await useMe()
-    if (me.value) setPageLayout("dashboard")
+    // `?present` shows the drop alone, for another window (ViewerPresent), signed in or not.
+    if (me.value && to.query.present === undefined) setPageLayout("dashboard")
   },
 })
 
 const route = useRoute("d-id-slug")
 const { data: me } = await useMe()
 const pinned = computed(() => Number(route.query.v) || undefined)
+const presenting = computed(() => route.query.present !== undefined)
 const target = await useApi<DropLink>(() => `/api/links/${route.params.id}`, {
   key: () => keys.dropLink(route.params.id, pinned.value),
   query: computed(() => (pinned.value ? { v: pinned.value } : {})),
@@ -68,8 +70,9 @@ const here = useHerePath()
 </script>
 
 <template>
+  <ViewerPresent v-if="presenting && drop.data.value" :key="drop.data.value.id" />
   <!-- The dashboard layout brings its own UDashboardGroup; a visitor's page needs one for the viewer's panels. -->
-  <template v-if="me">
+  <template v-else-if="me">
     <DropViewer v-if="drop.data.value" :key="drop.data.value.id" public-view />
     <UDashboardPanel v-else id="drop-missing">
       <template #header>

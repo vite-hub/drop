@@ -31,6 +31,8 @@ publish({
 
 A built app, such as a Vite `dist/` folder, a prerendered Nuxt site, or a Slidev deck, goes up as one archive. The agent calls `publish` with `archive: {}`, gets an upload URL, and runs `tar -czf - -C dist . | curl -T - '<uploadUrl>'`. Fonts, images, and wasm go in as they are. The app runs at the root of its own origin, which serves its files like a static host, so build it for `/`. Each archive replaces every file of the app.
 
+To present an app or a single HTML page, such as a Slidev deck, choose **Open in new window** in **More** (or press :kbd[O]). It shows the drop alone, ready for a projector or a second screen. A Slidev deck's presenter view, opened in the drop's page, drives that window, with notes and the next slide on your screen.
+
 An app with server code, like API routes, sign-in, or a database, isn't a drop. Deploy it to a preview and review it as a [site](/docs/sites).
 
 ## Folders {#folders}
