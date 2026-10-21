@@ -28,7 +28,40 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem)); margin: 0 auto; paddi
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
 .mermaid svg { max-width: 100%; height: auto; }
 .typeset :is(h2, h3) { scroll-margin-top: 1.5rem; }
+/* An image on its way (DEFERRED_IMAGES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
+.typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }
 `
+
+/**
+ * Asks the viewer for each image deferImages left waiting (shared/embedded-images.ts) as it comes within a screen and a
+ * half of view, and shows it once the viewer sends it as a data URL. Every copy of the image takes it, Comark zoom's too.
+ */
+const DEFERRED_IMAGES_SCRIPT = String.raw`(() => {
+  const waiting = document.querySelectorAll("img[data-drop-image]");
+  if (!waiting.length) return;
+  const asked = new Set();
+  // The document as root: a sandboxed frame is cross-origin, and browsers ignore rootMargin on its implicit root.
+  const near = new IntersectionObserver((entries) => {
+    const paths = [];
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      near.unobserve(entry.target);
+      const path = entry.target.dataset.dropImage;
+      if (path && !asked.has(path)) { asked.add(path); paths.push(path); }
+    }
+    if (paths.length) parent.postMessage({ __drop: true, type: "images", paths }, "*");
+  }, { root: document, rootMargin: "150% 0px" });
+  waiting.forEach((image) => near.observe(image));
+  addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || !m.__drop || e.source !== parent || m.type !== "image-data" || !String(m.url).startsWith("data:image/")) return;
+    for (const image of document.querySelectorAll("img[data-drop-image]")) {
+      if (image.dataset.dropImage !== m.path) continue;
+      image.src = m.url;
+      image.removeAttribute("data-drop-image");
+    }
+  });
+})()`
 
 /**
  * A spreadsheet's preview (server/utils/spreadsheet.ts): Drop's table look from the docs, as a grid. The column letters
@@ -188,7 +221,7 @@ export function planDocument(
   }
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_IMAGES_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )

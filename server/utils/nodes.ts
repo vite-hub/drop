@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, like, or, sql } from "drizzle-orm"
+import { and, eq, inArray, isNull, like, or, type SQL, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { MAX_SLUG } from "#shared/links"
 import { MAX_DEPTH } from "#shared/nodes"
@@ -6,7 +6,7 @@ import { type Share, SHARE_RANK } from "#shared/share"
 import { dropHeads, drops } from "../databases/config"
 import type { DropRow } from "./drops"
 import { isExpired } from "./expiry"
-import { shareNow } from "./share"
+import { shareNow, sharePolicy } from "./share"
 
 // Every drop is a node: it may sit in a folder, and the files a doc embeds hang off the doc. A node takes the widest
 // share on its path, the strictest review and quarantine, and the lifetime and Trash of the top-most node. Reads work
@@ -46,6 +46,25 @@ export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"
       )
     for (const row of found) byId.set(row.id, row)
   }
+  return walkUp(rows, byId)
+}
+
+/**
+ * The id `hit` selects (a query for at most one id) and the ids of every node above it, so a lookup reads a drop and its
+ * ancestors in one query instead of two in a row. `walkUp` walks them the way `ancestorsOf` does.
+ */
+export const withAncestors = (hit: SQL) => sql`(
+  WITH RECURSIVE up(id, depth) AS (
+    SELECT id, 0 FROM drops WHERE id = (${hit})
+    UNION ALL SELECT d.parent_id, up.depth + 1 FROM drops d JOIN up ON d.id = up.id WHERE d.parent_id IS NOT NULL AND up.depth < ${MAX_WALK}
+  ) SELECT id FROM up
+)`
+
+/** Each row's ancestors, nearest first, keyed by the row's id, from the nodes `byId` holds. */
+export function walkUp(
+  rows: (Pick<Row, "id" | "parentId" | "ownerId"> & { teamFolder?: boolean })[],
+  byId: Map<string, Row>,
+) {
   const result = new Map<string, Row[]>()
   for (const row of rows) {
     const path: Row[] = []
@@ -77,7 +96,13 @@ export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"
  * everything below it there. `raw` keeps the row's own values, which is what changing it edits.
  */
 export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date.now()): DropRow {
-  const own = shareNow(row, now)
+  // Inside a team's folders, a personal Drop shares like a team one (./share.ts modeFor). Team folders only sit under
+  // team folders, so one anywhere on the path puts the whole path in the team.
+  const mode =
+    sharePolicy().mode === "team" || [row, ...ancestors].some((node) => node.teamFolder && node.teamId)
+      ? "team"
+      : "personal"
+  const own = shareNow(row, now, mode)
   if (!ancestors.length)
     return {
       ...row,
@@ -88,7 +113,7 @@ export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date
       expired: Boolean(row.trashedAt) || isExpired(row, now, days),
     }
   const path = [row, ...ancestors]
-  const shares = path.map((node) => shareNow(node, now))
+  const shares = path.map((node) => shareNow(node, now, mode))
   const root = ancestors.at(-1)!
   const widestAt = shares.reduce(
     (best, share, index) => (SHARE_RANK[share] > SHARE_RANK[shares[best]!] ? index : best),

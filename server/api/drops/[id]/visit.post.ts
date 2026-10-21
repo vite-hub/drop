@@ -1,4 +1,4 @@
-import { defineHandler } from "h3"
+import { defineHandler, noContent } from "h3"
 import { findDrop, permissions } from "../../../utils/drops"
 import { recordVisit } from "../../../utils/expiry"
 import { identify } from "../../../utils/identity"
@@ -14,6 +14,5 @@ export default defineHandler(async (event) => {
   const who = await identify(event)
   if (drop && permissions(drop, who).view)
     await Promise.all([recordVisit(event, drop, who, "beacon"), countView(event, drop, who, "beacon")])
-  event.res.status = 204
-  return null
+  return noContent()
 })

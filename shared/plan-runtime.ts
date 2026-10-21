@@ -321,7 +321,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       away.relList.add("noopener");
       return;
     }
-    if (!img || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
+    // An image still on its way (data-drop-image) has nothing to zoom yet.
+    if (!img || img.dataset.dropImage || host.contains(img) || (getSelection() && !getSelection().isCollapsed)) return;
     e.preventDefault(); e.stopPropagation();
     // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
     const r = img.getBoundingClientRect();

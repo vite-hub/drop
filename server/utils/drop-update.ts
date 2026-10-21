@@ -11,7 +11,8 @@ import { chainOf, expiryPolicy, renewDrop } from "./expiry"
 import { MAX_FOLDER_DESCRIPTION, moveNode } from "./folders"
 import type { Identity } from "./identity"
 import { isAttachment, parentNode, resolveNode, rootOf, uniqueSlug } from "./nodes"
-import { shareFields } from "./share"
+import { requireKeepSlot } from "./quotas"
+import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 
 export type DropChange = v.InferOutput<typeof DropPatchSchema>
@@ -46,7 +47,7 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
     if (above?.expired)
       throw new HTTPError({
         status: 409,
-        statusText: `It's in ${trashedFolder(drop, days).title}, which is in the Trash. Restore that folder.`,
+        message: `It's in ${trashedFolder(drop, days).title}, which is in the Trash. Restore that folder.`,
       })
     await restoreDrop(drop, now)
     drop = { ...drop, trashedAt: null, trashReason: null, lastAccessedAt: now, expired: false }
@@ -68,7 +69,7 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   // Picking Public again on a public drop starts its window over.
   const share: { share?: Share; publicUntil?: number | null; shareReview?: "pending" | "rejected" | null } = {}
   if (body.share !== undefined && (body.share !== own.share || isPublic(body.share))) {
-    Object.assign(share, shareFields(body.share, drop, event, now))
+    Object.assign(share, shareFields(body.share, { ...drop, team: modeFor(drop, event) === "team" }, event, now))
     // Going public, or from public to private or the team, is a different share; public to public isn't.
     if (isPublic(body.share) !== isPublic(own.share))
       share.shareReview = isPublic(body.share) ? await shareReviewFor(drop.ownerId, event) : null
@@ -84,6 +85,8 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
     body.lifetime !== undefined
       ? lifetimeFields(who, { lifetime: body.lifetime, keepReason: body.keepReason }, drop, event)
       : {}
+  if (body.lifetime !== undefined)
+    await requireKeepSlot(drop.ownerId, { lifetime: body.lifetime }, drop.lifetime === "keep", !drop.parentId)
   const slug = body.slug !== undefined ? { slug: await uniqueSlug(drop.parentId, slugify(body.slug), own.link) } : {}
   const chainChange = { ...share, ...life, ...slug }
   if (Object.keys(chainChange).length) {

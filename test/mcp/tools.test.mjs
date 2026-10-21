@@ -16,6 +16,8 @@ const { default: commentsGet } = await import("../../server/api/drops/[id]/comme
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
 
+const MIB = 1024 * 1024
+
 migrate()
 beforeEach(() => {
   reset()
@@ -485,6 +487,19 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
       event.context.params = { ticket: new URL(url).pathname.split("/").pop() }
       return uploadPut(event)
     }
+    // Streamed with no length (`curl -T -`), a body over the limit is cut off while it arrives, not read whole first.
+    let chunks = 0
+    const endless = new ReadableStream({
+      pull: (stream) => (chunks++ < 64 ? stream.enqueue(new Uint8Array(MIB)) : stream.close()),
+    })
+    const streamed = new H3Event(new Request(ticket.uploadUrl, { method: "PUT", body: endless, duplex: "half" }))
+    streamed.context.log = { set() {}, error() {}, warn() {} }
+    streamed.context.params = { ticket: new URL(ticket.uploadUrl).pathname.split("/").pop() }
+    await assert.rejects(
+      uploadPut(streamed),
+      (error) => error.status === 413 && /exceeds the 4 MiB/.test(error.message),
+    )
+    assert.ok(chunks < 10, `read ${chunks} MiB`)
     const shot = await put(ticket.uploadUrl)
     assert.equal(shot.kind, "image")
     assert.equal(shot.share, "public")
