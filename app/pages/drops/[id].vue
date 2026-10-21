@@ -8,7 +8,7 @@ const here = useHerePath()
 </script>
 
 <template>
-  <DropViewer v-if="drop.data.value" :key="drop.data.value.id" />
+  <DropViewer v-if="drop.data.value" :key="`${drop.data.value.id}@${drop.data.value.version}`" />
   <UDashboardPanel v-else id="drop-missing">
     <template #header>
       <!-- The viewer's bar while it loads or can't open, so the page keeps its line and doesn't jump. -->

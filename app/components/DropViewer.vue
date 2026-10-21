@@ -89,12 +89,19 @@ function closeLightbox() {
 const popoverRef = useTemplateRef<{ fail: (reason?: string) => void; sent: () => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 
+// Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
+// they're commenting, selecting, or sharing. Editors are left out: the live editor tells them itself (useLiveEditor).
+useLatestVersion(drop, {
+  enabled: () => publicView && !route.query.v && !older.value && !trashed.value && !editing.value,
+  busy: () => Boolean(selection.value || popover.value || lightbox.value || shareOpen.value),
+})
+
 function startEdit() {
   popover.value = selection.value = null
   void live.open()
 }
-// Both pages key this viewer by the drop's id, so another version (a teammate's "Open", the sidebar) mounts a new one;
-// the old one leaves its draft's room as it unmounts (useLiveEditor).
+// Both pages key this viewer by the drop's id and version, so another version (a teammate's "Open", the sidebar, an app
+// republished in place) mounts a new one; the old one leaves its draft's room as it unmounts (useLiveEditor).
 onMounted(() => {
   if (route.query.edit === "1" && drop.value.canEdit) startEdit()
 })
