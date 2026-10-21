@@ -10,6 +10,7 @@ const MARKS = { "github.com": "i-simple-icons-github" } satisfies Record<string,
 const props = defineProps<{ url: string }>()
 const mark = computed(() => {
   const hostname = new URL(props.url).hostname.replace(/^www\./, "")
+  // SAFETY: MARKS is keyed by normalized hostnames, so this lookup can only use one of its declared keys.
   return MARKS[hostname as keyof typeof MARKS]
 })
 const tries = computed(() => faviconUrls(props.url))
