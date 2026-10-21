@@ -4,6 +4,9 @@ import { test } from "vite-plus/test"
 import { parseYAML } from "confbox/yaml"
 import { createMarkdownParser } from "@comark/html/parse"
 import annotate from "comark-annotate"
+import { migrate } from "../cost/harness.mjs"
+
+migrate()
 
 const root = new URL("../../skills/", import.meta.url)
 const names = (await readdir(root, { withFileTypes: true }))
