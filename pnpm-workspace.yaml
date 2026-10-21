@@ -25,11 +25,17 @@ overrides:
 patchedDependencies:
   # Keeps the Server Env resolver in Auth's global state. In dev, editing anything server/auth.ts imports re-ran the
   # module and dropped it, so signed-in requests failed on `env.drop` until /api/auth ran again (vite-hub/vitehub#2469).
+  # createAuthClient() loads Better Auth's Vue client on first use, so pages that never sign in or out don't download it
+  # (vite-hub/vitehub#2692).
   "@vite-hub/auth@0.0.4": patches/@vite-hub__auth@0.0.4.patch
   # Under `nuxt dev` (cloudflare-dev), the Blob plugin stored unenv's process.env proxy as globalThis.__env__, which
   # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings
   # (vite-hub/vitehub#2468). Its serve() also answers a single byte Range with a 206, so videos seek (and play in Safari).
   "@vite-hub/blob@0.0.4": patches/@vite-hub__blob@0.0.4.patch
+  # D1 read replicas: with `readReplication`, each request reads through its own D1 session, and a request that writes
+  # returns a bookmark cookie so the same reader sees its own writes (vite-hub/vitehub#2693). Each request's wide event
+  # also gets its database work, `database: { calls, ms, maxConcurrent }` (vite-hub/vitehub#2694).
+  "@vite-hub/database@0.0.4": patches/@vite-hub__database@0.0.4.patch
   # `vitehub schedule run` returned 500 under `nuxt dev` (ssrLoadModule needs a runnable ssr environment) and ran
   # outside Nitro elsewhere. Runs Static Schedules through the Nitro dev handler, imports registry definitions by
   # absolute path (the app/ Vite root broke relative ones), and reloads the registry on HMR (vite-hub/vitehub#2473).
@@ -61,7 +67,8 @@ patchedDependencies:
   # Forwards vite-hub/ui/avatar-stack, connection-status, and sync-status to the patched @vite-hub/ui (#2461), and
   # copies its collaboration CSS into vite-hub/ui/styles.css, a separate file; without it the avatars render full size.
   # Keeps Rate Limit in memory under `nuxt dev`: the preset pinned the Cloudflare provider, whose bindings exist only
-  # in the built wrangler.json, so every limited route returned 500 in dev (vite-hub/vitehub#2467).
+  # in the built wrangler.json, so every limited route returned 500 in dev (vite-hub/vitehub#2467). Its own copy of the
+  # database's runtime/state, which Nuxt aliases, also runs each request in its D1 sessions (vite-hub/vitehub#2693).
   vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
   # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
   # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
