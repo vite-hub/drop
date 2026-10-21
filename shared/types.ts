@@ -171,9 +171,11 @@ export interface DropComment {
   mine: boolean
   /** The thread under it, oldest first. */
   replies: CommentReply[]
+  /** Images sent with it. */
+  attachments: CommentAttachment[]
 }
 
-/** A reply in a comment's thread: words only, the comment keeps the anchor and the resolved state. */
+/** A reply in a comment's thread: words and images; the comment keeps the anchor and the resolved state. */
 export interface CommentReply {
   id: string
   body: string
@@ -181,6 +183,17 @@ export interface CommentReply {
   authorImage: string | null
   createdAt: number
   mine: boolean
+  attachments: CommentAttachment[]
+}
+
+/** An image someone sent with a comment or a reply. It's a drop of its own under the commented drop. */
+export interface CommentAttachment {
+  id: string
+  filename: string
+  contentType: string
+  size: number
+  /** Where Drop serves it, relative to Drop's origin (`/f/<key>`), for whoever may view the drop. */
+  url: string
 }
 
 /**
@@ -190,6 +203,37 @@ export interface CommentReply {
 export interface SiteReviewItem extends DropComment {
   /** The screenshot's own drop, which shows the box and takes replies. Null when the page couldn't take one. */
   screenshot: { id: string; link: string; slug: string; url: string } | null
+  /** Where the pin sits on the element `label` names, in thousandths of its box. Null without an element. */
+  spot: { x: number; y: number } | null
+}
+
+/**
+ * A thread as the review script shows it on the site's page: what Drop's own lists show, minus anything that would
+ * open the review in Drop (ids, links). Images come from /api/review/images/<id> with the review token.
+ */
+export interface ReviewThread {
+  n: number
+  body: string
+  author: { name: string; image: string | null }
+  createdAt: number
+  resolved: boolean
+  mine: boolean
+  /** Its author and the site's managers may resolve it, as in Drop. */
+  canResolve: boolean
+  page: string | null
+  /** The element under the box: its CSS path and its name, as the page sent them. */
+  element: { selector: string; label: string | null } | null
+  spot: { x: number; y: number } | null
+  /** The box, in thousandths of the viewport it was drawn in. */
+  box: { ox: number; oy: number; ow: number; oh: number }
+  screenshot: string | null
+  images: { id: string; filename: string }[]
+  replies: {
+    author: { name: string; image: string | null }
+    body: string
+    createdAt: number
+    images: { id: string; filename: string }[]
+  }[]
 }
 
 export interface Member {

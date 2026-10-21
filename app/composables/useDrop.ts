@@ -6,6 +6,15 @@ import * as v from "valibot"
 /** What a comment box waits on: what it posted, or the sentence to show under it (none when the plan-limit dialog says it). */
 export type Sent<T> = { value: T } | { error?: string }
 
+/** A comment's or reply's body: JSON, or multipart with the JSON in `data` when it carries images. */
+function withImages(data: Partial<CommentInput>, files: File[]) {
+  if (!files.length) return data
+  const form = new FormData()
+  form.append("data", JSON.stringify(data))
+  for (const file of files) form.append("image", file, file.name || "image")
+  return form
+}
+
 /**
  * One drop and its comments, with the actions the viewer needs. Keys follow the id, so the cache
  * stays right when the router reuses the page for another drop (the next version, for instance).
@@ -19,11 +28,15 @@ function useDrop(id: MaybeRefOrGetter<string>) {
   })
 
   // No toast either way: the new pin shows it went through, and a failure shows under the box that sent it.
-  async function addComment(input: Omit<CommentInput, "body">, body: string): Promise<Sent<DropComment>> {
+  async function addComment(
+    input: Omit<CommentInput, "body">,
+    body: string,
+    files: File[] = [],
+  ): Promise<Sent<DropComment>> {
     try {
       const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, {
         method: "POST",
-        body: { ...input, body },
+        body: withImages({ ...input, body }, files),
       })
       comments.data.value = [...comments.data.value, comment]
       return { value: comment }
@@ -58,9 +71,12 @@ function useDrop(id: MaybeRefOrGetter<string>) {
       comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment,
     ))
 
-  async function addReply(commentId: string, body: string): Promise<Sent<CommentReply>> {
+  async function addReply(commentId: string, body: string, files: File[] = []): Promise<Sent<CommentReply>> {
     try {
-      const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, { method: "POST", body: { body } })
+      const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, {
+        method: "POST",
+        body: withImages({ body }, files),
+      })
       setReplies(commentId, (replies) => [...replies, reply])
       return { value: reply }
     } catch (error) {

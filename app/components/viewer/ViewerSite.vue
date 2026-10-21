@@ -249,6 +249,7 @@ const box = (item: SiteReviewItem) => ({
               <ViewerCommentHeader :comment="{ ...item, resolved: resolved(item) }" />
               <p v-if="item.quote" class="truncate font-mono text-xs text-muted">{{ item.quote }}</p>
               <p class="line-clamp-3 text-sm">{{ item.body }}</p>
+              <ViewerCommentImages :attachments="item.attachments" />
               <div class="flex items-center gap-3 text-xs">
                 <span v-if="resolved(item)" class="text-muted">Resolved</span>
                 <ULink

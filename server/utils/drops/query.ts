@@ -587,12 +587,15 @@ function openableAncestors(row: DropRow, who: Identity | null, days: number): Dr
     .reverse()
 }
 
+/** Images sent in comments (server/utils/comment-images.ts) are the doc's children too, but it doesn't embed them. */
+const notCommentImage = sql`NOT EXISTS (SELECT 1 FROM comment_attachments WHERE comment_attachments.drop_id = ${drops.id})`
+
 /** Files a doc embeds from this Drop, across every version of the doc. */
 async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachment[]> {
   const rows = await db
     .select()
     .from(drops)
-    .where(and(sql`${drops.parentId} IN (${chainOf(row)})`, isNotNull(drops.blobKey)))
+    .where(and(sql`${drops.parentId} IN (${chainOf(row)})`, isNotNull(drops.blobKey), notCommentImage))
     .limit(100)
   return rows.map((item) => ({
     id: item.id,

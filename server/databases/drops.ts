@@ -198,6 +198,12 @@ export const comments = sqliteTable(
     authorName: text("author_name").notNull(),
     resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull(),
+    /**
+     * Site review: where the pin sits on the element `label` names, in thousandths of that element's box, so the
+     * review script can put it back on the live page. Null for comments with no element.
+     */
+    elementX: integer("element_x"),
+    elementY: integer("element_y"),
   },
   (table) => [
     index("comments_drop_idx").on(table.dropId, table.n),
@@ -222,6 +228,26 @@ export const commentReplies = sqliteTable(
     createdAt: integer("created_at").notNull(),
   },
   (table) => [index("comment_replies_comment_idx").on(table.commentId, table.createdAt)],
+)
+
+/**
+ * Images in a comment or in one of its replies. Each image is a drop of its own under the commented drop (see
+ * server/utils/comment-images.ts), so it shares that drop's sharing, lifetime, and Trash; this row says whose it is.
+ */
+export const commentAttachments = sqliteTable(
+  "comment_attachments",
+  {
+    dropId: text("drop_id")
+      .primaryKey()
+      .references(() => drops.id, { onDelete: "cascade" }),
+    commentId: text("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    /** Null when the image is on the comment itself. */
+    replyId: text("reply_id").references(() => commentReplies.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [index("comment_attachments_comment_idx").on(table.commentId, table.createdAt)],
 )
 
 /** Blob deletions that need another attempt after metadata has been removed. */

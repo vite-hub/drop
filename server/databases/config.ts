@@ -8,6 +8,7 @@ import { skillSettings } from "./skills"
 import {
   blobCleanup,
   codeImages,
+  commentAttachments,
   commentReplies,
   comments,
   dropFiles,
@@ -126,6 +127,7 @@ export {
   skillSettings,
   blobCleanup,
   codeImages,
+  commentAttachments,
   commentReplies,
   comments,
   dropFiles,
@@ -153,6 +155,7 @@ export default defineDatabase({
     account,
     blobCleanup,
     codeImages,
+    commentAttachments,
     commentReplies,
     comments,
     dropFiles,

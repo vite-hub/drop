@@ -347,19 +347,24 @@ const moreMenu = computed(() =>
 )
 const moreActive = computed(() => areaMode.value || showing("history") || showing("details"))
 
-async function submit(body: string) {
+async function submit(body: string, files: File[]) {
   if (popover.value?.type !== "new") return
-  const sent = await state.addComment({ ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
+  const sent = await state.addComment(
+    { ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) },
+    body,
+    files,
+  )
   if (!("value" in sent)) return popoverRef.value?.fail(sent.error)
   popover.value = null
   send({ type: "clear-selection" })
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
-const addPageComment = (body: string) =>
+const addPageComment = (body: string, files: File[]) =>
   state.addComment(
     { kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) },
     body,
+    files,
   )
 
 async function resolve(id: string, resolved: boolean) {
@@ -372,8 +377,8 @@ async function removeComment(id: string) {
   await state.removeComment(id)
 }
 
-async function reply(id: string, body: string) {
-  const sent = await state.addReply(id, body)
+async function reply(id: string, body: string, files: File[]) {
+  const sent = await state.addReply(id, body, files)
   if ("value" in sent) await popoverRef.value?.sent()
   else popoverRef.value?.fail(sent.error)
 }
