@@ -3,7 +3,7 @@
 // over the frame and screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
 // so a comment carries the screenshot, the box, and the address typed above, never the element under the box. Comments
 // are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way.
-import { siteMatches } from "#shared/review"
+import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
 /** `inset`: room to leave on the right for the floating panel, in pixels. */
@@ -17,14 +17,7 @@ const capture = useTabCapture()
 // someone types in it.
 const typed = ref(props.address)
 const open = ref(props.address)
-const covered = (value: string) => {
-  try {
-    return Boolean(props.drop.siteUrl) && siteMatches(props.drop.siteUrl!, new URL(value).origin)
-  } catch {
-    return false
-  }
-}
-const valid = computed(() => covered(typed.value))
+const valid = computed(() => siteCovers(props.drop.siteUrl, typed.value))
 function go() {
   if (valid.value) open.value = new URL(typed.value).href
 }
