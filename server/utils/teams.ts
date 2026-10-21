@@ -15,7 +15,6 @@ import type { DropRow } from "./drops/types"
 
 /** `owner` made the team and pays for it; `admin` manages its folders and people; `member` adds to its folders. */
 export type TeamRole = "owner" | "admin" | "member"
-export const TEAM_ROLES: TeamRole[] = ["owner", "admin", "member"]
 const asRole = (role: string): TeamRole => (role === "owner" || role === "admin" ? role : "member")
 
 /** Subscription states that pay for a team. `past_due` keeps it while Stripe retries the card. */

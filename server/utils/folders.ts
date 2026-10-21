@@ -30,9 +30,9 @@ export async function requireFolder(
   const folder = await findDropByRef(ref, event)
   const can = folder && permissions(folder, who)
   if (!folder || folder.kind !== "folder" || !can || !(can.manage || (folder.teamFolder && can.view)))
-    throw new HTTPError({ status: 404, statusText: `No folder you can add to with id ${ref}.` })
+    throw new HTTPError({ status: 404, message: `No folder you can add to with id ${ref}.` })
   if (folder.expired)
-    throw new HTTPError({ status: 409, statusText: `${folder.title} is in the Trash. Restore it first.` })
+    throw new HTTPError({ status: 409, message: `${folder.title} is in the Trash. Restore it first.` })
   if (moving && (folder.id === moving.id || folder.ancestors?.some((node) => node.id === moving.id)))
     throw new HTTPError({ status: 400, statusText: "A folder can't go inside itself." })
   const folderGoesIn = adding === "folder" || moving?.kind === "folder"

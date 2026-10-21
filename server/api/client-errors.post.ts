@@ -1,5 +1,5 @@
 import { useLogger } from "evlog/nitro/v3"
-import { defineValidatedHandler } from "h3"
+import { defineValidatedHandler, noContent } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { ClientErrorSchema } from "#shared/schemas"
 
@@ -14,6 +14,6 @@ export default defineValidatedHandler({
     const body = await event.req.json()
     // An error-level event, so it's kept even though the request itself succeeds.
     useLogger(event).error(`Client: ${body.message}`, { action: "client-error", client: body })
-    return new Response(null, { status: 204 })
+    return noContent()
   },
 })
