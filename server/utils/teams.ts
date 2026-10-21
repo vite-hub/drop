@@ -2,7 +2,7 @@ import { and, count, eq, inArray, sql } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
-import { member, organization, subscription } from "../databases/config"
+import { member, subscription } from "../databases/config"
 import type { DropRow } from "./drops/types"
 
 // Teams on a personal Drop. A team is a Better Auth organization: its members, their roles, and invitations live there.
@@ -19,7 +19,7 @@ export const TEAM_ROLES: TeamRole[] = ["owner", "admin", "member"]
 const asRole = (role: string): TeamRole => (role === "owner" || role === "admin" ? role : "member")
 
 /** Subscription states that pay for a team. `past_due` keeps it while Stripe retries the card. */
-export const PAYING = ["active", "trialing", "past_due"] as const
+const PAYING = ["active", "trialing", "past_due"] as const
 
 /** Whether people may make teams here: a personal Drop with `DROP_TEAMS` on. A team Drop is one team already. */
 export function teamsEnabled(event?: H3Event) {
@@ -109,14 +109,4 @@ export async function memberLimit(team: string, event?: H3Event) {
   const billing = billingConfig(event)
   if (!billing.enabled) return Number.MAX_SAFE_INTEGER
   return (await paidTeams([team])).has(team) ? Number.MAX_SAFE_INTEGER : billing.freeMembers
-}
-
-/** The names of teams, for labels. */
-export async function teamNames(ids: string[]): Promise<Map<string, string>> {
-  if (!ids.length) return new Map()
-  const rows = await db
-    .select({ id: organization.id, name: organization.name })
-    .from(organization)
-    .where(inArray(organization.id, ids))
-  return new Map(rows.map((row) => [row.id, row.name]))
 }

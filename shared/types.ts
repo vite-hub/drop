@@ -249,7 +249,7 @@ export interface Viewer {
   paid?: boolean
 }
 
-export interface ViewerTeam {
+interface ViewerTeam {
   id: string
   name: string
   slug: string
