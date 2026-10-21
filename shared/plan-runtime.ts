@@ -388,6 +388,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
     if (m.type === "inset") { document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px"); render(); }
+    // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
+    if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     if (m.type === "focus") {
       active = m.id; render();
       const dot = Array.from(marks.children).find((d) => d.classList.contains("pulse"));

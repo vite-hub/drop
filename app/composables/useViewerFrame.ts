@@ -1,4 +1,4 @@
-import { planDocument } from "#shared/documents"
+import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { injectRuntime } from "#shared/plan-runtime"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
@@ -25,6 +25,8 @@ export function useViewerFrame(options: {
   pinned: Ref<DropComment[]>
   /** Room the floating panel takes on the right, in pixels. */
   inset: Ref<number>
+  /** How wide a Markdown doc's text runs. */
+  width: Ref<DocWidth>
   annotations: ReturnType<typeof useViewerAnnotations>
 }) {
   const {
@@ -50,9 +52,11 @@ export function useViewerFrame(options: {
   const attached = useAttachmentData(drop)
 
   // A plain variable, not a ref: the documents read it when they're built, and opening the panel later must not
-  // rebuild (and reload) them. The "inset" message moves the text from there.
+  // rebuild (and reload) them. The "inset" message moves the text from there, and "width" widens it.
   let startInset = 0
   watch(options.inset, (value) => (startInset = value), { immediate: true, flush: "sync" })
+  let startWidth: DocWidth = "readable"
+  watch(options.width, (value) => (startWidth = value), { immediate: true, flush: "sync" })
   const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset)
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
@@ -71,6 +75,7 @@ export function useViewerFrame(options: {
       dark.value,
       attached.inline(drop.value.html ?? ""),
       startInset,
+      startWidth,
     )
   })
 
@@ -204,6 +209,7 @@ export function useViewerFrame(options: {
   watch([ready, annotations.areaMode], () => ready.value && send({ type: "area-mode", on: annotations.areaMode.value }))
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
   watch([ready, options.inset], () => ready.value && send({ type: "inset", right: options.inset.value }))
+  watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
 
   return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath }
 }

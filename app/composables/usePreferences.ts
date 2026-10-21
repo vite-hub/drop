@@ -1,3 +1,4 @@
+import type { DocWidth } from "#shared/documents"
 import type { SideTab } from "~/utils/viewer"
 
 const year = 60 * 60 * 24 * 365
@@ -11,6 +12,10 @@ export function useSidePanel() {
   const tab = useCookie<SideTab>("drop-side-tab", { default: () => "comments", maxAge: year, sameSite: "lax" })
   return { open, tab }
 }
+
+/** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */
+export const useDocWidth = () =>
+  useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
 /** Whether the Drops page's Get started checklist was dismissed. A cookie, so a dismissed checklist never flashes in. */
 export const useGetStartedHidden = () =>
