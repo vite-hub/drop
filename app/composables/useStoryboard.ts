@@ -63,6 +63,9 @@ export function useCursorTarget(
   anchor = { x: 0.6, y: 0.65 },
 ) {
   const position = reactive({ x: 0, y: 0, shown: false })
+  // The server has nothing to measure, and its render would still run the immediate watcher below and leave the
+  // re-measure timer behind.
+  if (import.meta.server) return position
   function measure(target: string | null | undefined) {
     const element = target ? root.value?.querySelector<HTMLElement>(`[data-cursor="${target}"]`) : null
     if (!root.value || !element) return void (position.shown = false)

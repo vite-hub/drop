@@ -4,6 +4,7 @@
 // publish new versions, and people who may edit a Markdown doc edit it together live (useLiveEditor). State lives in
 // composables (useDrop, useViewerPanel, useAppFiles, useViewerFrame, useViewerAnnotations, useLiveEditor); this file
 // wires them up.
+import type { DocWidth } from "#shared/documents"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
@@ -132,6 +133,19 @@ const floating = computed(() => sideOpen.value && wide.value && !editing.value &
 const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
 const inset = computed(() => (floating.value ? FLOATING_INSET : 0))
 
+// A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
+const docWidth = useDocWidth()
+const widths: { value: DocWidth; label: string }[] = [
+  { value: "readable", label: "Readable" },
+  { value: "wide", label: "Wide" },
+  { value: "full", label: "Full width" },
+]
+const widens = computed(() => drop.value.kind === "markdown")
+function nextWidth() {
+  const at = widths.findIndex((item) => item.value === docWidth.value)
+  docWidth.value = widths[(at + 1) % widths.length]!.value
+}
+
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath } = useViewerFrame({
   drop,
@@ -139,6 +153,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
   app,
   pinned,
   inset,
+  width: docWidth,
   annotations,
 })
 
@@ -215,6 +230,7 @@ defineShortcuts({
   l: () => !editing.value && copyLink("Link copied"),
   d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
+  w: () => widens.value && nextWidth(),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
     closeChanges()
@@ -262,6 +278,20 @@ const moreMenu = computed(() =>
               icon: "i-mingcute-message-1-line",
               kbds: ["r"],
               onSelect: toggleArea,
+            },
+          ]
+        : []),
+      ...(widens.value
+        ? [
+            {
+              label: "Width",
+              icon: "i-mingcute-spacing-horizontal-line",
+              children: widths.map((item) => ({
+                label: item.label,
+                type: "checkbox" as const,
+                checked: docWidth.value === item.value,
+                onUpdateChecked: () => (docWidth.value = item.value),
+              })),
             },
           ]
         : []),
@@ -833,7 +863,7 @@ watch(
       </div>
 
       <div class="relative flex min-h-0 flex-1 flex-col">
-        <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" />
+        <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
         <!-- The grid keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
         <ViewerFolder
           v-else-if="drop.kind === 'folder'"

@@ -370,6 +370,9 @@ export default defineNuxtConfig({
       wrangler: {
         name: cloudflareTemplate.name,
         observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } },
+        // A page waits on D1 queries one after another, each a round trip from wherever the Worker runs. Smart
+        // Placement runs it near the database when that's faster; static assets are still served from the edge.
+        placement: { mode: "smart" },
       },
     },
     // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.

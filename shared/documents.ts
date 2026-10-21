@@ -5,6 +5,13 @@ import type { PlanKind } from "./plans"
 import { injectRuntime, THEME_CSS } from "./plan-runtime"
 import { CALLOUT_CSS, TYPESET_CSS } from "./typeset"
 
+/**
+ * How wide a Markdown doc's text column runs, the reader's choice in the viewer's More menu: a readable line, a wider
+ * one for tables, or the whole frame. The doc reads it from --drop-column, which the viewer's "width" message changes.
+ */
+export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "100vw" } as const
+export type DocWidth = keyof typeof DOC_WIDTHS
+
 const DOCUMENT_EXTRA_CSS =
   CALLOUT_CSS +
   `
@@ -13,9 +20,10 @@ const DOCUMENT_EXTRA_CSS =
    --drop-shift itself, to keep a column of its own (OUTLINE_SCRIPT); a compare keeps clear of both (document-shell.css). */
 body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out;
   --drop-right: calc(var(--drop-inset, 0px) + var(--drop-outline, 0px));
-  --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + 46rem - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
+  --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
   padding-right: var(--drop-shift); }
-main { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+main { width: min(100% - 2rem, var(--drop-column, 46rem)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+@media (max-width: 36rem) { main { width: min(100% - 1.25rem, var(--drop-column, 46rem)); } }
 .task-list-item { list-style: none; margin-left: -1.25rem; }
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
 .mermaid svg { max-width: 100%; height: auto; }
@@ -145,9 +153,16 @@ const OUTLINE_SCRIPT = String.raw`(() => {
 
 /**
  * Builds the exact document an iframe shows for a drop, with Drop's theme and annotator injected. `html` is the
- * server-rendered body for Markdown, and a spreadsheet's sheets for a file.
+ * server-rendered body for Markdown, and a spreadsheet's sheets for a file. `width` is a Markdown doc's column (DOC_WIDTHS).
  */
-export function planDocument(kind: PlanKind, source: string, dark = false, html = "", inset = 0): string {
+export function planDocument(
+  kind: PlanKind,
+  source: string,
+  dark = false,
+  html = "",
+  inset = 0,
+  width: DocWidth = "readable",
+): string {
   if (kind === "html") return injectRuntime(source, dark, inset)
   if (kind === "image") {
     const src = source.trim().startsWith("<svg")
@@ -173,7 +188,7 @@ export function planDocument(kind: PlanKind, source: string, dark = false, html 
   }
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )
