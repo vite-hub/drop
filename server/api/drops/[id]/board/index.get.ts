@@ -12,7 +12,7 @@ export default defineHandler(async (event) => {
   const latest = (await versionsOf(drop))[0]?.id === drop.id
   return {
     snapshot: await readBoard(drop),
-    canEdit: Boolean(latest && !drop.expired && permissions(drop, who).edit),
+    canEdit: latest && !drop.expired && permissions(drop, who).edit,
     updatedAt: drop.updatedAt,
   }
 })

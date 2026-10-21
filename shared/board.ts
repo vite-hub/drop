@@ -191,14 +191,20 @@ export function labelGrowth(text: string, w: number, h: number) {
 }
 
 /** The plain text of a tldraw rich text value. */
+function walkRichText(node: any): string {
+  return node?.type === "text"
+    ? String(node.text ?? "")
+    : Array.isArray(node?.content)
+      ? node.content.map(walkRichText).join(node.type === "doc" ? "\n" : "")
+      : ""
+}
+
 export function plainText(rich: unknown): string {
-  const walk = (node: any): string =>
-    node?.type === "text"
-      ? String(node.text ?? "")
-      : Array.isArray(node?.content)
-        ? node.content.map(walk).join(node.type === "doc" ? "\n" : "")
-        : ""
-  return walk(rich).trim()
+  return walkRichText(rich).trim()
+}
+
+function fail(message: string): never {
+  throw new Error(message)
 }
 
 function textOf(shape: Shape) {
@@ -211,10 +217,6 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
   const remove = new Set<string>()
   const page = pageOf(board)
   const current = (id: string) => (put.get(id) ?? board.store[id]) as Shape | undefined
-  const fail = (message: string): never => {
-    throw new Error(message)
-  }
-
   // Frames first, so items placed in a frame added in the same edit find it.
   const added = [...(edit.add ?? [])].sort((a, b) => Number(b.type === "frame") - Number(a.type === "frame"))
   const children = new Map<string, BoardItem[]>()

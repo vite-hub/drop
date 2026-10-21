@@ -18,6 +18,13 @@ const readOnly = ref(true)
 type Records = Record<string, { id: string; typeName: string; [key: string]: unknown }>
 let unmount: (() => void) | undefined
 
+async function toBase64(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  let binary = ""
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(binary)
+}
+
 onMounted(async () => {
   const id = props.drop.id
   try {
@@ -175,7 +182,7 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
           ),
         )
     }
-    apply(fitted.map(({ id, type, props }) => ({ id, type, props })))
+    apply(fitted.map((shape) => ({ id: shape.id, type: shape.type, props: shape.props })))
     const frames = editor
       .getCurrentPageShapes()
       .filter((shape) => shape.type === "frame" && shape.meta?.agent) as import("tldraw").TLFrameShape[]
@@ -196,18 +203,13 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
   void fitText().then(() => {
     editor.zoomToFit()
     if (editor.getZoomLevel() > 1) editor.resetZoom(editor.getViewportScreenCenter())
+    return undefined
   })
 
   async function images() {
     if (!canEdit) return
     const shapes = [...editor.getCurrentPageShapeIds()]
     if (!shapes.length) return
-    const toBase64 = async (blob: Blob) => {
-      const bytes = new Uint8Array(await blob.arrayBuffer())
-      let binary = ""
-      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-      return btoa(binary)
-    }
     // At most 1600 px on the long side: readable for a model, small enough to send.
     const render = async (ids: typeof shapes) => {
       const bounds = editor.getShapesPageBounds(ids)
