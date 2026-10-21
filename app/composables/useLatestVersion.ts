@@ -12,13 +12,20 @@ export function useLatestVersion(
 ) {
   const notify = useNotify()
   const config = useRuntimeConfig()
-  const realtime = useRealtimeTiptap("latest", () => drop.value.link, {
-    enabled: () => config.public.realtime && toValue(options.enabled),
-    identity: null,
-    carets: false,
-  })
-  // The room's digest is the head's version number; it is only `null` for a link with no doc behind it.
-  const latest = computed(() => Number(realtime.saveStatus.value?.digest) || 0)
+  const enabled = () => config.public.realtime && toValue(options.enabled)
+  // The room loads once the page shows and following is on (~/utils/latest-room), in a scope of this component's.
+  const scope = effectScope()
+  const room = shallowRef<ComputedRef<number>>()
+  const mounted = useMounted()
+  watch(
+    () => mounted.value && enabled(),
+    async (on) => {
+      if (!on || room.value) return
+      const { joinLatestRoom } = await import("~/utils/latest-room")
+      room.value ??= scope.run(() => joinLatestRoom(() => drop.value.link, enabled))
+    },
+  )
+  const latest = computed(() => room.value?.value ?? 0)
 
   // The page loads the doc behind the link again: another version mounts a new viewer (both pages key it by id and
   // version), and an app, which keeps its id, gets its new files.
