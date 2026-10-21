@@ -1,6 +1,14 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { applyChanges, boardChanges, boardOutline, emptyBoard, labelGrowth, parseBoard } from "../../shared/board.ts"
+import {
+  applyChanges,
+  boardChanges,
+  boardOutline,
+  emptyBoard,
+  labelGrowth,
+  parseBoard,
+  serializeBoard,
+} from "../../shared/board.ts"
 
 const flow = {
   add: [
@@ -25,7 +33,27 @@ test("an agent's items become tldraw records the schema accepts, and read back a
   assert.match(outline, /Arrows:\n  arrow \S+: signup "Sign up" → team "Pick a team" "invite\?" by Claude/)
   assert.match(outline, /Outside frames:\n  text idea "Skip the team step for solo users\?"/)
   // What the server stores loads back through tldraw's migrations unchanged.
+  assert.deepEqual(parseBoard(serializeBoard(board)).store, board.store)
+})
+
+test("a board is stored as tldraw's .tldr file, and boards stored as a store snapshot still read", () => {
+  const board = applyChanges(emptyBoard(), ...Object.values(boardChanges(emptyBoard(), flow, "Claude")))
+  const file = JSON.parse(serializeBoard(board))
+  // What tldraw.com's Open checks (parseTldrawJsonFile): a format version, the schema, and the records as a list.
+  assert.equal(file.tldrawFileFormatVersion, 1)
+  assert.deepEqual(file.schema, board.schema)
+  assert.equal(file.records.length, Object.keys(board.store).length)
   assert.deepEqual(parseBoard(JSON.stringify(board)).store, board.store)
+})
+
+test("a .tldr from tldraw.com loads without its author's camera, selection and pointer", () => {
+  const board = emptyBoard()
+  const file = JSON.parse(serializeBoard(board))
+  file.records.push(
+    { id: "camera:page:page", typeName: "camera", x: 0, y: 0, z: 1, meta: {} },
+    { id: "pointer:pointer", typeName: "pointer", x: 0, y: 0, lastActivityTimestamp: 0, meta: {} },
+  )
+  assert.deepEqual(Object.keys(parseBoard(JSON.stringify(file)).store).sort(), Object.keys(board.store).sort())
 })
 
 test("removing a frame removes what's in it and the arrows between them", () => {

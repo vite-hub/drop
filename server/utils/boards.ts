@@ -10,6 +10,7 @@ import {
   boardFrames,
   type BoardSnapshot,
   parseBoard,
+  serializeBoard,
   validateRecord,
 } from "#shared/board"
 import { drops } from "../databases/config"
@@ -27,12 +28,24 @@ import { textStatements } from "./search"
 export async function readBoard(drop: DropRow): Promise<BoardSnapshot> {
   if (drop.kind !== "board" || !drop.blobKey)
     throw new HTTPError({ status: 400, statusText: "That drop isn't a board." })
+  let text: string
+  let board: BoardSnapshot
   try {
-    return parseBoard(await readText(drop.blobKey))
+    text = await readText(drop.blobKey)
+    board = parseBoard(text)
   } catch (error) {
     if (HTTPError.isError(error)) throw error
     throw new HTTPError({ status: 500, statusText: "This board's file can't be read.", cause: error })
   }
+  // Boards stored before Drop wrote tldraw's file format are rewritten in it the first time they're read, so their
+  // download opens in tldraw.com too. Same records, so the version stays the same.
+  if (!text.startsWith('{"tldrawFileFormatVersion"')) {
+    const bytes = new TextEncoder().encode(serializeBoard(board))
+    const [error] = await blob.put(drop.blobKey, bytes, { access: "private", contentType: BOARD_CONTENT_TYPE })
+    if (error) throw storageFailure(error)
+    await db.update(drops).set({ size: bytes.byteLength }).where(eq(drops.id, drop.id))
+  }
+  return board
 }
 
 /**
@@ -74,7 +87,7 @@ export async function writeBoard(
   }
   // SAFETY: every record in put passed validateRecord or came from boardChanges, which validates its own.
   applyChanges(board, put as never, remove)
-  const text = JSON.stringify(board)
+  const text = serializeBoard(board)
   const bytes = new TextEncoder().encode(text)
   if (bytes.byteLength > MAX_FILE_BYTES)
     throw new HTTPError({ status: 413, statusText: "The board is over the 4 MiB limit. Split it into two boards." })

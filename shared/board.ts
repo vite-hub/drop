@@ -103,22 +103,40 @@ export function emptyBoard(): BoardSnapshot {
   }
 }
 
-const StoredBoard = v.object({
-  schema: v.record(v.string(), v.unknown()),
-  store: v.record(v.string(), v.looseObject({ id: v.string(), typeName: v.string() })),
-})
+const Records = v.array(v.looseObject({ id: v.string(), typeName: v.string() }))
+// tldraw's own `.tldr` file, what tldraw.com downloads and opens, and what Drop stores. Boards stored before it were a
+// store snapshot (`store` instead of `records`), which tldraw.com refuses; Drop still reads those.
+const BoardFile = v.union([
+  v.object({ tldrawFileFormatVersion: v.literal(1), schema: v.record(v.string(), v.unknown()), records: Records }),
+  v.object({
+    schema: v.record(v.string(), v.unknown()),
+    store: v.record(v.string(), v.looseObject({ id: v.string(), typeName: v.string() })),
+  }),
+])
 
-/** Parses a stored board and migrates it to the current tldraw schema. Throws on anything else. */
+/** Parses a `.tldr` file (or a board stored before Drop wrote them) and migrates it to the current tldraw schema. */
 export function parseBoard(text: string): BoardSnapshot {
-  const parsed = v.safeParse(StoredBoard, JSON.parse(text))
+  const parsed = v.safeParse(BoardFile, JSON.parse(text))
   if (!parsed.success) throw new Error("Not a board.")
+  const file = parsed.output
+  const records = "records" in file ? file.records : Object.values(file.store)
+  // A file from tldraw.com carries its author's camera, selection and pointer too; only the document is shared.
+  // Unknown types stay, for the migration to refuse.
+  // SAFETY: boardSchema.types maps each type name to its record type; an unknown name comes back undefined.
+  const types = boardSchema.types as Record<string, { scope: string } | undefined>
+  const shared = records.filter((record) => (types[record.typeName]?.scope ?? "document") === "document")
+  const store = Object.fromEntries(shared.map((record) => [record.id, record]))
   // SAFETY: migrateStoreSnapshot checks the schema's version and migrates every record, and returns an error otherwise.
-  const result = boardSchema.migrateStoreSnapshot(parsed.output as never)
+  const result = boardSchema.migrateStoreSnapshot({ schema: file.schema, store } as never)
   if (result.type === "error") throw new Error(`This board can't be read (${result.reason}).`)
   // SAFETY: the migrated store holds tldraw records, plain objects with id and typeName.
   // doctor-disable-next-line typescript/evidence/no-chained-type-assertions -- tldraw's record interfaces lack BoardRecord's index signature, though every record is a plain object with id and typeName
   return { schema: boardSchema.serialize(), store: result.value as unknown as BoardSnapshot["store"] }
 }
+
+/** A board as a `.tldr` file: what Drop stores and serves, so a downloaded board opens in tldraw.com. */
+export const serializeBoard = (board: BoardSnapshot) =>
+  JSON.stringify({ tldrawFileFormatVersion: 1, schema: board.schema, records: Object.values(board.store) })
 
 /** Checks one record against tldraw's schema. Throws with tldraw's message when it doesn't fit. */
 export function validateRecord(record: BoardRecord) {
