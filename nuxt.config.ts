@@ -300,6 +300,8 @@ export default defineNuxtConfig({
         "simple-icons:zedindustries",
         "simple-icons:opencode",
         "simple-icons:githubactions",
+        // Link marks that replace a favicon (MARKS in app/components/viewer/ViewerResourceIcon.vue).
+        "simple-icons:github",
         // Host icons in the docs (app/utils/docs.ts).
         "simple-icons:cloudflare",
         "simple-icons:vercel",
