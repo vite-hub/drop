@@ -242,6 +242,9 @@ export default defineNuxtConfig({
   },
 
   app: {
+    // Not Nuxt's default /_nuxt/: apps built with Nuxt load their chunks from /_nuxt/ on their content origin, which this
+    // same deployment serves, and Drop's own asset paths come first there (server/utils/app-files.ts).
+    buildAssetsDir: "/_drop-ui/",
     head: {
       htmlAttrs: { lang: "en" },
       link: [
@@ -356,7 +359,7 @@ export default defineNuxtConfig({
     modules: [
       evlog({
         env: { service: "drop" },
-        exclude: ["/_nuxt/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
+        exclude: ["/_drop-ui/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
         redact: { paths: ["**.key", "**.secret", "**.password"] },
       }),
     ],

@@ -148,7 +148,7 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
     const message = event.data;
     if (event.source !== parent || !message || message.__drop !== true || message.type !== "document" || typeof message.html !== "string") return;
     if (typeof message.grant === "string" && /^[\\w.-]+$/.test(message.grant))
-      document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (location.protocol === "https:" ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
+      document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (isSecureContext ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
     document.open();
     document.write(message.html);
     document.close();

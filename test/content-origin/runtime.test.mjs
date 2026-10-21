@@ -262,6 +262,7 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
     runInNewContext(script, {
       parent,
       window: {},
+      isSecureContext: true,
       location: { protocol: "https:", pathname: "/" },
       addEventListener: (_type, handler) => (onMessage = handler),
       document: {
