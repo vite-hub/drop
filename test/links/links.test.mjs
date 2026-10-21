@@ -73,6 +73,24 @@ test("slugs read well, stay short, and keep only letters and numbers", () => {
   assert.equal(dropPath({ link: "abc", slug: "" }), "/d/abc")
 })
 
+test("each new version tells the readers of its link, docs and apps alike, and a first publish has none to tell", async () => {
+  const v1 = await call(publish, { markdown: "# Plan", note: "First", lifetime: "review" })
+  assert.deepEqual(state.refreshedLinks, [])
+  await call(publish, { previous: v1.url, markdown: "# Plan, v2", note: "Second" })
+  assert.deepEqual(state.refreshedLinks, [v1.url.split("/")[4]])
+
+  state.refreshedLinks.length = 0
+  const app = await call(publish, {
+    files: { "index.html": "<h1>One</h1>" },
+    name: "Demo",
+    note: "First",
+    lifetime: "review",
+  })
+  assert.deepEqual(state.refreshedLinks, [])
+  await call(publish, { previous: app.url, files: { "index.html": "<h1>Two</h1>" }, note: "Second" })
+  assert.deepEqual(state.refreshedLinks, [app.url.split("/")[4]])
+})
+
 test("a doc keeps one link across versions; it opens the latest, ?v= pins one, and an old version's id moves to the latest", async () => {
   const v1 = await call(publish, {
     markdown: "# Hipoteca de 75.000 €",

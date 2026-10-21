@@ -26,7 +26,7 @@ export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/
   "#code-image-png":
     "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "#live-drafts":
-    "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
+    "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}; export const refreshLatest = async link => { globalThis.dropTest.refreshedLinks.push(link) }",
 }
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.
 const baseline = new Set([

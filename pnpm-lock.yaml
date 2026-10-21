@@ -20,6 +20,7 @@ overrides:
 patchedDependencies:
   '@vite-hub/auth@0.0.4': 62dc72cd19331b1e5156b53169e3b6db4461d0b8e71f83f19e71d1773d130603
   '@vite-hub/blob@0.0.4': a2895ce880cf310374262c911e8de15334695d50117960be6ce6501e0d99813b
+  '@vite-hub/realtime@0.0.4': ecb4d2a1356a7fcafd10c134ef015efac187c2ac086e99702d01818832f0a3e5
   '@vite-hub/schedule@0.0.4': aaad3294fd0053e6dcc9c02691ddf1e537656e523925621300ec2eb4119a312a
   '@vite-hub/source@0.0.4': d5e035fc27c2c809437287bfc7964d0cea811182fd2bd82eca9eee391ba0faf1
   '@vite-hub/ui@0.0.4': 515a0e9e0562564474c6eb6bb92c407bb38acb8eb79a16dd3b183807df9b1363
@@ -16484,7 +16485,7 @@ snapshots:
       - ocache
       - typescript
 
-  '@vite-hub/realtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(1ca44d240a2b3150e82b4e7246e9bcd6)':
+  '@vite-hub/realtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(patch_hash=ecb4d2a1356a7fcafd10c134ef015efac187c2ac086e99702d01818832f0a3e5)(1ca44d240a2b3150e82b4e7246e9bcd6)':
     dependencies:
       '@tiptap/core': 3.31.4(@tiptap/pm@3.31.4)
       '@tiptap/extension-collaboration': 3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/y-tiptap@3.0.9(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(yjs@13.6.33)
@@ -22909,7 +22910,7 @@ snapshots:
       '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
       '@vite-hub/queue': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(@aws-sdk/credential-provider-web-identity@3.972.49)(@opentelemetry/api@1.9.1)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0)
       '@vite-hub/rate-limit': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.12(srvx@1.0.5))(ocache@0.3.0)(typescript@6.0.3)
-      '@vite-hub/realtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(1ca44d240a2b3150e82b4e7246e9bcd6)
+      '@vite-hub/realtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(patch_hash=ecb4d2a1356a7fcafd10c134ef015efac187c2ac086e99702d01818832f0a3e5)(1ca44d240a2b3150e82b4e7246e9bcd6)
       '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea
       '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(@cloudflare/sandbox@0.12.10)(@vercel/sandbox@3.5.1)(@voidzero-dev/vite-plus-core@1.3.0)(oxc-parser@0.153.0)(rolldown@1.2.12)(ssh2@1.17.0)
       '@vite-hub/schedule': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(patch_hash=aaad3294fd0053e6dcc9c02691ddf1e537656e523925621300ec2eb4119a312a)(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)
