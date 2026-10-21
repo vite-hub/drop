@@ -17,7 +17,7 @@ export const BOARD_EXTENSION = ".tldr"
 export const BOARD_CONTENT_TYPE = "application/vnd.tldraw+json"
 
 /** tldraw's own schema: the editor validates with the same one, so records written here load as they are. */
-export const boardSchema = createTLSchema()
+const boardSchema = createTLSchema()
 
 type BoardRecord = { id: string; typeName: string; [key: string]: unknown }
 /** A tldraw store snapshot, as `getSnapshot(editor.store).document` returns it. */
@@ -115,9 +115,9 @@ export function validateRecord(record: BoardRecord) {
   return type.validate(record) as BoardRecord
 }
 
-export const shapeId = (id: string) => (id.startsWith("shape:") ? id : (createShapeId(id) as string))
+const shapeId = (id: string) => (id.startsWith("shape:") ? id : (createShapeId(id) as string))
 /** The id agents see and use: the shape's without its `shape:` prefix. */
-export const shortId = (id: string) => id.replace(/^shape:/, "")
+const shortId = (id: string) => id.replace(/^shape:/, "")
 
 const shapes = (board: BoardSnapshot) =>
   Object.values(board.store).filter((record) => record.typeName === "shape") as Shape[]
