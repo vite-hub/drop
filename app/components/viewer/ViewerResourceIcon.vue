@@ -7,8 +7,7 @@ import { faviconUrls } from "#shared/resources"
 const props = defineProps<{ url: string }>()
 const tries = computed(() => faviconUrls(props.url))
 const index = ref(0)
-const mounted = ref(false)
-onMounted(() => (mounted.value = true))
+const mounted = useMounted()
 watch(
   () => props.url,
   () => (index.value = 0),
