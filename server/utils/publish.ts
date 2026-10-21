@@ -24,6 +24,7 @@ import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
 import { annotationIssues } from "./markdown-document"
 import { createSiteDrop } from "./review"
+import { unpackApp } from "./app-archive"
 import { addedResources, resourceList, ResourcesInput, saveResources } from "./resources"
 import { signUpload } from "./uploads"
 
@@ -35,7 +36,15 @@ export const PublishInput = v.object({
     v.pipe(
       v.record(v.string(), v.string()),
       v.description(
-        `A static app: path to UTF-8 contents, with an index.html, at most ${MAX_FILE_BYTES} bytes in all. With previous, send only the files that changed; every other file carries over.`,
+        `A small hand-written static app: path to UTF-8 contents, with an index.html, at most ${MAX_FILE_BYTES} bytes in all. With previous, send only the files that changed; every other file carries over. For a built app (a dist/ folder), use archive.`,
+      ),
+    ),
+  ),
+  archive: v.optional(
+    v.pipe(
+      v.object({}),
+      v.description(
+        "A built static app, such as a dist/ folder with its index.html at the top, binary files (fonts, images, wasm) included. Pass {} and you get an uploadUrl: upload the folder with `tar -czf - -C <folder> . | curl -T - '<uploadUrl>'`, which publishes it and prints the drop. It replaces every file of the app, so with previous upload the whole folder again.",
       ),
     ),
   ),
@@ -157,15 +166,19 @@ export const PublishInput = v.object({
 export type PublishInput = v.InferOutput<typeof PublishInput>
 
 /**
- * One `publish` call: what the MCP tool does, and what an upload URL finishes. `upload` carries the bytes of a file
- * sent to that URL; without them, a file with no base64 gets an upload URL instead of a drop, after the same checks.
+ * One `publish` call: what the MCP tool does, and what an upload URL finishes. `upload` carries the bytes of a file or
+ * an app's archive sent to that URL; without them, a file with no base64, or an archive, gets an upload URL instead of
+ * a drop, after the same checks.
  */
 export async function publishInput(who: Identity, input: PublishInput, event: H3Event, upload?: Uint8Array) {
-  const given = (["markdown", "html", "files", "file", "site", "board"] as const).filter(
+  const given = (["markdown", "html", "files", "archive", "file", "site", "board"] as const).filter(
     (key) => input[key] !== undefined,
   )
   if (given.length !== 1)
-    throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, file, site, or board." })
+    throw new HTTPError({
+      status: 400,
+      message: "Pass exactly one of markdown, html, files, archive, file, site, or board.",
+    })
   if (!input.previous && !input.folder && !input.lifetime)
     throw new HTTPError({
       status: 400,
@@ -230,17 +243,31 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
 
   let row
   let warnings: string[] = []
-  if (input.files) {
+  if (input.files || input.archive) {
     if (previous && previous.kind !== "app")
       throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
+    if (input.archive && input.removes)
+      throw new HTTPError({
+        status: 400,
+        message: "An archive replaces the whole app: leave removes out and upload the whole folder.",
+      })
+    if (input.archive && !upload) {
+      // The checks above passed, so the upload will too unless something changes in the meantime; it runs them again.
+      const { url, expiresAt } = await signUpload(event, who, input)
+      return {
+        text: `Upload the built folder within 15 minutes, once:\ntar -czf - -C <folder> . | curl -T - '${url}'\nIt publishes the app and prints it as JSON, with any warnings.`,
+        result: { uploadUrl: url, method: "PUT" as const, expiresAt: new Date(expiresAt).toISOString() },
+      }
+    }
     row = await publishApp(
       who,
       {
         id: previous?.id,
         name: input.title,
         slug: input.slug,
-        files: input.files,
+        files: input.archive ? await unpackApp(upload!) : input.files!,
         removes: input.removes,
+        replace: !!input.archive,
         folder,
         ...share,
         ...life,

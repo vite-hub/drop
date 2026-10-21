@@ -86,11 +86,11 @@ try {
   })
   assert.equal(denied.status, 402)
   assert.deepEqual(denied.data.quota, { unit: "writes", used: 1000, limit: 1000 })
-  const files = { "index.html": "", ...Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`${i}.txt`, ""])) }
+  const files = { "index.html": "", ...Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`${i}.txt`, ""])) }
   const appDenied = await request("/api/apps", "POST", { id: app.data.id, files })
   assert.equal(appDenied.status, 402)
   assert.equal(appDenied.data.quota.unit, "appFiles")
-  assert.equal(appDenied.data.quota.limit, 50)
+  assert.equal(appDenied.data.quota.limit, 300)
   assert.equal((await request("/api/usage")).data.writes.used, 0)
   db.prepare("DELETE FROM quota_reservations WHERE id=?").run(exhausted)
   const revision = await request("/api/drops", "POST", {

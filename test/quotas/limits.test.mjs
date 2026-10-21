@@ -84,7 +84,7 @@ const used = (db, owner = "owner", month = "2026-10") => ({
 })
 
 test("plans, warnings, and non-retryable agent guidance", () => {
-  assert.deepEqual(planLimits("free"), { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB })
+  assert.deepEqual(planLimits("free"), { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 300, appBytes: 10 * MIB })
   assert.equal(planLimits("pro").bytes, 1024 * MIB)
   assert.equal(planLimits("pro", { writes: 234 }).writes, 234)
   assert.equal(planLimits("unlimited").drops, null)

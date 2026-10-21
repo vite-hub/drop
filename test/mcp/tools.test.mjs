@@ -3,7 +3,8 @@ import { readdirSync } from "node:fs"
 import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { sql, state, migrate, reset, who } from "../cost/harness.mjs"
+import { createTarGzip } from "nanotar"
+import { objects, sql, state, migrate, reset, who } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: listDrops } = await import("../../server/mcp/tools/list_drops.ts")
@@ -497,6 +498,73 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
     await assert.rejects(put(ticket.uploadUrl), /already used/)
     const tampered = ticket.uploadUrl.slice(0, -4) + (ticket.uploadUrl.endsWith("AAAA") ? "BBBB" : "AAAA")
     await assert.rejects(put(tampered), /run out or isn't valid/)
+  } finally {
+    state.authSecret = undefined
+  }
+})
+
+test("a built app goes up as one archive, binary files and all, and its next archive replaces every file", async () => {
+  state.authSecret = "test-secret"
+  try {
+    assert.match(
+      (await call(publish, { archive: {}, removes: ["a.js"], note: "x", lifetime: "temporary" })).message,
+      /leave removes out/,
+    )
+    const ticket = (await call(publish, { archive: {}, slug: "site", note: "Build", lifetime: "temporary" }))
+      .structuredContent
+    assert.match(ticket.uploadUrl, /\/api\/uploads\/v2\./)
+    assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0, "nothing exists until the upload")
+
+    state.who = null
+    const put = (url, body) => {
+      const event = new H3Event(new Request(url, { method: "PUT", body }))
+      event.context.log = { set() {}, error() {}, warn() {} }
+      event.context.params = { ticket: new URL(url).pathname.split("/").pop() }
+      return uploadPut(event)
+    }
+    const font = new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0xff, 0x00, 0xfe, 0x80])
+    const archive = await createTarGzip([
+      { name: "dist/" },
+      {
+        name: "dist/index.html",
+        data: '<link rel="stylesheet" href="/_nuxt/app.css"><script type="module" src="/_nuxt/entry.js"></script>',
+      },
+      { name: "dist/_nuxt/entry.js", data: 'import("./lazy.js")' },
+      { name: "dist/_nuxt/lazy.js", data: "export default 1" },
+      { name: "dist/_nuxt/app.css", data: "@font-face{src:url(./inter.woff2)}" },
+      { name: "dist/_nuxt/inter.woff2", data: font },
+      { name: "dist/._index.html", data: "junk" },
+    ])
+    const app = await put(ticket.uploadUrl, archive)
+    assert.equal(app.kind, "app")
+    assert.equal(app.warnings, undefined, "every reference resolves")
+    const rows = sql.prepare("SELECT path, blob_key, size FROM drop_files WHERE drop_id = ? ORDER BY path").all(app.id)
+    assert.deepEqual(
+      rows.map((row) => row.path),
+      ["_nuxt/app.css", "_nuxt/entry.js", "_nuxt/inter.woff2", "_nuxt/lazy.js", "index.html"],
+      "the lone top folder and macOS junk are left out",
+    )
+    const stored = new Uint8Array(
+      await objects.get(rows.find((row) => row.path.endsWith(".woff2")).blob_key).body.arrayBuffer(),
+    )
+    assert.deepEqual(stored, font, "binary files keep their bytes")
+
+    state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+    const next = (await call(publish, { archive: {}, previous: app.id, note: "Rebuild" })).structuredContent
+    state.who = null
+    const v2 = await put(next.uploadUrl, await createTarGzip([{ name: "./index.html", data: "<p>v2</p>" }]))
+    assert.equal(v2.version, 2)
+    const after = sql.prepare("SELECT path, blob_key FROM drop_files WHERE drop_id = ?").all(app.id)
+    assert.deepEqual(
+      after.map((row) => row.path),
+      ["index.html"],
+      "files missing from the archive leave the app",
+    )
+    for (const row of rows) assert.equal(objects.has(row.blob_key), false, "and their blobs are deleted")
+
+    state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+    const empty = (await call(publish, { archive: {}, previous: app.id, note: "x" })).structuredContent
+    await assert.rejects(put(empty.uploadUrl, await createTarGzip([{ name: "app.js", data: "1" }])), /index\.html/)
   } finally {
     state.authSecret = undefined
   }

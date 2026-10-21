@@ -3,12 +3,12 @@
 import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_SLUG, slugify } from "./links"
-import { MAX_APP_BYTES, TIERS } from "./quotas"
+import { MIB, TIERS } from "./quotas"
 import { MAX_REVIEW_PAGE, SITE_ADDRESS_RULE, siteAddress } from "./review"
 import { SHARES } from "./share"
 
-/** 4 MiB: the most one file (or one app) may weigh. */
-export const MAX_FILE_BYTES = MAX_APP_BYTES
+/** 4 MiB: the most one doc or file may weigh. Apps have their own limit, MAX_APP_BYTES. */
+export const MAX_FILE_BYTES = 4 * MIB
 
 export const NewDocSchema = v.object({
   filename: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),

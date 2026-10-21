@@ -24,7 +24,7 @@ import { textStatements } from "../search"
 import type { DropKind } from "#shared/types"
 import type { DropRow, LifetimeInput } from "./types"
 import { MAX_FILE_BYTES } from "#shared/schemas"
-import { MAX_APP_FILES } from "#shared/quotas"
+import { MAX_APP_BYTES, MAX_APP_FILES, MIB } from "#shared/quotas"
 import { splitFrontmatter } from "#shared/frontmatter"
 import { permissions } from "./access"
 import { findDrop, findDropByBlob, versionChain, storageFailure } from "./query"
@@ -328,6 +328,14 @@ export async function createDocDrop(
   )
 }
 
+/** The files whose references `appLinkIssues` checks, as text. Fonts, images and the like reference nothing. */
+function linkedText(files: (readonly [string, Uint8Array])[]) {
+  const decoder = new TextDecoder()
+  return Object.fromEntries(
+    files.filter(([path]) => /\.(html?|css|m?js)$/i.test(path)).map(([path, bytes]) => [path, decoder.decode(bytes)]),
+  )
+}
+
 function cleanPath(path: string) {
   const clean = path
     .replace(/\\/g, "/")
@@ -346,8 +354,8 @@ function cleanPath(path: string) {
  *
  * Creates an app drop, or publishes the next version of one you may edit. A next version starts from the previous
  * one's files: `files` adds or replaces paths, and a path leaves the app only when `removes` names it, so an agent
- * that sends just the files it changed can't delete the rest by accident. `folder` places a new app in it, as in
- * `createDocDrop`.
+ * that sends just the files it changed can't delete the rest by accident. With `replace` (a built app's archive),
+ * `files` is the whole next version instead. `folder` places a new app in it, as in `createDocDrop`.
  */
 export async function publishApp(
   who: Identity,
@@ -355,8 +363,10 @@ export async function publishApp(
     id?: string
     name?: string
     slug?: string
-    files: Record<string, string>
+    /** Text, or bytes for a binary file from an archive. */
+    files: Record<string, string | Uint8Array>
     removes?: string[]
+    replace?: boolean
     share?: Share
     folder?: DropRow
   },
@@ -372,12 +382,16 @@ export async function publishApp(
       status: 400,
       statusText: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.`,
     })
+  if (input.replace && removes.length)
+    throw new HTTPError({ status: 400, statusText: "An archive replaces the whole app, so it takes no removes." })
   const encoder = new TextEncoder()
-  const encoded = entries.map(([path, content]) => [path, encoder.encode(content)] as const)
+  const encoded = entries.map(
+    ([path, content]) => [path, typeof content === "string" ? encoder.encode(content) : content] as const,
+  )
   if (entries.length > MAX_APP_FILES)
     throw new HTTPError({ status: 413, statusText: `An app can have at most ${MAX_APP_FILES} files.` })
-  if (encoded.reduce((total, [, bytes]) => total + bytes.byteLength, 0) > MAX_FILE_BYTES)
-    throw new HTTPError({ status: 413, statusText: "An app can be at most 4 MiB." })
+  if (encoded.reduce((total, [, bytes]) => total + bytes.byteLength, 0) > MAX_APP_BYTES)
+    throw new HTTPError({ status: 413, statusText: `An app can be at most ${MAX_APP_BYTES / MIB} MiB.` })
   if (input.id && !entries.length && !removes.length)
     throw new HTTPError({ status: 400, statusText: "Send the files that changed, or name files in removes." })
 
@@ -426,8 +440,9 @@ export async function publishApp(
       status: 400,
       statusText: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
     })
-  // Files the agent neither sent nor removed carry over, blob and all: no new write, no new bytes.
-  const kept = old.filter((file) => !removes.includes(file.path) && !entries.some(([path]) => path === file.path))
+  // Files the agent neither sent nor removed carry over, blob and all: no new write, no new bytes. An archive keeps none.
+  const sent = new Set(entries.map(([path]) => path))
+  const kept = input.replace ? [] : old.filter((file) => !removes.includes(file.path) && !sent.has(file.path))
   const paths = [...kept.map((file) => file.path), ...entries.map(([path]) => path)]
   if (!paths.includes("index.html"))
     throw new HTTPError({
@@ -439,7 +454,8 @@ export async function publishApp(
   const size =
     kept.reduce((total, file) => total + file.size, 0) +
     encoded.reduce((total, [, bytes]) => total + bytes.byteLength, 0)
-  if (size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "An app can be at most 4 MiB." })
+  if (size > MAX_APP_BYTES)
+    throw new HTTPError({ status: 413, statusText: `An app can be at most ${MAX_APP_BYTES / MIB} MiB.` })
   const oldSize = old.reduce((total, file) => total + file.size, 0)
   return withDropQuota(
     ownerId,
@@ -455,12 +471,27 @@ export async function publishApp(
       const stagedKeys: string[] = []
       let committedPublish = false
       try {
-        for (const [path, bytes] of encoded) {
-          const blobKey = `${prefix}/${path}`
-          stagedKeys.push(blobKey)
-          const [error] = await blob.put(blobKey, bytes, { access: "private", contentType: contentTypeOf(path) })
-          if (error) throw storageFailure(error)
+        // A few at a time: a built app has hundreds of files, and a Worker keeps only six connections open. After a
+        // failure the others stop taking files, and all of them finish before the cleanup below deletes what they wrote.
+        const queue = [...encoded]
+        let failed = false
+        const put = async () => {
+          for (let next = queue.shift(); next && !failed; next = queue.shift()) {
+            const [path, bytes] = next
+            const blobKey = `${prefix}/${path}`
+            stagedKeys.push(blobKey)
+            try {
+              const [error] = await blob.put(blobKey, bytes, { access: "private", contentType: contentTypeOf(path) })
+              if (error) throw storageFailure(error)
+            } catch (error) {
+              failed = true
+              throw error
+            }
+          }
         }
+        const puts = await Promise.allSettled(Array.from({ length: Math.min(6, queue.length) }, put))
+        const rejected = puts.find((result) => result.status === "rejected")
+        if (rejected) throw rejected.reason
 
         const name = input.name?.trim() || row?.title || "Untitled app"
         const named = (input.slug && slugify(input.slug)) || row?.slug || slugify(name)
@@ -554,7 +585,7 @@ export async function publishApp(
           committedPublish = true
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
         }
-        return Object.assign(next, { warnings: appLinkIssues(Object.fromEntries(entries), paths) })
+        return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths) })
       } catch (error) {
         if (!committedPublish) {
           await deleteBlobKeys(stagedKeys)
