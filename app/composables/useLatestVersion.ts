@@ -1,4 +1,5 @@
 import type { DropDetail } from "#shared/types"
+import type { EffectScope } from "vue"
 
 /**
  * Follows a doc's link to its newest version while someone reads it. The link's Realtime room (server/realtime/latest.ts)
