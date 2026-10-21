@@ -21,6 +21,10 @@ const search = ref("")
 const live = computed(() => !props.drop.trashedAt)
 const adds = computed(() => live.value && Boolean(me.value) && (props.drop.isOwner || Boolean(props.drop.teamFolder)))
 const addsFolders = computed(() => props.drop.isOwner)
+// ⌘K's new drops go in here too, where the New menu would put them.
+offerToPalette("folder", () =>
+  adds.value ? { id: props.drop.id, title: props.drop.title, folders: addsFolders.value } : null,
+)
 
 async function newFolder() {
   const input = await folderDialog({ inside: props.drop.title })

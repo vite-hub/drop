@@ -20,6 +20,8 @@ const at = (path: string) => route.path === path || route.path.startsWith(`${pat
 const close = () => (open.value = false)
 const collapsed = useSidebarCollapsed()
 defineShortcuts({ meta_b: () => (collapsed.value = !collapsed.value) })
+// The page in view tells the ⌘K palette (SearchPalette) which drop or folder is open.
+providePaletteContext()
 
 const onDrops = computed(() => route.path === "/drops" && route.query.tab !== "with-me")
 const onShared = computed(() => route.path === "/drops" && route.query.tab === "with-me")

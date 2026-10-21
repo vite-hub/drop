@@ -74,7 +74,7 @@ More in [Review a live site](/docs/sites).
 
 ### Search {#search}
 
-Press :kbd[⌘K] (<kbd>Ctrl K</kbd> on Windows and Linux), or **Search** in the sidebar, on any page of Drop while you're signed in. It finds drops by their title, file name, or link, and docs by the words inside their latest version. It searches your drops in every folder, then the ones shared with you. Without words, it lists your latest drops and Drop's pages. It also makes new drops: type *new* for a doc, which opens in the editor, a board, a folder, or a site review.
+Press :kbd[⌘K] (<kbd>Ctrl K</kbd> on Windows and Linux), or **Search** in the sidebar, on any page of Drop while you're signed in. It finds drops by their title, file name, or link, and docs by the words inside their latest version. It searches your drops in every folder, then the ones shared with you. Without words, it lists your latest drops and Drop's pages. It also makes new drops: type *new* for a doc, which opens in the editor, a board, a folder, or a site review, or *upload* for a file. Inside a folder you add to, they go in that folder. On a drop's page it lists what you can do with that drop first, from editing and comments to sharing, moving, and the Trash. The theme and signing out are there too.
 
 ::docs-figure{src="/docs/features/search.webp" alt="The search palette: the word invoice finds the Billing migration doc in Plans, with the matching text" :width="808" :height="488"}
 ::

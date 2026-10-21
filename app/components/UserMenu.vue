@@ -5,7 +5,7 @@ import type { DropdownMenuItem } from "@nuxt/ui"
 // shadcn's NavUser row, opening upward.
 const { compact = false } = defineProps<{ compact?: boolean }>()
 
-const { signOut } = useUserSession(useNuxtApp().$auth)
+const leave = useSignOut()
 // From /api/me, which SSR fetches with the session cookie; the client-side session only exists after hydration.
 const { data: me } = useMe()
 const shortcutsOpen = useShortcutsOpen()
@@ -23,13 +23,6 @@ const items = computed<DropdownMenuItem[][]>(() => [
   ],
   [{ label: "Sign out", icon: "i-mingcute-exit-line", onSelect: () => void leave() }],
 ])
-async function leave() {
-  await signOut()
-  // Leave first: cleared data would flash the dashboard's empty defaults for a frame. /home, not /: / sends whoever
-  // it still thinks is signed in to their drops.
-  await navigateTo("/home")
-  clearNuxtData()
-}
 const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "Member" })[me.value?.role ?? "member"])
 </script>
 

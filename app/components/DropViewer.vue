@@ -8,6 +8,7 @@ import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
 import { SHARE_ICONS } from "#shared/share"
+import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion } from "#shared/types"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
@@ -368,6 +369,81 @@ async function deleteDrop() {
 const moveTo = useMoveDialog()
 const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
   publicView ? dropPath(crumb) : `/drops/${crumb.id}`
+
+// ⌘K lists what you can do with this drop, under its title: the More menu, the header's buttons, and Details' actions.
+offerToPalette("drop", () => {
+  if (visitor.value) return null
+  if (editing.value)
+    return {
+      title: drop.value.title,
+      items: [
+        {
+          label: "Publish the draft",
+          icon: "i-mingcute-upload-line",
+          kbds: ["meta", "s"],
+          onSelect: () => void live.publish(),
+        },
+      ],
+    }
+  if (trashed.value)
+    return {
+      title: drop.value.title,
+      items: owner.value
+        ? [{ label: "Restore", icon: "i-mingcute-back-2-line", onSelect: () => void restoreDrop() }]
+        : [],
+    }
+  const items: CommandPaletteItem[] = [
+    ...(drop.value.canEdit
+      ? [{ label: "Edit together", icon: "i-mingcute-edit-2-line", kbds: ["e"], onSelect: startEdit }]
+      : []),
+    ...(has("comments")
+      ? [{ label: "Comments", icon: "i-mingcute-chat-1-line", kbds: ["c"], onSelect: () => panel.show("comments") }]
+      : []),
+    ...(canDrawArea.value
+      ? [
+          {
+            label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
+            icon: "i-mingcute-message-1-line",
+            kbds: ["r"],
+            onSelect: toggleArea,
+          },
+        ]
+      : []),
+    ...(has("history")
+      ? [{ label: "History", icon: "i-mingcute-history-line", kbds: ["h"], onSelect: () => panel.show("history") }]
+      : []),
+    ...(has("details")
+      ? [{ label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => panel.show("details") }]
+      : []),
+    { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
+    ...(copiesMarkdown.value
+      ? [
+          {
+            label: "Copy as Markdown",
+            icon: "i-mingcute-markdown-line",
+            kbds: ["m"],
+            onSelect: () => void copyMarkdown("Markdown copied"),
+          },
+        ]
+      : []),
+    ...(owner.value
+      ? [{ label: "Share…", icon: SHARE_ICONS[drop.value.share], onSelect: () => (shareOpen.value = true) }]
+      : []),
+    ...(owner.value
+      ? [
+          {
+            label: "Move to folder",
+            icon: "i-mingcute-new-folder-line",
+            onSelect: () => void moveTo({ drop: drop.value }),
+          },
+        ]
+      : []),
+    ...(drop.value.canTrash
+      ? [{ label: "Move to Trash", icon: "i-mingcute-delete-2-line", onSelect: () => void deleteDrop() }]
+      : []),
+  ]
+  return { title: drop.value.title, items }
+})
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
 const imageComments = computed(() =>
