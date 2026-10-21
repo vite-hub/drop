@@ -111,11 +111,11 @@ async function save() {
       </div>
       <div v-if="site && drop.siteUrl" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Address</dt>
-        <dd class="min-w-0 truncate font-mono text-xs text-highlighted" :title="drop.siteUrl">{{ drop.siteUrl }}</dd>
+        <dd class="min-w-0 truncate text-highlighted" :title="drop.siteUrl">{{ drop.siteUrl }}</dd>
       </div>
       <div v-else-if="drop.kind !== 'folder'" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">File</dt>
-        <dd class="min-w-0 truncate font-mono text-xs text-highlighted">{{ drop.filename }}</dd>
+        <dd class="min-w-0 truncate text-highlighted">{{ drop.filename }}</dd>
       </div>
       <div class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Type</dt>
