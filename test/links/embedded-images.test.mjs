@@ -29,7 +29,7 @@ test("the same image twice is fetched once, and a long doc stops at 60", () => {
 })
 
 test("a Markdown doc's images wait in the frame, keyed by path; other images and links stay as they are", () => {
-  const html = `<p><img src="https://drop.quiver.dk/f/${a}.png" alt="Before" loading="lazy"> <img src="/f/${b}.webp?raw" alt=""></p><a href="/f/${a}.png">full size</a><img src="https://example.com/x.png"><img src="/f/${c}.png">`
+  const html = `<p><img src="https://drop.quiver.dk/f/${a}.png" alt="Before" loading="lazy"> <img src="/f/${b}.webp?raw" alt=""><img src="/f/${c}.png" srcset="/f/${c}.png 1x" sizes="100vw"></p><a href="/f/${a}.png">full size</a><img src="https://example.com/x.png"><img src="/f/${c}.png">`
   const deferred = deferImages(html, [`/f/${a}.png`, `/f/${b}.webp`])
   assert.match(
     deferred,
@@ -40,4 +40,11 @@ test("a Markdown doc's images wait in the frame, keyed by path; other images and
     deferred,
     new RegExp(`<a href="/f/${a}.png">full size</a><img src="https://example.com/x.png"><img src="/f/${c}.png">$`),
   )
+})
+
+test("srcset candidates are deferred and srcset-only images get a placeholder", () => {
+  const html = `<img src="/fallback.png" srcset="/f/${a}.png 1x, /f/${b}.webp 2x" sizes="50vw"><img srcset="/f/${b}.webp 1x, /f/${c}.png 2x" sizes="100vw">`
+  const deferred = deferImages(html, [`/f/${a}.png`, `/f/${b}.webp`])
+  assert.match(deferred, new RegExp(`<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png"><img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp">`))
+  assert.doesNotMatch(deferred, /srcset|sizes/)
 })
