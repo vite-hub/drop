@@ -1,10 +1,10 @@
 <script setup lang="ts">
 useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 
-const { data: me } = await useMe()
+// Both requests at once: the page waits for the slower one, not the two in turn.
+const [{ data: me }, { data: method }] = await Promise.all([useMe(), useSignInMethod()])
 const { next, signIn } = useGitHubSignIn()
 const { signOut } = useUserSession(useNuxtApp().$auth)
-const { data: method } = await useSignInMethod()
 const pending = ref(false)
 const error = ref("")
 const dev = import.meta.dev
