@@ -312,7 +312,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         const { put, remove } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
         applyChanges(board, put, remove)
       } catch (error) {
-        throw new HTTPError({ status: 400, message: (error as Error).message })
+        throw new HTTPError({ status: 400, message: error instanceof Error ? error.message : String(error) })
       }
       filename = "board.tldr"
       bytes = new TextEncoder().encode(JSON.stringify(board))

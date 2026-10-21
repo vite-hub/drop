@@ -332,7 +332,7 @@ export async function createDocDrop(
 function linkedText(files: (readonly [string, Uint8Array])[]) {
   const decoder = new TextDecoder()
   return Object.fromEntries(
-    files.filter(([path]) => /\.(html?|css|m?js)$/i.test(path)).map(([path, bytes]) => [path, decoder.decode(bytes)]),
+    files.flatMap(([path, bytes]) => (/\.(html?|css|m?js)$/i.test(path) ? [[path, decoder.decode(bytes)]] : [])),
   )
 }
 
@@ -386,6 +386,7 @@ export async function publishApp(
     throw new HTTPError({ status: 400, statusText: "An archive replaces the whole app, so it takes no removes." })
   const encoder = new TextEncoder()
   const encoded = entries.map(
+    // doctor-disable-next-line typescript/strict/no-runtime-typeof -- the parsed domain: an app file is text or bytes
     ([path, content]) => [path, typeof content === "string" ? encoder.encode(content) : content] as const,
   )
   if (entries.length > MAX_APP_FILES)

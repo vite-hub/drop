@@ -47,9 +47,11 @@ export default defineHandler(async (event) => {
   })
   if (!image) return generic()
   const bytes = new Uint8Array(await image.arrayBuffer())
-  await storage
-    .setItemRaw(key, bytes, { ttl: CARD_TTL })
-    .catch((error: unknown) => useLogger(event).error(error as Error, { ogImage: { cache: "write" } }))
+  await storage.setItemRaw(key, bytes, { ttl: CARD_TTL }).catch((error: unknown) =>
+    useLogger(event).error(error instanceof Error ? error : new Error(String(error)), {
+      ogImage: { cache: "write" },
+    }),
+  )
   return png(event, bytes)
 })
 
@@ -65,6 +67,7 @@ async function rendersAllowed(event: H3Event) {
 
 // Short-lived in shared caches: a drop someone makes private stops showing its title within the hour.
 const png = (event: H3Event, bytes: Uint8Array<ArrayBuffer>) =>
+  // doctor-disable-next-line nitro/request/prefer-route-method-suffix -- crawlers check a card with HEAD; it shares the GET's cache and rendering, so answer it here without the body.
   new Response(event.req.method === "HEAD" ? null : bytes, {
     headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" },
   })

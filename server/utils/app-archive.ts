@@ -16,6 +16,7 @@ const tooLarge = () =>
   })
 
 async function gunzip(bytes: Uint8Array, limit: number): Promise<Uint8Array> {
+  // SAFETY: Drop's bytes come from request bodies and blob reads, which are ArrayBuffer-backed, never shared memory.
   const reader = new Blob([bytes as Uint8Array<ArrayBuffer>])
     .stream()
     .pipeThrough(new DecompressionStream("gzip"))

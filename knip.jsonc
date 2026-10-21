@@ -39,6 +39,7 @@
     "@fontsource/instrument-serif",
     // Nuxt Icon reads the icon collections by name at build time.
     "@iconify-json/ph",
+    "@iconify-json/mingcute",
     "@iconify-json/simple-icons",
     // Served from node_modules/medium-zoom/dist through nitro.publicAssets, never imported.
     "medium-zoom",
