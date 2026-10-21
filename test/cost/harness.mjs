@@ -47,6 +47,8 @@ export const state = (globalThis.dropTest = {
   entries,
   bursts: [],
   failBurst: false,
+  ogRenders: [],
+  ogBrowser: true,
   failDelete: false,
   failCacheDelete: false,
   blob: {
@@ -72,6 +74,11 @@ export const state = (globalThis.dropTest = {
   },
   storage: {
     getItem: async (key) => entries.get(key) ?? null,
+    getItemRaw: async (key) => entries.get(key) ?? null,
+    setItemRaw: async (key, value, options) => {
+      calls.writes.push({ key, value, options })
+      entries.set(key, value)
+    },
     setItem: async (key, value, options) => {
       calls.writes.push({ key, value, options })
       entries.set(key, value)
@@ -100,6 +107,8 @@ export function reset() {
   )
   state.bursts.length = 0
   state.failBurst = false
+  state.ogRenders.length = 0
+  state.ogBrowser = true
   state.quotasEnabled = false
   state.shareApproval = false
   state.expiryDays = 30

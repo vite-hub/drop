@@ -3,6 +3,7 @@
 // drops 404. Signed-in people read it inside the app instead, with their sidebar, so the link never strands them.
 // The address settles on the doc's link (`/d/<link>/<slug>`): an old version's id or an outdated slug moves there.
 import { type DropLink, dropPath } from "#shared/links"
+import { isPublic } from "#shared/share"
 
 definePageMeta({
   middleware: async () => {
@@ -34,6 +35,18 @@ watch(() => target.data.value, settle)
 const { drop, comments } = provideDrop(() => target.data.value?.id ?? route.params.id)
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
+// A pasted link's preview names the drop. Unfurlers aren't signed in, so only public drops reach them; the rest keep
+// app.vue's Drop card. The card image is the version's own (server/routes/og/[id].get.ts).
+const origin = useRequestURL().origin
+const shown = computed(() => (drop.data.value && isPublic(drop.data.value.share) ? drop.data.value : null))
+useSeoMeta({
+  ogTitle: () => shown.value?.title,
+  description: () => shown.value && (shown.value.excerpt ?? "Shared on Drop."),
+  ogDescription: () => shown.value && (shown.value.excerpt ?? "Shared on Drop."),
+  ogImage: () => shown.value && `${origin}/og/${shown.value.id}.png`,
+  ogImageAlt: () => shown.value?.title,
+  ogType: () => shown.value && "article",
+})
 // The doc renders in a frame once the page's script runs; agents reading the HTML find its text here instead.
 useHeadSafe({
   link: () =>

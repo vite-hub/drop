@@ -12,3 +12,11 @@ export async function renderCodePng(
     statusText: 'PNG code images need Cloudflare Browser Run, which this Drop doesn\'t have. Use format "svg".',
   })
 }
+
+/** Link previews keep the generic /og.png here. */
+export async function renderOgPng(
+  _event: H3Event,
+  _page: { html: string; width: number; height: number },
+): Promise<Blob | null> {
+  return null
+}

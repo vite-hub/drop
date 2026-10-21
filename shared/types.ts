@@ -110,6 +110,8 @@ export interface DropDetail extends DropSummary {
   editNote?: string
   /** Text source for Markdown and HTML docs. */
   content?: string
+  /** A line of what it says, for link previews: a doc's first words, a folder's description, a site's address. */
+  excerpt?: string
   /** Markdown docs, rendered by the server's Comark renderer: the viewer shows exactly what /f/ shows. */
   html?: string
   /** Where the raw file is served, for images and other files. */

@@ -23,7 +23,8 @@ export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/
   "vite-hub/schedule": "export const defineSchedule = value => value",
   "#vitehub/env/server":
     "export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: t.githubOrg ?? '', authProxy: t.authProxy ?? false, authProxyCookie: '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: 100, proBytes: 1073741824, proWrites: 10000 } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
-  "#code-image-png": "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png'])",
+  "#code-image-png":
+    "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "#live-drafts":
     "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
 }

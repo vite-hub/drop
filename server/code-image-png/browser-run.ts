@@ -21,3 +21,23 @@ export async function renderCodePng(
   }
   return response.blob()
 }
+
+/** A link preview card (server/utils/og.ts) as a PNG, once its font and icon have loaded. */
+export async function renderOgPng(event: H3Event, page: { html: string; width: number; height: number }) {
+  // A preview without its card is still a preview: any failure leaves the generic one.
+  const response = await runBrowserAction("screenshot", {
+    html: page.html,
+    viewport: { width: page.width, height: page.height },
+    gotoOptions: { waitUntil: "networkidle0", timeout: 15_000 },
+    screenshotOptions: { type: "png" },
+  }).catch((error: unknown) => {
+    useLogger(event).error(error as Error, { ogImage: { status: 0 } })
+    return null
+  })
+  if (!response) return null
+  if (!response.ok) {
+    useLogger(event).error(new Error(await response.text()), { ogImage: { status: response.status } })
+    return null
+  }
+  return response.blob()
+}
