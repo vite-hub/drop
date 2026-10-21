@@ -5,7 +5,7 @@
 import { faviconUrls } from "#shared/resources"
 
 // Sites whose favicon is a black mark, lost on the dark theme: their Simple Icons mark takes the text color instead.
-const MARKS: Record<string, string> = { "github.com": "i-simple-icons-github" }
+const MARKS = { "github.com": "i-simple-icons-github" } satisfies Record<string, string>
 
 const props = defineProps<{ url: string }>()
 const mark = computed(() => MARKS[new URL(props.url).hostname.replace(/^www\./, "")])
