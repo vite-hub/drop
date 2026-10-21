@@ -295,6 +295,10 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
     let onMessage
     const timers = []
     const parent = { postMessage() {} }
+    const rootStyle = {
+      setProperty: (...args) => (rootStyle.set = args),
+      removeProperty: (name) => (rootStyle.removed = name),
+    }
     runInNewContext(script, {
       parent,
       window: {},
@@ -305,6 +309,7 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
       setTimeout: (callback, ms) => timers.push({ callback, ms }),
       document: {
         body: {},
+        documentElement: { style: rootStyle },
         open() {},
         write: (value) => ((written += value), (held = value.includes("data-drop-hold"))),
         close() {},
@@ -313,7 +318,7 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
       },
     })
     onMessage({ source: parent, data: { __drop: true, type: "document", html } })
-    return { written: () => written, held: () => held, timers }
+    return { written: () => written, held: () => held, rootStyle, timers }
   }
   const link = (props = {}) => {
     const listeners = {}
@@ -334,7 +339,10 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
   )
   assert.equal(run("<!DOCTYPE html><header>A</header>").written(), `<!DOCTYPE html>${hold}<header>A</header>`)
   assert.equal(run("<p>A</p>").written(), `${hold}<p>A</p>`)
-  assert.equal(run("<p>A</p>").held(), false, "nothing to wait for")
+  const immediate = run("<p>A</p>")
+  assert.equal(immediate.held(), false, "nothing to wait for")
+  assert.deepEqual(immediate.rootStyle.set, ["visibility", "hidden", "important"])
+  assert.equal(immediate.rootStyle.removed, "visibility")
 
   const css = link()
   const broken = link()
@@ -350,6 +358,7 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
   assert.equal(page.held(), true, "one stylesheet still loading")
   broken.fire("error")
   assert.equal(page.held(), false)
+  assert.equal(page.rootStyle.removed, "visibility")
 
   const slow = run("<head></head>", [link()])
   assert.equal(slow.timers[0].ms, 3000)
