@@ -1,6 +1,7 @@
 import { log } from "evlog"
 import { blob } from "vite-hub/blob"
 import { RealtimeDocumentConflict, type RealtimeDocumentAdapter } from "vite-hub/realtime"
+import { refreshRealtimeDocument } from "vite-hub/realtime/server"
 import { draftPath } from "../utils/draft-paths"
 
 /**
@@ -61,4 +62,9 @@ export async function deleteDrafts(ids: string[]) {
   if (!ids.length) return
   const [error] = await blob.del(ids.map(draftPath))
   if (error) log.warn({ action: "draft-cleanup", drops: ids.join(","), error: String(error) })
+}
+
+/** Tells the people reading a doc's link that it has a new latest version (server/realtime/latest.ts). Never throws. */
+export async function refreshLatest(link: string) {
+  await refreshRealtimeDocument("latest", link)
 }

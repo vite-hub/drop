@@ -48,6 +48,7 @@ export const state = (globalThis.dropTest = {
   bursts: [],
   failBurst: false,
   ogRenders: [],
+  refreshedLinks: [],
   ogBrowser: true,
   failDelete: false,
   failCacheDelete: false,
@@ -108,6 +109,7 @@ export function reset() {
   state.bursts.length = 0
   state.failBurst = false
   state.ogRenders.length = 0
+  state.refreshedLinks.length = 0
   state.ogBrowser = true
   state.quotasEnabled = false
   state.shareApproval = false

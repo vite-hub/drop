@@ -10,6 +10,7 @@ import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
 import { renderMarkdownCached } from "../markdown-document"
+import { refreshLatest } from "#live-drafts"
 import { deleteMarkdownCache } from "../markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
 import { defaultShare, isPublic, type Share } from "#shared/share"
@@ -318,6 +319,8 @@ export async function createDocDrop(
         throw error
       }
       if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text, previous)
+      // People reading the doc's link follow it to this version.
+      if (previous && row.link) await refreshLatest(row.link)
       // TODO(repo-mirror): also commit this version to a repo the owner picks, one commit per version with the note
       // as its message. Drop stays the source of truth: versions keep living in Blob and the database on every host.
       // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
@@ -585,6 +588,7 @@ export async function publishApp(
           await quota.commit([update, replace, ...inserts], exists(db.select({ id: drops.id }).from(drops).where(won)))
           committedPublish = true
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
+          if (next.link) await refreshLatest(next.link)
         }
         return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths) })
       } catch (error) {

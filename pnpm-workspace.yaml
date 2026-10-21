@@ -37,6 +37,12 @@ patchedDependencies:
   # files(): a Source over files bundled at build time, so the docs' Content runs on Workers without a file system.
   # The vite-hub patch adds its `vite-hub/source/files` export (vite-hub/vitehub#2627).
   "@vite-hub/source@0.0.4": patches/@vite-hub__source@0.0.4.patch
+  # Lets refreshRealtimeDocument() reach rooms on Cloudflare, so a publish tells a doc's open readers at once
+  # (vite-hub/vitehub#2695): it finds the Worker's $DurableObject binding itself, accepts workerd's binding (its methods
+  # are on the DurableObjectNamespace prototype), and leaves the rooms to the Durable Object even when it shares the
+  # Worker's isolate. Also backports main's SqlStorage check (workerd's databaseSize getter is anonymous), without
+  # which the Durable Object never knew it was one: no room persistence, and no refresh.
+  "@vite-hub/realtime@0.0.4": patches/@vite-hub__realtime@0.0.4.patch
   # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461 (still open).
   "@vite-hub/ui@0.0.4": patches/@vite-hub__ui@0.0.4.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
