@@ -82,15 +82,28 @@ async function contentLabel(event: H3Event, dropId: string): Promise<string> {
   return label
 }
 
+/** Whether every drop gets an origin of its own: only then can its origin serve the app's files (server/utils/app-files.ts). */
+export const perDropOrigins = (event: H3Event) => !!configured(event)?.perDrop
+
 /** Where the viewer frames the drop `dropId` names (an app or HTML doc, by its link key), or null for the opaque sandbox. Never Drop's own origin. */
 export async function contentOrigin(event: H3Event, dropId: string): Promise<string | null> {
   const config = configured(event)
   if (!config) return null
+  const host = await hostFor(event, config, dropId)
+  return host === event.url.host ? null : `${config.protocol}//${host}`
+}
+
+async function hostFor(event: H3Event, config: ContentConfig, dropId: string) {
   const name = config.perDrop
     ? `${config.perDrop.prefix}${await contentLabel(event, dropId)}${config.perDrop.suffix}`
     : config.host
-  const host = `${name}${config.port ? `:${config.port}` : ""}`
-  return host === event.url.host ? null : `${config.protocol}//${host}`
+  return `${name}${config.port ? `:${config.port}` : ""}`
+}
+
+/** Whether this request came in on the origin of the drop `dropId` names, its own one. Needs per-drop origins. */
+export async function onOwnOrigin(event: H3Event, dropId: string): Promise<boolean> {
+  const config = configured(event)
+  return !!config?.perDrop && (await hostFor(event, config, dropId)) === event.url.host
 }
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -124,14 +137,18 @@ export const isContentRequest = (event: H3Event) => contentHost(event) === "cont
 
 /**
  * The only page the content origin serves, at every path so an app sees the URL it was built for. The viewer sends
- * the document over postMessage, so private drops and unpublished edits never pass through this origin's server.
- * Opened outside a frame it shows nothing: there is no parent to take a document from.
+ * the document over postMessage, so docs and unpublished edits never pass through this origin's server. An app's other
+ * files do, with per-drop origins: the viewer sends a grant along, kept here as a cookie, which opens that app's files
+ * on this origin and nothing else (server/utils/app-files.ts). Opened outside a frame it shows nothing: there is no
+ * parent to take a document from.
  */
 export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Drop</title></head><body><script>(() => {
   if (parent === window) { document.body.textContent = "This domain shows previews inside Drop."; return; }
   addEventListener("message", (event) => {
     const message = event.data;
     if (event.source !== parent || !message || message.__drop !== true || message.type !== "document" || typeof message.html !== "string") return;
+    if (typeof message.grant === "string" && /^[\\w.-]+$/.test(message.grant))
+      document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (location.protocol === "https:" ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
     document.open();
     document.write(message.html);
     document.close();

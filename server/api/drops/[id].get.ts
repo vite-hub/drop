@@ -1,5 +1,6 @@
 import { defineHandler, HTTPError } from "h3"
-import { contentOrigin } from "../../utils/content-origin"
+import { appFilesGrant } from "../../utils/app-files"
+import { contentOrigin, perDropOrigins } from "../../utils/content-origin"
 import { dropDetail, expiredLink, findDrop, permissions, recordSharedVisit, waitingForReview } from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
 import { identify } from "../../utils/identity"
@@ -24,8 +25,16 @@ export default defineHandler(async (event) => {
       countView(event, drop, who, "beacon"),
       recordSharedVisit(drop, who),
     ])
-  const detail = await dropDetail(drop, who, event.url.origin, event)
   // Named after the doc's link, so every version of an HTML doc keeps the browser storage the last one left.
-  const frameOrigin = detail.kind === "app" || detail.kind === "html" ? await contentOrigin(event, detail.link) : null
-  return frameOrigin ? { ...detail, contentOrigin: frameOrigin } : detail
+  const link = drop.link ?? drop.id
+  const frameOrigin = drop.kind === "app" || drop.kind === "html" ? await contentOrigin(event, link) : null
+  // An app on its own origin loads its files from there, so the viewer needs only its pages, and a grant to the rest.
+  const served = drop.kind === "app" && !!frameOrigin && perDropOrigins(event)
+  const detail = await dropDetail(drop, who, event.url.origin, event, served ? "pages" : "all")
+  if (!frameOrigin) return detail
+  return {
+    ...detail,
+    contentOrigin: frameOrigin,
+    ...(served ? { contentGrant: await appFilesGrant(event, link) } : {}),
+  }
 })

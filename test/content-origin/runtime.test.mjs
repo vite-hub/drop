@@ -2,8 +2,8 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext } from "node:vm"
 import { H3Event } from "h3"
-import { migrate, reset, insertDrop, state } from "../cost/harness.mjs"
-const { contentOrigin, isContentRequest } = await import("../../server/utils/content-origin.ts")
+import { migrate, reset, insertDrop, objects, sql, state } from "../cost/harness.mjs"
+const { contentOrigin, FRAME_HOST_HTML, isContentRequest } = await import("../../server/utils/content-origin.ts")
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
 const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
@@ -172,6 +172,135 @@ test("apps and HTML docs carry the content origin; other kinds don't", async () 
   const event = request("https://drop.example/api/drops/app")
   event.context.params = { id: "app" }
   assert.equal((await detailHandler(event)).contentOrigin, undefined)
+})
+
+test("an app's own origin serves its files to a frame holding its grant, and to nobody else", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  try {
+    insertDrop("app", { kind: "app", filename: "app/", blob_key: null, link: "applink" })
+    insertDrop("other", { kind: "app", filename: "other/", blob_key: null, link: "otherlink" })
+    const font = new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0xff, 0x00])
+    for (const [path, body] of [
+      ["index.html", '<script type="module" src="/_nuxt/entry.js"></script>'],
+      ["_nuxt/entry.js", "export default 1"],
+      ["_nuxt/inter.woff2", font],
+      ["docs/index.html", "<p>Docs</p>"],
+    ]) {
+      const key = `apps/app/publish-1/${path}`
+      objects.set(key, { body: new Blob([body]), uploadedAt: new Date() })
+      sql
+        .prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, ?, ?, ?)")
+        .run("app", path, key, typeof body === "string" ? body.length : body.byteLength)
+    }
+
+    const detailEvent = request("https://drop.example/api/drops/app")
+    detailEvent.context.params = { id: "app" }
+    const detail = await detailHandler(detailEvent)
+    assert.match(detail.contentOrigin, /^https:\/\/[a-z2-7]{26}-drop\.example$/)
+    assert.deepEqual(Object.keys(detail.files).sort(), ["docs/index.html", "index.html"], "only its pages")
+    assert.equal(detail.sizes["_nuxt/inter.woff2"], font.byteLength)
+    assert.match(detail.contentGrant, /^v2\.[\w-]+$/)
+
+    const origin = detail.contentOrigin
+    const load = (path, { grant = detail.contentGrant, dest = "script", headers = {} } = {}) =>
+      contentMiddleware(
+        request(`${origin}${path}`, {
+          headers: {
+            "sec-fetch-dest": dest,
+            ...(grant ? { cookie: `theme=dark; drop_grant=${grant}` } : {}),
+            ...headers,
+          },
+        }),
+      )
+
+    const script = await load("/_nuxt/entry.js")
+    assert.equal(script.status, 200)
+    assert.equal(await script.text(), "export default 1")
+    assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8")
+    assert.equal(script.headers.get("x-content-type-options"), "nosniff")
+    const etag = script.headers.get("etag")
+    assert.equal((await load("/_nuxt/entry.js", { headers: { "if-none-match": etag } })).status, 304)
+
+    const woff = await load("/_nuxt/inter.woff2", { dest: "font" })
+    assert.equal(woff.headers.get("content-type"), "font/woff2")
+    assert.deepEqual(new Uint8Array(await woff.arrayBuffer()), font, "binary files come back byte for byte")
+    assert.equal(
+      await (await load("/docs/", { dest: "empty" })).text(),
+      "<p>Docs</p>",
+      "a folder serves its index.html",
+    )
+
+    assert.equal((await load("/_nuxt/entry.js", { grant: null })).status, 404, "no grant, no file")
+    assert.equal((await load("/_nuxt/missing.js")).status, 404)
+    assert.match(
+      await (await load("/_nuxt/entry.js", { dest: "iframe" })).text(),
+      /document\.write/,
+      "frames get the host",
+    )
+
+    const otherEvent = request("https://drop.example/api/drops/other")
+    otherEvent.context.params = { id: "other" }
+    const other = await detailHandler(otherEvent)
+    assert.equal((await load("/_nuxt/entry.js", { grant: other.contentGrant })).status, 404, "another app's grant")
+    assert.equal((await load("/_nuxt/entry.js", { grant: `${detail.contentGrant}x` })).status, 404, "a changed grant")
+
+    sql.prepare("UPDATE drops SET trashed_at = ? WHERE id = 'app'").run(Date.now())
+    assert.equal((await load("/_nuxt/entry.js")).status, 404, "nothing once it's in the Trash")
+  } finally {
+    state.authSecret = undefined
+  }
+})
+
+test("the frame host keeps the viewer's grant as a cookie before it writes the page, and only a well-formed one", () => {
+  const script = FRAME_HOST_HTML.match(/<script>([\s\S]*)<\/script>/)[1]
+  const run = (grant) => {
+    const cookies = []
+    const written = []
+    let onMessage
+    const parent = { postMessage() {} }
+    runInNewContext(script, {
+      parent,
+      window: {},
+      location: { protocol: "https:", pathname: "/" },
+      addEventListener: (_type, handler) => (onMessage = handler),
+      document: {
+        body: {},
+        set cookie(value) {
+          cookies.push(value)
+        },
+        open: () => written.push(`open after ${cookies.length} cookies`),
+        write() {},
+        close() {},
+      },
+    })
+    onMessage({ source: parent, data: { __drop: true, type: "document", html: "<p>", grant } })
+    return { cookies, written }
+  }
+  const { cookies, written } = run("v2.abc-DEF_123")
+  assert.deepEqual(cookies, ["drop_grant=v2.abc-DEF_123; Path=/; Max-Age=43200; Secure; SameSite=None; Partitioned"])
+  assert.deepEqual(written, ["open after 1 cookies"])
+  assert.deepEqual(run("v2.x; Domain=vitehub.dev").cookies, [], "nothing that could add cookie attributes")
+  assert.deepEqual(run(undefined).cookies, [])
+})
+
+test("an app on a shared content origin or none gets no grant, and its text files for the viewer to inline", async () => {
+  insertDrop("app", { kind: "app", filename: "app/", blob_key: null, link: "applink" })
+  for (const [path, body] of [
+    ["index.html", "<p>Hi</p>"],
+    ["logo.png", "PNG"],
+  ]) {
+    objects.set(`apps/app/p/${path}`, { body: new Blob([body]), uploadedAt: new Date() })
+    sql
+      .prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, ?, ?, 3)")
+      .run("app", path, `apps/app/p/${path}`)
+  }
+  const event = request("https://drop.example/api/drops/app")
+  event.context.params = { id: "app" }
+  const detail = await detailHandler(event)
+  assert.equal(detail.contentGrant, undefined)
+  assert.deepEqual(Object.keys(detail.files), ["index.html"], "binary files aren't read as text")
+  assert.deepEqual(detail.paths, ["index.html", "logo.png"])
 })
 
 test("app pages map to the URLs a static host serves them at", () => {

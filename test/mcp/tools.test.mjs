@@ -332,7 +332,8 @@ test("an agent publishes an app, sends only what changed, and hears about missin
   assert.equal(next.structuredContent.version, 2)
   assert.equal(next.structuredContent.warnings, undefined)
   const read = (await call(readDrop, { id: app.structuredContent.id })).structuredContent
-  assert.deepEqual(Object.keys(read.files).sort(), ["app.js", "index.html", "logo.png"])
+  assert.deepEqual(Object.keys(read.sizes).sort(), ["app.js", "index.html", "logo.png"])
+  assert.deepEqual(Object.keys(read.files).sort(), ["app.js", "index.html"], "a PNG isn't pasted in as text")
   assert.match(
     (await call(publish, { previous: app.structuredContent.id, files: {}, removes: ["nope.js"], note: "x" })).message,
     /nope\.js, which isn't in v2/,
@@ -507,6 +508,11 @@ test("a built app goes up as one archive, binary files and all, and its next arc
   state.authSecret = "test-secret"
   try {
     assert.match(
+      (await call(publish, { archive: {}, note: "x", lifetime: "temporary" })).message,
+      /needs an origin of its own/,
+    )
+    state.contentOrigin = "https://*-drop.example"
+    assert.match(
       (await call(publish, { archive: {}, removes: ["a.js"], note: "x", lifetime: "temporary" })).message,
       /leave removes out/,
     )
@@ -567,6 +573,7 @@ test("a built app goes up as one archive, binary files and all, and its next arc
     await assert.rejects(put(empty.uploadUrl, await createTarGzip([{ name: "app.js", data: "1" }])), /index\.html/)
   } finally {
     state.authSecret = undefined
+    state.contentOrigin = undefined
   }
 })
 

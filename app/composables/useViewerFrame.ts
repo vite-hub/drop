@@ -137,7 +137,8 @@ export function useViewerFrame(options: {
         return
       case "host":
         frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
-        return send({ type: "document", html: frameDocument })
+        // The grant lets this app's origin serve it its other files (server/utils/app-files.ts).
+        return send({ type: "document", html: frameDocument, grant: drop.value.contentGrant })
       case "frame-request": {
         if (!isApp.value) return
         const target = pageFor(message.path)

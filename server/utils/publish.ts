@@ -25,6 +25,7 @@ import type { Identity } from "./identity"
 import { annotationIssues } from "./markdown-document"
 import { createSiteDrop } from "./review"
 import { unpackApp } from "./app-archive"
+import { perDropOrigins } from "./content-origin"
 import { addedResources, resourceList, ResourcesInput, saveResources } from "./resources"
 import { signUpload } from "./uploads"
 
@@ -246,6 +247,12 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (input.files || input.archive) {
     if (previous && previous.kind !== "app")
       throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
+    if (input.archive && !perDropOrigins(event))
+      throw new HTTPError({
+        status: 400,
+        message:
+          "This Drop can't serve built apps: each needs an origin of its own (a DROP_CONTENT_ORIGIN with a *). Publish a small app with files instead.",
+      })
     if (input.archive && input.removes)
       throw new HTTPError({
         status: 400,

@@ -123,10 +123,14 @@ export interface DropDetail extends DropSummary {
   html?: string
   /** Where the raw file is served, for images and other files. */
   url?: string
-  /** App files keyed by path. */
+  /** An app's text files keyed by path: all of them, or only its pages when its origin serves the rest (contentGrant). */
   files?: Record<string, string>
+  /** Apps: each file's size in bytes, keyed by path. */
+  sizes?: Record<string, number>
   /** Apps and HTML docs: the separate origin the viewer frames them on. Absent means an opaque-origin sandbox. */
   contentOrigin?: string
+  /** Apps on a per-drop origin: what the viewer hands the frame so that origin serves the app's files to it. */
+  contentGrant?: string
   versions: DropVersion[]
   /** Docs: the files they embed from this Drop. */
   attachments?: DropAttachment[]

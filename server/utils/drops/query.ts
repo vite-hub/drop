@@ -10,6 +10,7 @@ import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
 import { hasEditorlessSyntax } from "#shared/frontmatter"
 import { MAX_DEPTH } from "#shared/nodes"
+import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
 import { LIVE_EDITING } from "#live-drafts"
 import { chainOf, expiryPolicy } from "../expiry"
@@ -471,11 +472,21 @@ export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
   }))
 }
 
+/**
+ * What an app's detail reads of its files: `all` its text files, for the viewer to build pages from; `pages` only its
+ * HTML, when its origin serves the rest; `agent` the smaller text files, for read_drop, and only sizes for the rest.
+ */
+type AppText = "all" | "pages" | "agent"
+// read_drop's share of a built app: enough to see what it is without pasting a bundle into an agent's context.
+const AGENT_FILE_BYTES = 64 * 1024
+const AGENT_FILES = 40
+
 export async function dropDetail(
   row: DropRow,
   who: Identity | null,
   origin: string,
   event?: H3Event,
+  appText: AppText = "all",
 ): Promise<DropDetail> {
   const can = permissions(row, who)
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
@@ -496,10 +507,18 @@ export async function dropDetail(
   }
   if (row.kind === "app") {
     const files = await db.select().from(dropFiles).where(eq(dropFiles.dropId, row.id))
+    const read = files
+      .filter((file) =>
+        appText === "pages"
+          ? /\.html?$/i.test(file.path)
+          : isTextFile(file.path) && (appText === "all" || file.size <= AGENT_FILE_BYTES),
+      )
+      .slice(0, appText === "agent" ? AGENT_FILES : undefined)
     detail.files = Object.fromEntries(
-      await Promise.all(files.map(async (file) => [file.path, await readText(file.blobKey)] as const)),
+      await Promise.all(read.map(async (file) => [file.path, await readText(file.blobKey)] as const)),
     )
     detail.paths = files.map((file) => file.path).sort()
+    detail.sizes = Object.fromEntries(files.map((file) => [file.path, file.size]))
   } else if (row.blobKey) {
     if (row.kind === "markdown") {
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)

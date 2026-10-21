@@ -42,7 +42,7 @@ export default defineMcpTool({
     const drop = await findDropByRef(id, event)
     if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
     await Promise.all([recordVisit(event, drop, who, "beacon"), countView(event, drop, who, "beacon")])
-    const detail = await dropDetail(drop, who, event.url.origin, event)
+    const detail = await dropDetail(drop, who, event.url.origin, event, "agent")
     const comments = (await listComments(drop, who)).filter((comment) => resolved || !comment.resolved)
     const versions = detail.versions.map(({ id: versionId, version, note, actorName, createdAt }) => ({
       id: versionId,
@@ -115,9 +115,7 @@ export default defineMcpTool({
         ? []
         : [
             detail.files
-              ? `## Files\n${Object.entries(detail.files)
-                  .map(([path, content]) => `--- ${path}\n${content}`)
-                  .join("\n\n")}`
+              ? appFiles(detail.files, detail.sizes ?? {})
               : `## Content\n${detail.content ?? `Binary file: ${detail.url}`}`,
           ]),
     ]
@@ -145,7 +143,9 @@ export default defineMcpTool({
         ...(drop.kind === "app" || drop.kind === "html"
           ? { errors: errors.map(({ lastAt, ...error }) => ({ ...error, lastAt: new Date(lastAt).toISOString() })) }
           : {}),
-        ...(detail.files ? { files: detail.files } : { content: detail.content ?? null, fileUrl: detail.url ?? null }),
+        ...(detail.files
+          ? { files: detail.files, sizes: detail.sizes }
+          : { content: detail.content ?? null, fileUrl: detail.url ?? null }),
       },
     }
   },
@@ -161,3 +161,14 @@ const siteLine = (item: SiteReviewItem) =>
     `   Box ${pct(item.ox)}–${pct(item.ox + item.ow)} across, ${pct(item.oy)}–${pct(item.oy + item.oh)} down the ${item.screenshot ? "screenshot" : "viewport"}${item.quote ? `, over ${item.quote}` : ""}${item.label ? ` (${item.label})` : ""}`,
     ...(item.screenshot ? [`   Screenshot: ${item.screenshot.url}`] : []),
   ].join("\n")
+
+/** Every file of an app with its size, then the text of the smaller ones. A built bundle stays a line. */
+function appFiles(files: Record<string, string>, sizes: Record<string, number>) {
+  const all = Object.keys(sizes).sort()
+  const left = all.filter((path) => !(path in files))
+  return [
+    `## Files\n${all.map((path) => `- ${path} (${sizes[path]} bytes)`).join("\n")}`,
+    ...Object.entries(files).map(([path, content]) => `--- ${path}\n${content}`),
+    ...(left.length ? [`Not shown: ${left.length} binary or large files.`] : []),
+  ].join("\n\n")
+}
