@@ -157,9 +157,13 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
     document.open();
     document.write(message.html.slice(0, at) + hold + message.html.slice(at));
     document.close();
-    document.documentElement?.style.setProperty("visibility", "hidden", "important");
+    const rootStyle = document.documentElement?.style;
+    const previousVisibility = rootStyle?.getPropertyValue("visibility") ?? "";
+    const previousVisibilityPriority = rootStyle?.getPropertyPriority("visibility") ?? "";
+    rootStyle?.setProperty("visibility", "hidden", "important");
     const reveal = () => {
-      document.documentElement?.style.removeProperty("visibility");
+      if (previousVisibility) rootStyle?.setProperty("visibility", previousVisibility, previousVisibilityPriority);
+      else rootStyle?.removeProperty("visibility");
       document.querySelector("style[data-drop-hold]")?.remove();
     };
     const pending = [...document.querySelectorAll('link[rel~="stylesheet" i]')].filter(

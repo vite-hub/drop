@@ -289,15 +289,28 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
 
 test("the frame host keeps a written page hidden until its stylesheets load, fail, or take 3 seconds", () => {
   const script = FRAME_HOST_HTML.match(/<script>([\s\S]*)<\/script>/)[1]
-  const run = (html, links = []) => {
+  const run = (html, links = [], initialStyle = {}) => {
     let written = ""
     let held = false
     let onMessage
     const timers = []
     const parent = { postMessage() {} }
     const rootStyle = {
-      setProperty: (...args) => (rootStyle.set = args),
-      removeProperty: (name) => (rootStyle.removed = name),
+      ...initialStyle,
+      getPropertyValue: (name) => (name === "visibility" ? rootStyle.value ?? "" : ""),
+      getPropertyPriority: (name) => (name === "visibility" ? rootStyle.priority ?? "" : ""),
+      setProperty: (...args) => {
+        rootStyle.calls ??= []
+        rootStyle.calls.push(args)
+        rootStyle.set = args
+        rootStyle.value = args[1]
+        rootStyle.priority = args[2]
+      },
+      removeProperty: (name) => {
+        rootStyle.removed = name
+        rootStyle.value = ""
+        rootStyle.priority = ""
+      },
     }
     runInNewContext(script, {
       parent,
@@ -343,6 +356,12 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
   assert.equal(immediate.held(), false, "nothing to wait for")
   assert.deepEqual(immediate.rootStyle.set, ["visibility", "hidden", "important"])
   assert.equal(immediate.rootStyle.removed, "visibility")
+
+  const existing = run('<html style="visibility: visible !important"><head></head>', [], { value: "visible", priority: "important" })
+  assert.deepEqual(existing.rootStyle.calls, [
+    ["visibility", "hidden", "important"],
+    ["visibility", "visible", "important"],
+  ])
 
   const css = link()
   const broken = link()
