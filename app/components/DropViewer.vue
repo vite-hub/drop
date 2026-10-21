@@ -133,7 +133,7 @@ const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
 const inset = computed(() => (floating.value ? FLOATING_INSET : 0))
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced } = useViewerFrame({
+const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath } = useViewerFrame({
   drop,
   frame,
   app,
@@ -196,6 +196,15 @@ function openWindow() {
   if (isApp.value && page.value !== "index.html") query.set("file", page.value)
   window.open(`${dropPath(drop.value)}?${query}`, "_blank", "popup")
 }
+// A Slidev build (its runtime under assets/slidev/) presents in one step: the deck alone in a new window for the
+// projector, and Slidev's own presenter view (notes, next slide, timer) in this frame, which drives that window.
+const slidev = computed(
+  () => isApp.value && Boolean(drop.value.paths?.some((path) => path.startsWith("assets/slidev/"))),
+)
+function present() {
+  openWindow()
+  openPath("/presenter/1")
+}
 
 defineShortcuts({
   c: () => !editing.value && panel.show("comments"),
@@ -205,7 +214,6 @@ defineShortcuts({
   r: toggleArea,
   l: () => !editing.value && copyLink("Link copied"),
   d: () => !editing.value && download(),
-  o: () => presents.value && openWindow(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
   escape: () => {
@@ -245,7 +253,7 @@ const moreMenu = computed(() =>
   [
     [
       ...(presents.value
-        ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", kbds: ["o"], onSelect: openWindow }]
+        ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
         : []),
       ...(canDrawArea.value
         ? [
@@ -449,8 +457,11 @@ offerToPalette("drop", () => {
     ...(drop.value.url
       ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
       : []),
+    ...(slidev.value && contentOrigin.value
+      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
+      : []),
     ...(presents.value
-      ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", kbds: ["o"], onSelect: openWindow }]
+      ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
       : []),
     ...(drop.value.resources ?? []).map((resource) => ({
       label: `Open ${resourceLabel(resource)}`,
@@ -659,6 +670,16 @@ watch(
         </template>
         <!-- Three tools at hand and More for the rest: icons only, shortcuts in the tooltips and the menu. -->
         <template v-else #right>
+          <UTooltip v-if="slidev && contentOrigin" text="Deck in a new window, presenter view here">
+            <UButton
+              color="neutral"
+              icon="i-mingcute-presentation-2-line"
+              label="Present"
+              size="sm"
+              variant="ghost"
+              @click="present"
+            />
+          </UTooltip>
           <UTooltip
             v-if="drop.canEdit || drop.editNote"
             :kbds="drop.canEdit ? ['E'] : undefined"

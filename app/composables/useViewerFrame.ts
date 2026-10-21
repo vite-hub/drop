@@ -86,6 +86,12 @@ export function useViewerFrame(options: {
     frameKey.value++
   }
   onMounted(reloadFrame)
+  /** Loads `path` in the content frame, as if the app went there itself: a Slidev deck's presenter view, say. */
+  function openPath(path: string) {
+    if (!contentOrigin.value) return
+    frameSrc.value = contentOrigin.value + path
+    frameKey.value++
+  }
 
   function pageFor(path: string) {
     let decoded = path
@@ -199,5 +205,5 @@ export function useViewerFrame(options: {
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
   watch([ready, options.inset], () => ready.value && send({ type: "inset", right: options.inset.value }))
 
-  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced }
+  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath }
 }
