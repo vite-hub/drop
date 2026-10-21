@@ -14,13 +14,15 @@ Call `list_folders` first. If a folder's description says it's for pull request 
 ## Capture
 
 1. Find the two states: **after** from this pull request's preview, **before** from any running deploy that still has the old behavior, such as another open pull request's preview that doesn't touch this change. Note both URLs.
-2. Capture both at the same viewport, zoom, scroll position, and page state (same data, same open menus, popups closed). The change has to be visible in what you capture. If the data or the state can't show it, set that up first. A doc with only one of the two states, or a description in place of a screenshot, isn't evidence: if you can't capture both comparably, publish nothing: no new drop and no new version of an existing one. Your final answer says what blocked you.
+2. Capture both at the same viewport, zoom, scroll position, and page state (same data, same open menus, popups closed). The change has to be visible in what you capture. If the data or the state can't show it, set that up first. A compare shows each image at under half the page width, where a full-page capture's text is too small to read, so clip both to the same region around the change, such as Playwright's `screenshot({ clip })`. A doc with only one of the two states, or a description in place of a screenshot, isn't evidence: if you can't capture both comparably, publish nothing: no new drop and no new version of an existing one. Your final answer says what blocked you.
 3. For every element you want to mark, measure it in the page you captured. Never estimate from the image:
 
    ```js
    const r = document.querySelector("SELECTOR").getBoundingClientRect();
    [(r.x / innerWidth) * 100, (r.y / innerHeight) * 100, (r.width / innerWidth) * 100, (r.height / innerHeight) * 100].map((v) => +v.toFixed(1));
    ```
+
+   For a clipped capture, subtract the clip's `x` and `y` and divide by its `width` and `height`.
 
 4. Publish each screenshot with `publish` and `file: { name }` (`share: "public"`, plus the folder or lifetime from [Where it lives](#where-it-lives)). It answers with an `uploadUrl`; run `curl -T before.png '<uploadUrl>'`, which prints the drop with its `fileUrl`. Images already hosted elsewhere over `https` work too.
 
@@ -32,7 +34,7 @@ The screenshots are the evidence; the text only points into them. Pick:
 - One `::screenshot`, when a single state shows it.
 - Side notes (`side="top"`, `"left"`, or `"right"`) with `mark="none"` for the two or three points that matter most; other notes stay numbered under the image.
 
-Use `red` for what was wrong, `green` for the fix, and the default blue to point something out. Every mark sits on the change, and its note says in a few words what changed or what is wrong, not just "here". Keep to about six marks per screenshot. The full syntax is in [references/annotations.md](references/annotations.md).
+Use `red` for what was wrong, `green` for the fix, and the default blue to point something out. Mark the change at its own size: the bar, field, or label that changed. What stayed the same goes unmarked; the steps line says how the screen was set up. Keep to about six marks per screenshot, fewer in a compare. Each note says in a few words what changed or what is wrong, in the words the screen shows, so the reader can check it against the image; a value the screenshot doesn't show stays out of the note. The full syntax is in [references/annotations.md](references/annotations.md).
 
 Above the screenshots, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `href`, not in the text. No tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
 
