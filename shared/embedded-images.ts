@@ -39,8 +39,8 @@ export function deferImages(html: string, paths: string[]) {
       srcPath && wanted.has(srcPath)
         ? srcPath
         : [...(srcset ?? "").matchAll(FILE_LINK)]
-          .map((match) => match[1])
-          .find((candidate): candidate is string => !!candidate && wanted.has(candidate))
+            .map((match) => match[1])
+            .find((candidate): candidate is string => !!candidate && wanted.has(candidate))
     if (!path || !wanted.has(path)) return tag
 
     let deferred = tag.replace(/\s(?:srcset|sizes)\s*=\s*(["']).*?\1/gi, "")
