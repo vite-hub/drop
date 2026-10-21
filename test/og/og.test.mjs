@@ -86,6 +86,10 @@ test("excerpts end on a whole word and come from what each kind says", async () 
   assert.ok(long.length <= 201)
   assert.match(long, /word\d+…$/)
 
+  insertDrop("callout", { visibility: "public" })
+  text("callout", "[!IMPORTANT] Decisión: ING Variable , firmada a 10 años.")
+  assert.equal(await dropExcerpt(await findDrop("callout")), "Decisión: ING Variable, firmada a 10 años.")
+
   insertDrop("folder", { kind: "folder", blob_key: null, note: "Plans the agents file here." })
   assert.equal(await dropExcerpt(await findDrop("folder")), "Plans the agents file here.")
 

@@ -10,8 +10,13 @@ import type { DropRow } from "./drops/types"
 /** About two lines in a chat app's preview. */
 const EXCERPT_LENGTH = 200
 
+// Search text keeps what a snippet can live with: callout markers (`[!NOTE]`), and a space where bold met a comma.
 const clip = (text: string, length: number) => {
-  const line = text.replace(/\s+/g, " ").trim()
+  const line = text
+    .replace(/\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/ ([,.;:!?)])/g, "$1")
+    .trim()
   if (line.length <= length) return line
   return `${line.slice(0, length).replace(/\s+\S*$/, "")}…`
 }
