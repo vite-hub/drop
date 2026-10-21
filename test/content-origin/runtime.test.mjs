@@ -297,8 +297,8 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
     const parent = { postMessage() {} }
     const rootStyle = {
       ...initialStyle,
-      getPropertyValue: (name) => (name === "visibility" ? rootStyle.value ?? "" : ""),
-      getPropertyPriority: (name) => (name === "visibility" ? rootStyle.priority ?? "" : ""),
+      getPropertyValue: (name) => (name === "visibility" ? (rootStyle.value ?? "") : ""),
+      getPropertyPriority: (name) => (name === "visibility" ? (rootStyle.priority ?? "") : ""),
       setProperty: (...args) => {
         rootStyle.calls ??= []
         rootStyle.calls.push(args)
@@ -357,7 +357,10 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
   assert.deepEqual(immediate.rootStyle.set, ["visibility", "hidden", "important"])
   assert.equal(immediate.rootStyle.removed, "visibility")
 
-  const existing = run('<html style="visibility: visible !important"><head></head>', [], { value: "visible", priority: "important" })
+  const existing = run('<html style="visibility: visible !important"><head></head>', [], {
+    value: "visible",
+    priority: "important",
+  })
   assert.deepEqual(existing.rootStyle.calls, [
     ["visibility", "hidden", "important"],
     ["visibility", "visible", "important"],
