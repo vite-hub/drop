@@ -57,6 +57,8 @@ export interface DropSummary {
   ownShare?: Share
   /** Folders the team keeps: everyone adds to them; admins name, describe, and share them. */
   teamFolder?: boolean
+  /** On a personal Drop with teams: the team whose folders hold it, which its team shares reach. */
+  team?: string
   /** Folders: how many drops are directly inside. */
   items?: number
   /** Images in a folder or a search: where the file is served, for a thumbnail. */
@@ -283,4 +285,18 @@ export interface Viewer {
   members: number
   /** Admins only: public shares waiting for their review (/admin/review). */
   reviews?: number
+  /** On a personal Drop with `DROP_TEAMS`: the teams they're on. Absent when teams are off. */
+  teams?: ViewerTeam[]
+  /** Teams pay through Stripe here (`STRIPE_*`): past `freeMembers`, a team needs a subscription. */
+  billing?: { freeMembers: number; annual: boolean }
+  /** They're on a team that pays: the Pro plan, and no new boards. */
+  paid?: boolean
+}
+
+interface ViewerTeam {
+  id: string
+  name: string
+  slug: string
+  role: "owner" | "admin" | "member"
+  paid: boolean
 }

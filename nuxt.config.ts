@@ -4,12 +4,13 @@ import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
-import { DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
+import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
+const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
 const liveEditing = host === "cloudflare" || host === "vps"
@@ -215,13 +216,17 @@ export default defineNuxtConfig({
     "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
     "/agents": SIGNED_IN,
     "/members": SIGNED_IN,
+    "/teams/**": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
+    // Never cached, like /f/ and /d/ (server/plugins/content-headers.ts sets theirs).
+    "/signin": { headers: { "cache-control": "private, no-store" } },
     "/docs/**": { appLayout: "docs" },
     // The policies sit in the docs nav, so they keep its sidebar.
     "/terms": { appLayout: "docs" },
     "/acceptable-use": { appLayout: "docs" },
     "/abuse": { appLayout: "docs" },
+    "/pricing": { appLayout: "docs" },
   },
 
   experimental: { typescriptPlugin: true },
@@ -349,7 +354,6 @@ export default defineNuxtConfig({
   nitro: {
     // Drizzle applies the existing migration journal before a local Node instance serves requests.
     plugins: database === "sqlite" ? [fileURLToPath(new URL("./server/database-migrate.ts", import.meta.url))] : [],
-    errorHandler: fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url)),
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.
     ...(host === "cloudflare"
@@ -400,6 +404,10 @@ export default defineNuxtConfig({
     // server import protection rejects. Dev works without it.
     "nitro:config": function (config) {
       config.plugins = config.plugins?.filter((plugin) => !plugin.includes("dev-close-sockets"))
+      // Raw files and share pages get their own error page (server/handlers/content-error.ts); everything else keeps
+      // Nuxt's, which renders app/error.vue. Nuxt only adds its handler when nitro.errorHandler is unset, so ours goes
+      // in front of it here instead.
+      config.errorHandler = [contentErrorHandler, ...[config.errorHandler ?? []].flat()]
     },
   },
 
@@ -449,6 +457,25 @@ export default defineNuxtConfig({
             proDrops: env.number({ source: env.source("DROP_PRO_DROPS"), default: DEFAULT_PRO_LIMITS.drops }),
             proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
             proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
+            // Drops a Free plan keeps forever at once; Pro keeps any number.
+            freeKept: env.number({ source: env.source("DROP_FREE_KEPT"), default: DEFAULT_FREE_KEPT }),
+          },
+          // Teams on a personal Drop: people make a team, invite others, and share its folders with them (server/utils/teams.ts).
+          teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
+          // Paid teams through Stripe. Billing is on once the key, the webhook secret, and the per-member price are all set.
+          billing: {
+            stripeSecretKey: env({ secret: true, source: env.source("STRIPE_SECRET_KEY"), default: "" }),
+            stripeWebhookSecret: env({ secret: true, source: env.source("STRIPE_WEBHOOK_SECRET"), default: "" }),
+            // A recurring price per member (quantity = members), and optionally its yearly one.
+            priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
+            annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),
+            // Members a team has before it needs a subscription.
+            freeMembers: env.number({
+              source: env.source("DROP_FREE_TEAM_MEMBERS"),
+              default: DEFAULT_FREE_TEAM_MEMBERS,
+            }),
+            // Stripe as merchant of record, which files sales tax and VAT. Turn off to sell under your own account.
+            managedPayments: env.boolean({ source: env.source("STRIPE_MANAGED_PAYMENTS"), default: true }),
           },
         },
       },

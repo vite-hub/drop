@@ -98,6 +98,10 @@ test("a banned owner's shared doc, downloads, page, app, and code image all retu
   sql.exec("UPDATE user SET banned = 1 WHERE id = 'owner'")
   for (const path of [`/f/${key}`, `/f/${key}?raw`, `/f/${imageKey}`, "/f/apps/app/file.html", "/d/doc", "/d/app"])
     for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
+  // The address a share page settles on, with the doc's slug, passes the same gate.
+  await missing(() => accessMiddleware(event("/d/doc/the-doc")))
+  // A malformed escape is a 404 too, not an unhandled URIError.
+  for (const path of ["/f/%E0%A4", "/d/%E0%A4", "/d/%E0%A4/slug"]) await missing(() => accessMiddleware(event(path)))
   const request = event(`/f/${key}`)
   await missing(() => markdownMiddleware(request))
   for (const id of ["doc", "app"]) {
@@ -136,7 +140,8 @@ test("review policy reuses the owner join for IDs, blobs, pages and raw download
     assert.equal(queries.length, 1)
   }
   await missing(() => requireBlobAccess(event("/f/doc.md?raw"), "doc.md"))
-  await assert.rejects(accessMiddleware(event("/d/doc")), (error) => error.status === 403)
+  for (const path of ["/d/doc", "/d/doc/the-doc"])
+    await assert.rejects(accessMiddleware(event(path)), (error) => error.status === 403)
   for (const identity of [who, { ...who, userId: "admin", role: "admin" }]) {
     state.who = identity
     await requireBlobAccess(event("/f/doc.md"), "doc.md")
@@ -304,6 +309,26 @@ test("app publishing keeps only the latest file set, as the docs promise", async
       readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"),
       /[Aa]pps? keeps? only|[Oo]nly the latest app|[Aa]pps? keeps? (?:only )?(?:their|its) latest/,
     )
+})
+
+test("an app's file path can't climb out of its folder through an escape the blob store decodes", async () => {
+  const before = [...state.objects.keys()]
+  for (const path of [
+    "%2e%2e/%2e%2e/%2e%2e/victim.md",
+    "a/%2E%2E/%2e%2e/b.js",
+    "%252e%252e/x.js",
+    "..%5c..%5cx.js",
+    "a%2fb.js",
+    "a%5cb.js",
+    "a%252fb.js",
+  ])
+    await assert.rejects(
+      publishApp(who, { files: { "index.html": "app", [path]: "x" } }),
+      (error) => error.status === 400 && /Invalid file path/.test(error.message),
+    )
+  assert.deepEqual([...state.objects.keys()], before)
+  // A name that only contains a percent sign still publishes.
+  await publishApp(who, { files: { "index.html": "app", "100%.txt": "x" } })
 })
 
 test("an app's next version deletes a file only when removes names it", async () => {

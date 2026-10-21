@@ -6,7 +6,8 @@ import { requireIdentity } from "../utils/identity"
 
 /**
  * New folder, at the top or inside `folder`, with a description of what goes in it. It starts with this Drop's default
- * share, like any drop. `team` makes it one of the team's folders, which only admins do.
+ * share, like any drop. `team` makes it one of the team's folders, which only admins do; `teamId` one of that team's,
+ * which its owner and admins do.
  */
 export default defineValidatedHandler({
   validate: { body: FolderSchema },
@@ -15,7 +16,11 @@ export default defineValidatedHandler({
     const body = await event.req.json()
     const parent = body.folder ? await requireFolder(body.folder, who, event, undefined, "folder") : undefined
     return toSummary(
-      await createFolder(who, { title: body.title, folder: parent, note: body.description, team: body.team }, event),
+      await createFolder(
+        who,
+        { title: body.title, folder: parent, note: body.description, team: body.team, teamId: body.teamId },
+        event,
+      ),
     )
   },
 })

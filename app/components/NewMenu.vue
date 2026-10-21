@@ -6,6 +6,8 @@ import type { DropdownMenuItem } from "@nuxt/ui"
 // `folder` false hides the folder entry: in a team folder only admins add folders.
 const { folder = true } = defineProps<{ folder?: boolean }>()
 const emit = defineEmits<{ folder: []; site: []; doc: []; board: [] }>()
+// Boards run on tldraw, whose free license doesn't cover paid use: the Team plan has none (server/utils/teams.ts).
+const { data: me } = useMe()
 
 const items = computed<DropdownMenuItem[]>(() => [
   ...(folder
@@ -24,12 +26,16 @@ const items = computed<DropdownMenuItem[]>(() => [
     icon: KIND_ICONS.markdown,
     onSelect: () => emit("doc"),
   },
-  {
-    label: "Board",
-    description: "A whiteboard to draw on together",
-    icon: "i-mingcute-drawing-board-line",
-    onSelect: () => emit("board"),
-  },
+  ...(me.value?.paid
+    ? []
+    : [
+        {
+          label: "Board",
+          description: "A whiteboard to draw on together",
+          icon: "i-mingcute-drawing-board-line",
+          onSelect: () => emit("board"),
+        },
+      ]),
   {
     label: "Site review",
     description: "Comments on a live URL",

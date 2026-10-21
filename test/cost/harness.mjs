@@ -103,7 +103,7 @@ export function event(path, method = "GET") {
 }
 export function reset() {
   sql.exec(
-    "DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM drop_resources; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM user",
+    "DELETE FROM quota_reservations; DELETE FROM quota_blobs; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM drop_resources; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
   )
   state.bursts.length = 0
   state.failBurst = false
@@ -114,6 +114,9 @@ export function reset() {
   state.expiryDays = 30
   state.customExpiry = true
   state.mode = "personal"
+  state.teams = false
+  state.billing = false
+  state.freeKept = 10
   state.publicLinkDays = ""
   state.admins = ""
   state.failDelete = false

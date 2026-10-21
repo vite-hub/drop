@@ -22,11 +22,12 @@ export default defineValidatedHandler({
     if (drop && drop.share === "private")
       throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
     if (!drop) {
-      if (decodeURIComponent(target.slice(3)).startsWith("apps/"))
-        throw new HTTPError({ status: 404, statusText: "No public file with that link." })
+      // Only a file link is percent-decoded; a share link's id is matched as written.
       if (!target.startsWith("/f/")) throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
+      const key = decodeURIComponent(target.slice(3))
+      if (key.startsWith("apps/")) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
       // Metadata only: reporting must not download the file.
-      const [error, file] = await blob.head(decodeURIComponent(target.slice(3)))
+      const [error, file] = await blob.head(key)
       if (error?.code === "BLOB_NOT_FOUND")
         throw new HTTPError({ status: 404, statusText: "No public file with that link." })
       if (error) {

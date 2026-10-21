@@ -34,8 +34,8 @@ import {
 } from "./drops"
 import { type Identity, roleOf } from "./identity"
 import { isMember, membersOnly } from "./members"
-import { DropQuotaError, withDropQuota } from "./quotas"
-import { shareFields, sharePolicy } from "./share"
+import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
+import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
 
@@ -302,9 +302,11 @@ export async function createSiteDrop(
   const folder = input.folder ?? null
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
+  await requireKeepSlot(ownerId, life, false, !folder)
+  const mode = modeFor(folder, event)
   const { share, publicUntil } = input.share
-    ? shareFields(input.share, { kind: "site" }, event)
-    : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+    ? shareFields(input.share, { kind: "site", team: mode === "team" }, event)
+    : { share: defaultShare(mode), publicUntil: null }
   return withDropQuota(ownerId, { drops: 1, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
     const host = siteHost(siteUrl)
@@ -339,6 +341,7 @@ export async function createSiteDrop(
       parentId: folder?.id ?? null,
       siteUrl,
       publishToken: null,
+      teamId: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     return row
@@ -481,6 +484,7 @@ async function insertReviewComment(
         author.name,
         now,
       )
+
       try {
         await quota.commit([
           db.insert(drops).values(image),

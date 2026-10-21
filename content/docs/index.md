@@ -39,6 +39,8 @@ A drop is one doc, app, or uploaded file with its version chain. Every retained 
 
 At a limit, your existing drops and shared links keep working. Revisions are allowed while storage and writes remain available. Moving a drop to the Trash frees its slot; its storage is freed when it's deleted for good, 15 days later or when you empty the Trash. Files a doc embeds don't take a slot. Deleting never refunds monthly writes. Monthly budgets reset at the start of each UTC calendar month. Publishing also has a short burst limit.
 
+The Free plan also keeps at most 10 drops forever at once; Pro keeps any number. On a Drop that [bills teams](/docs/self-host#billing), everyone on a team that pays is on Pro.
+
 Operators set `DROP_QUOTAS=true` to turn quotas on and `DROP_DEFAULT_PLAN` to `free`, `pro`, or `unlimited`; `DROP_PRO_DROPS`, `DROP_PRO_BYTES`, and `DROP_PRO_WRITES` change the Pro limits. Like every Drop setting, they're read at runtime, so a restart applies them. For other limits, [deploy your own](/docs/self-host).
 
 ## Roles {#roles}

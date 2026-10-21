@@ -16,10 +16,11 @@ import { defaultShare, isPublic, type Share } from "#shared/share"
 import { MAX_KEEP_REASON } from "#shared/expiry"
 import { shareReviewFor } from "../trust"
 import type { Identity } from "../identity"
-import { withDropQuota } from "../quotas"
+import { requireKeepSlot, withDropQuota } from "../quotas"
+import { isPaying } from "../teams"
 import { chainOf, expiryPolicy, renewDrop } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
-import { sharePolicy, shareFields } from "../share"
+import { modeFor, shareFields } from "../share"
 import { textStatements } from "../search"
 import type { DropKind } from "#shared/types"
 import type { DropRow, LifetimeInput } from "./types"
@@ -210,6 +211,12 @@ export async function createDocDrop(
       previous = (await versionChain(found))[0] ?? found
     }
   }
+  // Boards run on tldraw, whose free license doesn't cover paid use: people on a paying team make none (../teams.ts).
+  if (kind === "board" && !previous && (await isPaying(who.userId, event)))
+    throw new HTTPError({
+      status: 403,
+      statusText: "Boards aren't part of the Team plan. Publish the board as a Markdown doc or an HTML page instead.",
+    })
   const folder = previous ? null : (input.folder ?? null)
   const parentId = previous?.parentId ?? folder?.id ?? null
   // A drop in someone's folder is theirs (admins add to anyone's); in a team folder it stays its publisher's.
@@ -217,12 +224,15 @@ export async function createDocDrop(
   const life = parentId
     ? lifetimeFields(who, {}, previous ?? folder, event)
     : lifetimeFields(who, input, previous, event)
+  await requireKeepSlot(ownerId, life, previous?.lifetime === "keep", !parentId)
+  // In a team's folders a drop shares like one on a team Drop (../share.ts modeFor).
+  const mode = modeFor(previous ?? folder, event)
   const share =
     input.share !== undefined
-      ? shareFields(input.share, { kind }, event)
+      ? shareFields(input.share, { kind, team: mode === "team" }, event)
       : previous
         ? { share: previous.share, publicUntil: previous.publicUntil }
-        : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+        : { share: defaultShare(mode), publicUntil: null }
 
   return withDropQuota(
     ownerId,
@@ -285,6 +295,7 @@ export async function createDocDrop(
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
         quarantinedAt: null,
         publishToken: null,
+        teamId: null,
         siteUrl: null,
       }
       try {
@@ -343,8 +354,31 @@ function cleanPath(path: string) {
     .split("/")
     .filter((part) => part && part !== "." && part !== "..")
     .join("/")
-  if (!clean || clean.length > 300) throw new HTTPError({ status: 400, statusText: `Invalid file path: ${path}` })
+  if (!clean || clean.length > 300 || escapesFolder(clean))
+    throw new HTTPError({ status: 400, message: `Invalid file path: ${path}` })
   return clean
+}
+
+/**
+ * Whether a blob key part climbs out of its folder once decoded. ViteHub's blob store percent-decodes every key before
+ * its driver sees it, so `%2e%2e/` is `../`, which the fs driver resolves; a URL-based driver (S3) may decode again.
+ * Either way an app's file could land on another drop's blob.
+ */
+export function escapesFolder(path: string) {
+  let decoded = path
+  for (let round = 0; round < 3; round++) {
+    if (/%(?:2f|5c)/i.test(decoded)) return true
+    let next = decoded
+    try {
+      next = decodeURIComponent(decoded)
+    } catch {}
+    if (next === decoded) break
+    decoded = next
+  }
+  return decoded
+    .replace(/\\/g, "/")
+    .split("/")
+    .some((part) => part === "." || part === "..")
 }
 
 /**
@@ -380,7 +414,7 @@ export async function publishApp(
   if (clash.length)
     throw new HTTPError({
       status: 400,
-      statusText: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.`,
+      message: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.`,
     })
   if (input.replace && removes.length)
     throw new HTTPError({ status: 400, statusText: "An archive replaces the whole app, so it takes no removes." })
@@ -413,13 +447,15 @@ export async function publishApp(
   const parentId = row?.parentId ?? folder?.id ?? null
   const ownerId = row?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
   const life = parentId ? lifetimeFields(who, {}, own ?? folder, event) : lifetimeFields(who, input, row, event)
+  await requireKeepSlot(ownerId, life, row?.lifetime === "keep", !parentId)
   const note = input.note?.trim() || null
+  const mode = modeFor(row ?? folder, event)
   const share =
     input.share !== undefined
-      ? shareFields(input.share, { kind: "app" }, event)
+      ? shareFields(input.share, { kind: "app", team: mode === "team" }, event)
       : own
         ? { share: own.share, publicUntil: own.publicUntil }
-        : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+        : { share: defaultShare(mode), publicUntil: null }
   const shareReview = !isPublic(share.share)
     ? null
     : own && isPublic(own.share) && input.share === undefined
@@ -439,7 +475,7 @@ export async function publishApp(
   if (stale.length)
     throw new HTTPError({
       status: 400,
-      statusText: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
+      message: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
     })
   // Files the agent neither sent nor removed carry over, blob and all: no new write, no new bytes. An archive keeps none.
   const sent = new Set(entries.map(([path]) => path))
@@ -519,6 +555,7 @@ export async function publishApp(
           createdAt: row?.createdAt ?? now,
           updatedAt: now,
           publishToken: token,
+          teamId: null,
           lastAccessedAt: now,
           ...life,
           note,

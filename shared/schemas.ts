@@ -57,6 +57,8 @@ export const FolderSchema = v.object({
   ),
   /** A team folder: on a team Drop, admins only. */
   team: v.optional(v.boolean()),
+  /** On a personal Drop with teams: the team it's for, whose owner and admins make its folders. */
+  teamId: v.optional(v.pipe(v.string(), v.maxLength(100))),
   /** The folder to create it in, by id or link. */
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
