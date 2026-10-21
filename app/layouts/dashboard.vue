@@ -10,7 +10,8 @@
 // once it's done; the sidebar there starts on the docs pane, and the swap doesn't show.
 //
 // ⌘B or the button in its header folds the whole sidebar away, like T3 Code; the pages' top bars then lead with the
-// button that brings it back (SidebarExpand). The sidebar's cookie keeps it folded across visits.
+// button that brings it back (SidebarExpand). The sidebar's cookie keeps it folded across visits. A drop's link opened
+// straight away reads without it, until the next page (useOpenedOnLink).
 // ? opens the keyboard shortcuts (ShortcutsModal).
 import { promiseTimeout } from "@vueuse/core"
 
@@ -19,7 +20,13 @@ const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
 const close = () => (open.value = false)
 const collapsed = useSidebarCollapsed()
-defineShortcuts({ meta_b: () => (collapsed.value = !collapsed.value) })
+const { hidden, toggle } = useSidebarHidden()
+const onLink = useOpenedOnLink()
+watch(
+  () => route.name,
+  (name) => name !== "d-id-slug" && (onLink.value = false),
+)
+defineShortcuts({ meta_b: toggle })
 // The page in view tells the ⌘K palette (SearchPalette) which drop or folder is open.
 providePaletteContext()
 
@@ -98,9 +105,9 @@ function leaveDocs() {
       :max-size="20"
       resizable
       :ui="{
-        root: ['bg-muted', collapsed && 'lg:hidden'],
+        root: ['bg-muted', hidden && 'lg:hidden'],
         content: 'bg-muted',
-        handle: collapsed ? 'lg:hidden' : undefined,
+        handle: hidden ? 'lg:hidden' : undefined,
         header: 'h-12 border-b border-default px-4',
         body: 'gap-0 p-2',
         footer: 'border-t border-default p-2',

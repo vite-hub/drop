@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // What someone with the link sees: the doc's latest version, or the one `?v=` pins, full screen, no sidebar. Private
-// drops 404. Signed-in people read it inside the app instead, with their sidebar, so the link never strands them.
+// drops 404. Signed-in people read it inside the app instead, so the link never strands them; opened straight away, it
+// keeps the sidebar out of the way until they ask for it (useOpenedOnLink).
 // The address settles on the doc's link (`/d/<link>/<slug>`): an old version's id or an outdated slug moves there.
 import { type DropLink, dropPath } from "#shared/links"
 import { isPublic } from "#shared/share"
