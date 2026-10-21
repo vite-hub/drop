@@ -16,6 +16,8 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
   v.object({ type: v.literal("copy"), text: v.string() }),
+  // The /f/ paths of a Markdown doc's images that came near the screen (DEFERRED_IMAGES_SCRIPT in ./documents).
+  v.object({ type: v.literal("images"), paths: v.pipe(v.array(v.string()), v.maxLength(100)) }),
   // A cleared selection carries nothing else.
   v.variant("clear", [
     v.object({ type: v.literal("selection"), clear: v.literal(true) }),
