@@ -168,25 +168,25 @@ async function save() {
           </span>
         </dd>
       </div>
-    </dl>
-
-    <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
-    <!-- The team's folders never expire, so there's nothing to choose. -->
-    <dl v-if="drop.teamFolder" class="text-sm">
-      <div class="flex items-center gap-3">
+      <!-- The team's folders never expire, so there's nothing to choose. -->
+      <div v-if="drop.teamFolder" class="flex items-center gap-3">
         <dt class="w-20 shrink-0 text-muted">Lifetime</dt>
         <dd class="min-w-0 truncate text-highlighted">Kept: the team's folders never expire</dd>
       </div>
-    </dl>
-    <ViewerLifetime v-else-if="drop.isOwner && !drop.parentId" :drop="drop" />
-    <dl v-else-if="drop.isOwner && drop.ancestors.length && me?.expiry.days" class="text-sm">
-      <div class="flex items-center gap-3">
+      <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
+      <div
+        v-else-if="drop.isOwner && drop.parentId && drop.ancestors.length && me?.expiry.days"
+        class="flex items-center gap-3"
+      >
         <dt class="w-20 shrink-0 text-muted">Lifetime</dt>
         <dd class="min-w-0 truncate text-highlighted tabular-nums">
           {{ expiryLabel(drop, now) }}, with {{ drop.ancestors[0]!.title }}
         </dd>
       </div>
     </dl>
+
+    <!-- A drop at the top chooses its own lifetime, so it gets the full control below Details. -->
+    <ViewerLifetime v-if="!drop.teamFolder && drop.isOwner && !drop.parentId" :drop="drop" />
 
     <section v-if="$slots.actions" class="-mx-2 border-t border-default pt-3">
       <slot name="actions" />
