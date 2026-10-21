@@ -80,7 +80,12 @@ test("each new version tells the readers of its link, docs and apps alike, and a
   assert.deepEqual(state.refreshedLinks, [v1.url.split("/")[4]])
 
   state.refreshedLinks.length = 0
-  const app = await call(publish, { files: { "index.html": "<h1>One</h1>" }, name: "Demo", note: "First", lifetime: "review" })
+  const app = await call(publish, {
+    files: { "index.html": "<h1>One</h1>" },
+    name: "Demo",
+    note: "First",
+    lifetime: "review",
+  })
   assert.deepEqual(state.refreshedLinks, [])
   await call(publish, { previous: app.url, files: { "index.html": "<h1>Two</h1>" }, note: "Second" })
   assert.deepEqual(state.refreshedLinks, [app.url.split("/")[4]])

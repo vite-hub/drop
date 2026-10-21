@@ -14,17 +14,36 @@ export function useLatestVersion(
   const config = useRuntimeConfig()
   const enabled = () => config.public.realtime && toValue(options.enabled)
   // The room loads once the page shows and following is on (~/utils/latest-room), in a scope of this component's.
-  const scope = effectScope()
   const room = shallowRef<ComputedRef<number>>()
+  let scope: EffectScope | undefined
+  let generation = 0
   const mounted = useMounted()
   watch(
     () => mounted.value && enabled(),
     async (on) => {
-      if (!on || room.value) return
+      const current = ++generation
+      if (!on) {
+        scope?.stop()
+        scope = undefined
+        room.value = undefined
+        return
+      }
+      if (room.value || scope) return
+      const nextScope = effectScope()
+      scope = nextScope
       const { joinLatestRoom } = await import("~/utils/latest-room")
-      room.value ??= scope.run(() => joinLatestRoom(() => drop.value.link, enabled))
+      if (current !== generation || !enabled()) {
+        nextScope.stop()
+        if (scope === nextScope) scope = undefined
+        return
+      }
+      room.value = nextScope.run(() => joinLatestRoom(() => drop.value.link, enabled))
     },
   )
+  onScopeDispose(() => {
+    generation++
+    scope?.stop()
+  })
   const latest = computed(() => room.value?.value ?? 0)
 
   // The page loads the doc behind the link again: another version mounts a new viewer (both pages key it by id and
