@@ -29,8 +29,7 @@ export default defineHandler(async (event) => {
     import("../utils/drops"),
     import("../utils/identity"),
   ])
-  const drop = await findDrop(decoded(page[1]!), event)
-  const who = await identify(event)
+  const [drop, who] = await Promise.all([findDrop(decoded(page[1]!), event), identify(event)])
   if (waitingForReview(drop, who))
     throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
   if (expiredLink(drop, who)) throw new HTTPError({ status: 410, statusText: "Expired" })

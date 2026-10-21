@@ -15,8 +15,9 @@ const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-err
 const { host, database } = deployment()
 const liveEditing = host === "cloudflare" || host === "vps"
 
-// The blob handler also handles conditional requests; keep its policy aligned with the access gate.
-const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-store" } } }
+// The browser keeps a file but asks again on every use: the access gate runs each time, and an unchanged file answers
+// 304 without its bytes (the blob handler handles conditional requests). server/plugins/content-headers.ts agrees.
+const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-cache" } } }
 
 // D1's HTTP driver works from every host. The account and API token are read at runtime.
 const d1 = (fallback: string) => ({

@@ -14,7 +14,17 @@ import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
 import { LIVE_EDITING } from "#live-drafts"
 import { chainOf, expiryPolicy } from "../expiry"
-import { ancestorsOf, foldersUnder, isAttachment, itemCounts, listedNode, parentNode, resolveNode } from "../nodes"
+import {
+  ancestorsOf,
+  foldersUnder,
+  isAttachment,
+  itemCounts,
+  listedNode,
+  parentNode,
+  resolveNode,
+  walkUp,
+  withAncestors,
+} from "../nodes"
 import { shareNow, sharePolicy } from "../share"
 import { searchHeads, searchWords } from "../search"
 import { resourcesOf } from "../resources"
@@ -27,15 +37,21 @@ import { permissions, toCrumb, toSummary } from "./access"
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
- * Reuse the joined owner for review policy so each lookup remains one query, plus one for the ancestors of a drop in a
- * folder or a file a doc embeds: it is shared, kept, and trashed with them (see ./nodes).
+ * The drop `hit` selects (a query for at most one id) with its owner, and the ancestors of a drop in a folder or a file a
+ * doc embeds, which it is shared, kept, and trashed with (see ./nodes): one query, whatever the depth. Review policy
+ * reuses the joined owner, so it adds none.
  */
-async function withOwnerAccess(
-  row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined,
-  event?: H3Event,
-): Promise<DropRow | null> {
+async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
+  const rows = await db
+    .select({ drop: drops, owner: user, hit: sql<number>`${drops.id} = (${hit})` })
+    .from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId))
+    .where(inArray(drops.id, withAncestors(hit)))
+  const row = rows.find((item) => item.hit)
   if (!row) return null
-  const ancestors = row.drop.parentId ? (await ancestorsOf([row.drop])).get(row.drop.id)! : []
+  const ancestors = row.drop.parentId
+    ? walkUp([row.drop], new Map(rows.map((item) => [item.drop.id, item.drop]))).get(row.drop.id)!
+    : []
   const drop: DropRow = {
     ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
     ownerBanned: !row.owner || Boolean(row.owner.banned),
@@ -106,15 +122,18 @@ async function headsMatching(where: SQL | undefined, words: string[], limit: num
   return { rows: found.map((item) => item.drop), snippets: new Map(found.map((item) => [item.drop.id, item.snippet])) }
 }
 
-/** A drop by its id, or by its share link's key: the doc's latest version. */
-export async function findDrop(id: string, event?: H3Event) {
-  const [row] = await db
-    .select({ drop: drops, owner: user })
+const idOf = (where: SQL) => db.select({ id: drops.id }).from(drops).where(where).limit(1)
+const headOf = (link: string) =>
+  db
+    .select({ id: drops.id })
     .from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId))
-    .where(eq(drops.id, id))
+    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
+    .where(eq(drops.link, link))
     .limit(1)
-  return row ? withOwnerAccess(row, event) : findDropByLink(id, undefined, event)
+
+/** A drop by its id, or by its share link's key: the doc's latest version. The id wins, in the same query. */
+export function findDrop(id: string, event?: H3Event) {
+  return findOne(sql`coalesce(${idOf(eq(drops.id, id))}, ${headOf(id)})`, event)
 }
 
 /** A drop an agent names: its id, its link's key, or its share link (`…/d/<key>/<slug>?v=2` pins a version). */
@@ -125,22 +144,15 @@ export async function findDropByRef(ref: string, event?: H3Event) {
 }
 
 /** The version of the doc behind a share link, or its latest one. */
-export async function findDropByLink(link: string, version?: number, event?: H3Event) {
-  const query = db.select({ drop: drops, owner: user }).from(drops).leftJoin(user, eq(user.id, drops.ownerId))
-  const [row] = version
-    ? await query.where(and(eq(drops.link, link), eq(drops.version, version))).limit(1)
-    : await query.innerJoin(dropHeads, eq(dropHeads.dropId, drops.id)).where(eq(drops.link, link)).limit(1)
-  return withOwnerAccess(row, event)
+export function findDropByLink(link: string, version?: number, event?: H3Event) {
+  return findOne(
+    version ? sql`${idOf(and(eq(drops.link, link), eq(drops.version, version))!)}` : sql`${headOf(link)}`,
+    event,
+  )
 }
 
-export async function findDropByBlob(key: string, event?: H3Event) {
-  const [row] = await db
-    .select({ drop: drops, owner: user })
-    .from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId))
-    .where(eq(drops.blobKey, key))
-    .limit(1)
-  return withOwnerAccess(row, event)
+export function findDropByBlob(key: string, event?: H3Event) {
+  return findOne(sql`${idOf(eq(drops.blobKey, key))}`, event)
 }
 
 /**
@@ -486,16 +498,45 @@ export async function dropDetail(
   const can = permissions(row, who)
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
+  // No part waits for another, so their queries reach the database together instead of one round trip each.
+  const [versions, body, attachments, views, resources] = await Promise.all([
+    versionsOf(row),
+    bodyOf(row, who, origin, event, appText),
+    TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
+    can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
+    // Everyone who can open it sees what it links to.
+    isAttachment(row) ? [] : resourcesOf(row),
+  ])
   const detail: DropDetail = {
     ...toSummary(row, undefined, days),
     isOwner: can.manage,
     canTrash: can.trash,
     canComment: can.comment,
-    canEdit: false,
-    versions: await versionsOf(row),
+    canEdit: liveEditable(row, who, versions),
+    versions,
     ancestors: openableAncestors(row, who, days),
+    ...body,
   }
-  detail.canEdit = liveEditable(row, who, detail.versions)
+  if (detail.canEdit && row.kind === "markdown" && hasEditorlessSyntax(detail.content ?? "")) {
+    detail.canEdit = false
+    detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
+  }
+  if (attachments) detail.attachments = attachments
+  if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
+  if (views) detail.views = views
+  if (resources.length) detail.resources = resources
+  return detail
+}
+
+/** What a drop holds: a folder's drops, an app's files, a doc's text and rendering, and the excerpt read from them. */
+async function bodyOf(
+  row: DropRow,
+  who: Identity | null,
+  origin: string,
+  event: H3Event | undefined,
+  appText: AppText,
+): Promise<Partial<DropDetail>> {
+  const detail: Partial<DropDetail> = {}
   if (row.kind === "folder") {
     detail.children = await listFolder(row, event, { who })
     detail.items = detail.children.length
@@ -519,10 +560,6 @@ export async function dropDetail(
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       detail.html = rendered.html
-      if (detail.canEdit && hasEditorlessSyntax(rendered.source)) {
-        detail.canEdit = false
-        detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
-      }
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
@@ -531,12 +568,6 @@ export async function dropDetail(
     }
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
-  if (TEXT_KINDS.has(row.kind)) detail.attachments = await attachmentsOf(row, origin)
-  if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
-  if (can.manage && !isAttachment(row)) detail.views = await viewsOf(row)
-  // Everyone who can open it sees what it links to.
-  const resources = isAttachment(row) ? [] : await resourcesOf(row)
-  if (resources.length) detail.resources = resources
   detail.excerpt = await dropExcerpt(row, detail.content)
   return detail
 }
