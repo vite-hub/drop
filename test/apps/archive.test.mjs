@@ -53,3 +53,16 @@ test("unpacking stops past the largest app, and broken archives say so", async (
   await assert.rejects(unpackApp(new Uint8Array([0x1f, 0x8b, 1, 2, 3])), /isn't valid gzip/)
   await assert.rejects(unpackApp(createTar([{ name: "dir/" }])), /holds no files/)
 })
+
+test("a bundle's minified code doesn't read as bare imports; a real one still warns", async () => {
+  const { appLinkIssues } = await import("../../shared/project-bundle.ts")
+  const files = {
+    "index.html": '<script type="module" src="/assets/index.js"></script>',
+    "assets/index.js":
+      'import{a as b}from"./vue.js";const c={"v-popper__popper--show-from":n.showFrom,"x":1};import("preact");import x from "node:fs"',
+    "assets/vue.js": "export const a = 1",
+  }
+  assert.deepEqual(appLinkIssues(files, Object.keys(files)), [
+    'assets/index.js imports "preact", a bare module name that browsers can\'t load. Import it from a CDN URL (https://esm.sh/preact) or add an import map.',
+  ])
+})
