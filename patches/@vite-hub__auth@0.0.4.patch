@@ -77,7 +77,7 @@ diff --git a/dist/vue.js b/dist/vue.js
 index d3b625c6f98be0b06b1bb3a0ed51004dfec1177a..44682acf7eb78153883659c076f7d2e8f13c5386 100644
 --- a/dist/vue.js
 +++ b/dist/vue.js
-@@ -1,6 +1,65 @@
+@@ -1,6 +1,71 @@
 -import { createAuthClient } from "better-auth/vue";
 -import { computed } from "vue";
 +import { computed, getCurrentInstance, getCurrentScope, shallowRef, watch } from "vue";
