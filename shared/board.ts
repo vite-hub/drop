@@ -57,7 +57,7 @@ export interface BoardItem {
   h?: number
   color?: (typeof BOARD_COLORS)[number]
 }
-export interface BoardEdge {
+interface BoardEdge {
   from: string
   to: string
   label?: string
@@ -143,7 +143,7 @@ function topIndex(board: BoardSnapshot, parentId: string) {
 }
 
 /** A shape's box on the page: its own position plus every frame's above it. Rotation is ignored. */
-export function pageBounds(board: BoardSnapshot, shape: Shape) {
+function pageBounds(board: BoardSnapshot, shape: Shape) {
   let x = shape.x
   let y = shape.y
   for (let parent = board.store[shape.parentId] as Shape | undefined; parent?.typeName === "shape";) {
@@ -199,7 +199,7 @@ function walkRichText(node: any): string {
       : ""
 }
 
-export function plainText(rich: unknown): string {
+function plainText(rich: unknown): string {
   return walkRichText(rich).trim()
 }
 

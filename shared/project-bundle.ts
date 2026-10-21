@@ -32,6 +32,10 @@ export const pageUrl = (page: string): string => encodeURI(`/${page.replace(/(^|
 
 export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain"
 
+/** Files the viewer and agents read as text. The rest (fonts, images, wasm) only a browser loads. */
+export const isTextFile = (path: string): boolean =>
+  /^(text\/|application\/(javascript|json|xml|manifest\+json)|image\/svg\+xml)/.test(contentTypeOf(path))
+
 const dataUrl = (path: string, content: string) =>
   `data:${contentTypeOf(path)};charset=utf-8,${encodeURIComponent(content)}`
 const safeScript = (code: string) => code.replace(/<\/script/gi, "<\\/script")

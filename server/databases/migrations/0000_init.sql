@@ -512,3 +512,17 @@ WHEN NOT EXISTS (SELECT 1 FROM drops d WHERE d.link = OLD.link) BEGIN
   DELETE FROM `drop_views` WHERE `link` = coalesce(OLD.link, OLD.id);
   DELETE FROM `drop_viewers` WHERE `link` = coalesce(OLD.link, OLD.id);
 END;
+--> statement-breakpoint
+-- The links a drop points to (server/utils/resources.ts), per doc: they go with its last version.
+CREATE TABLE `drop_resources` (
+	`link` text NOT NULL,
+	`url` text NOT NULL,
+	`title` text,
+	`position` integer NOT NULL,
+	PRIMARY KEY(`link`, `url`)
+);
+--> statement-breakpoint
+CREATE TRIGGER `drop_resources_drop_delete` AFTER DELETE ON `drops`
+WHEN NOT EXISTS (SELECT 1 FROM drops d WHERE d.link = OLD.link) BEGIN
+  DELETE FROM `drop_resources` WHERE `link` = coalesce(OLD.link, OLD.id);
+END;

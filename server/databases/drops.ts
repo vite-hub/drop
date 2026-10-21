@@ -144,6 +144,22 @@ export const dropViewers = sqliteTable(
   (table) => [primaryKey({ columns: [table.link, table.day, table.id] }), index("drop_viewers_day_idx").on(table.day)],
 )
 
+/**
+ * Links a drop points to, like its pull request and that PR's preview, shown with their sites' icons at the top of its
+ * page. Agents set them (./utils/resources.ts). Keyed on the doc's link, so every version shows the same ones.
+ */
+export const dropResources = sqliteTable(
+  "drop_resources",
+  {
+    link: text("link").notNull(),
+    url: text("url").notNull(),
+    /** What it is, like "PR #123". Null shows the site's host. */
+    title: text("title"),
+    position: integer("position").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.link, table.url] })],
+)
+
 /** Files of an app drop. Publishing a new version replaces the set. */
 export const dropFiles = sqliteTable(
   "drop_files",

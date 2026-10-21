@@ -6,8 +6,8 @@ export type Plan = (typeof PLANS)[number]
 export const TIERS = ["free", "pro"] as const
 export type Tier = (typeof TIERS)[number]
 export const MIB = 1024 * 1024
-export const MAX_APP_FILES = 200
-export const MAX_APP_BYTES = 4 * MIB
+export const MAX_APP_FILES = 1000
+export const MAX_APP_BYTES = 25 * MIB
 export const DEFAULT_PRO_LIMITS = { drops: 100, bytes: 1024 * MIB, writes: 10_000 } as const
 
 export interface PlanLimits {
@@ -20,7 +20,7 @@ export interface PlanLimits {
 
 /** Global app safety limits also apply when owner quotas are disabled. */
 export function planLimits(plan: Plan, pro: { drops?: number; bytes?: number; writes?: number } = {}): PlanLimits {
-  if (plan === "free") return { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 50, appBytes: 2 * MIB }
+  if (plan === "free") return { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 300, appBytes: 10 * MIB }
   if (plan === "pro")
     return {
       drops: pro.drops ?? DEFAULT_PRO_LIMITS.drops,
@@ -103,7 +103,7 @@ export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retry
     drops: "Trash drops you no longer need, or ask the user.",
     bytes: "Trash large drops you no longer need, or ask the user.",
     writes: `It resets on ${resetAt?.slice(0, 10)}.`,
-    appFiles: "Publish fewer files: bundle scripts and styles together.",
+    appFiles: "Publish fewer files: leave source maps and unused assets out of the build.",
     appBytes: "Publish a smaller app: compress images or load large libraries from a CDN.",
   }[unit]
   return {

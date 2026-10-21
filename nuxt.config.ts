@@ -154,6 +154,7 @@ export default defineNuxtConfig({
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   // tldraw needs a license key in production (NUXT_PUBLIC_TLDRAW_LICENSE_KEY); without one, boards show its watermark.
+  // doctor-disable-next-line nuxt/runtime/no-secret-in-public-config -- tldraw license keys are public: the browser runs tldraw and checks the key against the domain.
   runtimeConfig: { seoIndex: false, public: { tldrawLicenseKey: "" } },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
@@ -242,6 +243,9 @@ export default defineNuxtConfig({
   },
 
   app: {
+    // Not Nuxt's default /_nuxt/: apps built with Nuxt load their chunks from /_nuxt/ on their content origin, which this
+    // same deployment serves, and Drop's own asset paths come first there (server/utils/app-files.ts).
+    buildAssetsDir: "/_drop-ui/",
     head: {
       htmlAttrs: { lang: "en" },
       link: [
@@ -356,7 +360,7 @@ export default defineNuxtConfig({
     modules: [
       evlog({
         env: { service: "drop" },
-        exclude: ["/_nuxt/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
+        exclude: ["/_drop-ui/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
         redact: { paths: ["**.key", "**.secret", "**.password"] },
       }),
     ],

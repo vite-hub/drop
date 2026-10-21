@@ -88,6 +88,13 @@ export interface DropVersion {
   current?: boolean
 }
 
+/** A link a drop points to, like its pull request. Every version of the drop shows the same ones (#shared/resources). */
+export interface DropResource {
+  url: string
+  /** What it is, like "PR #123". Without one, the page shows the link's host. */
+  title?: string
+}
+
 /** A file a doc embeds from this Drop (an image, usually). It belongs to the doc. */
 export interface DropAttachment {
   id: string
@@ -116,10 +123,14 @@ export interface DropDetail extends DropSummary {
   html?: string
   /** Where the raw file is served, for images and other files. */
   url?: string
-  /** App files keyed by path. */
+  /** An app's text files keyed by path: all of them, or only its pages when its origin serves the rest (contentGrant). */
   files?: Record<string, string>
+  /** Apps: each file's size in bytes, keyed by path. */
+  sizes?: Record<string, number>
   /** Apps and HTML docs: the separate origin the viewer frames them on. Absent means an opaque-origin sandbox. */
   contentOrigin?: string
+  /** Apps on a per-drop origin: what the viewer hands the frame so that origin serves the app's files to it. */
+  contentGrant?: string
   versions: DropVersion[]
   /** Docs: the files they embed from this Drop. */
   attachments?: DropAttachment[]
@@ -131,6 +142,8 @@ export interface DropDetail extends DropSummary {
   siteUrl?: string
   /** Its owner and admins: views of every version, each viewer counted once a day. Their own visits don't count. */
   views?: Record<ViewerKind, number>
+  /** Links it points to, like its pull request and that PR's preview, in the order they were added. */
+  resources?: DropResource[]
 }
 
 export interface DropComment {

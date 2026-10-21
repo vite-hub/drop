@@ -7,6 +7,7 @@
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
+import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion } from "#shared/types"
@@ -416,6 +417,12 @@ offerToPalette("drop", () => {
       ? [{ label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => panel.show("details") }]
       : []),
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
+    ...(drop.value.resources ?? []).map((resource) => ({
+      label: `Open ${resourceLabel(resource)}`,
+      icon: "i-mingcute-external-link-line",
+      to: resource.url,
+      target: "_blank",
+    })),
     ...(copiesMarkdown.value
       ? [
           {
@@ -596,6 +603,10 @@ watch(
               <ConnectionStatusLabel v-slot="{ state: connection }">{{ liveLabel(connection) }}</ConnectionStatusLabel>
             </ConnectionStatus>
           </span>
+        </template>
+        <!-- After the title, not in it: the heading stays the drop's name. -->
+        <template v-if="drop.resources && !editing" #trailing>
+          <ViewerResources :resources="drop.resources" />
         </template>
         <template v-if="editing" #right>
           <AvatarStack

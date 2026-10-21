@@ -7,7 +7,7 @@ export const REVIEW_TOKEN_HOURS = 12
 /** The longest page address a review comment keeps: path, query, and hash. */
 export const MAX_REVIEW_PAGE = 1000
 
-const isLocal = (hostname: string) =>
+export const isLocal = (hostname: string) =>
   hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname.endsWith(".localhost")
 
 /** One host label, as browsers write it in an origin: lowercase letters, digits, dashes (punycode included). */

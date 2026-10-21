@@ -1,5 +1,5 @@
 import { expiryLabel } from "#shared/expiry"
-import type { DropComment, DropSummary, ViewerKind } from "#shared/types"
+import type { DropComment, DropResource, DropSummary, ViewerKind } from "#shared/types"
 import { dropPageUrl, type DropRow } from "../utils/drops"
 
 /** How every tool describes the share input: one state, the same names the pages use. */
@@ -46,6 +46,10 @@ export const mcpViews = (views: Record<ViewerKind, number>) => ({
   anonymous: views.anonymous,
   agents: views.agent,
 })
+
+/** A drop's links, for agents that read text: one per line, so they can pass them back to update_drop. */
+export const resourcesLines = (resources: DropResource[]) =>
+  `Links:\n${resources.map((resource) => `- ${resource.title ? `${resource.title}: ` : ""}${resource.url}`).join("\n")}`
 
 export const viewsLine = (views: ReturnType<typeof mcpViews>) =>
   `Views: ${views.total} (${views.signedIn} signed in, ${views.anonymous} anonymous, ${views.agents} by agents), each viewer counted once a day`

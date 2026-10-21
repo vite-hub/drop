@@ -590,6 +590,52 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "drop_resources": {
+      "name": "drop_resources",
+      "columns": {
+        "link": {
+          "name": "link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "drop_resources_link_url_pk": {
+          "columns": [
+            "link",
+            "url"
+          ],
+          "name": "drop_resources_link_url_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "drop_viewers": {
       "name": "drop_viewers",
       "columns": {

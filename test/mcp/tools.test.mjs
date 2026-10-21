@@ -3,7 +3,8 @@ import { readdirSync } from "node:fs"
 import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { sql, state, migrate, reset, who } from "../cost/harness.mjs"
+import { createTarGzip } from "nanotar"
+import { objects, sql, state, migrate, reset, who } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: listDrops } = await import("../../server/mcp/tools/list_drops.ts")
@@ -331,7 +332,8 @@ test("an agent publishes an app, sends only what changed, and hears about missin
   assert.equal(next.structuredContent.version, 2)
   assert.equal(next.structuredContent.warnings, undefined)
   const read = (await call(readDrop, { id: app.structuredContent.id })).structuredContent
-  assert.deepEqual(Object.keys(read.files).sort(), ["app.js", "index.html", "logo.png"])
+  assert.deepEqual(Object.keys(read.sizes).sort(), ["app.js", "index.html", "logo.png"])
+  assert.deepEqual(Object.keys(read.files).sort(), ["app.js", "index.html"], "a PNG isn't pasted in as text")
   assert.match(
     (await call(publish, { previous: app.structuredContent.id, files: {}, removes: ["nope.js"], note: "x" })).message,
     /nope\.js, which isn't in v2/,
@@ -383,6 +385,75 @@ test("read_drop tells the owner's agents how many viewed the drop, and nobody el
   assert.doesNotMatch(theirs.content[0].text, /Views:/)
 })
 
+test("an agent links a drop to its pull request and preview; publishing again adds without doubling", async () => {
+  const pr = "https://github.com/acme/portal/pull/42"
+  const bad = await call(publish, {
+    markdown: "# Evidence",
+    note: "v1",
+    lifetime: "review",
+    resources: [{ url: "http://example.com/pr" }],
+  })
+  assert.match(bad.message, /isn't a link: use https/)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0, "nothing is published")
+
+  const doc = (
+    await call(publish, {
+      markdown: "# Evidence",
+      share: "public",
+      note: "v1",
+      lifetime: "review",
+      resources: [{ url: pr, title: "PR #42" }, { url: `${pr}#top` }, { url: pr }],
+    })
+  ).structuredContent
+  const v2 = (
+    await call(publish, {
+      markdown: "# Evidence 2",
+      previous: doc.id,
+      note: "v2",
+      resources: [{ url: pr }, { url: "https://pr42-demo.preview.quiver.dk", title: "Preview" }],
+    })
+  ).structuredContent
+  const linked = [
+    { url: pr, title: "PR #42" },
+    { url: `${pr}#top` },
+    { url: "https://pr42-demo.preview.quiver.dk/", title: "Preview" },
+  ]
+  const read = await call(readDrop, { id: v2.id })
+  assert.deepEqual(read.structuredContent.resources, linked, "the PR keeps its place and its title")
+  assert.match(read.content[0].text, /\nLinks:\n- PR #42: https:\/\/github\.com\/acme\/portal\/pull\/42\n/)
+  assert.deepEqual(
+    (await call(readDrop, { id: doc.id })).structuredContent.resources,
+    linked,
+    "every version shows them",
+  )
+
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('reader', 'Reader', 'reader@example.com')").run()
+  const agent = state.who
+  state.who = { ...agent, userId: "reader", name: "Reader", email: "reader@example.com" }
+  assert.deepEqual((await call(readDrop, { id: v2.id })).structuredContent.resources, linked, "anyone who can open it")
+  assert.match((await call(updateDrop, { id: v2.id, resources: [] })).message, /No drop/, "only who may publish to it")
+  state.who = agent
+
+  const tooMany = Array.from({ length: 6 }, (_, n) => ({ url: `https://example.com/${n}` }))
+  assert.match(
+    (await call(publish, { markdown: "# 3", previous: v2.id, note: "v3", resources: tooMany })).message,
+    /at most 8/,
+  )
+  const replaced = await call(updateDrop, { id: v2.id, resources: [{ url: "https://linear.app/acme/issue/ACM-7" }] })
+  assert.match(replaced.content[0].text, /^Updated, 1 link at the top:/)
+  assert.deepEqual((await call(readDrop, { id: v2.id })).structuredContent.resources, [
+    { url: "https://linear.app/acme/issue/ACM-7" },
+  ])
+  await call(updateDrop, { id: v2.id, resources: [] })
+  assert.equal((await call(readDrop, { id: v2.id })).structuredContent.resources, undefined)
+
+  await call(updateDrop, { id: v2.id, resources: [{ url: pr }] })
+  sql.prepare("DELETE FROM drops WHERE id = ?").run(v2.id)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 1, "they stay while a version does")
+  sql.prepare("DELETE FROM drops WHERE id = ?").run(doc.id)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 0, "and go with the last one")
+})
+
 test("a file without base64 gets an upload URL; curl -T creates the drop once, and a changed ticket does nothing", async () => {
   state.authSecret = "test-secret"
   try {
@@ -430,6 +501,79 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
     await assert.rejects(put(tampered), /run out or isn't valid/)
   } finally {
     state.authSecret = undefined
+  }
+})
+
+test("a built app goes up as one archive, binary files and all, and its next archive replaces every file", async () => {
+  state.authSecret = "test-secret"
+  try {
+    assert.match(
+      (await call(publish, { archive: {}, note: "x", lifetime: "temporary" })).message,
+      /needs an origin of its own/,
+    )
+    state.contentOrigin = "https://*-drop.example"
+    assert.match(
+      (await call(publish, { archive: {}, removes: ["a.js"], note: "x", lifetime: "temporary" })).message,
+      /leave removes out/,
+    )
+    const ticket = (await call(publish, { archive: {}, slug: "site", note: "Build", lifetime: "temporary" }))
+      .structuredContent
+    assert.match(ticket.uploadUrl, /\/api\/uploads\/v2\./)
+    assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0, "nothing exists until the upload")
+
+    state.who = null
+    const put = (url, body) => {
+      const event = new H3Event(new Request(url, { method: "PUT", body }))
+      event.context.log = { set() {}, error() {}, warn() {} }
+      event.context.params = { ticket: new URL(url).pathname.split("/").pop() }
+      return uploadPut(event)
+    }
+    const font = new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0xff, 0x00, 0xfe, 0x80])
+    const archive = await createTarGzip([
+      { name: "dist/" },
+      {
+        name: "dist/index.html",
+        data: '<link rel="stylesheet" href="/_nuxt/app.css"><script type="module" src="/_nuxt/entry.js"></script>',
+      },
+      { name: "dist/_nuxt/entry.js", data: 'import("./lazy.js")' },
+      { name: "dist/_nuxt/lazy.js", data: "export default 1" },
+      { name: "dist/_nuxt/app.css", data: "@font-face{src:url(./inter.woff2)}" },
+      { name: "dist/_nuxt/inter.woff2", data: font },
+      { name: "dist/._index.html", data: "junk" },
+    ])
+    const app = await put(ticket.uploadUrl, archive)
+    assert.equal(app.kind, "app")
+    assert.equal(app.warnings, undefined, "every reference resolves")
+    const rows = sql.prepare("SELECT path, blob_key, size FROM drop_files WHERE drop_id = ? ORDER BY path").all(app.id)
+    assert.deepEqual(
+      rows.map((row) => row.path),
+      ["_nuxt/app.css", "_nuxt/entry.js", "_nuxt/inter.woff2", "_nuxt/lazy.js", "index.html"],
+      "the lone top folder and macOS junk are left out",
+    )
+    const stored = new Uint8Array(
+      await objects.get(rows.find((row) => row.path.endsWith(".woff2")).blob_key).body.arrayBuffer(),
+    )
+    assert.deepEqual(stored, font, "binary files keep their bytes")
+
+    state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+    const next = (await call(publish, { archive: {}, previous: app.id, note: "Rebuild" })).structuredContent
+    state.who = null
+    const v2 = await put(next.uploadUrl, await createTarGzip([{ name: "./index.html", data: "<p>v2</p>" }]))
+    assert.equal(v2.version, 2)
+    const after = sql.prepare("SELECT path, blob_key FROM drop_files WHERE drop_id = ?").all(app.id)
+    assert.deepEqual(
+      after.map((row) => row.path),
+      ["index.html"],
+      "files missing from the archive leave the app",
+    )
+    for (const row of rows) assert.equal(objects.has(row.blob_key), false, "and their blobs are deleted")
+
+    state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+    const empty = (await call(publish, { archive: {}, previous: app.id, note: "x" })).structuredContent
+    await assert.rejects(put(empty.uploadUrl, await createTarGzip([{ name: "app.js", data: "1" }])), /index\.html/)
+  } finally {
+    state.authSecret = undefined
+    state.contentOrigin = undefined
   }
 })
 

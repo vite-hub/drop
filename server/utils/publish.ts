@@ -24,6 +24,9 @@ import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
 import { annotationIssues } from "./markdown-document"
 import { createSiteDrop } from "./review"
+import { unpackApp } from "./app-archive"
+import { perDropOrigins } from "./content-origin"
+import { addedResources, resourceList, ResourcesInput, saveResources } from "./resources"
 import { signUpload } from "./uploads"
 
 // No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
@@ -34,7 +37,15 @@ export const PublishInput = v.object({
     v.pipe(
       v.record(v.string(), v.string()),
       v.description(
-        `A static app: path to UTF-8 contents, with an index.html, at most ${MAX_FILE_BYTES} bytes in all. With previous, send only the files that changed; every other file carries over.`,
+        `A small hand-written static app: path to UTF-8 contents, with an index.html, at most ${MAX_FILE_BYTES} bytes in all. With previous, send only the files that changed; every other file carries over. For a built app (a dist/ folder), use archive.`,
+      ),
+    ),
+  ),
+  archive: v.optional(
+    v.pipe(
+      v.object({}),
+      v.description(
+        "A built static app, such as a dist/ folder with its index.html at the top, binary files (fonts, images, wasm) included. Pass {} and you get an uploadUrl: upload the folder with `tar -czf - -C <folder> . | curl -T - '<uploadUrl>'`, which publishes it and prints the drop. It replaces every file of the app, so with previous upload the whole folder again.",
       ),
     ),
   ),
@@ -135,6 +146,14 @@ export const PublishInput = v.object({
       ),
     ),
   ),
+  resources: v.optional(
+    v.pipe(
+      ResourcesInput,
+      v.description(
+        "Links the drop belongs with, shown with their sites' icons at the top of its page: the pull request it documents, that PR's preview deploy, the issue. Every version shows the same ones. With previous, these are added to the drop's links; one already there keeps its place, so pass them again freely. Replace or clear them with update_drop.",
+      ),
+    ),
+  ),
   folder: v.optional(
     v.pipe(
       v.string(),
@@ -148,15 +167,19 @@ export const PublishInput = v.object({
 export type PublishInput = v.InferOutput<typeof PublishInput>
 
 /**
- * One `publish` call: what the MCP tool does, and what an upload URL finishes. `upload` carries the bytes of a file
- * sent to that URL; without them, a file with no base64 gets an upload URL instead of a drop, after the same checks.
+ * One `publish` call: what the MCP tool does, and what an upload URL finishes. `upload` carries the bytes of a file or
+ * an app's archive sent to that URL; without them, a file with no base64, or an archive, gets an upload URL instead of
+ * a drop, after the same checks.
  */
 export async function publishInput(who: Identity, input: PublishInput, event: H3Event, upload?: Uint8Array) {
-  const given = (["markdown", "html", "files", "file", "site", "board"] as const).filter(
+  const given = (["markdown", "html", "files", "archive", "file", "site", "board"] as const).filter(
     (key) => input[key] !== undefined,
   )
   if (given.length !== 1)
-    throw new HTTPError({ status: 400, message: "Pass exactly one of markdown, html, files, file, site, or board." })
+    throw new HTTPError({
+      status: 400,
+      message: "Pass exactly one of markdown, html, files, archive, file, site, or board.",
+    })
   if (!input.previous && !input.folder && !input.lifetime)
     throw new HTTPError({
       status: 400,
@@ -165,12 +188,20 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const folder = input.folder && !input.previous ? await requireFolder(input.folder, who, event) : undefined
   if (input.slug !== undefined && !slugify(input.slug))
     throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
+  const links = input.resources ? resourceList(input.resources) : undefined
+  // The upload URL carries the call, and room in it is short.
+  if (links && input.file && input.file.base64 === undefined && !upload)
+    throw new HTTPError({
+      status: 400,
+      message: "Put resources on the doc that embeds the file, or set them with update_drop once it's uploaded.",
+    })
   if (input.site) {
     if (input.previous || input.resolves || input.removes)
       throw new HTTPError({
         status: 400,
         message: "A site has no versions. Change it with update_drop, and resolve its comments there.",
       })
+    const resources = links && (await addedResources(null, links))
     const row = await createSiteDrop(
       who,
       {
@@ -185,6 +216,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       },
       event,
     )
+    if (resources) await saveResources(row, resources)
     const drop = mcpDrop(toSummary((await findDrop(row.id, event)) ?? row), event.url.origin)
     const script = reviewSnippet(event.url.origin)
     return {
@@ -206,22 +238,43 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       message: "previous is a site, which has no versions. Change it with update_drop.",
     })
   if (previous) previous = (await versionChain(previous))[0] ?? previous
+  const resources = links && (await addedResources(previous, links))
   const share = input.share ? { share: input.share } : {}
   const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
 
   let row
   let warnings: string[] = []
-  if (input.files) {
+  if (input.files || input.archive) {
     if (previous && previous.kind !== "app")
       throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
+    if (input.archive && !perDropOrigins(event))
+      throw new HTTPError({
+        status: 400,
+        message:
+          "This Drop can't serve built apps: each needs an origin of its own (a DROP_CONTENT_ORIGIN with a *). Publish a small app with files instead.",
+      })
+    if (input.archive && input.removes)
+      throw new HTTPError({
+        status: 400,
+        message: "An archive replaces the whole app: leave removes out and upload the whole folder.",
+      })
+    if (input.archive && !upload) {
+      // The checks above passed, so the upload will too unless something changes in the meantime; it runs them again.
+      const { url, expiresAt } = await signUpload(event, who, input)
+      return {
+        text: `Upload the built folder within 15 minutes, once:\ntar -czf - -C <folder> . | curl -T - '${url}'\nIt publishes the app and prints it as JSON, with any warnings.`,
+        result: { uploadUrl: url, method: "PUT" as const, expiresAt: new Date(expiresAt).toISOString() },
+      }
+    }
     row = await publishApp(
       who,
       {
         id: previous?.id,
         name: input.title,
         slug: input.slug,
-        files: input.files,
+        files: input.archive ? await unpackApp(upload!) : input.files!,
         removes: input.removes,
+        replace: !!input.archive,
         folder,
         ...share,
         ...life,
@@ -259,7 +312,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         const { put, remove } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
         applyChanges(board, put, remove)
       } catch (error) {
-        throw new HTTPError({ status: 400, message: (error as Error).message })
+        throw new HTTPError({ status: 400, message: error instanceof Error ? error.message : String(error) })
       }
       filename = "board.tldr"
       bytes = new TextEncoder().encode(JSON.stringify(board))
@@ -312,6 +365,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves) : []
 
   const fresh = (await findDrop(row.id, event)) ?? row
+  if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
   const check = warnings.length

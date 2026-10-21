@@ -33,6 +33,7 @@ export const injectPaletteContext = () => inject(KEY, null)
  * dashboard layout have no palette, and nothing happens.
  */
 export function offerToPalette<K extends keyof PaletteContext>(key: K, value: () => PaletteContext[K]["value"]) {
+  // SAFETY: PaletteContext[K] is that slot's ShallowRef; TypeScript loses the link between K and its value type.
   const slot = injectPaletteContext()?.[key] as ShallowRef<PaletteContext[K]["value"]> | undefined
   if (!slot) return
   let mine: PaletteContext[K]["value"] = null

@@ -31,7 +31,7 @@ export async function renderOgPng(event: H3Event, page: { html: string; width: n
     gotoOptions: { waitUntil: "networkidle0", timeout: 15_000 },
     screenshotOptions: { type: "png" },
   }).catch((error: unknown) => {
-    useLogger(event).error(error as Error, { ogImage: { status: 0 } })
+    useLogger(event).error(error instanceof Error ? error : new Error(String(error)), { ogImage: { status: 0 } })
     return null
   })
   if (!response) return null

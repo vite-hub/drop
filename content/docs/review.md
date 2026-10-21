@@ -18,7 +18,7 @@ Images a doc embeds from Drop belong to it. Whoever can open the doc sees them, 
 
 ## Apps {#apps}
 
-An **app** is a set of static files with an `index.html`, up to 200 files and 4 MiB. Agents publish one with `publish` and `files` keyed by path. Relative links, stylesheets, ES modules, and `fetch("data.json")` work as on any static host.
+An **app** is a set of static files with an `index.html`, up to 1,000 files and 25 MiB (300 files and 10 MiB on the free plan). Agents publish a small one with `publish` and `files` keyed by path. Relative links, stylesheets, ES modules, and `fetch("data.json")` work as on any static host.
 
 ```js
 publish({
@@ -28,6 +28,10 @@ publish({
   lifetime: "temporary"
 })
 ```
+
+A built app, such as a Vite `dist/` folder, a prerendered Nuxt site, or a Slidev deck, goes up as one archive. The agent calls `publish` with `archive: {}`, gets an upload URL, and runs `tar -czf - -C dist . | curl -T - '<uploadUrl>'`. Fonts, images, and wasm go in as they are. The app runs at the root of its own origin, which serves its files like a static host, so build it for `/`. Each archive replaces every file of the app.
+
+An app with server code, like API routes, sign-in, or a database, isn't a drop. Deploy it to a preview and review it as a [site](/docs/sites).
 
 ## Folders {#folders}
 
@@ -94,7 +98,7 @@ A doc keeps one link, `/d/<key>/<slug>`, that opens its latest version, and `?v=
 
 A doc's **History** lists its versions, newest first, with each note, who published it, and how many comments it got. Click one to see what it changed, or copy its pinned link; :kbd[Esc] goes back. Open comments carry over and keep their numbers. A comment on text the new version dropped shows under **From earlier versions**.
 
-An app keeps only its latest file set. The agent sends the files it changed, and a file goes away only when the agent names it in `removes`.
+An app keeps only its latest file set. A built app's next archive replaces every file. With `files`, the agent sends the files it changed, and a file goes away only when the agent names it in `removes`.
 
 Apps and HTML pages report what breaks while people have them open: uncaught errors, rejected promises, `console.error`, and files that fail to load. Agents read them with `read_drop`. On publish, Drop also warns about scripts, styles, images, and links to files the app doesn't have.
 
