@@ -73,13 +73,8 @@ onMounted(async () => {
             // SAFETY: Excalidraw's elements are plain objects with the fields BoardElement names.
             onChange: (changed: readonly unknown[]) => onChange?.(changed as readonly BoardElement[]),
           },
-          createElement(
-            ex.MainMenu,
-            null,
-            createElement(ex.MainMenu.DefaultItems.SaveAsImage),
-            createElement(ex.MainMenu.DefaultItems.SearchMenu),
-            createElement(ex.MainMenu.DefaultItems.Help),
-          ),
+          // An empty main menu: its button is hidden (below), and Help stays in the footer.
+          createElement(ex.MainMenu),
         ),
       )
     render()
@@ -339,7 +334,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     </div>
     <div
       v-if="state === 'ready'"
-      class="pointer-events-none absolute bottom-3 left-1/2 z-[300] -translate-x-1/2 text-xs text-dimmed"
+      class="pointer-events-none absolute top-3 left-1/2 z-[300] -translate-x-1/2 text-xs text-dimmed"
       aria-live="polite"
     >
       {{ readOnly ? "View only" : saving ? "Saving…" : "" }}
@@ -349,23 +344,63 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
 
 <style>
 /*
- * Excalidraw's interface in Drop's tokens (shared/theme.css, app/assets/css/main.css): its panels, menus and buttons
- * use Drop's surfaces, text, primary and Geist, and its own `.theme--dark` follows Drop's theme (the theme prop). The
- * drawings keep Excalidraw's look: the canvas and its shapes aren't interface.
+ * Excalidraw's interface in Drop's tokens (shared/theme.css, app/assets/css/main.css), laid out like a Drop page: the
+ * tools sit in one bar at the bottom, as in Figma or tldraw, the main menu is gone (Drop's header holds the board's
+ * actions, and Help stays in the footer), and panels and the bar are popovers with a hairline. The drawings keep
+ * Excalidraw's look: the canvas and its shapes aren't interface. `.theme--dark` is listed so these beat Excalidraw's
+ * own dark values; Drop's tokens follow `.dark` by themselves.
  */
-.board .excalidraw {
+.board .excalidraw,
+.board .excalidraw.theme--dark {
   --ui-font: var(--font-sans, inherit);
   --color-primary: var(--ui-primary);
   --color-primary-darker: var(--ui-primary);
   --color-primary-darkest: var(--ui-primary);
-  --color-primary-light: color-mix(in oklab, var(--ui-primary) 15%, transparent);
+  --color-primary-light: var(--ui-bg-accented);
+  --color-primary-hover: var(--ui-primary);
   --island-bg-color: var(--popover);
   --default-bg-color: var(--ui-bg);
   --input-bg-color: var(--ui-bg);
   --text-primary-color: var(--ui-text-highlighted);
+  --icon-fill-color: var(--ui-text);
+  --default-border-color: var(--ui-border);
+  --button-hover-bg: var(--ui-bg-elevated);
+  --color-surface-primary-container: var(--ui-bg-inverted);
+  --color-on-primary-container: var(--ui-text-inverted);
+  --border-radius-lg: var(--radius);
+  --shadow-island: 0 1px 2px rgb(0 0 0 / 0.05), 0 4px 12px -2px rgb(0 0 0 / 0.08), inset 0 0 0 1px var(--ui-border);
 }
-/* The library holds people's saved shapes in their own browser; a shared board has no use for it. */
+.dark .board .excalidraw {
+  --shadow-island: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -2px rgb(0 0 0 / 0.4), inset 0 0 0 1px var(--ui-border);
+}
+
+/* The main menu's button, and the library, which holds people's saved shapes in their own browser. */
+.board .excalidraw .main-menu-trigger,
 .board .excalidraw .default-sidebar-trigger {
+  display: none;
+}
+
+/* The tool bar, at the bottom in the middle, level with the zoom and help in the footer; its hint shows above it. */
+.board .excalidraw:not(.excalidraw--mobile) .shapes-section {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
+}
+.board .excalidraw:not(.excalidraw--mobile) .shapes-section .HintViewer {
+  top: auto;
+  bottom: 100%;
+  margin: 0 0 0.5rem;
+  color: var(--ui-text-dimmed);
+}
+.board .excalidraw .App-toolbar .Island {
+  padding: 0.25rem;
+}
+.board .excalidraw .App-toolbar .ToolIcon__icon {
+  border-radius: calc(var(--radius) * 0.8);
+}
+/* Each tool's shortcut is in its tooltip; the digits under every icon were noise. */
+.board .excalidraw .App-toolbar .ToolIcon__keybinding {
   display: none;
 }
 </style>
