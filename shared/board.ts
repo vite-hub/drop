@@ -606,15 +606,17 @@ function arrowPath(from: BoardElement, to: BoardElement) {
   const end = edgePoint(boxOf(to), boxOf(from))
   const dx = end.x - start.x || 1
   const dy = end.y - start.y
+  // SAFETY: the array contains exactly the two numeric points constructed below.
+  const points = [
+    [0, 0],
+    [dx, dy],
+  ] as [[number, number], [number, number]]
   return {
     x: start.x,
     y: start.y,
     width: Math.abs(dx),
     height: Math.abs(dy),
-    points: [
-      [0, 0],
-      [dx, dy],
-    ] as [[number, number], [number, number]],
+    points,
   }
 }
 

@@ -107,7 +107,7 @@ function labelWidth(container: Shape) {
   if (container.type === "diamond") return Math.round(container.width / 2) - PADDING * 2
   return container.width - PADDING * 2
 }
-const FAMILIES: Record<number, string> = { 1: "Virgil", 2: "Helvetica", 3: "Cascadia", 5: "Excalifont", 6: "Nunito" }
+const FAMILIES = { 1: "Virgil", 2: "Helvetica", 3: "Cascadia", 5: "Excalifont", 6: "Nunito" } satisfies Record<number, string>
 const fontOf = (text: { fontSize: number; fontFamily: number }) =>
   `${text.fontSize}px ${FAMILIES[text.fontFamily] ?? "Helvetica"}, Segoe UI Emoji`
 
@@ -207,6 +207,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     for (const element of data.snapshot.elements)
       if (element.version > (known.get(element.id) ?? 0)) known.set(element.id, element.version)
     if (!newer.length) return
+    // SAFETY: newer contains the server's serialized Excalidraw elements, which restoreElements accepts as unknown input.
     const remote = ex.restoreElements(newer as never, null, { repairBindings: true })
     const elements = ex.reconcileElements(
       api.getSceneElementsIncludingDeleted(),
@@ -225,6 +226,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   // A new version for people who can draw, so it saves; a reader's copy stays at the server's version.
   type Element = ReturnType<Api["getSceneElementsIncludingDeleted"]>[number]
   const next = <T extends Element>(element: T, fields: Partial<T>) =>
+    // SAFETY: spreading an Element and Partial<T> preserves the concrete element shape for this generic helper.
     ({
       ...element,
       ...fields,
@@ -282,6 +284,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       const blob = await ex.exportToBlob({
         elements,
         files: api.getFiles(),
+        // SAFETY: exportToBlob accepts an Excalidraw element or null; this frame is one of the scene elements.
         exportingFrame: frame as never,
         appState: { exportBackground: true, viewBackgroundColor: "#ffffff", exportWithDarkMode: false },
         exportPadding: 24,
