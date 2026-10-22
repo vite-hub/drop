@@ -18,7 +18,7 @@ overrides:
   # Nuxt's payload serializer; 5.9.3+ fixes several uneval/stringify advisories.
   devalue: ^5.9.4
   vite@*: "catalog:"
-  # tldraw's @tiptap/react asks for ^3.12; without these, adding it moved Nuxt UI's menus to 3.32 beside core 3.31.4.
+  # Nuxt UI's editor menus stay on @tiptap/core's 3.31.4; a 3.32 menu beside core 3.31.4 breaks them.
   "@tiptap/extension-bubble-menu": 3.31.4
   "@tiptap/extension-floating-menu": 3.31.4
   # One h3 v2 in the server bundle. Nitro and ViteHub asked for older release candidates; Nitro's rc.22 answered a

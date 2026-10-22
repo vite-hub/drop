@@ -148,9 +148,30 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
     if (event.source !== parent || !message || message.__drop !== true || message.type !== "document" || typeof message.html !== "string") return;
     if (typeof message.grant === "string" && /^[\\w.-]+$/.test(message.grant))
       document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (isSecureContext ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
+    // A written document paints before its stylesheets load, unlike one the browser navigates to, so an app would show
+    // unstyled first. Keep it hidden until they load or fail, with a 3-second cap for a stylesheet that never answers.
+    const hold = "<style data-drop-hold>html{visibility:hidden!important}</style>";
+    const head = /<head(?:\\s[^>]*)?>/i.exec(message.html);
+    const at = head ? head.index + head[0].length : (/^\\s*<!doctype[^>]*>/i.exec(message.html)?.[0].length ?? 0);
     document.open();
-    document.write(message.html);
+    document.write(message.html.slice(0, at) + hold + message.html.slice(at));
     document.close();
+    const rootStyle = document.documentElement?.style;
+    const previousVisibility = rootStyle?.getPropertyValue("visibility") ?? "";
+    const previousVisibilityPriority = rootStyle?.getPropertyPriority("visibility") ?? "";
+    rootStyle?.setProperty("visibility", "hidden", "important");
+    const reveal = () => {
+      if (previousVisibility) rootStyle?.setProperty("visibility", previousVisibility, previousVisibilityPriority);
+      else rootStyle?.removeProperty("visibility");
+      document.querySelector("style[data-drop-hold]")?.remove();
+    };
+    const pending = [...document.querySelectorAll('link[rel~="stylesheet" i]')].filter(
+      (link) => !link.sheet && !link.disabled && (!link.media || matchMedia(link.media).matches));
+    if (!pending.length) return reveal();
+    let left = pending.length;
+    for (const link of pending)
+      for (const type of ["load", "error"]) link.addEventListener(type, () => --left || reveal(), { once: true });
+    setTimeout(reveal, 3000);
   });
   parent.postMessage({ __drop: true, type: "host", path: location.pathname }, "*");
 })();</script></body></html>`

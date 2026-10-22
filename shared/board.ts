@@ -1,31 +1,17 @@
-// Boards: tldraw whiteboards people draw on together, and agents read and add to. A board drop stores a tldraw store
-// snapshot (`.tldr`). People edit it in tldraw itself (app/components/viewer/ViewerBoard.vue); agents never touch
-// tldraw records. They write a small format (items and edges, below) that this module turns into validated records,
-// and read the board back as a text outline plus an image per frame (server/utils/boards.ts).
-import {
-  createBindingId,
-  createShapeId,
-  createTLSchema,
-  DocumentRecordType,
-  PageRecordType,
-  TLDOCUMENT_ID,
-  toRichText,
-} from "@tldraw/tlschema"
-import { getIndexAbove, ZERO_INDEX_KEY } from "@tldraw/utils"
+// Boards: Excalidraw whiteboards people draw on together, and agents read and add to. A board drop stores an
+// Excalidraw scene (`.excalidraw`, the file excalidraw.com opens). People edit it in Excalidraw itself
+// (app/components/viewer/ViewerBoard.vue); agents never touch elements. They write a small format (items and edges,
+// below) that this module turns into elements, and read the board back as a text outline plus an image per frame
+// (server/utils/boards.ts).
+//
+// Every element carries a version that goes up with each change, and a deleted element stays in the scene marked
+// isDeleted. That is how Excalidraw merges scenes, and how Drop does too: per element, the higher version wins
+// (mergeElements), so a deletion reaches every open board like any other change.
+import { generateNKeysBetween } from "fractional-indexing"
 import * as v from "valibot"
 
-export const BOARD_EXTENSION = ".tldr"
-export const BOARD_CONTENT_TYPE = "application/vnd.tldraw+json"
-
-/** tldraw's own schema: the editor validates with the same one, so records written here load as they are. */
-const boardSchema = createTLSchema()
-
-type BoardRecord = { id: string; typeName: string; [key: string]: unknown }
-/** A tldraw store snapshot, as `getSnapshot(editor.store).document` returns it. */
-export interface BoardSnapshot {
-  schema: ReturnType<typeof boardSchema.serialize>
-  store: Record<string, BoardRecord>
-}
+export const BOARD_EXTENSION = ".excalidraw"
+export const BOARD_CONTENT_TYPE = "application/vnd.excalidraw+json"
 
 export const BOARD_COLORS = [
   "black",
@@ -43,6 +29,7 @@ export const BOARD_COLORS = [
   "white",
 ] as const
 export const BOARD_ITEM_TYPES = ["note", "text", "box", "ellipse", "frame"] as const
+type BoardColor = (typeof BOARD_COLORS)[number]
 
 /** What an agent writes. `id` is the agent's own short name for it; edges and `in` refer to it. */
 export interface BoardItem {
@@ -56,7 +43,7 @@ export interface BoardItem {
   y?: number
   w?: number
   h?: number
-  color?: (typeof BOARD_COLORS)[number]
+  color?: BoardColor
 }
 interface BoardEdge {
   from: string
@@ -72,127 +59,156 @@ export interface BoardEdit {
   remove?: string[]
 }
 
-const PAGE_ID = "page:page"
-const NOTE = 200
-const GAP = 40
-// Agents write paragraphs where people scribble a few words, so their items use tldraw's plain small type instead
-// of the large hand-drawn default. People can still switch any of them in the style panel.
-const DEFAULTS = {
-  richText: toRichText(""),
-  color: "black",
-  labelColor: "black",
-  size: "s",
-  font: "sans",
-  align: "middle",
-  verticalAlign: "middle",
-  growY: 0,
-  url: "",
-  scale: 1,
-}
-
-/** A board with one empty page. */
-export function emptyBoard(): BoardSnapshot {
-  const document = DocumentRecordType.create({ id: TLDOCUMENT_ID })
-  // SAFETY: tldraw brands page ids and index keys; "page:page" and "a1" are valid ones, the first page tldraw makes.
-  const page = PageRecordType.create({ id: PAGE_ID as never, name: "Page 1", index: "a1" as never })
-  return {
-    schema: boardSchema.serialize(),
-    // SAFETY: both are plain records with id and typeName.
-    // doctor-disable-next-line typescript/evidence/no-chained-type-assertions -- tldraw's record interfaces lack BoardRecord's index signature, though every record is a plain object with id and typeName
-    store: { [document.id]: document as unknown as BoardRecord, [page.id]: page as unknown as BoardRecord },
-  }
-}
-
-const StoredBoard = v.object({
-  schema: v.record(v.string(), v.unknown()),
-  store: v.record(v.string(), v.looseObject({ id: v.string(), typeName: v.string() })),
-})
-
-/** Parses a stored board and migrates it to the current tldraw schema. Throws on anything else. */
-export function parseBoard(text: string): BoardSnapshot {
-  const parsed = v.safeParse(StoredBoard, JSON.parse(text))
-  if (!parsed.success) throw new Error("Not a board.")
-  // SAFETY: migrateStoreSnapshot checks the schema's version and migrates every record, and returns an error otherwise.
-  const result = boardSchema.migrateStoreSnapshot(parsed.output as never)
-  if (result.type === "error") throw new Error(`This board can't be read (${result.reason}).`)
-  // SAFETY: the migrated store holds tldraw records, plain objects with id and typeName.
-  // doctor-disable-next-line typescript/evidence/no-chained-type-assertions -- tldraw's record interfaces lack BoardRecord's index signature, though every record is a plain object with id and typeName
-  return { schema: boardSchema.serialize(), store: result.value as unknown as BoardSnapshot["store"] }
-}
-
-/** Checks one record against tldraw's schema. Throws with tldraw's message when it doesn't fit. */
-export function validateRecord(record: BoardRecord) {
-  // SAFETY: boardSchema.types maps each type name to its record type, and each has validate; indexing by any string
-  // needs the record form, and an unknown name comes back undefined.
-  const type = (boardSchema.types as Record<string, { validate(record: unknown): unknown }>)[record.typeName]
-  if (!type) throw new Error(`Unknown record type ${record.typeName}`)
-  // SAFETY: validate returns the record it was given once it fits the schema, and throws otherwise.
-  return type.validate(record) as BoardRecord
-}
-
-const shapeId = (id: string): string => (id.startsWith("shape:") ? id : createShapeId(id))
-/** The id agents see and use: the shape's without its `shape:` prefix. */
-const shortId = (id: string) => id.replace(/^shape:/, "")
-
-const shapes = (board: BoardSnapshot) =>
-  Object.values(board.store).filter((record): record is Shape => record.typeName === "shape")
-interface Shape extends BoardRecord {
+/** An Excalidraw element: the fields Drop reads and writes. Excalidraw keeps the rest as they are. */
+export interface BoardElement {
+  id: string
   type: string
   x: number
   y: number
-  parentId: string
-  index: string
-  props: Record<string, any>
-  meta: Record<string, unknown>
-}
-
-function pageOf(board: BoardSnapshot) {
-  const pages = Object.values(board.store).filter((record) => record.typeName === "page")
-  return pages.sort((a, b) => String(a.index).localeCompare(String(b.index)))[0]?.id ?? PAGE_ID
-}
-
-function topIndex(board: BoardSnapshot, parentId: string) {
-  return shapes(board)
-    .filter((shape) => shape.parentId === parentId)
-    .reduce<string>((top, shape) => (shape.index > top ? shape.index : top), ZERO_INDEX_KEY)
-}
-
-/** A shape's box on the page: its own position plus every frame's above it. Rotation is ignored. */
-function pageBounds(board: BoardSnapshot, shape: Shape) {
-  let x = shape.x
-  let y = shape.y
-  // SAFETY: a shape's parent is a page or a shape; the loop stops at the page, so `parent` is a shape inside it.
-  for (let parent = board.store[shape.parentId] as Shape | undefined; parent?.typeName === "shape";) {
-    x += parent.x
-    y += parent.y
-    // SAFETY: as above, a shape's parent is a page or a shape.
-    parent = board.store[parent.parentId] as Shape | undefined
+  width: number
+  height: number
+  version: number
+  versionNonce: number
+  isDeleted: boolean
+  index?: string | null
+  frameId?: string | null
+  containerId?: string | null
+  boundElements?: { id: string; type: string }[] | null
+  text?: string
+  originalText?: string
+  name?: string | null
+  startBinding?: { elementId: string } | null
+  endBinding?: { elementId: string } | null
+  /** Drop's own: who added it, whether an agent did, what kind of item, and `fit` on words no browser measured yet. */
+  customData?: {
+    author?: string
+    agent?: boolean
+    kind?: string
+    editedBy?: string
+    fit?: boolean
+    [key: string]: unknown
   }
-  const { w, h } = sizeOf(shape)
-  return { x, y, w, h }
+  [key: string]: unknown
 }
 
-function sizeOf(shape: Shape) {
-  const scale = shape.props.scale ?? 1
-  if (shape.type === "note") return { w: NOTE * scale, h: (NOTE + (shape.props.growY ?? 0)) * scale }
-  // doctor-disable-next-line typescript/strict/no-runtime-typeof -- tldraw's schema validated these props; only some shape types have a size
-  if (typeof shape.props.w === "number" && typeof shape.props.h === "number")
-    return { w: shape.props.w * scale, h: (shape.props.h + (shape.props.growY ?? 0)) * scale }
-  // doctor-disable-next-line typescript/strict/no-runtime-typeof -- tldraw's schema validated these props; only some shape types have a size
-  if (typeof shape.props.w === "number") return { w: shape.props.w * scale, h: 40 * scale }
-  return { w: 0, h: 0 }
+/** An Excalidraw scene, the `.excalidraw` file. */
+export interface Board {
+  type: "excalidraw"
+  version: 2
+  source: string
+  elements: BoardElement[]
+  appState: Record<string, unknown>
+  files: Record<string, unknown>
 }
 
-// tldraw measures a note's or a shape's words in the browser when someone types them, and grows the shape down to
-// fit (growY). Words an agent sends never meet a browser, so estimate what tldraw would measure: agents' items use
-// the sans font at size s (DEFAULTS), 18px with a 1.35 line height, about 10px a character, inside 16px of padding.
-// Long words break, so the estimate errs tall; the first browser to open the board fits it exactly (ViewerBoard).
-const LABEL = { line: 18 * 1.35, padding: 16, char: 10 }
+const NOTE = 200
+const GAP = 40
 
-/** How far a note or shape of w×h must grow down to hold its words. */
-export function labelGrowth(text: string, w: number, h: number) {
-  if (!text.trim()) return 0
-  const perLine = Math.max(1, Math.floor((w - LABEL.padding * 2) / LABEL.char))
+/** A board with nothing on it. */
+export function emptyBoard(): Board {
+  return {
+    type: "excalidraw",
+    version: 2,
+    source: "https://drop.vitehub.dev",
+    elements: [],
+    appState: { viewBackgroundColor: "#ffffff", gridSize: 20 },
+    files: {},
+  }
+}
+
+// Shapes, lines, text and frames. Images and embeds need files and URLs Drop doesn't keep, so boards don't take them.
+const ELEMENT_TYPES = ["rectangle", "diamond", "ellipse", "arrow", "line", "freedraw", "text", "frame"] as const
+const finite = v.pipe(v.number(), v.finite())
+const Element = v.looseObject({
+  id: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
+  type: v.picklist(ELEMENT_TYPES),
+  x: finite,
+  y: finite,
+  width: finite,
+  height: finite,
+  version: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  versionNonce: v.pipe(v.number(), v.integer()),
+  isDeleted: v.boolean(),
+})
+const BoardFile = v.object({
+  type: v.literal("excalidraw"),
+  elements: v.array(v.looseObject({ id: v.string(), type: v.string() })),
+})
+
+/** Whether an element from a browser is one a board stores: a shape, line, text or frame with the fields Drop reads. */
+export function isBoardElement(element: unknown): element is BoardElement {
+  return v.is(Element, element)
+}
+
+/** Parses a `.excalidraw` file. Elements a board doesn't take (images, embeds) are left out. Throws on anything else. */
+export function parseBoard(text: string): Board {
+  const parsed = v.safeParse(BoardFile, JSON.parse(text))
+  if (!parsed.success) throw new Error("Not a board.")
+  return { ...emptyBoard(), elements: parsed.output.elements.filter(isBoardElement) }
+}
+
+/** A board as a `.excalidraw` file: what Drop stores and serves, so a downloaded board opens in excalidraw.com. */
+export const serializeBoard = (board: Board) => JSON.stringify(board)
+
+/**
+ * Merges elements into a board in place, the way Excalidraw reconciles scenes: per element, the higher version wins,
+ * and on a tie the lower versionNonce. Who added an element stays as it was; a new element without one gets `author`,
+ * which read_drop's outline shows. Returns how many elements changed.
+ */
+export function mergeElements(board: Board, incoming: BoardElement[], author?: string) {
+  const at = new Map(board.elements.map((element, i) => [element.id, i]))
+  let changed = 0
+  for (const element of incoming) {
+    const i = at.get(element.id)
+    const stored = i === undefined ? undefined : board.elements[i]
+    if (
+      stored &&
+      (stored.version > element.version ||
+        (stored.version === element.version && stored.versionNonce <= element.versionNonce))
+    )
+      continue
+    const by = stored ? stored.customData?.author : (element.customData?.author ?? author)
+    const next = by ? { ...element, customData: { ...element.customData, author: by } } : element
+    if (i === undefined) {
+      at.set(element.id, board.elements.length)
+      board.elements.push(next)
+    } else board.elements[i] = next
+    changed++
+  }
+  return changed
+}
+
+// Excalidraw's palette (open-color), as each agent color's line and fill: notes are filled, shapes and text outlined.
+const PALETTE: Record<BoardColor, { stroke: string; fill: string }> = {
+  black: { stroke: "#1e1e1e", fill: "#e9ecef" },
+  grey: { stroke: "#868e96", fill: "#e9ecef" },
+  "light-violet": { stroke: "#9c36b5", fill: "#eebefa" },
+  violet: { stroke: "#6741d9", fill: "#d0bfff" },
+  blue: { stroke: "#1971c2", fill: "#a5d8ff" },
+  "light-blue": { stroke: "#0c8599", fill: "#99e9f2" },
+  yellow: { stroke: "#f08c00", fill: "#ffec99" },
+  orange: { stroke: "#e8590c", fill: "#ffd8a8" },
+  green: { stroke: "#2f9e44", fill: "#b2f2bb" },
+  "light-green": { stroke: "#099268", fill: "#96f2d7" },
+  "light-red": { stroke: "#f08c8c", fill: "#ffc9c9" },
+  red: { stroke: "#e03131", fill: "#ffc9c9" },
+  white: { stroke: "#ced4da", fill: "#ffffff" },
+}
+
+// Agents write paragraphs where people scribble a few words, so their items use a plain font at 16 px instead of the
+// hand-drawn default. It's Excalidraw's Helvetica, a system font: Excalidraw's own fonts load from a CDN, and a label
+// measured before they arrive keeps the narrower fallback's widths, so its words spill out of the shape. People can
+// still switch any item to another font in the style panel.
+const FONT = { family: 2, size: 16, lineHeight: 1.15 }
+// Excalidraw wraps a label to its shape's width by measuring the words, which only a browser can do: the first browser
+// that opens the board measures every label marked `fit` and saves it (ViewerBoard). Excalidraw doesn't grow a shape
+// to fit its label, so the shape's height comes from an estimate here: about 9 px a character at 16 px, inside
+// Excalidraw's 5 px label padding plus some air. Long words break, so the estimate errs tall.
+const LABEL = { line: FONT.size * FONT.lineHeight, padding: 16, char: 9 }
+
+/** How tall a label of `text` is when wrapped to `w`. */
+function textHeight(text: string, w: number) {
+  const perLine = Math.max(1, Math.floor(w / LABEL.char))
   let lines = 0
   for (const paragraph of text.split("\n")) {
     lines++
@@ -206,36 +222,136 @@ export function labelGrowth(text: string, w: number, h: number) {
       used = (used ? used + 1 : 0) + (word.length % perLine || perLine)
     }
   }
-  return Math.max(0, Math.ceil(lines * LABEL.line + LABEL.padding * 2 - h))
+  return Math.ceil(lines * LABEL.line)
 }
 
-const walk = (node: any): string =>
-  node?.type === "text"
-    ? String(node.text ?? "")
-    : Array.isArray(node?.content)
-      ? node.content.map(walk).join(node.type === "doc" ? "\n" : "")
-      : ""
-
-/** The plain text of a tldraw rich text value. */
-function plainText(rich: unknown): string {
-  return walk(rich).trim()
+/** How far a note or shape of w×h must grow down to hold its words. */
+export function labelGrowth(text: string, w: number, h: number) {
+  if (!text.trim()) return 0
+  return Math.max(0, textHeight(text, w - LABEL.padding * 2) + LABEL.padding * 2 - h)
 }
 
-function textOf(shape: Shape) {
-  return shape.type === "frame" ? String(shape.props.name ?? "") : plainText(shape.props.richText)
+const random = () => Math.floor(Math.random() * 2 ** 31)
+
+function makeElement(fields: Partial<BoardElement> & Pick<BoardElement, "id" | "type">): BoardElement {
+  return {
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    angle: 0,
+    strokeColor: "#1e1e1e",
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    strokeWidth: 1,
+    strokeStyle: "solid",
+    roughness: 0,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    index: null,
+    roundness: null,
+    seed: random(),
+    version: 1,
+    versionNonce: random(),
+    isDeleted: false,
+    boundElements: null,
+    updated: Date.now(),
+    link: null,
+    locked: false,
+    ...fields,
+  }
 }
+
+/** The same element, changed: its version goes up, so every open board takes the change. */
+const bump = (stored: BoardElement, fields: Partial<BoardElement>): BoardElement => ({
+  ...stored,
+  ...fields,
+  version: stored.version + 1,
+  versionNonce: random(),
+  updated: Date.now(),
+})
+
+const textId = (id: string) => `${id}:text`
+
+/** A label inside a shape or on an arrow, centered in `box`. */
+function labelFor(container: BoardElement, text: string, box: { x: number; y: number; w: number; h: number }) {
+  const width = Math.max(1, box.w - LABEL.padding * 2)
+  const height = textHeight(text, width)
+  return makeElement({
+    id: textId(container.id),
+    type: "text",
+    x: box.x + (box.w - width) / 2,
+    y: box.y + (box.h - height) / 2,
+    width,
+    height,
+    strokeColor: "#1e1e1e",
+    frameId: container.frameId ?? null,
+    text,
+    originalText: text,
+    fontSize: FONT.size,
+    fontFamily: FONT.family,
+    textAlign: "center",
+    verticalAlign: "middle",
+    containerId: container.id,
+    autoResize: true,
+    lineHeight: FONT.lineHeight,
+    customData: { ...container.customData, fit: true },
+  })
+}
+
+const live = (board: Board) => board.elements.filter((element) => !element.isDeleted)
+/** What a board shows as items: everything but the labels inside shapes and on arrows. */
+const items = (board: Board) => live(board).filter((element) => !element.containerId)
+const isFrame = (element: BoardElement) => element.type === "frame" || element.type === "magicframe"
+
+/** The words of an item: a frame's name, a text's own words, or its label's. */
+function textOf(board: Board, item: BoardElement) {
+  if (isFrame(item)) return item.name ?? ""
+  if (item.type === "text") return item.originalText ?? item.text ?? ""
+  const bound = item.boundElements?.find((each) => each.type === "text")
+  const text = bound && board.elements.find((each) => each.id === bound.id && !each.isDeleted)
+  return text ? (text.originalText ?? text.text ?? "") : ""
+}
+
+/** Where an arrow between two boxes leaves the first: on its edge, toward the second's center. */
+function edgePoint(from: Box, to: Box) {
+  const cx = from.x + from.w / 2
+  const cy = from.y + from.h / 2
+  const dx = to.x + to.w / 2 - cx
+  const dy = to.y + to.h / 2 - cy
+  if (!dx && !dy) return { x: cx, y: cy }
+  const t = Math.min(dx ? from.w / 2 / Math.abs(dx) : Infinity, dy ? from.h / 2 / Math.abs(dy) : Infinity)
+  const gap = 8 / Math.hypot(dx, dy)
+  return { x: cx + dx * (t + gap), y: cy + dy * (t + gap) }
+}
+interface Box {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+const boxOf = (element: BoardElement): Box => ({ x: element.x, y: element.y, w: element.width, h: element.height })
 
 const fail = (message: string): never => {
   throw new Error(message)
 }
 
-/** A board edit as tldraw records to put and ids to remove. Throws, naming the item, when one doesn't fit. */
-export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: string) {
-  const put = new Map<string, BoardRecord>()
-  const remove = new Set<string>()
-  const page = pageOf(board)
-  // SAFETY: called only with shape ids (shapeId), whose records are shapes.
-  const current = (id: string) => (put.get(id) ?? board.store[id]) as Shape | undefined
+/**
+ * A board edit as the elements to merge (mergeElements): new ones, and changed or deleted ones with their version
+ * raised. Throws, naming the item, when one doesn't fit.
+ */
+export function boardChanges(board: Board, edit: BoardEdit, author: string) {
+  const put = new Map<string, BoardElement>()
+  const current = (id: string) =>
+    put.get(id) ?? board.elements.find((element) => element.id === id && !element.isDeleted)
+  const change = (id: string, fields: Partial<BoardElement>) => {
+    const stored = current(id)
+    if (!stored) return
+    // Whatever is in put is new or already went up a version in this edit: it goes up once.
+    put.set(id, put.has(id) ? { ...stored, ...fields } : bump(stored, fields))
+  }
+  const meta = { author, agent: true }
 
   // Frames first, so items placed in a frame added in the same edit find it.
   const added = [...(edit.add ?? [])].sort((a, b) => Number(b.type === "frame") - Number(a.type === "frame"))
@@ -247,35 +363,37 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
   const gridRows = (kids: BoardItem[]) => {
     const rows: number[] = []
     kids.forEach((kid, slot) => {
-      const { h, growY } = itemSize(kid)
-      rows[Math.floor(slot / 4)] = Math.max(rows[Math.floor(slot / 4)] ?? 0, h + growY)
+      const { h } = itemSize(kid)
+      rows[Math.floor(slot / 4)] = Math.max(rows[Math.floor(slot / 4)] ?? 0, h)
     })
     return rows.length ? rows : [NOTE]
   }
-  const itemSize = (item: BoardItem): { w: number; h: number; growY: number } => {
+  const itemSize = (item: BoardItem): { w: number; h: number } => {
     if (item.type === "frame") {
       const kids = children.get(item.id) ?? []
       const columns = Math.min(Math.max(kids.length, 1), 4)
+      const widest = Math.max(NOTE, ...kids.map((kid) => itemSize(kid).w))
       return {
-        w: item.w ?? columns * (NOTE + GAP) + GAP,
+        w: item.w ?? columns * (widest + GAP) + GAP,
         h: item.h ?? gridRows(kids).reduce((sum, height) => sum + height + GAP, GAP * 2),
-        growY: 0,
       }
     }
-    if (item.type === "text") return { w: item.w ?? NOTE, h: item.h ?? 40, growY: 0 }
+    if (item.type === "text") {
+      const w = item.w ?? 400
+      return { w, h: item.h ?? textHeight(item.text ?? "", w) }
+    }
     // A note is always 200 wide and grows down; a box or ellipse grows down past the height it was given.
     const w = item.type === "note" ? NOTE : (item.w ?? NOTE)
     const h = item.type === "note" ? NOTE : (item.h ?? NOTE)
-    return { w, h, growY: labelGrowth(item.text ?? "", w, h) }
+    return { w, h: h + labelGrowth(item.text ?? "", w, h) }
   }
 
   for (const item of added) {
-    const id = shapeId(item.id)
-    if (!/^[\w-]{1,64}$/.test(shortId(id))) fail(`Item id "${item.id}" may only use letters, digits, _ and -.`)
-    if (current(id)) fail(`The board already has an item "${item.id}". Pick another id, or change it with update.`)
-    const parentId = item.in ? shapeId(item.in) : page
-    const parent = item.in ? current(parentId) : undefined
-    if (item.in && parent?.type !== "frame") fail(`"${item.in}", which "${item.id}" goes in, isn't a frame.`)
+    if (!/^[\w-]{1,64}$/.test(item.id)) fail(`Item id "${item.id}" may only use letters, digits, _ and -.`)
+    if (current(item.id) || board.elements.some((element) => element.id === item.id))
+      fail(`The board already has an item "${item.id}". Pick another id, or change it with update.`)
+    const frame = item.in ? current(item.in) : undefined
+    if (item.in && (!frame || !isFrame(frame))) fail(`"${item.in}", which "${item.id}" goes in, isn't a frame.`)
     const siblings = item.in ? (children.get(item.in) ?? []) : []
     const slot = siblings.indexOf(item)
     const size = itemSize(item)
@@ -285,284 +403,300 @@ export function boardChanges(board: BoardSnapshot, edit: BoardEdit, author: stri
     if (x === undefined || y === undefined) {
       if (item.in && slot >= 0) {
         const above = gridRows(siblings).slice(0, Math.floor(slot / 4))
-        x ??= GAP + (slot % 4) * (NOTE + GAP)
+        const widest = Math.max(NOTE, ...siblings.map((kid) => itemSize(kid).w))
+        x ??= GAP + (slot % 4) * (widest + GAP)
         y ??= above.reduce((sum, height) => sum + height + GAP, GAP * 1.5)
       } else {
         x ??= 0
         y ??= row
-        row = y + size.h + size.growY + GAP * 2
+        row = y + size.h + GAP * 2
       }
     }
-    // SAFETY: topIndex returns a shape's index, a valid index key, or ZERO_INDEX_KEY.
-    const index = getIndexAbove(
-      topIndex({ ...board, store: { ...board.store, ...Object.fromEntries(put) } }, parentId) as never,
-    )
-    const props = shapeProps(item, size)
-    put.set(
-      id,
-      validateRecord({
-        id,
-        typeName: "shape",
-        type: props.type,
-        x,
-        y,
-        rotation: 0,
-        index,
-        parentId,
-        isLocked: false,
-        opacity: 1,
-        props: props.props,
-        meta: { author, agent: true },
-      }),
-    )
+    if (frame) {
+      x += frame.x
+      y += frame.y
+    }
+    const palette = PALETTE[item.color ?? (item.type === "note" ? "yellow" : "black")]
+    const base = { id: item.id, x, y, width: size.w, height: size.h, frameId: frame?.id ?? null, customData: meta }
+    if (item.type === "frame") {
+      put.set(item.id, makeElement({ ...base, type: "frame", name: item.text ?? "", strokeColor: "#bbb" }))
+    } else if (item.type === "text") {
+      const text = item.text ?? ""
+      put.set(
+        item.id,
+        makeElement({
+          ...base,
+          type: "text",
+          strokeColor: palette.stroke === PALETTE.white.stroke ? "#1e1e1e" : palette.stroke,
+          text,
+          originalText: text,
+          fontSize: FONT.size,
+          fontFamily: FONT.family,
+          textAlign: "left",
+          verticalAlign: "top",
+          containerId: null,
+          autoResize: false,
+          lineHeight: FONT.lineHeight,
+          customData: { ...meta, kind: "text", fit: true },
+        }),
+      )
+    } else {
+      const shape = makeElement({
+        ...base,
+        type: item.type === "ellipse" ? "ellipse" : "rectangle",
+        roundness: item.type === "ellipse" ? { type: 2 } : { type: 3 },
+        ...(item.type === "note"
+          ? { strokeColor: palette.fill, backgroundColor: palette.fill, fillStyle: "solid" }
+          : { strokeColor: palette.stroke }),
+        customData: { ...meta, kind: item.type },
+      })
+      put.set(item.id, shape)
+      if (item.text) {
+        shape.boundElements = [{ id: textId(item.id), type: "text" }]
+        put.set(textId(item.id), labelFor(shape, item.text, boxOf(shape)))
+      }
+    }
   }
 
-  for (const change of edit.update ?? []) {
-    const id = shapeId(change.id)
-    const shape = current(id)
-    if (!shape) fail(`The board has no item "${change.id}".`)
-    const next = structuredClone(shape!)
-    if (change.x !== undefined) next.x = change.x
-    if (change.y !== undefined) next.y = change.y
-    if (change.text !== undefined) {
-      if (next.type === "frame") next.props.name = change.text
-      else if ("richText" in next.props) next.props.richText = toRichText(change.text)
-      else fail(`"${change.id}" is a ${next.type}, which holds no text.`)
+  // Moving or resizing items: their labels, a frame's contents and the arrows that touch them follow.
+  const moved = new Set<string>()
+  for (const changeTo of edit.update ?? []) {
+    const stored = current(changeTo.id)
+    if (!stored || stored.containerId) fail(`The board has no item "${changeTo.id}".`)
+    const item = stored!
+    const frame = item.frameId ? current(item.frameId) : undefined
+    const x = changeTo.x === undefined ? item.x : changeTo.x + (frame?.x ?? 0)
+    const y = changeTo.y === undefined ? item.y : changeTo.y + (frame?.y ?? 0)
+    const fields: Partial<BoardElement> = { x, y, customData: { ...item.customData, editedBy: author } }
+    if (changeTo.w !== undefined && item.type !== "arrow") fields.width = changeTo.w
+    if (changeTo.h !== undefined && item.type !== "arrow") fields.height = changeTo.h
+    const kind = item.customData?.kind
+    if (changeTo.color !== undefined) {
+      const palette = PALETTE[changeTo.color]
+      Object.assign(
+        fields,
+        kind === "note"
+          ? { strokeColor: palette.fill, backgroundColor: palette.fill }
+          : { strokeColor: palette.stroke },
+      )
     }
-    if (change.color !== undefined && "color" in next.props) next.props.color = change.color
-    if (change.w !== undefined && "w" in next.props) next.props.w = change.w
-    if (change.h !== undefined && "h" in next.props) next.props.h = change.h
-    if ("growY" in next.props && (change.text !== undefined || change.w !== undefined || change.h !== undefined))
-      next.props.growY =
-        next.type === "note"
-          ? labelGrowth(plainText(next.props.richText), NOTE, NOTE)
-          : labelGrowth(plainText(next.props.richText), next.props.w, next.props.h)
-    next.meta = { ...next.meta, editedBy: author }
-    put.set(id, validateRecord(next))
+    if (changeTo.text !== undefined) {
+      if (isFrame(item)) fields.name = changeTo.text
+      else if (item.type === "text")
+        Object.assign(fields, {
+          text: changeTo.text,
+          originalText: changeTo.text,
+          customData: { ...fields.customData, fit: true },
+        })
+      else if (item.type === "arrow" || item.type === "line" || item.type === "freedraw")
+        fail(`"${changeTo.id}" is a ${item.type}, which holds no text.`)
+    }
+    const words = changeTo.text ?? textOf(board, item)
+    if ((item.type === "rectangle" || item.type === "ellipse" || item.type === "diamond") && words) {
+      const w = fields.width ?? item.width
+      const minimum = kind === "note" ? NOTE : (changeTo.h ?? item.height)
+      if (changeTo.text !== undefined || changeTo.w !== undefined || changeTo.h !== undefined)
+        fields.height = minimum + labelGrowth(words, w, minimum)
+    }
+    if (item.type === "text" && (changeTo.text !== undefined || changeTo.w !== undefined) && changeTo.h === undefined)
+      fields.height = textHeight(words, fields.width ?? item.width)
+    change(item.id, fields)
+    const now = current(item.id)!
+    // The label: new words, and centered in the shape again.
+    if (!isFrame(item) && item.type !== "text" && item.type !== "arrow") {
+      const bound = item.boundElements?.find((b) => b.type === "text")?.id
+      if (words) {
+        const fresh = labelFor(now, words, boxOf(now))
+        const old = bound ? current(bound) : undefined
+        // The label keeps its own font and color; its words, place and size are new, and need measuring again.
+        const { width, height, text, originalText } = fresh
+        const at = { x: fresh.x, y: fresh.y }
+        if (old)
+          change(old.id, { ...at, width, height, text, originalText, customData: { ...old.customData, fit: true } })
+        else {
+          put.set(fresh.id, fresh)
+          change(item.id, { boundElements: [...(now.boundElements ?? []), { id: fresh.id, type: "text" }] })
+        }
+      }
+    }
+    const dx = now.x - item.x
+    const dy = now.y - item.y
+    if (isFrame(item) && (dx || dy))
+      for (const child of live(board))
+        if (child.frameId === item.id) {
+          change(child.id, { x: child.x + dx, y: child.y + dy })
+          moved.add(child.id)
+        }
+    moved.add(item.id)
   }
 
   for (const edge of edit.edges ?? []) {
-    const from = current(shapeId(edge.from))
-    const to = current(shapeId(edge.to))
+    const from = current(edge.from)
+    const to = current(edge.to)
     if (!from) fail(`An edge starts at "${edge.from}", which isn't on the board.`)
     if (!to) fail(`An edge ends at "${edge.to}", which isn't on the board.`)
-    const merged = { ...board, store: { ...board.store, ...Object.fromEntries(put) } }
-    const a = pageBounds(merged, from!)
-    const b = pageBounds(merged, to!)
-    const start = { x: a.x + a.w / 2, y: a.y + a.h / 2 }
-    const end = { x: b.x + b.w / 2, y: b.y + b.h / 2 }
-    const id: string = createShapeId()
-    put.set(
-      id,
-      validateRecord({
-        id,
-        typeName: "shape",
-        type: "arrow",
-        x: start.x,
-        y: start.y,
-        rotation: 0,
-        // SAFETY: topIndex returns a shape's index, a valid index key, or ZERO_INDEX_KEY.
-        index: getIndexAbove(topIndex(merged, page) as never),
-        parentId: page,
-        isLocked: false,
-        opacity: 1,
-        props: {
-          ...ARROW,
-          start: { x: 0, y: 0 },
-          end: { x: end.x - start.x || 1, y: end.y - start.y },
-          richText: toRichText(edge.label ?? ""),
-        },
-        meta: { author, agent: true },
-      }),
-    )
-    for (const [terminal, target] of [
-      ["start", from!],
-      ["end", to!],
-    ] as const) {
-      const binding: string = createBindingId()
-      put.set(
-        binding,
-        validateRecord({
-          id: binding,
-          typeName: "binding",
-          type: "arrow",
-          fromId: id,
-          toId: target.id,
-          props: { terminal, ...ARROW_BINDING },
-          meta: {},
-        }),
-      )
+    const id = `arrow-${random().toString(36)}`
+    const path = arrowPath(from!, to!)
+    const arrow = makeElement({ id, type: "arrow", customData: meta, roundness: { type: 2 } })
+    Object.assign(arrow, path, {
+      startBinding: { elementId: from!.id, focus: 0, gap: 8 },
+      endBinding: { elementId: to!.id, focus: 0, gap: 8 },
+      startArrowhead: null,
+      endArrowhead: "arrow",
+      elbowed: false,
+      lastCommittedPoint: null,
+    })
+    put.set(id, arrow)
+    for (const end of [from!, to!])
+      change(end.id, { boundElements: [...(current(end.id)!.boundElements ?? []), { id, type: "arrow" }] })
+    if (edge.label) {
+      arrow.boundElements = [{ id: textId(id), type: "text" }]
+      const [, [dx, dy]] = path.points
+      const box = { x: path.x + dx / 2 - 100, y: path.y + dy / 2 - 20, w: 200, h: 40 }
+      put.set(textId(id), labelFor(arrow, edge.label, box))
     }
+  }
+
+  // Arrows follow what they connect when it moved.
+  for (const arrow of live(board).filter((element) => element.type === "arrow")) {
+    const a = arrow.startBinding?.elementId
+    const b = arrow.endBinding?.elementId
+    if (!a || !b || (!moved.has(a) && !moved.has(b))) continue
+    const from = current(a)
+    const to = current(b)
+    if (from && to) change(arrow.id, arrowPath(from, to))
   }
 
   for (const ref of edit.remove ?? []) {
-    const id = shapeId(ref)
-    if (!current(id)) fail(`The board has no item "${ref}".`)
-    const doomed = [id]
-    for (let i = 0; i < doomed.length; i++)
-      for (const shape of shapes(board)) if (shape.parentId === doomed[i]) doomed.push(shape.id)
-    for (const gone of doomed) {
-      remove.add(gone)
-      put.delete(gone)
-      // An arrow bound to a deleted item would point at nothing, so it goes too, with its bindings.
-      for (const binding of bindings(board))
-        if (binding.toId === gone || binding.fromId === gone) {
-          remove.add(binding.id)
-          if (binding.toId === gone) remove.add(binding.fromId)
-        }
+    const stored = current(ref)
+    if (!stored || stored.containerId) fail(`The board has no item "${ref}".`)
+    const doomed = new Set([ref])
+    for (const element of live(board)) if (element.frameId === ref) doomed.add(element.id)
+    // An arrow bound to a deleted item would point at nothing, so it goes too.
+    for (const element of live(board))
+      if (
+        element.type === "arrow" &&
+        (doomed.has(element.startBinding?.elementId ?? "") || doomed.has(element.endBinding?.elementId ?? ""))
+      )
+        doomed.add(element.id)
+    // Labels go with what holds them.
+    for (const element of live(board))
+      if (element.containerId && doomed.has(element.containerId)) doomed.add(element.id)
+    for (const id of doomed) {
+      if (put.has(id) && !board.elements.some((element) => element.id === id)) put.delete(id)
+      else change(id, { isDeleted: true })
     }
   }
-  for (const id of remove) put.delete(id)
-  return { put: [...put.values()], remove: [...remove] }
+
+  // New elements stack above everything on the board, in the order they were made, each label right above its shape.
+  const placed = [...put.values()].filter((element) => !board.elements.some((stored) => stored.id === element.id))
+  const top = board.elements
+    .map((element) => element.index)
+    .filter((index): index is string => Boolean(index))
+    .sort()
+    .at(-1)
+  const keys = generateNKeysBetween(top ?? null, null, placed.length)
+  placed.forEach((element, i) => (element.index = keys[i]))
+  return { put: [...put.values()] }
 }
 
-/** Applies changes to a board in place: what the server stores after people or agents edit. */
-export function applyChanges(board: BoardSnapshot, put: BoardRecord[], remove: string[]) {
-  for (const id of remove) delete board.store[id]
-  for (const record of put) board.store[record.id] = record
+/** An arrow's place and points from one item's edge to the other's. */
+function arrowPath(from: BoardElement, to: BoardElement) {
+  const start = edgePoint(boxOf(from), boxOf(to))
+  const end = edgePoint(boxOf(to), boxOf(from))
+  const dx = end.x - start.x || 1
+  const dy = end.y - start.y
+  // SAFETY: the array contains exactly the two numeric points constructed below.
+  const points = [
+    [0, 0],
+    [dx, dy],
+  ] as [[number, number], [number, number]]
+  return {
+    x: start.x,
+    y: start.y,
+    width: Math.abs(dx),
+    height: Math.abs(dy),
+    points,
+  }
+}
+
+/** Applies an agent's changes (boardChanges) to a board in place. */
+export function applyChanges(board: Board, put: BoardElement[]) {
+  mergeElements(board, put)
   return board
 }
 
-const ARROW = {
-  kind: "arc",
-  elbowMidPoint: 0.5,
-  dash: "draw",
-  size: "m",
-  fill: "none",
-  color: "black",
-  labelColor: "black",
-  bend: 0,
-  arrowheadStart: "none",
-  arrowheadEnd: "arrow",
-  labelPosition: 0.5,
-  font: "draw",
-  scale: 1,
-}
-const ARROW_BINDING = { isPrecise: false, isExact: false, normalizedAnchor: { x: 0.5, y: 0.5 }, snap: "none" }
-
-function shapeProps(
-  item: BoardItem,
-  size: { w: number; h: number; growY: number },
-): { type: string; props: Record<string, unknown> } {
-  const color = item.color ?? (item.type === "note" ? "yellow" : "black")
-  const richText = toRichText(item.text ?? "")
-  switch (item.type) {
-    case "note":
-      return {
-        type: "note",
-        props: { ...DEFAULTS, color, richText, growY: size.growY, fontSizeAdjustment: 1, textLastEditedBy: null },
-      }
-    case "text":
-      return {
-        type: "text",
-        props: { color, size: "s", w: size.w, font: "sans", textAlign: "start", autoSize: !item.w, scale: 1, richText },
-      }
-    case "frame":
-      return { type: "frame", props: { w: size.w, h: size.h, name: item.text ?? "", color } }
-    default:
-      return {
-        type: "geo",
-        props: {
-          ...DEFAULTS,
-          geo: item.type === "ellipse" ? "ellipse" : "rectangle",
-          dash: "draw",
-          fill: "none",
-          flipX: false,
-          flipY: false,
-          w: size.w,
-          h: size.h,
-          growY: size.growY,
-          color,
-          richText,
-        },
-      }
-  }
-}
-
-function contentBottom(board: BoardSnapshot) {
-  const page = pageOf(board)
-  const top = shapes(board).filter((shape) => shape.parentId === page)
+function contentBottom(board: Board) {
+  const top = items(board).filter((element) => !element.frameId && element.type !== "arrow")
   if (!top.length) return 0
-  return Math.max(...top.map((shape) => pageBounds(board, shape)).map((box) => box.y + box.h)) + GAP * 2
+  return Math.max(...top.map((element) => element.y + element.height)) + GAP * 2
 }
-
-interface Binding extends BoardRecord {
-  type: string
-  fromId: string
-  toId: string
-  props: { terminal: "start" | "end" }
-}
-const bindings = (board: BoardSnapshot) =>
-  Object.values(board.store).filter((record): record is Binding => record.typeName === "binding")
 
 /** A frame on the board, for the per-frame images agents look at. */
-export function boardFrames(board: BoardSnapshot) {
-  return shapes(board)
-    .filter((shape) => shape.type === "frame")
-    .map((shape) => ({ id: shortId(shape.id), name: textOf(shape) || "Untitled frame" }))
+export function boardFrames(board: Board) {
+  return items(board)
+    .filter(isFrame)
+    .map((frame) => ({ id: frame.id, name: textOf(board, frame) || "Untitled frame" }))
 }
 
 const round = (n: number) => Math.round(n)
+const byPlace = (a: BoardElement, b: BoardElement) => a.y - b.y || a.x - b.x
 
 /**
  * The board as text for agents: each frame with what's in it, then everything outside frames. Every line names the
  * item's id (for edges, update and remove), its words, where it is, and who added it. Arrows read `a → b`; freehand
  * drawings only say where they are, since their meaning is in the frame's image.
  */
-export function boardOutline(board: BoardSnapshot) {
-  const all = shapes(board)
-  const arrows = new Map<string, { start?: string; end?: string }>()
-  for (const binding of bindings(board)) {
-    const ends = arrows.get(binding.fromId) ?? {}
-    ends[binding.props.terminal] = binding.toId
-    arrows.set(binding.fromId, ends)
-  }
+export function boardOutline(board: Board) {
+  const all = items(board)
+  const byId = new Map(all.map((element) => [element.id, element]))
   const name = (id?: string) => {
-    // SAFETY: arrows bind to shapes, so binding.toId names a shape.
-    const shape = id ? (board.store[id] as Shape | undefined) : undefined
-    if (!shape) return "nothing"
-    const text = textOf(shape)
-    return text ? `${shortId(shape.id)} "${clip(text, 40)}"` : shortId(shape.id)
+    const item = id ? byId.get(id) : undefined
+    if (!item) return "nothing"
+    const text = textOf(board, item)
+    return text ? `${item.id} "${clip(text, 40)}"` : item.id
   }
-  const line = (shape: Shape, depth: number): string[] => {
-    const box = pageBounds(board, shape)
-    // doctor-disable-next-line typescript/strict/no-runtime-typeof -- meta is free-form in tldraw's schema; Drop writes author as a string
-    const by = typeof shape.meta?.author === "string" ? ` by ${shape.meta.author}` : ""
-    const at = `(${round(box.x)},${round(box.y)}${box.w ? ` ${round(box.w)}×${round(box.h)}` : ""})`
-    const pad = "  ".repeat(depth)
-    const text = textOf(shape)
+  const line = (item: BoardElement, depth: number): string => {
+    const by = item.customData?.author ? ` by ${item.customData.author}` : ""
+    const at = `(${round(item.x)},${round(item.y)}${item.width ? ` ${round(item.width)}×${round(item.height)}` : ""})`
+    const text = textOf(board, item)
     let head: string
-    if (shape.type === "arrow") {
-      const ends = arrows.get(shape.id) ?? {}
+    if (item.type === "arrow") {
       const label = text ? ` "${clip(text, 60)}"` : ""
-      head = `arrow ${shortId(shape.id)}: ${name(ends.start)} → ${name(ends.end)}${label}${by}`
-    } else if (shape.type === "frame") {
-      head = `frame ${shortId(shape.id)} "${text || "Untitled frame"}" ${at}${by}`
+      head = `arrow ${item.id}: ${name(item.startBinding?.elementId)} → ${name(item.endBinding?.elementId)}${label}${by}`
+    } else if (isFrame(item)) {
+      head = `frame ${item.id} "${text || "Untitled frame"}" ${at}${by}`
     } else {
-      const kind = shape.type === "geo" ? String(shape.props.geo) : shape.type === "draw" ? "drawing" : shape.type
-      head = `${kind} ${shortId(shape.id)}${text ? ` "${clip(text, 400)}"` : ""} ${at}${by}`
+      const kind = item.customData?.kind === "note" ? "note" : item.type === "freedraw" ? "drawing" : item.type
+      head = `${kind} ${item.id}${text ? ` "${clip(text, 400)}"` : ""} ${at}${by}`
     }
-    const inner = all
-      .filter((child) => child.parentId === shape.id && child.type !== "arrow")
-      .sort((a, b) => a.y - b.y || a.x - b.x)
-      .flatMap((child) => line(child, depth + 1))
-    return [pad + head, ...inner]
+    return "  ".repeat(depth) + head
   }
-  const page = pageOf(board)
-  const top = all.filter((shape) => shape.parentId === page)
-  const frames = top.filter((shape) => shape.type === "frame").sort((a, b) => a.y - b.y || a.x - b.x)
-  const loose = top
-    .filter((shape) => shape.type !== "frame" && shape.type !== "arrow")
-    .sort((a, b) => a.y - b.y || a.x - b.x)
-  const links = all.filter((shape) => shape.type === "arrow")
-  const parts = frames.map((frame) => line(frame, 0).join("\n"))
-  if (loose.length) parts.push(["Outside frames:", ...loose.flatMap((shape) => line(shape, 1))].join("\n"))
-  if (links.length) parts.push(["Arrows:", ...links.flatMap((shape) => line(shape, 1))].join("\n"))
+  const shapes = all.filter((item) => item.type !== "arrow")
+  const frames = shapes.filter(isFrame).sort(byPlace)
+  const inFrame = new Set(frames.map((frame) => frame.id))
+  const loose = shapes.filter((item) => !isFrame(item) && !(item.frameId && inFrame.has(item.frameId))).sort(byPlace)
+  const links = all.filter((item) => item.type === "arrow")
+  const parts = frames.map((frame) =>
+    [
+      line(frame, 0),
+      ...shapes
+        .filter((item) => item.frameId === frame.id)
+        .sort(byPlace)
+        .map((item) => line(item, 1)),
+    ].join("\n"),
+  )
+  if (loose.length) parts.push(["Outside frames:", ...loose.map((item) => line(item, 1))].join("\n"))
+  if (links.length) parts.push(["Arrows:", ...links.map((item) => line(item, 1))].join("\n"))
   return parts.join("\n\n") || "The board is empty."
 }
 
 /** The board's words, for search. */
-export const boardText = (board: BoardSnapshot) => shapes(board).map(textOf).filter(Boolean).join("\n")
+export const boardText = (board: Board) =>
+  live(board)
+    .map((each) => (isFrame(each) ? (each.name ?? "") : (each.originalText ?? each.text ?? "")))
+    .filter(Boolean)
+    .join("\n")
 
 const clip = (text: string, max: number) => {
   const flat = text.replace(/\s+/g, " ")

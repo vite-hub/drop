@@ -245,7 +245,7 @@ export interface Viewer {
   teams?: ViewerTeam[]
   /** Teams pay through Stripe here (`STRIPE_*`): past `freeMembers`, a team needs a subscription. */
   billing?: { freeMembers: number; annual: boolean }
-  /** They're on a team that pays: the Pro plan, and no new boards. */
+  /** They're on a team that pays: the Pro plan. */
   paid?: boolean
 }
 

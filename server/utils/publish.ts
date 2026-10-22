@@ -7,7 +7,7 @@ import { reviewBookmarklet, reviewSnippet } from "#shared/review"
 import { SHARES } from "#shared/share"
 import { BoardInput } from "../mcp/board"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
-import { applyChanges, boardChanges, emptyBoard } from "#shared/board"
+import { applyChanges, boardChanges, emptyBoard, serializeBoard } from "#shared/board"
 import { resolveComments } from "./comments"
 import {
   createDocDrop,
@@ -309,13 +309,13 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         throw new HTTPError({ status: 400, message: "previous isn't a board; publish a board only to a board." })
       const board = emptyBoard()
       try {
-        const { put, remove } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
-        applyChanges(board, put, remove)
+        const { put } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
+        applyChanges(board, put)
       } catch (error) {
         throw new HTTPError({ status: 400, message: error instanceof Error ? error.message : String(error) })
       }
-      filename = "board.tldr"
-      bytes = new TextEncoder().encode(JSON.stringify(board))
+      filename = "board.excalidraw"
+      bytes = new TextEncoder().encode(serializeBoard(board))
     } else {
       const source = (input.markdown ?? input.html)!
       if (!source.trim()) throw new HTTPError({ status: 400, message: "The doc is empty." })
