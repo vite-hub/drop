@@ -107,9 +107,9 @@ function labelWidth(container: Shape) {
   if (container.type === "diamond") return Math.round(container.width / 2) - PADDING * 2
   return container.width - PADDING * 2
 }
-const FAMILIES: Record<number, string> = { 1: "Virgil", 2: "Helvetica", 3: "Cascadia", 5: "Excalifont", 6: "Nunito" }
+const FAMILIES = new Map([[1, "Virgil"], [2, "Helvetica"], [3, "Cascadia"], [5, "Excalifont"], [6, "Nunito"]])
 const fontOf = (text: { fontSize: number; fontFamily: number }) =>
-  `${text.fontSize}px ${FAMILIES[text.fontFamily] ?? "Helvetica"}, Segoe UI Emoji`
+  `${text.fontSize}px ${FAMILIES.get(text.fontFamily) ?? "Helvetica"}, Segoe UI Emoji`
 
 // Excalidraw centers bound text at the middle vertex of odd-point polylines, or
 // the midpoint of the middle segment for even-point polylines.
