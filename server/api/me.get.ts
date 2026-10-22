@@ -7,6 +7,7 @@ import type { Viewer } from "#shared/types"
 import { expiryPolicy } from "../utils/expiry"
 import { identify } from "../utils/identity"
 import { sharePolicy } from "../utils/share"
+import { enabledSkills } from "../utils/skills"
 import { billingConfig, paidTeams, teamsEnabled } from "../utils/teams"
 
 export default defineHandler(async (event): Promise<Viewer | null> => {
@@ -30,6 +31,8 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
         .from(organization)
         .where(inArray(organization.id, ids))
     : []
+  // The sidebar hides Skills from members while none is on.
+  const skills = (await enabledSkills()).length
   const billing = billingConfig(event)
   const paid = billing.enabled ? await paidTeams(ids) : new Set<string>()
   const teams = rows
@@ -45,6 +48,7 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
     mode,
     publicLinkDays,
     members,
+    skills,
     ...(pending && { reviews: pending.n }),
     ...(teamsEnabled(event) ? { teams } : {}),
     ...(billing.enabled
