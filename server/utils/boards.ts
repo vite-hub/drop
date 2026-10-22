@@ -3,15 +3,16 @@ import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import {
-  applyChanges,
   BOARD_CONTENT_TYPE,
+  type Board,
   boardChanges,
   type BoardEdit,
+  type BoardElement,
   boardFrames,
-  type BoardSnapshot,
+  isBoardElement,
+  mergeElements,
   parseBoard,
   serializeBoard,
-  validateRecord,
 } from "#shared/board"
 import { drops } from "../databases/config"
 import { type DropRow, escapesFolder, MAX_FILE_BYTES, readText, storageFailure } from "./drops"
@@ -25,68 +26,37 @@ import { textStatements } from "./search"
 // TODO(board-realtime): browsers send their changes here and poll for everyone else's. A Realtime room per board
 // (like server/realtime/drops.ts for Markdown) would show other people's cursors and strokes as they draw.
 
-export async function readBoard(drop: DropRow): Promise<BoardSnapshot> {
+export async function readBoard(drop: DropRow): Promise<Board> {
   if (drop.kind !== "board" || !drop.blobKey)
     throw new HTTPError({ status: 400, statusText: "That drop isn't a board." })
-  let text: string
-  let board: BoardSnapshot
   try {
-    text = await readText(drop.blobKey)
-    board = parseBoard(text)
+    return parseBoard(await readText(drop.blobKey))
   } catch (error) {
     if (HTTPError.isError(error)) throw error
     throw new HTTPError({ status: 500, statusText: "This board's file can't be read.", cause: error })
   }
-  // Boards stored before Drop wrote tldraw's file format are rewritten in it the first time they're read, so their
-  // download opens in tldraw.com too. Same records, so the version stays the same.
-  if (!text.startsWith('{"tldrawFileFormatVersion"')) {
-    const bytes = new TextEncoder().encode(serializeBoard(board))
-    const [error] = await blob.put(drop.blobKey, bytes, { access: "private", contentType: BOARD_CONTENT_TYPE })
-    if (error) throw storageFailure(error)
-    await db.update(drops).set({ size: bytes.byteLength }).where(eq(drops.id, drop.id))
-  }
-  return board
 }
 
 /**
- * Applies records people put and removed in tldraw, or an agent's edit, to the board, and stores it. Each record is
- * checked against tldraw's schema first, so a broken client can't store a board tldraw then refuses to open.
- * Last writer wins per record: two people moving the same note keep the later move.
+ * Merges the elements people changed in Excalidraw, or an agent's edit, into the board, and stores it. Per element the
+ * higher version wins (mergeElements): two people moving the same note keep the later move. Elements a board doesn't
+ * take (images, embeds, anything malformed) are skipped rather than failing the save, so one bad element can't stop a
+ * person's other strokes from saving.
  */
 export async function writeBoard(
   drop: DropRow,
-  change: { put?: Record<string, unknown>[]; remove?: string[] } | { edit: BoardEdit; who: Identity },
+  change: { elements: unknown[]; who: Identity | null } | { edit: BoardEdit; who: Identity },
 ) {
   const board = await readBoard(drop)
-  let put: Record<string, unknown>[]
-  let remove: string[]
+  let put: BoardElement[]
   if ("edit" in change) {
     try {
-      ;({ put, remove } = boardChanges(board, change.edit, change.who.actorName))
+      ;({ put } = boardChanges(board, change.edit, change.who.actorName))
     } catch (error) {
       throw new HTTPError({ status: 400, message: error instanceof Error ? error.message : String(error) })
     }
-  } else {
-    // doctor-disable-next-line typescript/strict/no-runtime-typeof -- the request body is unchecked JSON; tldraw's schema checks each record below
-    remove = (change.remove ?? []).filter((id) => typeof id === "string" && !SESSION.test(id))
-    put = []
-    for (const record of change.put ?? []) {
-      // Cameras, pointers and selection are each person's own; only the document is shared.
-      // doctor-disable-next-line typescript/strict/no-runtime-typeof -- the request body is unchecked JSON; validateRecord checks the rest
-      if (typeof record.id !== "string" || SESSION.test(record.id)) continue
-      try {
-        // SAFETY: validateRecord checks the record against tldraw's schema and throws when it doesn't fit.
-        put.push(validateRecord(record as never))
-      } catch (error) {
-        throw new HTTPError({
-          status: 400,
-          message: `Invalid record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
-        })
-      }
-    }
-  }
-  // SAFETY: every record in put passed validateRecord or came from boardChanges, which validates its own.
-  applyChanges(board, put as never, remove)
+  } else put = change.elements.filter(isBoardElement)
+  const changed = mergeElements(board, put, change.who?.actorName)
   const text = serializeBoard(board)
   const bytes = new TextEncoder().encode(text)
   if (bytes.byteLength > MAX_FILE_BYTES)
@@ -98,15 +68,13 @@ export async function writeBoard(
     db.update(drops).set({ size: bytes.byteLength, updatedAt: now }).where(eq(drops.id, drop.id)),
     ...textStatements(drop, text, drop.id),
   ])
-  return { board, put: put.length, remove: remove.length, updatedAt: now }
+  return { board, changed, updatedAt: now }
 }
 
-const SESSION = /^(camera|instance|instance_page_state|pointer|instance_presence):/
-
-// Images: the browser that saves a board renders the overview and each frame as PNG (tldraw only renders in a
+// Images: the browser that saves a board renders the overview and each frame as PNG (Excalidraw only renders in a
 // browser) and sends them here, so agents can look at drawings the outline can only locate.
 
-// Frame ids come from the board's records, which may name any string: one that would leave the board's folder once the
+// Frame ids come from the board's elements, which may name any string: one that would leave the board's folder once the
 // blob store decodes it gets no image.
 const imageKey = (drop: DropRow, name: string) => (escapesFolder(name) ? null : `boards/${drop.link}/${name}.png`)
 export const OVERVIEW = "overview"

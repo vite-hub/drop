@@ -170,7 +170,7 @@ test("the Free plan keeps a few drops forever; new versions of a kept one don't 
   assert.equal((await getUsage("owner")).kept.used, 2)
 })
 
-test("a team that pays puts its members on Pro and takes boards away; a free team stops at its free members", async () => {
+test("a team that pays puts its members on Pro and keeps boards; a free team stops at its free members", async () => {
   state.quotasEnabled = true
   state.billing = true
   assert.equal(await memberLimit("acme"), 3)
@@ -181,10 +181,7 @@ test("a team that pays puts its members on Pro and takes boards away; a free tea
   assert.equal(await memberLimit("acme"), Number.MAX_SAFE_INTEGER)
   const usage = await getUsage("mate")
   assert.deepEqual([usage.plan, usage.paid, usage.kept.limit], ["pro", true, null])
-  assert.match(
-    (await call(publish, { board: { items: [] }, note: "x", lifetime: "review" })).message,
-    /Boards aren't part of the Team plan/,
-  )
+  assert.ok(!(await call(publish, { board: { items: [] }, note: "x", lifetime: "review" })).isError)
   assert.equal((await getUsage("stranger")).plan, "free", "only the paying team's members")
 
   sql.prepare("UPDATE subscription SET status = 'canceled'").run()

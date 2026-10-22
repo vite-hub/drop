@@ -309,12 +309,12 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         throw new HTTPError({ status: 400, message: "previous isn't a board; publish a board only to a board." })
       const board = emptyBoard()
       try {
-        const { put, remove } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
-        applyChanges(board, put, remove)
+        const { put } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
+        applyChanges(board, put)
       } catch (error) {
         throw new HTTPError({ status: 400, message: error instanceof Error ? error.message : String(error) })
       }
-      filename = "board.tldr"
+      filename = "board.excalidraw"
       bytes = new TextEncoder().encode(serializeBoard(board))
     } else {
       const source = (input.markdown ?? input.html)!
