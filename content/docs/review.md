@@ -58,7 +58,7 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | To comment on | Do this |
 | --- | --- |
 | Text | Select it. |
-| An image | Click it to zoom, then click a spot or drag an area. |
+| An image | In a Markdown doc or an image drop, click it to zoom, then click a spot or drag an area. In an HTML doc or an app, clicks stay the page's own, so use an area. |
 | Part of a page | Press :kbd[R] (**Comment on an area**) and drag a rectangle. |
 | The whole page | Write in the box at the bottom of the Comments panel. |
 

@@ -503,3 +503,22 @@ test("in an opaque sandbox, storage and cookies last for the page and URL change
 test("on a real origin the shim leaves the browser's own storage alone", () => {
   assert.throws(() => opaqueWindow("https://drop-usercontent.example").localStorage)
 })
+
+test("a page someone else built gets only the comment layer: no theme of Drop's, no image zoom", () => {
+  const tailwind =
+    '<!doctype html><html><head><style>.a{color:var(--color-black)}</style></head><body><img src="x.png"></body></html>'
+  const own = injectRuntime(tailwind, true, 0, true)
+  assert.doesNotMatch(own, /data-drop-theme/)
+  assert.doesNotMatch(own, /classList\.toggle\("dark"/)
+  assert.match(own, /const AUTHORED = true, THEMED = false;/)
+  assert.doesNotMatch(own, /__AUTHORED__/)
+  // A plan written to the authoring guide still gets Drop's theme and follows dark mode.
+  const plan = injectRuntime('<html><head></head><body style="color:var(--foreground)"></body></html>', true, 0, true)
+  assert.match(plan, /data-drop-theme/)
+  assert.match(plan, /classList\.toggle\("dark", true\)/)
+  // Drop's own documents keep the zoom.
+  assert.match(
+    injectRuntime("<html><head></head><body></body></html>", false),
+    /const AUTHORED = false, THEMED = true;/,
+  )
+})
