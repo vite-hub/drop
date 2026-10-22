@@ -107,7 +107,7 @@ function labelWidth(container: Shape) {
   if (container.type === "diamond") return Math.round(container.width / 2) - PADDING * 2
   return container.width - PADDING * 2
 }
-const FAMILIES = { 1: "Virgil", 2: "Helvetica", 3: "Cascadia", 5: "Excalifont", 6: "Nunito" } satisfies Record<number, string>
+const FAMILIES: Record<number, string> = { 1: "Virgil", 2: "Helvetica", 3: "Cascadia", 5: "Excalifont", 6: "Nunito" }
 const fontOf = (text: { fontSize: number; fontFamily: number }) =>
   `${text.fontSize}px ${FAMILIES[text.fontFamily] ?? "Helvetica"}, Segoe UI Emoji`
 
@@ -208,7 +208,9 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       if (element.version > (known.get(element.id) ?? 0)) known.set(element.id, element.version)
     if (!newer.length) return
     // SAFETY: newer contains the server's serialized Excalidraw elements, which restoreElements accepts as unknown input.
-    const remote = ex.restoreElements(newer as never, null, { repairBindings: true })
+    // This is only a partial scene. Repairing bindings here would clear a bound text or arrow's
+    // references when its unchanged container is not included in this batch.
+    const remote = ex.restoreElements(newer as never, null, { repairBindings: false })
     const elements = ex.reconcileElements(
       api.getSceneElementsIncludingDeleted(),
       // SAFETY: elements from the server, restored by Excalidraw: what reconcileElements calls remote elements.
@@ -258,9 +260,9 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
         box = next(container, { height: height + PADDING * 4 })
         changed.set(container.id, box)
       }
-      const [dx, dy] = container.type === "arrow" ? (container.points.at(-1) ?? [0, 0]) : [box.width, box.height]
-      const cx = box.x + dx / 2
-      const cy = box.y + dy / 2
+      const [dx, dy] = container.type === "arrow" ? arrowMidpoint(container.points) : [box.width / 2, box.height / 2]
+      const cx = box.x + dx
+      const cy = box.y + dy
       changed.set(element.id, next(element, { ...fields, x: cx - width / 2, y: cy - height / 2 }))
     }
     if (!changed.size) return
@@ -268,6 +270,30 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       elements: scene.map((element) => changed.get(element.id) ?? element),
       captureUpdate: ex.CaptureUpdateAction.NEVER,
     })
+  }
+
+  // Excalidraw centers bound text at the midpoint of an arrow's polyline (the middle
+  // segment for bent arrows), rather than at its final point.
+  function arrowMidpoint(points: ReadonlyArray<ReadonlyArray<number>>) {
+    if (points.length < 2) return points[0] ?? [0, 0]
+    let total = 0
+    for (let i = 1; i < points.length; i++) {
+      const [x1, y1] = points[i - 1]
+      const [x2, y2] = points[i]
+      total += Math.hypot(x2 - x1, y2 - y1)
+    }
+    let target = total / 2
+    for (let i = 1; i < points.length; i++) {
+      const [x1, y1] = points[i - 1]
+      const [x2, y2] = points[i]
+      const length = Math.hypot(x2 - x1, y2 - y1)
+      if (target <= length) {
+        const ratio = length ? target / length : 0
+        return [x1 + (x2 - x1) * ratio, y1 + (y2 - y1) * ratio] as [number, number]
+      }
+      target -= length
+    }
+    return points.at(-1)!
   }
 
   // Open on the whole board, never zoomed past 100%: wide frames otherwise start off screen.
