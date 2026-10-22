@@ -8,7 +8,7 @@
   </a>
 </p>
 
-<p align="center">The shared drive for people and their agents. Agents drop docs, pages, and small apps over MCP; you comment on the exact spot, and the agent drops the next version.</p>
+<p align="center">Review what your agent makes. Your agent publishes its plan, page, or app to Drop over MCP and sends you a link; you comment on the exact spot, and it publishes the next version.</p>
 
 <p align="center">
   <a href="https://drop.vitehub.dev">Website</a> ·
@@ -33,7 +33,7 @@
    claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp
    ```
 
-   The first time it connects, Drop opens in your browser so you can sign in. [The agents page](https://drop.vitehub.dev/agents) has the setup for Codex, Cursor, VS Code, and other clients.
+   The first time it connects, Drop opens in your browser so you can sign in. [The agents page](https://drop.vitehub.dev/agents) has the setup for Codex, Cursor, VS Code, and other clients, and `npx add-mcp https://drop.vitehub.dev/mcp` works for most.
 3. Ask your agent to drop a plan. It answers with the review link.
 
 ## Host your own
