@@ -4,7 +4,7 @@ import { readBoard } from "../../../../utils/boards"
 import { identify } from "../../../../utils/identity"
 import { routeId } from "../../../../utils/params"
 
-/** A board's tldraw snapshot, and whether this person may draw on it: only on the latest version, like live editing. */
+/** A board's Excalidraw scene, and whether this person may draw on it: only on the latest version, like live editing. */
 export default defineHandler(async (event) => {
   const drop = await findDrop(await routeId(event), event)
   const who = await identify(event)
