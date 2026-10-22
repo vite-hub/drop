@@ -2,11 +2,12 @@ import { defineHandler } from "h3"
 import { membersOnly } from "../utils/members"
 
 /**
- * What a public link needs: one drop's page, files, and comments, and `/api/me`, which answers null to a stranger. Each
- * checks the drop's share itself (0.drop-access.ts, permissions), so a stranger reaches only what its owner made public.
+ * What a public link needs: one drop's page, files, comments, and latest-version room (server/realtime/latest.ts), and
+ * `/api/me`, which answers null to a stranger. Each checks the drop's share itself (0.drop-access.ts, permissions), so a
+ * stranger reaches only what its owner made public.
  */
 const PUBLIC_LINK =
-  /^\/(?:d\/[^/]+(?:\/[^/]*)?|f\/[^/]+|api\/me|api\/links\/[^/]+|api\/drops\/[^/]+(?:\/(?:comments|visit))?|api\/comments\/[^/]+\/replies)$/
+  /^\/(?:d\/[^/]+(?:\/[^/]*)?|f\/[^/]+|api\/me|api\/links\/[^/]+|api\/drops\/[^/]+(?:\/(?:comments|visit))?|api\/comments\/[^/]+\/replies|api\/_vitehub\/realtime\/latest\/[^/]+)$/
 
 /** Members-only Drops serve anonymous visitors only the drops shared publicly; the rest of the app needs a member. */
 export default defineHandler(async (event) => {
