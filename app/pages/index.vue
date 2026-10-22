@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { ROLE_LABELS } from "#shared/roles"
-
 // Signed in, / opens your drops; the landing page stays at /home for everyone. Runs on the server too, so the
 // redirect happens before any HTML renders.
 definePageMeta({
@@ -13,13 +11,12 @@ definePageMeta({
   },
 })
 
-useSeoMeta({
-  title: "The shared drive for people and their agents",
-  description:
-    "Agents drop docs, pages, and small apps. People comment on the exact spot, and the agent drops the next version.",
-})
+const DESCRIPTION =
+  "Your agent publishes its plan, page, or app to Drop and sends you a link. You comment on the exact spot, and it publishes the next version."
 
-// What search engines show for the site and the app: its name, and that it is a web app.
+useSeoMeta({ title: "Review what your agent makes", description: DESCRIPTION })
+
+// What search engines show for the site and the app: its name, that it is a web app, and the questions below.
 const origin = useRequestURL().origin
 useHead({
   script: [
@@ -33,8 +30,7 @@ useHead({
             "@type": "WebApplication",
             name: "Drop",
             url: `${origin}/`,
-            description:
-              "The shared drive for people and their agents. Agents drop docs, pages, and small apps; people comment on the exact spot, and the agent drops the next version.",
+            description: DESCRIPTION,
             applicationCategory: "DeveloperApplication",
             operatingSystem: "Web",
             image: `${origin}/og.png`,
@@ -51,137 +47,128 @@ const { signedIn, signInWithGitHub } = useGitHubSignIn()
 // `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.
 const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
 
+// Try it now: the one-line setups. Cursor, VS Code, and the chat apps take a file or a form, so they live on /docs/agents.
+const SNIPPETS = mcpSnippets(`${origin}/mcp`)
+const TRY = (["claude", "codex", "any"] as const).map((value) => ({ value, label: MCP_CLIENTS[value] }))
+const client = ref<(typeof TRY)[number]["value"]>("claude")
+
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
 
-// The review loop, beside the pitch.
-const LOOP = ["Your agent drops a draft", "You comment on the exact spot", "Your agent reads the comments and drops v2"]
+// The loop, in what you type and what Drop shows back.
+const STEPS = [
+  {
+    title: "Your agent drops it",
+    body: "Ask for a plan, a page, or a small app. The agent publishes it to Drop and answers with a link. It starts private.",
+    prompt: "write the launch plan and drop it",
+  },
+  {
+    title: "You comment on the spot",
+    body: "Open the link full screen. Select a sentence, drag a box over a screenshot, or pin a note on a running site. Share it when the team should see it.",
+    prompt: null,
+  },
+  {
+    title: "It drops the next version",
+    body: "The agent reads the open comments over MCP and publishes v2. History shows what changed, and unresolved comments carry over.",
+    prompt: "fix the comments on the launch plan",
+  },
+] as const
 
-// The first card is the point of Drop, so it gets two columns; the rest fill two more rows of four. Each opens its
-// screenshot on the Features docs page.
-const FEATURES = [
+// What an agent can drop, one row each, like a listing. Each opens its section of the docs.
+const KINDS = [
   {
-    icon: "i-mingcute-sparkles-line",
-    title: "Agents make the changes",
-    body: "People comment. The agent reads the open comments over MCP and drops the next version, so nobody copies feedback into a chat by hand.",
-    to: "/docs/features#agents",
-  },
-  {
-    icon: "i-mingcute-layers-line",
-    title: "Docs and apps",
-    body: "Markdown, HTML with scripts, Mermaid, or a folder of static files. Each opens full screen at its own link.",
-    to: "/docs/features#apps",
-  },
-  {
-    icon: "i-mingcute-chat-1-line",
-    title: "Comments on the exact spot",
-    body: "Select a sentence, zoom into a screenshot, or drag a box. Reply in threads, or copy everything back as Markdown.",
-    to: "/docs/features#comments",
-  },
-  {
-    icon: "i-mingcute-lock-line",
-    title: "Private until shared",
-    body: "Share with the team or make a link. Pick what it allows: view, comment, or edit.",
-    to: "/docs/features#sharing",
-  },
-  {
-    icon: "i-mingcute-group-2-line",
-    title: "Edit together",
-    body: "Change a Markdown doc with others, live, in a Notion-like editor. Publish makes it the next version.",
+    icon: "i-mingcute-document-2-line",
+    name: "Plans and docs",
+    detail: "Markdown with tables, Mermaid, and math. Your team can edit it together, live.",
+    example: "launch-plan.md",
     to: "/docs/features#edit",
   },
   {
-    icon: "i-mingcute-history-line",
-    title: "Version history",
-    body: "Each version gets a number and a note. History shows what it changed, and open comments carry over.",
-    to: "/docs/features#versions",
+    icon: "i-mingcute-code-line",
+    name: "HTML pages",
+    detail: "Explainers, reports, and prototypes with their own scripts and styles.",
+    example: "pricing-explainer.html",
+    to: "/docs/features#apps",
   },
   {
-    icon: "i-mingcute-search-line",
-    title: "Search everything",
-    body: "Press ⌘K to find a drop by its name or by the words inside a doc, in any folder.",
-    to: "/docs/features#search",
+    icon: "i-mingcute-layout-line",
+    name: "Small apps",
+    detail: "A folder of static files, served on its own origin. The link runs it.",
+    example: "launch-board/",
+    to: "/docs/features#apps",
   },
   {
-    icon: "i-mingcute-plugin-line",
-    title: "MCP built in",
-    body: "Add one URL to your agent and sign in through the browser. No API keys.",
-    to: "/docs/features#agents",
+    icon: "i-mingcute-git-pull-request-line",
+    name: "Pull request evidence",
+    detail: "Before and after screenshots with notes, linked from the PR.",
+    example: "pr-412-evidence.md",
+    to: "/docs/review#expiry",
   },
+  {
+    icon: "i-mingcute-web-line",
+    name: "Live sites",
+    detail: "Point a review at a preview deploy. People comment on the page itself.",
+    example: "preview.acme.dev",
+    to: "/docs/sites",
+  },
+  {
+    icon: "i-mingcute-pen-line",
+    name: "Boards",
+    detail: "Excalidraw boards for flows and sketches, commented like everything else.",
+    example: "checkout-flow.excalidraw",
+    to: "/docs/features",
+  },
+]
+
+const AROUND = [
+  {
+    icon: "i-mingcute-lock-line",
+    text: "Private until you share it: with the team, or by link that allows view, comment, or edit",
+  },
+  { icon: "i-mingcute-history-line", text: "Every version numbered, with a note and a diff" },
+  { icon: "i-mingcute-search-line", text: "⌘K finds a drop by its name or the words inside it" },
+  { icon: "i-mingcute-folder-line", text: "Folder descriptions tell agents what goes where and how to write it" },
   {
     icon: "i-mingcute-book-5-line",
-    title: "Skills for your agent",
-    body: "They come with the server: publishing for review, before-and-after for pull requests, UI prototypes, handoffs, and explainers.",
-    to: "/docs/features#skills",
-  },
-  {
-    icon: "i-mingcute-folder-line",
-    title: "Folders agents follow",
-    body: "A folder's description says what goes in it and how to write it. Agents read it before they publish.",
-    to: "/docs/features#folders",
-  },
-  {
-    icon: "i-mingcute-code-line",
-    title: "Code images",
-    body: "Your agent turns a snippet into a highlighted, framed image for a pull request or a post.",
-    to: "/docs/features#code-images",
+    text: "Skills ship with the server, for review, PR evidence, prototypes, and handoffs",
   },
 ]
-
-// One tab each, and only the open one's story plays. Every tab's words are in the server's HTML, the closed ones hidden.
-const USE_CASES = [
-  {
-    id: "docs",
-    icon: "i-mingcute-document-2-line",
-    label: "Plans and docs",
-    title: ["Write the plan ", "together", "."],
-    body: "Your agent drops the plan in the folder that fits. The team edits it live, publishes the next version, and History shows what changed.",
-    docs: "/docs/features#edit",
-  },
-  {
-    id: "pr",
-    icon: "i-mingcute-git-pull-request-line",
-    label: "Pull requests",
-    title: ["Put the before and after in every ", "pull request", "."],
-    body: "Claude Code drops the screenshots with its notes and links them from the PR. Reviewers see what changed, then read the diff.",
-    docs: "/docs/review#expiry",
-  },
-  {
-    id: "app",
-    icon: "i-mingcute-layout-line",
-    label: "Vibe-coded apps",
-    title: ["Ship the thing you ", "just made", "."],
-    body: "Ask for a prototype, a tool, or a small game. Your agent publishes the folder and the link runs it. This one's real, so try it.",
-    docs: "/docs/features#apps",
-  },
-  {
-    id: "site",
-    icon: "i-mingcute-web-line",
-    label: "Live sites",
-    title: ["Comment on the ", "running site", "."],
-    body: "Point a review at your preview deploys. People press Comment on the page itself and drag a box. The note lands in Drop with a screenshot, and your agent fixes it.",
-    docs: "/docs/sites",
-  },
-] as const
-type UseCase = (typeof USE_CASES)[number]["id"]
-const useCase = ref<UseCase>("docs")
-const useCaseTabs = USE_CASES.map(({ id, icon, label }) => ({ value: id, icon, label }))
-
-const SELF_HOSTED = [
-  "Team mode: shared inside the team, closed to the internet",
-  "Deploy to Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
-  "Any sign-in Better Auth supports",
-]
-// The members in the self-hosted card's picture, as they'd show on the Members page.
-const TEAM = [
-  { name: "You", role: "admin" },
-  { name: "Ben", role: "member" },
-  { name: "Lea", role: "member" },
-] as const
 
 const HOSTED = [
   "Sign in with GitHub",
-  "Agents connect over MCP",
+  "Free for you and small teams",
   "Unopened drops expire after 30 days, unless you keep them",
+]
+const SELF_HOSTED = [
+  "Team mode: shared inside the team, closed to the internet",
+  "Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
+  "Any sign-in Better Auth supports",
+]
+
+const FAQ = [
+  {
+    q: "What is a drop?",
+    a: "Anything your agent publishes for people to look at: a Markdown doc, an HTML page, a folder of static files, or a board. Each one gets its own link and keeps every version.",
+  },
+  {
+    q: "Which agents work with it?",
+    a: "Any agent that speaks MCP: Claude Code, Codex, Cursor, VS Code, Claude, ChatGPT, and others. The agents page has the setup for each.",
+  },
+  {
+    q: "Do I need an API key?",
+    a: "No. The first time your agent connects, Drop opens in your browser and you sign in. The agent keeps its own token.",
+  },
+  {
+    q: "Who can see what my agent drops?",
+    a: "Only you, until you share it. Share it with your team, or turn on a public link and pick whether it allows viewing, commenting, or editing.",
+  },
+  {
+    q: "How is this different from a gist or a shared drive?",
+    a: "People comment on the exact sentence, screenshot region, or spot on a page, and the agent reads those comments and publishes the next version itself. Nobody copies feedback back into a chat.",
+  },
+  {
+    q: "Can I run it myself?",
+    a: "Yes. Drop is open source under Apache-2.0. Deploy it to Cloudflare, Vercel, Netlify, Deno Deploy, or a server, and everything stays in your account.",
+  },
 ]
 </script>
 
@@ -190,273 +177,245 @@ const HOSTED = [
     <SiteHeader wide />
 
     <main>
-      <section class="relative overflow-hidden">
-        <LandingDotGrid
-          class="absolute inset-0 size-full [mask-image:radial-gradient(ellipse_at_50%_0%,black_10%,transparent_60%)]"
-        />
-        <div class="relative mx-auto w-full max-w-6xl px-4 pt-16 pb-24 sm:px-6 lg:pt-24 lg:pb-32">
-          <!-- The pitch on the left and the review loop's three steps beside it (the Loop prototype won, 2026-10-19). -->
-          <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:gap-16">
-            <div class="flex flex-col items-center text-center lg:items-start lg:text-left">
-              <NuxtLink
-                to="/docs/agents"
-                class="mb-6 flex items-center gap-2 rounded-full border border-default bg-default py-1 pr-3 pl-1 text-xs text-muted transition-colors hover:text-highlighted"
-              >
-                <span
-                  class="rounded-full bg-elevated px-2 py-0.5 font-mono text-[11px] tracking-wide text-highlighted uppercase"
-                  >MCP</span
-                >
-                Connect Claude Code, Codex, or any agent
-                <UIcon name="i-mingcute-arrow-right-line" class="size-3" />
-              </NuxtLink>
-              <h1
-                class="max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted"
-              >
-                The shared drive for people and
-                <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">their agents</em>.
-              </h1>
-              <p class="mt-6 max-w-[56ch] text-lg leading-relaxed text-pretty text-muted">
-                <LandingMention
-                  name="Claude Code"
-                  icon="i-simple-icons-claude"
-                  color="#D97757"
-                  href="https://claude.com/claude-code"
-                />, <LandingMention name="Codex" icon="i-simple-icons-openai" href="https://openai.com/codex" />, or any
-                <LandingMention
-                  name="MCP"
-                  icon="i-simple-icons-modelcontextprotocol"
-                  href="https://modelcontextprotocol.io"
-                />
-                agent drops a doc, a page, or a small app. You comment on the exact spot, and the agent drops the next
-                version.
-              </p>
-              <div class="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-                <UButton
-                  v-if="signedIn"
+      <!-- Hero: what it is, the command to try it, and the agents it works with. The pattern skills.sh uses. -->
+      <section class="mx-auto max-w-6xl px-4 pt-16 pb-16 sm:px-6 lg:pt-24 lg:pb-20">
+        <div class="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16">
+          <div>
+            <p class="label-mono">Drop · for Claude Code, Codex, and any MCP agent</p>
+            <h1
+              class="mt-5 max-w-[14ch] text-[clamp(2.5rem,6vw,4.25rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted"
+            >
+              Review what your
+              <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">agent</em> makes.
+            </h1>
+            <p class="mt-6 max-w-[52ch] text-lg leading-relaxed text-pretty text-muted">
+              Your agent publishes its plan, page, or app to Drop and sends you a link. You and your team comment on the
+              exact spot. The agent reads the comments and publishes the next version.
+            </p>
+            <div class="mt-8 flex flex-wrap items-center gap-3">
+              <UButton
+                v-if="signedIn"
+                color="neutral"
+                size="lg"
+                class="h-10 px-4"
+                label="Open Drop"
+                trailing-icon="i-mingcute-arrow-right-line"
+                to="/drops"
+              />
+              <UButton
+                v-else
+                color="neutral"
+                size="lg"
+                class="h-10 px-4"
+                icon="i-simple-icons-github"
+                label="Sign in with GitHub"
+                @click="signInWithGitHub"
+              />
+              <UButton color="neutral" variant="ghost" size="lg" class="h-10 px-4" label="How it works" to="#how" />
+            </div>
+            <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 max-w-xs" />
+          </div>
+
+          <div class="flex flex-col gap-8 lg:pt-10">
+            <div>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="label-mono text-highlighted">Try it now</h2>
+                <UTabs
+                  v-model="client"
+                  :items="TRY"
+                  :content="false"
                   color="neutral"
-                  size="lg"
-                  class="h-10 px-4"
-                  label="Open Drop"
-                  trailing-icon="i-mingcute-arrow-right-line"
-                  to="/drops"
-                />
-                <UButton
-                  v-else
-                  color="neutral"
-                  size="lg"
-                  class="h-10 px-4"
-                  icon="i-simple-icons-github"
-                  label="Sign in with GitHub"
-                  @click="signInWithGitHub"
-                />
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  size="lg"
-                  class="h-10 px-4"
-                  label="Read the docs"
-                  to="/docs"
+                  size="xs"
+                  :ui="{
+                    list: 'w-auto',
+                    indicator: 'bg-default shadow-xs ring ring-default',
+                    trigger: 'text-xs data-[state=active]:text-highlighted',
+                  }"
                 />
               </div>
-
-              <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 max-w-xs" />
-            </div>
-            <ol class="mx-auto grid w-full max-w-md gap-3 lg:mx-0 lg:max-w-none">
-              <li
-                v-for="(step, i) in LOOP"
-                :key="step"
-                class="flex items-center gap-4 rounded-xl border border-default bg-default p-4 shadow-xs"
-              >
-                <span
-                  class="grid size-8 shrink-0 place-items-center rounded-full bg-inverted font-mono text-sm font-medium text-inverted"
-                  >{{ i + 1 }}</span
+              <AgentsCodeBlock class="mt-3" :code="SNIPPETS[client]" />
+              <p class="mt-3 text-sm text-pretty text-muted">
+                {{ MCP_HINTS[client] }} Then ask it to drop something for review.
+                <NuxtLink
+                  to="/docs/agents"
+                  class="whitespace-nowrap text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)"
+                  >Cursor, VS Code, ChatGPT</NuxtLink
                 >
-                <span class="text-base text-highlighted">{{ step }}</span>
-              </li>
-            </ol>
+              </p>
+            </div>
+            <div>
+              <h2 class="label-mono text-highlighted">Works with these agents</h2>
+              <ul class="mt-4 flex flex-wrap gap-x-5 gap-y-3">
+                <li v-for="name in AGENTS" :key="name" class="flex items-center gap-2 text-sm text-muted">
+                  <AgentIcon :name="name" kind="agent" class="size-4" />{{ name }}
+                </li>
+              </ul>
+            </div>
           </div>
-          <LandingHeroStory class="mt-14" />
         </div>
       </section>
 
-      <section class="border-y border-default">
-        <div class="mx-auto flex max-w-6xl items-center gap-6 px-4 py-5 sm:px-6">
-          <span class="label-mono shrink-0">Works with</span>
-          <LazyLandingLogoLoop class="min-w-0 flex-1" hydrate-on-visible>
-            <span v-for="name in AGENTS" :key="name" class="flex shrink-0 items-center gap-2 text-sm text-muted">
-              <AgentIcon :name="name" kind="agent" class="size-4" />{{ name }}
-            </span>
-            <span class="shrink-0 text-sm text-muted">Any MCP client</span>
-          </LazyLandingLogoLoop>
-        </div>
+      <!-- The product itself, the way skills.sh leads with its leaderboard: a real doc with real comments. -->
+      <section class="mx-auto max-w-6xl px-4 sm:px-6">
+        <figure class="mx-auto max-w-[1066px] overflow-hidden rounded-xl border border-default bg-muted p-2 sm:p-3">
+          <div class="overflow-hidden rounded-lg border border-default bg-white shadow-sm">
+            <div class="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
+              <span class="size-2.5 rounded-full bg-neutral-300" />
+              <span class="size-2.5 rounded-full bg-neutral-300" />
+              <span class="size-2.5 rounded-full bg-neutral-300" />
+              <span class="mx-auto truncate font-mono text-xs text-neutral-500"
+                >drop.vitehub.dev/d/k3x9/billing-migration</span
+              >
+            </div>
+            <img
+              src="/docs/features/comments.webp"
+              width="1040"
+              height="760"
+              alt="A plan named Billing migration open in Drop, with three open comments pinned to sentences and a reply thread beside the text"
+              class="block h-auto w-full"
+              fetchpriority="high"
+            />
+          </div>
+          <figcaption class="px-2 pt-3 pb-1 text-sm text-muted">
+            A plan Claude Code dropped, with the team's comments on the lines they're about.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="how" class="mx-auto max-w-6xl scroll-mt-14 px-4 pt-24 sm:px-6 lg:pt-32">
+        <p class="label-mono">How it works</p>
+        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-balance text-highlighted">
+          Feedback goes to the agent, not into a
+          <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">chat</em>.
+        </h2>
+        <ol class="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
+          <li v-for="(step, i) in STEPS" :key="step.title" class="border-t border-default pt-5">
+            <p class="flex items-baseline gap-3">
+              <span class="font-mono text-sm text-dimmed tabular-nums">0{{ i + 1 }}</span>
+              <span class="font-medium text-highlighted">{{ step.title }}</span>
+            </p>
+            <p class="mt-2 text-sm leading-relaxed text-pretty text-muted">{{ step.body }}</p>
+            <p
+              v-if="step.prompt"
+              class="mt-4 truncate rounded-md border border-default bg-muted px-3 py-2 font-mono text-xs text-highlighted"
+            >
+              <span class="text-dimmed">›</span> {{ step.prompt }}
+            </p>
+          </li>
+        </ol>
       </section>
 
       <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
-        <UTabs
-          v-model="useCase"
-          :content="false"
-          color="neutral"
-          :items="useCaseTabs"
-          class="mb-10 lg:mb-12"
-          :ui="{
-            root: 'w-max max-w-full',
-            list: 'overflow-x-auto',
-            trigger: 'flex-none text-sm',
-            label: 'overflow-visible',
-            leadingIcon: 'hidden size-4 sm:inline-flex',
-          }"
-        />
-        <div
-          v-for="item in USE_CASES"
-          v-show="item.id === useCase"
-          :key="item.id"
-          class="mb-10 grid items-end gap-x-12 gap-y-3 lg:mb-12 lg:grid-cols-2"
-        >
+        <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 class="text-3xl leading-tight font-semibold tracking-tight text-balance text-highlighted">
-              {{ item.title[0]
-              }}<em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">{{
-                item.title[1]
-              }}</em
-              >{{ item.title[2] }}
-            </h2>
+            <p class="label-mono">What it holds</p>
+            <h2 class="mt-3 text-3xl font-semibold tracking-tight text-highlighted">What your agent can drop.</h2>
           </div>
-          <p class="max-w-[52ch] leading-relaxed text-pretty text-muted">
-            {{ item.body }}
-            <NuxtLink
-              :to="item.docs"
-              class="ml-1 whitespace-nowrap text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)"
-              >How it works</NuxtLink
-            >
-          </p>
-        </div>
-        <div class="rounded-xl border border-default bg-muted p-3 sm:p-8 lg:p-10">
-          <LazyLandingDocStory v-if="useCase === 'docs'" hydrate-on-visible />
-          <LazyLandingPrStory v-else-if="useCase === 'pr'" hydrate-on-visible />
-          <LazyLandingAppStory v-else-if="useCase === 'app'" hydrate-on-visible />
-          <LazyLandingSiteStory v-else hydrate-on-visible />
-        </div>
-      </section>
-
-      <section class="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
-        <div class="mb-10 lg:mb-12">
-          <p class="label-mono mb-3">Features</p>
-          <h2 class="text-3xl font-semibold tracking-tight text-highlighted">
-            What you and your
-            <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">agent</em> get.
-          </h2>
-        </div>
-        <div
-          class="grid gap-px overflow-hidden rounded-xl border border-default bg-(--ui-border) sm:grid-cols-2 lg:grid-cols-4"
-        >
-          <LazyLandingSpotlightCard
-            v-for="(feature, position) in FEATURES"
-            :key="feature.title"
-            class="group"
-            :class="position === 0 && 'sm:col-span-2'"
-            hydrate-on-interaction="pointerenter"
+          <NuxtLink
+            to="/docs/features"
+            class="text-sm text-muted underline decoration-(--ui-border-accented) underline-offset-4 hover:text-highlighted"
+            >All features</NuxtLink
           >
+        </div>
+        <ul class="mt-8 border-t border-default">
+          <li v-for="(kind, i) in KINDS" :key="kind.name" class="border-b border-default">
             <NuxtLink
-              :to="feature.to"
-              class="block h-full p-6 outline-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) focus-visible:ring-inset"
+              :to="kind.to"
+              class="group grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-4 outline-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) sm:grid-cols-[2rem_minmax(0,14rem)_minmax(0,1fr)_auto]"
             >
-              <span class="flex items-center justify-between">
-                <UIcon :name="feature.icon" class="size-4 text-muted" />
+              <span class="font-mono text-sm text-dimmed tabular-nums">{{ i + 1 }}</span>
+              <span class="flex items-center gap-2 font-medium text-highlighted">
+                <UIcon :name="kind.icon" class="size-4 shrink-0 text-muted" />{{ kind.name }}
+              </span>
+              <span class="col-start-2 text-sm text-pretty text-muted sm:col-start-auto">{{ kind.detail }}</span>
+              <span
+                class="col-start-3 row-start-1 hidden items-center gap-2 font-mono text-xs text-dimmed sm:col-start-auto sm:row-start-auto sm:flex"
+              >
+                {{ kind.example }}
                 <UIcon
                   name="i-mingcute-arrow-right-up-line"
-                  class="size-3.5 text-dimmed opacity-0 transition-opacity group-hover:opacity-100"
+                  class="size-3.5 opacity-0 transition-opacity group-hover:opacity-100"
                 />
               </span>
-              <span class="mt-3 block font-medium text-highlighted">{{ feature.title }}</span>
-              <span class="mt-1.5 block text-sm leading-relaxed text-muted">{{ feature.body }}</span>
             </NuxtLink>
-          </LazyLandingSpotlightCard>
+          </li>
+        </ul>
+      </section>
+
+      <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
+        <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+          <div>
+            <p class="label-mono">Around every drop</p>
+            <h2 class="mt-3 text-3xl font-semibold tracking-tight text-balance text-highlighted">
+              Every version kept, nothing public by accident.
+            </h2>
+            <ul class="mt-8 space-y-4">
+              <li v-for="item in AROUND" :key="item.text" class="flex gap-3 text-sm leading-relaxed text-toned">
+                <UIcon :name="item.icon" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item.text }}
+              </li>
+            </ul>
+          </div>
+          <div class="overflow-hidden rounded-xl border border-default bg-muted p-2 sm:p-3">
+            <img
+              src="/docs/features/history.webp"
+              width="1040"
+              height="470"
+              loading="lazy"
+              alt="Version 2 of the Billing migration plan beside version 1, with added and removed lines, and the History panel listing both versions"
+              class="block h-auto w-full rounded-lg border border-default bg-white"
+            />
+          </div>
         </div>
       </section>
 
-      <!-- Below the fold: rendered on the server, hydrated only when scrolled into view. -->
-      <LazyLandingOwnIt hydrate-on-visible />
-
       <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
-        <h2 class="mb-10 text-3xl font-semibold tracking-tight text-highlighted lg:mb-12">
+        <h2 class="text-3xl font-semibold tracking-tight text-highlighted">
           Use it here, or
           <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">run your own</em>.
         </h2>
-        <!-- Each card leads with a small picture of the product: a private drop with its share switch, and a team with
-             one member per role. Flat tokens only, like the stories above. -->
-        <div class="grid gap-4 md:grid-cols-2">
-          <div class="flex flex-col rounded-xl border border-default bg-default p-2">
-            <div
-              aria-hidden="true"
-              class="relative grid h-44 place-items-center overflow-hidden rounded-lg border border-default bg-muted"
-            >
-              <div class="w-64 rounded-lg border border-default bg-default shadow-sm">
-                <div class="flex items-center gap-2 border-b border-default px-3 py-2">
-                  <UIcon name="i-mingcute-document-2-line" class="size-3.5 text-muted" />
-                  <span class="font-mono text-xs text-toned">launch-plan.md</span>
-                  <span
-                    class="ml-auto inline-flex items-center gap-1 rounded-sm border border-default px-1.5 text-xs text-muted"
-                    ><UIcon name="i-mingcute-lock-line" class="size-3" />Private</span
-                  >
-                </div>
-                <div class="space-y-2 px-3 py-3">
-                  <div class="h-1.5 w-3/4 rounded-full bg-accented" />
-                  <div class="h-1.5 w-full rounded-full bg-accented/70" />
-                  <div class="h-1.5 w-1/2 rounded-full bg-accented/70" />
-                </div>
-              </div>
-              <div
-                class="absolute right-6 bottom-5 flex items-center gap-1.5 rounded-md border border-default bg-default px-2 py-1 text-xs text-toned shadow-md"
-              >
-                <UIcon name="i-mingcute-globe-line" class="size-3.5" />Anyone with the link
-              </div>
-            </div>
-            <div class="flex-1 px-4 pt-5 pb-4">
-              <p class="label-mono">drop.vitehub.dev</p>
-              <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Sign in and start dropping.</p>
-              <p class="mt-1.5 text-sm leading-relaxed text-muted">
-                Drops start private. A link shares one only when you say so.
-              </p>
-              <ul class="mt-4 space-y-2 text-sm">
-                <li v-for="item in HOSTED" :key="item" class="flex gap-2">
-                  <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
-                </li>
-              </ul>
-            </div>
+        <div class="mt-10 grid gap-10 md:grid-cols-2 md:gap-8">
+          <div class="border-t border-default pt-5">
+            <p class="label-mono">drop.vitehub.dev</p>
+            <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Sign in and start dropping.</p>
+            <ul class="mt-4 space-y-2 text-sm text-toned">
+              <li v-for="item in HOSTED" :key="item" class="flex gap-2">
+                <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+              </li>
+            </ul>
           </div>
-          <div class="flex flex-col rounded-xl border border-default bg-default p-2">
-            <div
-              aria-hidden="true"
-              class="grid h-44 place-items-center overflow-hidden rounded-lg border border-default bg-muted"
+          <div class="border-t border-default pt-5">
+            <p class="label-mono flex items-center gap-2"><ViteHubMark class="size-3" />Built on ViteHub</p>
+            <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Deploy one for your team.</p>
+            <ul class="mt-4 space-y-2 text-sm text-toned">
+              <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
+                <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
+              </li>
+            </ul>
+            <NuxtLink
+              to="/docs/self-host"
+              class="mt-4 inline-block text-sm text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)"
+              >Self-hosting guide</NuxtLink
             >
-              <ul class="w-64 divide-y divide-default rounded-lg border border-default bg-default shadow-sm">
-                <li v-for="person in TEAM" :key="person.name" class="flex items-center gap-2.5 px-3 py-2">
-                  <span
-                    class="grid size-6 place-items-center rounded-full bg-accented text-xs font-medium text-highlighted"
-                    >{{ person.name[0] }}</span
-                  >
-                  <span class="text-sm text-highlighted">{{ person.name }}</span>
-                  <span
-                    class="ml-auto rounded-sm border border-default px-1.5 text-xs"
-                    :class="person.role === 'admin' ? 'bg-inverted text-inverted' : 'text-muted'"
-                    >{{ ROLE_LABELS[person.role] }}</span
-                  >
-                </li>
-              </ul>
-            </div>
-            <div class="flex-1 px-4 pt-5 pb-4">
-              <p class="label-mono">Your own</p>
-              <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Deploy one for your team.</p>
-              <p class="mt-1.5 text-sm leading-relaxed text-muted">
-                What anyone drops is the team's, filed in folders your admins describe for people and agents. Public
-                links close after a week.
-              </p>
-              <ul class="mt-4 space-y-2 text-sm">
-                <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
-                  <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
-                </li>
-              </ul>
-            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
+        <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <h2 class="text-3xl font-semibold tracking-tight text-highlighted">Questions</h2>
+          <div class="border-t border-default">
+            <details v-for="item in FAQ" :key="item.q" class="group border-b border-default">
+              <summary
+                class="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-medium text-highlighted outline-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) [&::-webkit-details-marker]:hidden"
+              >
+                {{ item.q }}
+                <UIcon
+                  name="i-mingcute-add-line"
+                  class="size-4 shrink-0 text-muted transition-transform duration-200 group-open:rotate-45"
+                />
+              </summary>
+              <p class="max-w-[60ch] pb-5 text-sm leading-relaxed text-pretty text-muted">{{ item.a }}</p>
+            </details>
           </div>
         </div>
       </section>
