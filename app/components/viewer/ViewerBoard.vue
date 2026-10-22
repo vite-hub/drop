@@ -111,6 +111,17 @@ const FAMILIES: Record<number, string> = { 1: "Virgil", 2: "Helvetica", 3: "Casc
 const fontOf = (text: { fontSize: number; fontFamily: number }) =>
   `${text.fontSize}px ${FAMILIES[text.fontFamily] ?? "Helvetica"}, Segoe UI Emoji`
 
+// Excalidraw centers bound text at the middle vertex of odd-point polylines, or
+// the midpoint of the middle segment for even-point polylines.
+function arrowMidpoint(points: ReadonlyArray<ReadonlyArray<number>>): [number, number] {
+  if (!points.length) return [0, 0]
+  const middle = Math.floor(points.length / 2)
+  if (points.length % 2) return [points[middle][0], points[middle][1]]
+  const [x1, y1] = points[middle - 1]
+  const [x2, y2] = points[middle]
+  return [(x1 + x2) / 2, (y1 + y2) / 2]
+}
+
 let measuring: CanvasRenderingContext2D | null = null
 /** Words wrapped to `max` px wide the way Excalidraw wraps them: at spaces, and inside words longer than a line. */
 function wrap(text: string, font: string, max: number) {
@@ -270,30 +281,6 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       elements: scene.map((element) => changed.get(element.id) ?? element),
       captureUpdate: ex.CaptureUpdateAction.NEVER,
     })
-  }
-
-  // Excalidraw centers bound text at the midpoint of an arrow's polyline (the middle
-  // segment for bent arrows), rather than at its final point.
-  function arrowMidpoint(points: ReadonlyArray<ReadonlyArray<number>>) {
-    if (points.length < 2) return points[0] ?? [0, 0]
-    let total = 0
-    for (let i = 1; i < points.length; i++) {
-      const [x1, y1] = points[i - 1]
-      const [x2, y2] = points[i]
-      total += Math.hypot(x2 - x1, y2 - y1)
-    }
-    let target = total / 2
-    for (let i = 1; i < points.length; i++) {
-      const [x1, y1] = points[i - 1]
-      const [x2, y2] = points[i]
-      const length = Math.hypot(x2 - x1, y2 - y1)
-      if (target <= length) {
-        const ratio = length ? target / length : 0
-        return [x1 + (x2 - x1) * ratio, y1 + (y2 - y1) * ratio] as [number, number]
-      }
-      target -= length
-    }
-    return points.at(-1)!
   }
 
   // Open on the whole board, never zoomed past 100%: wide frames otherwise start off screen.
