@@ -116,9 +116,15 @@ const fontOf = (text: { fontSize: number; fontFamily: number }) =>
 function arrowMidpoint(points: ReadonlyArray<ReadonlyArray<number>>): [number, number] {
   if (!points.length) return [0, 0]
   const middle = Math.floor(points.length / 2)
-  if (points.length % 2) return [points[middle][0], points[middle][1]]
-  const [x1, y1] = points[middle - 1]
-  const [x2, y2] = points[middle]
+  const middlePoint = points[middle]
+  if (!middlePoint) return [0, 0]
+  const [middleX, middleY] = middlePoint
+  if (points.length % 2) return [middleX ?? 0, middleY ?? 0]
+  const previousPoint = points[middle - 1]
+  if (!previousPoint) return [middleX ?? 0, middleY ?? 0]
+  const [x1, y1] = previousPoint
+  const [x2, y2] = middlePoint
+  if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return [0, 0]
   return [(x1 + x2) / 2, (y1 + y2) / 2]
 }
 
