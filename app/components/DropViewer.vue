@@ -141,8 +141,14 @@ const pageComments = computed(() =>
 // TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
-// Comments on the whole page have nothing in it to pin to; they live in the panel.
-const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
+// Comments on the whole page have nothing in it to pin to; they live in the panel. A resolved comment leaves the page
+// and stays in the Resolved tab; opening it from there pins it until its thread closes (`revealed`).
+const revealed = ref<string | null>(null)
+const pinned = computed(() =>
+  pageComments.value.filter(
+    (comment) => (!comment.resolved || comment.id === revealed.value) && !replaced(comment) && comment.kind !== "page",
+  ),
+)
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
 // The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
@@ -368,6 +374,12 @@ async function focusComment(comment: DropComment, row?: DOMRect) {
   if (!wide.value) mobileSide.value = false
   // A page comment opens here and now, so it cancels a pin's thread still on its way too.
   if (!annotations.awaitThread(comment.kind === "page" ? null : comment.id, focusGeneration)) return
+  revealed.value = comment.resolved && comment.kind !== "page" ? comment.id : null
+  if (revealed.value) {
+    // The frame gets the pin with the next markers (useViewerFrame), so it has one to scroll to.
+    await nextTick()
+    if (!annotations.isFocusCurrent(focusGeneration)) return
+  }
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
@@ -519,10 +531,14 @@ const imageComments = computed(() =>
   lightbox.value
     ? pageComments.value.filter(
         (comment) =>
-          comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id),
+          comment.kind !== "text" &&
+          comment.selector === lightbox.value!.selector &&
+          !comment.resolved &&
+          !outdated.value.has(comment.id),
       )
     : [],
 )
+watch(popover, (open) => !open && (revealed.value = null))
 const threadComment = computed(() => {
   const open = popover.value
   return open?.type === "thread" ? state.findComment(open.id) : undefined
