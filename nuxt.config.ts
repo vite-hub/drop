@@ -314,7 +314,7 @@ export default defineNuxtConfig({
         // The Get started checklist's step marks (app/components/GetStarted.vue).
         "mingcute:check-circle-fill",
         "mingcute:round-line",
-        // The "Update ready" toast's icon (app/plugins/update-ready.client.ts).
+        // The sidebar's "Update ready" icon (app/components/UpdateReady.vue).
         "mingcute:refresh-2-line",
         // Nuxt UI's own icons (app.config ui.icons): the scanner reads templates, not app.config, so without these the
         // color-mode toggle, close buttons, carets, and spinners render empty.
