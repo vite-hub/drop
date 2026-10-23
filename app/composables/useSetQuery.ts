@@ -1,6 +1,6 @@
 import type { LocationQueryRaw, Router } from "vue-router"
 
-// The query each router is still navigating to, scoped to the route that started it.
+// The query each router is still navigating to. A key on the router, not module state, so server requests don't share it.
 const pending = new WeakMap<Router, { location: string; query: LocationQueryRaw }>()
 
 const queryKey = (query: LocationQueryRaw) =>

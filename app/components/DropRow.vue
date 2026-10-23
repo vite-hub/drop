@@ -242,7 +242,7 @@ const menu = computed(() => [
         <UButton
           :aria-label="`Actions for ${drop.title}`"
           color="neutral"
-          icon="i-mingcute-more-1-line"
+          icon="i-mingcute-more-1-fill"
           variant="ghost"
         />
       </UDropdownMenu>

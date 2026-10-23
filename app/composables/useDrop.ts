@@ -45,6 +45,8 @@ function useDrop(id: MaybeRefOrGetter<string>) {
     }
   }
 
+  const findComment = (commentId: string) => comments.data.value.find((comment) => comment.id === commentId)
+
   // Optimistic: the checkbox flips at once and rolls back if the server says no.
   async function resolveComment(commentId: string, resolved: boolean) {
     const before = comments.data.value
@@ -93,7 +95,7 @@ function useDrop(id: MaybeRefOrGetter<string>) {
     }
   }
 
-  return { drop, comments, addComment, resolveComment, removeComment, addReply, removeReply }
+  return { drop, comments, findComment, addComment, resolveComment, removeComment, addReply, removeReply }
 }
 
 /** The drop page provides its drop; the viewer and its panels inject it instead of threading props. */

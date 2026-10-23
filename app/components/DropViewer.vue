@@ -57,10 +57,9 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-// A folder's description (what goes in it) is in Details, for everyone signed in who adds to it.
-const details = computed(
-  () => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !publicView),
-)
+// Details holds what the header doesn't (Copy as Markdown, Download, Open in new window), so everyone signed in gets it;
+// sharing, views and lifetime in it stay with the owner (ViewerOverview).
+const details = computed(() => owner.value || Boolean(me.value))
 const panel = useViewerPanel({
   details,
   openCount,
@@ -164,7 +163,7 @@ const panelTabsUi = {
 // Shared with someone, or waiting on review: its status sits beside the title. A private drop gets Share on the right.
 const shared = computed(() => drop.value.share !== "private" || Boolean(drop.value.shareReview))
 // Comments has its own button in the header: it opens the panel there, and closes it once open. History and Details
-// open from More, the panel's tabs, or H and I.
+// open from the panel's tabs, or H and I; a drop without comments (a folder) gets a Details button instead.
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
 const showing = (value: SideTab) => panelOpen.value && tab.value === value
 const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
@@ -173,7 +172,7 @@ if (route.query.changes && has("history")) {
   tab.value = "history"
   sideOpen.value = true
 }
-// A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
+// A visitor on a folder's public link has no tab to show (no comments, no Details), so no panel either.
 const docked = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 
 // A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
@@ -286,7 +285,7 @@ defineShortcuts({
   },
 })
 
-// An uploaded file or image is the thing itself, so its download sits in the bar; Drop's own kinds keep it in the menu.
+// An uploaded file or image is the thing itself, so its download sits in the bar; Drop's own kinds keep it in Details.
 const downloadsInBar = computed(() => Boolean(drop.value.url) && ["file", "image"].includes(drop.value.kind))
 /** Saves the stored file under its uploaded name; the raw URL is same-origin, so `download` names it. */
 function download() {
@@ -311,79 +310,6 @@ function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") shareOpen.value = true
   else void copy(link.value, { key: "link", announce })
 }
-// The header keeps Edit, Comments and Copy link; the rest lives in More, each with its key. The menu closes on copy, so
-// a toast says it worked.
-const moreMenu = computed(() =>
-  [
-    [
-      ...(presents.value
-        ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
-        : []),
-      ...(widens.value
-        ? [
-            {
-              label: "Width",
-              icon: "i-mingcute-spacing-horizontal-line",
-              children: widths.map((item) => ({
-                label: item.label,
-                type: "checkbox" as const,
-                checked: docWidth.value === item.value,
-                onUpdateChecked: () => (docWidth.value = item.value),
-              })),
-            },
-          ]
-        : []),
-      ...(has("history")
-        ? [
-            {
-              label: "History",
-              icon: "i-mingcute-history-line",
-              kbds: ["h"],
-              onSelect: () => panel.show("history"),
-            },
-          ]
-        : []),
-      ...(has("details")
-        ? [
-            {
-              label: "Details",
-              icon: "i-mingcute-information-line",
-              kbds: ["i"],
-              onSelect: () => panel.show("details"),
-            },
-          ]
-        : []),
-    ],
-    [
-      ...(copiesMarkdown.value
-        ? [
-            {
-              label: "Copy as Markdown",
-              icon: "i-mingcute-markdown-line",
-              kbds: ["m"],
-              onSelect: () => void copyMarkdown("Markdown copied"),
-            },
-          ]
-        : []),
-      ...(drop.value.url && !downloadsInBar.value
-        ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
-        : []),
-    ],
-    // Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it.
-    ...(visitor.value
-      ? [
-          [
-            {
-              label: "Report",
-              icon: "i-mingcute-flag-1-line",
-              to: { path: "/report", query: { target: `/d/${drop.value.link}` } },
-            },
-          ],
-        ]
-      : []),
-  ].filter((group) => group.length),
-)
-const moreActive = computed(() => showing("history") || showing("details"))
 
 // Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
 // unless another one is open by then.
@@ -488,7 +414,7 @@ const moveTo = useMoveDialog()
 const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
   publicView ? dropPath(crumb) : `/drops/${crumb.id}`
 
-// ⌘K lists what you can do with this drop, under its title: the More menu, the header's buttons, and Details' actions.
+// ⌘K lists what you can do with this drop, under its title: the header's buttons, the toolbar's, and Details' actions.
 offerToPalette("drop", () => {
   if (visitor.value) return null
   if (editing.value)
@@ -690,7 +616,19 @@ watch(
             :label="copied('link') ? 'Link copied' : 'Copy link'"
             @click="copyLink()"
           />
+          <ViewerAction
+            v-if="copiesMarkdown"
+            :icon="copied('markdown') ? 'i-mingcute-check-line' : 'i-mingcute-markdown-line'"
+            :label="copied('markdown') ? 'Markdown copied' : 'Copy as Markdown'"
+            @click="copyMarkdown()"
+          />
           <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
+          <ViewerAction
+            v-if="presents"
+            icon="i-mingcute-external-link-line"
+            label="Open in new window"
+            @click="openWindow"
+          />
           <ViewerAction
             v-if="owner && !trashed"
             icon="i-mingcute-new-folder-line"
@@ -795,7 +733,8 @@ watch(
             @click="live.publish()"
           />
         </template>
-        <!-- Three tools at hand and More for the rest: icons only, shortcuts in the tooltips and the menu. -->
+        <!-- A few tools at hand, icons only with their keys in the tooltips. The review tools sit in the toolbar under the
+             page, and the rest in Details. -->
         <template v-else #right>
           <UTooltip v-if="slidev && contentOrigin" text="Deck in a new window, presenter view here">
             <UButton
@@ -836,6 +775,17 @@ watch(
               @click="toggleTab('comments')"
             />
           </UTooltip>
+          <UTooltip v-else-if="has('details')" :kbds="['I']" text="Details">
+            <UButton
+              aria-label="Details"
+              :aria-pressed="showing('details')"
+              color="neutral"
+              icon="i-mingcute-information-line"
+              size="sm"
+              :variant="showing('details') ? 'soft' : 'ghost'"
+              @click="toggleTab('details')"
+            />
+          </UTooltip>
           <UTooltip :kbds="['L']" text="Copy link">
             <UButton
               aria-label="Copy link"
@@ -856,16 +806,17 @@ watch(
               @click="download"
             />
           </UTooltip>
-          <UDropdownMenu v-if="moreMenu.length" :content="{ align: 'end' }" :items="moreMenu">
+          <!-- Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it. -->
+          <UTooltip v-if="visitor" text="Report">
             <UButton
-              aria-label="More"
-              :aria-pressed="moreActive"
+              aria-label="Report"
               color="neutral"
-              icon="i-mingcute-more-1-line"
+              icon="i-mingcute-flag-1-line"
               size="sm"
-              :variant="moreActive ? 'soft' : 'ghost'"
+              :to="{ path: '/report', query: { target: `/d/${drop.link}` } }"
+              variant="ghost"
             />
-          </UDropdownMenu>
+          </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
           <USeparator v-if="(owner && !shared) || visitor" class="ml-1 h-4" orientation="vertical" />
           <UButton
@@ -1017,8 +968,10 @@ watch(
           :can-comment="canDrawArea"
           :overlays="overlays"
           :tool="tool"
+          :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
           @toggle="toggleOverlay"
           @tool="setTool"
+          @width="nextWidth"
         />
 
         <ViewerDiff
