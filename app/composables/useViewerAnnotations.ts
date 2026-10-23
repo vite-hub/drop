@@ -14,14 +14,22 @@ type Lightbox = {
   label: string
   from?: { left: number; top: number; width: number; height: number }
 }
-type Popover = { x: number; y: number } & ({ type: "new"; pending: PendingComment } | { type: "thread"; id: string })
+// `body` and `error`: a comment that didn't go through, back in its box with why.
+type Popover = { x: number; y: number } & (
+  | { type: "new"; pending: PendingComment; body?: string; error?: string }
+  | { type: "thread"; id: string }
+)
+/** The toolbar's tools (ViewerToolbar): the page as it is, the Comment tool, or the Measure tool. */
+export type ViewerTool = "browse" | "comment" | "measure"
+/** What the toolbar shows over the page under any tool. */
+export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
 
 /** What the frame reports about the reader's pointer and keys, in frame coordinates. */
 type PointerMessage = Extract<FrameMessage, { type: "selection" | "image" | "area" | "marker" | "key" }>
 
 /**
  * What the reader points at in the viewer: a text selection with its Comment button, an image zoomed in the lightbox,
- * area mode's crosshair, and the popover where a new comment is written or a thread read. The frame's reports
+ * the toolbar's tools and overlays, and the popover where a new comment is written or a thread read. The frame's reports
  * (`receive`) arrive with the frame's box, to turn their coordinates into the page's.
  */
 export function useViewerAnnotations(options: {
@@ -34,10 +42,31 @@ export function useViewerAnnotations(options: {
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
   const popover = ref<Popover | null>(null)
+  /**
+   * The comment whose thread the frame will open once it has scrolled to the pin (`awaitThread`). Escape, a tool, or
+   * another comment in the meantime clears it, so the late report doesn't open a thread the reader moved on from.
+   */
+  let awaited: string | null = null
+  let focusGeneration = 0
+  const beginFocus = () => {
+    awaited = null
+    return ++focusGeneration
+  }
+  const isFocusCurrent = (generation: number) => generation === focusGeneration
+  const awaitThread = (id: string | null, generation?: number) => {
+    if (generation !== undefined && generation !== focusGeneration) return false
+    awaited = id
+    return true
+  }
   const commenting = computed(() => drop.value.canComment && !editing.value)
 
-  /** Area mode: the frame lays a crosshair over the page, and the next rectangle drawn there becomes a comment. */
-  const areaMode = ref(false)
+  /**
+   * Under Comment and Measure the frame lays a layer over the page that takes the pointer. Comment stays on after each
+   * comment, so a review drops one pin after another; Escape or Browse (V) gives the page its clicks back.
+   */
+  const tool = ref<ViewerTool>("browse")
+  const overlays = reactive<ViewerOverlays>({ rulers: false, xray: false, pins: true })
+  const areaMode = computed(() => tool.value === "comment")
   // TODO(file-comments): files without a preview (PDFs, zips) have nothing to anchor a comment to, so they take none yet.
   // Comments on the file as a whole would close that gap.
   // A site takes its comments on the site itself (ViewerSite).
@@ -49,26 +78,40 @@ export function useViewerAnnotations(options: {
       drop.value.kind !== "folder" &&
       drop.value.kind !== "site",
   )
-  function toggleArea() {
-    if (!canDrawArea.value) return
+  /** Picks a tool, or puts the one on back to Browse. */
+  function setTool(next: ViewerTool) {
+    if (next === "comment" && !canDrawArea.value) return
+    awaited = null
+    focusGeneration++
     popover.value = selection.value = null
-    areaMode.value = !areaMode.value
-    if (areaMode.value && !options.wide.value) options.mobileSide.value = false
+    tool.value = tool.value === next ? "browse" : next
+    if (tool.value !== "browse" && !options.wide.value) options.mobileSide.value = false
   }
-  watch(canDrawArea, (value) => !value && (areaMode.value = false))
+  const toggleArea = () => setTool("comment")
+  const toggleOverlay = (name: keyof ViewerOverlays) => (overlays[name] = !overlays[name])
+  watch(canDrawArea, (value) => !value && tool.value === "comment" && (tool.value = "browse"))
   // The frame keeps the drawn rectangle while its comment is written, on the page or a zoomed screenshot; it drops it
   // once the popover goes.
   const draftingArea = computed(
     () => popover.value?.type === "new" && ["area", "image"].includes(popover.value.pending.kind),
   )
 
-  /** Escape: close whatever is open. */
+  /** Escape: close whatever is open, then put the tool down. */
   function dismiss() {
-    popover.value = selection.value = null
-    areaMode.value = false
+    const waiting = awaited !== null
+    awaited = null
+    focusGeneration++
+    if (waiting || popover.value || selection.value) popover.value = selection.value = null
+    else tool.value = "browse"
   }
 
   function receive(message: PointerMessage, frame: DOMRect) {
+    if (message.type === "marker" && message.focused && message.id !== awaited) return
+    // A pin, an area or an image picked meanwhile is the reader moving on.
+    if (message.type === "marker" || message.type === "area" || message.type === "image") {
+      awaited = null
+      focusGeneration++
+    }
     if (message.type === "selection" && commenting.value) {
       selection.value = message.clear
         ? null
@@ -91,11 +134,9 @@ export function useViewerAnnotations(options: {
         width: message.rect.right - message.rect.left,
         height: message.rect.bottom - message.rect.top,
       }
-      areaMode.value = false
       lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
     }
     if (message.type === "area") {
-      areaMode.value = false
       if (commenting.value) {
         const { kind = "area", selector, label, ox, oy, ow, oh } = message
         popover.value = {
@@ -113,9 +154,18 @@ export function useViewerAnnotations(options: {
         x: frame.left + message.clientX,
         y: frame.top + message.clientY,
       }
-    if (message.type === "key" && message.key === "Escape") dismiss()
-    // Apps may use R themselves, so only docs forward it.
-    if (message.type === "key" && message.key === "r" && drop.value.kind !== "app") toggleArea()
+    if (message.type === "key") pressed(message.key, message.tool)
+  }
+
+  /** A toolbar key pressed while the page had focus. Apps may use these keys themselves, so only under a tool there. */
+  function pressed(key: Extract<PointerMessage, { type: "key" }>["key"], under?: ViewerTool) {
+    if (key === "Escape") return dismiss()
+    if (drop.value.kind === "app" && (under ?? "browse") === "browse") return
+    if (key === "v") tool.value = "browse"
+    if (key === "r") setTool("comment")
+    if (key === "s") setTool("measure")
+    if (key === "u") toggleOverlay("rulers")
+    if (key === "x") toggleOverlay("xray")
   }
 
   function commentOnSelection() {
@@ -150,12 +200,19 @@ export function useViewerAnnotations(options: {
     selection,
     lightbox,
     popover,
+    tool,
+    overlays,
     areaMode,
     canDrawArea,
     draftingArea,
     imageDraft,
     toggleArea,
+    setTool,
+    toggleOverlay,
     dismiss,
+    awaitThread,
+    beginFocus,
+    isFocusCurrent,
     receive,
     commentOnSelection,
     pickImage,

@@ -80,13 +80,35 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
-const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } =
-  annotations
+const {
+  selection,
+  lightbox,
+  popover,
+  tool,
+  overlays,
+  areaMode,
+  canDrawArea,
+  imageDraft,
+  toggleArea,
+  setTool,
+  toggleOverlay,
+  commentOnSelection,
+  pickImage,
+} = annotations
+/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
+const framed = computed(
+  () =>
+    !editing.value &&
+    !["folder", "site", "board"].includes(drop.value.kind) &&
+    !video.value &&
+    !(drop.value.kind === "file" && !drop.value.html),
+)
+watch(framed, (value) => !value && (tool.value = "browse"))
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
 }
-const popoverRef = useTemplateRef<{ fail: (reason?: string) => void; sent: () => Promise<void> }>("popoverRef")
+const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
@@ -243,6 +265,10 @@ defineShortcuts({
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
+  v: () => (tool.value = "browse"),
+  s: () => framed.value && setTool("measure"),
+  u: () => framed.value && toggleOverlay("rulers"),
+  x: () => framed.value && toggleOverlay("xray"),
   l: () => !editing.value && copyLink("Link copied"),
   d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
@@ -286,16 +312,6 @@ const moreMenu = computed(() =>
     [
       ...(presents.value
         ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
-        : []),
-      ...(canDrawArea.value
-        ? [
-            {
-              label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
-              icon: "i-mingcute-message-1-line",
-              kbds: ["r"],
-              onSelect: toggleArea,
-            },
-          ]
         : []),
       ...(widens.value
         ? [
@@ -361,14 +377,17 @@ const moreMenu = computed(() =>
       : []),
   ].filter((group) => group.length),
 )
-const moreActive = computed(() => areaMode.value || showing("history") || showing("details"))
+const moreActive = computed(() => showing("history") || showing("details"))
 
+// Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
+// unless another one is open by then.
 async function submit(body: string) {
-  if (popover.value?.type !== "new") return
-  const sent = await state.addComment({ ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
-  if (!("value" in sent)) return popoverRef.value?.fail(sent.error)
+  const open = popover.value
+  if (open?.type !== "new") return
   popover.value = null
   send({ type: "clear-selection" })
+  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
+  if (!("value" in sent) && !popover.value) popover.value = { ...open, body, error: sent.error }
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
@@ -390,8 +409,7 @@ async function removeComment(id: string) {
 
 async function reply(id: string, body: string) {
   const sent = await state.addReply(id, body)
-  if ("value" in sent) await popoverRef.value?.sent()
-  else popoverRef.value?.fail(sent.error)
+  if (!("value" in sent)) await popoverRef.value?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
@@ -413,13 +431,17 @@ function copyChangesLink(version: DropVersion) {
  * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
  */
 async function focusComment(comment: DropComment, row?: DOMRect) {
+  const focusGeneration = annotations.beginFocus()
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
     await nextTick()
     await until(ready).toBe(true, { timeout: 5000 })
   }
+  if (!annotations.isFocusCurrent(focusGeneration)) return
   if (!wide.value) mobileSide.value = false
+  // A page comment opens here and now, so it cancels a pin's thread still on its way too.
+  if (!annotations.awaitThread(comment.kind === "page" ? null : comment.id, focusGeneration)) return
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
@@ -486,10 +508,32 @@ offerToPalette("drop", () => {
     ...(canDrawArea.value
       ? [
           {
-            label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
+            label: areaMode.value ? "Stop commenting" : "Comment on an element",
             icon: "i-mingcute-message-1-line",
             kbds: ["r"],
             onSelect: toggleArea,
+          },
+        ]
+      : []),
+    ...(framed.value
+      ? [
+          {
+            label: tool.value === "measure" ? "Stop measuring" : "Measure",
+            icon: "i-mingcute-aiming-2-line",
+            kbds: ["s"],
+            onSelect: () => setTool("measure"),
+          },
+          {
+            label: overlays.rulers ? "Hide rulers" : "Rulers and guides",
+            icon: "i-mingcute-ruler-line",
+            kbds: ["u"],
+            onSelect: () => toggleOverlay("rulers"),
+          },
+          {
+            label: overlays.xray ? "Turn off X-ray" : "X-ray",
+            icon: "i-mingcute-layout-grid-line",
+            kbds: ["x"],
+            onSelect: () => toggleOverlay("xray"),
           },
         ]
       : []),
@@ -555,12 +599,12 @@ const imageComments = computed(() =>
 )
 const threadComment = computed(() => {
   const open = popover.value
-  return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
+  return open?.type === "thread" ? state.findComment(open.id) : undefined
 })
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => threadComment.value?.n,
-  (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
+  (n) => void setQuery({ comment: n }),
 )
 </script>
 
@@ -952,6 +996,15 @@ watch(
           :title="drop.title"
         />
 
+        <ViewerToolbar
+          v-if="framed && !shownVersion"
+          :can-comment="canDrawArea"
+          :overlays="overlays"
+          :tool="tool"
+          @toggle="toggleOverlay"
+          @tool="setTool"
+        />
+
         <ViewerDiff
           v-if="shownVersion && !editing"
           :key="shownVersion.id"
@@ -1038,6 +1091,8 @@ watch(
     ref="popoverRef"
     :can-manage="drop.isOwner"
     :comment="threadComment"
+    :draft="popover.type === 'new' ? popover.body : undefined"
+    :draft-error="popover.type === 'new' ? popover.error : undefined"
     :pending="popover.type === 'new' ? popover.pending : undefined"
     :x="popover.x"
     :y="popover.y"
