@@ -42,6 +42,12 @@ export function useViewerAnnotations(options: {
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
   const popover = ref<Popover | null>(null)
+  /**
+   * The comment whose thread the frame will open once it has scrolled to the pin (`awaitThread`). Escape, a tool, or
+   * another comment in the meantime clears it, so the late report doesn't open a thread the reader moved on from.
+   */
+  let awaited: string | null = null
+  const awaitThread = (id: string | null) => (awaited = id)
   const commenting = computed(() => drop.value.canComment && !editing.value)
 
   /**
@@ -65,6 +71,7 @@ export function useViewerAnnotations(options: {
   /** Picks a tool, or puts the one on back to Browse. */
   function setTool(next: ViewerTool) {
     if (next === "comment" && !canDrawArea.value) return
+    awaited = null
     popover.value = selection.value = null
     tool.value = tool.value === next ? "browse" : next
     if (tool.value !== "browse" && !options.wide.value) options.mobileSide.value = false
@@ -80,11 +87,16 @@ export function useViewerAnnotations(options: {
 
   /** Escape: close whatever is open, then put the tool down. */
   function dismiss() {
-    if (popover.value || selection.value) popover.value = selection.value = null
+    const waiting = awaited !== null
+    awaited = null
+    if (waiting || popover.value || selection.value) popover.value = selection.value = null
     else tool.value = "browse"
   }
 
   function receive(message: PointerMessage, frame: DOMRect) {
+    if (message.type === "marker" && message.focused && message.id !== awaited) return
+    // A pin, an area or an image picked meanwhile is the reader moving on.
+    if (message.type === "marker" || message.type === "area" || message.type === "image") awaited = null
     if (message.type === "selection" && commenting.value) {
       selection.value = message.clear
         ? null
@@ -183,6 +195,7 @@ export function useViewerAnnotations(options: {
     setTool,
     toggleOverlay,
     dismiss,
+    awaitThread,
     receive,
     commentOnSelection,
     pickImage,

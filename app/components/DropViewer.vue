@@ -429,6 +429,8 @@ async function focusComment(comment: DropComment, row?: DOMRect) {
     await until(ready).toBe(true, { timeout: 5000 })
   }
   if (!wide.value) mobileSide.value = false
+  // A page comment opens here and now, so it cancels a pin's thread still on its way too.
+  annotations.awaitThread(comment.kind === "page" ? null : comment.id)
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
@@ -591,7 +593,7 @@ const threadComment = computed(() => {
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => threadComment.value?.n,
-  (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
+  (n) => void setQuery({ comment: n }),
 )
 </script>
 

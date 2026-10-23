@@ -722,10 +722,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       active = m.id; render();
       const dot = Array.from(marks.children).find((d) => d.classList.contains("pulse"));
       if (dot) scrollTo({ top: Math.max(0, parseFloat(dot.style.top) - innerHeight / 3), behavior: "smooth" });
-      // With open: once the scroll settles, report the pin like a click, so Drop opens its thread beside it.
+      // With open: once the scroll settles, report the pin like a click, so Drop opens its thread beside it. Marked
+      // focused, so Drop can drop the report if Escape or another comment came first.
       if (dot && m.open) setTimeout(() => {
         const pin = Array.from(marks.children).find((d) => d.dataset.id === m.id);
-        if (pin) { const r = pin.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); }
+        if (pin) { const r = pin.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top, focused: true }); }
       }, 500);
       setTimeout(() => { active = null; render(); }, 2200);
     }

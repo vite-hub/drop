@@ -50,7 +50,14 @@ export const FrameMessage = v.variant("type", [
     oh: v.number(),
     rect: Rect,
   }),
-  v.object({ type: v.literal("marker"), id: v.string(), clientX: v.number(), clientY: v.number() }),
+  // A click on a pin, or (`focused`) the pin a "focus" with `open` scrolled to.
+  v.object({
+    type: v.literal("marker"),
+    id: v.string(),
+    clientX: v.number(),
+    clientY: v.number(),
+    focused: v.optional(v.boolean()),
+  }),
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
   // The toolbar's keys, pressed while the page had focus, with the tool it was under (apps keep their keys under Browse).
   v.object({
