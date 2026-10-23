@@ -7,7 +7,6 @@
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
-import { isPending } from "~/composables/useDrop"
 
 type PendingComment = Omit<CommentInput, "body">
 
@@ -115,7 +114,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc="emit('cancel')"
+          @keydown.esc.stop="emit('cancel')"
         />
         <UButton
           aria-label="Send comment"
@@ -203,7 +202,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc="emit('cancel')"
+          @keydown.esc.stop="emit('cancel')"
         />
         <UButton
           aria-label="Send reply"

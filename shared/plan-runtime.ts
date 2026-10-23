@@ -66,7 +66,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
  * author's DOM is never modified.
  */
 const ANNOTATOR_SCRIPT = String.raw`(() => {
-  const AUTHORED = __AUTHORED__, THEMED = __THEMED__;
+  const AUTHORED = __AUTHORED__, THEMED = __THEMED__, DARK = __DARK__;
   const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
   const host = document.createElement("drop-comments");
   host.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;";
@@ -85,16 +85,20 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
     '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--hi);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
-    // The tools' drawings (setTool below): Mesurer's highlight and guide colors, the box model in DevTools' colors.
-    ':host{--hi:oklch(0.62 0.18 255);--gd:oklch(0.63 0.26 29.23)}' +
+    // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
+    // (4.7:1 under white) behind labels, its white card and rulers in light mode and their dark cut in dark, and the box
+    // model in DevTools' colors.
+    ':host{--hi:oklch(0.62 0.18 255);--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
+    (DARK ? '--sf:#18181b;--ink:#fafafa;--ink-muted:#a1a1aa;--tick:#52525b;--float:0 0 0 .5px rgb(255 255 255/.16),0 1px 1px rgb(0 0 0/.125),0 2px 5px rgb(0 0 0/.125),0 3px 8px rgb(0 0 0/.125)}'
+      : '--sf:#fff;--ink:#18181b;--ink-muted:#71717a;--tick:#cbd5e1;--float:0 0 0 .5px rgb(0 0 0/.18),0 1px 1px rgb(0 0 0/.06),0 3px 9px rgb(0 0 0/.06),0 6px 18px rgb(0 0 0/.03)}') +
     '.fx>*{position:fixed;box-sizing:border-box;pointer-events:none}.hl{outline:1.5px solid var(--hi);outline-offset:-.75px}.hl.sel{outline-width:2px;background:color-mix(in oklab,var(--hi) 8%,transparent)}' +
     '.mb{background:rgb(246 178 107/.35)}.pb{background:rgb(147 196 125/.4)}.ln{background:var(--gd)}.ln.dash{background:none;border:0 dashed var(--gd)}' +
-    '.tag{padding:1px 6px;border-radius:4px;background:var(--hi);color:#fff;font:500 11px/18px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis}.tag.d{background:var(--gd)}' +
-    '.card{width:15rem;padding:8px 10px;border-radius:8px;background:#0a0a0a;color:#fafafa;font:12px/1.55 ui-sans-serif,system-ui,sans-serif;box-shadow:0 0 0 1px rgb(255 255 255/.08),0 8px 24px rgb(0 0 0/.25)}' +
-    '.card b{display:block;margin-bottom:4px;font:500 11px/16px ui-monospace,SFMono-Regular,Menlo,monospace;color:#a3a3a3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-    '.card div{display:flex;justify-content:space-between;gap:12px}.card span:first-child{color:#a3a3a3}.card span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}' +
-    '.sw{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:3px;vertical-align:-1px;box-shadow:inset 0 0 0 1px rgb(255 255 255/.3)}' +
-    '.ru{position:fixed;z-index:1;display:block;background:rgb(250 250 250/.94);box-shadow:0 0 0 1px rgb(0 0 0/.08)}.ru.x{left:20px;top:0;cursor:row-resize}.ru.y{left:0;top:20px;cursor:col-resize}.ru.c{left:0;top:0;width:20px;height:20px;cursor:default}' +
+    '.tag{padding:2px 4px;border-radius:4px;background:var(--hi-fill);color:#fff;font:500 10px/14px ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis}.tag.d{background:var(--gd-fill)}' +
+    '.card{width:15rem;box-sizing:border-box;padding:8px;border:1px solid transparent;border-radius:8px;background:var(--sf);color:var(--ink);font:11px/16px ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;box-shadow:var(--float)}' +
+    '.card b{display:block;margin-bottom:6px;font:500 11px/16px ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.card div{display:flex;justify-content:space-between;gap:12px}.card span:first-child{color:var(--ink-muted)}.card span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.sw{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:3px;vertical-align:-1px;box-shadow:inset 0 0 0 1px rgb(128 128 128/.35)}' +
+    '.ru{position:fixed;z-index:1;display:block;background:var(--sf);box-shadow:0 0 0 .5px rgb(128 128 128/.35)}.ru.x{left:18px;top:0;cursor:row-resize}.ru.y{left:0;top:18px;cursor:col-resize}.ru.c{left:0;top:0;width:18px;height:18px;cursor:default}' +
     '.gd{position:absolute;background:var(--gd)}.gd::before{content:"";position:absolute;inset:-3px}.gd.h{height:1px;left:0}.gd.h::before{cursor:row-resize}.gd.v{width:1px;top:0}.gd.v::before{cursor:col-resize}' +
     '</style>';
   const LAYERS = '<div class="marks"></div><div class="draft"></div>';
@@ -357,7 +361,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    * Measure shows the element's size and box model, its type and colors, and, once one is picked, the distances from
    * it to whatever the pointer is over.
    */
-  let tool = "browse", layer = null, hovered = null, picked = null, pointer = null;
+  let tool = "browse", layer = null, hovered = null, picked = null;
   const view = { rulers: false, xray: false, pins: true };
   const fx = document.createElement("div");
   fx.className = "fx";
@@ -507,8 +511,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // Below the element, else above it, else in the bottom corner, always on screen.
     const w = card.offsetWidth, h = card.offsetHeight, gap = 10;
     const top = r.bottom + gap + h < innerHeight ? r.bottom + gap : r.top - gap - h > 0 ? r.top - gap - h : innerHeight - h - 12;
-    card.style.left = Math.max(view.rulers ? 28 : 8, Math.min(innerWidth - w - 8, r.left)) + "px";
-    card.style.top = Math.max(view.rulers ? 28 : 8, top) + "px";
+    card.style.left = Math.max(view.rulers ? RULER + 8 : 8, Math.min(innerWidth - w - 8, r.left)) + "px";
+    card.style.top = Math.max(view.rulers ? RULER + 8 : 8, top) + "px";
   }
 
   let toolFrame = 0;
@@ -582,7 +586,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    * Rulers along the top and left edges, in the page's own pixels, with guides: drag one out of a ruler, drag it to
    * move it, drag it back onto the ruler (or double-click it) to remove it. Guides sit in the page, so they scroll with it.
    */
-  const RULER = 20;
+  const RULER = 18;
   const rulerX = document.createElement("canvas"), rulerY = document.createElement("canvas"), corner = document.createElement("div");
   rulerX.className = "ru x"; rulerY.className = "ru y"; corner.className = "ru c";
   const guideLayer = document.createElement("div");
@@ -597,27 +601,41 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const g = canvas.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
-    g.fillStyle = "#a3a3a3"; g.font = "9px ui-monospace, SFMono-Regular, Menlo, monospace";
+    const css = getComputedStyle(host), tick = css.getPropertyValue("--tick").trim(), label = DARK ? "#a1a1aa" : "#64748b";
+    g.font = "9px ui-sans-serif, system-ui, sans-serif";
+    g.textAlign = "center";
     for (let v = Math.ceil(offset / 10) * 10; v < offset + length; v += 10) {
-      const at = v - offset + 0.5, size = v % 100 === 0 ? RULER : v % 50 === 0 ? 8 : 4;
+      const at = Math.round(v - offset) + 0.5, size = v % 100 === 0 ? 6 : v % 50 === 0 ? 4 : 2;
+      g.fillStyle = tick;
       if (horizontal) g.fillRect(at, RULER - size, 1, size); else g.fillRect(RULER - size, at, size, 1);
       if (v % 100) continue;
-      g.fillStyle = "#737373";
-      if (horizontal) g.fillText(String(v), at + 3, 9);
-      else { g.save(); g.translate(9, at - 3); g.rotate(-Math.PI / 2); g.fillText(String(v), 0, 0); g.restore(); }
-      g.fillStyle = "#a3a3a3";
+      g.fillStyle = label;
+      if (horizontal) g.fillText(String(v), at, 9);
+      else { g.save(); g.translate(9, at); g.rotate(-Math.PI / 2); g.fillText(String(v), 0, 0); g.restore(); }
     }
-    // Where the pointer is, and the guides, on the ruler.
-    g.fillStyle = "oklch(0.63 0.26 29.23)";
-    // The top ruler marks the upright guides, the left one the level ones.
-    for (const guide of guides) if ((guide.axis === "v") === horizontal) {
-      const at = guide.at - offset;
-      if (at >= 0 && at <= length) { if (horizontal) g.fillRect(at, 0, 1, RULER); else g.fillRect(0, at, RULER, 1); }
-    }
-    if (pointer) {
-      g.fillStyle = "oklch(0.62 0.18 255)";
-      const at = (horizontal ? pointer.x : pointer.y) - RULER;
-      if (at >= 0) { if (horizontal) g.fillRect(at, 0, 1, RULER); else g.fillRect(0, at, RULER, 1); }
+    // Mesurer's red: the guides (the top ruler marks the upright ones, the left one the level ones), and the extents of
+    // the element the tool is on, each with its position over a fade of the ruler's surface.
+    const red = "#ef4444", surface = css.getPropertyValue("--sf").trim();
+    const mark = (page, labelled) => {
+      const at = Math.round(page - offset) + 0.5;
+      if (at < 0 || at > length) return;
+      g.fillStyle = red;
+      if (horizontal) g.fillRect(at - 0.5, 0, 1, RULER); else g.fillRect(0, at - 0.5, RULER, 1);
+      if (!labelled) return;
+      const text = String(Math.round(page)), width = g.measureText(text).width + 6;
+      g.fillStyle = surface;
+      if (horizontal) g.fillRect(at - width / 2, 0, width, 11); else g.fillRect(0, at - width / 2, 11, width);
+      g.fillStyle = red; g.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+      if (horizontal) g.fillText(text, at, 9);
+      else { g.save(); g.translate(9, at); g.rotate(-Math.PI / 2); g.fillText(text, 0, 0); g.restore(); }
+      g.font = "9px ui-sans-serif, system-ui, sans-serif";
+    };
+    for (const guide of guides) if ((guide.axis === "v") === horizontal) mark(guide.at, false);
+    const on = tool !== "browse" && (picked || hovered);
+    if (on && on.isConnected) {
+      const r = on.getBoundingClientRect(), scroll = horizontal ? scrollX : scrollY;
+      mark((horizontal ? r.left : r.top) + scroll, true);
+      mark((horizontal ? r.right : r.bottom) + scroll, true);
     }
   }
   function drawRulers() {
@@ -670,14 +688,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // X-ray: every element's box, outlined. Outlines take no room, so the layout doesn't move.
   const xrayStyle = document.createElement("style");
-  xrayStyle.textContent = "*:not(drop-comments){outline:1px solid color-mix(in oklab,oklch(0.62 0.18 255) 55%,transparent) !important;outline-offset:-1px !important}";
+  xrayStyle.textContent = "*:not(drop-comments){outline:1px solid oklch(0.62 0.18 255) !important;outline-offset:-1px !important}";
   function setView(next) {
     view.rulers = Boolean(next.rulers); view.pins = next.pins !== false;
     if (Boolean(next.xray) !== xrayStyle.isConnected) { if (next.xray) document.head.appendChild(xrayStyle); else xrayStyle.remove(); }
     view.xray = Boolean(next.xray);
     render(); redraw();
   }
-  addEventListener("pointermove", (e) => { pointer = { x: e.clientX, y: e.clientY }; if (view.rulers) redraw(); }, { capture: true, passive: true });
   addEventListener("scroll", () => { if (tool !== "browse" || view.rulers) redraw(); }, { capture: true, passive: true });
   drawRulers();
 
@@ -843,7 +860,7 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
       ? ""
       : `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`
   const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
-  const tail = `<script>${ANNOTATOR_SCRIPT.replace("__AUTHORED__", String(authored)).replace("__THEMED__", String(Boolean(theme)))}</script>`
+  const tail = `<script>${ANNOTATOR_SCRIPT.replace("__AUTHORED__", String(authored)).replace("__THEMED__", String(Boolean(theme))).replace("__DARK__", String(dark))}</script>`
   let out = prependToHead(html, head)
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail
   return out

@@ -510,7 +510,7 @@ test("a page someone else built gets only the comment layer: no theme of Drop's,
   const own = injectRuntime(tailwind, true, 0, true)
   assert.doesNotMatch(own, /data-drop-theme/)
   assert.doesNotMatch(own, /classList\.toggle\("dark"/)
-  assert.match(own, /const AUTHORED = true, THEMED = false;/)
+  assert.match(own, /const AUTHORED = true, THEMED = false, DARK = true;/)
   assert.doesNotMatch(own, /__AUTHORED__/)
   // A plan written to the authoring guide still gets Drop's theme and follows dark mode.
   const plan = injectRuntime('<html><head></head><body style="color:var(--foreground)"></body></html>', true, 0, true)
@@ -519,7 +519,7 @@ test("a page someone else built gets only the comment layer: no theme of Drop's,
   // Drop's own documents keep the zoom.
   assert.match(
     injectRuntime("<html><head></head><body></body></html>", false),
-    /const AUTHORED = false, THEMED = true;/,
+    /const AUTHORED = false, THEMED = true, DARK = false;/,
   )
 })
 
