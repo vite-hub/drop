@@ -4,7 +4,8 @@
 // number, Resolve, and a menu (Copy link, Delete); the comment and its replies; a reply box at the bottom.
 // Sending is optimistic: a new comment closes the box and shows its pin at once, a reply shows in the thread at once.
 // If the server refuses, the text comes back to its box (`draft` for a new comment, `fail` for a reply) with why.
-// Escape in a box with text only leaves the box, Figma's way: the text stays, and the next Escape or click away closes.
+// Escape or a click away from a box with text only leaves the box, Figma's way: the text stays, and the next Escape or
+// click away closes.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
@@ -52,6 +53,11 @@ function escape(event: KeyboardEvent) {
   ;(event.target as HTMLElement).blur()
 }
 
+// Pressing outside takes focus from the box before the click lands, so whether it was being typed in is read on press.
+let typing = false
+const press = () => (typing = Boolean(body.value.trim() && card.value?.contains(document.activeElement)))
+const clickAway = () => typing || emit("cancel")
+
 async function send() {
   const text = body.value
   if (!text.trim()) return
@@ -98,7 +104,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
-  <div class="fixed inset-0 z-40" @click="emit('cancel')" />
+  <div class="fixed inset-0 z-40" @click="clickAway" @pointerdown="press" />
   <div
     ref="card"
     class="fixed z-50 flex origin-top-left flex-col overflow-hidden rounded-xl border border-default bg-default text-default shadow-lg shadow-black/5 [animation:pop-in_160ms_var(--ease-out)]"
