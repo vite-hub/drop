@@ -22,17 +22,28 @@ index eaf89f9861bd1eb4e5d33a43650c39e564891c5b..248d26d1f7b0d39aa765c5a45ceeeaaa
 +    const styles = window.getComputedStyle(textarea);
 +    const padding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
 +    const lineHeight = Number.parseFloat(styles.lineHeight);
++    if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
++      return;
++    }
 +    const measure = textarea.cloneNode();
 +    measure.value = textarea.value;
-+    measure.removeAttribute("id");
 +    measure.removeAttribute("name");
 +    measure.removeAttribute("autofocus");
 +    measure.setAttribute("aria-hidden", "true");
 +    measure.tabIndex = -1;
-+    Object.assign(measure.style, { position: "absolute", top: "0", left: "0", visibility: "hidden", pointerEvents: "none", width: `${textarea.offsetWidth}px`, height: "0", minHeight: "0", overflow: "hidden" });
++    const border = Number.parseFloat(styles.borderLeftWidth) + Number.parseFloat(styles.borderRightWidth);
++    const width = styles.boxSizing === "border-box" ? textarea.offsetWidth : textarea.offsetWidth - padding - border;
++    Object.assign(measure.style, { position: "absolute", top: "0", left: "0", visibility: "hidden", pointerEvents: "none", width: `${width}px`, height: "0", minHeight: "0", overflow: "hidden", boxSizing: styles.boxSizing });
++    const id = textarea.id;
++    if (id) {
++      textarea.removeAttribute("id");
++    }
 +    textarea.after(measure);
 +    const { scrollHeight } = measure;
 +    measure.remove();
++    if (id) {
++      textarea.id = id;
++    }
 +    const newRows = Math.round((scrollHeight - padding) / lineHeight);
 +    const rows = Math.max(props.rows, props.maxrows ? Math.min(newRows, props.maxrows) : newRows);
 +    if (textarea.rows !== rows) {
