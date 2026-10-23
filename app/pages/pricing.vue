@@ -9,12 +9,11 @@ useSeoMeta({
 })
 
 const rows = computed(() => [
-  { label: "Drops", free: "50", team: "100 per member" },
+  { label: "Drops", free: "50", team: "Any number" },
   { label: "Storage", free: "100 MiB", team: "1 GiB per member" },
   { label: "Kept forever", free: `${plans.value?.freeKept} drops at a time`, team: "Any number" },
   { label: "Team members", free: `Up to ${plans.value?.freeMembers}`, team: "Any number" },
-  { label: "Team folders, comments, live editing", free: "Yes", team: "Yes" },
-  { label: "Boards", free: "Yes", team: "No" },
+  { label: "Team folders, comments, live editing, boards", free: "Yes", team: "Yes" },
 ])
 </script>
 
@@ -40,10 +39,6 @@ const rows = computed(() => [
       <p>
         The Team plan starts with a 14-day trial. Its price covers every member, the owner included, and changes as
         people join or leave. Stripe bills it and handles sales tax and VAT.
-      </p>
-      <p>
-        Boards run on tldraw, whose free license doesn't cover paid use, so the Team plan has none. Boards you made
-        before keep opening.
       </p>
       <p>
         Drop is open source: <NuxtLink to="/docs/self-host">host your own</NuxtLink> with no plans or limits you don't

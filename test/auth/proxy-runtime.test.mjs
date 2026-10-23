@@ -72,7 +72,21 @@ test.skipIf(!origin || !database || !githubToken)(
           .status,
         200,
       )
-      assert.equal((await request(`/d/${dropId}`, { anonymous: true })).status, 401)
+      // A public link opens for strangers; the rest of the app still needs a member.
+      assert.equal((await request(`/d/${dropId}`, { anonymous: true })).status, 200)
+      assert.equal((await request(`/api/drops/${dropId}`, { anonymous: true })).status, 200)
+      assert.equal((await request("/api/search?q=test", { anonymous: true })).status, 401)
+      assert.equal(
+        (await request(`/api/drops/${dropId}`, { method: "PATCH", body: { share: "team" }, proxy: true })).status,
+        200,
+      )
+      assert.equal((await request(`/d/${dropId}`, { anonymous: true })).status, 404)
+      assert.equal((await request(`/api/drops/${dropId}`, { anonymous: true })).status, 404)
+      assert.equal(
+        (await request(`/api/drops/${dropId}`, { method: "PATCH", body: { share: "public_comment" }, proxy: true }))
+          .status,
+        200,
+      )
       assert.equal((await request(`/d/${dropId}`, { proxy: true })).status, 200)
       db.prepare("UPDATE user SET banned=1 WHERE id=?").run(userId)
       assert.equal((await request("/api/drops")).status, 401, "An existing session cannot bypass a ban")

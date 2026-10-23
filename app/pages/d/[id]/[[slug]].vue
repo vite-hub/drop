@@ -70,10 +70,10 @@ const here = useHerePath()
 </script>
 
 <template>
-  <ViewerPresent v-if="presenting && drop.data.value" :key="drop.data.value.id" />
+  <ViewerPresent v-if="presenting && drop.data.value" :key="`${drop.data.value.id}@${drop.data.value.version}`" />
   <!-- The dashboard layout brings its own UDashboardGroup; a visitor's page needs one for the viewer's panels. -->
   <template v-else-if="me">
-    <DropViewer v-if="drop.data.value" :key="drop.data.value.id" public-view />
+    <DropViewer v-if="drop.data.value" :key="`${drop.data.value.id}@${drop.data.value.version}`" public-view />
     <UDashboardPanel v-else id="drop-missing">
       <template #header>
         <!-- The viewer's bar while it loads or can't open, so the page keeps its line and doesn't jump. -->
@@ -97,7 +97,7 @@ const here = useHerePath()
     </UDashboardPanel>
   </template>
   <UDashboardGroup v-else-if="drop.data.value" unit="rem" storage="cookie" storage-key="drop-public">
-    <DropViewer :key="drop.data.value.id" public-view />
+    <DropViewer :key="`${drop.data.value.id}@${drop.data.value.version}`" public-view />
     <ShortcutsModal />
   </UDashboardGroup>
   <ContentUnavailable

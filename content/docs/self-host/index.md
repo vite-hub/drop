@@ -59,7 +59,7 @@ DROP_PUBLIC_LINK_DAYS=7
 
 ### Bill teams through Stripe {#billing}
 
-With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan and can't make new boards, since tldraw's free license doesn't cover paid use. `/pricing` shows the plans; without billing it's a 404.
+With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` shows the plans; without billing it's a 404.
 
 | Variable | What it does |
 | --- | --- |

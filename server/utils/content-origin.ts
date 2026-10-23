@@ -140,20 +140,45 @@ export const isContentRequest = (event: H3Event) => contentHost(event) === "cont
  * the document over postMessage, so docs and unpublished edits never pass through this origin's server. An app's other
  * files do, with per-drop origins: the viewer sends a grant along, kept here as a cookie, which opens that app's files
  * on this origin and nothing else (server/utils/app-files.ts). Opened outside a frame it shows nothing: there is no
- * parent to take a document from.
+ * parent to take a document from. The viewer's page renders the frame on the server, so this page can load before the
+ * viewer's script listens: it says hello once it does, and the host asks again.
  */
 export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Drop</title></head><body><script>(() => {
   if (parent === window) { document.body.textContent = "This domain shows previews inside Drop."; return; }
+  const ask = () => parent.postMessage({ __drop: true, type: "host", path: location.pathname }, "*");
   addEventListener("message", (event) => {
     const message = event.data;
-    if (event.source !== parent || !message || message.__drop !== true || message.type !== "document" || typeof message.html !== "string") return;
+    if (event.source !== parent || !message || message.__drop !== true) return;
+    if (message.type === "hello") return ask();
+    if (message.type !== "document" || typeof message.html !== "string") return;
     if (typeof message.grant === "string" && /^[\\w.-]+$/.test(message.grant))
       document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (isSecureContext ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
+    // A written document paints before its stylesheets load, unlike one the browser navigates to, so an app would show
+    // unstyled first. Keep it hidden until they load or fail, with a 3-second cap for a stylesheet that never answers.
+    const hold = "<style data-drop-hold>html{visibility:hidden!important}</style>";
+    const head = /<head(?:\\s[^>]*)?>/i.exec(message.html);
+    const at = head ? head.index + head[0].length : (/^\\s*<!doctype[^>]*>/i.exec(message.html)?.[0].length ?? 0);
     document.open();
-    document.write(message.html);
+    document.write(message.html.slice(0, at) + hold + message.html.slice(at));
     document.close();
+    const rootStyle = document.documentElement?.style;
+    const previousVisibility = rootStyle?.getPropertyValue("visibility") ?? "";
+    const previousVisibilityPriority = rootStyle?.getPropertyPriority("visibility") ?? "";
+    rootStyle?.setProperty("visibility", "hidden", "important");
+    const reveal = () => {
+      if (previousVisibility) rootStyle?.setProperty("visibility", previousVisibility, previousVisibilityPriority);
+      else rootStyle?.removeProperty("visibility");
+      document.querySelector("style[data-drop-hold]")?.remove();
+    };
+    const pending = [...document.querySelectorAll('link[rel~="stylesheet" i]')].filter(
+      (link) => !link.sheet && !link.disabled && (!link.media || matchMedia(link.media).matches));
+    if (!pending.length) return reveal();
+    let left = pending.length;
+    for (const link of pending)
+      for (const type of ["load", "error"]) link.addEventListener(type, () => --left || reveal(), { once: true });
+    setTimeout(reveal, 3000);
   });
-  parent.postMessage({ __drop: true, type: "host", path: location.pathname }, "*");
+  ask();
 })();</script></body></html>`
 
 /**

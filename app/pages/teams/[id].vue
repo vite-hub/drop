@@ -255,8 +255,8 @@ if (import.meta.client && route.query.billing === "done") {
             <p class="font-medium text-highlighted">{{ team.paid ? "Team" : "Free" }}</p>
             <p class="text-xs text-muted">
               <template v-if="team.paid"
-                >Billed per member. Everyone on the team gets the Pro plan: more drops, storage, and drops kept
-                forever.</template
+                >Billed per member. Everyone on the team gets the Pro plan: any number of drops, more storage, and drops
+                kept forever.</template
               >
               <template v-else
                 >{{ seats }} of {{ billing.freeMembers }} free members, invitations included. The Team plan adds more

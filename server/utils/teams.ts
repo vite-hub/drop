@@ -10,8 +10,7 @@ import type { DropRow } from "./drops/types"
 // personal Drop works like one on a team Drop (`DROP_MODE=team`), with the team in place of everyone signed in.
 //
 // Billing is per team: the first `DROP_FREE_TEAM_MEMBERS` members are free, and a bigger team needs a subscription,
-// one seat per member. Everyone on a team that pays gets the Pro plan, across all their drops, and no boards: Drop's
-// boards run on tldraw, whose free license doesn't cover paid use.
+// one seat per member. Everyone on a team that pays gets the Pro plan, across all their drops.
 
 /** `owner` made the team and pays for it; `admin` manages its folders and people; `member` adds to its folders. */
 export type TeamRole = "owner" | "admin" | "member"
@@ -84,7 +83,7 @@ export async function paidTeams(ids: string[]): Promise<Set<string>> {
   return new Set(rows.map((row) => row.team))
 }
 
-/** Whether someone is on a team that pays: then they're on the Pro plan, and can't make boards. */
+/** Whether someone is on a team that pays: then they're on the Pro plan. */
 export async function isPaying(userId: string, event?: H3Event): Promise<boolean> {
   if (!billingConfig(event).enabled) return false
   const [row] = await db.all<{ paying: number }>(sql`SELECT EXISTS (

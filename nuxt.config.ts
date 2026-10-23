@@ -44,6 +44,9 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
       databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || cloudflareTemplate.d1_databases[0]!.database_name,
       // Local dev and `nuxt prepare` run against a local D1; deploys read the real id from the environment.
       databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || cloudflareTemplate.d1_databases[0]!.database_id,
+      // Reads go to the D1 replica nearest the Worker once replication is on for the database (Cloudflare API,
+      // read_replication.mode "auto"); a request that writes sets a bookmark cookie, so its reader sees the write next.
+      readReplication: true,
     },
     kv: true,
     rateLimit: true,
@@ -155,9 +158,8 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-07-17",
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
-  // tldraw needs a license key in production (NUXT_PUBLIC_TLDRAW_LICENSE_KEY); without one, boards show its watermark.
-  // doctor-disable-next-line nuxt/runtime/no-secret-in-public-config -- tldraw license keys are public: the browser runs tldraw and checks the key against the domain.
-  runtimeConfig: { seoIndex: false, public: { tldrawLicenseKey: "" } },
+  // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
+  runtimeConfig: { seoIndex: false, public: { realtime: liveEditing } },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
   // check, and body limits, so the module's request middlewares stay off.
@@ -295,6 +297,8 @@ export default defineNuxtConfig({
         "simple-icons:zedindustries",
         "simple-icons:opencode",
         "simple-icons:githubactions",
+        // Link marks that replace a favicon (MARKS in app/components/viewer/ViewerResourceIcon.vue).
+        "simple-icons:github",
         // Host icons in the docs (app/utils/docs.ts).
         "simple-icons:cloudflare",
         "simple-icons:vercel",
@@ -454,7 +458,8 @@ export default defineNuxtConfig({
           quotas: {
             enabled: env.boolean({ source: env.source("DROP_QUOTAS"), default: false }),
             plan: env.enum(PLANS, { source: env.source("DROP_DEFAULT_PLAN"), default: "free" }),
-            proDrops: env.number({ source: env.source("DROP_PRO_DROPS"), default: DEFAULT_PRO_LIMITS.drops }),
+            // Unset keeps Pro drops unlimited; a number caps them.
+            proDrops: env.number({ optional: true, source: env.source("DROP_PRO_DROPS") }),
             proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
             proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
             // Drops a Free plan keeps forever at once; Pro keeps any number.

@@ -58,15 +58,32 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | To comment on | Do this |
 | --- | --- |
 | Text | Select it. |
-| An image | Click it to zoom, then click a spot or drag an area. |
-| Part of a page | Press :kbd[R] (**Comment on an area**) and drag a rectangle. |
+| An image | In a Markdown doc or an image drop, click it to zoom, then click a spot or drag an area. In an HTML doc or an app, clicks stay the page's own, so use the Comment tool. |
+| An element or part of a page | Pick **Comment** in the toolbar under the page, or press :kbd[R]. Click an element to pin a comment to it, or drag a rectangle. The tool stays on for the next one. |
 | The whole page | Write in the box at the bottom of the Comments panel. |
+
+A comment shows the moment you send it. If it doesn't go through, it comes back to its box with the reason.
 
 Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread.
 
 Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
 
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
+
+### Review toolbar {#toolbar}
+
+Docs and apps show a toolbar under the page. Each tool has a key, which also works while the page has focus. In an app, the page keeps its own keys until a tool is on.
+
+| Tool | Key | What it does |
+| --- | --- | --- |
+| Browse | :kbd[V] | The page takes its own clicks. |
+| Comment | :kbd[R] | Highlights the element under the pointer. Click to pin a comment, drag for an area. |
+| Measure | :kbd[S] | Shows an element's size, padding, and margin, with its font, colors, gap, and corners. Click one to pick it, then point at another to see the distance between them. |
+| Rulers and guides | :kbd[U] | Pixel rulers along the top and left. Drag a guide out of a ruler. Drag it back, or double-click it, to remove it. |
+| X-ray | :kbd[X] | Outlines every element without moving anything. |
+| Hide comments | | Hides the pins and highlights while you look at the page. |
+
+:kbd[Esc] unpicks the measured element, closes an open comment box, then returns to Browse.
 
 ## Sharing {#sharing}
 

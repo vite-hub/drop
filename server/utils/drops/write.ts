@@ -7,9 +7,10 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
-import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard } from "#shared/board"
+import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
 import { renderMarkdownCached } from "../markdown-document"
+import { refreshLatest } from "#live-drafts"
 import { deleteMarkdownCache } from "../markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
 import { defaultShare, isPublic, type Share } from "#shared/share"
@@ -17,7 +18,6 @@ import { MAX_KEEP_REASON } from "#shared/expiry"
 import { shareReviewFor } from "../trust"
 import type { Identity } from "../identity"
 import { requireKeepSlot, withDropQuota } from "../quotas"
-import { isPaying } from "../teams"
 import { chainOf, expiryPolicy, renewDrop } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
 import { modeFor, shareFields } from "../share"
@@ -171,11 +171,14 @@ export async function createDocDrop(
     contentType = kind === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8"
   }
   if (extension === BOARD_EXTENSION) {
-    // An empty .tldr starts an empty board (the New menu's Board).
-    if (!input.bytes.byteLength) input = { ...input, bytes: new TextEncoder().encode(JSON.stringify(emptyBoard())) }
+    // An empty .excalidraw starts an empty board (the New menu's Board). Any other is stored without what a board
+    // doesn't take (images, embeds) or the uploader's own view.
     try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(input.bytes)
-      parseBoard(text)
+      const board = input.bytes.byteLength
+        ? parseBoard(new TextDecoder("utf-8", { fatal: true }).decode(input.bytes))
+        : emptyBoard()
+      text = serializeBoard(board)
+      input = { ...input, bytes: new TextEncoder().encode(text) }
     } catch {
       throw new HTTPError({ status: 400, statusText: "That isn't a board this Drop can read." })
     }
@@ -211,12 +214,6 @@ export async function createDocDrop(
       previous = (await versionChain(found))[0] ?? found
     }
   }
-  // Boards run on tldraw, whose free license doesn't cover paid use: people on a paying team make none (../teams.ts).
-  if (kind === "board" && !previous && (await isPaying(who.userId, event)))
-    throw new HTTPError({
-      status: 403,
-      statusText: "Boards aren't part of the Team plan. Publish the board as a Markdown doc or an HTML page instead.",
-    })
   const folder = previous ? null : (input.folder ?? null)
   const parentId = previous?.parentId ?? folder?.id ?? null
   // A drop in someone's folder is theirs (admins add to anyone's); in a team folder it stays its publisher's.
@@ -329,6 +326,8 @@ export async function createDocDrop(
         throw error
       }
       if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text, previous)
+      // People reading the doc's link follow it to this version.
+      if (previous && row.link) await refreshLatest(row.link)
       // TODO(repo-mirror): also commit this version to a repo the owner picks, one commit per version with the note
       // as its message. Drop stays the source of truth: versions keep living in Blob and the database on every host.
       // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
@@ -622,6 +621,7 @@ export async function publishApp(
           await quota.commit([update, replace, ...inserts], exists(db.select({ id: drops.id }).from(drops).where(won)))
           committedPublish = true
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
+          if (next.link) await refreshLatest(next.link)
         }
         return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths) })
       } catch (error) {

@@ -47,6 +47,8 @@ const { data: drops } = useDrops()
 const { data: shared } = useSharedWithMe()
 // A personal Drop's teams list their folders under Teams, not under Shared with me.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
+// Members is the admins' page. Members see Skills only while one is on, since only admins can switch them on.
+const admin = computed(() => me.value?.role === "admin")
 const workspace = computed(() => [
   {
     label: "Agents",
@@ -55,23 +57,31 @@ const workspace = computed(() => [
     to: "/agents",
     active: at("/agents") || at("/approve"),
   },
-  {
-    label: "Skills",
-    icon: "i-mingcute-plugin-2-line",
-    activeIcon: "i-mingcute-plugin-2-fill",
-    to: "/skills",
-    active: at("/skills"),
-  },
-  {
-    label: "Members",
-    icon: "i-mingcute-group-2-line",
-    activeIcon: "i-mingcute-group-2-fill",
-    to: "/members",
-    active: at("/members"),
-    count: me.value?.reviews,
-    countLabel: "shares to review",
-    alert: true,
-  },
+  ...(admin.value || me.value?.skills
+    ? [
+        {
+          label: "Skills",
+          icon: "i-mingcute-plugin-2-line",
+          activeIcon: "i-mingcute-plugin-2-fill",
+          to: "/skills",
+          active: at("/skills"),
+        },
+      ]
+    : []),
+  ...(admin.value
+    ? [
+        {
+          label: "Members",
+          icon: "i-mingcute-group-2-line",
+          activeIcon: "i-mingcute-group-2-fill",
+          to: "/members",
+          active: at("/members"),
+          count: me.value?.reviews,
+          countLabel: "shares to review",
+          alert: true,
+        },
+      ]
+    : []),
 ])
 
 // The policies live outside /docs but sit in its nav.

@@ -53,8 +53,10 @@ const pages = computed<CommandPaletteItem[]>(() =>
       : { label: "Shared with me", icon: "i-mingcute-inbox-line", to: "/drops?tab=with-me" },
     { label: "Trash", icon: "i-mingcute-delete-2-line", to: "/drops?tab=trash" },
     { label: "Agents", icon: "i-mingcute-sparkles-line", to: "/agents" },
-    { label: "Skills", icon: "i-mingcute-plugin-2-line", to: "/skills" },
-    { label: "Members", icon: "i-mingcute-group-2-line", to: "/members" },
+    // As in the sidebar: members see Skills while one is on, and Members is the admins' page.
+    ...(me.value?.role === "admin" || me.value?.skills
+      ? [{ label: "Skills", icon: "i-mingcute-plugin-2-line", to: "/skills" }]
+      : []),
     {
       label: "Keyboard shortcuts",
       icon: "i-mingcute-keyboard-line",
@@ -63,6 +65,7 @@ const pages = computed<CommandPaletteItem[]>(() =>
     },
     ...(me.value?.role === "admin"
       ? [
+          { label: "Members", icon: "i-mingcute-group-2-line", to: "/members" },
           { label: "Review shares", icon: "i-mingcute-safety-certificate-line", to: "/admin/review" },
           { label: "Reports", icon: "i-mingcute-flag-1-line", to: "/admin/reports" },
         ]

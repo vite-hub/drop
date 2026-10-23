@@ -43,9 +43,8 @@
     "@iconify-json/simple-icons",
     // Served from node_modules/medium-zoom/dist through nitro.publicAssets, never imported.
     "medium-zoom",
-    // Never imported, but listed so the build keeps one Yjs for the app and vite-hub/realtime. Without them the SSR
+    // Never imported, but listed so the build keeps one Yjs for the app and vite-hub/realtime. Without it the SSR
     // bundle inlines a second copy and the Worker logs "Yjs was already imported".
-    "yjs",
     "@tiptap/y-tiptap",
     // `nuxt typecheck` runs it.
     "vue-tsc",

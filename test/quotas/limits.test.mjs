@@ -94,6 +94,8 @@ test("plans, warnings, and non-retryable agent guidance", () => {
   })
   assert.equal(planLimits("pro").bytes, 1024 * MIB)
   assert.equal(planLimits("pro", { writes: 234 }).writes, 234)
+  assert.equal(planLimits("pro").drops, null, "Pro keeps any number of drops")
+  assert.equal(planLimits("pro", { drops: 500 }).drops, 500, "unless DROP_PRO_DROPS caps them")
   assert.equal(planLimits("unlimited").drops, null)
   const body = quotaFailure("drops", 3, 3)
   assert.equal(body.retryable, false)

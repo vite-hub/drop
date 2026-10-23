@@ -59,7 +59,7 @@ export const toComment = (
 })
 
 /** The pictures of the people who wrote `rows`. Guests and agents without one get initials. D1 binds at most 100. */
-export async function authorImages(rows: Pick<CommentRow, "authorId">[]) {
+async function authorImages(rows: Pick<CommentRow, "authorId">[]) {
   const ids = [...new Set(rows.flatMap((row) => (row.authorId ? [row.authorId] : [])))]
   const images = new Map<string, string | null>()
   for (let index = 0; index < ids.length; index += 90) {

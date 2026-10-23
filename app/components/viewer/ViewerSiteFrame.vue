@@ -6,8 +6,7 @@
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-/** `inset`: room to leave on the right for the floating panel, in pixels. */
-const props = defineProps<{ drop: DropDetail; address: string; inset: number }>()
+const props = defineProps<{ drop: DropDetail; address: string }>()
 const emit = defineEmits<{ close: [] }>()
 
 const notify = useNotify()
@@ -170,7 +169,7 @@ onBeforeUnmount(discard)
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col" :style="{ paddingRight: inset ? `${inset}px` : undefined }">
+  <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex h-12 shrink-0 items-center gap-2 border-b border-default px-3">
       <UButton
         color="neutral"

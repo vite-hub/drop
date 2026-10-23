@@ -8,7 +8,7 @@ const reload = () => refreshNuxtData([keys.members, keys.me])
 
 /** Who's in this Drop, and the admin actions on them. */
 export function useMembers() {
-  const { data: members, status } = useMemberList()
+  const { data: members, status, error: failed, refresh } = useMemberList()
   const notify = useNotify()
   const confirm = useConfirm()
 
@@ -25,6 +25,8 @@ export function useMembers() {
   return {
     members,
     status,
+    error: failed,
+    refresh,
     ban: (member: Member) =>
       update(member, { banned: true }, `${member.name} is banned`, "Their sessions and connected agents stop working."),
     unban: (member: Member) => update(member, { banned: false }, `${member.name} can sign in again`),

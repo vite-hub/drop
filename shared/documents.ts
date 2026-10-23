@@ -196,7 +196,7 @@ export function planDocument(
   inset = 0,
   width: DocWidth = "readable",
 ): string {
-  if (kind === "html") return injectRuntime(source, dark, inset)
+  if (kind === "html") return injectRuntime(source, dark, inset, true)
   if (kind === "image") {
     const src = source.trim().startsWith("<svg")
       ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`
