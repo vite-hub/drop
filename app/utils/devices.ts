@@ -7,10 +7,13 @@ export const DEVICES: { id: Preset; label: string; icon: string; width: number; 
   { id: "desktop", label: "Desktop", icon: "i-mingcute-monitor-line", width: 1920, height: 1080 },
 ]
 
-/** Device mode: whether it's on, and the size, a device's or one typed or dragged (`custom`). Off, the page fills. */
-export type DeviceSize = { on: boolean; id: Preset | "custom"; width: number; height: number }
+/**
+ * Device mode: whether it's on, the size (a device's, or one typed or dragged: `custom`), and the zoom, a fraction or
+ * `null` to fit the pane. Off, the page fills the pane.
+ */
+export type DeviceSize = { on: boolean; id: Preset | "custom"; width: number; height: number; zoom?: number | null }
 
-/** The widths Chrome's device mode marks above the page, narrowest first. A click sets the page to one. */
+/** The widths Chrome's device mode marks above the page, narrowest first. The device bar's boxes set the page to one. */
 export const BREAKPOINTS = [
   { label: "Mobile S", width: 320 },
   { label: "Mobile M", width: 375 },
@@ -21,6 +24,8 @@ export const BREAKPOINTS = [
   { label: "4K", width: 2560 },
 ]
 
+export const ZOOM_MIN = 0.1
+export const ZOOM_MAX = 4
 // Chrome's device mode and T3 Code's preview take the same bounds.
 export const DEVICE_MIN = 240
 export const DEVICE_MAX = 3840
