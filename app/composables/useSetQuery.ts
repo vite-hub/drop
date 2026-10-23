@@ -1,7 +1,7 @@
 import type { LocationQueryRaw, Router } from "vue-router"
 
 // The query each router is still navigating to. A key on the router, not module state, so server requests don't share it.
-const pending = new WeakMap<Router, LocationQueryRaw>()
+const pending = new WeakMap<Router, { location: string; query: LocationQueryRaw }>()
 
 const queryKey = (query: LocationQueryRaw) =>
   Object.entries(query)
@@ -19,14 +19,17 @@ export function useSetQuery() {
   const route = useRoute()
   const router = useRouter()
   return async (patch: Record<string, string | number | undefined>, { push = false } = {}) => {
-    const base = pending.get(router) ?? route.query
+    const location = `${route.path}${route.hash}`
+    const pendingQuery = pending.get(router)
+    const base = pendingQuery?.location === location ? pendingQuery.query : route.query
     const query = { ...base, ...patch }
     if (queryKey(query) === queryKey(base)) return
-    pending.set(router, query)
+    const next = { location, query }
+    pending.set(router, next)
     try {
       await navigateTo({ query, hash: route.hash }, { replace: !push })
     } finally {
-      if (pending.get(router) === query) pending.delete(router)
+      if (pending.get(router) === next) pending.delete(router)
     }
   }
 }

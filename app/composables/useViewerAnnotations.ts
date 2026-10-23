@@ -47,7 +47,17 @@ export function useViewerAnnotations(options: {
    * another comment in the meantime clears it, so the late report doesn't open a thread the reader moved on from.
    */
   let awaited: string | null = null
-  const awaitThread = (id: string | null) => (awaited = id)
+  let focusGeneration = 0
+  const beginFocus = () => {
+    awaited = null
+    return ++focusGeneration
+  }
+  const isFocusCurrent = (generation: number) => generation === focusGeneration
+  const awaitThread = (id: string | null, generation?: number) => {
+    if (generation !== undefined && generation !== focusGeneration) return false
+    awaited = id
+    return true
+  }
   const commenting = computed(() => drop.value.canComment && !editing.value)
 
   /**
@@ -72,6 +82,7 @@ export function useViewerAnnotations(options: {
   function setTool(next: ViewerTool) {
     if (next === "comment" && !canDrawArea.value) return
     awaited = null
+    focusGeneration++
     popover.value = selection.value = null
     tool.value = tool.value === next ? "browse" : next
     if (tool.value !== "browse" && !options.wide.value) options.mobileSide.value = false
@@ -89,6 +100,7 @@ export function useViewerAnnotations(options: {
   function dismiss() {
     const waiting = awaited !== null
     awaited = null
+    focusGeneration++
     if (waiting || popover.value || selection.value) popover.value = selection.value = null
     else tool.value = "browse"
   }
@@ -96,7 +108,10 @@ export function useViewerAnnotations(options: {
   function receive(message: PointerMessage, frame: DOMRect) {
     if (message.type === "marker" && message.focused && message.id !== awaited) return
     // A pin, an area or an image picked meanwhile is the reader moving on.
-    if (message.type === "marker" || message.type === "area" || message.type === "image") awaited = null
+    if (message.type === "marker" || message.type === "area" || message.type === "image") {
+      awaited = null
+      focusGeneration++
+    }
     if (message.type === "selection" && commenting.value) {
       selection.value = message.clear
         ? null
@@ -196,6 +211,8 @@ export function useViewerAnnotations(options: {
     toggleOverlay,
     dismiss,
     awaitThread,
+    beginFocus,
+    isFocusCurrent,
     receive,
     commentOnSelection,
     pickImage,
