@@ -124,7 +124,7 @@ function leaveDocs() {
         handle: hidden ? 'lg:hidden' : undefined,
         header: 'h-12 border-b border-default px-4',
         body: 'gap-0 p-2',
-        footer: 'border-t border-default p-2',
+        footer: 'flex-col items-stretch gap-0.5 border-t border-default p-2',
       }"
     >
       <template #header>
@@ -267,6 +267,7 @@ function leaveDocs() {
       </div>
 
       <template #footer>
+        <UpdateReady />
         <UserMenu />
       </template>
     </UDashboardSidebar>
