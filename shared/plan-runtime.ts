@@ -45,7 +45,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
 
   // A rectangle anchors to the smallest element that holds it, never the script's own root (skip).
   function anchorFor(left, top, right, bottom, skip) {
-    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement);
+    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments");
     let best = null, bestArea = Infinity;
     for (const el of under) {
       const r = el.getBoundingClientRect(), area = r.width * r.height;
@@ -384,7 +384,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // The element under a point, past Drop's own layer.
   function elementAt(x, y) {
-    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement) || document.body;
+    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments") || document.body;
   }
   const px = (n) => String(Math.round(n * 10) / 10);
   const num = (value) => parseFloat(value) || 0;
@@ -860,7 +860,9 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
       ? ""
       : `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`
   const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
-  const tail = `<script>${ANNOTATOR_SCRIPT.replace("__AUTHORED__", String(authored)).replace("__THEMED__", String(Boolean(theme))).replace("__DARK__", String(dark))}</script>`
+  const tail = `<script>${ANNOTATOR_SCRIPT.replace("__AUTHORED__", String(authored))
+    .replace("__THEMED__", String(Boolean(theme)))
+    .replace("__DARK__", String(dark))}</script>`
   let out = prependToHead(html, head)
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail
   return out

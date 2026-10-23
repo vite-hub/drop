@@ -60,7 +60,8 @@
   --ui-error: var(--destructive);
   --ui-radius: calc(var(--radius) * 0.6);
   --toolbar-shadow:
-    0 0 0 0.5px oklch(0 0 0 / 18%), 0 1px 1px oklch(0 0 0 / 6%), 0 3px 9px oklch(0 0 0 / 6%), 0 6px 18px oklch(0 0 0 / 3%);
+    0 0 0 0.5px oklch(0 0 0 / 18%), 0 1px 1px oklch(0 0 0 / 6%), 0 3px 9px oklch(0 0 0 / 6%),
+    0 6px 18px oklch(0 0 0 / 3%);
 }
 
 .dark {
