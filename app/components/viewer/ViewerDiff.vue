@@ -5,8 +5,7 @@
 import { diffHunks, diffLines } from "#shared/line-diff"
 import type { DropDetail, DropVersion } from "#shared/types"
 
-/** `inset`: room to leave on the right for the floating panel, in pixels. */
-const props = defineProps<{ version: DropVersion; previous: DropVersion | null; inset: number; copied?: boolean }>()
+const props = defineProps<{ version: DropVersion; previous: DropVersion | null; copied?: boolean }>()
 const emit = defineEmits<{ close: []; copyLink: [] }>()
 const versionTo = useVersionTo()
 
@@ -45,10 +44,7 @@ const counts = computed(() => ({
 
 <template>
   <section :aria-label="`What changed in v${version.version}`" class="absolute inset-0 z-10 flex flex-col bg-default">
-    <div
-      class="flex h-10 shrink-0 items-center gap-2 border-b border-default pr-2 pl-2 text-sm"
-      :style="{ paddingRight: inset ? `${inset}px` : undefined }"
-    >
+    <div class="flex h-10 shrink-0 items-center gap-2 border-b border-default pr-2 pl-2 text-sm">
       <!-- The way back leads the bar with a label, where it reads first; Esc and the browser's Back do the same. -->
       <UTooltip :kbds="['Esc']" text="Back to the document">
         <UButton
@@ -91,10 +87,7 @@ const counts = computed(() => ({
       </UTooltip>
     </div>
 
-    <div
-      class="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-8"
-      :style="{ paddingRight: inset ? `${inset}px` : undefined }"
-    >
+    <div class="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-8">
       <p v-if="error" class="py-10 text-center text-sm text-muted">
         {{ errorText(error, "Couldn't open that version.") }}
       </p>
