@@ -9,7 +9,7 @@ useSeoMeta({
 })
 
 const rows = computed(() => [
-  { label: "Drops", free: "50", team: "100 per member" },
+  { label: "Drops", free: "50", team: "Any number" },
   { label: "Storage", free: "100 MiB", team: "1 GiB per member" },
   { label: "Kept forever", free: `${plans.value?.freeKept} drops at a time`, team: "Any number" },
   { label: "Team members", free: `Up to ${plans.value?.freeMembers}`, team: "Any number" },

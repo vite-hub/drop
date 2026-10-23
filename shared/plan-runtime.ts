@@ -17,8 +17,8 @@ code, kbd, pre, samp { font-family: var(--font-mono); }`
 /** The rules agents follow when they build an HTML plan. Shown on the Agents page and shipped in the skill. */
 export const PLAN_AUTHORING_GUIDE = `Write one self-contained HTML document with inline <style> and <script>. Load libraries from a CDN (Chart.js, Mermaid, D3, KaTeX); they run as-is.
 Drop shows the page full screen, so center a readable column (max-width ~760px) with its own padding.
-Drop injects its theme as CSS custom properties on :root and follows the reader's light/dark mode: --background, --foreground, --muted, --muted-foreground, --card, --border, --primary, --primary-foreground, --destructive, --code-background, --chart-1 … --chart-8 (use in order), --positive, --caution, --negative, --radius, --font-sans, --font-mono. Use them instead of fixed colors. Grayscale first: color only for chart series and status.
-Readers comment by selecting text, clicking images, or drawing a rectangle over any part of the page, so prefer real text, lists, and tables over text baked into images.
+When the page reads them, Drop injects its theme as CSS custom properties on :root and follows the reader's light/dark mode: --background, --foreground, --muted, --muted-foreground, --card, --border, --primary, --primary-foreground, --destructive, --code-background, --chart-1 … --chart-8 (use in order), --positive, --caution, --negative, --radius, --font-sans, --font-mono. Use them instead of fixed colors. Grayscale first: color only for chart series and status.
+Readers comment by selecting text or drawing a rectangle over any part of the page; clicks stay your page's own. Prefer real text, lists, and tables over text baked into images.
 These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`
 
 /**
@@ -58,17 +58,21 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
 /**
  * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
  * Select text to comment on it; click an image to zoom and comment on a spot; in area mode (Drop's R), drag a rectangle.
+ * On a page someone else built (an HTML doc or an app, AUTHORED), clicks stay the page's own: no image zoom, no copy
+ * buttons on its code. Its images take comments through area mode.
  * Comark's own zoom, such as an annotated screenshot's, shows the comments on what it zooms and takes areas drawn on it.
  * Commented text is highlighted with the CSS Custom Highlight API and everything else draws in a shadow root, so the
  * author's DOM is never modified.
  */
 const ANNOTATOR_SCRIPT = String.raw`(() => {
+  const AUTHORED = __AUTHORED__, THEMED = __THEMED__;
   const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
   const host = document.createElement("drop-comments");
   host.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;";
   const shadow = host.attachShadow({ mode: "open" });
   // --drop-z keeps pins their size on screen over a scaled-up zoom (see zoomLayer).
-  const STYLE = '<style>' +
+  // A page without Drop's theme may lack its tokens, or hold its own under the same names: pins keep Drop's neutrals.
+  const STYLE = '<style>' + (THEMED ? '' : ':host{--primary:#171717;--primary-foreground:#fafafa;--background:#fff;--foreground:#0a0a0a;--muted-foreground:#737373;--card:#fff;--border:#e5e5e5;--font-sans:ui-sans-serif,system-ui,sans-serif}') +
     '.m{position:absolute;scale:var(--drop-z,1);width:22px;height:22px;margin:-11px 0 0 -2px;overflow:hidden;border-radius:11px 11px 11px 2px;background:var(--primary);color:var(--primary-foreground);font:600 10px/22px var(--font-sans);letter-spacing:.02em;text-align:center;cursor:pointer;box-shadow:0 1px 4px rgb(0 0 0/.25),0 0 0 2px var(--background);transition:transform 120ms}' +
     '.m img{display:block;width:100%;height:100%;object-fit:cover}' +
     '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-11px 0 0 -11px;border-radius:11px}' +
@@ -87,7 +91,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
   const pageStyle = document.createElement("style");
-  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}img{cursor:zoom-in}";
+  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img{cursor:zoom-in}");
+  // Highlights draw on the page itself, so without Drop's theme they take a grey that shows on light and dark pages.
+  if (!THEMED) pageStyle.textContent = pageStyle.textContent.replaceAll("var(--foreground)", "#808080");
   let markers = [], active = null;
   const highlights = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
 
@@ -252,7 +258,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     }
     // A copy button on each code block, shown while the pointer is over it: the block scrolls sideways under it, so an
     // always-on label would sit on top of the code. The sandbox has no clipboard access, so Drop copies.
-    if (!zoom) document.querySelectorAll("pre:not(.mermaid)").forEach((pre) => {
+    if (!zoom && !AUTHORED) document.querySelectorAll("pre:not(.mermaid)").forEach((pre) => {
       const r = pre.getBoundingClientRect();
       if (r.height < 24) return;
       const chip = document.createElement("button");
@@ -304,7 +310,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // Comark zooms its own blocks, such as annotated screenshots: its view keeps their marks and notes and pages
     // through a comparison, which Drop's lightbox of the bare image can't. The area tool still comments on them.
     const zoomed = target && target.closest("[data-zoom], .cz-dialog");
-    const img = !zoomed && target && target.closest("img");
+    const img = !AUTHORED && !zoomed && target && target.closest("img");
     // A srcdoc document resolves "#id" against Drop's page, so the frame would load Drop and be refused. Scroll here.
     const link = !img && location.protocol === "about:" && target && target.closest('a[href^="#"]');
     if (link && !host.contains(link)) {
@@ -433,7 +439,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   post({ type: "ready" });
 })();`
 
-/** Inject theme + annotator into a full HTML document without touching the author's markup. */
 /**
  * In an opaque-origin sandbox (no content origin configured), storage, cookies, and URL changes throw a
  * SecurityError ("The operation is insecure"), which crashes apps that never expected it. Give them in-memory
@@ -519,10 +524,27 @@ export function prependToHead(html: string, snippet: string): string {
   return doctype + snippet + html.slice(doctype.length)
 }
 
-/** `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it. */
-export function injectRuntime(html: string, dark: boolean, inset = 0): string {
-  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script><style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
-  const tail = `<script>${ANNOTATOR_SCRIPT}</script>`
+/**
+ * Whether a page was written for Drop's theme (PLAN_AUTHORING_GUIDE): it reads Drop's tokens without setting its own.
+ * A page with its own design, such as a Tailwind app, never gets Drop's fonts, base size, or dark class.
+ */
+const DROP_TOKEN =
+  /var\(\s*--(?:background|foreground|muted|muted-foreground|card|border|primary|primary-foreground|destructive|code-background|chart-\d|positive|caution|negative)\s*[,)]/
+const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\s*:/.test(html)
+
+/**
+ * Injects Drop's runtime into a full HTML document without touching the author's markup.
+ * `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it.
+ * `authored`: a page someone else built (an HTML doc or an app page), which gets only what comments need: Drop's
+ * theme only if it reads Drop's tokens, and a comment layer that leaves its clicks alone (ANNOTATOR_SCRIPT).
+ */
+export function injectRuntime(html: string, dark: boolean, inset = 0, authored = false): string {
+  const theme =
+    authored && !usesDropTheme(html)
+      ? ""
+      : `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`
+  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
+  const tail = `<script>${ANNOTATOR_SCRIPT.replace("__AUTHORED__", String(authored)).replace("__THEMED__", String(Boolean(theme)))}</script>`
   let out = prependToHead(html, head)
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail
   return out

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The drop viewer (T3 Code's layout): a main column with its own header, and one panel with tabs (Comments,
-// Details) that floats over the content, Mesurer-style. Docs and apps share it. People review and comment, agents
+// The drop viewer (T3 Code's layout): a main column with its own header, and a full-height, resizable panel beside it
+// with tabs (Comments, History, Details). Docs and apps share it. People review and comment, agents
 // publish new versions, and people who may edit a Markdown doc edit it together live (useLiveEditor). State lives in
 // composables (useDrop, useViewerPanel, useAppFiles, useViewerFrame, useViewerAnnotations, useLiveEditor); this file
 // wires them up.
@@ -124,6 +124,17 @@ const replaced = (comment: DropComment) => drop.value.kind === "image" && commen
 const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
+// The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
+// underline (`after:hidden` covers the one Nuxt UI paints before hydration).
+const panelTabsUi = {
+  list: "gap-1 border-0 mb-0 p-0",
+  indicator: "hidden",
+  trigger:
+    "h-6 gap-1 rounded-md py-0 pr-2 pl-1.5 font-normal after:hidden data-[state=active]:bg-elevated data-[state=active]:text-highlighted hover:data-[state=inactive]:not-disabled:bg-elevated/60 hover:data-[state=inactive]:not-disabled:text-highlighted",
+  leadingIcon: "size-3.5",
+}
+// Shared with someone, or waiting on review: its status sits beside the title. A private drop gets Share on the right.
+const shared = computed(() => drop.value.share !== "private" || Boolean(drop.value.shareReview))
 // Comments has its own button in the header: it opens the panel there, and closes it once open. History and Details
 // open from More, the panel's tabs, or H and I.
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
@@ -135,10 +146,7 @@ if (route.query.changes && has("history")) {
   sideOpen.value = true
 }
 // A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
-const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
-/** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
-const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
-const inset = computed(() => (floating.value ? FLOATING_INSET : 0))
+const docked = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 
 // A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
 const docWidth = useDocWidth()
@@ -159,7 +167,8 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
   frame,
   app,
   pinned,
-  inset,
+  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+  inset: ref(0),
   width: docWidth,
   annotations,
 })
@@ -558,7 +567,16 @@ watch(
 <template>
   <DefineSide>
     <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default pr-2 pl-2">
-      <UTabs v-model="tab" class="min-w-0" color="neutral" :content="false" :items="tabs" size="sm">
+      <UTabs
+        v-model="tab"
+        class="min-w-0"
+        color="neutral"
+        :content="false"
+        :items="tabs"
+        size="xs"
+        :ui="panelTabsUi"
+        variant="link"
+      >
         <template #trailing="{ item }">
           <span v-if="item.count" class="font-mono text-[11px] text-dimmed tabular-nums">{{ item.count }}</span>
         </template>
@@ -631,7 +649,7 @@ watch(
     </div>
   </DefineSide>
 
-  <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
+  <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }">
     <template #header>
       <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
@@ -683,8 +701,20 @@ watch(
           </span>
         </template>
         <!-- After the title, not in it: the heading stays the drop's name. -->
-        <template v-if="drop.resources && !editing" #trailing>
-          <ViewerResources :resources="drop.resources" />
+        <template v-if="(owner && shared) || (drop.resources && !editing)" #trailing>
+          <!-- Who can open it, beside its name; a private drop has a Share button on the right instead. -->
+          <UTooltip v-if="owner && shared" text="Change who can open it">
+            <UButton
+              class="shrink-0"
+              color="neutral"
+              :icon="SHARE_ICONS[drop.share]"
+              :label="shareStatus(drop, now)"
+              size="xs"
+              variant="subtle"
+              @click="shareOpen = true"
+            />
+          </UTooltip>
+          <ViewerResources v-if="drop.resources && !editing" :resources="drop.resources" />
         </template>
         <template v-if="editing" #right>
           <AvatarStack
@@ -777,14 +807,13 @@ watch(
             />
           </UDropdownMenu>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
-          <USeparator v-if="owner || visitor" class="ml-1 h-4" orientation="vertical" />
+          <USeparator v-if="(owner && !shared) || visitor" class="ml-1 h-4" orientation="vertical" />
           <UButton
-            v-if="owner"
+            v-if="owner && !shared"
             color="neutral"
             :icon="SHARE_ICONS[drop.share]"
-            :label="drop.share === 'private' && !drop.shareReview ? 'Share' : shareStatus(drop, now)"
+            label="Share"
             size="sm"
-            :variant="drop.share === 'private' ? 'solid' : 'ghost'"
             @click="shareOpen = true"
           />
           <UButton
@@ -871,26 +900,10 @@ watch(
 
       <div class="relative flex min-h-0 flex-1 flex-col">
         <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
-        <!-- The grid keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
-        <ViewerFolder
-          v-else-if="drop.kind === 'folder'"
-          :class="floating && 'pr-96'"
-          :drop="drop"
-          :public-view="publicView"
-        />
-        <ViewerSite
-          v-else-if="drop.kind === 'site'"
-          :drop="drop"
-          :inset="floating ? FLOATING_INSET : 0"
-          :public-view="publicView"
-        />
-        <LazyViewerBoard
-          v-else-if="drop.kind === 'board'"
-          :key="drop.id"
-          :drop="drop"
-          :inset="floating ? FLOATING_INSET : 0"
-        />
-        <ViewerVideo v-else-if="video && drop.url" :inset="inset" :src="drop.url" :title="drop.title" :type="video" />
+        <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
+        <ViewerSite v-else-if="drop.kind === 'site'" :drop="drop" :public-view="publicView" />
+        <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
+        <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
         <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
         <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
           <div>
@@ -935,24 +948,36 @@ watch(
         <ViewerDiff
           v-if="shownVersion && !editing"
           :key="shownVersion.id"
-          :inset="floating ? FLOATING_INSET : 0"
           :previous="previousVersion"
           :copied="copied('changes')"
           :version="shownVersion"
           @close="closeChanges"
           @copy-link="copyChangesLink(shownVersion)"
         />
-
-        <!-- As tall as its content, so a quiet drop gets a small card. Markdown docs make room for it (FLOATING_INSET). -->
-        <aside
-          v-if="floating"
-          class="absolute top-3 right-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[22.5rem] origin-top-right flex-col overflow-hidden rounded-lg border border-default bg-default shadow-md [animation:pop-in_160ms_var(--ease-out)]"
-        >
-          <ReuseSide />
-        </aside>
       </div>
     </template>
   </UDashboardPanel>
+  <!-- Beside the page, full height, like T3 Code's right panel: it pushes the content instead of covering it. The page's
+       right border divides them, and the handle on it resizes the panel; double-click resets it. -->
+  <template v-if="docked">
+    <UDashboardResizeHandle
+      aria-orientation="vertical"
+      @dblclick="panel.resize.reset"
+      @lostpointercapture="panel.resize.end"
+      @pointerdown="panel.resize.start"
+      @pointermove="panel.resize.move"
+    />
+    <UDashboardPanel
+      id="drop-side"
+      class="flex-none lg:w-(--width)"
+      :style="{ '--width': `${panel.width.value}rem` }"
+      :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
+    >
+      <template #body>
+        <ReuseSide />
+      </template>
+    </UDashboardPanel>
+  </template>
   <USlideover
     v-if="!wide && !editing"
     v-model:open="mobileSide"

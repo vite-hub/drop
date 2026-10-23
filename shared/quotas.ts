@@ -8,7 +8,8 @@ export type Tier = (typeof TIERS)[number]
 export const MIB = 1024 * 1024
 export const MAX_APP_FILES = 1000
 export const MAX_APP_BYTES = 25 * MIB
-export const DEFAULT_PRO_LIMITS = { drops: 100, bytes: 1024 * MIB, writes: 10_000 } as const
+/** Pro keeps any number of drops unless an operator caps them (`DROP_PRO_DROPS`); storage and writes stay capped. */
+export const DEFAULT_PRO_LIMITS = { drops: null, bytes: 1024 * MIB, writes: 10_000 } as const
 /** Drops a Free plan keeps forever at once (`DROP_FREE_KEPT`). Team folders and drops inside folders don't count. */
 export const DEFAULT_FREE_KEPT = 10
 /** Members a team has before it needs a subscription (`DROP_FREE_TEAM_MEMBERS`). */

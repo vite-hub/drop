@@ -458,7 +458,8 @@ export default defineNuxtConfig({
           quotas: {
             enabled: env.boolean({ source: env.source("DROP_QUOTAS"), default: false }),
             plan: env.enum(PLANS, { source: env.source("DROP_DEFAULT_PLAN"), default: "free" }),
-            proDrops: env.number({ source: env.source("DROP_PRO_DROPS"), default: DEFAULT_PRO_LIMITS.drops }),
+            // Unset keeps Pro drops unlimited; a number caps them.
+            proDrops: env.number({ optional: true, source: env.source("DROP_PRO_DROPS") }),
             proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
             proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
             // Drops a Free plan keeps forever at once; Pro keeps any number.

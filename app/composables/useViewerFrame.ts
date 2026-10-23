@@ -57,7 +57,8 @@ export function useViewerFrame(options: {
   watch(options.inset, (value) => (startInset = value), { immediate: true, flush: "sync" })
   let startWidth: DocWidth = "readable"
   watch(options.width, (value) => (startWidth = value), { immediate: true, flush: "sync" })
-  const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset)
+  const appDocument = (path: string) =>
+    injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset, true)
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
   // panel showing doesn't slide left once it loads.
