@@ -50,7 +50,7 @@ const style = computed(() => {
 /** Escape in an empty box closes; with text, it only leaves the box, and the viewer's Escape closes from there. */
 function escape(event: KeyboardEvent) {
   if (!body.value.trim()) return emit("cancel")
-  ;(event.target as HTMLElement).blur()
+  if (event.target instanceof HTMLElement) event.target.blur()
 }
 
 // Pressing outside takes focus from the box before the click lands, so whether it was being typed in is read on press.

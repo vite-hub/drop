@@ -6,18 +6,6 @@
 // replaces the fit, and a page bigger than the pane then scrolls. Size and zoom changes ease in. Its right, bottom, and
 // corner edges drag to any size, and the size shows on the page while they do. Off, the page fills the pane as before.
 // The same elements render either way, so switching never reloads the page.
-import {
-  BREAKPOINTS,
-  DEVICE_MAX,
-  DEVICE_MIN,
-  DEVICES,
-  type DeviceSize,
-  ZOOM_MAX,
-  ZOOM_MIN,
-  clampDevice,
-  deviceMatching,
-  deviceOf,
-} from "~/utils/devices"
 
 // `bottom` keeps the page clear of what floats under it, the review toolbar by default.
 const { on, bottom = 72 } = defineProps<{ on: boolean; bottom?: number }>()
@@ -68,8 +56,7 @@ const toFit = () => (device.value = { ...device.value, zoom: null })
 
 let start: { x: number; y: number; width: number; height: number } | null = null
 function grab(event: PointerEvent) {
-  // SAFETY: pointer events are dispatched from the handle element that owns the pointer capture.
-  ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+  if (event.currentTarget instanceof Element) event.currentTarget.setPointerCapture(event.pointerId)
   start = { x: event.clientX, y: event.clientY, width: device.value.width, height: device.value.height }
   held.value = scale.value
 }
