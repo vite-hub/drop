@@ -4,10 +4,17 @@
 // black tooltip with the key after the name. It picks the tool the pointer has over the page (Browse, Comment, Measure)
 // and what draws over it under any tool (rulers and guides, X-ray outlines, the comments' pins); the frame does the
 // drawing (shared/plan-runtime.ts). A Markdown doc adds its reading width (`width`, the one showing), which W steps
-// through too. It centers under the page; the side panel sits beside it, not over it.
+// through too. Last, on pages, device mode (ViewerDeviceButton). It centers under the page; the side panel sits beside
+// it, not over it.
 import type { ViewerOverlays, ViewerTool } from "~/composables/useViewerAnnotations"
 
-const props = defineProps<{ tool: ViewerTool; overlays: ViewerOverlays; canComment: boolean; width?: string }>()
+const props = defineProps<{
+  tool: ViewerTool
+  overlays: ViewerOverlays
+  canComment: boolean
+  width?: string
+  sizable: boolean
+}>()
 const emit = defineEmits<{ tool: [tool: ViewerTool]; toggle: [overlay: keyof ViewerOverlays]; width: [] }>()
 
 type Item = { id: string; label: string; icon: string; kbd?: string; on: boolean; press: () => void }
@@ -125,6 +132,12 @@ const hint = computed(() => {
               {{ item.label }}<span v-if="item.kbd" class="ml-1.5 opacity-60">{{ item.kbd }}</span>
             </template>
           </UTooltip>
+        </div>
+      </template>
+      <template v-if="sizable">
+        <div aria-hidden="true" class="w-px shrink-0 bg-(--ui-border)" />
+        <div aria-label="Device" class="flex items-center p-1" role="group">
+          <ViewerDeviceButton />
         </div>
       </template>
     </div>

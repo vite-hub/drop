@@ -277,7 +277,7 @@ export default defineNuxtConfig({
 
   icon: {
     provider: "none",
-    // Kind and agent icons are picked at runtime (KIND_ICONS, agentLogo), so the scanner can't see them.
+    // Kind, agent, and device icons are picked at runtime (KIND_ICONS, agentLogo, DEVICES), so the scanner can't see them.
     clientBundle: {
       scan: true,
       icons: [
@@ -292,6 +292,10 @@ export default defineNuxtConfig({
         "mingcute:sparkles-line",
         "mingcute:key-2-line",
         "mingcute:user-3-line",
+        "mingcute:cellphone-line",
+        "mingcute:pad-line",
+        "mingcute:laptop-line",
+        "mingcute:monitor-line",
         "simple-icons:claude",
         "simple-icons:openai",
         "simple-icons:cursor",

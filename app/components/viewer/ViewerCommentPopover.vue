@@ -16,6 +16,8 @@ const props = defineProps<{
   comment?: DropComment
   canManage: boolean
   canReply: boolean
+  draft?: string
+  draftError?: string
 }>()
 const emit = defineEmits<{
   submit: [body: string, files: File[]]
@@ -26,11 +28,11 @@ const emit = defineEmits<{
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
 }>()
-const body = ref("")
+const body = ref(props.draft ?? "")
 const busy = ref(false)
 const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
 // Why the last send failed, under the box that sent it; editing the text clears it.
-const error = ref<string>()
+const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
 const viewport = useWindowSize()
 const card = useTemplateRef("card")
@@ -43,15 +45,25 @@ const style = computed(() => {
   return { left: `${left}px`, top: `${top}px`, width: `${width.value}px` }
 })
 
+function escape(event: KeyboardEvent) {
+  if (!body.value.trim()) return emit("cancel")
+  if (event.target instanceof HTMLElement) event.target.blur()
+}
+let typing = false
+const press = () => (typing = Boolean(body.value.trim() && card.value?.contains(document.activeElement)))
+const clickAway = () => typing || emit("cancel")
+
 function send() {
   if (!body.value.trim() || busy.value) return
   busy.value = true
   if (props.comment) emit("reply", props.comment.id, body.value, files.value)
   else emit("submit", body.value, files.value)
+
 }
 defineExpose({
-  fail: (reason?: string) => {
+  fail: (reason?: string, text?: string) => {
     busy.value = false
+    if (text && !body.value) body.value = text
     error.value = reason
   },
   /** A reply went through: clear the box for the next one, and show it at the bottom of the thread. */
@@ -89,7 +101,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
-  <div class="fixed inset-0 z-40" @click="emit('cancel')" />
+  <div class="fixed inset-0 z-40" @click="clickAway" @pointerdown="press" />
   <div
     ref="card"
     class="fixed z-50 flex origin-top-left flex-col overflow-hidden rounded-xl border border-default bg-default text-default shadow-lg shadow-black/5 [animation:pop-in_160ms_var(--ease-out)]"
@@ -112,7 +124,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc="emit('cancel')"
+          @keydown.esc.stop="escape"
           @paste="paste"
         />
         <UTooltip text="Add images">
@@ -198,7 +210,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
 
       <ViewerImagePicks v-if="canReply" class="border-t border-default px-2.5 pt-1.5" :picks="picks" @remove="remove" />
       <div
-        v-if="canReply"
+          v-if="canReply"
         class="flex shrink-0 items-end gap-1 p-1.5 pl-2.5"
         :class="picks.length ? '' : 'border-t border-default'"
         @dragover.prevent
