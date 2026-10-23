@@ -997,7 +997,6 @@ watch(
         <ViewerToolbar
           v-if="framed && !shownVersion"
           :can-comment="canDrawArea"
-          :inset="floating ? FLOATING_INSET : 0"
           :overlays="overlays"
           :tool="tool"
           @toggle="toggleOverlay"

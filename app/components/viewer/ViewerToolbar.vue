@@ -3,10 +3,10 @@
 // shadows, 32px buttons in groups split by full-height hairlines, the tool that's on filled in the tools' one blue, and a
 // black tooltip with the key after the name. It picks the tool the pointer has over the page (Browse, Comment, Measure)
 // and what draws over it under any tool (rulers and guides, X-ray outlines, the comments' pins); the frame does the
-// drawing (shared/plan-runtime.ts). It centers on the room the floating panel leaves (`inset`).
+// drawing (shared/plan-runtime.ts). It centers under the page; the side panel sits beside it, not over it.
 import type { ViewerOverlays, ViewerTool } from "~/composables/useViewerAnnotations"
 
-const props = defineProps<{ tool: ViewerTool; overlays: ViewerOverlays; canComment: boolean; inset: number }>()
+const props = defineProps<{ tool: ViewerTool; overlays: ViewerOverlays; canComment: boolean }>()
 const emit = defineEmits<{ tool: [tool: ViewerTool]; toggle: [overlay: keyof ViewerOverlays] }>()
 
 type Item = { id: string; label: string; icon: string; kbd?: string; on: boolean; press: () => void }
@@ -70,7 +70,6 @@ const hint = computed(() => {
 <template>
   <div
     class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex flex-col items-center gap-2 px-4 pb-[env(safe-area-inset-bottom)]"
-    :style="{ paddingRight: `${inset + 16}px` }"
   >
     <Transition
       enter-active-class="transition-[opacity,translate] duration-150 ease-out motion-reduce:transition-opacity"
