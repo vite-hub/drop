@@ -47,12 +47,22 @@ const { signedIn, signInWithGitHub } = useGitHubSignIn()
 // `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.
 const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
 
-// Try it now: the one-line setups. Cursor, VS Code, and the chat apps take a file or a form, so they live on /docs/agents.
+// Try it now: the agents are the picker. The selected one shows its name and its color, the others their name on hover.
 const SNIPPETS = mcpSnippets(`${origin}/mcp`)
-const TRY = (["claude", "codex", "any"] as const).map((value) => ({ value, label: MCP_CLIENTS[value] }))
-const client = ref<(typeof TRY)[number]["value"]>("claude")
-
-const AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Windsurf", "Zed", "opencode"]
+const TRY = [
+  { value: "claude", icon: "i-simple-icons-claude", color: "#D97757" },
+  { value: "codex", icon: "i-simple-icons-openai" },
+  { value: "cursor", icon: "i-simple-icons-cursor" },
+  { value: "vscode", icon: "i-simple-icons-visualstudiocode", color: "#0098FF" },
+  { value: "claudeai", icon: "i-simple-icons-anthropic" },
+  { value: "chatgpt", icon: "i-mingcute-openai-line" },
+  {
+    value: "any",
+    icon: "i-simple-icons-modelcontextprotocol",
+    tip: "Any MCP client: Copilot, Gemini CLI, Zed, opencode…",
+  },
+] as const satisfies readonly { value: McpClient; icon: string; color?: string; tip?: string }[]
+const client = ref<McpClient>("claude")
 
 // The loop, in what you type and what Drop shows back.
 const STEPS = [
@@ -173,92 +183,91 @@ const FAQ = [
     <SiteHeader wide />
 
     <main>
-      <!-- Hero: what it is, the command to try it, and the agents it works with. The pattern skills.sh uses. -->
+      <!-- Hero: what it is and the command to try it, with the agents as the picker. -->
       <div class="relative isolate">
         <LandingShader
-          class="absolute inset-x-0 top-0 -z-10 h-[64rem] w-full [mask-image:radial-gradient(ellipse_75%_55%_at_50%_68%,black_35%,transparent)]"
+          class="absolute inset-x-0 top-0 -z-10 h-[72rem] w-full [mask-image:radial-gradient(ellipse_70%_45%_at_50%_72%,black_30%,transparent)]"
         />
-        <section class="mx-auto max-w-6xl px-4 pt-16 pb-16 sm:px-6 lg:pt-24 lg:pb-20">
-          <div class="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16">
-            <div>
-              <p class="label-mono">Drop · for Claude Code, Codex, and any MCP agent</p>
-              <h1
-                class="mt-5 max-w-[14ch] text-[clamp(2.5rem,6vw,4.25rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-highlighted"
-              >
-                Review what your
-                <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">agent</em> makes.
-              </h1>
-              <p class="mt-6 max-w-[52ch] text-lg leading-relaxed text-pretty text-muted">
-                Your agent drops a link. You comment on the exact spot. It publishes the next version.
-              </p>
-              <div class="mt-8 flex flex-wrap items-center gap-3">
-                <UButton
-                  v-if="signedIn"
-                  color="neutral"
-                  size="lg"
-                  class="h-10 px-4"
-                  label="Open Drop"
-                  trailing-icon="i-mingcute-arrow-right-line"
-                  to="/drops"
-                />
-                <UButton
-                  v-else
-                  color="neutral"
-                  size="lg"
-                  class="h-10 px-4"
-                  icon="i-simple-icons-github"
-                  label="Sign in with GitHub"
-                  @click="signInWithGitHub"
-                />
-                <UButton color="neutral" variant="ghost" size="lg" class="h-10 px-4" label="How it works" to="#how" />
-              </div>
-              <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 max-w-xs" />
-            </div>
+        <section class="mx-auto flex max-w-6xl flex-col items-center px-4 pt-20 pb-16 text-center sm:px-6 lg:pt-28">
+          <h1
+            class="max-w-[15ch] text-[clamp(2.5rem,6.5vw,4.5rem)] leading-[1.1] font-semibold tracking-[-0.045em] text-balance text-highlighted"
+          >
+            Review what your
+            <!-- The word looks the way a commented sentence looks in Drop: highlighted, with its pin. -->
+            <span class="relative whitespace-nowrap"
+              ><span class="inline-block rounded-lg bg-amber-200/70 px-1.5 pb-1 leading-[0.95] dark:bg-amber-400/25"
+                >agent</span
+              ><span
+                class="absolute -top-1 -right-2.5 grid size-5 place-items-center rounded-full bg-inverted text-[11px] font-semibold tracking-normal text-inverted shadow-sm"
+                aria-hidden="true"
+                >1</span
+              ></span
+            >
+            makes.
+          </h1>
+          <p class="mt-6 max-w-[56ch] text-lg leading-relaxed text-balance text-muted">
+            Your agent drops a link. You comment on the exact spot. It publishes the next version.
+          </p>
+          <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <UButton
+              v-if="signedIn"
+              color="neutral"
+              size="lg"
+              class="h-10 px-4"
+              label="Open Drop"
+              trailing-icon="i-mingcute-arrow-right-line"
+              to="/drops"
+            />
+            <UButton
+              v-else
+              color="neutral"
+              size="lg"
+              class="h-10 px-4"
+              icon="i-simple-icons-github"
+              label="Sign in with GitHub"
+              @click="signInWithGitHub"
+            />
+            <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="How it works" to="#how" />
+          </div>
+          <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 w-full max-w-xs text-left" />
 
-            <div class="flex flex-col gap-8 lg:pt-10">
-              <div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <h2 class="label-mono text-highlighted">Try it now</h2>
-                  <UTabs
-                    v-model="client"
-                    :items="TRY"
-                    :content="false"
-                    color="neutral"
-                    size="xs"
-                    :ui="{
-                      list: 'w-auto',
-                      indicator: 'bg-default shadow-xs ring ring-default',
-                      trigger: 'text-xs data-[state=active]:text-highlighted',
-                    }"
-                  />
-                </div>
-                <AgentsCodeBlock class="mt-3" :code="SNIPPETS[client]" />
-                <p class="mt-3 text-sm text-pretty text-muted">
-                  {{ MCP_HINTS[client] }}
-                  <NuxtLink
-                    to="/docs/agents"
-                    class="whitespace-nowrap text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)"
-                    >Other agents</NuxtLink
+          <div class="mt-12 w-full max-w-xl rounded-xl border border-default bg-default p-1.5 text-left shadow-xs">
+            <div class="flex items-center justify-between gap-3 p-1">
+              <h2 class="sr-only">Try it now</h2>
+              <div role="group" aria-label="Your agent" class="flex flex-wrap items-center gap-0.5">
+                <UTooltip
+                  v-for="item in TRY"
+                  :key="item.value"
+                  :text="'tip' in item ? item.tip : MCP_CLIENTS[item.value]"
+                  :disabled="client === item.value && !('tip' in item)"
+                >
+                  <button
+                    type="button"
+                    :aria-pressed="client === item.value"
+                    :aria-label="MCP_CLIENTS[item.value]"
+                    class="flex h-7 items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
+                    :class="
+                      client === item.value
+                        ? 'bg-elevated font-medium text-highlighted'
+                        : 'text-dimmed hover:bg-muted hover:text-highlighted'
+                    "
+                    @click="client = item.value"
                   >
-                </p>
+                    <UIcon
+                      :name="item.icon"
+                      class="size-4 shrink-0"
+                      :style="client === item.value && 'color' in item ? { color: item.color } : undefined"
+                    />
+                    <span v-if="client === item.value">{{ MCP_CLIENTS[item.value] }}</span>
+                  </button>
+                </UTooltip>
               </div>
-              <div>
-                <h2 class="sr-only">Works with</h2>
-                <ul class="flex flex-wrap items-center gap-x-6 gap-y-4">
-                  <li v-for="name in AGENTS" :key="name">
-                    <UTooltip :text="name">
-                      <AgentIcon
-                        :name="name"
-                        kind="agent"
-                        :aria-label="name"
-                        role="img"
-                        class="size-6 opacity-60 grayscale transition hover:opacity-100 hover:grayscale-0"
-                      />
-                    </UTooltip>
-                  </li>
-                </ul>
-              </div>
+              <NuxtLink to="/docs/agents" class="shrink-0 text-xs text-muted hover:text-highlighted"
+                >All setups</NuxtLink
+              >
             </div>
+            <AgentsCodeBlock class="mt-1" :code="SNIPPETS[client]" />
+            <p class="px-2 pt-2 pb-1 text-xs text-pretty text-muted">{{ MCP_HINTS[client] }}</p>
           </div>
         </section>
 
@@ -275,18 +284,21 @@ const FAQ = [
       </div>
 
       <section id="how" class="mx-auto max-w-6xl scroll-mt-14 px-4 pt-24 sm:px-6 lg:pt-32">
-        <p class="label-mono">How it works</p>
-        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-balance text-highlighted">
-          Feedback goes to the agent, not into a
-          <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">chat</em>.
+        <h2 class="text-3xl font-semibold tracking-tight text-balance text-highlighted">
+          Feedback goes to the agent, not into a chat.
         </h2>
-        <ol class="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
-          <li v-for="(step, i) in STEPS" :key="step.title">
-            <p class="flex items-baseline gap-3">
-              <span class="font-mono text-sm text-dimmed tabular-nums">0{{ i + 1 }}</span>
-              <span class="font-medium text-highlighted">{{ step.title }}</span>
-            </p>
-            <p class="mt-2 text-sm leading-relaxed text-pretty text-muted">{{ step.body }}</p>
+        <ol class="mt-10 grid gap-3 md:grid-cols-3">
+          <li
+            v-for="(step, i) in STEPS"
+            :key="step.title"
+            class="flex flex-col rounded-xl border border-default bg-default p-5 shadow-xs"
+          >
+            <span
+              class="grid size-6 place-items-center rounded-full bg-elevated font-mono text-xs text-highlighted tabular-nums"
+              >{{ i + 1 }}</span
+            >
+            <p class="mt-4 font-medium text-highlighted">{{ step.title }}</p>
+            <p class="mt-1 text-sm leading-relaxed text-pretty text-muted">{{ step.body }}</p>
             <p
               v-if="step.prompt"
               class="mt-4 truncate rounded-md border border-default bg-muted px-3 py-2 font-mono text-xs text-highlighted"
@@ -300,8 +312,7 @@ const FAQ = [
       <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p class="label-mono">What it holds</p>
-            <h2 class="mt-3 text-3xl font-semibold tracking-tight text-highlighted">What your agent can drop.</h2>
+            <h2 class="text-3xl font-semibold tracking-tight text-highlighted">What your agent can drop.</h2>
           </div>
           <NuxtLink
             to="/docs/features"
@@ -313,10 +324,13 @@ const FAQ = [
           <li v-for="kind in KINDS" :key="kind.name" :class="kind.wide && 'lg:col-span-2'">
             <NuxtLink
               :to="kind.to"
-              class="group flex h-full min-h-40 flex-col rounded-xl bg-muted p-5 outline-none transition-colors hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
+              class="group flex h-full min-h-40 flex-col rounded-xl border border-default bg-default p-5 shadow-xs outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
             >
               <span class="flex items-center justify-between">
-                <UIcon :name="kind.icon" class="size-5 text-highlighted" />
+                <span
+                  class="grid size-9 place-items-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300"
+                  ><UIcon :name="kind.icon" class="size-5"
+                /></span>
                 <UIcon
                   name="i-mingcute-arrow-right-up-line"
                   class="size-4 text-muted opacity-0 transition-opacity group-hover:opacity-100"
@@ -352,13 +366,10 @@ const FAQ = [
       </section>
 
       <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
-        <h2 class="text-3xl font-semibold tracking-tight text-highlighted">
-          Use it here, or
-          <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">run your own</em>.
-        </h2>
+        <h2 class="text-3xl font-semibold tracking-tight text-highlighted">Use it here, or run your own.</h2>
         <div class="mt-10 grid gap-10 md:grid-cols-2 md:gap-8">
           <div>
-            <p class="label-mono">drop.vitehub.dev</p>
+            <p class="flex items-center gap-2 text-sm text-muted"><DropMark class="h-3" />drop.vitehub.dev</p>
             <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Sign in and start dropping.</p>
             <ul class="mt-4 space-y-2 text-sm text-toned">
               <li v-for="item in HOSTED" :key="item" class="flex gap-2">
@@ -367,7 +378,7 @@ const FAQ = [
             </ul>
           </div>
           <div>
-            <p class="label-mono flex items-center gap-2"><ViteHubMark class="size-3" />Built on ViteHub</p>
+            <p class="flex items-center gap-2 text-sm text-muted"><ViteHubMark class="size-3" />Built on ViteHub</p>
             <p class="mt-2 text-lg font-medium tracking-tight text-highlighted">Deploy one for your team.</p>
             <ul class="mt-4 space-y-2 text-sm text-toned">
               <li v-for="item in SELF_HOSTED" :key="item" class="flex gap-2">
@@ -408,10 +419,7 @@ const FAQ = [
           class="flex flex-col items-start justify-between gap-6 rounded-xl border border-default p-8 sm:flex-row sm:items-center"
         >
           <div>
-            <p class="text-xl font-semibold tracking-tight text-highlighted">
-              Drop your
-              <em class="font-serif text-[1.1em] leading-none font-normal tracking-normal italic">first</em> doc.
-            </p>
+            <p class="text-xl font-semibold tracking-tight text-highlighted">Drop your first doc.</p>
             <p class="mt-1 text-sm text-muted">
               Sign in with GitHub, connect your agent, and ask it to drop something for review.
             </p>
