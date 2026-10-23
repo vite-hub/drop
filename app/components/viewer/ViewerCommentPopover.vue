@@ -144,7 +144,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           />
         </UTooltip>
         <UDropdownMenu v-if="!posting" :content="{ align: 'end' }" :items="menu">
-          <UButton aria-label="More" color="neutral" icon="i-mingcute-more-1-line" size="sm" variant="ghost" />
+          <UButton aria-label="More" color="neutral" icon="i-mingcute-more-1-fill" size="sm" variant="ghost" />
         </UDropdownMenu>
         <UButton
           aria-label="Close"

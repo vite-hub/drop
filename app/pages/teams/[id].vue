@@ -223,7 +223,7 @@ if (import.meta.client && route.query.billing === "done") {
                 <UButton
                   :aria-label="`Actions for ${person.user.name}`"
                   color="neutral"
-                  icon="i-mingcute-more-1-line"
+                  icon="i-mingcute-more-1-fill"
                   size="sm"
                   variant="ghost"
                 />
