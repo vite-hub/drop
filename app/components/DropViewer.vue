@@ -890,12 +890,19 @@ watch(
       />
       <div v-if="isApp" class="flex h-9 shrink-0 items-center gap-2 border-b border-default px-3">
         <span
-          class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted"
+          class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-toned"
         >
           <UIcon :name="SHARE_ICONS[drop.share]" class="size-3 shrink-0" />
           <span class="truncate">{{ drop.slug || drop.link }}/{{ page === "index.html" ? "" : page }}</span>
         </span>
-        <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
+        <USelect
+          v-if="pages.length > 1"
+          v-model="page"
+          aria-label="Page"
+          class="w-40 font-mono"
+          :items="pages"
+          size="xs"
+        />
       </div>
 
       <div class="relative flex min-h-0 flex-1 flex-col">
