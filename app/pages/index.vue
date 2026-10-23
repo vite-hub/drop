@@ -47,88 +47,30 @@ const { signedIn, signInWithGitHub } = useGitHubSignIn()
 // `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.
 const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
 
-// Try it now: the agents are the picker. The selected one shows its name and its color, the others their name on hover.
-const SNIPPETS = mcpSnippets(`${origin}/mcp`)
-const TRY = [
-  { value: "claude", icon: "i-simple-icons-claude", color: "#D97757" },
-  { value: "codex", icon: "i-simple-icons-openai" },
-  { value: "cursor", icon: "i-simple-icons-cursor" },
-  { value: "vscode", icon: "i-simple-icons-visualstudiocode", color: "#0098FF" },
-  { value: "claudeai", icon: "i-simple-icons-anthropic" },
-  { value: "chatgpt", icon: "i-mingcute-openai-line" },
-  {
-    value: "any",
-    icon: "i-simple-icons-modelcontextprotocol",
-    tip: "Any MCP client: Copilot, Gemini CLI, Zed, opencode…",
-  },
-] as const satisfies readonly { value: McpClient; icon: string; color?: string; tip?: string }[]
-const client = ref<McpClient>("claude")
-
-// The loop, in what you type and what Drop shows back.
+// The loop, in what you type and what Drop shows back. The middle step is people: everyone you share it with.
 const STEPS = [
   {
     title: "Your agent drops it",
-    body: "A plan, a page, or an app, as a private link.",
+    body: "A plan, a page, or an app, as a link your team can open.",
     prompt: "write the launch plan and drop it",
   },
   {
-    title: "You comment on the spot",
-    body: "Select a sentence, box a screenshot, or pin a site.",
+    title: "Your team comments on the spot",
+    body: "Anyone you share it with selects a sentence, boxes a screenshot, or pins a site.",
     prompt: null,
   },
   {
     title: "It drops the next version",
-    body: "It reads your comments and publishes v2.",
+    body: "It reads everyone's comments and publishes v2.",
     prompt: "fix the comments on the launch plan",
   },
 ] as const
 
-// What an agent can drop, one row each, like a listing. Each opens its section of the docs.
-const KINDS = [
-  {
-    icon: "i-mingcute-document-2-line",
-    name: "Plans and docs",
-    detail: "Markdown with tables, Mermaid, and math. Edit it together, live.",
-    example: "launch-plan.md",
-    to: "/docs/features#edit",
-    wide: true,
-  },
-  {
-    icon: "i-mingcute-code-line",
-    name: "HTML pages",
-    detail: "Explainers and reports with their own scripts.",
-    example: "pricing-explainer.html",
-    to: "/docs/features#apps",
-  },
-  {
-    icon: "i-mingcute-layout-line",
-    name: "Small apps",
-    detail: "A folder of static files. The link runs it.",
-    example: "launch-board/",
-    to: "/docs/features#apps",
-  },
-  {
-    icon: "i-mingcute-git-pull-request-line",
-    name: "Pull request evidence",
-    detail: "Before and after screenshots, linked from the PR.",
-    example: "pr-412-evidence.md",
-    to: "/docs/agents#skill",
-  },
-  {
-    icon: "i-mingcute-web-line",
-    name: "Live sites",
-    detail: "Comment on a preview deploy itself.",
-    example: "preview.acme.dev",
-    to: "/docs/sites",
-  },
-  {
-    icon: "i-mingcute-pen-line",
-    name: "Boards",
-    detail: "Excalidraw boards for flows and sketches, commented like everything else.",
-    example: "checkout-flow.excalidraw",
-    to: "/docs/features",
-    wide: true,
-  },
+// Who commented in step 2, as initials on a tint.
+const PEOPLE = [
+  { initials: "AL", tint: "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200" },
+  { initials: "MR", tint: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200" },
+  { initials: "You", tint: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" },
 ]
 
 const AROUND = [
@@ -183,92 +125,59 @@ const FAQ = [
     <SiteHeader wide />
 
     <main>
-      <!-- Hero: what it is and the command to try it, with the agents as the picker. -->
+      <!-- Hero: what it is on the left, the command to try it on the right, with the agents as the picker. -->
       <div class="relative isolate">
         <LandingShader
           class="absolute inset-x-0 top-0 -z-10 h-[72rem] w-full [mask-image:radial-gradient(ellipse_70%_45%_at_50%_72%,black_30%,transparent)]"
         />
-        <section class="mx-auto flex max-w-6xl flex-col items-center px-4 pt-20 pb-16 text-center sm:px-6 lg:pt-28">
-          <h1
-            class="max-w-[15ch] text-[clamp(2.5rem,6.5vw,4.5rem)] leading-[1.1] font-semibold tracking-[-0.045em] text-balance text-highlighted"
-          >
-            Review what your
-            <!-- The word looks the way a commented sentence looks in Drop: highlighted, with its pin. -->
-            <span class="relative whitespace-nowrap"
-              ><span class="inline-block rounded-lg bg-amber-200/70 px-1.5 pb-1 leading-[0.95] dark:bg-amber-400/25"
-                >agent</span
-              ><span
-                class="absolute -top-1 -right-2.5 grid size-5 place-items-center rounded-full bg-inverted text-[11px] font-semibold tracking-normal text-inverted shadow-sm"
-                aria-hidden="true"
-                >1</span
-              ></span
+        <section
+          class="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] items-center gap-12 px-4 pt-16 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-14 lg:pt-24 lg:pb-20"
+        >
+          <div>
+            <h1
+              class="max-w-[16ch] text-[clamp(2.5rem,5.5vw,3.75rem)] leading-[1.1] font-semibold tracking-[-0.045em] text-balance text-highlighted"
             >
-            makes.
-          </h1>
-          <p class="mt-6 max-w-[56ch] text-lg leading-relaxed text-balance text-muted">
-            Your agent drops a link. You comment on the exact spot. It publishes the next version.
-          </p>
-          <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <UButton
-              v-if="signedIn"
-              color="neutral"
-              size="lg"
-              class="h-10 px-4"
-              label="Open Drop"
-              trailing-icon="i-mingcute-arrow-right-line"
-              to="/drops"
-            />
-            <UButton
-              v-else
-              color="neutral"
-              size="lg"
-              class="h-10 px-4"
-              icon="i-simple-icons-github"
-              label="Sign in with GitHub"
-              @click="signInWithGitHub"
-            />
-            <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="How it works" to="#how" />
-          </div>
-          <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 w-full max-w-xs text-left" />
-
-          <div class="mt-12 w-full max-w-xl rounded-xl border border-default bg-default p-1.5 text-left shadow-xs">
-            <div class="flex items-center justify-between gap-3 p-1">
-              <h2 class="sr-only">Try it now</h2>
-              <div role="group" aria-label="Your agent" class="flex flex-wrap items-center gap-0.5">
-                <UTooltip
-                  v-for="item in TRY"
-                  :key="item.value"
-                  :text="'tip' in item ? item.tip : MCP_CLIENTS[item.value]"
-                  :disabled="client === item.value && !('tip' in item)"
-                >
-                  <button
-                    type="button"
-                    :aria-pressed="client === item.value"
-                    :aria-label="MCP_CLIENTS[item.value]"
-                    class="flex h-7 items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
-                    :class="
-                      client === item.value
-                        ? 'bg-elevated font-medium text-highlighted'
-                        : 'text-dimmed hover:bg-muted hover:text-highlighted'
-                    "
-                    @click="client = item.value"
-                  >
-                    <UIcon
-                      :name="item.icon"
-                      class="size-4 shrink-0"
-                      :style="client === item.value && 'color' in item ? { color: item.color } : undefined"
-                    />
-                    <span v-if="client === item.value">{{ MCP_CLIENTS[item.value] }}</span>
-                  </button>
-                </UTooltip>
-              </div>
-              <NuxtLink to="/docs/agents" class="shrink-0 text-xs text-muted hover:text-highlighted"
-                >All setups</NuxtLink
+              Review what your
+              <!-- The word looks the way a commented sentence looks in Drop: highlighted, with its pin. -->
+              <span class="relative whitespace-nowrap"
+                ><span class="inline-block rounded-lg bg-amber-200/70 px-1.5 pb-1 leading-[0.95] dark:bg-amber-400/25"
+                  >agent</span
+                ><span
+                  class="absolute -top-1 -right-2.5 grid size-5 place-items-center rounded-full bg-inverted text-[11px] font-semibold tracking-normal text-inverted shadow-sm"
+                  aria-hidden="true"
+                  >1</span
+                ></span
               >
+              makes.
+            </h1>
+            <p class="mt-6 max-w-[42ch] text-lg leading-relaxed text-pretty text-muted">
+              Your agent drops a link. Your team comments on the exact spot. It publishes the next version.
+            </p>
+            <div class="mt-8 flex flex-wrap items-center gap-3">
+              <UButton
+                v-if="signedIn"
+                color="neutral"
+                size="lg"
+                class="h-10 px-4"
+                label="Open Drop"
+                trailing-icon="i-mingcute-arrow-right-line"
+                to="/drops"
+              />
+              <UButton
+                v-else
+                color="neutral"
+                size="lg"
+                class="h-10 px-4"
+                icon="i-simple-icons-github"
+                label="Sign in with GitHub"
+                @click="signInWithGitHub"
+              />
+              <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="How it works" to="#how" />
             </div>
-            <AgentsCodeBlock class="mt-1" :code="SNIPPETS[client]" />
-            <p class="px-2 pt-2 pb-1 text-xs text-pretty text-muted">{{ MCP_HINTS[client] }}</p>
+            <DevSignIn v-if="devSignIn && !signedIn" class="mt-6 w-full max-w-xs" />
           </div>
+
+          <LandingSetup />
         </section>
 
         <!-- The loop itself, played out: Claude Code drops a plan, you comment on a line, it publishes v2. -->
@@ -285,7 +194,7 @@ const FAQ = [
 
       <section id="how" class="mx-auto max-w-6xl scroll-mt-14 px-4 pt-24 sm:px-6 lg:pt-32">
         <h2 class="text-3xl font-semibold tracking-tight text-balance text-highlighted">
-          Feedback goes to the agent, not into a chat.
+          Your team's feedback goes to the agent, not into a chat.
         </h2>
         <ol class="mt-10 grid gap-3 md:grid-cols-3">
           <li
@@ -299,12 +208,26 @@ const FAQ = [
             >
             <p class="mt-4 font-medium text-highlighted">{{ step.title }}</p>
             <p class="mt-1 text-sm leading-relaxed text-pretty text-muted">{{ step.body }}</p>
-            <p
-              v-if="step.prompt"
-              class="mt-4 truncate rounded-md border border-default bg-muted px-3 py-2 font-mono text-xs text-highlighted"
-            >
-              <span class="text-dimmed">›</span> {{ step.prompt }}
-            </p>
+            <div class="mt-auto pt-4">
+              <p
+                v-if="step.prompt"
+                class="truncate rounded-md border border-default bg-muted px-3 py-2 font-mono text-xs text-highlighted"
+              >
+                <span class="text-dimmed">›</span> {{ step.prompt }}
+              </p>
+              <p v-else class="flex items-center gap-2.5 py-1 text-xs text-muted">
+                <span class="flex -space-x-1">
+                  <span
+                    v-for="person in PEOPLE"
+                    :key="person.initials"
+                    class="grid size-6 place-items-center rounded-full text-[9px] font-semibold ring-2 ring-(--ui-bg)"
+                    :class="person.tint"
+                    >{{ person.initials }}</span
+                  >
+                </span>
+                Ana, Marco, and you · 5 comments
+              </p>
+            </div>
           </li>
         </ol>
       </section>
@@ -320,28 +243,7 @@ const FAQ = [
             >All features</NuxtLink
           >
         </div>
-        <ul class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <li v-for="kind in KINDS" :key="kind.name" :class="kind.wide && 'lg:col-span-2'">
-            <NuxtLink
-              :to="kind.to"
-              class="group flex h-full min-h-40 flex-col rounded-xl border border-default bg-default p-5 shadow-xs outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
-            >
-              <span class="flex items-center justify-between">
-                <span
-                  class="grid size-9 place-items-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300"
-                  ><UIcon :name="kind.icon" class="size-5"
-                /></span>
-                <UIcon
-                  name="i-mingcute-arrow-right-up-line"
-                  class="size-4 text-muted opacity-0 transition-opacity group-hover:opacity-100"
-                />
-              </span>
-              <span class="mt-auto pt-6 font-medium text-highlighted">{{ kind.name }}</span>
-              <span class="mt-1 text-sm text-pretty text-muted">{{ kind.detail }}</span>
-              <span class="mt-3 font-mono text-xs text-dimmed">{{ kind.example }}</span>
-            </NuxtLink>
-          </li>
-        </ul>
+        <LandingKinds class="mt-8" />
       </section>
 
       <section class="mx-auto max-w-6xl px-4 pt-24 sm:px-6 lg:pt-32">
@@ -354,14 +256,7 @@ const FAQ = [
               </li>
             </ul>
           </div>
-          <img
-            src="/docs/features/history.webp"
-            width="1040"
-            height="470"
-            loading="lazy"
-            alt="Version 2 of the Billing migration plan beside version 1, with added and removed lines, and the History panel listing both versions"
-            class="block h-auto w-full rounded-xl border border-default bg-white shadow-xl shadow-black/5"
-          />
+          <LandingHistory />
         </div>
       </section>
 
