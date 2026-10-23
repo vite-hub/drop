@@ -101,7 +101,7 @@ const KINDS = [
     name: "Pull request evidence",
     detail: "Before and after screenshots with notes, linked from the PR.",
     example: "pr-412-evidence.md",
-    to: "/docs/review#expiry",
+    to: "/docs/agents#skill",
   },
   {
     icon: "i-mingcute-web-line",
@@ -136,7 +136,7 @@ const AROUND = [
 const HOSTED = [
   "Sign in with GitHub",
   "Free for you and small teams",
-  "Unopened drops expire after 30 days, unless you keep them",
+  "Drops expire after inactivity: 30 days for review, 14 for temporary, and never for keep",
 ]
 const SELF_HOSTED = [
   "Team mode: shared inside the team, closed to the internet",
@@ -159,7 +159,7 @@ const FAQ = [
   },
   {
     q: "Who can see what my agent drops?",
-    a: "Only you, until you share it. Share it with your team, or turn on a public link and pick whether it allows viewing, commenting, or editing.",
+    a: "Only you, until you share it. Share it with your team, or turn on a public link and pick whether it allows viewing or commenting. Team Drops can also grant editing.",
   },
   {
     q: "How is this different from a gist or a shared drive?",
