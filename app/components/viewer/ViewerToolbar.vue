@@ -5,66 +5,87 @@
 // and what draws over it under any tool (rulers and guides, X-ray outlines, the comments' pins); the frame does the
 // drawing (shared/plan-runtime.ts). A Markdown doc adds its reading width (`width`, the one showing), which W steps
 // through too. Last, on pages, device mode (ViewerDeviceButton). It centers under the page; the side panel sits beside
-// it, not over it.
+// it, not over it. A reviewed site (ViewerSiteFrame) offers fewer: `tools` and `views` say which, and `commentHint` what
+// its Comment does.
 import type { ViewerOverlays, ViewerTool } from "~/composables/useViewerAnnotations"
 
-const props = defineProps<{
+const {
+  tool,
+  overlays = { rulers: false, xray: false, pins: true },
+  canComment,
+  width,
+  sizable,
+  tools = ["browse", "comment", "measure"],
+  views = ["rulers", "xray", "pins"],
+  commentHint = "Click an element to comment on it, or drag an area",
+} = defineProps<{
   tool: ViewerTool
-  overlays: ViewerOverlays
+  overlays?: ViewerOverlays
   canComment: boolean
   width?: string
   sizable: boolean
+  tools?: readonly ViewerTool[]
+  views?: readonly (keyof ViewerOverlays)[]
+  commentHint?: string
 }>()
 const emit = defineEmits<{ tool: [tool: ViewerTool]; toggle: [overlay: keyof ViewerOverlays]; width: [] }>()
 
 type Item = { id: string; label: string; icon: string; kbd?: string; on: boolean; press: () => void }
 
-const tools = computed<Item[]>(() =>
+const toolItems = computed<Item[]>(() =>
   [
     { value: "browse" as const, label: "Browse", icon: "i-mingcute-cursor-3-line", kbd: "V" },
-    ...(props.canComment
-      ? [{ value: "comment" as const, label: "Comment", icon: "i-mingcute-message-1-line", kbd: "R" }]
-      : []),
+    { value: "comment" as const, label: "Comment", icon: "i-mingcute-message-1-line", kbd: "R" },
     { value: "measure" as const, label: "Measure", icon: "i-mingcute-aiming-2-line", kbd: "S" },
-  ].map((item) => ({
-    id: item.value,
-    label: item.label,
-    icon: item.icon,
-    kbd: item.kbd,
-    on: props.tool === item.value,
-    press: () => emit("tool", item.value),
-  })),
+  ].flatMap((item) =>
+    tools.includes(item.value) && (item.value !== "comment" || canComment)
+      ? [
+          {
+            id: item.value,
+            label: item.label,
+            icon: item.icon,
+            kbd: item.kbd,
+            on: tool === item.value,
+            press: () => emit("tool", item.value),
+          },
+        ]
+      : [],
+  ),
 )
-const views = computed<Item[]>(() => [
-  {
-    id: "rulers",
-    label: "Rulers and guides",
-    icon: "i-mingcute-ruler-line",
-    kbd: "U",
-    on: props.overlays.rulers,
-    press: () => emit("toggle", "rulers"),
-  },
-  {
-    id: "xray",
-    label: "X-ray",
-    icon: "i-mingcute-layout-grid-line",
-    kbd: "X",
-    on: props.overlays.xray,
-    press: () => emit("toggle", "xray"),
-  },
-  {
-    // Pressed means hidden, like the others: pressed is the one that changes the page.
-    id: "pins",
-    label: "Hide comments",
-    icon: props.overlays.pins ? "i-mingcute-eye-line" : "i-mingcute-eye-close-line",
-    on: !props.overlays.pins,
-    press: () => emit("toggle", "pins"),
-  },
-  ...(props.width
+const viewItems = computed<Item[]>(() => [
+  ...(
+    [
+      {
+        id: "rulers",
+        label: "Rulers and guides",
+        icon: "i-mingcute-ruler-line",
+        kbd: "U",
+        on: overlays.rulers,
+        press: () => emit("toggle", "rulers"),
+      },
+      {
+        id: "xray",
+        label: "X-ray",
+        icon: "i-mingcute-layout-grid-line",
+        kbd: "X",
+        on: overlays.xray,
+        press: () => emit("toggle", "xray"),
+      },
+      {
+        // Pressed means hidden, like the others: pressed is the one that changes the page.
+        id: "pins",
+        label: "Hide comments",
+        icon: overlays.pins ? "i-mingcute-eye-line" : "i-mingcute-eye-close-line",
+        on: !overlays.pins,
+        press: () => emit("toggle", "pins"),
+      },
+    ] as const
+  ).filter((item) => views.includes(item.id)),
+  ...(width
     ? [
         {
           id: "width",
-          label: `Width: ${props.width}`,
+          label: `Width: ${width}`,
           icon: "i-mingcute-spacing-horizontal-line",
           kbd: "W",
           on: false,
@@ -73,16 +94,18 @@ const views = computed<Item[]>(() => [
       ]
     : []),
 ])
-const groups = computed(() => [
-  { label: "Tools", items: tools.value },
-  { label: "Views", items: views.value },
-])
+const groups = computed(() =>
+  [
+    { label: "Tools", items: toolItems.value },
+    { label: "Views", items: viewItems.value },
+  ].filter((group) => group.items.length),
+)
 
 // What the tool does, above the bar while it's on.
 const hint = computed(() => {
-  if (props.tool === "comment") return "Click an element to comment on it, or drag an area"
-  if (props.tool === "measure") return "Click an element to pick it, then point at another for the distance"
-  if (props.overlays.rulers) return "Drag a guide out of a ruler, and back to remove it"
+  if (tool === "comment") return commentHint
+  if (tool === "measure") return "Click an element to pick it, then point at another for the distance"
+  if (overlays.rulers) return "Drag a guide out of a ruler, and back to remove it"
   return ""
 })
 </script>
