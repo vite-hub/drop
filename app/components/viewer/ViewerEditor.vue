@@ -38,7 +38,7 @@ async function editLink() {
   })
   if (href === null) return
   const chain = editor.chain().focus().extendMarkRange("link")
-  void (href.trim() ? chain.setLink({ href: href.trim() }) : chain.unsetLink()).run()
+  void (href.trim() ? chain.setMark("link", { href: href.trim() }) : chain.unsetMark("link")).run()
 }
 
 const toolbar = computed<EditorToolbarItem[][]>(() => [
