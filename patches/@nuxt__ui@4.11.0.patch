@@ -2,7 +2,7 @@ diff --git a/dist/runtime/components/Textarea.vue b/dist/runtime/components/Text
 index eaf89f9861bd1eb4e5d33a43650c39e564891c5b..62d807dc4c26646163cd80bf02cf682c7d6ccd4d 100644
 --- a/dist/runtime/components/Textarea.vue
 +++ b/dist/runtime/components/Textarea.vue
-@@ -114,20 +114,42 @@ function autoFocus() {
+@@ -114,20 +114,41 @@ function autoFocus() {
  }
  function autoResize() {
    if (props.autoresize && textareaRef.value) {
