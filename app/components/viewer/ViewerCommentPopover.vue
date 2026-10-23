@@ -58,7 +58,6 @@ function send() {
   busy.value = true
   if (props.comment) emit("reply", props.comment.id, body.value, files.value)
   else emit("submit", body.value, files.value)
-
 }
 defineExpose({
   fail: (reason?: string, text?: string) => {
@@ -210,7 +209,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
 
       <ViewerImagePicks v-if="canReply" class="border-t border-default px-2.5 pt-1.5" :picks="picks" @remove="remove" />
       <div
-          v-if="canReply"
+        v-if="canReply"
         class="flex shrink-0 items-end gap-1 p-1.5 pl-2.5"
         :class="picks.length ? '' : 'border-t border-default'"
         @dragover.prevent

@@ -37,11 +37,11 @@ Reviewers comment in one of three ways:
 
 ## Review it in Drop {#here}
 
-On the site review's page, type a page address, press **Open here**, then **Comment**, and drag a box over what you mean. Nothing changes on the site.
+On the site review's page, type a page address and press **Open here**. Then press **Comment** in the toolbar under the page, or <kbd>R</kbd>, and drag a box over what you mean. Nothing changes on the site.
 
 Drop takes the screenshot with your browser's screen sharing, which asks once per visit. Chrome, Edge, and Brave share **This tab**, so the screenshot matches the page. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off. You see the screenshot before you send it.
 
-These comments carry the screenshot, your box, your note, and the address in the bar above the page, but not the element under the box. Clicks inside the page don't change that address, so type the page you're on. A site that refuses to be framed stays blank; use the bookmarklet there.
+These comments carry the screenshot, your box, your note, and the address in the row above the page, but not the element under the box. Clicks inside the page don't change that address, so type the page you're on. A site that refuses to be framed stays blank; use the bookmarklet there.
 
 ## Add the script to preview builds {#install}
 
