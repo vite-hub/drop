@@ -3,11 +3,12 @@
 // shadows, 32px buttons in groups split by full-height hairlines, the tool that's on filled in the tools' one blue, and a
 // black tooltip with the key after the name. It picks the tool the pointer has over the page (Browse, Comment, Measure)
 // and what draws over it under any tool (rulers and guides, X-ray outlines, the comments' pins); the frame does the
-// drawing (shared/plan-runtime.ts). It centers under the page; the side panel sits beside it, not over it.
+// drawing (shared/plan-runtime.ts). A Markdown doc adds its reading width (`width`, the one showing), which W steps
+// through too. It centers under the page; the side panel sits beside it, not over it.
 import type { ViewerOverlays, ViewerTool } from "~/composables/useViewerAnnotations"
 
-const props = defineProps<{ tool: ViewerTool; overlays: ViewerOverlays; canComment: boolean }>()
-const emit = defineEmits<{ tool: [tool: ViewerTool]; toggle: [overlay: keyof ViewerOverlays] }>()
+const props = defineProps<{ tool: ViewerTool; overlays: ViewerOverlays; canComment: boolean; width?: string }>()
+const emit = defineEmits<{ tool: [tool: ViewerTool]; toggle: [overlay: keyof ViewerOverlays]; width: [] }>()
 
 type Item = { id: string; label: string; icon: string; kbd?: string; on: boolean; press: () => void }
 
@@ -52,6 +53,18 @@ const views = computed<Item[]>(() => [
     on: !props.overlays.pins,
     press: () => emit("toggle", "pins"),
   },
+  ...(props.width
+    ? [
+        {
+          id: "width",
+          label: `Width: ${props.width}`,
+          icon: "i-mingcute-spacing-horizontal-line",
+          kbd: "W",
+          on: false,
+          press: () => emit("width"),
+        },
+      ]
+    : []),
 ])
 const groups = computed(() => [
   { label: "Tools", items: tools.value },
