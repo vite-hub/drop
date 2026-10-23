@@ -61,6 +61,7 @@
     "h3-mcp": "0.2.0",
     "hucre": "^1.2.0",
     "isbot": "^5.2.2",
+    "lib0": "0.2.119",
     "mdream": "2.0.3",
     "media-chrome": "^4.19.3",
     "medium-zoom": "1.1.0",
@@ -80,6 +81,7 @@
     "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@5c5ba8e26efb7b8d892ce078a17ae69cc38f15ea",
     "vue": "3.5.44",
     "vue-router": "5.2.0",
+    "y-websocket": "3.1.0",
     "yjs": "13.6.33"
   },
   "devDependencies": {
