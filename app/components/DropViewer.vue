@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The drop viewer (T3 Code's layout): a main column with its own header, and one panel with tabs (Comments,
-// Details) that floats over the content, Mesurer-style. Docs and apps share it. People review and comment, agents
+// The drop viewer (T3 Code's layout): a main column with its own header, and a full-height, resizable panel beside it
+// with tabs (Comments, History, Details). Docs and apps share it. People review and comment, agents
 // publish new versions, and people who may edit a Markdown doc edit it together live (useLiveEditor). State lives in
 // composables (useDrop, useViewerPanel, useAppFiles, useViewerFrame, useViewerAnnotations, useLiveEditor); this file
 // wires them up.
@@ -80,21 +80,50 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
-const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } =
-  annotations
+const {
+  selection,
+  lightbox,
+  popover,
+  tool,
+  overlays,
+  areaMode,
+  canDrawArea,
+  imageDraft,
+  toggleArea,
+  setTool,
+  toggleOverlay,
+  commentOnSelection,
+  pickImage,
+} = annotations
+/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
+const framed = computed(
+  () =>
+    !editing.value &&
+    !["folder", "site", "board"].includes(drop.value.kind) &&
+    !video.value &&
+    !(drop.value.kind === "file" && !drop.value.html),
+)
+watch(framed, (value) => !value && (tool.value = "browse"))
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
 }
-const popoverRef = useTemplateRef<{ fail: (reason?: string) => void; sent: () => Promise<void> }>("popoverRef")
+const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
+
+// Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
+// they're commenting, selecting, or sharing. Editors are left out: the live editor tells them itself (useLiveEditor).
+useLatestVersion(drop, {
+  enabled: () => publicView && !route.query.v && !older.value && !trashed.value && !editing.value,
+  busy: () => Boolean(selection.value || popover.value || lightbox.value || shareOpen.value),
+})
 
 function startEdit() {
   popover.value = selection.value = null
   void live.open()
 }
-// Both pages key this viewer by the drop's id, so another version (a teammate's "Open", the sidebar) mounts a new one;
-// the old one leaves its draft's room as it unmounts (useLiveEditor).
+// Both pages key this viewer by the drop's id and version, so another version (a teammate's "Open", the sidebar, an app
+// republished in place) mounts a new one; the old one leaves its draft's room as it unmounts (useLiveEditor).
 onMounted(() => {
   if (route.query.edit === "1" && drop.value.canEdit) startEdit()
 })
@@ -113,10 +142,27 @@ const pageComments = computed(() =>
 // TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
-// Comments on the whole page have nothing in it to pin to; they live in the panel.
-const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
+// Comments on the whole page have nothing in it to pin to; they live in the panel. A resolved comment leaves the page
+// and stays in the Resolved tab; opening it from there pins it until its thread closes (`revealed`).
+const revealed = ref<string | null>(null)
+const pinned = computed(() =>
+  pageComments.value.filter(
+    (comment) => (!comment.resolved || comment.id === revealed.value) && !replaced(comment) && comment.kind !== "page",
+  ),
+)
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
+// The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
+// underline (`after:hidden` covers the one Nuxt UI paints before hydration).
+const panelTabsUi = {
+  list: "gap-1 border-0 mb-0 p-0",
+  indicator: "hidden",
+  trigger:
+    "h-6 gap-1 rounded-md py-0 pr-2 pl-1.5 font-normal after:hidden data-[state=active]:bg-elevated data-[state=active]:text-highlighted hover:data-[state=inactive]:not-disabled:bg-elevated/60 hover:data-[state=inactive]:not-disabled:text-highlighted",
+  leadingIcon: "size-3.5",
+}
+// Shared with someone, or waiting on review: its status sits beside the title. A private drop gets Share on the right.
+const shared = computed(() => drop.value.share !== "private" || Boolean(drop.value.shareReview))
 // Comments has its own button in the header: it opens the panel there, and closes it once open. History and Details
 // open from More, the panel's tabs, or H and I.
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
@@ -128,10 +174,7 @@ if (route.query.changes && has("history")) {
   sideOpen.value = true
 }
 // A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
-const floating = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
-/** The floating card is 22.5rem wide, 0.75rem from the edge, with 1rem of air before the page's text. */
-const FLOATING_INSET = 16 * (22.5 + 0.75 + 1)
-const inset = computed(() => (floating.value ? FLOATING_INSET : 0))
+const docked = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 
 // A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
 const docWidth = useDocWidth()
@@ -152,7 +195,8 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
   frame,
   app,
   pinned,
-  inset,
+  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+  inset: ref(0),
   width: docWidth,
   annotations,
 })
@@ -227,6 +271,10 @@ defineShortcuts({
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
+  v: () => (tool.value = "browse"),
+  s: () => framed.value && setTool("measure"),
+  u: () => framed.value && toggleOverlay("rulers"),
+  x: () => framed.value && toggleOverlay("xray"),
   l: () => !editing.value && copyLink("Link copied"),
   d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
@@ -270,16 +318,6 @@ const moreMenu = computed(() =>
     [
       ...(presents.value
         ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
-        : []),
-      ...(canDrawArea.value
-        ? [
-            {
-              label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
-              icon: "i-mingcute-message-1-line",
-              kbds: ["r"],
-              onSelect: toggleArea,
-            },
-          ]
         : []),
       ...(widens.value
         ? [
@@ -345,26 +383,24 @@ const moreMenu = computed(() =>
       : []),
   ].filter((group) => group.length),
 )
-const moreActive = computed(() => areaMode.value || showing("history") || showing("details"))
+const moreActive = computed(() => showing("history") || showing("details"))
 
-async function submit(body: string, files: File[]) {
-  if (popover.value?.type !== "new") return
-  const sent = await state.addComment(
-    { ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) },
-    body,
-    files,
-  )
-  if (!("value" in sent)) return popoverRef.value?.fail(sent.error)
+// Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
+// unless another one is open by then.
+async function submit(body: string) {
+  const open = popover.value
+  if (open?.type !== "new") return
   popover.value = null
   send({ type: "clear-selection" })
+  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
+  if (!("value" in sent) && !popover.value) popover.value = { ...open, body, error: sent.error }
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
-const addPageComment = (body: string, files: File[]) =>
+const addPageComment = (body: string) =>
   state.addComment(
     { kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) },
     body,
-    files,
   )
 
 async function resolve(id: string, resolved: boolean) {
@@ -377,10 +413,9 @@ async function removeComment(id: string) {
   await state.removeComment(id)
 }
 
-async function reply(id: string, body: string, files: File[]) {
-  const sent = await state.addReply(id, body, files)
-  if ("value" in sent) await popoverRef.value?.sent()
-  else popoverRef.value?.fail(sent.error)
+async function reply(id: string, body: string) {
+  const sent = await state.addReply(id, body)
+  if (!("value" in sent)) await popoverRef.value?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
@@ -402,13 +437,23 @@ function copyChangesLink(version: DropVersion) {
  * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
  */
 async function focusComment(comment: DropComment, row?: DOMRect) {
+  const focusGeneration = annotations.beginFocus()
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
     await nextTick()
     await until(ready).toBe(true, { timeout: 5000 })
   }
+  if (!annotations.isFocusCurrent(focusGeneration)) return
   if (!wide.value) mobileSide.value = false
+  // A page comment opens here and now, so it cancels a pin's thread still on its way too.
+  if (!annotations.awaitThread(comment.kind === "page" ? null : comment.id, focusGeneration)) return
+  revealed.value = comment.resolved && comment.kind !== "page" ? comment.id : null
+  if (revealed.value) {
+    // The frame gets the pin with the next markers (useViewerFrame), so it has one to scroll to.
+    await nextTick()
+    if (!annotations.isFocusCurrent(focusGeneration)) return
+  }
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
@@ -475,10 +520,32 @@ offerToPalette("drop", () => {
     ...(canDrawArea.value
       ? [
           {
-            label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
+            label: areaMode.value ? "Stop commenting" : "Comment on an element",
             icon: "i-mingcute-message-1-line",
             kbds: ["r"],
             onSelect: toggleArea,
+          },
+        ]
+      : []),
+    ...(framed.value
+      ? [
+          {
+            label: tool.value === "measure" ? "Stop measuring" : "Measure",
+            icon: "i-mingcute-aiming-2-line",
+            kbds: ["s"],
+            onSelect: () => setTool("measure"),
+          },
+          {
+            label: overlays.rulers ? "Hide rulers" : "Rulers and guides",
+            icon: "i-mingcute-ruler-line",
+            kbds: ["u"],
+            onSelect: () => toggleOverlay("rulers"),
+          },
+          {
+            label: overlays.xray ? "Turn off X-ray" : "X-ray",
+            icon: "i-mingcute-layout-grid-line",
+            kbds: ["x"],
+            onSelect: () => toggleOverlay("xray"),
           },
         ]
       : []),
@@ -538,25 +605,38 @@ const imageComments = computed(() =>
   lightbox.value
     ? pageComments.value.filter(
         (comment) =>
-          comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id),
+          comment.kind !== "text" &&
+          comment.selector === lightbox.value!.selector &&
+          !comment.resolved &&
+          !outdated.value.has(comment.id),
       )
     : [],
 )
+watch(popover, (open) => !open && (revealed.value = null))
 const threadComment = computed(() => {
   const open = popover.value
-  return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
+  return open?.type === "thread" ? state.findComment(open.id) : undefined
 })
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => threadComment.value?.n,
-  (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
+  (n) => void setQuery({ comment: n }),
 )
 </script>
 
 <template>
   <DefineSide>
     <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default pr-2 pl-2">
-      <UTabs v-model="tab" class="min-w-0" color="neutral" :content="false" :items="tabs" size="sm">
+      <UTabs
+        v-model="tab"
+        class="min-w-0"
+        color="neutral"
+        :content="false"
+        :items="tabs"
+        size="xs"
+        :ui="panelTabsUi"
+        variant="link"
+      >
         <template #trailing="{ item }">
           <span v-if="item.count" class="font-mono text-[11px] text-dimmed tabular-nums">{{ item.count }}</span>
         </template>
@@ -629,7 +709,7 @@ watch(
     </div>
   </DefineSide>
 
-  <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
+  <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }">
     <template #header>
       <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
         <template #leading>
@@ -681,8 +761,20 @@ watch(
           </span>
         </template>
         <!-- After the title, not in it: the heading stays the drop's name. -->
-        <template v-if="drop.resources && !editing" #trailing>
-          <ViewerResources :resources="drop.resources" />
+        <template v-if="(owner && shared) || (drop.resources && !editing)" #trailing>
+          <!-- Who can open it, beside its name; a private drop has a Share button on the right instead. -->
+          <UTooltip v-if="owner && shared" text="Change who can open it">
+            <UButton
+              class="shrink-0"
+              color="neutral"
+              :icon="SHARE_ICONS[drop.share]"
+              :label="shareStatus(drop, now)"
+              size="xs"
+              variant="subtle"
+              @click="shareOpen = true"
+            />
+          </UTooltip>
+          <ViewerResources v-if="drop.resources && !editing" :resources="drop.resources" />
         </template>
         <template v-if="editing" #right>
           <AvatarStack
@@ -775,14 +867,13 @@ watch(
             />
           </UDropdownMenu>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
-          <USeparator v-if="owner || visitor" class="ml-1 h-4" orientation="vertical" />
+          <USeparator v-if="(owner && !shared) || visitor" class="ml-1 h-4" orientation="vertical" />
           <UButton
-            v-if="owner"
+            v-if="owner && !shared"
             color="neutral"
             :icon="SHARE_ICONS[drop.share]"
-            :label="drop.share === 'private' && !drop.shareReview ? 'Share' : shareStatus(drop, now)"
+            label="Share"
             size="sm"
-            :variant="drop.share === 'private' ? 'solid' : 'ghost'"
             @click="shareOpen = true"
           />
           <UButton
@@ -859,36 +950,27 @@ watch(
       />
       <div v-if="isApp" class="flex h-9 shrink-0 items-center gap-2 border-b border-default px-3">
         <span
-          class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted"
+          class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-toned"
         >
           <UIcon :name="SHARE_ICONS[drop.share]" class="size-3 shrink-0" />
           <span class="truncate">{{ drop.slug || drop.link }}/{{ page === "index.html" ? "" : page }}</span>
         </span>
-        <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
+        <USelect
+          v-if="pages.length > 1"
+          v-model="page"
+          aria-label="Page"
+          class="w-40 font-mono"
+          :items="pages"
+          size="xs"
+        />
       </div>
 
       <div class="relative flex min-h-0 flex-1 flex-col">
         <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
-        <!-- The grid keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
-        <ViewerFolder
-          v-else-if="drop.kind === 'folder'"
-          :class="floating && 'pr-96'"
-          :drop="drop"
-          :public-view="publicView"
-        />
-        <ViewerSite
-          v-else-if="drop.kind === 'site'"
-          :drop="drop"
-          :inset="floating ? FLOATING_INSET : 0"
-          :public-view="publicView"
-        />
-        <LazyViewerBoard
-          v-else-if="drop.kind === 'board'"
-          :key="drop.id"
-          :drop="drop"
-          :inset="floating ? FLOATING_INSET : 0"
-        />
-        <ViewerVideo v-else-if="video && drop.url" :inset="inset" :src="drop.url" :title="drop.title" :type="video" />
+        <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
+        <ViewerSite v-else-if="drop.kind === 'site'" :drop="drop" :public-view="publicView" />
+        <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
+        <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
         <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
         <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
           <div>
@@ -930,27 +1012,48 @@ watch(
           :title="drop.title"
         />
 
+        <ViewerToolbar
+          v-if="framed && !shownVersion"
+          :can-comment="canDrawArea"
+          :overlays="overlays"
+          :tool="tool"
+          @toggle="toggleOverlay"
+          @tool="setTool"
+        />
+
         <ViewerDiff
           v-if="shownVersion && !editing"
           :key="shownVersion.id"
-          :inset="floating ? FLOATING_INSET : 0"
           :previous="previousVersion"
           :copied="copied('changes')"
           :version="shownVersion"
           @close="closeChanges"
           @copy-link="copyChangesLink(shownVersion)"
         />
-
-        <!-- As tall as its content, so a quiet drop gets a small card. Markdown docs make room for it (FLOATING_INSET). -->
-        <aside
-          v-if="floating"
-          class="absolute top-3 right-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[22.5rem] origin-top-right flex-col overflow-hidden rounded-lg border border-default bg-default shadow-md [animation:pop-in_160ms_var(--ease-out)]"
-        >
-          <ReuseSide />
-        </aside>
       </div>
     </template>
   </UDashboardPanel>
+  <!-- Beside the page, full height, like T3 Code's right panel: it pushes the content instead of covering it. The page's
+       right border divides them, and the handle on it resizes the panel; double-click resets it. -->
+  <template v-if="docked">
+    <UDashboardResizeHandle
+      aria-orientation="vertical"
+      @dblclick="panel.resize.reset"
+      @lostpointercapture="panel.resize.end"
+      @pointerdown="panel.resize.start"
+      @pointermove="panel.resize.move"
+    />
+    <UDashboardPanel
+      id="drop-side"
+      class="flex-none lg:w-(--width)"
+      :style="{ '--width': `${panel.width.value}rem` }"
+      :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
+    >
+      <template #body>
+        <ReuseSide />
+      </template>
+    </UDashboardPanel>
+  </template>
   <USlideover
     v-if="!wide && !editing"
     v-model:open="mobileSide"
@@ -1004,6 +1107,8 @@ watch(
     ref="popoverRef"
     :can-manage="drop.isOwner"
     :comment="threadComment"
+    :draft="popover.type === 'new' ? popover.body : undefined"
+    :draft-error="popover.type === 'new' ? popover.error : undefined"
     :pending="popover.type === 'new' ? popover.pending : undefined"
     :x="popover.x"
     :y="popover.y"
