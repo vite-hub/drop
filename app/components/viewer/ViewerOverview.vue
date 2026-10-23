@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// Details as label/value rows, like an inspector: who dropped it, what it is, who can see it, how many viewed it, how
-// long it lives. Each row's action sits at its end. Versions have their own tab (ViewerHistory). A folder leads with
+// Details in sections, not a label/value table: the drop itself first (its name, type and size, who dropped it, when,
+// where), then who can open it, how many have, its links and how long it lives. Each section's action sits in it. Versions have their own tab (ViewerHistory). A folder leads with
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
 // it in place.
 import { expiryLabel } from "#shared/expiry"
 import { resourceLabel } from "#shared/resources"
-import { SHARE_ICONS } from "#shared/share"
+import { SHARE_HINTS, SHARE_ICONS } from "#shared/share"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
@@ -27,6 +27,19 @@ const type = computed(() =>
 const access = computed(
   () =>
     `${shareStatus(props.drop, now.value)}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`,
+)
+const accessHint = computed(() =>
+  props.drop.shareReview
+    ? "An admin reviews public links on this Drop. It still works for you, and for the team on a team Drop."
+    : SHARE_HINTS[props.drop.share],
+)
+// A site goes by its address, a folder by its title, anything else by its file's name.
+const name = computed(() =>
+  site.value && props.drop.siteUrl
+    ? props.drop.siteUrl
+    : props.drop.kind === "folder"
+      ? props.drop.title
+      : props.drop.filename,
 )
 const folder = computed(() => props.drop.ancestors.map((crumb) => crumb.title).join(" / "))
 // The owner's view count, then who the views came from, with the icons agents and people get on rows (AgentIcon).
@@ -52,7 +65,7 @@ const views = computed(() => {
         tip: `${counts.anonymous} by visitors not signed in`,
       },
       {
-        label: "by agents",
+        label: "agents",
         icon: "i-mingcute-sparkles-line",
         n: counts.agent,
         tip: `${counts.agent} by agents reading it, yours included`,
@@ -78,10 +91,42 @@ async function save() {
 </script>
 
 <template>
-  <div class="space-y-6 p-4">
-    <section v-if="drop.kind === 'folder' && (drop.note || describable)" aria-label="Description" class="text-sm">
+  <div class="divide-y divide-default">
+    <section aria-label="File" class="space-y-3 p-4">
+      <div class="flex items-center gap-3">
+        <span
+          class="grid size-10 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-default ring-inset"
+        >
+          <UIcon :name="drop.teamFolder ? 'i-mingcute-group-2-line' : KIND_ICONS[drop.kind]" class="size-5" />
+        </span>
+        <div class="min-w-0">
+          <p class="truncate text-sm font-medium text-highlighted" :title="name">{{ name }}</p>
+          <p class="truncate text-xs text-muted tabular-nums">{{ type }}</p>
+        </div>
+      </div>
+      <!-- Icons stand in for the labels; the words still say what each line is. -->
+      <ul class="space-y-1.5 text-sm">
+        <li class="flex min-w-0 items-center gap-2">
+          <AgentIcon class="size-4 shrink-0 text-muted" :kind="drop.actorKind" :name="drop.actorName" />
+          <span class="truncate text-highlighted">{{ drop.actorName }}</span>
+          <span class="shrink-0 text-muted">via {{ VIA_LABELS[drop.actorKind] }}</span>
+        </li>
+        <li class="flex items-center gap-2 text-muted">
+          <UIcon name="i-mingcute-time-line" class="size-4 shrink-0" />
+          <span>Updated <TimeAgo class="text-highlighted" :at="drop.updatedAt" /></span>
+        </li>
+        <li v-if="folder" class="flex min-w-0 items-center gap-2 text-muted">
+          <UIcon name="i-mingcute-folder-line" class="size-4 shrink-0" />
+          <span class="truncate" :title="folder"
+            >In <span class="text-highlighted">{{ folder }}</span></span
+          >
+        </li>
+      </ul>
+    </section>
+
+    <section v-if="drop.kind === 'folder' && (drop.note || describable)" aria-label="Description" class="p-4 text-sm">
       <div class="flex items-center justify-between gap-3">
-        <h3 class="text-muted">Description</h3>
+        <h3 class="text-xs font-medium text-muted">Description</h3>
         <UButton
           v-if="describable && !editing"
           class="-my-1"
@@ -109,48 +154,55 @@ async function save() {
           <UButton color="neutral" label="Save" :loading="saving" size="sm" type="submit" />
         </div>
       </form>
-      <p v-else-if="drop.note" class="mt-1.5 whitespace-pre-line text-highlighted">{{ drop.note }}</p>
-      <p v-else class="mt-1.5 text-muted">
+      <p v-else-if="drop.note" class="mt-1.5 whitespace-pre-line text-pretty text-highlighted">{{ drop.note }}</p>
+      <p v-else class="mt-1.5 text-pretty text-muted">
         What belongs here and how to name it. Agents read this before they publish into the folder.
       </p>
     </section>
 
-    <dl class="space-y-2.5 text-sm">
-      <div class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Dropped by</dt>
-        <dd class="flex min-w-0 items-center gap-1.5">
-          <AgentIcon class="size-3.5 shrink-0 text-muted" :kind="drop.actorKind" :name="drop.actorName" />
-          <span class="truncate text-highlighted">{{ drop.actorName }}</span>
-          <span class="shrink-0 text-muted">via {{ VIA_LABELS[drop.actorKind] }}</span>
-        </dd>
+    <section v-if="drop.isOwner" aria-labelledby="details-access" class="space-y-2.5 p-4">
+      <h3 id="details-access" class="text-xs font-medium text-muted">Access</h3>
+      <div class="flex items-start gap-3">
+        <span class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated text-muted">
+          <UIcon :name="SHARE_ICONS[drop.share]" class="size-4" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm text-highlighted">{{ access }}</p>
+          <p class="text-xs text-pretty text-muted">{{ accessHint }}</p>
+        </div>
+        <UButton color="neutral" label="Change" size="xs" variant="outline" @click="emit('share')" />
       </div>
-      <div class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Updated</dt>
-        <dd class="text-highlighted"><TimeAgo :at="drop.updatedAt" /></dd>
-      </div>
-      <div v-if="site && drop.siteUrl" class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Address</dt>
-        <dd class="min-w-0 truncate text-highlighted" :title="drop.siteUrl">{{ drop.siteUrl }}</dd>
-      </div>
-      <div v-else-if="drop.kind !== 'folder'" class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">File</dt>
-        <dd class="min-w-0 truncate text-highlighted">{{ drop.filename }}</dd>
-      </div>
-      <div class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Type</dt>
-        <dd class="text-highlighted tabular-nums">{{ type }}</dd>
-      </div>
-      <div v-if="folder" class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Folder</dt>
-        <dd class="min-w-0 truncate text-highlighted" :title="folder">{{ folder }}</dd>
-      </div>
-      <div v-if="drop.resources" class="flex items-start gap-3">
-        <dt class="w-20 shrink-0 text-muted">Links</dt>
-        <dd class="min-w-0 flex-1 space-y-1.5">
+    </section>
+
+    <section v-if="views" aria-labelledby="details-views" class="@container space-y-2.5 p-4">
+      <h3 id="details-views" class="text-xs font-medium text-muted">Views</h3>
+      <!-- A total and where the views came from, each a number over what it counts; two by two in a narrow panel.
+           Hovering says how they're counted. -->
+      <dl class="grid grid-cols-2 gap-x-2 gap-y-3 @[22rem]:grid-cols-4">
+        <UTooltip :text="views.tip">
+          <div class="flex flex-col-reverse">
+            <dt class="text-xs text-muted">Total</dt>
+            <dd class="text-lg font-medium text-highlighted tabular-nums">{{ views.total }}</dd>
+          </div>
+        </UTooltip>
+        <UTooltip v-for="part in views.by" :key="part.label" :text="part.tip">
+          <div class="flex flex-col-reverse">
+            <dt class="flex items-center gap-1 text-xs text-muted">
+              <UIcon :name="part.icon" class="size-3.5 shrink-0" />
+              <span class="truncate">{{ part.label }}</span>
+            </dt>
+            <dd class="text-lg font-medium text-highlighted tabular-nums">{{ part.n }}</dd>
+          </div>
+        </UTooltip>
+      </dl>
+    </section>
+
+    <section v-if="drop.resources" aria-labelledby="details-links" class="space-y-2 p-4">
+      <h3 id="details-links" class="text-xs font-medium text-muted">Links</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li v-for="resource in drop.resources" :key="resource.url">
           <a
-            v-for="resource in drop.resources"
-            :key="resource.url"
-            class="flex min-w-0 items-center gap-1.5 text-highlighted hover:underline"
+            class="flex min-w-0 items-center gap-2 text-highlighted hover:underline"
             :href="resource.url"
             rel="noopener noreferrer"
             target="_blank"
@@ -159,51 +211,28 @@ async function save() {
             <ViewerResourceIcon :url="resource.url" />
             <span class="truncate">{{ resourceLabel(resource) }}</span>
           </a>
-        </dd>
-      </div>
-      <div v-if="drop.isOwner" class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Access</dt>
-        <dd class="flex min-w-0 flex-1 items-center gap-1.5 text-highlighted">
-          <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5 shrink-0 text-muted" />
-          <span class="truncate">{{ access }}</span>
-        </dd>
-        <UButton class="-my-1" color="neutral" label="Change" size="xs" variant="ghost" @click="emit('share')" />
-      </div>
-      <div v-if="views" class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Views</dt>
-        <dd class="flex min-w-0 items-center gap-3 tabular-nums">
-          <UTooltip :text="views.tip">
-            <span class="text-highlighted">{{ views.total }}</span>
-          </UTooltip>
-          <UTooltip v-for="part in views.by" :key="part.label" :text="part.tip">
-            <span :aria-label="`${part.n} ${part.label}`" class="flex items-center gap-1 text-muted" role="img">
-              <UIcon :name="part.icon" class="size-3.5 shrink-0" />
-              {{ part.n }}
-            </span>
-          </UTooltip>
-        </dd>
-      </div>
-      <!-- The team's folders never expire, so there's nothing to choose. -->
-      <div v-if="drop.teamFolder" class="flex items-center gap-3">
-        <dt class="w-20 shrink-0 text-muted">Lifetime</dt>
-        <dd class="min-w-0 truncate text-highlighted">Kept: the team's folders never expire</dd>
-      </div>
-      <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
-      <div
-        v-else-if="drop.isOwner && drop.parentId && drop.ancestors.length && me?.expiry.days"
-        class="flex items-center gap-3"
-      >
-        <dt class="w-20 shrink-0 text-muted">Lifetime</dt>
-        <dd class="min-w-0 truncate text-highlighted tabular-nums">
-          {{ expiryLabel(drop, now) }}, with {{ drop.ancestors[0]!.title }}
-        </dd>
-      </div>
-    </dl>
+        </li>
+      </ul>
+    </section>
 
-    <!-- A drop at the top chooses its own lifetime, so it gets the full control below Details. -->
-    <ViewerLifetime v-if="!drop.teamFolder && drop.isOwner && !drop.parentId" :drop="drop" />
+    <!-- The team's folders never expire, so there's nothing to choose. -->
+    <section v-if="drop.teamFolder" aria-labelledby="details-lifetime" class="space-y-1 p-4 text-sm">
+      <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
+      <p class="text-highlighted">Kept: the team's folders never expire</p>
+    </section>
+    <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
+    <section
+      v-else-if="drop.isOwner && drop.parentId && drop.ancestors.length && me?.expiry.days"
+      aria-labelledby="details-lifetime"
+      class="space-y-1 p-4 text-sm"
+    >
+      <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
+      <p class="text-highlighted tabular-nums">{{ expiryLabel(drop, now) }}, with {{ drop.ancestors[0]!.title }}</p>
+    </section>
+    <!-- A drop at the top chooses its own lifetime. -->
+    <ViewerLifetime v-else-if="drop.isOwner && !drop.parentId" class="p-4" :drop="drop" />
 
-    <section v-if="$slots.actions" class="-mx-2 border-t border-default pt-3">
+    <section v-if="$slots.actions" class="p-2">
       <slot name="actions" />
     </section>
   </div>
