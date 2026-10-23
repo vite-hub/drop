@@ -81,6 +81,11 @@ patchedDependencies:
   # originalOf, which Drop's frame runtime anchors comments in the zoom with). Drop both once a release has #25 and #15.
   comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
   comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
+  # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the
+  # overlay scrollbar of a comment past maxrows. Measures a hidden copy instead (nuxt/ui#7267). Also scrolls to the
+  # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
+  # padding, so keep this part after #7267 ships.
+  "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
