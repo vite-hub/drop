@@ -92,20 +92,27 @@ export function useViewerFrame(options: {
   // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
   // postMessage (see server/utils/content-origin.ts). Otherwise the document is the iframe's srcdoc, in an opaque origin.
   const contentOrigin = computed(() => drop.value.contentOrigin)
-  const frameSrc = ref<string>()
+  const hostUrl = () =>
+    contentOrigin.value ? contentOrigin.value + (isApp.value ? pageUrl(page.value) : "/") : undefined
+  // Rendered with the page, so the frame host loads while the viewer's own script does. It asks for its document when
+  // it loads; if the viewer wasn't listening yet, the hello once mounted (below) has it ask again.
+  const frameSrc = ref(hostUrl())
   const frameKey = ref(0)
   /** The document the content frame shows. When the frame moves on its own, the viewer follows without a reload. */
   let frameDocument = ""
+  /** Whether this frame load asked for its document yet. Until it does, a changed document needs no reload. */
+  let asked = false
   function reloadFrame() {
-    frameSrc.value = contentOrigin.value ? contentOrigin.value + (isApp.value ? pageUrl(page.value) : "/") : undefined
+    frameSrc.value = hostUrl()
     frameKey.value++
+    asked = false
   }
-  onMounted(reloadFrame)
   /** Loads `path` in the content frame, as if the app went there itself: a Slidev deck's presenter view, say. */
   function openPath(path: string) {
     if (!contentOrigin.value) return
     frameSrc.value = contentOrigin.value + path
     frameKey.value++
+    asked = false
   }
 
   function pageFor(path: string) {
@@ -157,6 +164,7 @@ export function useViewerFrame(options: {
         }
         return
       case "host":
+        asked = true
         frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
         // The grant lets this app's origin serve it its other files (server/utils/app-files.ts).
         return send({ type: "document", html: frameDocument, grant: drop.value.contentGrant })
@@ -191,8 +199,10 @@ export function useViewerFrame(options: {
         annotations.receive(message, rect)
     }
   })
+  onMounted(() => contentOrigin.value && send({ type: "hello" }))
   watch(srcdoc, (value) => {
-    if (contentOrigin.value && value === frameDocument) return
+    // A frame that hasn't asked yet gets the document as it is then, unless it's loading another page's address.
+    if (contentOrigin.value && (asked ? value === frameDocument : frameSrc.value === hostUrl())) return
     ready.value = false
     if (contentOrigin.value) reloadFrame()
   })
