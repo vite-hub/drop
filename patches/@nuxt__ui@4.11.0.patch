@@ -27,7 +27,6 @@ index eaf89f9861bd1eb4e5d33a43650c39e564891c5b..62d807dc4c26646163cd80bf02cf682c
 +    }
 +    const measure = textarea.cloneNode();
 +    measure.value = textarea.value;
-+    measure.removeAttribute("id");
 +    measure.removeAttribute("name");
 +    measure.setAttribute("aria-hidden", "true");
 +    measure.tabIndex = -1;
@@ -42,9 +41,9 @@ index eaf89f9861bd1eb4e5d33a43650c39e564891c5b..62d807dc4c26646163cd80bf02cf682c
 +      visibility: "hidden",
 +      pointerEvents: "none"
 +    });
-+    textarea.after(measure);
++    textarea.replaceWith(measure);
 +    const { scrollHeight } = measure;
-+    measure.remove();
++    measure.replaceWith(textarea);
 +    const newRows = Math.round((scrollHeight - padding) / lineHeight);
 +    const rows = Math.max(props.rows, props.maxrows ? Math.min(newRows, props.maxrows) : newRows);
 +    if (textarea.rows !== rows) {
