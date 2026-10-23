@@ -357,6 +357,7 @@ function copyChangesLink(version: DropVersion) {
  * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
  */
 async function focusComment(comment: DropComment, row?: DOMRect) {
+  const focusGeneration = annotations.beginFocus()
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
