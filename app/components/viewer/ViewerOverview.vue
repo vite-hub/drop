@@ -28,6 +28,11 @@ const access = computed(
   () =>
     `${shareStatus(props.drop, now.value)}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`,
 )
+const accessHint = computed(() =>
+  props.drop.shareReview
+    ? "An admin reviews public links on this Drop. It still works for you, and for the team on a team Drop."
+    : SHARE_HINTS[props.drop.share],
+)
 // A site goes by its address, a folder by its title, anything else by its file's name.
 const name = computed(() =>
   site.value && props.drop.siteUrl
@@ -163,7 +168,7 @@ async function save() {
         </span>
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm text-highlighted">{{ access }}</p>
-          <p class="text-xs text-pretty text-muted">{{ SHARE_HINTS[drop.share] }}</p>
+          <p class="text-xs text-pretty text-muted">{{ accessHint }}</p>
         </div>
         <UButton color="neutral" label="Change" size="xs" variant="outline" @click="emit('share')" />
       </div>
