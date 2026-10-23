@@ -54,8 +54,9 @@ export function useViewerPanel(options: {
   let drag: { x: number; width: number; rem: number } | undefined
   const resize = {
     start(event: PointerEvent) {
-      // SAFETY: the resize handle is an Element, and pointerdown is only bound to that handle in the viewer panel.
-      ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+      const target = event.currentTarget
+      if (!(target instanceof Element)) return
+      target.setPointerCapture(event.pointerId)
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
       drag = { x: event.clientX, width: width.value, rem }
     },
