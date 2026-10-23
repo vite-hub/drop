@@ -6,7 +6,6 @@
 // replaces the fit, and a page bigger than the pane then scrolls. Size and zoom changes ease in. Its right, bottom, and
 // corner edges drag to any size, and the size shows on the page while they do. Off, the page fills the pane as before.
 // The same elements render either way, so switching never reloads the page.
-import type { DropdownMenuItem } from "@nuxt/ui"
 import {
   BREAKPOINTS,
   DEVICE_MAX,
@@ -21,10 +20,10 @@ import {
 } from "~/utils/devices"
 
 // `bottom` keeps the page clear of what floats under it, the review toolbar by default.
-const props = withDefaults(defineProps<{ on: boolean; bottom?: number }>(), { bottom: 72 })
+const { on, bottom = 72 } = defineProps<{ on: boolean; bottom?: number }>()
 
 const device = useDeviceSize()
-const sized = computed(() => props.on && device.value.on)
+const sized = computed(() => on && device.value.on)
 const preset = computed(() => deviceOf(device.value.id))
 const set = (size: Pick<DeviceSize, "width" | "height">) =>
   (device.value = { ...device.value, on: true, ...size, id: deviceMatching(size.width, size.height) })
@@ -42,7 +41,7 @@ const rotate = () => (device.value = { ...device.value, width: device.value.heig
 function resize(side: "width" | "height", value: number | null | undefined) {
   if (value) set({ ...device.value, [side]: clampDevice(value) })
 }
-const items = computed<DropdownMenuItem[]>(() =>
+const items = computed(() =>
   DEVICES.map((item) => ({
     label: item.label,
     icon: item.icon,
@@ -56,16 +55,8 @@ const within = computed(() => BREAKPOINTS.findLast((band) => band.width <= devic
 
 const stage = useTemplateRef("stage")
 const pane = useElementSize(stage)
-// The stage's padding: a little above the page, and room for the drag handles beside it.
-const TOP = 16,
-  SIDE = 24
-const fit = computed(() =>
-  Math.min(
-    1,
-    (pane.width.value - 2 * SIDE) / device.value.width,
-    (pane.height.value - TOP - props.bottom) / device.value.height,
-  ),
-)
+// useElementSize reports the stage content box, which already excludes its device-mode padding.
+const fit = computed(() => Math.min(1, pane.width.value / device.value.width, pane.height.value / device.value.height))
 const fitting = computed(() => device.value.zoom == null)
 // Frozen while dragging, so the edge stays under the pointer.
 const held = ref<number | null>(null)
@@ -77,6 +68,7 @@ const toFit = () => (device.value = { ...device.value, zoom: null })
 
 let start: { x: number; y: number; width: number; height: number } | null = null
 function grab(event: PointerEvent) {
+  // SAFETY: pointer events are dispatched from the handle element that owns the pointer capture.
   ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
   start = { x: event.clientX, y: event.clientY, width: device.value.width, height: device.value.height }
   held.value = scale.value
@@ -235,7 +227,7 @@ const percent = { style: "percent", maximumFractionDigits: 0 } as const
       ref="stage"
       class="relative flex min-h-0 flex-1 flex-col"
       :class="sized && 'overflow-auto bg-muted'"
-      :style="sized ? { padding: `${TOP}px ${SIDE}px ${bottom}px` } : undefined"
+      :style="sized ? { padding: `16px 24px ${bottom}px` } : undefined"
     >
       <!-- The scaled page's footprint; the page inside keeps its real size. -->
       <div
