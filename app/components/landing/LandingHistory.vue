@@ -25,7 +25,8 @@ const VERSIONS = [
 
 <template>
   <div
-    aria-hidden="true"
+    role="img"
+    aria-label="Billing migration history showing version 2 compared with version 1, including two additions and one removal."
     class="overflow-hidden rounded-xl border border-default bg-default text-highlighted shadow-xl shadow-black/5 select-none"
   >
     <div class="flex h-10 items-center gap-2 border-b border-default px-4 text-[13px]">
@@ -43,7 +44,7 @@ const VERSIONS = [
       </span>
     </div>
 
-    <div class="grid grid-cols-[minmax(0,1fr)_13rem]">
+    <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_13rem]">
       <div class="min-w-0">
         <p class="flex items-center gap-1.5 border-b border-default px-4 py-2 text-xs text-muted">
           <span class="font-semibold text-highlighted">v2</span> vs v1
@@ -75,7 +76,7 @@ const VERSIONS = [
         </div>
       </div>
 
-      <aside class="border-l border-default p-2">
+      <aside class="border-t border-default p-2 sm:border-l sm:border-t-0">
         <p class="flex gap-1 rounded-md bg-muted p-0.5 text-[11px]">
           <span class="px-2 py-0.5 text-muted">Comments</span>
           <span class="rounded-[5px] bg-default px-2 py-0.5 font-medium shadow-xs">History</span>
