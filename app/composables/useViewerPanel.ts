@@ -32,8 +32,8 @@ export function useViewerPanel(options: {
           },
         ]
       : []),
-    // Anyone who can open the drop can read its history; Details (sharing, lifetime) stays with its managers, and with
-    // whoever files into a folder that says what goes in it.
+    // Anyone who can open the drop can read its history. Details is for everyone signed in; its sharing, views and
+    // lifetime stay with the owner (ViewerOverview).
     ...(options.versions.value > 1
       ? [{ value: "history" as const, label: "History", icon: "i-mingcute-history-line" }]
       : []),
