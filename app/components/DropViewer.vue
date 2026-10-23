@@ -103,6 +103,8 @@ const framed = computed(
     !(drop.value.kind === "file" && !drop.value.html),
 )
 watch(framed, (value) => !value && (tool.value = "browse"))
+/** Whether the page can show at a device's size (ViewerDevice): pages, not images or spreadsheets. */
+const sizable = computed(() => framed.value && ["html", "app", "markdown"].includes(drop.value.kind))
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
@@ -939,34 +941,37 @@ watch(
             />
           </div>
         </div>
-        <iframe
-          v-else-if="contentOrigin"
-          :key="frameKey"
-          ref="frame"
-          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-          :allow="frameAllow(drop.kind)"
-          :sandbox="CONTENT_SANDBOX"
-          :src="frameSrc"
-          :title="drop.title"
-        />
-        <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
-             backdrop behind it in dark mode. -->
-        <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
-        <iframe
-          v-else-if="srcdoc"
-          ref="frame"
-          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-          data-allow-mismatch="attribute"
-          :allow="frameAllow(drop.kind)"
-          :sandbox="PREVIEW_SANDBOX"
-          :srcdoc="srcdoc"
-          :title="drop.title"
-        />
+        <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable">
+          <iframe
+            v-if="contentOrigin"
+            :key="frameKey"
+            ref="frame"
+            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+            :allow="frameAllow(drop.kind)"
+            :sandbox="CONTENT_SANDBOX"
+            :src="frameSrc"
+            :title="drop.title"
+          />
+          <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
+               backdrop behind it in dark mode. -->
+          <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
+          <iframe
+            v-else
+            ref="frame"
+            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+            data-allow-mismatch="attribute"
+            :allow="frameAllow(drop.kind)"
+            :sandbox="PREVIEW_SANDBOX"
+            :srcdoc="srcdoc"
+            :title="drop.title"
+          />
+        </ViewerDevice>
 
         <ViewerToolbar
           v-if="framed && !shownVersion"
           :can-comment="canDrawArea"
           :overlays="overlays"
+          :sizable="sizable"
           :tool="tool"
           :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
           @toggle="toggleOverlay"

@@ -1,4 +1,5 @@
 import type { DocWidth } from "#shared/documents"
+import type { DeviceSize } from "~/utils/devices"
 import type { SideTab } from "~/utils/viewer"
 
 const year = 60 * 60 * 24 * 365
@@ -20,6 +21,14 @@ export function useSidePanel() {
 /** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
+
+/** The size HTML docs, apps, and Markdown docs show at (the review toolbar's Device menu), for every drop. */
+export const useDeviceSize = () =>
+  useCookie<DeviceSize>("drop-device", {
+    default: () => ({ id: "fill", width: 1280, height: 800 }),
+    maxAge: year,
+    sameSite: "lax",
+  })
 
 /** Whether the Drops page's Get started checklist was dismissed. A cookie, so a dismissed checklist never flashes in. */
 export const useGetStartedHidden = () =>
