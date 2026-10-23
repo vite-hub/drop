@@ -136,7 +136,7 @@ const AROUND = [
 const HOSTED = [
   "Sign in with GitHub",
   "Free for you and small teams",
-  "Drops expire after inactivity: 30 days for review, 14 for temporary, and never for keep",
+  "Drops expire after inactivity according to their lifetime: temporary drops last up to 14 days, review drops follow the deployment policy, and keep drops never expire",
 ]
 const SELF_HOSTED = [
   "Team mode: shared inside the team, closed to the internet",
