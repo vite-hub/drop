@@ -2,8 +2,8 @@
 import type { DropComment, DropVersion } from "#shared/types"
 import type { Sent } from "~/composables/useDrop"
 
-// `addPageComment` posts a comment on the page as a whole, written in the box at the bottom; the box only clears once it
-// went through, and says why under it when it didn't. `focus` carries the row's box for those comments, which have no pin to open at.
+// `addPageComment` posts a comment on the page as a whole, written in the box at the bottom. The box clears at once, as
+// the comment shows in the list; if it doesn't go through, the text comes back with why under it. `focus` carries the row's box for those comments, which have no pin to open at.
 const props = defineProps<{
   comments: DropComment[]
   canComment: boolean
@@ -39,18 +39,20 @@ const repliers = (comment: DropComment) => [
 ]
 
 const pageBody = ref("")
-const sending = ref(false)
 const pageError = ref<string>()
 watch(pageBody, () => (pageError.value = undefined))
 async function sendPageComment() {
-  if (!pageBody.value.trim() || sending.value) return
-  sending.value = true
-  const sent = await props.addPageComment(pageBody.value)
-  if ("value" in sent) {
-    pageBody.value = ""
-    filter.value = "open"
-  } else pageError.value = sent.error
-  sending.value = false
+  const text = pageBody.value
+  if (!text.trim()) return
+  pageBody.value = ""
+  filter.value = "open"
+  const sent = await props.addPageComment(text)
+  if (!("value" in sent)) {
+    // Only if nothing new was typed meanwhile.
+    if (!pageBody.value) pageBody.value = text
+    await nextTick()
+    pageError.value = sent.error
+  }
 }
 </script>
 
@@ -161,7 +163,6 @@ async function sendPageComment() {
         color="neutral"
         :disabled="!pageBody.trim()"
         icon="i-mingcute-arrow-up-line"
-        :loading="sending"
         @click="sendPageComment"
       />
     </div>

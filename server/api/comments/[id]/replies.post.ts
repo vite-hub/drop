@@ -13,6 +13,8 @@ import { routeId } from "../../../utils/params"
 export default defineValidatedHandler({
   validate: { body: CommentReplySchema },
   async handler(event) {
+    // Who's asking resolves while the comment and its drop load.
+    const asking = identify(event)
     const [comment] = await db
       .select()
       .from(comments)
@@ -21,7 +23,7 @@ export default defineValidatedHandler({
     // Open comments carry over to later versions, so a thread may hang off an old one: ask the latest version.
     const written = comment ? await findDrop(comment.dropId, event) : null
     const drop = written?.link ? ((await findDropByLink(written.link, undefined, event)) ?? written) : written
-    const who = await identify(event)
+    const who = await asking
     if (!comment || !drop || !permissions(drop, who).comment)
       throw new HTTPError({ status: 404, statusText: "You can't reply to this comment." })
     // Replies share the comment limit: a thread is no way around it.

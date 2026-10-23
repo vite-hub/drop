@@ -193,7 +193,7 @@ function menu(member: Member): DropdownMenuItem[][] {
                 <UButton
                   :aria-label="`Actions for ${member.name}`"
                   color="neutral"
-                  icon="i-mingcute-more-1-line"
+                  icon="i-mingcute-more-1-fill"
                   size="sm"
                   variant="ghost"
                 />

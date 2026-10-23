@@ -66,7 +66,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
           :class="reveal"
           type="button"
         >
-          <UIcon name="i-mingcute-more-1-line" class="size-3.5" />
+          <UIcon name="i-mingcute-more-1-fill" class="size-3.5" />
         </button>
       </UDropdownMenu>
       <button

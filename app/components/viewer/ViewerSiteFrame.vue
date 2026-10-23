@@ -3,6 +3,7 @@
 // over the frame and screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
 // so a comment carries the screenshot, the box, and the address typed above, never the element under the box. Comments
 // are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way.
+// The page can show at a device's size (ViewerDevice), and the comment then says that size, not the scaled one.
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
@@ -63,11 +64,14 @@ async function comment() {
   drawing.value = true
 }
 
+// In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
-  const rect = stage.value!.getBoundingClientRect()
+  const el = stage.value!
+  const rect = el.getBoundingClientRect()
+  const scale = rect.width / (el.offsetWidth || rect.width)
   return {
-    x: Math.min(Math.max(event.clientX - rect.left, 0), rect.width),
-    y: Math.min(Math.max(event.clientY - rect.top, 0), rect.height),
+    x: Math.min(Math.max((event.clientX - rect.left) / scale, 0), el.offsetWidth),
+    y: Math.min(Math.max((event.clientY - rect.top) / scale, 0), el.offsetHeight),
   }
 }
 function down(event: PointerEvent) {
@@ -89,7 +93,8 @@ async function up() {
   const drawn = box.value
   from = null
   if (!drawn || drawn.width < 8 || drawn.height < 8) return (box.value = null)
-  const rect = stage.value!.getBoundingClientRect()
+  const el = stage.value!
+  const rect = el.getBoundingClientRect()
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
   drawing.value = false
   box.value = null
@@ -102,7 +107,7 @@ async function up() {
       blob,
       url: URL.createObjectURL(blob),
       box: drawn,
-      size: { width: Math.round(rect.width), height: Math.round(rect.height) },
+      size: { width: el.offsetWidth, height: el.offsetHeight },
       page: (url.pathname + url.search + url.hash).slice(0, 1000),
       origin: url.origin,
     }
@@ -185,6 +190,7 @@ onBeforeUnmount(discard)
           spellcheck="false"
         />
       </form>
+      <ViewerDeviceButton />
       <UButton
         color="neutral"
         :variant="drawing ? 'solid' : 'outline'"
@@ -204,36 +210,45 @@ onBeforeUnmount(discard)
       Check it before you send.
     </p>
 
-    <div ref="stage" class="relative min-h-0 flex-1 bg-muted">
-      <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
+    <div class="relative flex min-h-0 flex-1 flex-col bg-muted">
+      <ViewerDevice :bottom="24" on>
+        <div ref="stage" class="relative min-h-0 flex-1">
+          <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
            dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
-      <iframe
-        :key="open"
-        class="absolute inset-0 size-full border-0 bg-white"
-        referrerpolicy="strict-origin"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
-        :src="open"
-        :title="`${drop.title}: the site under review`"
-      />
-      <div
-        v-if="drawing"
-        class="absolute inset-0 cursor-crosshair touch-none bg-inverted/5"
-        @pointerdown="down"
-        @pointermove="move"
-        @pointerup="up"
-      >
-        <div
-          v-if="box"
-          class="absolute rounded-sm border-2 border-inverted bg-inverted/10"
-          :style="{ left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` }"
-        />
-        <p
-          v-else
-          class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
-        >
-          Drag over what you mean. <UKbd value="escape" /> cancels.
-        </p>
-      </div>
+          <iframe
+            :key="open"
+            class="absolute inset-0 size-full border-0 bg-white"
+            referrerpolicy="strict-origin"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
+            :src="open"
+            :title="`${drop.title}: the site under review`"
+          />
+          <div
+            v-if="drawing"
+            class="absolute inset-0 cursor-crosshair touch-none bg-inverted/5"
+            @pointerdown="down"
+            @pointermove="move"
+            @pointerup="up"
+          >
+            <div
+              v-if="box"
+              class="absolute rounded-sm border-2 border-inverted bg-inverted/10"
+              :style="{
+                left: `${box.left}px`,
+                top: `${box.top}px`,
+                width: `${box.width}px`,
+                height: `${box.height}px`,
+              }"
+            />
+            <p
+              v-else
+              class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
+            >
+              Drag over what you mean. <UKbd value="escape" /> cancels.
+            </p>
+          </div>
+        </div>
+      </ViewerDevice>
 
       <form
         v-if="pending"

@@ -231,7 +231,11 @@ export default defineNuxtConfig({
     "/pricing": { appLayout: "docs" },
   },
 
-  experimental: { typescriptPlugin: true },
+  experimental: {
+    typescriptPlugin: true,
+    // How often an open tab asks for the newest build id (app/plugins/update-ready.client.ts). Nuxt's default is an hour.
+    checkOutdatedBuildInterval: 2 * 60_000,
+  },
 
   // media-chrome's elements (app/components/viewer/ViewerVideo.vue) are web components, not Vue components.
   vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("media-") } },
@@ -273,7 +277,7 @@ export default defineNuxtConfig({
 
   icon: {
     provider: "none",
-    // Kind and agent icons are picked at runtime (KIND_ICONS, agentLogo), so the scanner can't see them.
+    // Kind, agent, and device icons are picked at runtime (KIND_ICONS, agentLogo, DEVICES), so the scanner can't see them.
     clientBundle: {
       scan: true,
       icons: [
@@ -288,6 +292,10 @@ export default defineNuxtConfig({
         "mingcute:sparkles-line",
         "mingcute:key-2-line",
         "mingcute:user-3-line",
+        "mingcute:cellphone-line",
+        "mingcute:pad-line",
+        "mingcute:laptop-line",
+        "mingcute:monitor-line",
         "simple-icons:claude",
         "simple-icons:openai",
         "simple-icons:cursor",
@@ -310,6 +318,8 @@ export default defineNuxtConfig({
         // The Get started checklist's step marks (app/components/GetStarted.vue).
         "mingcute:check-circle-fill",
         "mingcute:round-line",
+        // The sidebar's "Update ready" icon (app/components/UpdateReady.vue).
+        "mingcute:refresh-2-line",
         // Nuxt UI's own icons (app.config ui.icons): the scanner reads templates, not app.config, so without these the
         // color-mode toggle, close buttons, carets, and spinners render empty.
         "mingcute:refresh-anticlockwise-1-line",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
-import { runInNewContext } from "node:vm"
+import { runInNewContext, Script } from "node:vm"
 import { H3Event } from "h3"
 import { migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
 const { contentOrigin, FRAME_HOST_HTML, isContentRequest } = await import("../../server/utils/content-origin.ts")
@@ -580,7 +580,7 @@ test("a page someone else built gets only the comment layer: no theme of Drop's,
   const own = injectRuntime(tailwind, true, 0, true)
   assert.doesNotMatch(own, /data-drop-theme/)
   assert.doesNotMatch(own, /classList\.toggle\("dark"/)
-  assert.match(own, /const AUTHORED = true, THEMED = false;/)
+  assert.match(own, /const AUTHORED = true, THEMED = false, DARK = true;/)
   assert.doesNotMatch(own, /__AUTHORED__/)
   // A plan written to the authoring guide still gets Drop's theme and follows dark mode.
   const plan = injectRuntime('<html><head></head><body style="color:var(--foreground)"></body></html>', true, 0, true)
@@ -589,6 +589,25 @@ test("a page someone else built gets only the comment layer: no theme of Drop's,
   // Drop's own documents keep the zoom.
   assert.match(
     injectRuntime("<html><head></head><body></body></html>", false),
-    /const AUTHORED = false, THEMED = true;/,
+    /const AUTHORED = false, THEMED = true, DARK = false;/,
   )
+})
+
+test("every script the runtime injects parses, tools included", () => {
+  const html = injectRuntime("<!doctype html><html><head></head><body><p>Hi</p></body></html>", false, 0, true)
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1])
+  assert.ok(scripts.length >= 3)
+  for (const source of scripts) assert.doesNotThrow(() => new Script(source))
+  // The toolbar's messages reach the comment layer.
+  assert.match(html, /m\.type === "tool"/)
+  assert.match(html, /m\.type === "view"/)
+})
+
+test("a comment may point at a spot on an element, but an area needs both sides", async () => {
+  const v = await import("valibot")
+  const { CommentSchema } = await import("../../shared/schemas.ts")
+  const spot = { kind: "area", selector: "main > p", ox: 400, oy: 500, body: "This" }
+  assert.equal(v.safeParse(CommentSchema, spot).success, true)
+  assert.equal(v.safeParse(CommentSchema, { ...spot, ow: 100, oh: 50 }).success, true)
+  assert.equal(v.safeParse(CommentSchema, { ...spot, ow: 100 }).success, false)
 })

@@ -13,8 +13,8 @@ type RuntimeReport = {
 
 /**
  * The frame the drop renders in, and everything that goes over its postMessage bridge (useDropFrame): the document
- * it shows, the app page it navigated to, the comment pins, area mode, the room the floating panel takes, and the
- * errors the page reports. What the reader points at goes on to the annotations.
+ * it shows, the app page it navigated to, the comment pins, the toolbar's tool and overlays, the room the floating
+ * panel takes, and the errors the page reports. What the reader points at goes on to the annotations.
  */
 export function useViewerFrame(options: {
   drop: Ref<DropDetail>
@@ -150,7 +150,7 @@ export function useViewerFrame(options: {
       }).catch(() => {})
   }, 2000)
 
-  const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, rect) => {
+  const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
       case "runtime-error":
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
@@ -196,7 +196,7 @@ export function useViewerFrame(options: {
       case "area":
       case "marker":
       case "key":
-        annotations.receive(message, rect)
+        annotations.receive(message, box)
     }
   })
   onMounted(() => contentOrigin.value && send({ type: "hello" }))
@@ -231,7 +231,11 @@ export function useViewerFrame(options: {
         ),
       })
   })
-  watch([ready, annotations.areaMode], () => ready.value && send({ type: "area-mode", on: annotations.areaMode.value }))
+  watch([ready, annotations.tool], () => ready.value && send({ type: "tool", tool: annotations.tool.value }))
+  watch(
+    [ready, () => ({ ...annotations.overlays })],
+    () => ready.value && send({ type: "view", ...annotations.overlays }),
+  )
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
   watch([ready, options.inset], () => ready.value && send({ type: "inset", right: options.inset.value }))
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))

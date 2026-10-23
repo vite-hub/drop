@@ -57,10 +57,9 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-// A folder's description (what goes in it) is in Details, for everyone signed in who adds to it.
-const details = computed(
-  () => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !publicView),
-)
+// Details holds what the header doesn't (Copy as Markdown, Download, Open in new window), so everyone signed in gets it;
+// sharing, views and lifetime in it stay with the owner (ViewerOverview).
+const details = computed(() => owner.value || Boolean(me.value))
 const panel = useViewerPanel({
   details,
   openCount,
@@ -80,13 +79,37 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
-const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } =
-  annotations
+const {
+  selection,
+  lightbox,
+  popover,
+  tool,
+  overlays,
+  areaMode,
+  canDrawArea,
+  imageDraft,
+  toggleArea,
+  setTool,
+  toggleOverlay,
+  commentOnSelection,
+  pickImage,
+} = annotations
+/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
+const framed = computed(
+  () =>
+    !editing.value &&
+    !["folder", "site", "board"].includes(drop.value.kind) &&
+    !video.value &&
+    !(drop.value.kind === "file" && !drop.value.html),
+)
+watch(framed, (value) => !value && (tool.value = "browse"))
+/** Whether the page can show at a device's size (ViewerDevice): pages, not images or spreadsheets. */
+const sizable = computed(() => framed.value && ["html", "app", "markdown"].includes(drop.value.kind))
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
 }
-const popoverRef = useTemplateRef<{ fail: (reason?: string) => void; sent: () => Promise<void> }>("popoverRef")
+const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
@@ -120,8 +143,14 @@ const pageComments = computed(() =>
 // TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
-// Comments on the whole page have nothing in it to pin to; they live in the panel.
-const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
+// Comments on the whole page have nothing in it to pin to; they live in the panel. A resolved comment leaves the page
+// and stays in the Resolved tab; opening it from there pins it until its thread closes (`revealed`).
+const revealed = ref<string | null>(null)
+const pinned = computed(() =>
+  pageComments.value.filter(
+    (comment) => (!comment.resolved || comment.id === revealed.value) && !replaced(comment) && comment.kind !== "page",
+  ),
+)
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
 // The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
@@ -136,7 +165,7 @@ const panelTabsUi = {
 // Shared with someone, or waiting on review: its status sits beside the title. A private drop gets Share on the right.
 const shared = computed(() => drop.value.share !== "private" || Boolean(drop.value.shareReview))
 // Comments has its own button in the header: it opens the panel there, and closes it once open. History and Details
-// open from More, the panel's tabs, or H and I.
+// open from the panel's tabs, or H and I; a drop without comments (a folder) gets a Details button instead.
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
 const showing = (value: SideTab) => panelOpen.value && tab.value === value
 const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
@@ -145,7 +174,7 @@ if (route.query.changes && has("history")) {
   tab.value = "history"
   sideOpen.value = true
 }
-// A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
+// A visitor on a folder's public link has no tab to show (no comments, no Details), so no panel either.
 const docked = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
 
 // A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
@@ -243,6 +272,10 @@ defineShortcuts({
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
+  v: () => (tool.value = "browse"),
+  s: () => framed.value && setTool("measure"),
+  u: () => framed.value && toggleOverlay("rulers"),
+  x: () => framed.value && toggleOverlay("xray"),
   l: () => !editing.value && copyLink("Link copied"),
   d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
@@ -254,7 +287,7 @@ defineShortcuts({
   },
 })
 
-// An uploaded file or image is the thing itself, so its download sits in the bar; Drop's own kinds keep it in the menu.
+// An uploaded file or image is the thing itself, so its download sits in the bar; Drop's own kinds keep it in Details.
 const downloadsInBar = computed(() => Boolean(drop.value.url) && ["file", "image"].includes(drop.value.kind))
 /** Saves the stored file under its uploaded name; the raw URL is same-origin, so `download` names it. */
 function download() {
@@ -279,96 +312,16 @@ function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") shareOpen.value = true
   else void copy(link.value, { key: "link", announce })
 }
-// The header keeps Edit, Comments and Copy link; the rest lives in More, each with its key. The menu closes on copy, so
-// a toast says it worked.
-const moreMenu = computed(() =>
-  [
-    [
-      ...(presents.value
-        ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
-        : []),
-      ...(canDrawArea.value
-        ? [
-            {
-              label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
-              icon: "i-mingcute-message-1-line",
-              kbds: ["r"],
-              onSelect: toggleArea,
-            },
-          ]
-        : []),
-      ...(widens.value
-        ? [
-            {
-              label: "Width",
-              icon: "i-mingcute-spacing-horizontal-line",
-              children: widths.map((item) => ({
-                label: item.label,
-                type: "checkbox" as const,
-                checked: docWidth.value === item.value,
-                onUpdateChecked: () => (docWidth.value = item.value),
-              })),
-            },
-          ]
-        : []),
-      ...(has("history")
-        ? [
-            {
-              label: "History",
-              icon: "i-mingcute-history-line",
-              kbds: ["h"],
-              onSelect: () => panel.show("history"),
-            },
-          ]
-        : []),
-      ...(has("details")
-        ? [
-            {
-              label: "Details",
-              icon: "i-mingcute-information-line",
-              kbds: ["i"],
-              onSelect: () => panel.show("details"),
-            },
-          ]
-        : []),
-    ],
-    [
-      ...(copiesMarkdown.value
-        ? [
-            {
-              label: "Copy as Markdown",
-              icon: "i-mingcute-markdown-line",
-              kbds: ["m"],
-              onSelect: () => void copyMarkdown("Markdown copied"),
-            },
-          ]
-        : []),
-      ...(drop.value.url && !downloadsInBar.value
-        ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
-        : []),
-    ],
-    // Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it.
-    ...(visitor.value
-      ? [
-          [
-            {
-              label: "Report",
-              icon: "i-mingcute-flag-1-line",
-              to: { path: "/report", query: { target: `/d/${drop.value.link}` } },
-            },
-          ],
-        ]
-      : []),
-  ].filter((group) => group.length),
-)
-const moreActive = computed(() => areaMode.value || showing("history") || showing("details"))
 
+// Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
+// unless another one is open by then.
 async function submit(body: string) {
-  if (popover.value?.type !== "new") return
-  const sent = await state.addComment({ ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
-  if (!("value" in sent)) return popoverRef.value?.fail(sent.error)
+  const open = popover.value
+  if (open?.type !== "new") return
   popover.value = null
   send({ type: "clear-selection" })
+  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
+  if (!("value" in sent) && !popover.value) popover.value = { ...open, body, error: sent.error }
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
@@ -390,8 +343,7 @@ async function removeComment(id: string) {
 
 async function reply(id: string, body: string) {
   const sent = await state.addReply(id, body)
-  if ("value" in sent) await popoverRef.value?.sent()
-  else popoverRef.value?.fail(sent.error)
+  if (!("value" in sent)) await popoverRef.value?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
@@ -413,13 +365,23 @@ function copyChangesLink(version: DropVersion) {
  * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
  */
 async function focusComment(comment: DropComment, row?: DOMRect) {
+  const focusGeneration = annotations.beginFocus()
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
     await nextTick()
     await until(ready).toBe(true, { timeout: 5000 })
   }
+  if (!annotations.isFocusCurrent(focusGeneration)) return
   if (!wide.value) mobileSide.value = false
+  // A page comment opens here and now, so it cancels a pin's thread still on its way too.
+  if (!annotations.awaitThread(comment.kind === "page" ? null : comment.id, focusGeneration)) return
+  revealed.value = comment.resolved && comment.kind !== "page" ? comment.id : null
+  if (revealed.value) {
+    // The frame gets the pin with the next markers (useViewerFrame), so it has one to scroll to.
+    await nextTick()
+    if (!annotations.isFocusCurrent(focusGeneration)) return
+  }
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
@@ -454,7 +416,7 @@ const moveTo = useMoveDialog()
 const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
   publicView ? dropPath(crumb) : `/drops/${crumb.id}`
 
-// ⌘K lists what you can do with this drop, under its title: the More menu, the header's buttons, and Details' actions.
+// ⌘K lists what you can do with this drop, under its title: the header's buttons, the toolbar's, and Details' actions.
 offerToPalette("drop", () => {
   if (visitor.value) return null
   if (editing.value)
@@ -486,10 +448,32 @@ offerToPalette("drop", () => {
     ...(canDrawArea.value
       ? [
           {
-            label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
+            label: areaMode.value ? "Stop commenting" : "Comment on an element",
             icon: "i-mingcute-message-1-line",
             kbds: ["r"],
             onSelect: toggleArea,
+          },
+        ]
+      : []),
+    ...(framed.value
+      ? [
+          {
+            label: tool.value === "measure" ? "Stop measuring" : "Measure",
+            icon: "i-mingcute-aiming-2-line",
+            kbds: ["s"],
+            onSelect: () => setTool("measure"),
+          },
+          {
+            label: overlays.rulers ? "Hide rulers" : "Rulers and guides",
+            icon: "i-mingcute-ruler-line",
+            kbds: ["u"],
+            onSelect: () => toggleOverlay("rulers"),
+          },
+          {
+            label: overlays.xray ? "Turn off X-ray" : "X-ray",
+            icon: "i-mingcute-layout-grid-line",
+            kbds: ["x"],
+            onSelect: () => toggleOverlay("xray"),
           },
         ]
       : []),
@@ -549,18 +533,22 @@ const imageComments = computed(() =>
   lightbox.value
     ? pageComments.value.filter(
         (comment) =>
-          comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id),
+          comment.kind !== "text" &&
+          comment.selector === lightbox.value!.selector &&
+          !comment.resolved &&
+          !outdated.value.has(comment.id),
       )
     : [],
 )
+watch(popover, (open) => !open && (revealed.value = null))
 const threadComment = computed(() => {
   const open = popover.value
-  return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
+  return open?.type === "thread" ? state.findComment(open.id) : undefined
 })
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => threadComment.value?.n,
-  (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
+  (n) => void setQuery({ comment: n }),
 )
 </script>
 
@@ -630,7 +618,19 @@ watch(
             :label="copied('link') ? 'Link copied' : 'Copy link'"
             @click="copyLink()"
           />
+          <ViewerAction
+            v-if="copiesMarkdown"
+            :icon="copied('markdown') ? 'i-mingcute-check-line' : 'i-mingcute-markdown-line'"
+            :label="copied('markdown') ? 'Markdown copied' : 'Copy as Markdown'"
+            @click="copyMarkdown()"
+          />
           <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
+          <ViewerAction
+            v-if="presents"
+            icon="i-mingcute-external-link-line"
+            label="Open in new window"
+            @click="openWindow"
+          />
           <ViewerAction
             v-if="owner && !trashed"
             icon="i-mingcute-new-folder-line"
@@ -735,7 +735,8 @@ watch(
             @click="live.publish()"
           />
         </template>
-        <!-- Three tools at hand and More for the rest: icons only, shortcuts in the tooltips and the menu. -->
+        <!-- A few tools at hand, icons only with their keys in the tooltips. The review tools sit in the toolbar under the
+             page, and the rest in Details. -->
         <template v-else #right>
           <UTooltip v-if="slidev && contentOrigin" text="Deck in a new window, presenter view here">
             <UButton
@@ -776,6 +777,17 @@ watch(
               @click="toggleTab('comments')"
             />
           </UTooltip>
+          <UTooltip v-else-if="has('details')" :kbds="['I']" text="Details">
+            <UButton
+              aria-label="Details"
+              :aria-pressed="showing('details')"
+              color="neutral"
+              icon="i-mingcute-information-line"
+              size="sm"
+              :variant="showing('details') ? 'soft' : 'ghost'"
+              @click="toggleTab('details')"
+            />
+          </UTooltip>
           <UTooltip :kbds="['L']" text="Copy link">
             <UButton
               aria-label="Copy link"
@@ -796,16 +808,17 @@ watch(
               @click="download"
             />
           </UTooltip>
-          <UDropdownMenu v-if="moreMenu.length" :content="{ align: 'end' }" :items="moreMenu">
+          <!-- Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it. -->
+          <UTooltip v-if="visitor" text="Report">
             <UButton
-              aria-label="More"
-              :aria-pressed="moreActive"
+              aria-label="Report"
               color="neutral"
-              icon="i-mingcute-more-1-line"
+              icon="i-mingcute-flag-1-line"
               size="sm"
-              :variant="moreActive ? 'soft' : 'ghost'"
+              :to="{ path: '/report', query: { target: `/d/${drop.link}` } }"
+              variant="ghost"
             />
-          </UDropdownMenu>
+          </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
           <USeparator v-if="(owner && !shared) || visitor" class="ml-1 h-4" orientation="vertical" />
           <UButton
@@ -928,28 +941,42 @@ watch(
             />
           </div>
         </div>
-        <iframe
-          v-else-if="contentOrigin"
-          :key="frameKey"
-          ref="frame"
-          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-          :allow="frameAllow(drop.kind)"
-          :sandbox="CONTENT_SANDBOX"
-          :src="frameSrc"
-          :title="drop.title"
-        />
-        <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
-             backdrop behind it in dark mode. -->
-        <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
-        <iframe
-          v-else-if="srcdoc"
-          ref="frame"
-          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-          data-allow-mismatch="attribute"
-          :allow="frameAllow(drop.kind)"
-          :sandbox="PREVIEW_SANDBOX"
-          :srcdoc="srcdoc"
-          :title="drop.title"
+        <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable">
+          <iframe
+            v-if="contentOrigin"
+            :key="frameKey"
+            ref="frame"
+            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+            :allow="frameAllow(drop.kind)"
+            :sandbox="CONTENT_SANDBOX"
+            :src="frameSrc"
+            :title="drop.title"
+          />
+          <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
+               backdrop behind it in dark mode. -->
+          <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
+          <iframe
+            v-else
+            ref="frame"
+            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+            data-allow-mismatch="attribute"
+            :allow="frameAllow(drop.kind)"
+            :sandbox="PREVIEW_SANDBOX"
+            :srcdoc="srcdoc"
+            :title="drop.title"
+          />
+        </ViewerDevice>
+
+        <ViewerToolbar
+          v-if="framed && !shownVersion"
+          :can-comment="canDrawArea"
+          :overlays="overlays"
+          :sizable="sizable"
+          :tool="tool"
+          :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
+          @toggle="toggleOverlay"
+          @tool="setTool"
+          @width="nextWidth"
         />
 
         <ViewerDiff
@@ -1038,6 +1065,8 @@ watch(
     ref="popoverRef"
     :can-manage="drop.isOwner"
     :comment="threadComment"
+    :draft="popover.type === 'new' ? popover.body : undefined"
+    :draft-error="popover.type === 'new' ? popover.error : undefined"
     :pending="popover.type === 'new' ? popover.pending : undefined"
     :x="popover.x"
     :y="popover.y"
