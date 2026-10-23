@@ -33,7 +33,7 @@ Every drop opens full screen and has its own link. Docs keep earlier versions; p
 
 ## Plans and limits {#plans}
 
-Quotas are off unless the operator turns them on. When they're on, everyone in the Drop gets the same plan, set in the environment. Free includes 50 drops, 100 MiB of storage, and 1,000 file writes per calendar month. An app can contain up to 300 files and 10 MiB. Pro includes 100 drops, 1 GiB, and 10,000 writes per month, with apps up to 1,000 files and 25 MiB. Unlimited has no owner limits.
+Quotas are off unless the operator turns them on. When they're on, everyone in the Drop gets the same plan, set in the environment. Free includes 50 drops, 100 MiB of storage, and 1,000 file writes per calendar month. An app can contain up to 300 files and 10 MiB. Pro includes any number of drops, 1 GiB, and 10,000 writes per month, with apps up to 1,000 files and 25 MiB. Unlimited has no owner limits.
 
 A drop is one doc, app, or uploaded file with its version chain. Every retained document version and app file counts toward storage. A document version uses one write; an app publish uses one per file. Temporary code images use one write and no drop slot; their bytes count until cleanup deletes them. The owner's plan applies even when someone else edits.
 
@@ -41,7 +41,7 @@ At a limit, your existing drops and shared links keep working. Revisions are all
 
 The Free plan also keeps at most 10 drops forever at once; Pro keeps any number. On a Drop that [bills teams](/docs/self-host#billing), everyone on a team that pays is on Pro.
 
-Operators set `DROP_QUOTAS=true` to turn quotas on and `DROP_DEFAULT_PLAN` to `free`, `pro`, or `unlimited`; `DROP_PRO_DROPS`, `DROP_PRO_BYTES`, and `DROP_PRO_WRITES` change the Pro limits. Like every Drop setting, they're read at runtime, so a restart applies them. For other limits, [deploy your own](/docs/self-host).
+Operators set `DROP_QUOTAS=true` to turn quotas on and `DROP_DEFAULT_PLAN` to `free`, `pro`, or `unlimited`; `DROP_PRO_BYTES` and `DROP_PRO_WRITES` change the Pro limits, and `DROP_PRO_DROPS` caps Pro's drops, which are unlimited unless it's set. Like every Drop setting, they're read at runtime, so a restart applies them. For other limits, [deploy your own](/docs/self-host).
 
 ## Roles {#roles}
 
