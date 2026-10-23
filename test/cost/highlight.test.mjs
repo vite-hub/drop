@@ -19,7 +19,8 @@ test("code stays escaped, and unknown or unlabelled fences stay plain", async ()
   const html = await render(
     "```html\n<script>alert(1)</script>\n```\n\n```\n<b>plain</b>\n```\n\n```brainfuck\n+++\n```",
   )
-  assert.doesNotMatch(html, /<script>/)
+  // comark-code adds its own copy-button runtime as a <script>; the fenced one must stay text.
+  assert.doesNotMatch(html, /<script>alert/)
   assert.match(html, /&lt;<\/span><span[^>]*>script/)
   assert.match(html, /<pre><code>&lt;b&gt;plain&lt;\/b&gt;<\/code><\/pre>/)
   assert.equal(html.match(/class="shiki"/g)?.length, 1)

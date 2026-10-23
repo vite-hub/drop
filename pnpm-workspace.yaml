@@ -76,11 +76,6 @@ patchedDependencies:
   # Nitro's memory cache (Node hosts like Quiver) dropped every render with a 30-day TTL at once: a setTimeout over
   # 2^31-1 ms fires after 1 ms. Backport of unjs/unstorage#845 (in 2.0.0-alpha.11; Nitro pins alpha.7).
   unstorage@2.0.0-alpha.7: patches/unstorage@2.0.0-alpha.7.patch
-  # comark-plugins main plus onmax/comark-plugins#25 and #15, built: a zoomed annotated screenshot shows its notes
-  # beside it, a mark lights up its note there, and the zoom's events map copies to the page and back (copyOf and
-  # originalOf, which Drop's frame runtime anchors comments in the zoom with). Drop both once a release has #25 and #15.
-  comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
-  comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
   # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the
   # overlay scrollbar of a comment past maxrows. Measures a hidden copy instead (nuxt/ui#7267). Also scrolls to the
   # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
@@ -116,9 +111,6 @@ minimumReleaseAgeExclude:
   - "@better-auth/stripe@1.7.10"
   - "@better-auth/telemetry@1.7.10"
   - better-auth@1.7.10
-  - comark-annotate@0.2.0
-  - comark-carousel@0.2.0
-  - comark-zoom@0.2.0
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0

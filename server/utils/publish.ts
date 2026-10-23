@@ -319,12 +319,12 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     } else {
       const source = (input.markdown ?? input.html)!
       if (!source.trim()) throw new HTTPError({ status: 400, message: "The doc is empty." })
-      // A broken annotated screenshot would render with marks in the wrong place; send the agent back to fix it.
+      // A broken annotated screenshot or chart would render wrong; send the agent back to fix it.
       const issues = input.markdown ? await annotationIssues(source) : []
       if (issues.length)
         throw new HTTPError({
           status: 400,
-          message: `Fix the annotated screenshots and publish again:\n${issues.map((issue) => `- ${issue}`).join("\n")}`,
+          message: `Fix these problems and publish again:\n${issues.map((issue) => `- ${issue}`).join("\n")}`,
         })
       // An HTML doc is one file, so anything it loads by relative path is missing.
       if (input.html)

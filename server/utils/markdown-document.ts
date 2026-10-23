@@ -4,6 +4,7 @@ import { renderHtmlFromDocument } from "@comark/html"
 import { log } from "evlog"
 import { createMarkdownParser } from "@comark/html/parse"
 import alert from "@comark/html/plugins/alert"
+import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
 import footnotes from "@comark/html/plugins/footnotes"
 import frontmatter from "@comark/html/plugins/frontmatter"
@@ -12,6 +13,19 @@ import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { visitAsync } from "@comark/html/utils"
 import annotate, { components as annotations } from "comark-annotate/html"
+import badge, { components as badgeComponents } from "comark-badge/html"
+import cards, { components as cardsComponents } from "comark-cards/html"
+import carousel, { components as carouselComponents } from "comark-carousel/html"
+import charts, { components as chartsComponents } from "comark-charts/html"
+import chips, { components as chipsComponents } from "comark-chips/html"
+import codeBlocks, { components as codeComponents } from "comark-code/html"
+import diff, { components as diffComponents } from "comark-diff/html"
+import embed, { components as embedComponents } from "comark-embed/html"
+import icon, { components as iconComponents } from "comark-icon/html"
+import media, { components as mediaComponents } from "comark-media/html"
+import steps, { components as stepsComponents } from "comark-steps/html"
+import tabs, { components as tabsComponents } from "comark-tabs/html"
+import zoom, { components as zoomComponents } from "comark-zoom/html"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { stringifyTokenStyle } from "shiki/core"
 import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
@@ -31,6 +45,22 @@ const ALLOWED_TAGS = [
     " ",
   ),
   ...COMPONENT_TAGS,
+  // Every block the comark-plugins below render (chart, tabs, diff, steps, ...); each draws only its own markup.
+  ...Object.keys({
+    ...badgeComponents,
+    ...cardsComponents,
+    ...carouselComponents,
+    ...chartsComponents,
+    ...chipsComponents,
+    ...codeComponents,
+    ...diffComponents,
+    ...embedComponents,
+    ...iconComponents,
+    ...mediaComponents,
+    ...stepsComponents,
+    ...tabsComponents,
+    ...zoomComponents,
+  }),
 ]
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
@@ -83,8 +113,24 @@ const plugins = [
   taskList(),
   footnotes(),
   components(),
+  // Comark 0.8 moved `{props}` out of components(); without it `:icon{name=...}` has no name.
+  attributes(),
   mermaid({ theme: "zinc-light" }),
+  // comark-plugins, in the order its docs register them (comark.onmax.me/plugins). comark-code comes after highlight.
   annotate(),
+  carousel(),
+  charts(),
+  // Chips keep their downloaded favicons and avatars in memory: the image's node_modules may be read-only.
+  chips({ cache: false }),
+  diff(),
+  embed(),
+  icon(),
+  badge(),
+  media(),
+  cards(),
+  steps(),
+  tabs(),
+  zoom(),
   security({
     allowedProtocols: ["http", "https", "mailto"],
     allowedTags: ALLOWED_TAGS,
@@ -96,6 +142,7 @@ const plugins = [
     ],
   }),
   highlight(),
+  codeBlocks(),
 ] as const
 
 const parse = createMarkdownParser({ plugins, registerDefaultPlugins: false })
@@ -172,7 +219,7 @@ function createMermaidRenderer(): NodeHandler {
  * The one Markdown renderer: Comark with front matter, alerts, task lists, footnotes, server-rendered Mermaid SVG, and a
  * tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
  */
-/** Problems with a document's annotated screenshots, one readable sentence each. Empty when it has none. */
+/** Problems with a document's annotated screenshots, charts, chips, and other plugin blocks, one readable sentence each. Empty when it has none. */
 export async function annotationIssues(markdown: string): Promise<string[]> {
   return (await parseMarkdown(markdown)).meta.issues ?? []
 }
@@ -186,11 +233,24 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
       : ""
     const issues = document.meta.issues ?? []
     const problems = issues.length
-      ? `<aside class="render-error"><p>This document's annotated screenshots have ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
+      ? `<aside class="render-error"><p>This document has ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
       : ""
     const content = await renderHtmlFromDocument(document, {
       components: {
         ...annotations,
+        ...badgeComponents,
+        ...cardsComponents,
+        ...carouselComponents,
+        ...chartsComponents,
+        ...chipsComponents,
+        ...codeComponents,
+        ...diffComponents,
+        ...embedComponents,
+        ...iconComponents,
+        ...mediaComponents,
+        ...stepsComponents,
+        ...tabsComponents,
+        ...zoomComponents,
         alert: renderCallout,
         callout: renderCallout,
         caution: renderCallout,
