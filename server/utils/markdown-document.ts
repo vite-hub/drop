@@ -61,6 +61,8 @@ const ALLOWED_TAGS = [
     ...tabsComponents,
     ...zoomComponents,
   }),
+  // comark-tabs renders each item inside its `tabs` handler, so the item has no handler of its own.
+  "tabs-item",
 ]
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
@@ -132,7 +134,8 @@ const plugins = [
   tabs(),
   zoom(),
   security({
-    allowedProtocols: ["http", "https", "mailto"],
+    // `data` lets comark-icon and comark-chips inline their images; Comark allows it only for data:image/* in src.
+    allowedProtocols: ["http", "https", "mailto", "data"],
     allowedTags: ALLOWED_TAGS,
     tagFallback: ([tag, , ...children]) => [
       "aside",

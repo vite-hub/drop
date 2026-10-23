@@ -51,3 +51,17 @@ test("a doc written before comark-annotate 0.2 keeps its screenshot's url and la
   assert.match(html, /href="https:\/\/pr12\.example\.com\/plan"/)
   assert.match(html, /Wrapped/)
 })
+
+test("comark-plugins blocks render whole: a chart's SVG, a tab's panel, an icon's inlined image, and no data: link", async () => {
+  const markdown = [
+    "::chart{title=\"Load (ms)\"}\n| page | before | after |\n| --- | --: | --: |\n| Products | 1840 | 610 |\n::",
+    "::tabs\n:::tabs-item{label=\"Before\"}\nOne request per row.\n:::\n::",
+    "Press :icon{name=\"lucide:command\"} K. [x](data:text/html,hi)",
+  ].join("\n\n")
+  const { html } = await renderMarkdownCached("plugins.md", async () => markdown)
+  assert.doesNotMatch(html, /unsupported-component|render-error/)
+  assert.match(html, /<figure class="cch"[^>]*>[\s\S]*<svg/)
+  assert.match(html, /role="tabpanel"[^>]*>[\s\S]*One request per row\./)
+  assert.match(html, /class="ci"[^>]*--ci:url\(&quot;data:image\/svg\+xml/)
+  assert.doesNotMatch(html, /href="data:/)
+})
