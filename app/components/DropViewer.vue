@@ -431,15 +431,17 @@ function copyChangesLink(version: DropVersion) {
  * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
  */
 async function focusComment(comment: DropComment, row?: DOMRect) {
+  const focusGeneration = annotations.beginFocus()
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
     await nextTick()
     await until(ready).toBe(true, { timeout: 5000 })
   }
+  if (!annotations.isFocusCurrent(focusGeneration)) return
   if (!wide.value) mobileSide.value = false
   // A page comment opens here and now, so it cancels a pin's thread still on its way too.
-  annotations.awaitThread(comment.kind === "page" ? null : comment.id)
+  if (!annotations.awaitThread(comment.kind === "page" ? null : comment.id, focusGeneration)) return
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
