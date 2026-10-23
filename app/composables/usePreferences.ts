@@ -22,10 +22,10 @@ export function useSidePanel() {
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
-/** The size HTML docs, apps, and Markdown docs show at (the review toolbar's Device menu), for every drop. */
+/** Device mode for HTML docs, apps, Markdown docs, and reviewed sites (ViewerDevice), for every drop. */
 export const useDeviceSize = () =>
-  useCookie<DeviceSize>("drop-device", {
-    default: () => ({ id: "fill", width: 1280, height: 800 }),
+  useCookie<DeviceSize>("drop-device-mode", {
+    default: () => ({ on: false, id: "iphone", width: 393, height: 852 }),
     maxAge: year,
     sameSite: "lax",
   })

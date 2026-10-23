@@ -4,8 +4,8 @@
 // black tooltip with the key after the name. It picks the tool the pointer has over the page (Browse, Comment, Measure)
 // and what draws over it under any tool (rulers and guides, X-ray outlines, the comments' pins); the frame does the
 // drawing (shared/plan-runtime.ts). A Markdown doc adds its reading width (`width`, the one showing), which W steps
-// through too. Last, on pages, the size the page shows at (ViewerDeviceMenu). It centers under the page; the side panel
-// sits beside it, not over it.
+// through too. Last, on pages, device mode (ViewerDeviceButton). It centers under the page; the side panel sits beside
+// it, not over it.
 import type { ViewerOverlays, ViewerTool } from "~/composables/useViewerAnnotations"
 
 const props = defineProps<{
@@ -137,7 +137,7 @@ const hint = computed(() => {
       <template v-if="sizable">
         <div aria-hidden="true" class="w-px shrink-0 bg-(--ui-border)" />
         <div aria-label="Device" class="flex items-center p-1" role="group">
-          <ViewerDeviceMenu />
+          <ViewerDeviceButton />
         </div>
       </template>
     </div>

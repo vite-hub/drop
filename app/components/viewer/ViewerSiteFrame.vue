@@ -190,7 +190,7 @@ onBeforeUnmount(discard)
           spellcheck="false"
         />
       </form>
-      <ViewerDeviceMenu />
+      <ViewerDeviceButton />
       <UButton
         color="neutral"
         :variant="drawing ? 'solid' : 'outline'"
