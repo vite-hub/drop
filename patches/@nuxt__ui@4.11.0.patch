@@ -1,0 +1,48 @@
+diff --git a/dist/runtime/components/Textarea.vue b/dist/runtime/components/Textarea.vue
+index eaf89f9861bd1eb4e5d33a43650c39e564891c5b..248d26d1f7b0d39aa765c5a45ceeeaaaf4efa5f0 100644
+--- a/dist/runtime/components/Textarea.vue
++++ b/dist/runtime/components/Textarea.vue
+@@ -114,20 +114,30 @@ function autoFocus() {
+ }
+ function autoResize() {
+   if (props.autoresize && textareaRef.value) {
+-    textareaRef.value.rows = props.rows;
+-    const overflow = textareaRef.value.style.overflow;
+-    textareaRef.value.style.overflow = "hidden";
+-    const styles = window.getComputedStyle(textareaRef.value);
+-    const paddingTop = Number.parseInt(styles.paddingTop);
+-    const paddingBottom = Number.parseInt(styles.paddingBottom);
+-    const padding = paddingTop + paddingBottom;
+-    const lineHeight = Number.parseInt(styles.lineHeight);
+-    const { scrollHeight } = textareaRef.value;
+-    const newRows = (scrollHeight - padding) / lineHeight;
+-    if (newRows > props.rows) {
+-      textareaRef.value.rows = props.maxrows ? Math.min(newRows, props.maxrows) : newRows;
++    const textarea = textareaRef.value;
++    const styles = window.getComputedStyle(textarea);
++    const padding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
++    const lineHeight = Number.parseFloat(styles.lineHeight);
++    const measure = textarea.cloneNode();
++    measure.value = textarea.value;
++    measure.removeAttribute("id");
++    measure.removeAttribute("name");
++    measure.removeAttribute("autofocus");
++    measure.setAttribute("aria-hidden", "true");
++    measure.tabIndex = -1;
++    Object.assign(measure.style, { position: "absolute", top: "0", left: "0", visibility: "hidden", pointerEvents: "none", width: `${textarea.offsetWidth}px`, height: "0", minHeight: "0", overflow: "hidden" });
++    textarea.after(measure);
++    const { scrollHeight } = measure;
++    measure.remove();
++    const newRows = Math.round((scrollHeight - padding) / lineHeight);
++    const rows = Math.max(props.rows, props.maxrows ? Math.min(newRows, props.maxrows) : newRows);
++    if (textarea.rows !== rows) {
++      textarea.rows = rows;
++    }
++    const end = textarea.value.length;
++    if (document.activeElement === textarea && textarea.selectionStart === end && textarea.selectionEnd === end) {
++      textarea.scrollTop = textarea.scrollHeight;
+     }
+-    textareaRef.value.style.overflow = overflow;
+   }
+ }
+ watch(modelValue, () => {
