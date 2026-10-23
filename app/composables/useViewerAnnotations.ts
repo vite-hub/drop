@@ -1,6 +1,7 @@
 import type { FrameMessage } from "#shared/frame-messages"
 import type { CommentInput } from "#shared/schemas"
 import type { DropDetail } from "#shared/types"
+import type { FrameBox } from "~/composables/useDropFrame"
 
 // Spelled out here rather than imported from the popover and lightbox SFCs, whose types ESLint can't read.
 type PendingComment = Omit<CommentInput, "body">
@@ -105,7 +106,10 @@ export function useViewerAnnotations(options: {
     else tool.value = "browse"
   }
 
-  function receive(message: PointerMessage, frame: DOMRect) {
+  function receive(message: PointerMessage, frame: FrameBox) {
+    // Frame coordinates to page ones: the frame may be scaled down to fit a device's size.
+    const x = (value: number) => frame.left + value * frame.scale
+    const y = (value: number) => frame.top + value * frame.scale
     if (message.type === "marker" && message.focused && message.id !== awaited) return
     // A pin, an area or an image picked meanwhile is the reader moving on.
     if (message.type === "marker" || message.type === "area" || message.type === "image") {
@@ -120,19 +124,19 @@ export function useViewerAnnotations(options: {
             selector: message.selector,
             label: message.label,
             rect: {
-              left: frame.left + message.rect.left,
-              top: frame.top + message.rect.top,
-              right: frame.left + message.rect.right,
-              bottom: frame.top + message.rect.bottom,
+              left: x(message.rect.left),
+              top: y(message.rect.top),
+              right: x(message.rect.right),
+              bottom: y(message.rect.bottom),
             },
           }
     }
     if (message.type === "image") {
       const from = message.rect && {
-        left: frame.left + message.rect.left,
-        top: frame.top + message.rect.top,
-        width: message.rect.right - message.rect.left,
-        height: message.rect.bottom - message.rect.top,
+        left: x(message.rect.left),
+        top: y(message.rect.top),
+        width: (message.rect.right - message.rect.left) * frame.scale,
+        height: (message.rect.bottom - message.rect.top) * frame.scale,
       }
       lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
     }
@@ -142,8 +146,8 @@ export function useViewerAnnotations(options: {
         popover.value = {
           type: "new",
           pending: { kind, selector, label, ox, oy, ow, oh },
-          x: frame.left + message.rect.left,
-          y: frame.top + message.rect.bottom,
+          x: x(message.rect.left),
+          y: y(message.rect.bottom),
         }
       }
     }
@@ -151,8 +155,8 @@ export function useViewerAnnotations(options: {
       popover.value = {
         type: "thread",
         id: message.id,
-        x: frame.left + message.clientX,
-        y: frame.top + message.clientY,
+        x: x(message.clientX),
+        y: y(message.clientY),
       }
     if (message.type === "key") pressed(message.key, message.tool)
   }

@@ -150,7 +150,7 @@ export function useViewerFrame(options: {
       }).catch(() => {})
   }, 2000)
 
-  const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, rect) => {
+  const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
       case "runtime-error":
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
@@ -196,7 +196,7 @@ export function useViewerFrame(options: {
       case "area":
       case "marker":
       case "key":
-        annotations.receive(message, rect)
+        annotations.receive(message, box)
     }
   })
   onMounted(() => contentOrigin.value && send({ type: "hello" }))
