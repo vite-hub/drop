@@ -103,7 +103,10 @@ function useDrop(id: MaybeRefOrGetter<string>) {
   async function addReply(commentId: string, body: string): Promise<Sent<CommentReply>> {
     if (isPending(commentId)) return { error: "The comment is still being posted." }
     const pendingId = PENDING + crypto.randomUUID()
-    setReplies(commentId, (replies) => [...replies, { id: pendingId, body: body.trim(), createdAt: Date.now(), ...author() }])
+    setReplies(commentId, (replies) => [
+      ...replies,
+      { id: pendingId, body: body.trim(), createdAt: Date.now(), ...author() },
+    ])
     try {
       const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, { method: "POST", body: { body } })
       setReplies(commentId, (replies) => replies.map((item) => (item.id === pendingId ? reply : item)))
