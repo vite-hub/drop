@@ -2,11 +2,12 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext, Script } from "node:vm"
 import { H3Event } from "h3"
-import { migrate, reset, insertDrop, objects, sql, state } from "../cost/harness.mjs"
+import { migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
 const { contentOrigin, FRAME_HOST_HTML, isContentRequest } = await import("../../server/utils/content-origin.ts")
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
 const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
+const { isHashedAsset } = await import("../../server/utils/app-files.ts")
 const { buildProjectDocument, pageAt, pageUrl } = await import("../../shared/project-bundle.ts")
 const { injectRuntime, OPAQUE_ORIGIN_SHIM, prependToHead } = await import("../../shared/plan-runtime.ts")
 
@@ -184,6 +185,7 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     for (const [path, body] of [
       ["index.html", '<script type="module" src="/_nuxt/entry.js"></script>'],
       ["_nuxt/entry.js", "export default 1"],
+      ["_nuxt/B0nDsZtt.js", "export default 2"],
       ["_nuxt/inter.woff2", font],
       ["docs/index.html", "<p>Docs</p>"],
     ]) {
@@ -219,8 +221,26 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     assert.equal(await script.text(), "export default 1")
     assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8")
     assert.equal(script.headers.get("x-content-type-options"), "nosniff")
+    assert.equal(script.headers.get("cache-control"), "private, no-cache", "a name the next version may reuse")
     const etag = script.headers.get("etag")
     assert.equal((await load("/_nuxt/entry.js", { headers: { "if-none-match": etag } })).status, 304)
+    const chunk = await load("/_nuxt/B0nDsZtt.js")
+    assert.equal(chunk.headers.get("cache-control"), "private, max-age=31536000, immutable", "a hashed name")
+
+    // A page's files share one lookup of the app's files: loading more asks the database nothing.
+    const asked = queries.length
+    const loads = await Promise.all(["/_nuxt/entry.js", "/_nuxt/B0nDsZtt.js", "/docs/"].map((path) => load(path)))
+    assert.deepEqual(
+      loads.map((response) => response.status),
+      [200, 200, 200],
+    )
+    assert.equal(queries.length, asked)
+    // A file published since the kept lookup is found: a path it lacks looks again.
+    objects.set("apps/app/publish-2/late.js", { body: new Blob(["late"]), uploadedAt: new Date() })
+    sql
+      .prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, ?, ?, ?)")
+      .run("app", "late.js", "apps/app/publish-2/late.js", 4)
+    assert.equal(await (await load("/late.js")).text(), "late")
 
     const woff = await load("/_nuxt/inter.woff2", { dest: "font" })
     assert.equal(woff.headers.get("content-type"), "font/woff2")
@@ -245,11 +265,40 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     assert.equal((await load("/_nuxt/entry.js", { grant: other.contentGrant })).status, 404, "another app's grant")
     assert.equal((await load("/_nuxt/entry.js", { grant: `${detail.contentGrant}x` })).status, 404, "a changed grant")
 
+    // The kept lookup lasts a few seconds, so the Trash shows once it runs out.
     sql.prepare("UPDATE drops SET trashed_at = ? WHERE id = 'app'").run(Date.now())
-    assert.equal((await load("/_nuxt/entry.js")).status, 404, "nothing once it's in the Trash")
+    const now = Date.now
+    Date.now = () => now() + 10_000
+    try {
+      assert.equal((await load("/_nuxt/entry.js")).status, 404, "nothing once it's in the Trash")
+    } finally {
+      Date.now = now
+    }
   } finally {
     state.authSecret = undefined
   }
+})
+
+test("only files named after their content count as hashed, so the browser never keeps one that may change", () => {
+  for (const path of [
+    "_nuxt/B0nDsZtt.js",
+    "_nuxt/entry.2pJuYtgD.css",
+    "assets/index-BdJJ9uks.js",
+    "static/js/main.3f2a9c1b.js",
+    "_fonts/HgJel4iAS5mDVqJaDUYKmxaMJg4zKHTGmyD1FQkOsTM-2hVuuQIZ4GSGMgNv6dvlqz7cfD6lr7xLohUph7OCgFg.woff2",
+  ])
+    assert.equal(isHashedAsset(path), true, path)
+  for (const path of [
+    "index.html",
+    "logos/vans.svg",
+    "_nuxt/entry.js",
+    "assets/logo-2024final.png",
+    "jquery-3.7.1.min.js",
+    "fonts/InterVariable.woff2",
+    "BkRpwUQU.js",
+    "deadbeefcafe.js",
+  ])
+    assert.equal(isHashedAsset(path), false, path)
 })
 
 test("the frame host keeps the viewer's grant as a cookie before it writes the page, and only a well-formed one", () => {
@@ -285,6 +334,27 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
   assert.deepEqual(written, ["open after 1 cookies"])
   assert.deepEqual(run("v2.x; Domain=vitehub.dev").cookies, [], "nothing that could add cookie attributes")
   assert.deepEqual(run(undefined).cookies, [])
+})
+
+test("the frame host asks for its page on load, and again when the viewer says hello after missing that", () => {
+  const script = FRAME_HOST_HTML.match(/<script>([\s\S]*)<\/script>/)[1]
+  const asked = []
+  let onMessage
+  // Copied out of the sandbox, whose objects have its own prototypes.
+  const parent = { postMessage: (message) => asked.push({ ...message }) }
+  runInNewContext(script, {
+    parent,
+    window: {},
+    location: { pathname: "/docs/" },
+    addEventListener: (_type, handler) => (onMessage = handler),
+    document: { body: {} },
+  })
+  onMessage({ source: parent, data: { __drop: true, type: "hello" } })
+  onMessage({ source: {}, data: { __drop: true, type: "hello" } })
+  assert.deepEqual(asked, [
+    { __drop: true, type: "host", path: "/docs/" },
+    { __drop: true, type: "host", path: "/docs/" },
+  ])
 })
 
 test("the frame host keeps a written page hidden until its stylesheets load, fail, or take 3 seconds", () => {

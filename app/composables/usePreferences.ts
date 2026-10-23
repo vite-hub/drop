@@ -12,7 +12,9 @@ export function useSidePanel() {
   // name, so the old cookie that defaulted to open doesn't keep it open.
   const open = useCookie<boolean>("drop-side-panel", { default: () => false, maxAge: year, sameSite: "lax" })
   const tab = useCookie<SideTab>("drop-side-tab", { default: () => "comments", maxAge: year, sameSite: "lax" })
-  return { open, tab }
+  // In rem, like the sidebar's (UDashboardGroup's unit), so the server renders the width they left it at.
+  const width = useCookie<number>("drop-side-width", { default: () => 24, maxAge: year, sameSite: "lax" })
+  return { open, tab, width }
 }
 
 /** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */

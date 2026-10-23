@@ -7,7 +7,7 @@
 import type { Board, BoardElement } from "#shared/board"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; inset?: number }>()
+const props = defineProps<{ drop: DropDetail }>()
 const host = useTemplateRef<HTMLElement>("host")
 const colorMode = useColorMode()
 const state = ref<"loading" | "ready" | "failed">("loading")
@@ -351,8 +351,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
 
 <template>
   <div class="relative min-h-0 flex-1">
-    <!-- The board keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
-    <div ref="host" class="board absolute inset-y-0 left-0" :style="{ right: `${inset ?? 0}px` }" />
+    <div ref="host" class="board absolute inset-0" />
     <div v-if="state !== 'ready'" class="absolute inset-0 grid place-items-center text-sm text-muted">
       <span v-if="state === 'loading'" class="flex items-center gap-2">
         <UIcon name="i-mingcute-loading-line" class="size-4 animate-spin" />

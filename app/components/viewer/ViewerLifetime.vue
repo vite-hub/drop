@@ -28,12 +28,15 @@ const hint = computed(() => {
     return props.drop.keepReason ? `Kept by an agent: ${props.drop.keepReason}` : "Kept until you delete it."
   return `Gone ${lifetimeDays(props.drop.lifetime, days.value)} days after the last visit. Any visit restarts the count.`
 })
-// A quiet segmented control. The trigger's `before:` classes style the selected item until hydration adds the indicator.
+// A segmented control whose selected item sits raised on a layered shadow rather than a ring. Corners nest: the track's
+// 12px is the thumb's 8px plus its 4px of padding. The trigger's `before:` classes style the selected item until
+// hydration adds the indicator.
 const tabsUi = {
-  list: "w-full",
-  indicator: "bg-default shadow-xs ring ring-default",
+  list: "w-full rounded-xl p-1",
+  indicator:
+    "rounded-lg bg-default shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)] dark:bg-accented dark:shadow-none",
   trigger:
-    "flex-1 justify-center data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:ring in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:ring-default",
+    "h-7 flex-1 justify-center rounded-lg data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:rounded-lg in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)] dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-accented dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:shadow-none",
 }
 
 async function run(action: () => Promise<boolean>, done?: string) {
@@ -46,10 +49,12 @@ const choose = (lifetime: Lifetime) => run(() => setLifetime(props.drop, { lifet
 </script>
 
 <template>
-  <section v-if="days > 0" class="space-y-2.5 text-sm">
+  <section v-if="days > 0" aria-labelledby="details-lifetime" class="space-y-2.5 text-sm">
     <div class="flex items-center gap-3">
-      <h3 class="w-20 shrink-0 text-muted">Lifetime</h3>
-      <p class="min-w-0 flex-1 truncate text-highlighted tabular-nums">{{ status }}</p>
+      <div class="min-w-0 flex-1">
+        <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
+        <p class="truncate text-highlighted tabular-nums">{{ status }}</p>
+      </div>
       <UButton
         v-if="trashed"
         class="-my-1"
@@ -67,7 +72,7 @@ const choose = (lifetime: Lifetime) => run(() => setLifetime(props.drop, { lifet
         label="Renew"
         :loading="busy"
         size="xs"
-        variant="ghost"
+        variant="outline"
         @click="run(() => setLifetime(drop, { renew: true }), 'Renewed')"
       />
     </div>
