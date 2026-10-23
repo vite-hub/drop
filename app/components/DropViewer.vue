@@ -59,7 +59,7 @@ async function restoreDrop() {
 
 // Details holds what the header doesn't (Copy as Markdown, Download, Open in new window), so everyone signed in gets it;
 // sharing, views and lifetime in it stay with the owner (ViewerOverview).
-const details = computed(() => owner.value || (Boolean(me.value) && !publicView))
+const details = computed(() => owner.value || Boolean(me.value))
 const panel = useViewerPanel({
   details,
   openCount,
