@@ -530,7 +530,7 @@ export function prependToHead(html: string, snippet: string): string {
  */
 const DROP_TOKEN =
   /var\(\s*--(?:background|foreground|muted|muted-foreground|card|border|primary|primary-foreground|destructive|code-background|chart-\d|positive|caution|negative)\s*[,)]/
-export const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\s*:/.test(html)
+const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\s*:/.test(html)
 
 /**
  * Injects Drop's runtime into a full HTML document without touching the author's markup.
