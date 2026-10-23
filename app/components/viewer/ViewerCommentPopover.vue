@@ -4,6 +4,7 @@
 // number, Resolve, and a menu (Copy link, Delete); the comment and its replies; a reply box at the bottom.
 // Sending is optimistic: a new comment closes the box and shows its pin at once, a reply shows in the thread at once.
 // If the server refuses, the text comes back to its box (`draft` for a new comment, `fail` for a reply) with why.
+// Escape in a box with text only leaves the box, Figma's way: the text stays, and the next Escape or click away closes.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
@@ -44,6 +45,12 @@ const style = computed(() => {
   const top = Math.max(56, Math.min(props.y + 8, viewport.height.value - Math.max(height.value, 120) - 8))
   return { left: `${left}px`, top: `${top}px`, width: `${width.value}px` }
 })
+
+/** Escape in an empty box closes; with text, it only leaves the box, and the viewer's Escape closes from there. */
+function escape(event: KeyboardEvent) {
+  if (!body.value.trim()) return emit("cancel")
+  ;(event.target as HTMLElement).blur()
+}
 
 async function send() {
   const text = body.value
@@ -114,7 +121,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc.stop="emit('cancel')"
+          @keydown.esc.stop="escape"
         />
         <UButton
           aria-label="Send comment"
@@ -202,7 +209,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc.stop="emit('cancel')"
+          @keydown.esc.stop="escape"
         />
         <UButton
           aria-label="Send reply"
