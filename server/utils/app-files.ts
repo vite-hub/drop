@@ -41,7 +41,10 @@ const kept = new Map<string, { at: number; files: Promise<AppFiles> }>()
 async function appFiles(event: H3Event, link: string, now: number, fresh: boolean) {
   const entry = kept.get(link)
   if (entry && !fresh && now - entry.at < KEEP_MS) {
-    const settled = entry.files.then((files) => ({ files }), () => undefined)
+    const settled = entry.files.then(
+      (files) => ({ files }),
+      () => undefined,
+    )
     const shared = await Promise.race([
       settled,
       new Promise<undefined>((resolve) => {
