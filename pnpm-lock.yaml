@@ -29,6 +29,7 @@ patchedDependencies:
   nuxt-security@2.6.0: 4e0b031f149d93d8c906afeb76441c6c0791279b678fbc1f8d71dcb3bd4554b5
   unstorage@2.0.0-alpha.7: adba754ded4bb62e2dfc1aadae87d494ee5127386fd526aab3a5c3cc5beef405
   vite-doctor@0.0.12: 509387934bd12fa78553a60464c8c14d8f448489f754e0cda4a9e0beb01afe16
+  vite-hub@0.0.4: 4aa4aef0bd18705489413f7bd36941990341a33b35badf8d89eedd61ded0140b
 
 importers:
 
@@ -207,7 +208,7 @@ importers:
         version: 1.5.0(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(0890568ee0dae94e898c33c58ba457a2)
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(patch_hash=4aa4aef0bd18705489413f7bd36941990341a33b35badf8d89eedd61ded0140b)(b65d01897d208379f9f59a54b38bbeb8)
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -22987,7 +22988,7 @@ snapshots:
       - magicast
       - supports-color
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(0890568ee0dae94e898c33c58ba457a2):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(patch_hash=4aa4aef0bd18705489413f7bd36941990341a33b35badf8d89eedd61ded0140b)(b65d01897d208379f9f59a54b38bbeb8):
     dependencies:
       '@cloudflare/sandbox': 0.12.12
       '@cloudflare/workers-types': 5.20261021.1
