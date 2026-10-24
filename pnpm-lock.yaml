@@ -29,7 +29,7 @@ patchedDependencies:
   nuxt-security@2.6.0: 4e0b031f149d93d8c906afeb76441c6c0791279b678fbc1f8d71dcb3bd4554b5
   unstorage@2.0.0-alpha.7: adba754ded4bb62e2dfc1aadae87d494ee5127386fd526aab3a5c3cc5beef405
   vite-doctor@0.0.12: 509387934bd12fa78553a60464c8c14d8f448489f754e0cda4a9e0beb01afe16
-  vite-hub@0.0.4: eb4cb7b91645ce9ccc39811d826e6623cb9989340cf98714ca083b03692f659f
+  vite-hub@0.0.4: 6be6a0ec12f1229f12d5c0eb2ad220c47a56b21aea36f138f6f846a30be3e597
 
 importers:
 
@@ -208,7 +208,7 @@ importers:
         version: 1.5.0(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@4a9dd47a67888ec7bab73205ef7baeb7e9012093
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@4a9dd47a67888ec7bab73205ef7baeb7e9012093(patch_hash=eb4cb7b91645ce9ccc39811d826e6623cb9989340cf98714ca083b03692f659f)(b65d01897d208379f9f59a54b38bbeb8)
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@4a9dd47a67888ec7bab73205ef7baeb7e9012093(patch_hash=6be6a0ec12f1229f12d5c0eb2ad220c47a56b21aea36f138f6f846a30be3e597)(b65d01897d208379f9f59a54b38bbeb8)
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -20816,7 +20816,7 @@ snapshots:
       - magicast
       - supports-color
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@4a9dd47a67888ec7bab73205ef7baeb7e9012093(patch_hash=eb4cb7b91645ce9ccc39811d826e6623cb9989340cf98714ca083b03692f659f)(b65d01897d208379f9f59a54b38bbeb8):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@4a9dd47a67888ec7bab73205ef7baeb7e9012093(patch_hash=6be6a0ec12f1229f12d5c0eb2ad220c47a56b21aea36f138f6f846a30be3e597)(b65d01897d208379f9f59a54b38bbeb8):
     dependencies:
       '@cloudflare/sandbox': 0.12.14
       '@cloudflare/workers-types': 5.20261023.1
