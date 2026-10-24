@@ -21,6 +21,7 @@ overrides:
   h3@2.0.1-rc.33: 2.0.1
 
 patchedDependencies:
+  '@nuxt/ui@4.11.0': ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc
   comark-annotate@0.2.0: cfedc6d3ac332f71417b51cc76e73bd0b5f731eb42932554d18e7a8b76dbec4f
   comark-zoom@0.2.0: f27a1541d5813a43595d685a165874126c64c7cef0d6620019af973d959ab45c
   h3-mcp@0.2.0: 300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b
@@ -81,7 +82,7 @@ importers:
         version: 1.2.100
       '@nuxt/ui':
         specifier: 4.11.0
-        version: 4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5)
+        version: 4.11.0(patch_hash=ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc)(7a6a2ddbcced4dfaa1a73566c4bf28c5)
       '@shikijs/langs':
         specifier: 4.5.0
         version: 4.5.0
@@ -207,7 +208,7 @@ importers:
         version: 1.5.0(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(b65d01897d208379f9f59a54b38bbeb8)
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(a931a8f5e7e531f8fbc9e8b46f4793c1)
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -13292,7 +13293,7 @@ snapshots:
       rc9: 3.1.0
       std-env: 4.3.0
 
-  '@nuxt/ui@4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5)':
+  '@nuxt/ui@4.11.0(patch_hash=ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc)(7a6a2ddbcced4dfaa1a73566c4bf28c5)':
     dependencies:
       '@floating-ui/dom': 1.8.0
       '@iconify/vue': 5.0.4(vue@3.5.44(typescript@6.0.3))
@@ -15816,7 +15817,7 @@ snapshots:
       - crossws
       - ocache
 
-  '@vite-hub/ui@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))':
+  '@vite-hub/ui@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(patch_hash=ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc)(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))':
     dependencies:
       '@comark/vue': 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
       '@iconify-json/ph': 1.2.2
@@ -15830,7 +15831,7 @@ snapshots:
       shiki: 4.5.0
       vue: 3.5.44(typescript@6.0.3)
     optionalDependencies:
-      '@nuxt/ui': 4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5)
+      '@nuxt/ui': 4.11.0(patch_hash=ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc)(7a6a2ddbcced4dfaa1a73566c4bf28c5)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     transitivePeerDependencies:
       - '@nuxt/schema'
@@ -21781,7 +21782,7 @@ snapshots:
       - magicast
       - supports-color
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(b65d01897d208379f9f59a54b38bbeb8):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(a931a8f5e7e531f8fbc9e8b46f4793c1):
     dependencies:
       '@cloudflare/sandbox': 0.12.14
       '@cloudflare/workers-types': 5.20261023.1
@@ -21823,7 +21824,7 @@ snapshots:
       '@vite-hub/schedule': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)
       '@vite-hub/shell': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@b8fac50c142ed7c03380abf338a1848de9e05928(supports-color@8.1.1)
       '@vite-hub/source': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/ui': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/ui': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(patch_hash=ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc)(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))
       '@vite-hub/workflow': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@b8fac50c142ed7c03380abf338a1848de9e05928(358ffe082ffa5cdbd278807eac7bb031)
       '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928(cbaf4e6d39954586115c57f2936dacb8)
       '@vueuse/core': 14.4.0(vue@3.5.44(typescript@6.0.3))
@@ -21850,7 +21851,7 @@ snapshots:
       '@aws-sdk/lib-storage': 3.1156.0(@aws-sdk/client-s3@3.1156.0)
       '@aws-sdk/s3-presigned-post': 3.1156.0
       '@aws-sdk/s3-request-presigner': 3.1156.0
-      '@nuxt/ui': 4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5)
+      '@nuxt/ui': 4.11.0(patch_hash=ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc)(7a6a2ddbcced4dfaa1a73566c4bf28c5)
       comark-content: 0.4.1(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0))(aws4fetch@1.0.20)(beautiful-mermaid@1.1.3)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1)))(katex@0.17.0)(shiki@4.5.0)
       evlog: 2.30.1(abdc173eaa54486133cb282a470c8f72)
       reka-ui: 2.10.3(vue@3.5.44(typescript@6.0.3))
