@@ -1,6 +1,6 @@
 # Blocks in Drop
 
-Drop renders every block from [comark-plugins](https://comark.onmax.me). Pick the block from the table, copy its example, and change the content. Each section links the plugin's page with its full syntax.
+Drop renders every block from [comark-ui](https://comark-ui.onmax.me). Pick the block from the table, copy its example, and change the content. Each section links the plugin's page with its full syntax.
 
 Drop reads no files, so a block that points at one (`src` on `::table`, `::tests`, or `::cast`) shows a problem instead. Paste the data into the block, as the examples here do.
 
@@ -36,6 +36,7 @@ Drop reads no files, so a block that points at one (`src` on `::table`, `::tests
 | Several screenshots in one place | [a carousel](#carousels) |
 | A table or block to see larger | [a zoom](#zoom) |
 | A PlantUML, Graphviz, D2, DBML, or ASCII diagram | [a diagram](#diagrams) |
+| A question to check, a poll, or a card to recall | [a quiz](#quizzes) |
 
 ## Steps
 
@@ -52,7 +53,7 @@ Run `pnpm dev`.
 ::
 ```
 
-Each `###` heading starts a numbered step. [comark-steps](https://comark.onmax.me/steps/)
+Each `###` heading starts a numbered step. [comark-steps](https://comark-ui.onmax.me/steps/)
 
 ## Tabs
 
@@ -77,7 +78,7 @@ npm install drop-client
 ::
 ````
 
-`sync` switches every tab group with the same name together. `::code-group` turns fences into tabs named by their `[label]`. [comark-tabs](https://comark.onmax.me/tabs/)
+`sync` switches every tab group with the same name together. `::code-group` turns fences into tabs named by their `[label]`. [comark-tabs](https://comark-ui.onmax.me/tabs/)
 
 ## Details
 
@@ -97,7 +98,7 @@ After the review, on the next deploy.
 ::
 ```
 
-`::collapsible` hides a block behind a Show and Hide toggle. [comark-details](https://comark.onmax.me/details/)
+`::collapsible` hides a block behind a Show and Hide toggle. [comark-details](https://comark-ui.onmax.me/details/)
 
 ## Cards
 
@@ -113,7 +114,7 @@ Run Drop on your own Worker.
 ::
 ```
 
-`::columns` with `:::column` lays out any blocks side by side. [comark-cards](https://comark.onmax.me/cards/)
+`::columns` with `:::column` lays out any blocks side by side. [comark-cards](https://comark-ui.onmax.me/cards/)
 
 ## Fields
 
@@ -129,7 +130,7 @@ How long the drop stays: `temporary`, `review`, or `keep`.
 ::
 ```
 
-[comark-fields](https://comark.onmax.me/fields/)
+[comark-fields](https://comark-ui.onmax.me/fields/)
 
 ## File trees
 
@@ -145,7 +146,7 @@ package.json
 ::
 ````
 
-A `#` comment after a name becomes its note. [comark-file-tree](https://comark.onmax.me/file-tree/)
+A `#` comment after a name becomes its note. [comark-file-tree](https://comark-ui.onmax.me/file-tree/)
 
 ## Diffs
 
@@ -160,7 +161,7 @@ if (issues.annotations.length) throw error
 ::
 ````
 
-The first fence is the code as it is, the second as it should be. [comark-diff](https://comark.onmax.me/diff/)
+The first fence is the code as it is, the second as it should be. [comark-diff](https://comark-ui.onmax.me/diff/)
 
 ## Code titles, marks, and notes
 
@@ -181,7 +182,7 @@ return rows.length // <2>
 2. Counts in memory, since the list is short.
 ````
 
-`ins`, `del`, and `mark` take line ranges such as `{2-4}`, and `collapse={5-9}` folds lines. A `// <1>` comment points at the item with that number in the list after the block. [comark-code](https://comark.onmax.me/code/), [comark-code-notes](https://comark.onmax.me/code-notes/)
+`ins`, `del`, and `mark` take line ranges such as `{2-4}`, and `collapse={5-9}` folds lines. A `// <1>` comment points at the item with that number in the list after the block. [comark-code](https://comark-ui.onmax.me/code/), [comark-code-notes](https://comark-ui.onmax.me/code-notes/)
 
 ## Metrics
 
@@ -196,7 +197,7 @@ The bundle went from :delta{from=412 to=388 unit="kB" better="lower"}, and the m
 ::
 ```
 
-`better` says which way is good, so the change shows green or red. [comark-metrics](https://comark.onmax.me/metrics/)
+`better` says which way is good, so the change shows green or red. [comark-metrics](https://comark-ui.onmax.me/metrics/)
 
 ## Data tables
 
@@ -217,7 +218,7 @@ Route,Before (ms),After (ms)
 ::
 ````
 
-A ` ```csv ` or ` ```tsv ` fence becomes a table with Copy CSV and Copy Markdown buttons. `::table{sort}` makes its headers sort. [comark-table](https://comark.onmax.me/table/)
+A ` ```csv ` or ` ```tsv ` fence becomes a table with Copy CSV and Copy Markdown buttons. `::table{sort}` makes its headers sort. [comark-table](https://comark-ui.onmax.me/table/)
 
 ## Charts
 
@@ -231,7 +232,7 @@ A ` ```csv ` or ` ```tsv ` fence becomes a table with Copy CSV and Copy Markdown
 ::
 ```
 
-The first column is the x axis and each other column a series. `type` is `line`, `bar`, `area`, `scatter`, or `pie`. [comark-charts](https://comark.onmax.me/charts/)
+The first column is the x axis and each other column a series. `type` is `line`, `bar`, `area`, `scatter`, or `pie`. [comark-charts](https://comark-ui.onmax.me/charts/)
 
 ## Test results
 
@@ -250,7 +251,7 @@ The first column is the x axis and each other column a series. `type` is `line`,
 ::
 ````
 
-Paste a JUnit XML report into the fence. [comark-tests](https://comark.onmax.me/tests/)
+Paste a JUnit XML report into the fence. [comark-tests](https://comark-ui.onmax.me/tests/)
 
 ## Terminal recordings
 
@@ -264,7 +265,7 @@ Paste a JUnit XML report into the fence. [comark-tests](https://comark.onmax.me/
 ::
 ````
 
-Paste an asciinema v2 cast: a header line, then one event per line. Colors come through. [comark-cast](https://comark.onmax.me/cast/)
+Paste an asciinema v2 cast: a header line, then one event per line. Colors come through. [comark-cast](https://comark-ui.onmax.me/cast/)
 
 ## Sources
 
@@ -277,7 +278,7 @@ Cold starts dropped by half :cite[1], and the new cache keeps them there :cite[2
 ::
 ```
 
-[comark-sources](https://comark.onmax.me/sources/)
+[comark-sources](https://comark-ui.onmax.me/sources/)
 
 ## Figures and references
 
@@ -289,7 +290,7 @@ The new toolbar is in :ref{#fig-toolbar}.
 ![The old toolbar, wrapping onto two rows](https://example.com/old-toolbar.png "Before the change")
 ```
 
-An id that starts with `fig-` or `tbl-` numbers an image or a `::table`, and `:ref` to it reads as "Figure 1". An image's title becomes its caption, on an image without an id. [comark-xref](https://comark.onmax.me/xref/), [comark-figure](https://comark.onmax.me/figure/)
+An id that starts with `fig-` or `tbl-` numbers an image or a `::table`, and `:ref` to it reads as "Figure 1". An image's title becomes its caption, on an image without an id. [comark-xref](https://comark-ui.onmax.me/xref/), [comark-figure](https://comark-ui.onmax.me/figure/)
 
 ## Properties
 
@@ -304,7 +305,7 @@ date: 2026-10-24
 The plan starts here.
 ```
 
-`status`, `pr`, `author`, `date`, and `tags` in the front matter show as a box at the top. [comark-properties](https://comark.onmax.me/properties/)
+`status`, `pr`, `author`, `date`, and `tags` in the front matter show as a box at the top. [comark-properties](https://comark-ui.onmax.me/properties/)
 
 ## Table of contents
 
@@ -317,7 +318,7 @@ The plan starts here.
 ## Plan
 ```
 
-[comark-outline](https://comark.onmax.me/outline/)
+[comark-outline](https://comark-ui.onmax.me/outline/)
 
 ## Badges
 
@@ -325,7 +326,7 @@ The plan starts here.
 Retries :badge[beta]{color="warning"} on every route :badge[v2]{color="info"}.
 ```
 
-`color` is `primary`, `neutral`, `info`, `success`, `warning`, or `error`. [comark-badge](https://comark.onmax.me/badge/)
+`color` is `primary`, `neutral`, `info`, `success`, `warning`, or `error`. [comark-badge](https://comark-ui.onmax.me/badge/)
 
 ## Keys
 
@@ -333,7 +334,7 @@ Retries :badge[beta]{color="warning"} on every route :badge[v2]{color="info"}.
 Press ++ctrl+shift+k++ to open the command menu, and ++esc++ to close it.
 ```
 
-[comark-keys](https://comark.onmax.me/keys/)
+[comark-keys](https://comark-ui.onmax.me/keys/)
 
 ## Highlights and superscripts
 
@@ -341,7 +342,7 @@ Press ++ctrl+shift+k++ to open the command menu, and ++esc++ to close it.
 The deploy waits while ==a migration is pending==, which happens 2^nd^ in the queue.
 ```
 
-[comark-mark](https://comark.onmax.me/mark/)
+[comark-mark](https://comark-ui.onmax.me/mark/)
 
 ## Suggested edits
 
@@ -349,7 +350,7 @@ The deploy waits while ==a migration is pending==, which happens 2^nd^ in the qu
 The limit is {--ten--}{++fifty++} drops, counted {~~daily~>monthly~~} for {==every team==}{>>Including the free plan?<<}.
 ```
 
-CriticMarkup: `{++add++}`, `{--remove--}`, `{~~old~>new~~}`, and `{==text==}{>>a comment<<}`. [comark-critic](https://comark.onmax.me/critic/)
+CriticMarkup: `{++add++}`, `{--remove--}`, `{~~old~>new~~}`, and `{==text==}{>>a comment<<}`. [comark-critic](https://comark-ui.onmax.me/critic/)
 
 ## Definition lists
 
@@ -361,7 +362,7 @@ Lifetime
 : How long a drop stays before it expires.
 ```
 
-[comark-deflist](https://comark.onmax.me/deflist/)
+[comark-deflist](https://comark-ui.onmax.me/deflist/)
 
 ## Icons
 
@@ -369,7 +370,7 @@ Lifetime
 Merge once :icon{name="lucide:circle-check"} checks pass.
 ```
 
-Any [Iconify](https://icones.js.org) name, `set:icon`. Cards, details, and tabs take the same names in `icon`. [comark-icon](https://comark.onmax.me/icon/)
+Any [Iconify](https://icones.js.org) name, `set:icon`. Cards, details, and tabs take the same names in `icon`. [comark-icon](https://comark-ui.onmax.me/icon/)
 
 ## Colors
 
@@ -382,7 +383,7 @@ The button moves from `#3b82f6` to `oklch(0.55 0.2 264)`.
 ::
 ```
 
-A color in inline code gets a swatch. [comark-colors](https://comark.onmax.me/colors/)
+A color in inline code gets a swatch. [comark-colors](https://comark-ui.onmax.me/colors/)
 
 ## QR codes
 
@@ -390,7 +391,7 @@ A color in inline code gets a swatch. [comark-colors](https://comark.onmax.me/co
 Open the preview on your phone: :qr{value="https://drop.vitehub.dev"}
 ```
 
-[comark-qr](https://comark.onmax.me/qr/)
+[comark-qr](https://comark-ui.onmax.me/qr/)
 
 ## Video and audio
 
@@ -398,7 +399,7 @@ Open the preview on your phone: :qr{value="https://drop.vitehub.dev"}
 ![The upload flow, recorded](https://example.com/upload.mp4){loop muted}
 ```
 
-An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file plays as a video or audio. [comark-media](https://comark.onmax.me/media/)
+An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file plays as a video or audio. [comark-media](https://comark-ui.onmax.me/media/)
 
 ## Embeds
 
@@ -407,7 +408,7 @@ An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file play
 ::
 ```
 
-[comark-embed](https://comark.onmax.me/embed/)
+[comark-embed](https://comark-ui.onmax.me/embed/)
 
 ## Carousels
 
@@ -419,7 +420,7 @@ An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file play
 ::
 ```
 
-[comark-carousel](https://comark.onmax.me/carousel/)
+[comark-carousel](https://comark-ui.onmax.me/carousel/)
 
 ## Zoom
 
@@ -432,7 +433,39 @@ An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file play
 ::
 ```
 
-A click opens the block full screen. Images zoom on their own. [comark-zoom](https://comark.onmax.me/zoom/)
+A click opens the block full screen. Images zoom on their own. [comark-zoom](https://comark-ui.onmax.me/zoom/)
+
+## Quizzes
+
+```md
+::question{#event-loop-order}
+Which callback runs first once the current script ends?
+
+- [x] A resolved promise's `then` callback
+  > Promise callbacks are microtasks, which run before the next task.
+- [ ] A `setTimeout(fn, 0)` callback
+  > A timer queues a task, which waits for the microtasks.
+
+#explain
+After every task, the event loop empties the microtask queue.
+::
+
+::poll{#next-lesson}
+What should the next lesson cover?
+
+- [ ] Web Workers
+- [ ] Streams
+::
+
+::recall{#why-microtasks}
+Why does a promise callback run before a zero-delay timer?
+
+#answer
+Promise callbacks are microtasks, and a timer's callback is a task.
+::
+```
+
+Give each block an `#id` and keep it across versions. Mark the right options with `[x]` and put a `>` reason under every option. `#hint` adds a hint to a question. Options are shuffled, so don't write "All of the above". [comark-quiz](https://comark-ui.onmax.me/quiz/)
 
 ## Diagrams
 
@@ -442,10 +475,10 @@ digraph { rankdir=LR; node [shape=box]; agent -> drop [label="publish"]; drop ->
 ```
 ````
 
-` ```plantuml `, ` ```graphviz ` (or ` ```dot `), ` ```d2 `, ` ```dbml `, and ` ```goat ` (or ` ```svgbob `) fences draw through [Kroki](https://kroki.io), which sees the diagram's source. Use [Mermaid](markdown.md#mermaid), drawn by Drop itself, for anything private. [comark-diagrams](https://comark.onmax.me/diagrams/)
+` ```plantuml `, ` ```graphviz ` (or ` ```dot `), ` ```d2 `, ` ```dbml `, and ` ```goat ` (or ` ```svgbob `) fences draw through [Kroki](https://kroki.io), which sees the diagram's source. Use [Mermaid](markdown.md#mermaid), drawn by Drop itself, for anything private. [comark-diagrams](https://comark-ui.onmax.me/diagrams/)
 
 ## Links
 
-Every web link shows as a chip with its site's icon, and `@user` as a chip with their GitHub avatar. Add `{chip=false}` after a link to keep it plain: `[the guide](https://vite.dev/guide/){chip=false}`. `owner/repo#12` links to that issue or pull request, and each heading gets a link to itself. [comark-chips](https://comark.onmax.me/chips/), [comark-github](https://comark.onmax.me/github/), [comark-links](https://comark.onmax.me/links/)
+Every web link shows as a chip with its site's icon, and `@user` as a chip with their GitHub avatar. Add `{chip=false}` after a link to keep it plain: `[the guide](https://vite.dev/guide/){chip=false}`. `owner/repo#12` links to that issue or pull request, and each heading gets a link to itself. [comark-chips](https://comark-ui.onmax.me/chips/), [comark-github](https://comark-ui.onmax.me/github/), [comark-links](https://comark-ui.onmax.me/links/)
 
-Inline HTML that GitHub allows, such as `<kbd>`, `<sub>`, and `<details>`, renders as on GitHub. Bold and italics also work next to Chinese, Japanese, and Korean punctuation ([comark-cjk](https://comark.onmax.me/cjk/)).
+Inline HTML that GitHub allows, such as `<kbd>`, `<sub>`, and `<details>`, renders as on GitHub. Bold and italics also work next to Chinese, Japanese, and Korean punctuation ([comark-cjk](https://comark-ui.onmax.me/cjk/)).
