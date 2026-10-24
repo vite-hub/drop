@@ -95,19 +95,40 @@ async function up() {
   if (!drawn || drawn.width < 8 || drawn.height < 8) return (box.value = null)
   const el = stage.value!
   const rect = el.getBoundingClientRect()
+  const scale = rect.width / (el.offsetWidth || rect.width)
+  // A zoomed device page can extend beyond the browser viewport. Keep the image crop and normalized box in the same
+  // visible page coordinate space instead of recording coordinates relative to the clipped, full-size stage.
+  const visible = {
+    left: Math.max(0, rect.left),
+    top: Math.max(0, rect.top),
+    right: Math.min(innerWidth, rect.right),
+    bottom: Math.min(innerHeight, rect.bottom),
+  }
+  const crop = {
+    left: Math.max(0, (visible.left - rect.left) / scale),
+    top: Math.max(0, (visible.top - rect.top) / scale),
+    width: Math.max(0, (visible.right - visible.left) / scale),
+    height: Math.max(0, (visible.bottom - visible.top) / scale),
+  }
+  if (crop.width < 1 || crop.height < 1) return (box.value = null)
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
   drawing.value = false
   box.value = null
   await nextTick()
   await new Promise(requestAnimationFrame)
   try {
-    const blob = await capture.grab({ left: rect.left, top: rect.top, width: rect.width, height: rect.height })
+    const blob = await capture.grab({
+      left: visible.left,
+      top: visible.top,
+      width: visible.right - visible.left,
+      height: visible.bottom - visible.top,
+    })
     const url = new URL(open.value)
     pending.value = {
       blob,
       url: URL.createObjectURL(blob),
-      box: drawn,
-      size: { width: el.offsetWidth, height: el.offsetHeight },
+      box: { left: drawn.left - crop.left, top: drawn.top - crop.top, width: drawn.width, height: drawn.height },
+      size: { width: crop.width, height: crop.height },
       page: (url.pathname + url.search + url.hash).slice(0, 1000),
       origin: url.origin,
     }

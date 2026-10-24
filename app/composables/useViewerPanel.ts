@@ -54,7 +54,8 @@ export function useViewerPanel(options: {
   let drag: { x: number; width: number; rem: number } | undefined
   const resize = {
     start(event: PointerEvent) {
-      ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+      if (!(event.currentTarget instanceof Element)) return
+      event.currentTarget.setPointerCapture(event.pointerId)
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
       drag = { x: event.clientX, width: width.value, rem }
     },
