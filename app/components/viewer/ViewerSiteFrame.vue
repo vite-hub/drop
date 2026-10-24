@@ -123,10 +123,14 @@ async function up() {
   }
 }
 
+// Images the reviewer adds beside the screenshot: from the button, a paste, or a drop on the form.
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop: dropImages } = useImagePicks()
+
 function discard() {
   if (pending.value) URL.revokeObjectURL(pending.value.url)
   pending.value = null
   note.value = ""
+  clear()
 }
 
 // The box in thousandths of the screenshot, as every review comment stores it.
@@ -153,6 +157,7 @@ async function send() {
     }),
   )
   form.append("screenshot", shot.blob, "screenshot")
+  for (const file of files.value) form.append("image", file, file.name || "image")
   sending.value = true
   try {
     await sendSiteComment(props.drop.id, shot.origin, form)
@@ -273,6 +278,8 @@ onBeforeUnmount(discard)
       <form
         v-if="pending"
         class="absolute right-4 bottom-18 z-30 w-80 max-w-[calc(100%-2rem)] space-y-3 rounded-lg border border-default bg-default p-3 shadow-lg"
+        @dragover.prevent
+        @drop="dropImages"
         @submit.prevent="send"
       >
         <div class="relative overflow-hidden rounded-md border border-default">
@@ -297,8 +304,21 @@ onBeforeUnmount(discard)
           :rows="3"
           @keydown.meta.enter="send"
           @keydown.ctrl.enter="send"
+          @paste="paste"
         />
+        <ViewerImagePicks :picks="picks" @remove="remove" />
+        <p v-if="problem" class="text-xs text-error" role="alert">{{ problem }}</p>
         <div class="flex justify-end gap-2">
+          <UTooltip text="Add images">
+            <UButton
+              aria-label="Add images"
+              class="mr-auto"
+              color="neutral"
+              icon="i-mingcute-pic-line"
+              variant="ghost"
+              @click="pickImages"
+            />
+          </UTooltip>
           <UButton color="neutral" label="Cancel" variant="ghost" @click="discard" />
           <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
         </div>

@@ -1,11 +1,8 @@
 <script setup lang="ts">
 // New comments: a one-line composer (Enter sends, Shift+Enter breaks). The selection stays highlighted
 // in the document, so the composer doesn't repeat it. Existing comments: the thread, Figma's way. A bar with the
-// number, Resolve, and a menu (Copy link, Delete); the comment and its replies; a reply box at the bottom.
-// Sending is optimistic: a new comment closes the box and shows its pin at once, a reply shows in the thread at once.
-// If the server refuses, the text comes back to its box (`draft` for a new comment, `fail` for a reply) with why.
-// Escape or a click away from a box with text only leaves the box, Figma's way: the text stays, and the next Escape or
-// click away closes.
+// number, Resolve, and a menu (Copy link, Delete); the comment and its replies; a reply box at the bottom. Both boxes
+// take images: from the image button, a paste, or a drop.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
@@ -19,20 +16,21 @@ const props = defineProps<{
   comment?: DropComment
   canManage: boolean
   canReply: boolean
-  /** A new comment's text that didn't go through, and why. */
   draft?: string
   draftError?: string
 }>()
 const emit = defineEmits<{
-  submit: [body: string]
+  submit: [body: string, files: File[]]
   cancel: []
   resolve: [id: string, resolved: boolean]
   delete: [id: string]
-  reply: [id: string, body: string]
+  reply: [id: string, body: string, files: File[]]
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
 }>()
 const body = ref(props.draft ?? "")
+const busy = ref(false)
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
 // Why the last send failed, under the box that sent it; editing the text clears it.
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
@@ -47,38 +45,36 @@ const style = computed(() => {
   return { left: `${left}px`, top: `${top}px`, width: `${width.value}px` }
 })
 
-/** Escape in an empty box closes; with text, it only leaves the box, and the viewer's Escape closes from there. */
 function escape(event: KeyboardEvent) {
   if (!body.value.trim()) return emit("cancel")
   if (event.target instanceof HTMLElement) event.target.blur()
 }
-
-// Pressing outside takes focus from the box before the click lands, so whether it was being typed in is read on press.
 let typing = false
 const press = () => (typing = Boolean(body.value.trim() && card.value?.contains(document.activeElement)))
 const clickAway = () => typing || emit("cancel")
 
-async function send() {
-  const text = body.value
-  if (!text.trim()) return
-  if (!props.comment) return emit("submit", text)
-  emit("reply", props.comment.id, text)
-  // The reply is in the thread already: clear the box for the next one and show it at the bottom.
-  body.value = ""
-  await nextTick()
-  thread.value?.scrollTo({ top: thread.value.scrollHeight, behavior: "smooth" })
+function send() {
+  if (!body.value.trim() || busy.value) return
+  busy.value = true
+  if (props.comment) emit("reply", props.comment.id, body.value, files.value)
+  else emit("submit", body.value, files.value)
 }
 defineExpose({
-  /** A reply didn't go through: its text comes back, unless a new one was typed meanwhile. */
-  fail: async (reason?: string, text?: string) => {
+  fail: (reason?: string, text?: string) => {
+    busy.value = false
     if (text && !body.value) body.value = text
-    await nextTick()
     error.value = reason
+  },
+  /** A reply went through: clear the box for the next one, and show it at the bottom of the thread. */
+  sent: async () => {
+    busy.value = false
+    body.value = ""
+    clear()
+    await nextTick()
+    thread.value?.scrollTo({ top: thread.value.scrollHeight, behavior: "smooth" })
   },
 })
 const thread = useTemplateRef("thread")
-// Until the server has it, a new comment can't be resolved, deleted, or replied to.
-const posting = computed(() => Boolean(props.comment && isPending(props.comment.id)))
 const mayDelete = computed(() => Boolean(props.comment && (props.canManage || props.comment.mine)))
 const menu = computed<DropdownMenuItem[][]>(() => [
   [
@@ -112,7 +108,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     :style="style"
   >
     <template v-if="pending">
-      <div class="flex items-end gap-2">
+      <div class="flex items-end gap-1" @dragover.prevent @drop="drop">
         <UTextarea
           v-model="body"
           aria-label="Comment"
@@ -128,25 +124,37 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           variant="none"
           @keydown.enter.exact.prevent="send"
           @keydown.esc.stop="escape"
+          @paste="paste"
         />
+        <UTooltip text="Add images">
+          <UButton
+            aria-label="Add images"
+            class="size-8 justify-center rounded-full"
+            color="neutral"
+            icon="i-mingcute-pic-line"
+            variant="ghost"
+            @click="pickImages"
+          />
+        </UTooltip>
         <UButton
           aria-label="Send comment"
           class="size-8 justify-center rounded-full"
           color="neutral"
           :disabled="!body.trim()"
           icon="i-mingcute-arrow-up-line"
+          :loading="busy"
           @click="send"
         />
       </div>
-      <p v-if="error" class="px-1 pt-1 pb-0.5 text-xs text-error" role="alert">{{ error }}</p>
+      <ViewerImagePicks class="px-1 pt-1" :picks="picks" @remove="remove" />
+      <p v-if="error || problem" class="px-1 pt-1 pb-0.5 text-xs text-error" role="alert">{{ error || problem }}</p>
     </template>
     <template v-else-if="comment">
       <div class="flex h-10 shrink-0 items-center gap-1 border-b border-default pr-1.5 pl-3">
         <span class="label-mono">Comment #{{ comment.n }}</span>
         <span v-if="comment.resolved" class="ml-1.5 text-xs text-muted">Resolved</span>
-        <span v-if="posting" class="ml-1.5 text-xs text-muted">Posting</span>
         <span class="flex-1" />
-        <UTooltip v-if="!posting && (canManage || comment.mine)" :text="comment.resolved ? 'Reopen' : 'Resolve'">
+        <UTooltip v-if="canManage || comment.mine" :text="comment.resolved ? 'Reopen' : 'Resolve'">
           <UButton
             :aria-label="comment.resolved ? 'Reopen' : 'Resolve'"
             color="neutral"
@@ -156,8 +164,8 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             @click="emit('resolve', comment.id, !comment.resolved)"
           />
         </UTooltip>
-        <UDropdownMenu v-if="!posting" :content="{ align: 'end' }" :items="menu">
-          <UButton aria-label="More" color="neutral" icon="i-mingcute-more-1-fill" size="sm" variant="ghost" />
+        <UDropdownMenu :content="{ align: 'end' }" :items="menu">
+          <UButton aria-label="More" color="neutral" icon="i-mingcute-more-1-line" size="sm" variant="ghost" />
         </UDropdownMenu>
         <UButton
           aria-label="Close"
@@ -176,19 +184,15 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             {{ comment.quote }}
           </p>
           <p class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
+          <ViewerCommentImages :attachments="comment.attachments" />
         </div>
-        <div
-          v-for="reply in comment.replies"
-          :key="reply.id"
-          class="group space-y-1.5 px-3 py-3 transition-opacity"
-          :class="isPending(reply.id) && 'opacity-60'"
-        >
+        <div v-for="reply in comment.replies" :key="reply.id" class="group space-y-1.5 px-3 py-3">
           <div class="flex items-center gap-2">
             <UAvatar :alt="reply.authorName" :src="reply.authorImage ?? undefined" size="2xs" />
             <span class="text-sm font-medium text-highlighted">{{ reply.authorName }}</span>
             <span class="font-mono text-xs text-muted"><TimeAgo :at="reply.createdAt" /></span>
             <UButton
-              v-if="!isPending(reply.id) && (canManage || reply.mine)"
+              v-if="canManage || reply.mine"
               aria-label="Delete reply"
               class="ml-auto opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
               color="neutral"
@@ -199,10 +203,18 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             />
           </div>
           <p class="text-sm whitespace-pre-wrap">{{ reply.body }}</p>
+          <ViewerCommentImages :attachments="reply.attachments" />
         </div>
       </div>
 
-      <div v-if="canReply && !posting" class="flex shrink-0 items-end gap-2 border-t border-default p-1.5 pl-2.5">
+      <ViewerImagePicks v-if="canReply" class="border-t border-default px-2.5 pt-1.5" :picks="picks" @remove="remove" />
+      <div
+        v-if="canReply"
+        class="flex shrink-0 items-end gap-1 p-1.5 pl-2.5"
+        :class="picks.length ? '' : 'border-t border-default'"
+        @dragover.prevent
+        @drop="drop"
+      >
         <UTextarea
           v-model="body"
           aria-label="Reply"
@@ -215,18 +227,32 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc.stop="escape"
+          @keydown.esc="emit('cancel')"
+          @paste="paste"
         />
+        <UTooltip text="Add images">
+          <UButton
+            aria-label="Add images"
+            class="size-8 justify-center rounded-full"
+            color="neutral"
+            icon="i-mingcute-pic-line"
+            variant="ghost"
+            @click="pickImages"
+          />
+        </UTooltip>
         <UButton
           aria-label="Send reply"
           class="size-8 justify-center rounded-full"
           color="neutral"
           :disabled="!body.trim()"
           icon="i-mingcute-arrow-up-line"
+          :loading="busy"
           @click="send"
         />
       </div>
-      <p v-if="canReply && error" class="px-3 pb-2 text-xs text-error" role="alert">{{ error }}</p>
+      <p v-if="canReply && (error || problem)" class="px-3 pb-2 text-xs text-error" role="alert">
+        {{ error || problem }}
+      </p>
     </template>
   </div>
 </template>

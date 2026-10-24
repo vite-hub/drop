@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { commentReplies, comments } from "../../databases/config"
+import { deleteImagesOf } from "../../utils/comment-images"
 import { findDrop, permissions } from "../../utils/drops"
 import { identify } from "../../utils/identity"
 import { routeId } from "../../utils/params"
@@ -18,6 +19,7 @@ export default defineHandler(async (event) => {
   const who = await identify(event)
   if (!found || !drop || !(permissions(drop, who).manage || (who && found.reply.authorId === who.userId)))
     throw new HTTPError({ status: 404, statusText: "No reply with that id." })
+  await deleteImagesOf({ replyId: found.reply.id })
   await db.delete(commentReplies).where(eq(commentReplies.id, found.reply.id))
   return { ok: true }
 })

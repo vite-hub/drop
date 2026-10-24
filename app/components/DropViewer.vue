@@ -315,12 +315,12 @@ function copyLink(announce?: string) {
 
 // Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
 // unless another one is open by then.
-async function submit(body: string) {
+async function submit(body: string, files: File[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
   popover.value = null
   send({ type: "clear-selection" })
-  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
+  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
   if (!("value" in sent) && !popover.value) popover.value = { ...open, body, error: sent.error }
 }
 
@@ -341,8 +341,8 @@ async function removeComment(id: string) {
   await state.removeComment(id)
 }
 
-async function reply(id: string, body: string) {
-  const sent = await state.addReply(id, body)
+async function reply(id: string, body: string, files: File[] = []) {
+  const sent = await state.addReply(id, body, files)
   if (!("value" in sent)) await popoverRef.value?.fail(sent.error, body)
 }
 
