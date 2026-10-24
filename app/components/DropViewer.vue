@@ -80,13 +80,39 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
-const { selection, lightbox, popover, areaMode, canDrawArea, imageDraft, toggleArea, commentOnSelection, pickImage } =
-  annotations
+const {
+  selection,
+  lightbox,
+  popover,
+  tool,
+  overlays,
+  areaMode,
+  canDrawArea,
+  imageDraft,
+  toggleArea,
+  setTool,
+  toggleOverlay,
+  commentOnSelection,
+  pickImage,
+} = annotations
+/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
+const framed = computed(
+  () =>
+    !editing.value &&
+    !["folder", "site", "board"].includes(drop.value.kind) &&
+    !video.value &&
+    !(drop.value.kind === "file" && !drop.value.html),
+)
+watch(framed, (value) => !value && (tool.value = "browse"))
+/** Whether the page can show at a device's size (ViewerDevice): pages, not images or spreadsheets. */
+const sizable = computed(() => framed.value && ["html", "app", "markdown"].includes(drop.value.kind))
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
 }
-const popoverRef = useTemplateRef<{ fail: (reason?: string) => void; sent: () => Promise<void> }>("popoverRef")
+const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void>; sent: () => Promise<void> }>(
+  "popoverRef",
+)
 const shareOpen = ref(false)
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
@@ -243,6 +269,10 @@ defineShortcuts({
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleArea,
+  v: () => (tool.value = "browse"),
+  s: () => framed.value && setTool("measure"),
+  u: () => framed.value && toggleOverlay("rulers"),
+  x: () => framed.value && toggleOverlay("xray"),
   l: () => !editing.value && copyLink("Link copied"),
   d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
@@ -924,28 +954,42 @@ watch(
             />
           </div>
         </div>
-        <iframe
-          v-else-if="contentOrigin"
-          :key="frameKey"
-          ref="frame"
-          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-          :allow="frameAllow(drop.kind)"
-          :sandbox="CONTENT_SANDBOX"
-          :src="frameSrc"
-          :title="drop.title"
-        />
-        <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
-             backdrop behind it in dark mode. -->
-        <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
-        <iframe
-          v-else-if="srcdoc"
-          ref="frame"
-          class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-          data-allow-mismatch="attribute"
-          :allow="frameAllow(drop.kind)"
-          :sandbox="PREVIEW_SANDBOX"
-          :srcdoc="srcdoc"
-          :title="drop.title"
+        <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable">
+          <iframe
+            v-if="contentOrigin"
+            :key="frameKey"
+            ref="frame"
+            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+            :allow="frameAllow(drop.kind)"
+            :sandbox="CONTENT_SANDBOX"
+            :src="frameSrc"
+            :title="drop.title"
+          />
+          <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
+               backdrop behind it in dark mode. -->
+          <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
+          <iframe
+            v-else
+            ref="frame"
+            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+            data-allow-mismatch="attribute"
+            :allow="frameAllow(drop.kind)"
+            :sandbox="PREVIEW_SANDBOX"
+            :srcdoc="srcdoc"
+            :title="drop.title"
+          />
+        </ViewerDevice>
+
+        <ViewerToolbar
+          v-if="framed && !shownVersion"
+          :can-comment="canDrawArea"
+          :overlays="overlays"
+          :sizable="sizable"
+          :tool="tool"
+          :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
+          @toggle="toggleOverlay"
+          @tool="setTool"
+          @width="nextWidth"
         />
 
         <ViewerDiff
