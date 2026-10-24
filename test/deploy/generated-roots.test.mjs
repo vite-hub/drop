@@ -29,10 +29,7 @@ for (const command of ["build", "serve"]) {
       const config = { root: join(root, "app"), command, nitro: {}, plugins: [], build: {} }
       plugin.config(config, { command })
       await plugin.configResolved(config)
-      for (const file of [
-        "nitro/rate-limit/plugin.ts",
-        "rate-limit/manifest.json",
-      ])
+      for (const file of ["nitro/rate-limit/plugin.ts", "rate-limit/manifest.json"])
         await access(join(root, ".vitehub", file))
       for (const file of config.nitro.plugins) await access(file)
       if (command === "serve") {

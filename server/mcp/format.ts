@@ -79,17 +79,27 @@ export function commentTarget(
 }
 
 /** `version` is the one being read: a comment written on an earlier version says which. */
-export const commentLine = (comment: DropComment, version: number) =>
-  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${replyLines(comment)}`
+export const commentLine = (comment: DropComment, version: number, origin: string) =>
+  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
+
+/** The images sent with a comment or a reply, as full addresses an agent can fetch. */
+export const imageUrls = (item: Pick<DropComment, "attachments">, origin: string) =>
+  item.attachments.map((file) => new URL(file.url, origin).href)
+
+const imageLine = (item: Pick<DropComment, "attachments">, origin: string, indent = "   ") =>
+  item.attachments.length ? `\n${indent}Images: ${imageUrls(item, origin).join(" ")}` : ""
 
 /** A comment's thread under it, oldest first, one line per reply. */
-export const replyLines = (comment: Pick<DropComment, "replies">) =>
-  comment.replies.map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body}`).join("")
+export const replyLines = (comment: Pick<DropComment, "replies">, origin: string) =>
+  comment.replies
+    .map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body}${imageLine(reply, origin, "     ")}`)
+    .join("")
 
 /** The thread for structured output. */
-export const replyItems = (comment: Pick<DropComment, "replies">) =>
+export const replyItems = (comment: Pick<DropComment, "replies">, origin: string) =>
   comment.replies.map((reply) => ({
     body: reply.body,
     author: reply.authorName,
     at: new Date(reply.createdAt).toISOString(),
+    images: imageUrls(reply, origin),
   }))

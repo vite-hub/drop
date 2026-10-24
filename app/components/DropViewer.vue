@@ -363,12 +363,15 @@ const moreMenu = computed(() =>
 )
 const moreActive = computed(() => areaMode.value || showing("history") || showing("details"))
 
-async function submit(body: string) {
-  if (popover.value?.type !== "new") return
-  const sent = await state.addComment({ ...popover.value.pending, ...(isApp.value ? { page: page.value } : {}) }, body)
-  if (!("value" in sent)) return popoverRef.value?.fail(sent.error)
+// Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
+// unless another one is open by then.
+async function submit(body: string, files: File[] = []) {
+  const open = popover.value
+  if (open?.type !== "new") return
   popover.value = null
   send({ type: "clear-selection" })
+  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
+  if (!("value" in sent) && !popover.value) popover.value = { ...open, body, error: sent.error }
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
@@ -388,10 +391,10 @@ async function removeComment(id: string) {
   await state.removeComment(id)
 }
 
-async function reply(id: string, body: string) {
-  const sent = await state.addReply(id, body)
+async function reply(id: string, body: string, files: File[] = []) {
+  const sent = await state.addReply(id, body, files)
   if ("value" in sent) await popoverRef.value?.sent()
-  else popoverRef.value?.fail(sent.error, body)
+  else await popoverRef.value?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
