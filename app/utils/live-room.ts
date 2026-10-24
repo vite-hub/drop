@@ -1,4 +1,5 @@
 import { Placeholder } from "@tiptap/extension-placeholder"
+import { Link } from "@tiptap/extension-link"
 import { Editor } from "@tiptap/vue-3"
 import { RealtimeCaret } from "vite-hub/realtime/vue"
 
@@ -23,6 +24,7 @@ export function joinLiveRoom(documentId: Ref<string | undefined>) {
       extensions: [
         ...extensions,
         CodeHighlight,
+        Link.configure({ openOnClick: false }),
         Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
         RealtimeCaret.configure({
           awareness: markRaw(realtime.provider.value.awareness),

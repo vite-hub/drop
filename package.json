@@ -25,6 +25,10 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1156.0",
+    "@aws-sdk/lib-storage": "3.1156.0",
+    "@aws-sdk/s3-presigned-post": "3.1156.0",
+    "@aws-sdk/s3-request-presigner": "3.1156.0",
     "@better-auth/oauth-provider": "1.7.10",
     "@better-auth/stripe": "1.7.10",
     "@comark/html": "0.7.0",
@@ -41,6 +45,7 @@
     "@shikijs/themes": "4.5.0",
     "@tiptap/core": "3.31.4",
     "@tiptap/extension-emoji": "3.31.4",
+    "@tiptap/extension-link": "3.31.4",
     "@tiptap/extension-placeholder": "3.31.4",
     "@tiptap/pm": "3.31.4",
     "@tiptap/vue-3": "3.31.4",
@@ -61,7 +66,6 @@
     "h3-mcp": "0.2.0",
     "hucre": "^1.2.0",
     "isbot": "^5.2.2",
-    "lib0": "0.2.119",
     "mdream": "2.0.3",
     "media-chrome": "^4.19.3",
     "medium-zoom": "1.1.0",
@@ -78,10 +82,9 @@
     "stripe": "22.6.2",
     "tailwindcss": "4.3.3",
     "valibot": "^1.4.2",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@667db8317fa3dd317c6df3c48529484fbd355a5d",
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722",
     "vue": "3.5.44",
     "vue-router": "5.2.0",
-    "y-websocket": "3.1.0",
     "yjs": "13.6.33"
   },
   "devDependencies": {

@@ -1,18 +1,8 @@
-supportedArchitectures:
-  cpu:
-    - current
-    - x64
-    - arm64
-  libc:
-    - current
-    - glibc
-  os:
-    - current
-    - linux
-
 blockExoticSubdeps: false
 
 overrides:
+  # Keep ViteHub auth and the app on one Better Auth type surface.
+  better-auth: 1.7.10
   # Nuxt and Nuxt UI must share one Vue instance. 3.5.42+ fixes an SSR attribute-name XSS (@vue/server-renderer).
   vue: 3.5.44
   # Nuxt's payload serializer; 5.9.3+ fixes several uneval/stringify advisories.
@@ -27,8 +17,6 @@ overrides:
   "h3@2.0.1-rc.33": 2.0.1
 
 patchedDependencies:
-  # serve() answers a single byte Range with a 206, so videos seek (and play in Safari). Not upstream yet.
-  "@vite-hub/blob@0.0.4": patches/@vite-hub__blob@0.0.4.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
@@ -53,11 +41,7 @@ patchedDependencies:
   # originalOf, which Drop's frame runtime anchors comments in the zoom with). Drop both once a release has #25 and #15.
   comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
   comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
-  # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the
-  # overlay scrollbar of a comment past maxrows. Measures a hidden copy instead (nuxt/ui#7267). Also scrolls to the
-  # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
-  # padding, so keep this part after #7267 ships.
-  "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
+  # Deno's package copier sees mdream's architecture branches even when those native packages are not published.
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
