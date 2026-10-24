@@ -80,7 +80,7 @@ Cold starts dropped to 40 ms.[^bench]
 [^bench]: Median of 200 requests on the staging Worker, 2026-10-14.
 ```
 
-Drop numbers them in order and lists them under a Footnotes heading at the end. A definition can hold links, bold, and code. [comark-footnotes](https://comark.onmax.me/footnotes/)
+Drop numbers them in order and lists them under a Footnotes heading at the end. A definition can hold links, bold, and code. [comark-footnotes](https://comark-ui.onmax.me/footnotes/)
 
 ## Annotated screenshots
 
@@ -92,7 +92,7 @@ Save sits below the fold on a laptop screen.
 ::
 ```
 
-`::screenshot` marks areas of an image, and `::compare` puts two screenshots side by side as before and after. `src` takes an `https://` URL or the `fileUrl` of an image published with `file`. Before you write marks or a comparison, read the full syntax in [the annotation reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/annotations.md). When the syntax is wrong, `publish` fails and lists every problem. [comark-annotate](https://comark.onmax.me/annotate/)
+`::screenshot` marks areas of an image, and `::compare` puts two screenshots side by side as before and after. `src` takes an `https://` URL or the `fileUrl` of an image published with `file`. Before you write marks or a comparison, read the full syntax in [the annotation reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/annotations.md). When the syntax is wrong, `publish` fails and lists every problem. [comark-annotate](https://comark-ui.onmax.me/annotate/)
 
 ## Front matter
 
