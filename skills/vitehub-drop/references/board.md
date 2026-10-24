@@ -1,6 +1,6 @@
 # Boards
 
-A board is a whiteboard (tldraw) that people draw on together in Drop. You read it, add to it, and look at it. Use a board when the thing is spatial: a flow, a system map, a retro, a set of options to arrange. Use a doc when it is prose.
+A board is a whiteboard (Excalidraw) that people draw on together in Drop. You read it, add to it, and look at it. Use a board when the thing is spatial: a flow, a system map, a retro, a set of options to arrange. Use a doc when it is prose.
 
 ## Publish a board
 
@@ -23,7 +23,7 @@ Call `publish` with `board`, a `title`, a `note` and a `lifetime` (or a `folder`
 - `type` is one of `note` (a sticky note), `text`, `box`, `ellipse` or `frame` (a named area that holds items).
 - `id` is a short name you pick. Edges, `in`, `update` and `remove` use it.
 - `in` puts an item in a frame. Leave out `x` and `y` and Drop lays items out for you: a grid four across inside a frame, and a new row below everything else outside one.
-- `color` is one of tldraw's colors: `yellow`, `blue`, `green`, `red`, `orange`, `violet`, `grey`, `black` and their `light-` variants.
+- `color` is one of `yellow`, `blue`, `green`, `red`, `orange`, `violet`, `grey`, `black` and their `light-` variants.
 
 Give each question or topic its own frame. People and agents both find things by frame.
 

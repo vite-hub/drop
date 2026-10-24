@@ -8,8 +8,10 @@ useSeoMeta({ title: "Connect an agent", robots: "noindex" })
 
 const route = useRoute("oauth")
 const { $auth } = useNuxtApp()
-const { loggedIn, user, signIn } = useUserSession($auth)
-const ready = useMounted()
+const { loggedIn, user, signIn, ready: sessionKnown } = useUserSession($auth)
+// Until the session is known, a signed-in person would see "Sign in" for a moment.
+const mounted = useMounted()
+const ready = computed(() => mounted.value && sessionKnown.value)
 
 const clientId = computed(() => textValue(route.query.client_id) ?? "")
 const valid = computed(() => Boolean(clientId.value && route.query.sig))

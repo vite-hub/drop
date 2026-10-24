@@ -258,8 +258,8 @@ export function useDropActions() {
     try {
       const board = await $fetch<DropSummary>("/api/drops", {
         method: "POST",
-        // An empty .tldr becomes an empty board on the server.
-        body: { filename: "board.tldr", title: "Untitled board", content: "" },
+        // An empty .excalidraw becomes an empty board on the server.
+        body: { filename: "board.excalidraw", title: "Untitled board", content: "" },
       })
       if (parent) await $fetch(`/api/drops/${board.id}`, { method: "PATCH", body: { folder: parent.id } })
       await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])

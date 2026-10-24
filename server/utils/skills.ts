@@ -10,6 +10,7 @@ import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
 import prototypeCanvas from "../../skills/prototype/references/canvas.md?raw"
 import prototypeMd from "../../skills/prototype/SKILL.md?raw"
 import showMeMd from "../../skills/show-me/SKILL.md?raw"
+import blocksGuide from "../../skills/vitehub-drop/references/blocks.md?raw"
 import boardGuide from "../../skills/vitehub-drop/references/board.md?raw"
 import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
 import markdownGuide from "../../skills/vitehub-drop/references/markdown.md?raw"
@@ -68,6 +69,7 @@ export const SKILLS: Skill[] = [
     file("SKILL.md", dropMd),
     file("references/documents.md", documentsGuide),
     file("references/markdown.md", markdownGuide),
+    file("references/blocks.md", blocksGuide),
     file("references/board.md", boardGuide),
   ]),
   skill([file("SKILL.md", handoffMd)]),

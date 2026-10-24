@@ -1,7 +1,7 @@
 import * as v from "valibot"
 import { BOARD_COLORS, BOARD_ITEM_TYPES } from "#shared/board"
 
-// The board format agents write (shared/board.ts turns it into tldraw records). No transforms: every input schema
+// The board format agents write (shared/board.ts turns it into Excalidraw elements). No transforms: every input schema
 // becomes JSON Schema for tools/list.
 
 const id = v.pipe(
@@ -47,6 +47,6 @@ export const BoardInput = v.pipe(
     edges: v.optional(v.pipe(v.array(BoardEdgeInput), v.maxLength(500))),
   }),
   v.description(
-    "A whiteboard people draw on together (tldraw): frames, sticky notes, text, shapes, and arrows between them. Use it for flows, maps, retros and anything spatial; people then draw, move and add to it, and you read it back with read_drop and view_board.",
+    "A whiteboard people draw on together (Excalidraw): frames, sticky notes, text, shapes, and arrows between them. Use it for flows, maps, retros and anything spatial; people then draw, move and add to it, and you read it back with read_drop and view_board.",
   ),
 )

@@ -20,4 +20,8 @@ test("Comark block components and footnotes keep a doc out of the editor; colons
   assert.equal(hasEditorlessSyntax("A claim.[^1]\n\n[^1]: The source.\n"), true)
   assert.equal(hasEditorlessSyntax("---\ntitle: a::b\n---\n\nTime 10::30 is fine.\n"), false)
   assert.equal(hasEditorlessSyntax("Exponents like x[^2] and [^ref] stay prose.\n"), false)
+  assert.equal(hasEditorlessSyntax("Released :badge[New] today.\n"), true)
+  assert.equal(hasEditorlessSyntax(':icon{name="lucide:rocket"} Launch\n'), true)
+  assert.equal(hasEditorlessSyntax("Ship it{++ today++}.\n"), true)
+  assert.equal(hasEditorlessSyntax("Note: see key:value, 10:30, and [the docs](https://drop.vitehub.dev).\n"), false)
 })

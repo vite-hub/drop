@@ -14,7 +14,7 @@ export default defineHandler((event) => {
   const config = quotaConfig()
   const limits = planLimits(config.enabled ? config.defaultPlan : "unlimited", config.pro)
   const owner = config.enabled
-    ? `- Each account holds at most ${limits.drops} drops and ${Math.round(limits.bytes! / MIB)} MiB, and writes at most ${limits.writes} files a month. Trash doesn't take a drop slot. \`list_drops\` shows usage.`
+    ? `- Each account holds ${limits.drops === null ? "any number of drops" : `at most ${limits.drops} drops`} and at most ${Math.round(limits.bytes! / MIB)} MiB, and writes at most ${limits.writes} files a month. Trash doesn't take a drop slot. \`list_drops\` shows usage.`
     : "- This Drop sets no per-account limits."
   const skill = dropMd
     .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "")

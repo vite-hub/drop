@@ -111,7 +111,7 @@ test("each member's limits follow their own tier, and anything else falls back t
   sql.prepare("UPDATE user SET plan = 'pro' WHERE id = 'owner'").run()
   const pro = await getUsage("owner")
   assert.equal(pro.plan, "pro")
-  assert.deepEqual([pro.drops.limit, pro.bytes.limit, pro.writes.limit], [100, 1024 * 1024 * 1024, 10_000])
+  assert.deepEqual([pro.drops.limit, pro.bytes.limit, pro.writes.limit], [null, 1024 * 1024 * 1024, 10_000])
   // Admins pick Free or Pro; an old `unlimited` row doesn't lift the limits.
   sql.prepare("UPDATE user SET plan = 'unlimited' WHERE id = 'owner'").run()
   assert.equal((await getUsage("owner")).plan, "free")

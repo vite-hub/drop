@@ -12,7 +12,7 @@ test("each Nuxt app gets its own auth client and session state", () => {
   assert.notEqual(first, second)
   assert.notEqual(first.$store.atoms.session, second.$store.atoms.session)
   first.$store.atoms.session.set({ data: { user: { id: "first-account" } } })
-  assert.equal(second.$store.atoms.session.get().data, null)
+  assert.equal(second.$store.atoms.session.get().data?.user, undefined)
 })
 
 async function browser(run) {

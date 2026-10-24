@@ -1,24 +1,33 @@
 import { and, asc, eq, inArray, lte, type SQL, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { commentReplies, comments, drops, user } from "../databases/config"
-import type { CommentReply, DropComment } from "#shared/types"
+import type { CommentAttachment, CommentReply, DropComment } from "#shared/types"
+import { attachmentsOf, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
 import { chainOf } from "./expiry"
 import type { Identity } from "./identity"
 
 export type CommentRow = typeof comments.$inferSelect
 
-export type ReplyRow = typeof commentReplies.$inferSelect
-/** What toComment adds from other tables: the authors' pictures by user id, and each comment's replies. */
-export type CommentExtras = { images: Map<string, string | null>; replies: Map<string, ReplyRow[]> }
+type ReplyRow = typeof commentReplies.$inferSelect
+/**
+ * What toComment adds from other tables: the authors' pictures by user id, each comment's replies, and the images
+ * sent with each comment or reply, by the comment's or the reply's id.
+ */
+export type CommentExtras = {
+  images: Map<string, string | null>
+  replies: Map<string, ReplyRow[]>
+  attachments?: Map<string, CommentAttachment[]>
+}
 
-const toReply = (row: ReplyRow, who: Identity | null, images?: Map<string, string | null>): CommentReply => ({
+const toReply = (row: ReplyRow, who: Identity | null, extras?: Partial<CommentExtras>): CommentReply => ({
   id: row.id,
   body: row.body,
   authorName: row.authorName,
-  authorImage: (row.authorId && images?.get(row.authorId)) || null,
+  authorImage: (row.authorId && extras?.images?.get(row.authorId)) || null,
   createdAt: row.createdAt,
   mine: Boolean(who && row.authorId === who.userId),
+  attachments: extras?.attachments?.get(row.id) ?? [],
 })
 
 export const toComment = (
@@ -45,7 +54,8 @@ export const toComment = (
   createdAt: row.createdAt,
   version,
   mine: Boolean(who && row.authorId === who.userId),
-  replies: (extras?.replies.get(row.id) ?? []).map((reply) => toReply(reply, who, extras?.images)),
+  replies: (extras?.replies.get(row.id) ?? []).map((reply) => toReply(reply, who, extras)),
+  attachments: extras?.attachments?.get(row.id) ?? [],
 })
 
 /** The pictures of the people who wrote `rows`. Guests and agents without one get initials. D1 binds at most 100. */
@@ -64,19 +74,33 @@ export async function authorImages(rows: Pick<CommentRow, "authorId">[]) {
 
 /**
  * The replies and pictures for comments on the drops `dropIds` selects (a subquery, so no list of ids to bind).
- * Replies come oldest first, grouped by comment.
+ * Replies come oldest first, grouped by comment. Both read from the subquery alone, so they go with the comments' own
+ * query rather than after it.
  */
-export async function commentExtras(rows: CommentRow[], dropIds: SQL) {
-  const replies = rows.length
-    ? await db
-        .select()
-        .from(commentReplies)
-        .where(sql`${commentReplies.commentId} IN (SELECT id FROM comments WHERE drop_id IN (${dropIds}))`)
-        .orderBy(asc(commentReplies.createdAt))
-    : []
+export async function commentExtras(dropIds: SQL): Promise<CommentExtras> {
+  const commented = sql`SELECT id FROM comments WHERE drop_id IN (${dropIds})`
+  const [replies, people, files] = await Promise.all([
+    db
+      .select()
+      .from(commentReplies)
+      .where(sql`${commentReplies.commentId} IN (${commented})`)
+      .orderBy(asc(commentReplies.createdAt)),
+    db
+      .select({ id: user.id, image: user.image })
+      .from(user)
+      .where(
+        sql`${user.id} IN (SELECT author_id FROM comments WHERE drop_id IN (${dropIds}) UNION SELECT author_id FROM comment_replies WHERE comment_id IN (${commented}))`,
+      ),
+    attachmentsOf(commented),
+  ])
   const byComment = new Map<string, ReplyRow[]>()
   for (const reply of replies) byComment.set(reply.commentId, [...(byComment.get(reply.commentId) ?? []), reply])
-  return { images: await authorImages([...rows, ...replies]), replies: byComment }
+  const attachments = new Map<string, CommentAttachment[]>()
+  for (const file of files) {
+    const owner = file.replyId ?? file.commentId
+    attachments.set(owner, [...(attachments.get(owner) ?? []), toAttachment(file)])
+  }
+  return { images: new Map(people.map((person) => [person.id, person.image])), replies: byComment, attachments }
 }
 
 /**
@@ -96,24 +120,25 @@ const siteOf = (row: Pick<DropRow, "id" | "kind" | "parentId">) => (row.kind ===
  */
 export async function listComments(row: Pick<DropRow, "id" | "ownerId" | "version" | "kind">, who: Identity | null) {
   if (row.kind === "site") {
-    const rows = await db
-      .select()
-      .from(comments)
-      .where(sql`${comments.dropId} IN (${siteFamily(row.id)})`)
-      .orderBy(asc(comments.n))
-    const extras = await commentExtras(rows, siteFamily(row.id))
+    const [rows, extras] = await Promise.all([
+      db
+        .select()
+        .from(comments)
+        .where(sql`${comments.dropId} IN (${siteFamily(row.id)})`)
+        .orderBy(asc(comments.n)),
+      commentExtras(siteFamily(row.id)),
+    ])
     return rows.map((item) => toComment(item, who, 1, extras))
   }
-  const rows = await db
-    .select({ comment: comments, version: drops.version })
-    .from(comments)
-    .innerJoin(drops, eq(drops.id, comments.dropId))
-    .where(and(sql`${comments.dropId} IN (${chainOf(row)})`, lte(drops.version, row.version)))
-    .orderBy(asc(comments.n), asc(drops.version))
-  const extras = await commentExtras(
-    rows.map((item) => item.comment),
-    chainOf(row),
-  )
+  const [rows, extras] = await Promise.all([
+    db
+      .select({ comment: comments, version: drops.version })
+      .from(comments)
+      .innerJoin(drops, eq(drops.id, comments.dropId))
+      .where(and(sql`${comments.dropId} IN (${chainOf(row)})`, lte(drops.version, row.version)))
+      .orderBy(asc(comments.n), asc(drops.version)),
+    commentExtras(chainOf(row)),
+  ])
   return rows.map((item) => toComment(item.comment, who, item.version, extras))
 }
 
@@ -158,8 +183,8 @@ export async function findCommentByNumber(row: Pick<DropRow, "id" | "ownerId" | 
   return comment ?? null
 }
 
-/** Adds a reply to `comment`'s thread; the callers check who may. */
-export async function addReply(comment: Pick<CommentRow, "id">, who: Identity | null, body: string) {
+/** Adds a reply to `comment`'s thread; the callers check who may. `name` is a guest's, from a review token. */
+export async function insertReply(comment: Pick<CommentRow, "id">, who: Identity | null, body: string, name?: string) {
   const [row] = await db
     .insert(commentReplies)
     .values({
@@ -167,9 +192,17 @@ export async function addReply(comment: Pick<CommentRow, "id">, who: Identity | 
       commentId: comment.id,
       body,
       authorId: who?.userId ?? null,
-      authorName: who?.name ?? "Guest",
+      authorName: who?.name ?? name ?? "Guest",
       createdAt: Date.now(),
     })
     .returning()
-  return toReply(row!, who, await authorImages([row!]))
+  return row!
 }
+
+/** The reply as the thread shows it, with the images stored for it. */
+export const replyOf = async (row: ReplyRow, who: Identity | null, attachments: CommentAttachment[]) =>
+  toReply(row, who, { images: await authorImages([row]), attachments: new Map([[row.id, attachments]]) })
+
+/** A reply with words only, as an agent sends it. */
+export const addReply = async (comment: Pick<CommentRow, "id">, who: Identity | null, body: string) =>
+  replyOf(await insertReply(comment, who, body), who, [])

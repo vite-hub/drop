@@ -2,8 +2,7 @@ import assert from "node:assert/strict"
 import { readdir, readFile } from "node:fs/promises"
 import { test } from "vite-plus/test"
 import { parseYAML } from "confbox/yaml"
-import { createMarkdownParser } from "@comark/html/parse"
-import annotate from "comark-annotate"
+const { parseMarkdown } = await import("../../server/utils/markdown-document.ts")
 
 const root = new URL("../../skills/", import.meta.url)
 const names = (await readdir(root, { withFileTypes: true }))
@@ -25,21 +24,20 @@ for (const name of names) {
   })
 }
 
-test("pr-evidence's annotation examples are valid comark-annotate", async () => {
+test("pr-evidence's annotation examples render in Drop without a problem", async () => {
   const reference = await readFile(new URL("pr-evidence/references/annotations.md", root), "utf8")
-  // Fenced `md` examples, including ````md fences that wrap a ``` block.
   const examples = [...reference.matchAll(/^(`{3,})md\n([\s\S]*?)\n\1$/gm)].map((match) => match[2])
   assert.equal(examples.length, 2)
   for (const example of examples) {
-    const document = await createMarkdownParser({ plugins: [annotate()] })(example)
+    const document = await parseMarkdown(example)
     assert.deepEqual(document.meta.issues, [], example)
   }
 })
 
-test("show-me's annotated screenshot example is valid comark-annotate", async () => {
+test("show-me's annotated screenshot example renders in Drop without a problem", async () => {
   const skill = await readFile(new URL("show-me/SKILL.md", root), "utf8")
   const example = skill.match(/```md\n([\s\S]*?)\n```/)?.[1]
   assert.ok(example)
-  const document = await createMarkdownParser({ plugins: [annotate()] })(example)
+  const document = await parseMarkdown(example)
   assert.deepEqual(document.meta.issues, [])
 })

@@ -19,6 +19,16 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/*
+ * The review tools (ViewerToolbar, and what the frame draws in shared/plan-runtime.ts) take Mesurer's look: one blue for
+ * the tool that's on, at the lightness where a white icon or label on it reads (4.7:1), and a borderless toolbar raised by
+ * layered shadows. The rest of Drop stays grayscale.
+ */
+@theme inline {
+  --color-tool: oklch(0.56 0.18 255);
+  --shadow-toolbar: var(--toolbar-shadow);
+}
+
 /* shadcn's radius scale, from --radius: md 8px for controls, lg 10px for containers, xl 14px for cards. */
 @theme inline {
   --radius-xs: calc(var(--radius) * 0.4);
@@ -49,6 +59,9 @@
   --ui-border-inverted: var(--foreground);
   --ui-error: var(--destructive);
   --ui-radius: calc(var(--radius) * 0.6);
+  --toolbar-shadow:
+    0 0 0 0.5px oklch(0 0 0 / 18%), 0 1px 1px oklch(0 0 0 / 6%), 0 3px 9px oklch(0 0 0 / 6%),
+    0 6px 18px oklch(0 0 0 / 3%);
 }
 
 .dark {
@@ -58,6 +71,9 @@
   --ui-text-toned: oklch(0.85 0 0);
   --ui-border-muted: oklch(1 0 0 / 6%);
   --ui-border-accented: oklch(1 0 0 / 18%);
+  --toolbar-shadow:
+    0 0 0 0.5px oklch(1 0 0 / 16%), 0 1px 1px oklch(0 0 0 / 12.5%), 0 2px 5px oklch(0 0 0 / 12.5%),
+    0 3px 8px oklch(0 0 0 / 12.5%);
 }
 
 /* Mono uppercase section labels, Executor's signature. */

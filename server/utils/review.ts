@@ -17,16 +17,25 @@ import {
   siteMatches,
 } from "#shared/review"
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
-import type { SiteReviewItem } from "#shared/types"
+import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { comments, drops, user } from "../databases/config"
+import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
 import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
-import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions, storageFailure } from "./drops"
+import {
+  deleteDrop,
+  type DropRow,
+  findDrop,
+  type LifetimeInput,
+  lifetimeFields,
+  permissions,
+  storageFailure,
+} from "./drops"
 import { type Identity, roleOf } from "./identity"
 import { isMember, membersOnly } from "./members"
-import { DropQuotaError, withDropQuota } from "./quotas"
-import { shareFields, sharePolicy } from "./share"
+import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
+import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
 
@@ -241,7 +250,7 @@ export async function reviewPreflight(event: H3Event) {
     status: 204,
     headers: {
       "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET, POST",
+      "Access-Control-Allow-Methods": "GET, POST, PATCH",
       "Access-Control-Allow-Headers": "authorization, content-type",
       "Access-Control-Max-Age": "600",
       Vary: "Origin",
@@ -293,9 +302,11 @@ export async function createSiteDrop(
   const folder = input.folder ?? null
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
+  await requireKeepSlot(ownerId, life, false, !folder)
+  const mode = modeFor(folder, event)
   const { share, publicUntil } = input.share
-    ? shareFields(input.share, { kind: "site" }, event)
-    : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+    ? shareFields(input.share, { kind: "site", team: mode === "team" }, event)
+    : { share: defaultShare(mode), publicUntil: null }
   return withDropQuota(ownerId, { drops: 1, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
     const host = siteHost(siteUrl)
@@ -330,6 +341,7 @@ export async function createSiteDrop(
       parentId: folder?.id ?? null,
       siteUrl,
       publishToken: null,
+      teamId: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     return row
@@ -347,21 +359,14 @@ function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | null {
 }
 
 /**
- * A review comment as multipart: `data` (JSON, ReviewCommentSchema) and an optional `screenshot`. Both the review
- * script on the site and Drop's own embedded review send it. The screenshot is checked by its bytes, not its claimed
- * type, and at most 4 MiB.
+ * A review comment as multipart: `data` (JSON, ReviewCommentSchema), an optional `screenshot`, and the `image`s the
+ * reviewer added. Both the review script on the site and Drop's own embedded review send it. Every file is checked by
+ * its bytes, not its claimed type, and at most 4 MiB.
  */
 export async function readReviewComment(
   event: H3Event,
-): Promise<{ input: ReviewCommentInput; shot: Screenshot | null }> {
-  if (Number(event.req.headers.get("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024)
-    throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
-  let form: FormData
-  try {
-    form = await event.req.formData()
-  } catch {
-    throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." })
-  }
+): Promise<{ input: ReviewCommentInput; shot: Screenshot | null; images: CommentImage[] }> {
+  const form = await readForm(event)
   const data = form.get("data")
   let input: ReviewCommentInput
   try {
@@ -370,8 +375,9 @@ export async function readReviewComment(
     throw new HTTPError({ status: 400, statusText: v.isValiError(error) ? error.message : "The comment is missing." })
   }
 
+  const images = await imagesOf(form)
   const file = form.get("screenshot")
-  if (file === null) return { input, shot: null }
+  if (file === null) return { input, shot: null, images }
   if (!(file instanceof File)) throw new HTTPError({ status: 400, statusText: "The screenshot must be a file." })
   if (file.size > MAX_FILE_BYTES)
     throw new HTTPError({ status: 413, statusText: "The screenshot exceeds the 4 MiB limit." })
@@ -379,7 +385,7 @@ export async function readReviewComment(
   const contentType = screenshotType(bytes)
   if (!contentType)
     throw new HTTPError({ status: 400, statusText: "The screenshot must be a PNG, JPEG, or WebP image." })
-  return { input, shot: { bytes, contentType } }
+  return { input, shot: { bytes, contentType }, images }
 }
 
 /**
@@ -389,9 +395,33 @@ export async function readReviewComment(
  *
  * The page's element is kept the same way in both: `label` holds its selector and `quote` its tag and text, which
  * the comment lists show. The comment's own `selector` is its anchor in Drop: the screenshot (`body > img` in the
- * image view), or the element itself on the site. `origin` is the page's, from its token.
+ * image view), or the element itself on the site. `origin` is the page's, from its token. `spot` is where on the
+ * element the pin goes, so the script can put it back on the live page. `images` are what the reviewer added, stored
+ * under the site like its screenshots.
  */
 export async function addReviewComment(
+  site: DropRow,
+  author: { who: Identity | null; name: string },
+  input: ReviewCommentInput,
+  shot: Screenshot | null,
+  origin: string,
+  images: CommentImage[] = [],
+) {
+  const { row } = await withImages(
+    images,
+    () => insertReviewComment(site, author, input, shot, origin),
+    (added) => attachImages(site, images, { commentId: added.id, replyId: null, n: added.n }, author.name),
+    async (added) => {
+      // With a screenshot, the comment is on the screenshot's drop: deleting that takes the comment with it.
+      const shotDrop = added.dropId === site.id ? null : await findDrop(added.dropId)
+      if (shotDrop) await deleteDrop(shotDrop)
+      else await db.delete(comments).where(eq(comments.id, added.id))
+    },
+  )
+  return row
+}
+
+async function insertReviewComment(
   site: DropRow,
   author: { who: Identity | null; name: string },
   input: ReviewCommentInput,
@@ -409,6 +439,8 @@ export async function addReviewComment(
     oh: input.oh,
     label: input.selector || null,
     quote: input.label || null,
+    elementX: input.selector && input.spot ? input.spot.x : null,
+    elementY: input.selector && input.spot ? input.spot.y : null,
     authorId: author.who?.userId ?? null,
     authorName: author.name,
     resolved: false,
@@ -434,50 +466,35 @@ export async function addReviewComment(
     { drops: 0, bytes: shot.bytes.byteLength, writes: 1 },
     undefined,
     async (quota) => {
-      const id = crypto.randomUUID()
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
       const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
       if (storageError) throw storageFailure(storageError)
       const path = input.page.replace(/[?#].*$/, "") || "/"
       const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
-      const image: DropRow = {
-        id,
-        ownerId: site.ownerId,
-        kind: "image",
-        title: `Screenshot of ${where}`.slice(0, 160),
-        filename: `screenshot.${EXTENSIONS[shot.contentType]}`,
-        blobKey: key,
-        contentType: shot.contentType,
-        size: shot.bytes.byteLength,
-        version: 1,
-        supersedesId: null,
-        link: newLink(),
-        slug: "screenshot",
-        share: "private",
-        publicUntil: null,
-        teamFolder: false,
-        shareReview: null,
-        quarantinedAt: null,
-        actorKind: "browser",
-        actorName: author.name,
-        createdAt: now,
-        updatedAt: now,
-        lastAccessedAt: now,
-        lifetime: "review",
-        keepReason: null,
-        note: `${input.viewport.width}x${input.viewport.height} viewport`,
-        trashedAt: null,
-        trashReason: null,
-        parentId: site.id,
-        siteUrl: null,
-        publishToken: null,
-      }
+      const image = imageDrop(
+        site,
+        {
+          key,
+          contentType: shot.contentType,
+          size: shot.bytes.byteLength,
+          filename: `screenshot.${EXTENSIONS[shot.contentType]}`,
+          title: `Screenshot of ${where}`,
+          note: `${input.viewport.width}x${input.viewport.height} viewport`,
+        },
+        author.name,
+        now,
+      )
+
       try {
         await quota.commit([
           db.insert(drops).values(image),
-          db
-            .insert(comments)
-            .values({ ...fields, dropId: id, n: nextCommentNumber(image), kind: "image", selector: "body > img" }),
+          db.insert(comments).values({
+            ...fields,
+            dropId: image.id,
+            n: nextCommentNumber(image),
+            kind: "image",
+            selector: "body > img",
+          }),
         ])
       } catch (error) {
         await blob.del([key])
@@ -496,29 +513,29 @@ export async function siteItems(
   origin: string,
   page?: string,
 ): Promise<SiteReviewItem[]> {
-  const rows = await db
-    .select({
-      comment: comments,
-      shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
-    })
-    .from(comments)
-    .innerJoin(drops, eq(drops.id, comments.dropId))
-    .where(
-      and(
-        sql`${comments.dropId} IN (${siteFamily(site.id)})`,
-        page
-          ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
-          : undefined,
-      ),
-    )
-    .orderBy(asc(comments.createdAt))
-    .limit(500)
-  const extras = await commentExtras(
-    rows.map((item) => item.comment),
-    siteFamily(site.id),
-  )
+  const [rows, extras] = await Promise.all([
+    db
+      .select({
+        comment: comments,
+        shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
+      })
+      .from(comments)
+      .innerJoin(drops, eq(drops.id, comments.dropId))
+      .where(
+        and(
+          sql`${comments.dropId} IN (${siteFamily(site.id)})`,
+          page
+            ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
+            : undefined,
+        ),
+      )
+      .orderBy(asc(comments.createdAt))
+      .limit(500),
+    commentExtras(siteFamily(site.id)),
+  ])
   return rows.reverse().map(({ comment, shot }) => ({
     ...toComment(comment, who, 1, extras),
+    spot: comment.elementX !== null && comment.elementY !== null ? { x: comment.elementX, y: comment.elementY } : null,
     screenshot:
       shot.kind === "image" && shot.blobKey
         ? {
@@ -529,4 +546,44 @@ export async function siteItems(
           }
         : null,
   }))
+}
+
+const reviewImages = (files: SiteReviewItem["attachments"]) => files.map(({ id, filename }) => ({ id, filename }))
+
+/**
+ * A site's threads as the review script shows them on the page (ReviewThread): no ids or links that would open the
+ * review in Drop, and images by the ids /api/review/images serves with the token.
+ */
+export function reviewThreads(site: DropRow, who: Identity | null, items: SiteReviewItem[]): ReviewThread[] {
+  const manage = permissions(site, who).manage
+  return items.map((item) => ({
+    n: item.n,
+    body: item.body,
+    author: { name: item.authorName, image: item.authorImage },
+    createdAt: item.createdAt,
+    resolved: item.resolved,
+    mine: item.mine,
+    canResolve: manage || item.mine,
+    page: item.page,
+    element: item.label ? { selector: item.label, label: item.quote } : null,
+    spot: item.spot,
+    box: { ox: item.ox, oy: item.oy, ow: item.ow, oh: item.oh },
+    screenshot: item.screenshot?.id ?? null,
+    images: reviewImages(item.attachments),
+    replies: item.replies.map((reply) => ({
+      author: { name: reply.authorName, image: reply.authorImage },
+      body: reply.body,
+      createdAt: reply.createdAt,
+      images: reviewImages(reply.attachments),
+    })),
+  }))
+}
+
+/**
+ * An image the review script may show: a screenshot sent from the site or an image in one of its threads. Both are
+ * the site's own children; anything else is no image of this review's.
+ */
+export async function reviewImage(site: Pick<DropRow, "id">, id: string) {
+  const image = await findDrop(id)
+  return image?.kind === "image" && image.parentId === site.id && image.blobKey ? image : null
 }

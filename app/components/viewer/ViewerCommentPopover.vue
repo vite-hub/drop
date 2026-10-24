@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // New comments: a one-line composer (Enter sends, Shift+Enter breaks). The selection stays highlighted
 // in the document, so the composer doesn't repeat it. Existing comments: the thread, Figma's way. A bar with the
-// number, Resolve, and a menu (Copy link, Delete); the comment and its replies; a reply box at the bottom.
+// number, Resolve, and a menu (Copy link, Delete); the comment and its replies; a reply box at the bottom. Both boxes
+// take images: from the image button, a paste, or a drop.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
@@ -15,20 +16,23 @@ const props = defineProps<{
   comment?: DropComment
   canManage: boolean
   canReply: boolean
+  draft?: string
+  draftError?: string
 }>()
 const emit = defineEmits<{
-  submit: [body: string]
+  submit: [body: string, files: File[]]
   cancel: []
   resolve: [id: string, resolved: boolean]
   delete: [id: string]
-  reply: [id: string, body: string]
+  reply: [id: string, body: string, files: File[]]
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
 }>()
-const body = ref("")
+const body = ref(props.draft ?? "")
 const busy = ref(false)
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
 // Why the last send failed, under the box that sent it; editing the text clears it.
-const error = ref<string>()
+const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
 const viewport = useWindowSize()
 const card = useTemplateRef("card")
@@ -41,21 +45,31 @@ const style = computed(() => {
   return { left: `${left}px`, top: `${top}px`, width: `${width.value}px` }
 })
 
+function escape(event: KeyboardEvent) {
+  if (!body.value.trim()) return emit("cancel")
+  if (event.target instanceof HTMLElement) event.target.blur()
+}
+let typing = false
+const press = () => (typing = Boolean(body.value.trim() && card.value?.contains(document.activeElement)))
+const clickAway = () => typing || emit("cancel")
+
 function send() {
   if (!body.value.trim() || busy.value) return
   busy.value = true
-  if (props.comment) emit("reply", props.comment.id, body.value)
-  else emit("submit", body.value)
+  if (props.comment) emit("reply", props.comment.id, body.value, files.value)
+  else emit("submit", body.value, files.value)
 }
 defineExpose({
-  fail: (reason?: string) => {
+  fail: (reason?: string, text?: string) => {
     busy.value = false
+    if (text && !body.value) body.value = text
     error.value = reason
   },
   /** A reply went through: clear the box for the next one, and show it at the bottom of the thread. */
   sent: async () => {
     busy.value = false
     body.value = ""
+    clear()
     await nextTick()
     thread.value?.scrollTo({ top: thread.value.scrollHeight, behavior: "smooth" })
   },
@@ -86,7 +100,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
-  <div class="fixed inset-0 z-40" @click="emit('cancel')" />
+  <div class="fixed inset-0 z-40" @click="clickAway" @pointerdown="press" />
   <div
     ref="card"
     class="fixed z-50 flex origin-top-left flex-col overflow-hidden rounded-xl border border-default bg-default text-default shadow-lg shadow-black/5 [animation:pop-in_160ms_var(--ease-out)]"
@@ -94,7 +108,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     :style="style"
   >
     <template v-if="pending">
-      <div class="flex items-end gap-2">
+      <div class="flex items-end gap-1" @dragover.prevent @drop="drop">
         <UTextarea
           v-model="body"
           aria-label="Comment"
@@ -109,8 +123,19 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc="emit('cancel')"
+          @keydown.esc.stop="escape"
+          @paste="paste"
         />
+        <UTooltip text="Add images">
+          <UButton
+            aria-label="Add images"
+            class="size-8 justify-center rounded-full"
+            color="neutral"
+            icon="i-mingcute-pic-line"
+            variant="ghost"
+            @click="pickImages"
+          />
+        </UTooltip>
         <UButton
           aria-label="Send comment"
           class="size-8 justify-center rounded-full"
@@ -121,7 +146,8 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           @click="send"
         />
       </div>
-      <p v-if="error" class="px-1 pt-1 pb-0.5 text-xs text-error" role="alert">{{ error }}</p>
+      <ViewerImagePicks class="px-1 pt-1" :picks="picks" @remove="remove" />
+      <p v-if="error || problem" class="px-1 pt-1 pb-0.5 text-xs text-error" role="alert">{{ error || problem }}</p>
     </template>
     <template v-else-if="comment">
       <div class="flex h-10 shrink-0 items-center gap-1 border-b border-default pr-1.5 pl-3">
@@ -158,6 +184,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             {{ comment.quote }}
           </p>
           <p class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
+          <ViewerCommentImages :attachments="comment.attachments" />
         </div>
         <div v-for="reply in comment.replies" :key="reply.id" class="group space-y-1.5 px-3 py-3">
           <div class="flex items-center gap-2">
@@ -176,10 +203,18 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             />
           </div>
           <p class="text-sm whitespace-pre-wrap">{{ reply.body }}</p>
+          <ViewerCommentImages :attachments="reply.attachments" />
         </div>
       </div>
 
-      <div v-if="canReply" class="flex shrink-0 items-end gap-2 border-t border-default p-1.5 pl-2.5">
+      <ViewerImagePicks v-if="canReply" class="border-t border-default px-2.5 pt-1.5" :picks="picks" @remove="remove" />
+      <div
+        v-if="canReply"
+        class="flex shrink-0 items-end gap-1 p-1.5 pl-2.5"
+        :class="picks.length ? '' : 'border-t border-default'"
+        @dragover.prevent
+        @drop="drop"
+      >
         <UTextarea
           v-model="body"
           aria-label="Reply"
@@ -193,7 +228,18 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           variant="none"
           @keydown.enter.exact.prevent="send"
           @keydown.esc="emit('cancel')"
+          @paste="paste"
         />
+        <UTooltip text="Add images">
+          <UButton
+            aria-label="Add images"
+            class="size-8 justify-center rounded-full"
+            color="neutral"
+            icon="i-mingcute-pic-line"
+            variant="ghost"
+            @click="pickImages"
+          />
+        </UTooltip>
         <UButton
           aria-label="Send reply"
           class="size-8 justify-center rounded-full"
@@ -204,7 +250,9 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           @click="send"
         />
       </div>
-      <p v-if="canReply && error" class="px-3 pb-2 text-xs text-error" role="alert">{{ error }}</p>
+      <p v-if="canReply && (error || problem)" class="px-3 pb-2 text-xs text-error" role="alert">
+        {{ error || problem }}
+      </p>
     </template>
   </div>
 </template>

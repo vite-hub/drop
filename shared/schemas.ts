@@ -10,6 +10,11 @@ import { SHARES } from "./share"
 /** 4 MiB: the most one doc or file may weigh. Apps have their own limit, MAX_APP_BYTES. */
 export const MAX_FILE_BYTES = 4 * MIB
 
+/** Images one comment or reply may carry, each at most MAX_FILE_BYTES. */
+export const MAX_COMMENT_IMAGES = 4
+/** The image types a comment takes: what browsers paste and screenshot tools save. */
+export const COMMENT_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const
+
 export const NewDocSchema = v.object({
   filename: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
   content: v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES, "The file exceeds the 4 MiB limit.")),
@@ -52,6 +57,8 @@ export const FolderSchema = v.object({
   ),
   /** A team folder: on a team Drop, admins only. */
   team: v.optional(v.boolean()),
+  /** On a personal Drop with teams: the team it's for, whose owner and admins make its folders. */
+  teamId: v.optional(v.pipe(v.string(), v.maxLength(100))),
   /** The folder to create it in, by id or link. */
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
@@ -90,7 +97,11 @@ export const CommentSchema = v.pipe(
     (input) => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000,
     "The area must stay inside its anchor.",
   ),
-  v.check((input) => input.kind !== "area" || (input.ow > 0 && input.oh > 0), "An area needs a width and a height."),
+  // A spot on an element (the Comment tool's click) has neither.
+  v.check(
+    (input) => input.kind !== "area" || input.ow > 0 === input.oh > 0,
+    "An area needs both a width and a height.",
+  ),
   v.check(
     (input) =>
       input.kind !== "page" || (!input.selector && !input.ox && !input.oy && !input.ow && !input.oh && !input.quote),
@@ -112,6 +123,8 @@ export const ReviewCommentSchema = v.pipe(
     oy: thousandths,
     ow: thousandths,
     oh: thousandths,
+    /** Where the pin sits on the element, in thousandths of its box. */
+    spot: v.optional(v.object({ x: thousandths, y: thousandths })),
     viewport: v.object({
       width: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20_000)),
       height: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20_000)),

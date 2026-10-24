@@ -57,6 +57,8 @@ export interface DropSummary {
   ownShare?: Share
   /** Folders the team keeps: everyone adds to them; admins name, describe, and share them. */
   teamFolder?: boolean
+  /** On a personal Drop with teams: the team whose folders hold it, which its team shares reach. */
+  team?: string
   /** Folders: how many drops are directly inside. */
   items?: number
   /** Images in a folder or a search: where the file is served, for a thumbnail. */
@@ -171,9 +173,11 @@ export interface DropComment {
   mine: boolean
   /** The thread under it, oldest first. */
   replies: CommentReply[]
+  /** Images sent with it. */
+  attachments: CommentAttachment[]
 }
 
-/** A reply in a comment's thread: words only, the comment keeps the anchor and the resolved state. */
+/** A reply in a comment's thread: words and images; the comment keeps the anchor and the resolved state. */
 export interface CommentReply {
   id: string
   body: string
@@ -181,6 +185,17 @@ export interface CommentReply {
   authorImage: string | null
   createdAt: number
   mine: boolean
+  attachments: CommentAttachment[]
+}
+
+/** An image someone sent with a comment or a reply. It's a drop of its own under the commented drop. */
+export interface CommentAttachment {
+  id: string
+  filename: string
+  contentType: string
+  size: number
+  /** Where Drop serves it, relative to Drop's origin (`/f/<key>`), for whoever may view the drop. */
+  url: string
 }
 
 /**
@@ -190,6 +205,37 @@ export interface CommentReply {
 export interface SiteReviewItem extends DropComment {
   /** The screenshot's own drop, which shows the box and takes replies. Null when the page couldn't take one. */
   screenshot: { id: string; link: string; slug: string; url: string } | null
+  /** Where the pin sits on the element `label` names, in thousandths of its box. Null without an element. */
+  spot: { x: number; y: number } | null
+}
+
+/**
+ * A thread as the review script shows it on the site's page: what Drop's own lists show, minus anything that would
+ * open the review in Drop (ids, links). Images come from /api/review/images/<id> with the review token.
+ */
+export interface ReviewThread {
+  n: number
+  body: string
+  author: { name: string; image: string | null }
+  createdAt: number
+  resolved: boolean
+  mine: boolean
+  /** Its author and the site's managers may resolve it, as in Drop. */
+  canResolve: boolean
+  page: string | null
+  /** The element under the box: its CSS path and its name, as the page sent them. */
+  element: { selector: string; label: string | null } | null
+  spot: { x: number; y: number } | null
+  /** The box, in thousandths of the viewport it was drawn in. */
+  box: { ox: number; oy: number; ow: number; oh: number }
+  screenshot: string | null
+  images: { id: string; filename: string }[]
+  replies: {
+    author: { name: string; image: string | null }
+    body: string
+    createdAt: number
+    images: { id: string; filename: string }[]
+  }[]
 }
 
 export interface Member {
@@ -237,6 +283,22 @@ export interface Viewer {
   /** Days a public link stays open before it closes (null: until changed, 0: public links are off). */
   publicLinkDays: number | null
   members: number
+  /** How many skills are on: agents get them over MCP, and members see Skills only while one is. */
+  skills: number
   /** Admins only: public shares waiting for their review (/admin/review). */
   reviews?: number
+  /** On a personal Drop with `DROP_TEAMS`: the teams they're on. Absent when teams are off. */
+  teams?: ViewerTeam[]
+  /** Teams pay through Stripe here (`STRIPE_*`): past `freeMembers`, a team needs a subscription. */
+  billing?: { freeMembers: number; annual: boolean }
+  /** They're on a team that pays: the Pro plan. */
+  paid?: boolean
+}
+
+interface ViewerTeam {
+  id: string
+  name: string
+  slug: string
+  role: "owner" | "admin" | "member"
+  paid: boolean
 }

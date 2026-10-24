@@ -65,13 +65,20 @@ export function resourceList(input: v.InferOutput<typeof ResourcesInput>): DropR
 
 /** A drop's links, the same on every version. */
 export async function resourcesOf(row: Linked): Promise<DropResource[]> {
-  try {
-    await ensureTable()
-    const rows = await db
+  const read = () =>
+    db
       .select({ url: dropResources.url, title: dropResources.title })
       .from(dropResources)
       .where(eq(dropResources.link, row.link ?? row.id))
       .orderBy(asc(dropResources.position))
+  try {
+    // A read doesn't wait for the table's statements: it creates the table only when it finds none.
+    const rows = await read().catch(async (error: unknown) => {
+      // Drizzle wraps the database's error, which names the missing table, as its cause.
+      if (!/no such table/i.test(`${String(error)} ${error instanceof Error ? String(error.cause) : ""}`)) throw error
+      await ensureTable()
+      return read()
+    })
     return rows.map(({ url, title }) => ({ url, ...(title ? { title } : {}) }))
   } catch (error) {
     // A drop's page still opens without them.

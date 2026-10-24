@@ -16,6 +16,8 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
   v.object({ type: v.literal("copy"), text: v.string() }),
+  // The /f/ paths of a Markdown doc's images that came near the screen (DEFERRED_IMAGES_SCRIPT in ./documents).
+  v.object({ type: v.literal("images"), paths: v.pipe(v.array(v.string()), v.maxLength(100)) }),
   // A cleared selection carries nothing else.
   v.variant("clear", [
     v.object({ type: v.literal("selection"), clear: v.literal(true) }),
@@ -48,9 +50,21 @@ export const FrameMessage = v.variant("type", [
     oh: v.number(),
     rect: Rect,
   }),
-  v.object({ type: v.literal("marker"), id: v.string(), clientX: v.number(), clientY: v.number() }),
+  // A click on a pin, or (`focused`) the pin a "focus" with `open` scrolled to.
+  v.object({
+    type: v.literal("marker"),
+    id: v.string(),
+    clientX: v.number(),
+    clientY: v.number(),
+    focused: v.optional(v.boolean()),
+  }),
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
-  v.object({ type: v.literal("key"), key: v.picklist(["Escape", "r"]) }),
+  // The toolbar's keys, pressed while the page had focus, with the tool it was under (apps keep their keys under Browse).
+  v.object({
+    type: v.literal("key"),
+    key: v.picklist(["Escape", "v", "r", "s", "u", "x"]),
+    tool: v.optional(v.picklist(["browse", "comment", "measure"])),
+  }),
   v.object({
     type: v.literal("runtime-error"),
     kind: RuntimeErrorKind,

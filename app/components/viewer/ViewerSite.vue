@@ -6,8 +6,7 @@ import { dropPath } from "#shared/links"
 import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
 import type { DropDetail, SiteReviewItem } from "#shared/types"
 
-/** `inset`: room to leave on the right for the floating panel, in pixels. */
-const props = defineProps<{ drop: DropDetail; publicView: boolean; inset: number }>()
+const props = defineProps<{ drop: DropDetail; publicView: boolean }>()
 
 const state = injectDrop()!
 const items = useApi<SiteReviewItem[]>(() => `/api/drops/${props.drop.id}/review`, {
@@ -93,12 +92,9 @@ const box = (item: SiteReviewItem) => ({
 </script>
 
 <template>
-  <ViewerSiteFrame v-if="framed" :address="framed" :drop="drop" :inset="inset" @close="framed = null" />
+  <ViewerSiteFrame v-if="framed" :address="framed" :drop="drop" @close="framed = null" />
   <div v-else class="min-h-0 flex-1 overflow-y-auto">
-    <div
-      class="mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6"
-      :style="{ paddingRight: inset ? `${inset}px` : undefined }"
-    >
+    <div class="mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6">
       <section class="space-y-3">
         <p class="label-mono">Site</p>
         <div class="flex flex-wrap items-center gap-3">
@@ -249,6 +245,7 @@ const box = (item: SiteReviewItem) => ({
               <ViewerCommentHeader :comment="{ ...item, resolved: resolved(item) }" />
               <p v-if="item.quote" class="truncate font-mono text-xs text-muted">{{ item.quote }}</p>
               <p class="line-clamp-3 text-sm">{{ item.body }}</p>
+              <ViewerCommentImages :attachments="item.attachments" />
               <div class="flex items-center gap-3 text-xs">
                 <span v-if="resolved(item)" class="text-muted">Resolved</span>
                 <ULink

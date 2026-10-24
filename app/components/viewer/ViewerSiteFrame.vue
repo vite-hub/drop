@@ -3,11 +3,11 @@
 // over the frame and screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
 // so a comment carries the screenshot, the box, and the address typed above, never the element under the box. Comments
 // are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way.
+// The page can show at a device's size (ViewerDevice), and the comment then says that size, not the scaled one.
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-/** `inset`: room to leave on the right for the floating panel, in pixels. */
-const props = defineProps<{ drop: DropDetail; address: string; inset: number }>()
+const props = defineProps<{ drop: DropDetail; address: string }>()
 const emit = defineEmits<{ close: [] }>()
 
 const notify = useNotify()
@@ -64,11 +64,14 @@ async function comment() {
   drawing.value = true
 }
 
+// In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
-  const rect = stage.value!.getBoundingClientRect()
+  const el = stage.value!
+  const rect = el.getBoundingClientRect()
+  const scale = rect.width / (el.offsetWidth || rect.width)
   return {
-    x: Math.min(Math.max(event.clientX - rect.left, 0), rect.width),
-    y: Math.min(Math.max(event.clientY - rect.top, 0), rect.height),
+    x: Math.min(Math.max((event.clientX - rect.left) / scale, 0), el.offsetWidth),
+    y: Math.min(Math.max((event.clientY - rect.top) / scale, 0), el.offsetHeight),
   }
 }
 function down(event: PointerEvent) {
@@ -90,20 +93,42 @@ async function up() {
   const drawn = box.value
   from = null
   if (!drawn || drawn.width < 8 || drawn.height < 8) return (box.value = null)
-  const rect = stage.value!.getBoundingClientRect()
+  const el = stage.value!
+  const rect = el.getBoundingClientRect()
+  const scale = rect.width / (el.offsetWidth || rect.width)
+  // A zoomed device page can extend beyond the browser viewport. Keep the image crop and normalized box in the same
+  // visible page coordinate space instead of recording coordinates relative to the clipped, full-size stage.
+  const visible = {
+    left: Math.max(0, rect.left),
+    top: Math.max(0, rect.top),
+    right: Math.min(innerWidth, rect.right),
+    bottom: Math.min(innerHeight, rect.bottom),
+  }
+  const crop = {
+    left: Math.max(0, (visible.left - rect.left) / scale),
+    top: Math.max(0, (visible.top - rect.top) / scale),
+    width: Math.max(0, (visible.right - visible.left) / scale),
+    height: Math.max(0, (visible.bottom - visible.top) / scale),
+  }
+  if (crop.width < 1 || crop.height < 1) return (box.value = null)
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
   drawing.value = false
   box.value = null
   await nextTick()
   await new Promise(requestAnimationFrame)
   try {
-    const blob = await capture.grab({ left: rect.left, top: rect.top, width: rect.width, height: rect.height })
+    const blob = await capture.grab({
+      left: visible.left,
+      top: visible.top,
+      width: visible.right - visible.left,
+      height: visible.bottom - visible.top,
+    })
     const url = new URL(open.value)
     pending.value = {
       blob,
       url: URL.createObjectURL(blob),
-      box: drawn,
-      size: { width: Math.round(rect.width), height: Math.round(rect.height) },
+      box: { left: drawn.left - crop.left, top: drawn.top - crop.top, width: drawn.width, height: drawn.height },
+      size: { width: crop.width, height: crop.height },
       page: (url.pathname + url.search + url.hash).slice(0, 1000),
       origin: url.origin,
     }
@@ -112,10 +137,14 @@ async function up() {
   }
 }
 
+// Images the reviewer adds beside the screenshot: from the button, a paste, or a drop on the form.
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop: dropImages } = useImagePicks()
+
 function discard() {
   if (pending.value) URL.revokeObjectURL(pending.value.url)
   pending.value = null
   note.value = ""
+  clear()
 }
 
 // The box in thousandths of the screenshot, as every review comment stores it.
@@ -142,6 +171,7 @@ async function send() {
     }),
   )
   form.append("screenshot", shot.blob, "screenshot")
+  for (const file of files.value) form.append("image", file, file.name || "image")
   sending.value = true
   try {
     await sendSiteComment(props.drop.id, shot.origin, form)
@@ -165,7 +195,7 @@ onBeforeUnmount(discard)
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col" :style="{ paddingRight: inset ? `${inset}px` : undefined }">
+  <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex h-12 shrink-0 items-center gap-2 border-b border-default px-3">
       <UButton
         color="neutral"
@@ -186,6 +216,7 @@ onBeforeUnmount(discard)
           spellcheck="false"
         />
       </form>
+      <ViewerDeviceButton />
       <UButton
         color="neutral"
         :variant="drawing ? 'solid' : 'outline'"
@@ -205,40 +236,51 @@ onBeforeUnmount(discard)
       Check it before you send.
     </p>
 
-    <div ref="stage" class="relative min-h-0 flex-1 bg-muted">
-      <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
-           dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
-      <iframe
-        :key="open"
-        class="absolute inset-0 size-full border-0 bg-white"
-        referrerpolicy="strict-origin"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
-        :src="open"
-        :title="`${drop.title}: the site under review`"
-      />
-      <div
-        v-if="drawing"
-        class="absolute inset-0 cursor-crosshair touch-none bg-inverted/5"
-        @pointerdown="down"
-        @pointermove="move"
-        @pointerup="up"
-      >
-        <div
-          v-if="box"
-          class="absolute rounded-sm border-2 border-inverted bg-inverted/10"
-          :style="{ left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` }"
-        />
-        <p
-          v-else
-          class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
-        >
-          Drag over what you mean. <UKbd value="escape" /> cancels.
-        </p>
-      </div>
+    <div class="relative flex min-h-0 flex-1 flex-col bg-muted">
+      <ViewerDevice :bottom="24" on>
+        <div ref="stage" class="relative min-h-0 flex-1">
+          <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
+               dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
+          <iframe
+            :key="open"
+            class="absolute inset-0 size-full border-0 bg-white"
+            referrerpolicy="strict-origin"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
+            :src="open"
+            :title="`${drop.title}: the site under review`"
+          />
+          <div
+            v-if="drawing"
+            class="absolute inset-0 cursor-crosshair touch-none bg-inverted/5"
+            @pointerdown="down"
+            @pointermove="move"
+            @pointerup="up"
+          >
+            <div
+              v-if="box"
+              class="absolute rounded-sm border-2 border-inverted bg-inverted/10"
+              :style="{
+                left: `${box.left}px`,
+                top: `${box.top}px`,
+                width: `${box.width}px`,
+                height: `${box.height}px`,
+              }"
+            />
+            <p
+              v-else
+              class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
+            >
+              Drag over what you mean. <UKbd value="escape" /> cancels.
+            </p>
+          </div>
+        </div>
+      </ViewerDevice>
 
       <form
         v-if="pending"
-        class="absolute right-4 bottom-4 w-80 space-y-3 rounded-lg border border-default bg-default p-3 shadow-lg"
+        class="absolute right-4 bottom-18 z-30 w-80 max-w-[calc(100%-2rem)] space-y-3 rounded-lg border border-default bg-default p-3 shadow-lg"
+        @dragover.prevent
+        @drop="dropImages"
         @submit.prevent="send"
       >
         <div class="relative overflow-hidden rounded-md border border-default">
@@ -263,8 +305,21 @@ onBeforeUnmount(discard)
           :rows="3"
           @keydown.meta.enter="send"
           @keydown.ctrl.enter="send"
+          @paste="paste"
         />
+        <ViewerImagePicks :picks="picks" @remove="remove" />
+        <p v-if="problem" class="text-xs text-error" role="alert">{{ problem }}</p>
         <div class="flex justify-end gap-2">
+          <UTooltip text="Add images">
+            <UButton
+              aria-label="Add images"
+              class="mr-auto"
+              color="neutral"
+              icon="i-mingcute-pic-line"
+              variant="ghost"
+              @click="pickImages"
+            />
+          </UTooltip>
           <UButton color="neutral" label="Cancel" variant="ghost" @click="discard" />
           <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
         </div>

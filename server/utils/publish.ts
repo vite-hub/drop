@@ -7,7 +7,7 @@ import { reviewBookmarklet, reviewSnippet } from "#shared/review"
 import { SHARES } from "#shared/share"
 import { BoardInput } from "../mcp/board"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
-import { applyChanges, boardChanges, emptyBoard } from "#shared/board"
+import { applyChanges, boardChanges, emptyBoard, serializeBoard } from "#shared/board"
 import { resolveComments } from "./comments"
 import {
   createDocDrop,
@@ -22,7 +22,7 @@ import {
 import { updateDrop } from "./drop-update"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
-import { annotationIssues } from "./markdown-document"
+import { markdownIssues } from "./markdown-document"
 import { createSiteDrop } from "./review"
 import { unpackApp } from "./app-archive"
 import { perDropOrigins } from "./content-origin"
@@ -309,23 +309,25 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         throw new HTTPError({ status: 400, message: "previous isn't a board; publish a board only to a board." })
       const board = emptyBoard()
       try {
-        const { put, remove } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
-        applyChanges(board, put, remove)
+        const { put } = boardChanges(board, { add: input.board.items, edges: input.board.edges }, who.actorName)
+        applyChanges(board, put)
       } catch (error) {
         throw new HTTPError({ status: 400, message: error instanceof Error ? error.message : String(error) })
       }
-      filename = "board.tldr"
-      bytes = new TextEncoder().encode(JSON.stringify(board))
+      filename = "board.excalidraw"
+      bytes = new TextEncoder().encode(serializeBoard(board))
     } else {
       const source = (input.markdown ?? input.html)!
       if (!source.trim()) throw new HTTPError({ status: 400, message: "The doc is empty." })
-      // A broken annotated screenshot would render with marks in the wrong place; send the agent back to fix it.
-      const issues = input.markdown ? await annotationIssues(source) : []
-      if (issues.length)
+      // A broken annotated screenshot would render with marks in the wrong place; send the agent back to fix it. Other
+      // blocks show their problem in the doc, so they publish, and the agent hears about them.
+      const issues = input.markdown ? await markdownIssues(source) : { annotations: [], blocks: [] }
+      if (issues.annotations.length)
         throw new HTTPError({
           status: 400,
-          message: `Fix the annotated screenshots and publish again:\n${issues.map((issue) => `- ${issue}`).join("\n")}`,
+          message: `Fix the annotated screenshots and publish again:\n${issues.annotations.map((issue) => `- ${issue}`).join("\n")}`,
         })
+      warnings = issues.blocks
       // An HTML doc is one file, so anything it loads by relative path is missing.
       if (input.html)
         warnings = appLinkIssues({ "doc.html": input.html }, ["doc.html"]).filter(
@@ -368,8 +370,11 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
+  const lead = input.markdown
+    ? "These blocks have problems, which the doc shows to its readers."
+    : `These references point at nothing in the ${input.files ? "app" : "page"}.`
   const check = warnings.length
-    ? `\n\nThese references point at nothing in the ${input.files ? "app" : "page"}. Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
+    ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
     : ""
   return {
     text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${check}`,

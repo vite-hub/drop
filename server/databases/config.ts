@@ -1,13 +1,16 @@
-// Better Auth tables (user, session, account, verification), its OAuth provider's (./oauth.ts), and Drop's own (./drops.ts).
+// Better Auth tables (user, session, account, verification), its OAuth provider's (./oauth.ts), its teams and billing
+// (./teams.ts), and Drop's own (./drops.ts).
 import { defineDatabase } from "vite-hub/database"
 import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 import { quotaBlobs, quotaReservations } from "./quotas"
 import { abuseReports } from "./trust"
 import { skillSettings } from "./skills"
+import { invitation, member, organization, subscription } from "./teams"
 import {
   blobCleanup,
   codeImages,
+  commentAttachments,
   commentReplies,
   comments,
   dropFiles,
@@ -44,6 +47,7 @@ export const user = sqliteTable("user", {
   banned: integer("banned", { mode: "boolean" }).default(false),
   banReason: text("ban_reason"),
   banExpires: integer("ban_expires", { mode: "timestamp_ms" }),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),
@@ -68,6 +72,7 @@ export const session = sqliteTable(
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     impersonatedBy: text("impersonated_by"),
+    activeOrganizationId: text("active_organization_id"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -120,12 +125,17 @@ export const verification = sqliteTable(
 )
 
 export {
+  invitation,
+  member,
+  organization,
+  subscription,
   quotaBlobs,
   quotaReservations,
   abuseReports,
   skillSettings,
   blobCleanup,
   codeImages,
+  commentAttachments,
   commentReplies,
   comments,
   dropFiles,
@@ -153,6 +163,7 @@ export default defineDatabase({
     account,
     blobCleanup,
     codeImages,
+    commentAttachments,
     commentReplies,
     comments,
     dropFiles,
@@ -164,7 +175,9 @@ export default defineDatabase({
     dropViews,
     dropVisits,
     workspaceStats,
+    invitation,
     jwks,
+    member,
     oauthAccessToken,
     oauthClient,
     oauthClientAssertion,
@@ -172,7 +185,9 @@ export default defineDatabase({
     oauthConsent,
     oauthRefreshToken,
     oauthResource,
+    organization,
     session,
+    subscription,
     user,
     verification,
   },
