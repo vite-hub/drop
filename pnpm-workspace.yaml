@@ -41,6 +41,10 @@ patchedDependencies:
   # originalOf, which Drop's frame runtime anchors comments in the zoom with). Drop both once a release has #25 and #15.
   comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
   comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
+  # The Nuxt module aliased @vite-hub/database/runtime/state to ViteHub's own re-export of it, which imports that
+  # specifier, so the bundled module imported itself and every request failed with "runWithDatabaseRequest is not a
+  # function". The alias names @vite-hub/database's file instead.
+  vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
   # Deno's package copier sees mdream's architecture branches even when those native packages are not published.
 
 # Only workerd (local Workers runtime) needs its install script.
