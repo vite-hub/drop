@@ -34,6 +34,7 @@ Split the change into boards, one per thing a reviewer should notice. Each board
 
 - a `##` heading that says what the change does, as a claim: "Lead with what actually failed.", not "Error screen";
 - a `::compare` of before and after, or one `::screenshot` when a single state shows it;
+- a `::diff`, when the code is the point. See [Code changes](#code-changes).
 - inside each screenshot, after its annotations, one sentence on the state it shows, which becomes its caption.
 
 Leave `color` and `ink` off: the default violet reads on light and dark screenshots alike, and one ink is the point. Each annotation is a side note in the margin above or below the image, `side="top"` or `"bottom"`, whichever is nearer its point. Use `mark="none"` with `to` on the exact spot, so the arrow does the pointing and nothing covers the screen. Set the note off with `at`, a tenth of the image or more from its point, so its arrow sweeps in; a top or bottom note reads away from its point, so give it room on that side. Use `mark="bracket"` for a run of rows or a group, and `circle` or `underline` only when the area itself is the point. Left and right notes only work on a single screenshot; in a compare they fall back to the numbered list.
@@ -71,6 +72,10 @@ Before writing a mark, read [references/annotations.md](references/annotations.m
 Above the first board, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `href`, not in the text. Beyond the headings and captions, no tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
 
 The doc shows the change; how the work went (the checks you ran, retries, CI counts, who has reviewed) belongs in your report to the user. When you're asked to put that report in the doc, end it with one `## For <name>` section of at most five bullets: the verdict first (ready, or blocked and why), the cause in one sentence, each decision they have to make as a question, and anything you couldn't check. A side question gets its answer in one line there.
+
+### Code changes
+
+A `::diff` shows one file's lines before and after, the way a review shows a suggested change. Copy the lines from the pull request's diff, a few around the change, and set `line` to where they start in the file, so a reviewer can find them. One diff shows one file: a change that adds a component and uses it is two diffs, the new file first with an empty before block. When the same change repeats across files, show one of them and name the others in the line above it, like "The same change in Forecast, Alerts, and 11 more pages." That line also says what the change does. The syntax is in [references/annotations.md](references/annotations.md#diff).
 
 ## Publish
 
