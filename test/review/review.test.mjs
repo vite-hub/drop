@@ -12,6 +12,11 @@ const { default: openPost } = await import("../../server/api/review/open.post.ts
 const { default: commentsPost } = await import("../../server/api/review/comments.post.ts")
 const { default: commentsGet } = await import("../../server/api/review/comments.get.ts")
 const { default: preflight } = await import("../../server/api/review/comments.options.ts")
+const { default: threadPatch } = await import("../../server/api/review/comments/[n].patch.ts")
+const { default: threadReply } = await import("../../server/api/review/comments/[n]/replies.post.ts")
+const { default: reviewImageGet } = await import("../../server/api/review/images/[id].get.ts")
+const { default: commentDelete } = await import("../../server/api/comments/[id]/index.delete.ts")
+const { default: replyPost } = await import("../../server/api/comments/[id]/replies.post.ts")
 const { default: newSite } = await import("../../server/api/sites.post.ts")
 const { default: newFolder } = await import("../../server/api/folders.post.ts")
 const { default: reviewList } = await import("../../server/api/drops/[id]/review.get.ts")
@@ -45,10 +50,10 @@ const site = (id = "site", overrides = {}) =>
     ...overrides,
   })
 
-function request(path, { method = "GET", headers = {}, body, id = "site" } = {}) {
+function request(path, { method = "GET", headers = {}, body, id = "site", params = {} } = {}) {
   const event = new H3Event(new Request(`https://drop.example${path}`, { method, headers, body }))
   event.context.log = { set() {}, error() {}, warn() {} }
-  event.context.params = { id }
+  event.context.params = { id, ...params }
   return event
 }
 const post = (path, body) =>
@@ -75,7 +80,7 @@ async function token(origin = SITE, { name, pick = 0 } = {}) {
   return { status: response.status, body: await json(response) }
 }
 
-function comment(bearer, data, { screenshot, origin = SITE } = {}) {
+function comment(bearer, data, { screenshot, images = [], origin = SITE } = {}) {
   const form = new FormData()
   form.append(
     "data",
@@ -93,6 +98,7 @@ function comment(bearer, data, { screenshot, origin = SITE } = {}) {
     }),
   )
   if (screenshot) form.append("screenshot", new Blob([screenshot]), "screenshot")
+  for (const image of images) form.append("image", new Blob([image]), "pasted.png")
   return answer(
     commentsPost,
     request("/api/review/comments", {
@@ -541,9 +547,15 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   assert.equal(items[2].screenshot.url, `https://drop.example/f/${image.blob_key}`)
   assert.equal(items[1].screenshot, null)
 
-  // The toolbar's count for one page, hash or not: a number, not the comments.
+  // The toolbar's threads for one page, hash or not, with nothing that opens the review in Drop.
   state.who = null
-  assert.deepEqual(await json(await count(body.token, "/pricing?plan=pro")), { open: 1 })
+  const page = await json(await count(body.token, "/pricing?plan=pro"))
+  assert.equal(page.open, 1)
+  assert.deepEqual(
+    page.threads.map((thread) => [thread.n, thread.element, thread.screenshot === image.id]),
+    [[1, { selector: "main > button", label: 'button "Buy"' }, true]],
+  )
+  assert.doesNotMatch(JSON.stringify(page), /sitelink|"site"|\/d\//, "no link or id of the review")
 })
 
 test("comments on a pattern keep the origin of the preview they came from", async () => {
@@ -566,8 +578,8 @@ test("comments on a pattern keep the origin of the preview they came from", asyn
     sql.prepare("SELECT title FROM drops WHERE kind = 'image'").get().title,
     "Screenshot of pr12-acme.preview.quiver.dk/pricing",
   )
-  assert.deepEqual(await json(await count(pr12, "/pricing?plan=pro")), { open: 1 }, "each preview counts its own")
-  assert.deepEqual(await json(await count(pr13, "/pricing", "https://pr13-acme.preview.quiver.dk")), { open: 1 })
+  assert.equal((await json(await count(pr12, "/pricing?plan=pro"))).open, 1, "each preview counts its own")
+  assert.equal((await json(await count(pr13, "/pricing", "https://pr13-acme.preview.quiver.dk"))).open, 1)
 })
 
 /** A comment from Drop's embedded review: the signed-in reviewer, the address open in the frame, and a capture. */
@@ -757,4 +769,130 @@ test("review.js is one cacheable script with no key, inert until someone presses
   assert.match(bookmarklet, /^javascript:\(function\(\)\{.*\}\)\(\)$/)
   assert.match(bookmarklet, /"https:\/\/drop\.example\/review\.js"/)
   assert.doesNotThrow(() => new Function(bookmarklet.slice("javascript:".length)))
+})
+
+test("the page shows its threads where they were left: element, spot, replies, images, and resolving by the token", async () => {
+  site()
+  state.who = ada
+  const ada_ = (await token(SITE)).body.token
+  state.who = null
+  const ole = (await token(SITE, { name: "Ole" })).body.token
+  const sent = await comment(ada_, { spot: { x: 250, y: 500 } }, { screenshot: PNG, images: [PNG] })
+  assert.equal(sent.status, 200, await sent.clone().text())
+
+  const [thread] = (await json(await count(ole, "/pricing?plan=pro"))).threads
+  assert.deepEqual(thread.spot, { x: 250, y: 500 })
+  assert.equal(thread.author.name, "Ada")
+  assert.equal(thread.images.length, 1)
+  assert.equal(thread.canResolve, false, "a guest resolves nothing")
+  const asAda = (await json(await count(ada_, "/pricing?plan=pro"))).threads[0]
+  assert.equal(asAda.canResolve, true, "its author may")
+
+  // Images come with the token, from the site's own children only.
+  const image = (id, bearer = ole) =>
+    answer(
+      reviewImageGet,
+      request(`/api/review/images/${id}`, { headers: { origin: SITE, authorization: `Bearer ${bearer}` }, id }),
+    )
+  const shown = await image(thread.images[0].id)
+  assert.equal(shown.status, 200)
+  assert.equal(shown.headers.get("content-type"), "image/png")
+  assert.equal(shown.headers.get("access-control-allow-origin"), SITE)
+  assert.equal((await image(thread.screenshot)).status, 200)
+  insertDrop("elsewhere", { kind: "image", blob_key: "elsewhere.png" })
+  assert.equal((await image("elsewhere")).status, 404)
+  assert.equal((await image(thread.images[0].id, "v2.forged")).status, 401)
+
+  // A reply from the page, with an image, as the guest.
+  const form = new FormData()
+  form.append("data", JSON.stringify({ body: "Same on mobile" }))
+  form.append("image", new Blob([PNG]), "phone.png")
+  const replied = await answer(
+    threadReply,
+    request("/api/review/comments/1/replies", {
+      method: "POST",
+      headers: { origin: SITE, authorization: `Bearer ${ole}` },
+      body: form,
+      params: { n: "1" },
+    }),
+  )
+  assert.equal(replied.status, 200, await replied.clone().text())
+  const after = (await json(await count(ole, "/pricing?plan=pro"))).threads[0]
+  assert.deepEqual(
+    after.replies.map((reply) => [reply.author.name, reply.body, reply.images.map((file) => file.filename)]),
+    [["Ole (guest)", "Same on mobile", ["phone.png"]]],
+  )
+  assert.equal(
+    sql.prepare("SELECT count(*) AS n FROM drops WHERE parent_id = 'site' AND kind = 'image'").get().n,
+    3,
+    "the screenshot and both images are the site's",
+  )
+
+  const resolve = (bearer, resolved = true) =>
+    answer(
+      threadPatch,
+      request("/api/review/comments/1", {
+        method: "PATCH",
+        headers: { origin: SITE, authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+        body: JSON.stringify({ resolved }),
+        params: { n: "1" },
+      }),
+    )
+  assert.equal((await resolve(ole)).status, 403)
+  assert.equal((await resolve(ada_)).status, 200)
+  assert.equal((await json(await count(ole, "/pricing?plan=pro"))).open, 0)
+})
+
+test("comments and replies in Drop take images, which belong to the drop and go with the comment", async () => {
+  insertDrop("doc")
+  state.who = who
+  const form = new FormData()
+  form.append("data", JSON.stringify({ kind: "page", selector: "", ox: 0, oy: 0, body: "Like this" }))
+  form.append("image", new Blob([PNG]), "mock.png")
+  const posted = await dropCommentsPost(request("/api/drops/doc/comments", { method: "POST", body: form, id: "doc" }))
+  assert.deepEqual(
+    posted.attachments.map((file) => [file.filename, file.contentType]),
+    [["mock.png", "image/png"]],
+  )
+  assert.match(posted.attachments[0].url, /^\/f\/[0-9a-f-]{36}\.png$/)
+  const stored = sql.prepare("SELECT * FROM drops WHERE parent_id = 'doc'").get()
+  assert.equal(stored.kind, "image")
+  assert.equal(stored.owner_id, "owner")
+
+  const reply = new FormData()
+  reply.append("data", JSON.stringify({ body: "And this" }))
+  reply.append("image", new Blob([PNG]), "other.png")
+  const answered = await replyPost(
+    request(`/api/comments/${posted.id}/replies`, { method: "POST", body: reply, id: posted.id }),
+  )
+  assert.equal(answered.attachments.length, 1)
+  const [listed] = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
+  assert.equal(listed.attachments.length, 1)
+  assert.equal(listed.replies[0].attachments[0].filename, "other.png")
+
+  // JSON still works, and the bytes decide what an image is.
+  const plain = await dropCommentsPost(
+    request("/api/drops/doc/comments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "page", selector: "", ox: 0, oy: 0, body: "No picture" }),
+      id: "doc",
+    }),
+  )
+  assert.deepEqual(plain.attachments, [])
+  const fake = new FormData()
+  fake.append("data", JSON.stringify({ kind: "page", selector: "", ox: 0, oy: 0, body: "Fake" }))
+  fake.append("image", new Blob(["<svg onload=alert(1)>"]), "x.png")
+  const refused = await answer(
+    dropCommentsPost,
+    request("/api/drops/doc/comments", { method: "POST", body: fake, id: "doc" }),
+  )
+  assert.equal(refused.status, 400)
+
+  const keys = sql.prepare("SELECT blob_key FROM drops WHERE parent_id = 'doc'").all()
+  assert.equal(keys.length, 2)
+  await commentDelete(request(`/api/comments/${posted.id}`, { method: "DELETE", id: posted.id }))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE parent_id = 'doc'").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, 0)
+  for (const { blob_key } of keys) assert.equal(objects.has(blob_key), false)
 })

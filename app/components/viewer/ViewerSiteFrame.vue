@@ -1,13 +1,11 @@
 <script setup lang="ts">
-// A site under review, open inside Drop, laid out like a doc or an app: the page in a frame, its address in a slim row
-// above it like an app's page, and the review toolbar floating under it. Its Comment draws a box over the frame and
-// screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
+// A site under review, open inside Drop: the page in a frame, an address bar above it, and Comment, which draws a box
+// over the frame and screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
 // so a comment carries the screenshot, the box, and the address typed above, never the element under the box. Comments
 // are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way.
 // The page can show at a device's size (ViewerDevice), and the comment then says that size, not the scaled one.
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
-import type { ViewerTool } from "~/composables/useViewerAnnotations"
 
 const props = defineProps<{ drop: DropDetail; address: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -15,7 +13,7 @@ const emit = defineEmits<{ close: [] }>()
 const notify = useNotify()
 const capture = useTabCapture()
 
-// What's typed, and what the frame has open. Clicks inside the frame can't reach Drop, so the address only changes when
+// What's typed, and what the frame has open. Clicks inside the frame can't reach Drop, so the bar only changes when
 // someone types in it.
 const typed = ref(props.address)
 const open = ref(props.address)
@@ -27,8 +25,6 @@ function go() {
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
 const drawing = ref(false)
-// While the screenshot is taken, so the toolbar floating over the page stays out of it.
-const shooting = ref(false)
 const box = ref<Box | null>(null)
 let from: { x: number; y: number } | null = null
 const pending = ref<{
@@ -99,34 +95,56 @@ async function up() {
   if (!drawn || drawn.width < 8 || drawn.height < 8) return (box.value = null)
   const el = stage.value!
   const rect = el.getBoundingClientRect()
+  const scale = rect.width / (el.offsetWidth || rect.width)
+  // A zoomed device page can extend beyond the browser viewport. Keep the image crop and normalized box in the same
+  // visible page coordinate space instead of recording coordinates relative to the clipped, full-size stage.
+  const visible = {
+    left: Math.max(0, rect.left),
+    top: Math.max(0, rect.top),
+    right: Math.min(innerWidth, rect.right),
+    bottom: Math.min(innerHeight, rect.bottom),
+  }
+  const crop = {
+    left: Math.max(0, (visible.left - rect.left) / scale),
+    top: Math.max(0, (visible.top - rect.top) / scale),
+    width: Math.max(0, (visible.right - visible.left) / scale),
+    height: Math.max(0, (visible.bottom - visible.top) / scale),
+  }
+  if (crop.width < 1 || crop.height < 1) return (box.value = null)
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
   drawing.value = false
   box.value = null
-  shooting.value = true
   await nextTick()
   await new Promise(requestAnimationFrame)
   try {
-    const blob = await capture.grab({ left: rect.left, top: rect.top, width: rect.width, height: rect.height })
+    const blob = await capture.grab({
+      left: visible.left,
+      top: visible.top,
+      width: visible.right - visible.left,
+      height: visible.bottom - visible.top,
+    })
     const url = new URL(open.value)
     pending.value = {
       blob,
       url: URL.createObjectURL(blob),
-      box: drawn,
-      size: { width: el.offsetWidth, height: el.offsetHeight },
+      box: { left: drawn.left - crop.left, top: drawn.top - crop.top, width: drawn.width, height: drawn.height },
+      size: { width: crop.width, height: crop.height },
       page: (url.pathname + url.search + url.hash).slice(0, 1000),
       origin: url.origin,
     }
   } catch (error) {
     notify.fail("Couldn't take the screenshot", error)
-  } finally {
-    shooting.value = false
   }
 }
+
+// Images the reviewer adds beside the screenshot: from the button, a paste, or a drop on the form.
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop: dropImages } = useImagePicks()
 
 function discard() {
   if (pending.value) URL.revokeObjectURL(pending.value.url)
   pending.value = null
   note.value = ""
+  clear()
 }
 
 // The box in thousandths of the screenshot, as every review comment stores it.
@@ -153,6 +171,7 @@ async function send() {
     }),
   )
   form.append("screenshot", shot.blob, "screenshot")
+  for (const file of files.value) form.append("image", file, file.name || "image")
   sending.value = true
   try {
     await sendSiteComment(props.drop.id, shot.origin, form)
@@ -168,15 +187,6 @@ async function send() {
   }
 }
 
-// The toolbar has Browse and Comment only: without the review script, Drop can't see inside the site to measure it or
-// outline its elements.
-const TOOLS = ["browse", "comment"] as const
-function pick(next: ViewerTool) {
-  if (next === "comment") void comment()
-  else drawing.value = false
-}
-defineShortcuts({ r: () => pick("comment"), v: () => pick("browse") })
-
 onKeyStroke("Escape", () => {
   if (pending.value) discard()
   else drawing.value = false
@@ -186,32 +196,34 @@ onBeforeUnmount(discard)
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
-    <!-- The app viewer's page row: the address in a mono chip, typed into here. -->
-    <div class="flex h-9 shrink-0 items-center gap-1.5 border-b border-default pr-3 pl-1.5">
-      <UTooltip text="Back to the site's comments">
-        <UButton
-          aria-label="Back to the site's comments"
-          color="neutral"
-          icon="i-mingcute-arrow-left-line"
-          size="xs"
-          variant="ghost"
-          @click="emit('close')"
-        />
-      </UTooltip>
+    <div class="flex h-12 shrink-0 items-center gap-2 border-b border-default px-3">
+      <UButton
+        color="neutral"
+        icon="i-mingcute-arrow-left-line"
+        variant="ghost"
+        aria-label="Back to the site's comments"
+        @click="emit('close')"
+      />
       <form class="min-w-0 flex-1" @submit.prevent="go">
-        <label
-          class="flex items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-toned focus-within:ring-2 focus-within:ring-tool/50"
-          :class="!valid && 'text-error ring-1 ring-error'"
-        >
-          <UIcon class="size-3 shrink-0" name="i-mingcute-world-2-line" />
-          <input
-            v-model="typed"
-            aria-label="Address of the page under review"
-            class="min-w-0 flex-1 bg-transparent outline-none"
-            spellcheck="false"
-          />
-        </label>
+        <UInput
+          v-model="typed"
+          class="w-full"
+          :color="valid ? 'neutral' : 'error'"
+          :highlight="!valid"
+          icon="i-mingcute-world-2-line"
+          size="sm"
+          aria-label="Address of the page under review"
+          spellcheck="false"
+        />
       </form>
+      <ViewerDeviceButton />
+      <UButton
+        color="neutral"
+        :variant="drawing ? 'solid' : 'outline'"
+        icon="i-mingcute-chat-1-line"
+        :label="drawing ? 'Drawing…' : 'Comment'"
+        @click="comment"
+      />
     </div>
     <p v-if="!valid" class="border-b border-default px-3 py-1.5 text-xs text-error">
       That address isn't part of this site ({{ drop.siteUrl }}).
@@ -224,11 +236,11 @@ onBeforeUnmount(discard)
       Check it before you send.
     </p>
 
-    <div class="relative flex min-h-0 flex-1 flex-col">
-      <ViewerDevice on>
+    <div class="relative flex min-h-0 flex-1 flex-col bg-muted">
+      <ViewerDevice :bottom="24" on>
         <div ref="stage" class="relative min-h-0 flex-1">
           <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
-           dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
+               dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
           <iframe
             :key="open"
             class="absolute inset-0 size-full border-0 bg-white"
@@ -254,25 +266,21 @@ onBeforeUnmount(discard)
                 height: `${box.height}px`,
               }"
             />
+            <p
+              v-else
+              class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
+            >
+              Drag over what you mean. <UKbd value="escape" /> cancels.
+            </p>
           </div>
         </div>
       </ViewerDevice>
 
-      <ViewerToolbar
-        v-show="!shooting"
-        :can-comment="drop.canComment"
-        comment-hint="Drag over what you mean"
-        sizable
-        :tool="drawing ? 'comment' : 'browse'"
-        :tools="TOOLS"
-        :views="[]"
-        @tool="pick"
-      />
-
-      <!-- Above the toolbar's row, so it never covers it on a narrow pane. -->
       <form
         v-if="pending"
         class="absolute right-4 bottom-18 z-30 w-80 max-w-[calc(100%-2rem)] space-y-3 rounded-lg border border-default bg-default p-3 shadow-lg"
+        @dragover.prevent
+        @drop="dropImages"
         @submit.prevent="send"
       >
         <div class="relative overflow-hidden rounded-md border border-default">
@@ -297,8 +305,21 @@ onBeforeUnmount(discard)
           :rows="3"
           @keydown.meta.enter="send"
           @keydown.ctrl.enter="send"
+          @paste="paste"
         />
+        <ViewerImagePicks :picks="picks" @remove="remove" />
+        <p v-if="problem" class="text-xs text-error" role="alert">{{ problem }}</p>
         <div class="flex justify-end gap-2">
+          <UTooltip text="Add images">
+            <UButton
+              aria-label="Add images"
+              class="mr-auto"
+              color="neutral"
+              icon="i-mingcute-pic-line"
+              variant="ghost"
+              @click="pickImages"
+            />
+          </UTooltip>
           <UButton color="neutral" label="Cancel" variant="ghost" @click="discard" />
           <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
         </div>

@@ -35,6 +35,8 @@ CREATE TABLE `comments` (
 	`created_at` integer NOT NULL,
 	`ow` integer DEFAULT 0 NOT NULL,
 	`oh` integer DEFAULT 0 NOT NULL,
+	`element_x` integer,
+	`element_y` integer,
 	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -482,6 +484,19 @@ CREATE TABLE `comment_replies` (
 );
 --> statement-breakpoint
 CREATE INDEX `comment_replies_comment_idx` ON `comment_replies` (`comment_id`,`created_at`);
+--> statement-breakpoint
+-- Images in a comment or a reply: each is an image drop under the commented drop (server/utils/comment-images.ts).
+CREATE TABLE `comment_attachments` (
+	`drop_id` text PRIMARY KEY NOT NULL,
+	`comment_id` text NOT NULL,
+	`reply_id` text,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`comment_id`) REFERENCES `comments`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`reply_id`) REFERENCES `comment_replies`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `comment_attachments_comment_idx` ON `comment_attachments` (`comment_id`,`created_at`);
 --> statement-breakpoint
 -- A drop's views for its Details (server/utils/views.ts): a new viewer of the day counts one view.
 CREATE TABLE `drop_views` (

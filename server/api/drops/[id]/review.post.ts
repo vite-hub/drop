@@ -26,9 +26,9 @@ export default defineHandler(async (event) => {
   if (!site.siteUrl || !siteMatches(site.siteUrl, origin) || siteCoversDrop(event, origin))
     throw new HTTPError({ status: 400, statusText: "That address isn't part of this site." })
   await requireRateLimit(event, "review-comment", { key: who?.userId, limit: 20, window: "1m" })
-  const { input, shot } = await readReviewComment(event)
+  const { input, shot, images } = await readReviewComment(event)
 
-  const comment = await addReviewComment(site, { who, name: who?.name ?? "Guest" }, input, shot, origin)
+  const comment = await addReviewComment(site, { who, name: who?.name ?? "Guest" }, input, shot, origin, images)
   useLogger(event).set({ review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), embedded: true } })
   return { n: comment.n }
 })
