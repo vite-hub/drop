@@ -54,7 +54,6 @@ patchedDependencies:
   comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
   comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
   # Deno's package copier sees mdream's architecture branches even when those native packages are not published.
-  vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
