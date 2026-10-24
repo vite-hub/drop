@@ -32,8 +32,8 @@ export function useViewerPanel(options: {
           },
         ]
       : []),
-    // Anyone who can open the drop can read its history. Details is for everyone signed in; its sharing, views and
-    // lifetime stay with the owner (ViewerOverview).
+    // Anyone who can open the drop can read its history; Details (sharing, lifetime) stays with its managers, and with
+    // whoever files into a folder that says what goes in it.
     ...(options.versions.value > 1
       ? [{ value: "history" as const, label: "History", icon: "i-mingcute-history-line" }]
       : []),
@@ -54,9 +54,7 @@ export function useViewerPanel(options: {
   let drag: { x: number; width: number; rem: number } | undefined
   const resize = {
     start(event: PointerEvent) {
-      const target = event.currentTarget
-      if (!(target instanceof Element)) return
-      target.setPointerCapture(event.pointerId)
+      ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
       drag = { x: event.clientX, width: width.value, rem }
     },

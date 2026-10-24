@@ -31,7 +31,6 @@ for (const command of ["build", "serve"]) {
       await plugin.configResolved(config)
       for (const file of [
         "nitro/rate-limit/plugin.ts",
-        "rate-limit/cloudflare-runtime.mjs",
         "rate-limit/manifest.json",
       ])
         await access(join(root, ".vitehub", file))
