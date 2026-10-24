@@ -1,15 +1,19 @@
-diff --git a/dist/src-C-l_LYUI.js b/dist/src-C-l_LYUI.js
-index 752118611a61aee14ce5ff55de85537714806dac..b58602225dedea6e7e2e7184e150512b7c354287 100644
 --- a/dist/src-C-l_LYUI.js
 +++ b/dist/src-C-l_LYUI.js
-@@ -3145,7 +3145,9 @@ async function copyPackageToNodeModules(name, resolver, fromDir, outputNodeModul
- 	packageJsonPath ??= await resolvePackageJson(name, resolver, fromDir);
- 	packageJsonPath ??= await resolvePackageJson(name, createRequire(join(outputNodeModules, "package.json")), outputNodeModules);
- 	if (!packageJsonPath) {
--		if (options.optional) return;
-+		// mdream lists native bindings for architectures that are not published on npm.
-+		// Its loader only reaches the matching package for the current architecture.
-+		if (options.optional && name.startsWith("@mdream/rust-")) return;
- 		throw internalErrorDiagnostics.INTERNAL_B0021({ message: "Could not resolve package.json for " + name + "." });
- 	}
- 	let resolvedPackageJsonPath = await realpath(packageJsonPath);
+@@ -2995,13 +2995,10 @@
+ 	walk(module.program, (node) => {
+ 		if (node.type === "TemplateLiteral") {
+ 			if (specifiers.has(node) && node.expressions.length === 0) return false;
+-			for (const quasi of node.quasis) {
+-				const textStart = quasi.start + 1;
+-				const textEnd = quasi.tail ? quasi.end - 1 : quasi.end - 2;
+-				output[quasi.start] = quasi.start === node.start ? " " : "}";
+-				mask(textStart, textEnd, false);
+-				if (quasi.tail) output[quasi.end - 1] = "0";
+-			}
++			// Output parses as JavaScript, whose template element spans hold only the text, without the delimiters.
++			for (const quasi of node.quasis) mask(quasi.start, quasi.end, false);
++			output[node.start] = " ";
++			output[node.end - 1] = "0";
+ 			return;
+ 		}
