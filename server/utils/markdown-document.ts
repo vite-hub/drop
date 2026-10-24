@@ -10,7 +10,7 @@ import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { visitAsync } from "@comark/html/utils"
-import onmax from "@onmax/comark/html"
+import comarkUi from "comark-ui/html"
 import { escapeUTF8 as escapeHtml } from "entities"
 import * as v from "valibot"
 import { stringifyTokenStyle } from "shiki/core"
@@ -20,11 +20,12 @@ import { codeLanguage, loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
 
 /**
- * Every comark-plugins package, through onmax's preset, with what a Worker rendering other people's docs needs: include
- * stays off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
- * reader's browser instead of downloading them here, and plain images keep Drop's own lightbox, where a click comments.
+ * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
+ * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
+ * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments, and
+ * Mermaid stays Drop's, with its limits.
  */
-const preset = onmax({ chips: { download: false }, zoom: { images: false } })
+const preset = comarkUi({ chips: { download: false }, mermaid: false, zoom: { images: false } })
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
@@ -38,9 +39,13 @@ const ALLOWED_TAGS = [
   ..."a abbr b bdo blockquote br caption cite code dd del details dfn div dl dt em figcaption figure h1 h2 h3 h4 h5 h6 hr i img input ins kbd li mark ol p picture pre q rp rt ruby s samp section small source span strike strong sub summary sup table tbody td tfoot th thead time tr tt ul var wbr".split(
     " ",
   ),
-  // What the plugins draw with that isn't a component of theirs: comark-table's sort buttons and comark-tabs' items.
+  // What the plugins draw with that isn't a component of theirs: comark-table's sort buttons, comark-tabs' items, and the
+  // parts comark-quiz builds a question, poll, or recall card from.
   "button",
   "tabs-item",
+  ..."quiz-after quiz-answer quiz-explain quiz-hint quiz-label quiz-option quiz-options quiz-prompt quiz-rationale".split(
+    " ",
+  ),
   ...Object.keys(preset.components),
   ...COMPONENT_TAGS,
 ]
@@ -240,7 +245,7 @@ export async function markdownIssues(markdown: string): Promise<{ annotations: s
 }
 
 /**
- * The one Markdown renderer: Comark with front matter, task lists, server-rendered Mermaid SVG, every comark-plugins
+ * The one Markdown renderer: Comark with front matter, task lists, server-rendered Mermaid SVG, every comark-ui
  * package, and a tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
  */
 async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string; retry?: true }> {
