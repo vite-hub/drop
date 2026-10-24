@@ -47,11 +47,35 @@ DROP_GITHUB_ORG=your-org
 DROP_PUBLIC_LINK_DAYS=7
 ```
 
+## Teams on a personal Drop {#teams}
+
+`DROP_TEAMS=true` lets people on a personal Drop make teams on **Teams**. A team works like a small team Drop inside yours: its owner and admins invite people by email and make its folders, and drops in those folders reach its members and their agents, nobody else. Drop sends no email, so whoever invites copies the link and sends it; the invitee joins by opening it, signed in with that email.
+
+| Variable | What it does |
+| --- | --- |
+| [DROP_TEAMS]{.font-mono .text-xs} | Set true to turn teams on. Ignored on a team Drop, which is one team already. |
+| [DROP_FREE_TEAM_MEMBERS]{.font-mono .text-xs} | Members a team has before it needs a subscription, invitations included. Defaults to 3. Applies only with billing on. |
+| [DROP_FREE_KEPT]{.font-mono .text-xs} | Drops the Free plan keeps forever at once. Defaults to 10. Applies only with `DROP_QUOTAS=true`. |
+
+### Bill teams through Stripe {#billing}
+
+With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` shows the plans; without billing it's a 404.
+
+| Variable | What it does |
+| --- | --- |
+| [STRIPE_SECRET_KEY]{.font-mono .text-xs} | Your Stripe secret key. |
+| [STRIPE_WEBHOOK_SECRET]{.font-mono .text-xs} | The signing secret of a webhook to `<origin>/api/auth/stripe/webhook` that sends `checkout.session.completed` and the `customer.subscription.*` events. |
+| [STRIPE_TEAM_PRICE_ID]{.font-mono .text-xs} | A recurring per-unit price for one member. |
+| [STRIPE_TEAM_ANNUAL_PRICE_ID]{.font-mono .text-xs} | Optional: its yearly price, which adds a Pay yearly button. |
+| [STRIPE_MANAGED_PAYMENTS]{.font-mono .text-xs} | Defaults to true: Stripe sells as merchant of record and files sales tax and VAT. Turn Managed Payments on in Stripe and give the product an eligible tax code. Set false to sell under your own account. |
+
+Billing turns on once teams are on and the key, the webhook secret, and the price are all set.
+
 ## Give apps their own domain {#content-origin}
 
 Apps and HTML docs run their own scripts, so by default Drop shows them in a sandbox with no origin, away from Drop and the reader's session. The sandbox also blocks `localStorage`, cookies, and URL changes. Drop swaps in temporary storage, but an app that routes by its URL breaks.
 
-Set `DROP_CONTENT_ORIGIN` to a wildcard such as `https://*.drop-usercontent.example.com`, and serve every hostname under it from the same deployment. Each drop then runs on its own subdomain, as on a static host: storage and history work, and one app can't read what another stored. The subdomain is a hash of the drop's id, never the id, because hostnames are visible on the network.
+Set `DROP_CONTENT_ORIGIN` to a wildcard such as `https://*.drop-usercontent.example.com`, and serve every hostname under it from the same deployment. Each drop then runs on its own subdomain, as on a static host: storage and history work, and one app can't read what another stored. The subdomain is a hash of the drop's id, never the id, because hostnames are visible on the network. The hash is keyed with `VITEHUB_SECRET`, so set it too: `openssl rand -base64 32`, at least 32 characters.
 
 - **Use a domain that serves nothing else**, ideally a separate registrable domain, because a page can set cookies for its parent domain. Drop's sign-in cookies use the `__Host-` prefix, and API writes that carry cookies must come from Drop's own origin.
 - **DNS and certificate.** The wildcard needs a wildcard DNS record and a certificate that covers it. Cloudflare's free certificate covers one level under the zone, so `*.drop-usercontent.example.com` needs a paid one. To stay free on your own domain, put the `*` inside the first label: `https://*-drop.example.com` runs each drop at `<hash>-drop.example.com`.
@@ -107,7 +131,7 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 
-The schema is one file, `0000_init.sql`, which creates a new database. A database from an earlier release doesn't pick up later schema changes on its own: apply them by hand. After you change the schema in `server/databases/`, `pnpm db:generate` writes the next migration.
+`0000_init.sql` creates a new database, and each later numbered migration changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/`, `pnpm db:generate` writes the next migration.
 
 ## Pick a host {#hosts}
 

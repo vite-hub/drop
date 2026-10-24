@@ -4,18 +4,20 @@ import type { NuxtConfig } from "nuxt/schema"
 import { env } from "vite-hub/env"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
-import { DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
+import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
+const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
 const liveEditing = host === "cloudflare" || host === "vps"
 
-// The blob handler also handles conditional requests; keep its policy aligned with the access gate.
-const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-store" } } }
+// The browser keeps a file but asks again on every use: the access gate runs each time, and an unchanged file answers
+// 304 without its bytes (the blob handler handles conditional requests). server/plugins/content-headers.ts agrees.
+const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-cache" } } }
 
 // D1's HTTP driver works from every host. The account and API token are read at runtime.
 const d1 = (fallback: string) => ({
@@ -42,6 +44,9 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
       databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || cloudflareTemplate.d1_databases[0]!.database_name,
       // Local dev and `nuxt prepare` run against a local D1; deploys read the real id from the environment.
       databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || cloudflareTemplate.d1_databases[0]!.database_id,
+      // Reads go to the D1 replica nearest the Worker once replication is on for the database (Cloudflare API,
+      // read_replication.mode "auto"); a request that writes sets a bookmark cookie, so its reader sees the write next.
+      readReplication: true,
     },
     kv: true,
     rateLimit: true,
@@ -153,9 +158,8 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-07-17",
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
-  // tldraw needs a license key in production (NUXT_PUBLIC_TLDRAW_LICENSE_KEY); without one, boards show its watermark.
-  // doctor-disable-next-line nuxt/runtime/no-secret-in-public-config -- tldraw license keys are public: the browser runs tldraw and checks the key against the domain.
-  runtimeConfig: { seoIndex: false, public: { tldrawLicenseKey: "" } },
+  // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
+  runtimeConfig: { seoIndex: false, public: { realtime: liveEditing } },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
   // check, and body limits, so the module's request middlewares stay off.
@@ -214,16 +218,24 @@ export default defineNuxtConfig({
     "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
     "/agents": SIGNED_IN,
     "/members": SIGNED_IN,
+    "/teams/**": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
+    // Never cached, like /f/ and /d/ (server/plugins/content-headers.ts sets theirs).
+    "/signin": { headers: { "cache-control": "private, no-store" } },
     "/docs/**": { appLayout: "docs" },
     // The policies sit in the docs nav, so they keep its sidebar.
     "/terms": { appLayout: "docs" },
     "/acceptable-use": { appLayout: "docs" },
     "/abuse": { appLayout: "docs" },
+    "/pricing": { appLayout: "docs" },
   },
 
-  experimental: { typescriptPlugin: true },
+  experimental: {
+    typescriptPlugin: true,
+    // How often an open tab asks for the newest build id (app/plugins/update-ready.client.ts). Nuxt's default is an hour.
+    checkOutdatedBuildInterval: 2 * 60_000,
+  },
 
   // media-chrome's elements (app/components/viewer/ViewerVideo.vue) are web components, not Vue components.
   vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("media-") } },
@@ -265,7 +277,7 @@ export default defineNuxtConfig({
 
   icon: {
     provider: "none",
-    // Kind and agent icons are picked at runtime (KIND_ICONS, agentLogo), so the scanner can't see them.
+    // Kind, agent, and device icons are picked at runtime (KIND_ICONS, agentLogo, DEVICES), so the scanner can't see them.
     clientBundle: {
       scan: true,
       icons: [
@@ -280,6 +292,10 @@ export default defineNuxtConfig({
         "mingcute:sparkles-line",
         "mingcute:key-2-line",
         "mingcute:user-3-line",
+        "mingcute:cellphone-line",
+        "mingcute:pad-line",
+        "mingcute:laptop-line",
+        "mingcute:monitor-line",
         "simple-icons:claude",
         "simple-icons:openai",
         "simple-icons:cursor",
@@ -289,6 +305,8 @@ export default defineNuxtConfig({
         "simple-icons:zedindustries",
         "simple-icons:opencode",
         "simple-icons:githubactions",
+        // Link marks that replace a favicon (MARKS in app/components/viewer/ViewerResourceIcon.vue).
+        "simple-icons:github",
         // Host icons in the docs (app/utils/docs.ts).
         "simple-icons:cloudflare",
         "simple-icons:vercel",
@@ -300,6 +318,8 @@ export default defineNuxtConfig({
         // The Get started checklist's step marks (app/components/GetStarted.vue).
         "mingcute:check-circle-fill",
         "mingcute:round-line",
+        // The sidebar's "Update ready" icon (app/components/UpdateReady.vue).
+        "mingcute:refresh-2-line",
         // Nuxt UI's own icons (app.config ui.icons): the scanner reads templates, not app.config, so without these the
         // color-mode toggle, close buttons, carets, and spinners render empty.
         "mingcute:refresh-anticlockwise-1-line",
@@ -348,7 +368,6 @@ export default defineNuxtConfig({
   nitro: {
     // Drizzle applies the existing migration journal before a local Node instance serves requests.
     plugins: database === "sqlite" ? [fileURLToPath(new URL("./server/database-migrate.ts", import.meta.url))] : [],
-    errorHandler: fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url)),
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
     // Other hosts keep Nitro's default in-memory cache.
     ...(host === "cloudflare"
@@ -368,6 +387,9 @@ export default defineNuxtConfig({
       wrangler: {
         name: cloudflareTemplate.name,
         observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } },
+        // A page waits on D1 queries one after another, each a round trip from wherever the Worker runs. Smart
+        // Placement runs it near the database when that's faster; static assets are still served from the edge.
+        placement: { mode: "smart" },
       },
     },
     // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.
@@ -396,6 +418,10 @@ export default defineNuxtConfig({
     // server import protection rejects. Dev works without it.
     "nitro:config": function (config) {
       config.plugins = config.plugins?.filter((plugin) => !plugin.includes("dev-close-sockets"))
+      // Raw files and share pages get their own error page (server/handlers/content-error.ts); everything else keeps
+      // Nuxt's, which renders app/error.vue. Nuxt only adds its handler when nitro.errorHandler is unset, so ours goes
+      // in front of it here instead.
+      config.errorHandler = [contentErrorHandler, ...[config.errorHandler ?? []].flat()]
     },
   },
 
@@ -442,9 +468,29 @@ export default defineNuxtConfig({
           quotas: {
             enabled: env.boolean({ source: env.source("DROP_QUOTAS"), default: false }),
             plan: env.enum(PLANS, { source: env.source("DROP_DEFAULT_PLAN"), default: "free" }),
-            proDrops: env.number({ source: env.source("DROP_PRO_DROPS"), default: DEFAULT_PRO_LIMITS.drops }),
+            // Unset keeps Pro drops unlimited; a number caps them.
+            proDrops: env.number({ optional: true, source: env.source("DROP_PRO_DROPS") }),
             proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
             proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
+            // Drops a Free plan keeps forever at once; Pro keeps any number.
+            freeKept: env.number({ source: env.source("DROP_FREE_KEPT"), default: DEFAULT_FREE_KEPT }),
+          },
+          // Teams on a personal Drop: people make a team, invite others, and share its folders with them (server/utils/teams.ts).
+          teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
+          // Paid teams through Stripe. Billing is on once the key, the webhook secret, and the per-member price are all set.
+          billing: {
+            stripeSecretKey: env({ secret: true, source: env.source("STRIPE_SECRET_KEY"), default: "" }),
+            stripeWebhookSecret: env({ secret: true, source: env.source("STRIPE_WEBHOOK_SECRET"), default: "" }),
+            // A recurring price per member (quantity = members), and optionally its yearly one.
+            priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
+            annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),
+            // Members a team has before it needs a subscription.
+            freeMembers: env.number({
+              source: env.source("DROP_FREE_TEAM_MEMBERS"),
+              default: DEFAULT_FREE_TEAM_MEMBERS,
+            }),
+            // Stripe as merchant of record, which files sales tax and VAT. Turn off to sell under your own account.
+            managedPayments: env.boolean({ source: env.source("STRIPE_MANAGED_PAYMENTS"), default: true }),
           },
         },
       },

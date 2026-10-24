@@ -1,32 +1,39 @@
 import { eq } from "drizzle-orm"
-import { defineValidatedHandler, HTTPError } from "h3"
+import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
-import { comments } from "../../../databases/config"
-import { addReply } from "../../../utils/comments"
+import { commentReplies, comments } from "../../../databases/config"
+import { attachImages, imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
+import { insertReply, replyOf } from "../../../utils/comments"
 import { findDrop, findDropByLink, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 
-/** Reply in a comment's thread: anyone who may comment on the drop, like a new comment. */
-export default defineValidatedHandler({
-  validate: { body: CommentReplySchema },
-  async handler(event) {
-    const [comment] = await db
-      .select()
-      .from(comments)
-      .where(eq(comments.id, await routeId(event)))
-      .limit(1)
-    // Open comments carry over to later versions, so a thread may hang off an old one: ask the latest version.
-    const written = comment ? await findDrop(comment.dropId, event) : null
-    const drop = written?.link ? ((await findDropByLink(written.link, undefined, event)) ?? written) : written
-    const who = await identify(event)
-    if (!comment || !drop || !permissions(drop, who).comment)
-      throw new HTTPError({ status: 404, statusText: "You can't reply to this comment." })
-    // Replies share the comment limit: a thread is no way around it.
-    await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
-    const { body } = await event.req.json()
-    return addReply(comment, who, body)
-  },
+/** Reply in a comment's thread: anyone who may comment on the drop, like a new comment. Images as for a comment. */
+export default defineHandler(async (event) => {
+  const [comment] = await db
+    .select()
+    .from(comments)
+    .where(eq(comments.id, await routeId(event)))
+    .limit(1)
+  // Open comments carry over to later versions, so a thread may hang off an old one: ask the latest version.
+  const written = comment ? await findDrop(comment.dropId, event) : null
+  const drop = written?.link ? ((await findDropByLink(written.link, undefined, event)) ?? written) : written
+  const who = await identify(event)
+  if (!comment || !written || !drop || !permissions(drop, who).comment)
+    throw new HTTPError({ status: 404, statusText: "You can't reply to this comment." })
+  // Replies share the comment limit: a thread is no way around it.
+  await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
+  const { input, images } = await readCommentBody(event, CommentReplySchema)
+  // The images go where the comment's own would: under the version it was written on.
+  const parent = images.length ? await imageParent(written) : written
+  const { row, attachments } = await withImages(
+    images,
+    () => insertReply(comment, who, input.body),
+    (added) =>
+      attachImages(parent, images, { commentId: comment.id, replyId: added.id, n: comment.n }, added.authorName),
+    (added) => db.delete(commentReplies).where(eq(commentReplies.id, added.id)),
+  )
+  return replyOf(row, who, attachments)
 })

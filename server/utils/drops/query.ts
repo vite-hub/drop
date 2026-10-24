@@ -14,8 +14,18 @@ import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
 import { LIVE_EDITING } from "#live-drafts"
 import { chainOf, expiryPolicy } from "../expiry"
-import { ancestorsOf, foldersUnder, isAttachment, itemCounts, listedNode, parentNode, resolveNode } from "../nodes"
-import { shareNow, sharePolicy } from "../share"
+import {
+  ancestorsOf,
+  foldersUnder,
+  isAttachment,
+  itemCounts,
+  listedNode,
+  parentNode,
+  resolveNode,
+  walkUp,
+  withAncestors,
+} from "../nodes"
+import { modeFor, shareNow, sharePolicy } from "../share"
 import { searchHeads, searchWords } from "../search"
 import { resourcesOf } from "../resources"
 import { viewsOf } from "../views"
@@ -27,15 +37,21 @@ import { permissions, toCrumb, toSummary } from "./access"
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
- * Reuse the joined owner for review policy so each lookup remains one query, plus one for the ancestors of a drop in a
- * folder or a file a doc embeds: it is shared, kept, and trashed with them (see ./nodes).
+ * The drop `hit` selects (a query for at most one id) with its owner, and the ancestors of a drop in a folder or a file a
+ * doc embeds, which it is shared, kept, and trashed with (see ./nodes): one query, whatever the depth. Review policy
+ * reuses the joined owner, so it adds none.
  */
-async function withOwnerAccess(
-  row: { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null } | undefined,
-  event?: H3Event,
-): Promise<DropRow | null> {
+async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
+  const rows = await db
+    .select({ drop: drops, owner: user, hit: sql<number>`${drops.id} = (${hit})` })
+    .from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId))
+    .where(inArray(drops.id, withAncestors(hit)))
+  const row = rows.find((item) => item.hit)
   if (!row) return null
-  const ancestors = row.drop.parentId ? (await ancestorsOf([row.drop])).get(row.drop.id)! : []
+  const ancestors = row.drop.parentId
+    ? walkUp([row.drop], new Map(rows.map((item) => [item.drop.id, item.drop]))).get(row.drop.id)!
+    : []
   const drop: DropRow = {
     ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
     ownerBanned: !row.owner || Boolean(row.owner.banned),
@@ -106,15 +122,18 @@ async function headsMatching(where: SQL | undefined, words: string[], limit: num
   return { rows: found.map((item) => item.drop), snippets: new Map(found.map((item) => [item.drop.id, item.snippet])) }
 }
 
-/** A drop by its id, or by its share link's key: the doc's latest version. */
-export async function findDrop(id: string, event?: H3Event) {
-  const [row] = await db
-    .select({ drop: drops, owner: user })
+const idOf = (where: SQL) => db.select({ id: drops.id }).from(drops).where(where).limit(1)
+const headOf = (link: string) =>
+  db
+    .select({ id: drops.id })
     .from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId))
-    .where(eq(drops.id, id))
+    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
+    .where(eq(drops.link, link))
     .limit(1)
-  return row ? withOwnerAccess(row, event) : findDropByLink(id, undefined, event)
+
+/** A drop by its id, or by its share link's key: the doc's latest version. The id wins, in the same query. */
+export function findDrop(id: string, event?: H3Event) {
+  return findOne(sql`coalesce(${idOf(eq(drops.id, id))}, ${headOf(id)})`, event)
 }
 
 /** A drop an agent names: its id, its link's key, or its share link (`…/d/<key>/<slug>?v=2` pins a version). */
@@ -125,22 +144,15 @@ export async function findDropByRef(ref: string, event?: H3Event) {
 }
 
 /** The version of the doc behind a share link, or its latest one. */
-export async function findDropByLink(link: string, version?: number, event?: H3Event) {
-  const query = db.select({ drop: drops, owner: user }).from(drops).leftJoin(user, eq(user.id, drops.ownerId))
-  const [row] = version
-    ? await query.where(and(eq(drops.link, link), eq(drops.version, version))).limit(1)
-    : await query.innerJoin(dropHeads, eq(dropHeads.dropId, drops.id)).where(eq(drops.link, link)).limit(1)
-  return withOwnerAccess(row, event)
+export function findDropByLink(link: string, version?: number, event?: H3Event) {
+  return findOne(
+    version ? sql`${idOf(and(eq(drops.link, link), eq(drops.version, version))!)}` : sql`${headOf(link)}`,
+    event,
+  )
 }
 
-export async function findDropByBlob(key: string, event?: H3Event) {
-  const [row] = await db
-    .select({ drop: drops, owner: user })
-    .from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId))
-    .where(eq(drops.blobKey, key))
-    .limit(1)
-  return withOwnerAccess(row, event)
+export function findDropByBlob(key: string, event?: H3Event) {
+  return findOne(sql`${idOf(eq(drops.blobKey, key))}`, event)
 }
 
 /**
@@ -222,7 +234,7 @@ export async function listFolders(who: Identity, event?: H3Event): Promise<DropS
   const { days } = expiryPolicy(event)
   const mine = and(eq(dropHeads.ownerId, who.userId), eq(drops.teamFolder, false))
   const rows = await resolveRows(
-    await heads(and(eq(drops.kind, "folder"), or(mine, eq(drops.teamFolder, true))), 500),
+    await heads(and(eq(drops.kind, "folder"), or(mine, teamFolderSql(`"drops"`, who, event))), 500),
     days,
   )
   return summarize(
@@ -230,6 +242,21 @@ export async function listFolders(who: Identity, event?: H3Event): Promise<DropS
     days,
     { path: true },
   )
+}
+
+/**
+ * SQL for a team folder, at table alias `node`, on the caller's team: every one on a team Drop, and on a personal Drop
+ * the ones of the teams they're on.
+ */
+function teamFolderSql(node: string, who: Identity, event?: H3Event) {
+  const at = sql.raw(node)
+  if (sharePolicy(event).mode === "team") return sql`(${at}.team_folder = 1)`
+  const teams = Object.keys(who.teams ?? {})
+  if (!teams.length) return sql`0`
+  return sql`(${at}.team_folder = 1 AND ${at}.team_id IN (${sql.join(
+    teams.map((team) => sql`${team}`),
+    sql`, `,
+  )}))`
 }
 
 /**
@@ -250,7 +277,6 @@ function reachableSql(node: string, who: Identity, now: number, event?: H3Event)
  */
 export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const now = Date.now()
-  const team = sharePolicy(event).mode === "team"
   const others = and(ne(drops.ownerId, who.userId), reachableSql(`"drops"`, who, now, event))
   const rows = await db
     .select({ drop: drops, ownerName: user.name, ownerImage: user.image })
@@ -259,7 +285,7 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
     .innerJoin(user, eq(user.id, drops.ownerId))
     .where(
       and(
-        team ? or(others, and(eq(drops.teamFolder, true), isNull(drops.parentId))) : others,
+        or(others, and(teamFolderSql(`"drops"`, who, event), isNull(drops.parentId))),
         listedNode,
         isNull(drops.trashedAt),
         isNull(drops.quarantinedAt),
@@ -278,8 +304,11 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
       (node) =>
         !node.expired &&
         !node.quarantinedAt &&
-        (team || !node.shareReview) &&
-        !node.ancestors!.some((above) => listed.has(above.id) || (team && shareNow(above, now) !== "private")),
+        (modeFor(node, event) === "team" || !node.shareReview) &&
+        !node.ancestors!.some(
+          (above) =>
+            listed.has(above.id) || (modeFor(node, event) === "team" && shareNow(above, now, "team") !== "private"),
+        ),
     )
     .sort((a, b) => Number(b.teamFolder) - Number(a.teamFolder))
   return (await summarize(nodes, days)).map((summary) => ({
@@ -300,7 +329,7 @@ async function searchShared(who: Identity, words: string[], limit: number, event
   // Folders that open to you, yours aside, and the team's, whoever made them: what's in them opens through them.
   const openFolders = sql`(
     WITH RECURSIVE open(id, depth) AS (
-      SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND ((d.owner_id != ${who.userId} AND ${reachable("d")}) OR d.team_folder = 1)
+      SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND ((d.owner_id != ${who.userId} AND ${reachable("d")}) OR ${teamFolderSql("d", who, event)})
         AND d.trashed_at IS NULL AND d.quarantined_at IS NULL
       UNION ALL SELECT d.id, open.depth + 1 FROM drops d JOIN open ON d.parent_id = open.id WHERE d.kind = 'folder' AND open.depth < ${MAX_DEPTH}
     ) SELECT id FROM open
@@ -388,21 +417,16 @@ export function storageFailure(error: Error) {
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 
-export async function readText(key: string) {
+async function readFile(key: string) {
   const [error, file] = await blob.get(key)
-  if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  if (error) throw storageFailure(error)
+  if (error && error.code !== "BLOB_NOT_FOUND") throw storageFailure(error)
   if (!file) throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  return await file.text()
+  return file
 }
 
-async function readBytes(key: string) {
-  const [error, file] = await blob.get(key)
-  if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  if (error) throw storageFailure(error)
-  if (!file) throw new HTTPError({ status: 404, statusText: "File content is missing." })
-  return new Uint8Array(await file.arrayBuffer())
-}
+export const readText = async (key: string) => (await readFile(key)).text()
+
+const readBytes = async (key: string) => new Uint8Array(await (await readFile(key)).arrayBuffer())
 
 export async function versionChain(row: DropRow) {
   // Follow indexed parent/child links, retaining the existing 50 older / 100 total view bounds.
@@ -491,16 +515,45 @@ export async function dropDetail(
   const can = permissions(row, who)
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
+  // No part waits for another, so their queries reach the database together instead of one round trip each.
+  const [versions, body, attachments, views, resources] = await Promise.all([
+    versionsOf(row),
+    bodyOf(row, who, origin, event, appText),
+    TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
+    can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
+    // Everyone who can open it sees what it links to.
+    isAttachment(row) ? [] : resourcesOf(row),
+  ])
   const detail: DropDetail = {
     ...toSummary(row, undefined, days),
     isOwner: can.manage,
     canTrash: can.trash,
     canComment: can.comment,
-    canEdit: false,
-    versions: await versionsOf(row),
+    canEdit: liveEditable(row, who, versions),
+    versions,
     ancestors: openableAncestors(row, who, days),
+    ...body,
   }
-  detail.canEdit = liveEditable(row, who, detail.versions)
+  if (detail.canEdit && row.kind === "markdown" && hasEditorlessSyntax(detail.content ?? "")) {
+    detail.canEdit = false
+    detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
+  }
+  if (attachments) detail.attachments = attachments
+  if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
+  if (views) detail.views = views
+  if (resources.length) detail.resources = resources
+  return detail
+}
+
+/** What a drop holds: a folder's drops, an app's files, a doc's text and rendering, and the excerpt read from them. */
+async function bodyOf(
+  row: DropRow,
+  who: Identity | null,
+  origin: string,
+  event: H3Event | undefined,
+  appText: AppText,
+): Promise<Partial<DropDetail>> {
+  const detail: Partial<DropDetail> = {}
   if (row.kind === "folder") {
     detail.children = await listFolder(row, event, { who })
     detail.items = detail.children.length
@@ -524,10 +577,6 @@ export async function dropDetail(
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       detail.html = rendered.html
-      if (detail.canEdit && hasEditorlessSyntax(rendered.source)) {
-        detail.canEdit = false
-        detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
-      }
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
@@ -536,12 +585,6 @@ export async function dropDetail(
     }
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
-  if (TEXT_KINDS.has(row.kind)) detail.attachments = await attachmentsOf(row, origin)
-  if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
-  if (can.manage && !isAttachment(row)) detail.views = await viewsOf(row)
-  // Everyone who can open it sees what it links to.
-  const resources = isAttachment(row) ? [] : await resourcesOf(row)
-  if (resources.length) detail.resources = resources
   detail.excerpt = await dropExcerpt(row, detail.content)
   return detail
 }
@@ -561,12 +604,15 @@ function openableAncestors(row: DropRow, who: Identity | null, days: number): Dr
     .reverse()
 }
 
+/** Images sent in comments (server/utils/comment-images.ts) are the doc's children too, but it doesn't embed them. */
+const notCommentImage = sql`NOT EXISTS (SELECT 1 FROM comment_attachments WHERE comment_attachments.drop_id = ${drops.id})`
+
 /** Files a doc embeds from this Drop, across every version of the doc. */
 async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachment[]> {
   const rows = await db
     .select()
     .from(drops)
-    .where(and(sql`${drops.parentId} IN (${chainOf(row)})`, isNotNull(drops.blobKey)))
+    .where(and(sql`${drops.parentId} IN (${chainOf(row)})`, isNotNull(drops.blobKey), notCommentImage))
     .limit(100)
   return rows.map((item) => ({
     id: item.id,

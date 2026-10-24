@@ -1,64 +1,95 @@
 <script setup lang="ts">
-// A board drop: tldraw, mounted as a React root inside this Vue component and loaded only on boards. People draw;
-// each change goes to the server a moment later (only document records, never cameras or selections), and every few
-// seconds the board pulls what others and agents changed. After a save, the browser renders the whole board and each
-// frame as PNG for agents (view_board), since tldraw only renders in a browser. Shapes people add carry their name in
-// `meta.author`, which read_drop's outline shows.
+// A board drop: Excalidraw, mounted as a React root inside this Vue component and loaded only on boards. People draw;
+// each changed element goes to the server a moment later, and every few seconds the board pulls what others and agents
+// changed and merges it the way Excalidraw's own collaboration does (higher version wins, reconcileElements). After a
+// save, the browser renders the whole board and each frame as PNG for agents (view_board), since Excalidraw only
+// renders in a browser. The server records who added each element, which read_drop's outline shows.
+import type { Board, BoardElement } from "#shared/board"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; inset?: number }>()
+const props = defineProps<{ drop: DropDetail }>()
 const host = useTemplateRef<HTMLElement>("host")
-const { data: me } = useMe()
 const colorMode = useColorMode()
-const config = useRuntimeConfig()
 const state = ref<"loading" | "ready" | "failed">("loading")
 const saving = ref(false)
 const readOnly = ref(true)
 
-type Records = Record<string, { id: string; typeName: string; [key: string]: unknown }>
-let unmount: (() => void) | undefined
+type Excalidraw = typeof import("@excalidraw/excalidraw")
+type Api = import("@excalidraw/excalidraw/types").ExcalidrawImperativeAPI
+let root: import("react-dom/client").Root | undefined
+let stop: (() => void) | undefined
+let left = false
 
 onMounted(async () => {
   const id = props.drop.id
   try {
-    const [{ createElement }, { createRoot }, tl, data] = await Promise.all([
+    const [{ createElement }, { createRoot }, ex, data] = await Promise.all([
       import("react"),
       import("react-dom/client"),
-      import("tldraw"),
-      $fetch<{ snapshot: { schema: unknown; store: Records }; canEdit: boolean }>(`/api/drops/${id}/board`),
-      import("tldraw/tldraw.css"),
+      import("@excalidraw/excalidraw"),
+      $fetch<{ snapshot: Board; canEdit: boolean }>(`/api/drops/${id}/board`),
+      import("@excalidraw/excalidraw/index.css"),
     ])
+    // The reader left while Excalidraw loaded: there's no host to mount in any more.
+    if (left) return
     readOnly.value = !data.canEdit
-    const root = createRoot(host.value!)
-    root.render(
-      createElement(tl.Tldraw, {
-        // SAFETY: the server stores only snapshots tldraw's schema accepted and migrated (server/utils/boards.ts).
-        snapshot: { document: data.snapshot } as never,
-        licenseKey: config.public.tldrawLicenseKey || undefined,
-        // Drop's header already names the board and holds its menu. A board has one page, the one agents read, so
-        // tldraw's own menu and page picker would only repeat the header or add pages no one else sees. That leaves
-        // the top-left panel with only undo, redo, delete and duplicate, which have shortcuts and sit in the context
-        // menu; on narrow screens tldraw shows them above the toolbar instead, outside this panel.
-        components: { MainMenu: null, PageMenu: null, MenuPanel: null },
-        onMount: (editor) => {
-          // In dev, the editor on window lets a browser session inspect and drive the board.
-          if (import.meta.dev) Object.assign(window, { boardEditor: editor })
-          unmount = sync(editor, data.snapshot.store, data.canEdit)
-          state.value = "ready"
-        },
-      }),
-    )
-    const stop = unmount
-    unmount = () => {
-      stop?.()
-      root.unmount()
-    }
+    const elements = data.snapshot.elements
+    let onChange: ((elements: readonly BoardElement[]) => void) | undefined
+    root = createRoot(host.value!)
+    const render = () =>
+      root?.render(
+        createElement(
+          ex.Excalidraw,
+          {
+            // SAFETY: the server stores only elements with the fields Excalidraw's restore needs (isBoardElement).
+            initialData: {
+              elements: elements as never,
+              appState: { viewBackgroundColor: "transparent" },
+              scrollToContent: true,
+            },
+            theme: colorMode.value === "dark" ? "dark" : "light",
+            viewModeEnabled: !data.canEdit,
+            name: props.drop.title,
+            // Drop's header already names the board, holds its menu and shares it, and the board saves on its own:
+            // Excalidraw's open, save, reset and background controls would repeat it or fight the sync. Images need
+            // files Drop doesn't keep.
+            UIOptions: {
+              canvasActions: {
+                loadScene: false,
+                saveToActiveFile: false,
+                export: false,
+                clearCanvas: false,
+                changeViewBackgroundColor: false,
+                toggleTheme: false,
+              },
+              tools: { image: false },
+            },
+            excalidrawAPI: (ready: Api) => {
+              // In dev, the editor on window lets a browser session inspect and drive the board.
+              if (import.meta.dev) Object.assign(window, { boardApi: ready })
+              ;({ stop, onChange } = sync(ex, ready, data.snapshot.elements, data.canEdit))
+              state.value = "ready"
+            },
+            // SAFETY: Excalidraw's elements are plain objects with the fields BoardElement names.
+            onChange: (changed: readonly unknown[]) => onChange?.(changed as readonly BoardElement[]),
+          },
+          // An empty main menu: its button is hidden (below), and Help stays in the footer.
+          createElement(ex.MainMenu),
+        ),
+      )
+    render()
+    // Excalidraw follows Drop's theme; re-rendering only passes the new prop, the scene stays.
+    watch(() => colorMode.value, render)
   } catch (error) {
     console.error(error)
     state.value = "failed"
   }
 })
-onBeforeUnmount(() => unmount?.())
+onBeforeUnmount(() => {
+  left = true
+  stop?.()
+  root?.unmount()
+})
 
 async function toBase64(blob: Blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer())
@@ -67,41 +98,78 @@ async function toBase64(blob: Blob) {
   return btoa(binary)
 }
 
-function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolean) {
-  const id = props.drop.id
-  editor.updateInstanceState({ isReadonly: !canEdit })
-  editor.user.updateUserPreferences({
-    name: me.value?.name ?? "Guest",
-    colorScheme: colorMode.value === "dark" ? "dark" : "light",
-  })
-  const stopTheme = watch(
-    () => colorMode.value,
-    (mode) => editor.user.updateUserPreferences({ colorScheme: mode === "dark" ? "dark" : "light" }),
-  )
-  // Who drew it: read_drop's outline says "by <name>" for every shape.
-  const stopAuthor = editor.sideEffects.registerBeforeCreateHandler("shape", (shape, source) =>
-    source === "user" && me.value ? { ...shape, meta: { ...shape.meta, author: me.value.name } } : shape,
-  )
+// Excalidraw's label layout (its BOUND_TEXT_PADDING, getBoundTextMaxWidth and getFontString), for agents' words.
+const PADDING = 5
+type Shape = { type: string; width: number; fontSize?: number }
+function labelWidth(container: Shape) {
+  if (container.type === "arrow") return Math.max(0.7 * container.width, 16 * 11)
+  if (container.type === "ellipse") return Math.round((container.width / 2) * Math.SQRT2) - PADDING * 2
+  if (container.type === "diamond") return Math.round(container.width / 2) - PADDING * 2
+  return container.width - PADDING * 2
+}
+const FAMILIES = new Map([
+  [1, "Virgil"],
+  [2, "Helvetica"],
+  [3, "Cascadia"],
+  [5, "Excalifont"],
+  [6, "Nunito"],
+])
+const fontOf = (text: { fontSize: number; fontFamily: number }) =>
+  `${text.fontSize}px ${FAMILIES.get(text.fontFamily) ?? "Helvetica"}, Segoe UI Emoji`
 
-  // The server's records as last seen, and the changes made here that it hasn't stored yet.
-  let known: Records = structuredClone(initial)
-  const put = new Map<string, Records[string]>()
-  const removed = new Set<string>()
-  const stopListen = editor.store.listen(
-    ({ changes }) => {
-      for (const record of [...Object.values(changes.added), ...Object.values(changes.updated).map(([, to]) => to)]) {
-        // SAFETY: tldraw's records are plain objects with id and typeName, what Records holds.
-        put.set(record.id, record as never)
-        removed.delete(record.id)
+// Excalidraw centers bound text at the middle vertex of odd-point polylines, or
+// the midpoint of the middle segment for even-point polylines.
+function arrowMidpoint(points: ReadonlyArray<ReadonlyArray<number>>): [number, number] {
+  if (!points.length) return [0, 0]
+  const middle = Math.floor(points.length / 2)
+  const middlePoint = points[middle]
+  if (!middlePoint) return [0, 0]
+  const [middleX, middleY] = middlePoint
+  if (points.length % 2) return [middleX ?? 0, middleY ?? 0]
+  const previousPoint = points[middle - 1]
+  if (!previousPoint) return [middleX ?? 0, middleY ?? 0]
+  const [x1, y1] = previousPoint
+  const [x2, y2] = middlePoint
+  if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return [0, 0]
+  return [(x1 + x2) / 2, (y1 + y2) / 2]
+}
+
+let measuring: CanvasRenderingContext2D | null = null
+/** Words wrapped to `max` px wide the way Excalidraw wraps them: at spaces, and inside words longer than a line. */
+function wrap(text: string, font: string, max: number) {
+  measuring ??= document.createElement("canvas").getContext("2d")!
+  measuring.font = font
+  const ctx = measuring
+  const measure = (line: string) => ctx.measureText(line).width
+  const lines: { text: string; width: number }[] = []
+  for (const paragraph of text.split("\n")) {
+    let line = ""
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const candidate = line ? `${line} ${word}` : word
+      if (measure(candidate) <= max) {
+        line = candidate
+        continue
       }
-      for (const record of Object.values(changes.removed)) {
-        removed.add(record.id)
-        put.delete(record.id)
+      if (line) lines.push({ text: line, width: measure(line) })
+      line = ""
+      for (const char of word) {
+        if (line && measure(line + char) > max) {
+          lines.push({ text: line, width: measure(line) })
+          line = ""
+        }
+        line += char
       }
-      schedule()
-    },
-    { source: "user", scope: "document" },
-  )
+    }
+    lines.push({ text: line, width: measure(line) })
+  }
+  return lines
+}
+
+function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolean) {
+  const id = props.drop.id
+  // The version of each element the server has, and the elements changed here that it doesn't have yet.
+  const known = new Map(initial.map((element) => [element.id, element.version]))
+  const pending = new Map<string, BoardElement>()
 
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   let imageTimer: ReturnType<typeof setTimeout> | undefined
@@ -110,134 +178,154 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => (busy = busy.then(save)), 700)
   }
+  // Excalidraw calls this on every change, the pointer's and the selection's too: only elements with a version the
+  // server hasn't seen go out.
+  // Excalidraw loads its initial scene after it hands over its API: the first change with elements is the board.
+  let loaded = false
+  const onChange = (elements: readonly BoardElement[]) => {
+    if (!loaded && elements.length) {
+      loaded = true
+      measure()
+    }
+    if (!canEdit) return
+    let any = false
+    for (const element of elements)
+      if (element.version > (known.get(element.id) ?? 0)) {
+        pending.set(element.id, element)
+        any = true
+      }
+    if (any) schedule()
+  }
+
   async function save() {
-    if (!put.size && !removed.size) return
-    const body = { put: [...put.values()], remove: [...removed] }
-    put.clear()
-    removed.clear()
+    if (!pending.size) return
+    // Excalidraw changes elements in place, so the copy is what gets sent, and its versions are what the server has.
+    const elements = structuredClone([...pending.values()])
+    pending.clear()
     saving.value = true
     try {
-      // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- a save, from tldraw's onMount in the browser
-      await $fetch(`/api/drops/${id}/board`, { method: "POST", body })
-      for (const record of body.put) known[record.id] = record
-      for (const gone of body.remove) delete known[gone]
+      // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- a save, from Excalidraw's callbacks in the browser
+      await $fetch(`/api/drops/${id}/board`, { method: "POST", body: { elements } })
+      for (const element of elements)
+        if (element.version > (known.get(element.id) ?? 0)) known.set(element.id, element.version)
       clearTimeout(imageTimer)
       imageTimer = setTimeout(() => void images(), 4000)
     } catch (error) {
       // Kept for the next save, unless something newer replaced them meanwhile.
-      for (const record of body.put) if (!put.has(record.id) && !removed.has(record.id)) put.set(record.id, record)
-      for (const gone of body.remove) if (!put.has(gone)) removed.add(gone)
+      for (const element of elements) if (!pending.has(element.id)) pending.set(element.id, element)
       console.error("Board save failed", error)
     } finally {
       saving.value = false
     }
   }
 
-  // Others' and agents' changes: whatever differs from what this browser last saw, except what it is still saving.
+  // Others' and agents' changes: elements whose version is newer than this browser's, merged as Excalidraw merges.
   async function pull() {
     if (document.hidden) return
     await busy
-    const data = await $fetch<{ snapshot: { store: Records } }>(`/api/drops/${id}/board`).catch(() => null)
+    const data = await $fetch<{ snapshot: Board }>(`/api/drops/${id}/board`).catch(() => null)
     if (!data) return
-    const remote = data.snapshot.store
-    const changed = Object.values(remote).filter(
-      (record) => !put.has(record.id) && JSON.stringify(record) !== JSON.stringify(known[record.id]),
+    const local = new Map(api.getSceneElementsIncludingDeleted().map((element) => [element.id, element.version]))
+    const newer = data.snapshot.elements.filter((element) => element.version > (local.get(element.id) ?? 0))
+    for (const element of data.snapshot.elements)
+      if (element.version > (known.get(element.id) ?? 0)) known.set(element.id, element.version)
+    if (!newer.length) return
+    // SAFETY: newer contains the server's serialized Excalidraw elements, which restoreElements accepts as unknown input.
+    // This is only a partial scene. Repairing bindings here would clear a bound text or arrow's
+    // references when its unchanged container is not included in this batch.
+    const remote = ex.restoreElements(newer as never, null, { repairBindings: false })
+    const elements = ex.reconcileElements(
+      api.getSceneElementsIncludingDeleted(),
+      // SAFETY: elements from the server, restored by Excalidraw: what reconcileElements calls remote elements.
+      remote as never,
+      api.getAppState(),
     )
-    const gone = Object.keys(known).filter((key) => !(key in remote) && !put.has(key))
-    known = structuredClone(remote)
-    if (!changed.length && !gone.length) return
-    editor.store.mergeRemoteChanges(() => {
-      // SAFETY: the server stores only records its tldraw schema accepted (server/utils/boards.ts), under their ids.
-      editor.store.remove(gone as never)
-      // SAFETY: the same: records tldraw's schema accepted.
-      editor.store.put(changed as never)
-    })
-    await fitText(new Set(changed.map((record) => record.id)))
+    api.updateScene({ elements, captureUpdate: ex.CaptureUpdateAction.NEVER })
+    measure()
     // An agent's edit shows in its next view_board too.
     clearTimeout(imageTimer)
     imageTimer = setTimeout(() => void images(), 4000)
   }
   const poll = setInterval(() => void pull(), 3000)
 
-  // tldraw fits a note or shape to its text when a person types it. Items an agent wrote on the server skipped that,
-  // so long text spilled out of a fixed square: run the same fitting, then grow the agent's frames around what's in
-  // them (a frame clips its contents). It measures text, and tldraw's faces arrive after the board opens (the first
-  // measurement came out several lines short), so it runs again whenever the browser finishes loading fonts.
-  async function fitText(only?: Set<string>) {
-    await Promise.all(
-      ["tldraw_draw", "tldraw_sans", "tldraw_serif", "tldraw_mono"].map((family) =>
-        // doctor-disable-next-line nuxt/hydration/no-browser-global-in-universal-code -- runs from tldraw's onMount, in the browser
-        document.fonts.load(`16px ${family}`).catch(() => []),
-      ),
-    )
-    const agents = editor.getCurrentPageShapes().filter((shape) => shape.meta?.agent && (!only || only.has(shape.id)))
-    const fitted = agents
-      .map((shape) => editor.getShapeUtil(shape).onBeforeCreate?.(shape))
-      .filter((shape) => shape !== undefined)
-    const apply = (updates: { id: string; type: string; props: object }[]) => {
-      if (!updates.length) return
-      // People who can draw store the fit, so view_board's images and other readers get it too; others fit locally.
-      if (canEdit) {
-        // SAFETY: each update is a shape's own id and type with props tldraw's onBeforeCreate or its frame fit computed.
-        editor.run(() => editor.updateShapes(updates as never), { history: "ignore" })
-      } else
-        editor.store.mergeRemoteChanges(() =>
-          editor.store.put(
-            updates.map((update) => {
-              // SAFETY: update.id came from a shape on this page a moment ago.
-              const shape = editor.getShape(update.id as never)!
-              // SAFETY: update.props are props of this shape's own type, so the merge is still that shape.
-              return { ...shape, props: { ...shape.props, ...update.props } } as typeof shape
-            }),
-          ),
-        )
+  // A new version for people who can draw, so it saves; a reader's copy stays at the server's version.
+  type Element = ReturnType<Api["getSceneElementsIncludingDeleted"]>[number]
+  const next = <T extends Element>(element: T, fields: Partial<T>) =>
+    // SAFETY: spreading an Element and Partial<T> preserves the concrete element shape for this generic helper.
+    ({
+      ...element,
+      ...fields,
+      ...(canEdit && { version: element.version + 1, versionNonce: Math.floor(Math.random() * 2 ** 31) }),
+    }) as T
+
+  // Words an agent wrote reach the board unmeasured (`fit`, shared/board.ts): they're wrapped to their shape here, the
+  // shape grows to hold them, and someone who can draw saves the result, so the next reader and view_board get it as
+  // it is. Only those: people's own text is Excalidraw's, measured when they typed it.
+  function measure() {
+    const scene = api.getSceneElementsIncludingDeleted()
+    const byId = new Map(scene.map((element) => [element.id, element]))
+    const changed = new Map<string, (typeof scene)[number]>()
+    for (const element of scene) {
+      if (element.isDeleted || element.type !== "text" || !element.customData?.fit) continue
+      const { fit: _, ...customData } = element.customData
+      const container = element.containerId ? byId.get(element.containerId) : undefined
+      const lines = wrap(element.originalText, fontOf(element), container ? labelWidth(container) : element.width)
+      const width = Math.max(...lines.map((line) => line.width))
+      const height = lines.length * element.fontSize * element.lineHeight
+      const fields = { text: lines.map((line) => line.text).join("\n"), width, height, customData }
+      if (!container) {
+        changed.set(element.id, next(element, { ...fields, width: element.width }))
+        continue
+      }
+      // A shape grows down to hold its label; an arrow's label sits on its middle.
+      let box = container
+      if (container.type !== "arrow" && height + PADDING * 2 > container.height) {
+        box = next(container, { height: height + PADDING * 4 })
+        changed.set(container.id, box)
+      }
+      const [dx, dy] = container.type === "arrow" ? arrowMidpoint(container.points) : [box.width / 2, box.height / 2]
+      const cx = box.x + dx
+      const cy = box.y + dy
+      changed.set(element.id, next(element, { ...fields, x: cx - width / 2, y: cy - height / 2 }))
     }
-    apply(fitted.map((shape) => ({ id: shape.id, type: shape.type, props: shape.props })))
-    const frames = editor
-      .getCurrentPageShapes()
-      .filter((shape): shape is import("tldraw").TLFrameShape => shape.type === "frame" && Boolean(shape.meta?.agent))
-    apply(
-      frames.flatMap((frame) => {
-        const box = editor.getShapePageBounds(frame)
-        const kids = editor.getSortedChildIdsForParent(frame.id).map((child) => editor.getShapePageBounds(child))
-        if (!box || !kids.length) return []
-        const w = Math.max(frame.props.w, ...kids.map((kid) => (kid ? kid.maxX - box.x + 40 : 0)))
-        const h = Math.max(frame.props.h, ...kids.map((kid) => (kid ? kid.maxY - box.y + 40 : 0)))
-        return w > frame.props.w || h > frame.props.h ? [{ id: frame.id, type: "frame", props: { w, h } }] : []
-      }),
-    )
+    if (!changed.size) return
+    api.updateScene({
+      elements: scene.map((element) => changed.get(element.id) ?? element),
+      captureUpdate: ex.CaptureUpdateAction.NEVER,
+    })
   }
-  const refit = () => void fitText()
-  document.fonts.addEventListener("loadingdone", refit)
+
   // Open on the whole board, never zoomed past 100%: wide frames otherwise start off screen.
-  const openWhole = () => {
-    editor.zoomToFit()
-    if (editor.getZoomLevel() > 1) editor.resetZoom(editor.getViewportScreenCenter())
-  }
-  void fitText().then(openWhole)
+  requestAnimationFrame(() =>
+    api.scrollToContent(api.getSceneElements(), { fitToViewport: true, viewportZoomFactor: 0.95, maxZoom: 1 }),
+  )
 
   async function images() {
     if (!canEdit) return
-    const shapes = [...editor.getCurrentPageShapeIds()]
-    if (!shapes.length) return
+    const elements = api.getSceneElements()
+    if (!elements.length) return
     // At most 1600 px on the long side: readable for a model, small enough to send.
-    const render = async (ids: typeof shapes) => {
-      const bounds = editor.getShapesPageBounds(ids)
-      const scale = bounds ? Math.min(2, 1600 / Math.max(bounds.w, bounds.h, 1)) : 1
-      const { blob } = await editor.toImage(ids, { format: "png", scale, pixelRatio: 1, background: true, padding: 24 })
+    const render = async (frame: (typeof elements)[number] | null) => {
+      const blob = await ex.exportToBlob({
+        elements,
+        files: api.getFiles(),
+        // SAFETY: exportToBlob accepts an Excalidraw element or null; this frame is one of the scene elements.
+        exportingFrame: frame as never,
+        appState: { exportBackground: true, viewBackgroundColor: "#ffffff", exportWithDarkMode: false },
+        exportPadding: 24,
+        mimeType: "image/png",
+        getDimensions: (width: number, height: number) => {
+          const scale = Math.min(2, 1600 / Math.max(width, height, 1))
+          return { width: width * scale, height: height * scale, scale }
+        },
+      })
       return toBase64(blob)
     }
     try {
-      const page = editor.getCurrentPageId()
-      const frames = shapes
-        .flatMap((shapeId) => {
-          const shape = editor.getShape(shapeId)
-          return shape?.type === "frame" && shape.parentId === page ? [shape] : []
-        })
-        .slice(0, 20)
-      const out = [{ frame: "overview", png: await render(shapes) }]
-      for (const frame of frames) out.push({ frame: frame.id.replace(/^shape:/, ""), png: await render([frame.id]) })
-      // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- an upload, from tldraw's onMount in the browser
+      const frames = elements.filter((element) => element.type === "frame").slice(0, 20)
+      const out = [{ frame: "overview", png: await render(null) }]
+      for (const frame of frames) out.push({ frame: frame.id, png: await render(frame) })
+      // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- an upload, from Excalidraw's callbacks in the browser
       await $fetch(`/api/drops/${id}/board/images`, { method: "POST", body: { images: out } })
     } catch (error) {
       console.error("Board images failed", error)
@@ -248,24 +336,22 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
 
   const flush = () => void save()
   window.addEventListener("pagehide", flush)
-  return () => {
-    window.removeEventListener("pagehide", flush)
-    document.fonts.removeEventListener("loadingdone", refit)
-    clearInterval(poll)
-    clearTimeout(imageTimer)
-    if (put.size || removed.size) void save()
-    clearTimeout(saveTimer)
-    stopListen()
-    stopAuthor()
-    stopTheme()
+  return {
+    onChange,
+    stop: () => {
+      window.removeEventListener("pagehide", flush)
+      clearInterval(poll)
+      clearTimeout(imageTimer)
+      clearTimeout(saveTimer)
+      if (pending.size) void save()
+    },
   }
 }
 </script>
 
 <template>
   <div class="relative min-h-0 flex-1">
-    <!-- The board keeps clear of the floating panel, like a doc's text (FLOATING_INSET). -->
-    <div ref="host" class="board absolute inset-y-0 left-0" :style="{ right: `${inset ?? 0}px` }" />
+    <div ref="host" class="board absolute inset-0" />
     <div v-if="state !== 'ready'" class="absolute inset-0 grid place-items-center text-sm text-muted">
       <span v-if="state === 'loading'" class="flex items-center gap-2">
         <UIcon name="i-mingcute-loading-line" class="size-4 animate-spin" />
@@ -275,7 +361,7 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
     </div>
     <div
       v-if="state === 'ready'"
-      class="pointer-events-none absolute bottom-3 left-1/2 z-[300] -translate-x-1/2 text-xs text-dimmed"
+      class="pointer-events-none absolute top-3 left-1/2 z-[300] -translate-x-1/2 text-xs text-dimmed"
       aria-live="polite"
     >
       {{ readOnly ? "View only" : saving ? "Saving…" : "" }}
@@ -283,71 +369,65 @@ function sync(editor: import("tldraw").Editor, initial: Records, canEdit: boolea
   </div>
 </template>
 
-<style scoped>
-/* tldraw sizes itself to its parent and sets its own fonts; the dashboard's text styles stay outside it. */
-.board :deep(.tl-container) {
-  font-family: inherit;
-}
-</style>
-
 <style>
 /*
- * tldraw's interface in Drop's tokens (shared/theme.css, app/assets/css/main.css): the toolbar, style panel, zoom,
- * menus, popovers, dialogs and tooltips use Drop's surfaces, hairlines, text, radii and Geist, and follow `.dark` on
- * their own. Unscoped because tldraw portals its menus into its container, outside this component's elements; the
- * container's class beats tldraw's .tl-theme__light/.tl-theme__dark. The drawings keep tldraw's look: shape colors,
- * the hand-drawn font, and the blue selection and text highlight are canvas colors, not interface ones.
+ * Excalidraw's interface in Drop's tokens (shared/theme.css, app/assets/css/main.css), laid out like a Drop page: the
+ * tools sit in one bar at the bottom, as in Figma or tldraw, the main menu is gone (Drop's header holds the board's
+ * actions, and Help stays in the footer), and panels and the bar are popovers with a hairline. The drawings keep
+ * Excalidraw's look: the canvas and its shapes aren't interface. `.theme--dark` is listed so these beat Excalidraw's
+ * own dark values; Drop's tokens follow `.dark` by themselves.
  */
-.board .tl-container {
-  /* The canvas is Drop's page. */
-  --tl-color-background: var(--ui-bg);
-  /* Panels and menus are popovers with a hairline, like Nuxt UI's. */
-  --tl-color-panel: var(--popover);
-  --tl-color-panel-contrast: var(--ui-border);
-  --tl-color-panel-overlay: color-mix(in oklab, var(--popover) 82%, transparent);
-  --tl-color-panel-transparent: color-mix(in oklab, var(--popover) 0%, transparent);
-  --tl-color-low: var(--ui-bg-elevated);
-  --tl-color-low-border: var(--ui-border);
-  --tl-color-divider: var(--ui-border);
-  --tl-color-text: var(--ui-text-highlighted);
-  --tl-color-text-0: var(--ui-text-highlighted);
-  --tl-color-text-1: var(--ui-text);
-  --tl-color-text-3: var(--ui-text-muted);
-  --tl-color-text-disabled: var(--ui-text-dimmed);
-  /* Tooltips are inverted, as in Drop; tldraw writes their text in --tl-color-text-shadow, the page color. */
-  --tl-color-tooltip: var(--ui-bg-inverted);
-  --tl-color-text-shadow: var(--ui-bg);
-  --tl-color-primary: var(--ui-primary);
-  --tl-color-focus: var(--ring);
-  --tl-color-danger: var(--ui-error);
-  /* shadcn's scale from --radius: xs 4, sm 6, md 8 for controls, lg 10 for panels. */
-  --tl-radius-1: calc(var(--radius) * 0.4);
-  --tl-radius-2: calc(var(--radius) * 0.6);
-  --tl-radius-3: calc(var(--radius) * 0.8);
-  --tl-radius-4: var(--radius);
-  /* Hairlines over shadows: the ring does the work, a soft shadow lifts it off the canvas. */
-  --tl-shadow-1: 0 1px 2px rgb(0 0 0 / 0.05), inset 0 0 0 1px var(--ui-border);
-  --tl-shadow-2: 0 1px 2px rgb(0 0 0 / 0.05), 0 4px 12px -2px rgb(0 0 0 / 0.08), inset 0 0 0 1px var(--ui-border);
-  --tl-shadow-3: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1), inset 0 0 0 1px var(--ui-border);
-  --tl-shadow-4: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1), inset 0 0 0 1px var(--ui-border);
+.board .excalidraw,
+.board .excalidraw.theme--dark {
+  --ui-font: var(--font-sans, inherit);
+  --color-primary: var(--ui-primary);
+  --color-primary-darker: var(--ui-primary);
+  --color-primary-darkest: var(--ui-primary);
+  --color-primary-light: var(--ui-bg-accented);
+  --color-primary-hover: var(--ui-primary);
+  --island-bg-color: var(--popover);
+  --default-bg-color: var(--ui-bg);
+  --input-bg-color: var(--ui-bg);
+  --text-primary-color: var(--ui-text-highlighted);
+  --icon-fill-color: var(--ui-text);
+  --default-border-color: var(--ui-border);
+  --button-hover-bg: var(--ui-bg-elevated);
+  --color-surface-primary-container: var(--ui-bg-inverted);
+  --color-on-primary-container: var(--ui-text-inverted);
+  --border-radius-lg: var(--radius);
+  --shadow-island: 0 1px 2px rgb(0 0 0 / 0.05), 0 4px 12px -2px rgb(0 0 0 / 0.08), inset 0 0 0 1px var(--ui-border);
+}
+.dark .board .excalidraw {
+  --shadow-island: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -2px rgb(0 0 0 / 0.4), inset 0 0 0 1px var(--ui-border);
 }
 
-.dark .board .tl-container {
-  --tl-shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), inset 0 0 0 1px var(--ui-border);
-  --tl-shadow-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -2px rgb(0 0 0 / 0.4), inset 0 0 0 1px var(--ui-border);
-  --tl-shadow-3: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4), inset 0 0 0 1px var(--ui-border);
-  --tl-shadow-4: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5), inset 0 0 0 1px var(--ui-border);
+/* The main menu's button, and the library, which holds people's saved shapes in their own browser. */
+.board .excalidraw .main-menu-trigger,
+.board .excalidraw .default-sidebar-trigger {
+  display: none;
 }
 
-/* The active tool and the opacity slider are interface, so they take Drop's primary instead of tldraw's blue. */
-.board .tlui-button__tool[aria-pressed="true"],
-.board .tlui-button__tool[aria-pressed="true"]:not(:disabled, [data-disabled], :focus-visible):active {
-  color: var(--ui-text-inverted);
+/* The tool bar, at the bottom in the middle, level with the zoom and help in the footer; its hint shows above it. */
+.board .excalidraw:not(.excalidraw--mobile) .shapes-section {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
 }
-.board .tlui-button__tool[aria-pressed="true"]:not(:disabled, [data-disabled])::after {
-  background: var(--ui-primary);
+.board .excalidraw:not(.excalidraw--mobile) .shapes-section .HintViewer {
+  top: auto;
+  bottom: 100%;
+  margin: 0 0 0.5rem;
+  color: var(--ui-text-dimmed);
 }
-.board .tlui-slider__range {
-  background: var(--ui-primary);
+.board .excalidraw .App-toolbar .Island {
+  padding: 0.25rem;
+}
+.board .excalidraw .App-toolbar .ToolIcon__icon {
+  border-radius: calc(var(--radius) * 0.8);
+}
+/* Each tool's shortcut is in its tooltip; the digits under every icon were noise. */
+.board .excalidraw .App-toolbar .ToolIcon__keybinding {
+  display: none;
 }
 </style>

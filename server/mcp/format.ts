@@ -4,7 +4,7 @@ import { dropPageUrl, type DropRow } from "../utils/drops"
 
 /** How every tool describes the share input: one state, the same names the pages use. */
 export const SHARE_INPUT =
-  "Who can open it: private (only the user), team (everyone signed in to this Drop opens and comments; team Drops only), team_edit (the team also edits a Markdown doc, or the Markdown in a folder, together in the browser; team Drops only), public (anyone with the link opens it, signed-in people comment), or public_comment (anyone with the link comments too, guests included). On a team Drop a public link closes after a few days and it's back to team. Leave it out to keep the current share; a new drop starts as this Drop's default: team on a team Drop, private on a personal one, and inside a folder it shares at least as wide as the folder. Make it public only when the user asks or it's clearly meant for people outside, such as a pull request asset."
+  "Who can open it: private (only the user), team (everyone on the team opens and comments: everyone signed in to a team Drop, or a team's members in its folders), team_edit (the team also edits a Markdown doc, or the Markdown in a folder, together in the browser), public (anyone with the link opens it, signed-in people comment), or public_comment (anyone with the link comments too, guests included). On a team Drop a public link closes after a few days and it's back to team. Leave it out to keep the current share; a new drop starts as this Drop's default: team on a team Drop or in a team's folders, private otherwise, and inside a folder it shares at least as wide as the folder. Make it public only when the user asks or it's clearly meant for people outside, such as a pull request asset."
 
 /** What agents get back for a drop: enough to link it, embed its file, and know who can open it and for how long. */
 export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "blobKey">) {
@@ -79,17 +79,27 @@ export function commentTarget(
 }
 
 /** `version` is the one being read: a comment written on an earlier version says which. */
-export const commentLine = (comment: DropComment, version: number) =>
-  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${replyLines(comment)}`
+export const commentLine = (comment: DropComment, version: number, origin: string) =>
+  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
+
+/** The images sent with a comment or a reply, as full addresses an agent can fetch. */
+export const imageUrls = (item: Pick<DropComment, "attachments">, origin: string) =>
+  item.attachments.map((file) => new URL(file.url, origin).href)
+
+const imageLine = (item: Pick<DropComment, "attachments">, origin: string, indent = "   ") =>
+  item.attachments.length ? `\n${indent}Images: ${imageUrls(item, origin).join(" ")}` : ""
 
 /** A comment's thread under it, oldest first, one line per reply. */
-export const replyLines = (comment: Pick<DropComment, "replies">) =>
-  comment.replies.map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body}`).join("")
+export const replyLines = (comment: Pick<DropComment, "replies">, origin: string) =>
+  comment.replies
+    .map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body}${imageLine(reply, origin, "     ")}`)
+    .join("")
 
 /** The thread for structured output. */
-export const replyItems = (comment: Pick<DropComment, "replies">) =>
+export const replyItems = (comment: Pick<DropComment, "replies">, origin: string) =>
   comment.replies.map((reply) => ({
     body: reply.body,
     author: reply.authorName,
     at: new Date(reply.createdAt).toISOString(),
+    images: imageUrls(reply, origin),
   }))

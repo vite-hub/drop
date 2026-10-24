@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import geist from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url"
+
 // Link previews need an absolute image URL, so it follows whichever host serves Drop.
 const origin = useRequestURL().origin
 useSeoMeta({
@@ -22,6 +24,8 @@ const canonical = computed(() =>
 )
 useSeoMeta({ ogUrl: canonical })
 useHead({ link: () => (canonical.value ? [{ rel: "canonical", href: canonical.value }] : []) })
+// Geist loads with the stylesheet instead of after it, so text doesn't paint in the fallback font and then shift.
+useHead({ link: [{ rel: "preload", as: "font", type: "font/woff2", href: geist, crossorigin: "anonymous" }] })
 </script>
 
 <template>

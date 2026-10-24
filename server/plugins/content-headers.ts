@@ -14,7 +14,13 @@ export default definePlugin((app) => {
     const path = new URL(event.req.url).pathname
     if (path.startsWith("/f/") || path.startsWith("/d/")) {
       response.headers.set("X-Robots-Tag", "noindex, nofollow")
-      response.headers.set("Cache-Control", "private, no-store")
+      // Shared content is checked again on every request. A file with an ETag stays in the browser and is revalidated,
+      // so a screenshot opened twice comes back as a 304 without its bytes; pages, errors, and rendered documents
+      // aren't kept at all.
+      const revalidated =
+        path.startsWith("/f/") &&
+        (response.status === 304 || (response.status >= 200 && response.status < 300 && response.headers.has("ETag")))
+      response.headers.set("Cache-Control", revalidated ? "private, no-cache" : "private, no-store")
       return
     }
     // When indexing is on, search engines index the landing, docs and legal pages and nothing else: not the app, its API,

@@ -4,10 +4,11 @@
 // app.config.ts restyles them. Emoji and names go in as plain text, so the Markdown stays plain.
 import type { EditorEmojiMenuItem, EditorSuggestionMenuItem, EditorToolbarItem } from "@nuxt/ui"
 import { type Editor, EditorContent } from "@tiptap/vue-3"
+import { DOC_WIDTHS, type DocWidth } from "#shared/documents"
 // AvatarStack, ConnectionStatus, and the carets. The viewer loads this component only while someone edits.
 import "vite-hub/ui/styles.css"
 
-const props = defineProps<{ editor?: Editor; synced: boolean }>()
+const props = defineProps<{ editor?: Editor; synced: boolean; width: DocWidth }>()
 const prompt = usePrompt()
 
 // Everyone in this Drop, for "@". Editors are always signed in. The editor only mounts in the browser, and nothing
@@ -37,7 +38,7 @@ async function editLink() {
   })
   if (href === null) return
   const chain = editor.chain().focus().extendMarkRange("link")
-  void (href.trim() ? chain.setLink({ href: href.trim() }) : chain.unsetLink()).run()
+  void (href.trim() ? chain.setMark("link", { href: href.trim() }) : chain.unsetMark("link")).run()
 }
 
 const toolbar = computed<EditorToolbarItem[][]>(() => [
@@ -84,7 +85,7 @@ const blocks: EditorSuggestionMenuItem[][] = [
 
 <template>
   <div class="drop-doc min-h-0 flex-1 overflow-y-auto">
-    <main class="relative mx-auto max-w-[46rem] px-6 pt-14 pb-24">
+    <main class="relative mx-auto px-6 pt-14 pb-24" :style="{ maxWidth: DOC_WIDTHS[width] }">
       <!-- The header says how the connection is going; here the doc's shape stands in until its text arrives. -->
       <div v-if="!editor || !synced" aria-live="polite" class="space-y-4">
         <p class="sr-only">Loading the doc</p>

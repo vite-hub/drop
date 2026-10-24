@@ -11,7 +11,7 @@ const props = defineProps<{
   version: number
   versions: DropVersion[]
   outdated: Set<string>
-  addPageComment: (body: string) => Promise<Sent<DropComment>>
+  addPageComment: (body: string, files: File[]) => Promise<Sent<DropComment>>
 }>()
 const emit = defineEmits<{ focus: [comment: DropComment, row: DOMRect]; resolve: [id: string, resolved: boolean] }>()
 const filter = ref<"open" | "resolved">("open")
@@ -42,12 +42,14 @@ const pageBody = ref("")
 const sending = ref(false)
 const pageError = ref<string>()
 watch(pageBody, () => (pageError.value = undefined))
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
 async function sendPageComment() {
   if (!pageBody.value.trim() || sending.value) return
   sending.value = true
-  const sent = await props.addPageComment(pageBody.value)
+  const sent = await props.addPageComment(pageBody.value, files.value)
   if ("value" in sent) {
     pageBody.value = ""
+    clear()
     filter.value = "open"
   } else pageError.value = sent.error
   sending.value = false
@@ -89,6 +91,7 @@ async function sendPageComment() {
             {{ comment.quote }}
           </p>
           <p class="text-sm">{{ comment.body }}</p>
+          <ViewerCommentImages :attachments="comment.attachments" />
           <span v-if="comment.replies.length" class="flex items-center gap-1.5 text-xs text-muted">
             <UAvatarGroup :max="3" size="2xs">
               <UAvatar
@@ -142,7 +145,14 @@ async function sendPageComment() {
       </li>
     </ul>
     <!-- A comment on the page as a whole: no text, image, or area to point at. Enter sends, Shift+Enter breaks. -->
-    <div v-if="canComment" class="flex shrink-0 items-end gap-2 border-t border-default p-1.5 pl-2.5">
+    <ViewerImagePicks v-if="canComment" class="border-t border-default px-2.5 pt-1.5" :picks="picks" @remove="remove" />
+    <div
+      v-if="canComment"
+      class="flex shrink-0 items-end gap-1 p-1.5 pl-2.5"
+      :class="picks.length ? '' : 'border-t border-default'"
+      @dragover.prevent
+      @drop="drop"
+    >
       <UTextarea
         v-model="pageBody"
         aria-label="Comment on the whole page"
@@ -154,7 +164,18 @@ async function sendPageComment() {
         :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
         variant="none"
         @keydown.enter.exact.prevent="sendPageComment"
+        @paste="paste"
       />
+      <UTooltip text="Add images">
+        <UButton
+          aria-label="Add images"
+          class="size-8 justify-center rounded-full"
+          color="neutral"
+          icon="i-mingcute-pic-line"
+          variant="ghost"
+          @click="pickImages"
+        />
+      </UTooltip>
       <UButton
         aria-label="Send comment"
         class="size-8 justify-center rounded-full"
@@ -165,6 +186,8 @@ async function sendPageComment() {
         @click="sendPageComment"
       />
     </div>
-    <p v-if="canComment && pageError" class="shrink-0 px-3 pb-2 text-xs text-error" role="alert">{{ pageError }}</p>
+    <p v-if="canComment && (pageError || problem)" class="shrink-0 px-3 pb-2 text-xs text-error" role="alert">
+      {{ pageError || problem }}
+    </p>
   </div>
 </template>

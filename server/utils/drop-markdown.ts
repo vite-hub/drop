@@ -1,7 +1,5 @@
+import { FILE_LINK } from "#shared/embedded-images"
 import type { DropDetail } from "#shared/types"
-
-// A link to one of the drop's own files, as the source writes it: relative, or absolute on any Drop host.
-const FILE_LINK = /(?:https?:\/\/[^\s"'()<>]+)?(\/f\/[0-9a-f-]{36}\.[a-z0-9]{1,16})(?:\?raw)?/gi
 
 /**
  * A Markdown doc or a single HTML page as Markdown, for agents and for "Copy as Markdown". A Markdown doc is its own

@@ -1,15 +1,10 @@
 import { defineContent } from "vite-hub/content"
-import { files } from "vite-hub/source/files"
+import { glob } from "vite-hub/source/glob"
 
 /**
- * The docs at /docs, written in Markdown under content/docs. Vite bundles the files into the server at build time,
- * so every host serves them, Workers included, with no file system at runtime.
+ * The docs at /docs, written in Markdown under content/docs. The build bundles the files into the server, so every
+ * host serves them, Workers included, with no file system at runtime.
  */
 export const content = defineContent({
-  sources: {
-    docs: files(
-      import.meta.glob<string>("../content/docs/**/*.md", { query: "?raw", import: "default", eager: true }),
-      { base: "../content/docs" },
-    ),
-  },
+  sources: { docs: glob("content/docs/**/*.md") },
 })

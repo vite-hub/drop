@@ -32,7 +32,8 @@ export default defineAppConfig({
       copyCheck: "i-mingcute-check-line",
       dark: "i-mingcute-moon-line",
       drag: "i-mingcute-dots-line",
-      ellipsis: "i-mingcute-more-1-line",
+      // The filled dots: the line icon draws its dots as strokes alone, which the 1.75 hook above thins to specks.
+      ellipsis: "i-mingcute-more-1-fill",
       error: "i-mingcute-close-circle-line",
       external: "i-mingcute-arrow-right-up-line",
       eye: "i-mingcute-eye-2-line",

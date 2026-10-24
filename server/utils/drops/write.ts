@@ -7,19 +7,20 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, dropFiles, drops } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
-import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard } from "#shared/board"
+import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
 import { renderMarkdownCached } from "../markdown-document"
+import { refreshLatest } from "#live-drafts"
 import { deleteMarkdownCache } from "../markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { MAX_KEEP_REASON } from "#shared/expiry"
 import { shareReviewFor } from "../trust"
 import type { Identity } from "../identity"
-import { withDropQuota } from "../quotas"
+import { requireKeepSlot, withDropQuota } from "../quotas"
 import { chainOf, expiryPolicy, renewDrop } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
-import { sharePolicy, shareFields } from "../share"
+import { modeFor, shareFields } from "../share"
 import { textStatements } from "../search"
 import type { DropKind } from "#shared/types"
 import type { DropRow, LifetimeInput } from "./types"
@@ -170,11 +171,14 @@ export async function createDocDrop(
     contentType = kind === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8"
   }
   if (extension === BOARD_EXTENSION) {
-    // An empty .tldr starts an empty board (the New menu's Board).
-    if (!input.bytes.byteLength) input = { ...input, bytes: new TextEncoder().encode(JSON.stringify(emptyBoard())) }
+    // An empty .excalidraw starts an empty board (the New menu's Board). Any other is stored without what a board
+    // doesn't take (images, embeds) or the uploader's own view.
     try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(input.bytes)
-      parseBoard(text)
+      const board = input.bytes.byteLength
+        ? parseBoard(new TextDecoder("utf-8", { fatal: true }).decode(input.bytes))
+        : emptyBoard()
+      text = serializeBoard(board)
+      input = { ...input, bytes: new TextEncoder().encode(text) }
     } catch {
       throw new HTTPError({ status: 400, statusText: "That isn't a board this Drop can read." })
     }
@@ -217,12 +221,15 @@ export async function createDocDrop(
   const life = parentId
     ? lifetimeFields(who, {}, previous ?? folder, event)
     : lifetimeFields(who, input, previous, event)
+  await requireKeepSlot(ownerId, life, previous?.lifetime === "keep", !parentId)
+  // In a team's folders a drop shares like one on a team Drop (../share.ts modeFor).
+  const mode = modeFor(previous ?? folder, event)
   const share =
     input.share !== undefined
-      ? shareFields(input.share, { kind }, event)
+      ? shareFields(input.share, { kind, team: mode === "team" }, event)
       : previous
         ? { share: previous.share, publicUntil: previous.publicUntil }
-        : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+        : { share: defaultShare(mode), publicUntil: null }
 
   return withDropQuota(
     ownerId,
@@ -285,6 +292,7 @@ export async function createDocDrop(
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
         quarantinedAt: null,
         publishToken: null,
+        teamId: null,
         siteUrl: null,
       }
       try {
@@ -318,6 +326,8 @@ export async function createDocDrop(
         throw error
       }
       if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text, previous)
+      // People reading the doc's link follow it to this version.
+      if (previous && row.link) await refreshLatest(row.link)
       // TODO(repo-mirror): also commit this version to a repo the owner picks, one commit per version with the note
       // as its message. Drop stays the source of truth: versions keep living in Blob and the database on every host.
       // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
@@ -343,8 +353,31 @@ function cleanPath(path: string) {
     .split("/")
     .filter((part) => part && part !== "." && part !== "..")
     .join("/")
-  if (!clean || clean.length > 300) throw new HTTPError({ status: 400, statusText: `Invalid file path: ${path}` })
+  if (!clean || clean.length > 300 || escapesFolder(clean))
+    throw new HTTPError({ status: 400, message: `Invalid file path: ${path}` })
   return clean
+}
+
+/**
+ * Whether a blob key part climbs out of its folder once decoded. ViteHub's blob store percent-decodes every key before
+ * its driver sees it, so `%2e%2e/` is `../`, which the fs driver resolves; a URL-based driver (S3) may decode again.
+ * Either way an app's file could land on another drop's blob.
+ */
+export function escapesFolder(path: string) {
+  let decoded = path
+  for (let round = 0; round < 3; round++) {
+    if (/%(?:2f|5c)/i.test(decoded)) return true
+    let next = decoded
+    try {
+      next = decodeURIComponent(decoded)
+    } catch {}
+    if (next === decoded) break
+    decoded = next
+  }
+  return decoded
+    .replace(/\\/g, "/")
+    .split("/")
+    .some((part) => part === "." || part === "..")
 }
 
 /**
@@ -380,7 +413,7 @@ export async function publishApp(
   if (clash.length)
     throw new HTTPError({
       status: 400,
-      statusText: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.`,
+      message: `removes and files both name ${clash.join(", ")}. Send a file to keep it, or name it in removes to delete it.`,
     })
   if (input.replace && removes.length)
     throw new HTTPError({ status: 400, statusText: "An archive replaces the whole app, so it takes no removes." })
@@ -413,13 +446,15 @@ export async function publishApp(
   const parentId = row?.parentId ?? folder?.id ?? null
   const ownerId = row?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
   const life = parentId ? lifetimeFields(who, {}, own ?? folder, event) : lifetimeFields(who, input, row, event)
+  await requireKeepSlot(ownerId, life, row?.lifetime === "keep", !parentId)
   const note = input.note?.trim() || null
+  const mode = modeFor(row ?? folder, event)
   const share =
     input.share !== undefined
-      ? shareFields(input.share, { kind: "app" }, event)
+      ? shareFields(input.share, { kind: "app", team: mode === "team" }, event)
       : own
         ? { share: own.share, publicUntil: own.publicUntil }
-        : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+        : { share: defaultShare(mode), publicUntil: null }
   const shareReview = !isPublic(share.share)
     ? null
     : own && isPublic(own.share) && input.share === undefined
@@ -439,7 +474,7 @@ export async function publishApp(
   if (stale.length)
     throw new HTTPError({
       status: 400,
-      statusText: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
+      message: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
     })
   // Files the agent neither sent nor removed carry over, blob and all: no new write, no new bytes. An archive keeps none.
   const sent = new Set(entries.map(([path]) => path))
@@ -519,6 +554,7 @@ export async function publishApp(
           createdAt: row?.createdAt ?? now,
           updatedAt: now,
           publishToken: token,
+          teamId: null,
           lastAccessedAt: now,
           ...life,
           note,
@@ -585,6 +621,7 @@ export async function publishApp(
           await quota.commit([update, replace, ...inserts], exists(db.select({ id: drops.id }).from(drops).where(won)))
           committedPublish = true
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
+          if (next.link) await refreshLatest(next.link)
         }
         return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths) })
       } catch (error) {

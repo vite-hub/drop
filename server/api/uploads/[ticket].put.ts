@@ -1,5 +1,5 @@
 import { useLogger } from "evlog/nitro/v3"
-import { defineHandler, HTTPError } from "h3"
+import { assertBodySize, defineHandler, getRouterParam, HTTPError } from "h3"
 import { MIB } from "#shared/quotas"
 import { MAX_ARCHIVE_BYTES } from "../../utils/app-archive"
 import { MAX_FILE_BYTES } from "../../utils/drops"
@@ -13,7 +13,7 @@ import { claimUpload, readUpload, releaseUpload } from "../../utils/uploads"
  * have.
  */
 export default defineHandler(async (event) => {
-  const upload = await readUpload(event, event.context.params!.ticket!)
+  const upload = await readUpload(event, getRouterParam(event, "ticket")!)
   if (!upload) {
     await event.req.body?.cancel().catch(() => {})
     throw new HTTPError({
@@ -25,14 +25,19 @@ export default defineHandler(async (event) => {
   const [limit, what] = upload.input.archive ? [MAX_ARCHIVE_BYTES, "archive"] : [MAX_FILE_BYTES, "file"]
   const tooLarge = () =>
     new HTTPError({ status: 413, statusText: `The ${what} exceeds the ${Math.round(limit / MIB)} MiB limit.` })
-  if (Number(event.req.headers.get("content-length") ?? 0) > limit) throw tooLarge()
-  const bytes = new Uint8Array(await event.req.arrayBuffer())
+  // `curl -T -` streams the body chunked, with no length to check up front: h3 counts the bytes as they arrive.
+  let bytes: Uint8Array
+  try {
+    assertBodySize(event, limit)
+    bytes = new Uint8Array(await event.req.arrayBuffer())
+  } catch (error) {
+    throw HTTPError.isError(error) && error.status === 413 ? tooLarge() : error
+  }
   if (!bytes.byteLength)
     throw new HTTPError({
       status: 400,
       statusText: `The upload is empty. Send the ${what} as the body, as curl -T does.`,
     })
-  if (bytes.byteLength > limit) throw tooLarge()
   if (!(await claimUpload(upload.id, upload.expiresAt)))
     throw new HTTPError({
       status: 409,

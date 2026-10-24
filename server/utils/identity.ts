@@ -1,12 +1,13 @@
 import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import type { Auth } from "better-auth"
+import { verifyJwsAccessToken } from "better-auth/oauth2"
 import { useLogger } from "evlog/nitro/v3"
-import { createLocalJWKSet, type JSONWebKeySet, jwtVerify } from "jose"
 import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
 import { oauthClient, user as users } from "../databases/config"
 import { isMember } from "./members"
+import { type TeamRole, teamsOf } from "./teams"
 import { useServerEnv } from "#vitehub/env/server"
 import { type Role, roleFor } from "#shared/roles"
 import type { ActorKind } from "#shared/types"
@@ -23,6 +24,8 @@ export interface Identity {
   actorKind: ActorKind
   /** Shown on drops: the MCP client's name (often the agent, like "Claude Code") or the person's name. */
   actorName: string
+  /** The teams they're on and their role on each, on a personal Drop with teams (./teams.ts). */
+  teams?: Record<string, TeamRole>
 }
 
 type DropAuth = Auth<ReturnType<typeof auth.options>>
@@ -65,6 +68,7 @@ export const bearerFrom = (headers: Headers) => headers.get("authorization")?.ma
 export function identify(event: H3Event): Promise<Identity | null> {
   return (event.context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
     if (who && !(await isMember(who.userId))) return null
+    if (who) who.teams = await teamsOf(who.userId, event)
     // Every request's wide event says who made it, never the credential itself.
     if (who)
       useLogger(event).set({
@@ -93,31 +97,23 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   }
 }
 
-// Drop's own signing keys, read in-process instead of over HTTP (a Worker fetching its own hostname is a loop).
-// Kept for a few minutes per isolate; a token signed by a newer key forces a reload.
-let signingKeys: { at: number; keys: Promise<JSONWebKeySet> } | undefined
-function jwksFor(event: H3Event, fresh = false) {
-  if (fresh || !signingKeys || Date.now() - signingKeys.at > 300_000)
-    signingKeys = { at: Date.now(), keys: authFor(event).api.getJwks() }
-  return signingKeys.keys
-}
+// Drop's own signing keys, read in-process instead of over HTTP (a Worker fetching its own hostname is a loop). Better
+// Auth keeps them for five minutes per isolate and reloads them for a token signed by a newer key.
+const signingKeys = {}
 
 /** An MCP client's OAuth access token: a JWT this Drop issued, for this Drop's `/mcp`. */
 async function fromAccessToken(event: H3Event, token: string): Promise<Identity | null> {
   const origin = event.url.origin
-  const verify = async (fresh: boolean) =>
-    jwtVerify(token, createLocalJWKSet(await jwksFor(event, fresh)), {
-      issuer: `${origin}/api/auth`,
-      audience: `${origin}/mcp`,
-    })
-  const verified = await verify(false)
-    .catch((error) => (error?.code === "ERR_JWKS_NO_MATCHING_KEY" ? verify(true) : null))
-    .catch(() => null)
-  const payload = verified?.payload
+  const payload = await verifyJwsAccessToken(token, {
+    jwksFetch: () => authFor(event).api.getJwks(),
+    jwksCacheKey: signingKeys,
+    verifyOptions: { issuer: `${origin}/api/auth`, audience: `${origin}/mcp` },
+  }).catch(() => null)
   if (!payload?.sub) return null
   const [user] = await db.select().from(users).where(eq(users.id, payload.sub)).limit(1)
   if (!user || user.banned) return null
-  const clientId = textValue(payload.azp) ?? textValue(payload.client_id) ?? null
+  // Better Auth copies `azp` into `client_id`.
+  const clientId = textValue(payload.client_id) ?? null
   const [client] = clientId
     ? await db.select({ name: oauthClient.name }).from(oauthClient).where(eq(oauthClient.clientId, clientId)).limit(1)
     : []

@@ -19,14 +19,14 @@ setStorage({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, val
 export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/functions", ...options })`,
   "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
   "vite-hub/rate-limit":
-    "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { status: 429 }) }",
+    "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { name: 'HTTPError', status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",
   "#vitehub/env/server":
-    "export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: t.githubOrg ?? '', authProxy: t.authProxy ?? false, authProxyCookie: '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: 100, proBytes: 1073741824, proWrites: 10000 } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
+    "export const deriveSecret = async (purpose) => `test-secret:${purpose}`; export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: t.githubOrg ?? '', authProxy: t.authProxy ?? false, authProxyCookie: '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: { unseal: () => t.billing ? 'sk_test' : '' }, stripeWebhookSecret: { unseal: () => t.billing ? 'whsec_test' : '' }, priceId: t.billing ? 'price_team' : '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
   "#code-image-png":
     "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "#live-drafts":
-    "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}",
+    "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}; export const refreshLatest = async link => { globalThis.dropTest.refreshedLinks.push(link) }",
 }
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.
 const baseline = new Set([

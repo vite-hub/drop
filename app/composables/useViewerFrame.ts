@@ -1,4 +1,4 @@
-import { planDocument } from "#shared/documents"
+import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { injectRuntime } from "#shared/plan-runtime"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
@@ -13,8 +13,8 @@ type RuntimeReport = {
 
 /**
  * The frame the drop renders in, and everything that goes over its postMessage bridge (useDropFrame): the document
- * it shows, the app page it navigated to, the comment pins, area mode, the room the floating panel takes, and the
- * errors the page reports. What the reader points at goes on to the annotations.
+ * it shows, the app page it navigated to, the comment pins, the toolbar's tool and overlays, the room the floating
+ * panel takes, and the errors the page reports. What the reader points at goes on to the annotations.
  */
 export function useViewerFrame(options: {
   drop: Ref<DropDetail>
@@ -25,6 +25,8 @@ export function useViewerFrame(options: {
   pinned: Ref<DropComment[]>
   /** Room the floating panel takes on the right, in pixels. */
   inset: Ref<number>
+  /** How wide a Markdown doc's text runs. */
+  width: Ref<DocWidth>
   annotations: ReturnType<typeof useViewerAnnotations>
 }) {
   const {
@@ -50,10 +52,13 @@ export function useViewerFrame(options: {
   const attached = useAttachmentData(drop)
 
   // A plain variable, not a ref: the documents read it when they're built, and opening the panel later must not
-  // rebuild (and reload) them. The "inset" message moves the text from there.
+  // rebuild (and reload) them. The "inset" message moves the text from there, and "width" widens it.
   let startInset = 0
   watch(options.inset, (value) => (startInset = value), { immediate: true, flush: "sync" })
-  const appDocument = (path: string) => injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset)
+  let startWidth: DocWidth = "readable"
+  watch(options.width, (value) => (startWidth = value), { immediate: true, flush: "sync" })
+  const appDocument = (path: string) =>
+    injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset, true)
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
   // panel showing doesn't slide left once it loads.
@@ -64,6 +69,15 @@ export function useViewerFrame(options: {
     if (kind === "app") return appDocument(page.value)
     if (kind === "image")
       return imageData.value ? planDocument("image", imageData.value, dark.value, "", startInset) : ""
+    if (attached.deferred.value)
+      return planDocument(
+        kind,
+        drop.value.content ?? "",
+        dark.value,
+        attached.defer(drop.value.html ?? ""),
+        startInset,
+        startWidth,
+      )
     if (!attached.ready.value) return ""
     return planDocument(
       kind,
@@ -71,26 +85,34 @@ export function useViewerFrame(options: {
       dark.value,
       attached.inline(drop.value.html ?? ""),
       startInset,
+      startWidth,
     )
   })
 
   // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
   // postMessage (see server/utils/content-origin.ts). Otherwise the document is the iframe's srcdoc, in an opaque origin.
   const contentOrigin = computed(() => drop.value.contentOrigin)
-  const frameSrc = ref<string>()
+  const hostUrl = () =>
+    contentOrigin.value ? contentOrigin.value + (isApp.value ? pageUrl(page.value) : "/") : undefined
+  // Rendered with the page, so the frame host loads while the viewer's own script does. It asks for its document when
+  // it loads; if the viewer wasn't listening yet, the hello once mounted (below) has it ask again.
+  const frameSrc = ref(hostUrl())
   const frameKey = ref(0)
   /** The document the content frame shows. When the frame moves on its own, the viewer follows without a reload. */
   let frameDocument = ""
+  /** Whether this frame load asked for its document yet. Until it does, a changed document needs no reload. */
+  let asked = false
   function reloadFrame() {
-    frameSrc.value = contentOrigin.value ? contentOrigin.value + (isApp.value ? pageUrl(page.value) : "/") : undefined
+    frameSrc.value = hostUrl()
     frameKey.value++
+    asked = false
   }
-  onMounted(reloadFrame)
   /** Loads `path` in the content frame, as if the app went there itself: a Slidev deck's presenter view, say. */
   function openPath(path: string) {
     if (!contentOrigin.value) return
     frameSrc.value = contentOrigin.value + path
     frameKey.value++
+    asked = false
   }
 
   function pageFor(path: string) {
@@ -128,7 +150,7 @@ export function useViewerFrame(options: {
       }).catch(() => {})
   }, 2000)
 
-  const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, rect) => {
+  const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
       case "runtime-error":
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
@@ -142,6 +164,7 @@ export function useViewerFrame(options: {
         }
         return
       case "host":
+        asked = true
         frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
         // The grant lets this app's origin serve it its other files (server/utils/app-files.ts).
         return send({ type: "document", html: frameDocument, grant: drop.value.contentGrant })
@@ -158,6 +181,11 @@ export function useViewerFrame(options: {
         return
       case "copy":
         return void copy(message.text)
+      case "images":
+        // Each as soon as it's read, so the first one on screen doesn't wait for the rest.
+        for (const path of message.paths)
+          void attached.load(path).then((url) => url && send({ type: "image-data", path, url }))
+        return
       case "unplaced":
         unplaced.value = new Set(message.ids)
         return
@@ -168,11 +196,13 @@ export function useViewerFrame(options: {
       case "area":
       case "marker":
       case "key":
-        annotations.receive(message, rect)
+        annotations.receive(message, box)
     }
   })
+  onMounted(() => contentOrigin.value && send({ type: "hello" }))
   watch(srcdoc, (value) => {
-    if (contentOrigin.value && value === frameDocument) return
+    // A frame that hasn't asked yet gets the document as it is then, unless it's loading another page's address.
+    if (contentOrigin.value && (asked ? value === frameDocument : frameSrc.value === hostUrl())) return
     ready.value = false
     if (contentOrigin.value) reloadFrame()
   })
@@ -201,9 +231,14 @@ export function useViewerFrame(options: {
         ),
       })
   })
-  watch([ready, annotations.areaMode], () => ready.value && send({ type: "area-mode", on: annotations.areaMode.value }))
+  watch([ready, annotations.tool], () => ready.value && send({ type: "tool", tool: annotations.tool.value }))
+  watch(
+    [ready, () => ({ ...annotations.overlays })],
+    () => ready.value && send({ type: "view", ...annotations.overlays }),
+  )
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
   watch([ready, options.inset], () => ready.value && send({ type: "inset", right: options.inset.value }))
+  watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
 
   return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath }
 }

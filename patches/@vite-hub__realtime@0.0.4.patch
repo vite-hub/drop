@@ -1,0 +1,105 @@
+diff --git a/dist/server.js b/dist/server.js
+index 717313fb83dab4c024db673bc8de6ad8d895ec9a..64e87bbe6a13bbd3474470c0f9becc451b6c4485 100644
+--- a/dist/server.js
++++ b/dist/server.js
+@@ -485,8 +485,7 @@ function hasCloudflareSqlExec(sql) {
+ 		if (typeof constructor !== "function" || typeof exec !== "function" || typeof databaseSize !== "function") return false;
+ 		if (constructorEntry.owner !== execEntry.owner || constructorEntry.owner !== databaseSizeEntry.owner) return false;
+ 		if (!Object.hasOwn(constructor, "prototype") || constructor.prototype !== constructorEntry.owner) return false;
+-		if (Object.hasOwn(databaseSize, "prototype")) return false;
+-		if (!/^function\s+get(?:\s+\w+)?\s*\(\s*\)\s*\{\s*\[native\s+code\]\s*\}$/.test(Function.prototype.toString.call(databaseSize))) return false;
++		if (!/^function(?:\s+[\w$]+)*\s*\(\s*\)\s*\{\s*\[native\s+code\]\s*\}$/.test(Function.prototype.toString.call(databaseSize))) return false;
+ 		try {
+ 			Reflect.apply(databaseSize, Object.create(prototype), []);
+ 			return false;
+@@ -781,31 +780,35 @@ function localRefreshers() {
+ 	refreshScope[localRefreshKey] ??= /* @__PURE__ */ new Set();
+ 	return refreshScope[localRefreshKey];
+ }
++/**
++* Accepts the namespace that holds Realtime rooms, and nothing that only inherits `get` and `idFromName` from an
++* arbitrary prototype. Workerd's binding owns no methods: they belong to its `DurableObjectNamespace` class prototype,
++* and Workers have no global `DurableObjectNamespace` to compare with. Any other namespace, such as a test double,
++* must own both methods.
++*/
+ function isRealtimeDurableObjectNamespace(value) {
+ 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+-	const constructor = globalThis.DurableObjectNamespace;
+-	const callable = (method) => {
+-		if (typeof method !== "function") return false;
+-		try {
+-			return Function.prototype.toString.call(method) !== "function () { [native code] }";
+-		} catch {
+-			return false;
+-		}
+-	};
++	const methods = (target) => ["get", "idFromName"].map((name) => Object.getOwnPropertyDescriptor(target, name));
++	const callable = (method) => !!method && !method.get && typeof method.value === "function" && Function.prototype.toString.call(method.value) !== "function () { [native code] }";
+ 	try {
+-		if (typeof constructor === "function") {
+-			if (!(value instanceof constructor)) return false;
+-			const get = Object.getOwnPropertyDescriptor(value, "get");
+-			const id = Object.getOwnPropertyDescriptor(value, "idFromName");
+-			return get?.get === void 0 && id?.get === void 0 && callable(get?.value) && callable(id?.value);
+-		}
+-		const get = Object.getOwnPropertyDescriptor(value, "get");
+-		const id = Object.getOwnPropertyDescriptor(value, "idFromName");
+-		return get?.get === void 0 && id?.get === void 0 && callable(get?.value) && callable(id?.value);
++		const own = methods(value);
++		if (own.every(callable)) return true;
++		const prototype = Object.getPrototypeOf(value);
++		if (own.some(Boolean) || prototype === null || typeof prototype !== "object" || Object.getPrototypeOf(prototype) !== Object.prototype) return false;
++		return Object.prototype.toString.call(value) === "[object DurableObjectNamespace]" && methods(prototype).every(callable);
+ 	} catch {
+ 		return false;
+ 	}
+ }
++/** The `$DurableObject` binding of the running Worker. Nitro's Cloudflare entry stores each request's bindings in `globalThis.__env__`. */
++function workerDurableObjects() {
++	try {
++		const binding = globalThis.__env__?.$DurableObject;
++		return isRealtimeDurableObjectNamespace(binding) ? binding : void 0;
++	} catch {
++		return;
++	}
++}
+ /**
+ * Tells the open room of a document that its stored copy changed outside the room, such as a save by an Agent or the
+ * CLI. A room without unsaved edits re-seeds at once and resets its clients. A room with unsaved edits finds the change
+@@ -813,6 +816,8 @@ function isRealtimeDurableObjectNamespace(value) {
+ * whether a room re-seeded. It never throws: a failed refresh leaves the next save to find the change.
+ */
+ async function refreshRealtimeDocument(definition, documentId, options = {}) {
++	const binding = options.durableObjects ?? workerDurableObjects();
++	if (binding) return await refreshDurableRoom(binding, definition, documentId);
+ 	let reseeded = false;
+ 	for (const reference of localRefreshers()) {
+ 		const refresh = reference.deref();
+@@ -824,8 +829,13 @@ async function refreshRealtimeDocument(definition, documentId, options = {}) {
+ 			if (await refresh(definition, documentId)) reseeded = true;
+ 		} catch {}
+ 	}
+-	const binding = options.durableObjects;
+-	if (!binding) return reseeded;
++	return reseeded;
++}
++/**
++* On Cloudflare the rooms belong to the Durable Object, even when it shares an isolate with the Worker that calls this.
++* Only the Durable Object may refresh them: from the Worker's request, a room's sockets cannot receive the reset.
++*/
++async function refreshDurableRoom(binding, definition, documentId) {
+ 	try {
+ 		const room = documentId.split("/").map(encodeURIComponent).join("/");
+ 		const response = await binding.get(binding.idFromName(durableRoomsInstance)).fetch(new Request(`https://vitehub.internal${routePrefix}${encodeURIComponent(definition)}/${room}?document=refresh`, {
+@@ -833,9 +843,9 @@ async function refreshRealtimeDocument(definition, documentId, options = {}) {
+ 			headers: { [internalRefreshHeader]: "1" }
+ 		}));
+ 		const result = response.ok ? await response.json() : void 0;
+-		return reseeded || result instanceof Object && "reseeded" in result && result.reseeded === true;
++		return result instanceof Object && "reseeded" in result && result.reseeded === true;
+ 	} catch {
+-		return reseeded;
++		return false;
+ 	}
+ }
+ /**

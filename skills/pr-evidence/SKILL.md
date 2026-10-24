@@ -70,9 +70,11 @@ Before writing a mark, read [references/annotations.md](references/annotations.m
 
 Above the first board, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `href`, not in the text. Beyond the headings and captions, no tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
 
+The doc shows the change; how the work went (the checks you ran, retries, CI counts, who has reviewed) belongs in your report to the user. When you're asked to put that report in the doc, end it with one `## For <name>` section of at most five bullets: the verdict first (ready, or blocked and why), the cause in one sentence, each decision they have to make as a question, and anything you couldn't check. A side question gets its answer in one line there.
+
 ## Publish
 
-1. Write the doc from these rules and fresh captures each time. For a next version, read the earlier one only for its open comments; don't start from its text or its conclusions. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), a `note`, and `resources`: the pull request's URL with the title `PR #<number>`, and the after preview's URL with the title `Preview`. They show with their sites' icons at the top of the page. Pass them again with each version; one already there isn't added twice. Open the returned page.
+1. Write the doc from these rules and fresh captures each time. For a next version, read the earlier one only for its open comments; don't start from its text or its conclusions. Each version replaces the whole doc, and its `note` says what changed. Publish the Markdown with `publish`: `share: "public"`, the folder or lifetime from [Where it lives](#where-it-lives), a `note`, and `resources`: the pull request's URL with the title `PR #<number>`, and the after preview's URL with the title `Preview`. They show with their sites' icons at the top of the page. Pass them again with each version; one already there isn't added twice. Open the returned page.
 2. Take a screenshot of it and check that every arrow lands on its point, every mark sits on its target, and no note runs off the page or over another. Fix and publish again with `previous` until it does. If a mark can't be verified, say so in the report.
 3. Comment the link on the pull request, so the pull request leads to the doc as the doc leads to it:
 

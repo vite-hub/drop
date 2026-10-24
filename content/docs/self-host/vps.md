@@ -42,7 +42,7 @@ drop.example.com {
 
 Caddy forwards the host and HTTPS scheme. With nginx, set `proxy_set_header Host $host` and `proxy_set_header X-Forwarded-Proto $scheme`. Keep the OAuth app's homepage and callback on that HTTPS domain.
 
-To [give apps their own domain](/docs/self-host#content-origin), proxy a wildcard hostname (with a wildcard certificate) to the same port, with the same headers, and set `DROP_CONTENT_ORIGIN` to it, such as `https://*.drop-usercontent.example.com`.
+To [give apps their own domain](/docs/self-host#content-origin), proxy a wildcard hostname (with a wildcard certificate) to the same port, with the same headers, and set `DROP_CONTENT_ORIGIN` to it, such as `https://*.drop-usercontent.example.com`, and `VITEHUB_SECRET` to the output of `openssl rand -base64 32`.
 
 ## Settings {#env}
 
@@ -55,7 +55,7 @@ extra:
   - ["DROP_GITHUB_ORG", "Optional active organization membership requirement for publishing, viewing, and MCP."]
   - ["DROP_AUTH_PROXY", "Set true to reuse GitHub oauth2-proxy; requires DROP_GITHUB_ORG."]
   - ["DROP_AUTH_PROXY_COOKIE", "Optional proxy cookie name to clear on logout. Secure, host-only, Path=/."]
-  - ["DROP_CONTENT_ORIGIN", "Optional wildcard origin for apps and HTML docs, one subdomain per drop, proxied to the same port."]
+  - ["DROP_CONTENT_ORIGIN", "Optional wildcard origin for apps and HTML docs, one subdomain per drop, proxied to the same port. Needs VITEHUB_SECRET."]
 ---
 ::
 
