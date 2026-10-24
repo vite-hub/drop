@@ -391,7 +391,7 @@ async function removeComment(id: string) {
 async function reply(id: string, body: string) {
   const sent = await state.addReply(id, body)
   if ("value" in sent) await popoverRef.value?.sent()
-  else popoverRef.value?.fail(sent.error)
+  else popoverRef.value?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
