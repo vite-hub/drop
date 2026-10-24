@@ -53,6 +53,8 @@ patchedDependencies:
   # originalOf, which Drop's frame runtime anchors comments in the zoom with). Drop both once a release has #25 and #15.
   comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
   comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
+  # UTextarea's autoresize needs the hidden-copy measurement and bottom-padding scroll fix until upstream includes it.
+  "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
   # Deno's package copier sees mdream's architecture branches even when those native packages are not published.
 
 # Only workerd (local Workers runtime) needs its install script.
