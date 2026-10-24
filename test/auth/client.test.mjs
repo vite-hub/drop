@@ -1,16 +1,14 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { loadAuthClient } from "vite-hub/auth/vue"
 
 // Load the real Nuxt plugin with only Nuxt's registration helper supplied.
 globalThis.defineNuxtPlugin = (plugin) => plugin
 const { default: createPlugin } = await import("../../app/plugins/auth.ts")
 delete globalThis.defineNuxtPlugin
 
-test("each Nuxt app gets its own auth client and session state", async () => {
-  // The client loads Better Auth on first use; its store is only there once it has.
-  const first = await loadAuthClient(createPlugin().provide.auth)
-  const second = await loadAuthClient(createPlugin().provide.auth)
+test("each Nuxt app gets its own auth client and session state", () => {
+  const first = createPlugin().provide.auth
+  const second = createPlugin().provide.auth
   assert.notEqual(first, second)
   assert.notEqual(first.$store.atoms.session, second.$store.atoms.session)
   first.$store.atoms.session.set({ data: { user: { id: "first-account" } } })

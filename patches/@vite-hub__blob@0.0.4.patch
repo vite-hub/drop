@@ -1,8 +1,8 @@
-diff --git a/dist/storage-CW7dI9tZ.js b/dist/storage-CW7dI9tZ.js
-index 8be3f40e96911596147ad933f2752360cbf06517..70428f086f431374e5863add3b075e72cf8616bd 100644
---- a/dist/storage-CW7dI9tZ.js
-+++ b/dist/storage-CW7dI9tZ.js
-@@ -385,6 +385,26 @@ function createBlobStorage(driver, store = driver.name) {
+diff --git a/dist/storage-D2WunRjs.js b/dist/storage-D2WunRjs.js
+index b27f757f381167cbedff9f206079072b8805889c..d6ee4b892ce9b03aec8c1c11963daf81068329bf 100644
+--- a/dist/storage-D2WunRjs.js
++++ b/dist/storage-D2WunRjs.js
+@@ -390,6 +390,26 @@ function createBlobStorage(driver, store = driver.name) {
  						body = transformed ?? null;
  					}
  					if (!body) return;
@@ -29,18 +29,3 @@ index 8be3f40e96911596147ad933f2752360cbf06517..70428f086f431374e5863add3b075e72
  					const stream = body.stream();
  					headers.set("X-Content-Type-Options", "nosniff");
  					headers.set("Content-Length", String(body.size));
-diff --git a/dist/vite.js b/dist/vite.js
-index 86a9fd98d180c11b0105e543ef7ba22357e8bd89..c1c27ae37606701e16d0e6c29b9e3100ce92cf05 100644
---- a/dist/vite.js
-+++ b/dist/vite.js
-@@ -3474,7 +3474,9 @@ function renderNitroBlobPlugin(blob, cloudflare, importBase = blobPackageName) {
- 		cloudflare ? `const blobConfig = ${JSON.stringify(blob)}` : void 0,
- 		"",
- 		"export default function vitehubBlobPlugin() {",
--		cloudflare ? "  setActiveCloudflareEnv(vitehubEnv)" : void 0,
-+		// Under `nuxt dev`, cloudflare:workers is Nitro's shim: unenv's process.env proxy, which reads globalThis.__env__.
-+		// Storing it there makes the proxy read itself, so prefer the bindings Nitro's dev plugin already put there.
-+		cloudflare ? "  setActiveCloudflareEnv(globalThis.__env__ ?? vitehubEnv)" : void 0,
- 		"  setBlobRuntimeConfig(blobConfig)",
- 		"}",
- 		""
