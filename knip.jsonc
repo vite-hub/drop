@@ -16,6 +16,11 @@
     "server/content.ts",
     // Tags in content/docs/**/*.md (`::roles-table`) render these; knip doesn't read the Markdown.
     "app/components/docs/md/*.vue",
+    // Nuxt auto-imports these viewer controls; their references are template/runtime driven.
+    "app/components/viewer/ViewerDevice.vue",
+    "app/components/viewer/ViewerDeviceButton.vue",
+    "app/components/viewer/ViewerToolbar.vue",
+    "app/utils/devices.ts",
     "scripts/*.{ts,mjs}",
     "test/**/*.test.mjs",
     "test/e2e/*.mjs",
@@ -45,8 +50,6 @@
     "medium-zoom",
     // Loaded by the dynamic latest-room import, so knip cannot connect these runtime imports to an entry. Keeping
     // them ignored also ensures the SSR bundle uses one Yjs copy and avoids "Yjs was already imported" in the Worker.
-    "lib0",
-    "y-websocket",
     "yjs",
     "@tiptap/y-tiptap",
     // `nuxt typecheck` runs it.
