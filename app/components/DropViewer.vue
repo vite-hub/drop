@@ -110,9 +110,10 @@ function closeLightbox() {
   lightbox.value = null
   popover.value = null
 }
-const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void>; sent: () => Promise<void> }>(
-  "popoverRef",
-)
+const popoverRef = useTemplateRef<{
+  fail: (reason?: string, text?: string) => Promise<void>
+  sent: () => Promise<void>
+}>("popoverRef")
 const shareOpen = ref(false)
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
