@@ -28,11 +28,7 @@ const access = computed(
   () =>
     `${shareStatus(props.drop, now.value)}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`,
 )
-const accessHint = computed(() =>
-  props.drop.shareReview
-    ? "An admin reviews public links on this Drop. It still works for you, and for the team on a team Drop."
-    : SHARE_HINTS[props.drop.share],
-)
+const accessHint = computed(() => SHARE_HINTS[props.drop.share])
 // A site goes by its address, a folder by its title, anything else by its file's name.
 const name = computed(() =>
   site.value && props.drop.siteUrl

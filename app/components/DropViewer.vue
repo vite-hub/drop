@@ -147,14 +147,8 @@ const pageComments = computed(() =>
 // TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
-// Comments on the whole page have nothing in it to pin to; they live in the panel. Resolved comments stay there unless
-// explicitly opened, in which case `revealed` keeps its marker available while the thread is shown.
-const revealed = ref<string | null>(null)
-const pinned = computed(() =>
-  pageComments.value.filter(
-    (comment) => (!comment.resolved || comment.id === revealed.value) && !replaced(comment) && comment.kind !== "page",
-  ),
-)
+// Comments on the whole page have nothing in it to pin to; they live in the panel.
+const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
 // The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
@@ -453,21 +447,13 @@ function copyChangesLink(version: DropVersion) {
  * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
  */
 async function focusComment(comment: DropComment, row?: DOMRect) {
-  const focusGeneration = annotations.beginFocus()
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
     // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
     await nextTick()
     await until(ready).toBe(true, { timeout: 5000 })
   }
-  if (!annotations.isFocusCurrent(focusGeneration)) return
   if (!wide.value) mobileSide.value = false
-  if (!annotations.awaitThread(comment.kind === "page" ? null : comment.id, focusGeneration)) return
-  revealed.value = comment.resolved && comment.kind !== "page" ? comment.id : null
-  if (revealed.value) {
-    await nextTick()
-    if (!annotations.isFocusCurrent(focusGeneration)) return
-  }
   if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
   // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
   const top = frame.value?.getBoundingClientRect()
@@ -605,7 +591,6 @@ const threadComment = computed(() => {
   const open = popover.value
   return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
 })
-watch(popover, (open) => !open && (revealed.value = null))
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => threadComment.value?.n,
