@@ -1,11 +1,11 @@
 ---
 name: pr-evidence
-description: Builds pull-request evidence for UI changes, with before and after screenshots, hand-drawn marks, and notes written in Markdown, then drops it into Drop and comments its link on the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
+description: Builds pull-request evidence in Markdown, with before and after screenshots for UI changes or changed lines for code changes, then drops it into Drop and comments its link on the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
 ---
 
 # Pull-request evidence
 
-Show reviewers what changed on screen, marked up so they don't have to hunt for it. You write Markdown with comark-annotate components; Drop renders it as a page with hand-drawn marks, numbered notes, and arrows.
+Show reviewers what changed, marked up so they don't have to hunt for it. You write Markdown with comark-annotate components; Drop renders it as a page with hand-drawn marks, numbered notes, and arrows. When nothing changes on screen, as in a refactor, skip [Capture](#capture) and show the code as a [code change](#code-changes).
 
 ## Where it lives
 
@@ -28,7 +28,7 @@ Call `list_folders` first. If a folder's description says it's for pull request 
 
 ## Write
 
-The screenshots are the evidence; the text only points into them. Mark them up the way a designer marks up a review board: one ink, notes in the margin, and arrows that land on the exact spot, so the screenshot reads without a key.
+The screenshots are the evidence for UI changes; the text only points into them. Mark them up the way a designer marks up a review board: one ink, notes in the margin, and arrows that land on the exact spot, so the screenshot reads without a key. For code changes, the diff is the evidence; show the changed lines as described in [Code changes](#code-changes).
 
 Split the change into boards, one per thing a reviewer should notice. Each board is:
 
