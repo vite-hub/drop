@@ -46,6 +46,21 @@ const url = drop.url
 
 Use a common language name or alias such as `ts`, `py`, or `sh`. An unknown language or a missing one gives plain text. `{2}` highlights line 2. `{1,3-5}` highlights lines 1 and 3 to 5.
 
+## Code changes
+
+````md
+::diff{line=14}
+```ts [server/api/drops.get.ts]
+const limit = 20
+```
+```ts
+const limit = Number(getQuery(event).limit ?? 20)
+```
+::
+````
+
+`::diff` shows one file's lines before and after, with the file, line numbers, and the changed words marked. Copy real lines from the change. The full syntax is in [the annotation reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/annotations.md#diff).
+
 ## Mermaid
 
 ````md
