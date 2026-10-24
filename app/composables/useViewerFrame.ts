@@ -14,7 +14,8 @@ type RuntimeReport = {
 /**
  * The frame the drop renders in, and everything that goes over its postMessage bridge (useDropFrame): the document
  * it shows, the app page it navigated to, the comment pins, the toolbar's tool and overlays, the room the floating
- * panel takes, and the errors the page reports. What the reader points at goes on to the annotations.
+ * panel takes, and the errors the page reports. What the reader points at goes on to the annotations, and what they
+ * answer in a Markdown doc's questions and polls to the quiz (useViewerQuiz).
  */
 export function useViewerFrame(options: {
   drop: Ref<DropDetail>
@@ -150,8 +151,13 @@ export function useViewerFrame(options: {
       }).catch(() => {})
   }, 2000)
 
+  const quiz = useViewerQuiz(drop, (message) => send(message))
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
+      case "quiz-ready":
+      case "quiz-answer":
+        if (drop.value.kind === "markdown") quiz.receive(message)
+        return
       case "runtime-error":
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
           runtimeReports.push({
