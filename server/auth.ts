@@ -1,18 +1,21 @@
 import { oauthProvider } from "@better-auth/oauth-provider"
+import { stripe } from "@better-auth/stripe"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { github } from "better-auth/social-providers"
-import { admin, jwt } from "better-auth/plugins"
-import { eq } from "drizzle-orm"
+import { admin, jwt, organization as teamsPlugin } from "better-auth/plugins"
+import { and, eq, inArray } from "drizzle-orm"
+import { Stripe } from "stripe"
 import * as v from "valibot"
 import { defineAuth } from "vite-hub/auth"
 import { db, schema } from "vite-hub/database/drizzle"
-import { user as users } from "./databases/config"
+import { member, user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
-import { nativeClientRegistration } from "./utils/oauth-clients"
+import { clientRegistrationLimits } from "./utils/oauth-clients"
 import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
+import { billingConfig, memberLimit, teamSeats, teamsEnabled } from "./utils/teams"
 
 // The account's creation date, a review signal (shared/trust.ts).
 const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
@@ -30,7 +33,8 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  * people who may (admins always may); `DROP_GITHUB_ORG` limits it to an organization. `DROP_ADMINS` lists the admins
  * by email. Whoever signs in with one of those emails, verified by the sign-in method, is a member or an admin, so
  * swapping GitHub for another provider keeps both lists. `roleOf` decides on every request; each new session writes
- * it down for Better Auth's admin endpoints. Nobody else changes roles.
+ * it down for Better Auth's admin endpoints. Nobody else changes roles, so the admin plugin's set-role is off, and so is
+ * its impersonation, which Drop doesn't offer.
  *
  * Agents have no keys. Drop is an OAuth 2.1 authorization server for its own MCP endpoint (`oauthProvider`):
  * an MCP client registers itself, opens the browser once, and the person approves it on /oauth (signing in
@@ -39,9 +43,14 @@ type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
  *
  * Local dev has no GitHub OAuth app, so email and password sign-in is on in `nuxt dev` only.
  *
+ * Teams (`DROP_TEAMS`, ./utils/teams.ts) are Better Auth organizations; Drop sends no invitation emails, so whoever
+ * invites copies the link. With Stripe set up (`STRIPE_*`), a team past its free members needs a subscription, one seat
+ * per member, which Stripe's plugin keeps in step as people join and leave.
  */
 export default defineAuth(({ env, requestOrigin }) => {
   const proxied = authProxy().enabled
+  const teams = teamsEnabled()
+  const billing = billingConfig()
   const organization = env.drop.githubOrg.trim()
   const githubOptions = {
     clientId: proxied ? "" : env.auth.github.clientId.unseal(),
@@ -59,7 +68,13 @@ export default defineAuth(({ env, requestOrigin }) => {
     advanced: requestOrigin.startsWith("https://")
       ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
       : {},
-    disabledPaths: ["/token", ...(proxied ? ["/sign-in/social", "/callback/github", "/link-social"] : [])],
+    disabledPaths: [
+      "/token",
+      "/admin/set-role",
+      "/admin/impersonate-user",
+      "/admin/stop-impersonating",
+      ...(proxied ? ["/sign-in/social", "/callback/github", "/link-social"] : []),
+    ],
     access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
     socialProviders: proxied
       ? {}
@@ -78,7 +93,7 @@ export default defineAuth(({ env, requestOrigin }) => {
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
     // Free or Pro (shared/quotas.ts TIERS). Only admins set it, from the Members page through the admin plugin.
     user: { additionalFields: { plan: { type: ["free", "pro"], required: false, input: false } } },
-    hooks: { before: nativeClientRegistration },
+    hooks: { before: clientRegistrationLimits },
     databaseHooks: {
       account: {
         create: {
@@ -125,8 +140,62 @@ export default defineAuth(({ env, requestOrigin }) => {
     },
     plugins: [
       proxyAuth(),
-      admin({ ac, roles, defaultRole: "member", adminRoles: ["admin"] }),
+      admin({ ac, roles, defaultRole: "member" }),
       jwt(),
+      ...(teams
+        ? [
+            teamsPlugin({
+              creatorRole: "owner",
+              invitationExpiresIn: 7 * 24 * 60 * 60,
+              cancelPendingInvitationsOnReInvite: true,
+              membershipLimit: (_user: unknown, team: { id: string }) => memberLimit(team.id),
+              // Pending invitations count as seats, so a free team can't invite past its free members.
+              invitationLimit: async ({ organization: team }: { organization: { id: string } }) =>
+                Math.max(0, (await memberLimit(team.id)) - (await teamSeats(team.id)).members),
+            }),
+          ]
+        : []),
+      ...(billing.enabled
+        ? [
+            stripe({
+              stripeClient: new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
+              stripeWebhookSecret: billing.webhookSecret,
+              organization: { enabled: true },
+              subscription: {
+                enabled: true,
+                // One price per member: the plugin sets the quantity to the team's members and keeps it there.
+                plans: [
+                  {
+                    name: "team",
+                    priceId: billing.priceId,
+                    seatPriceId: billing.priceId,
+                    annualDiscountPriceId: billing.annualPriceId,
+                    freeTrial: { days: 14 },
+                  },
+                ],
+                // Only a team's owner and admins pay for it, see its billing, or cancel.
+                authorizeReference: async ({ user, referenceId }) => {
+                  const [row] = await db
+                    .select({ role: member.role })
+                    .from(member)
+                    .where(
+                      and(
+                        eq(member.userId, user.id),
+                        eq(member.organizationId, referenceId),
+                        inArray(member.role, ["owner", "admin"]),
+                      ),
+                    )
+                    .limit(1)
+                  return Boolean(row)
+                },
+                // Managed Payments makes Stripe the merchant of record, which files sales tax and VAT.
+                getCheckoutSessionParams: () => ({
+                  params: billing.managedPayments ? { managed_payments: { enabled: true } } : {},
+                }),
+              },
+            }),
+          ]
+        : []),
       oauthProvider({
         loginPage: "/oauth",
         consentPage: "/oauth",
@@ -138,6 +207,8 @@ export default defineAuth(({ env, requestOrigin }) => {
         enforcePerClientResources: false,
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
+        // MCP clients register loopback or private-use redirects without `application_type`; register them as native.
+        clientRegistrationDefaultApplicationType: "infer",
       }),
     ],
   }

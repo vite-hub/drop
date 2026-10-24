@@ -62,6 +62,8 @@ export const drops = sqliteTable(
     siteUrl: text("site_url"),
     /** CAS token used while replacing an app's file set. */
     publishToken: text("publish_token"),
+    /** Team folders on a personal Drop: the team (organization) whose members it reaches. Null on a team Drop's own. */
+    teamId: text("team_id"),
   },
   (table) => [
     index("drops_owner_idx").on(table.ownerId, table.updatedAt),

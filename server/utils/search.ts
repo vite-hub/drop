@@ -30,7 +30,7 @@ const ENTITIES = new Map([
 export function searchableText(kind: string, source: string) {
   let text = source
   if (kind === "board") {
-    // A board's source is its tldraw snapshot; its words are in the notes, texts, shapes and frame names.
+    // A board's source is its Excalidraw scene; its words are in the notes, texts, shapes and frame names.
     try {
       text = boardText(parseBoard(source))
     } catch {

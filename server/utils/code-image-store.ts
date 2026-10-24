@@ -7,6 +7,7 @@ import { requireRateLimit } from "vite-hub/rate-limit"
 import { PNG_CODE_IMAGES, renderCodePng } from "#code-image-png"
 import type { CodeImageInput } from "#shared/schemas"
 import { createCodeImageLocation, renderCodeSvg } from "./code-image"
+import { deleteBlobKeys } from "./drops"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
 
@@ -34,8 +35,10 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
       access: "private",
       contentType: format === "png" ? "image/png" : "image/svg+xml",
     })
+    // No code_images row points at the key yet, so the hourly cleanup would never find it: deleteBlobKeys queues a
+    // retry when the delete fails.
     if (storageError || !stored.url) {
-      await blob.del(key)
+      await deleteBlobKeys([key])
       throw new HTTPError({ status: 503, statusText: "The code image could not be stored." })
     }
     try {
@@ -46,7 +49,7 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
           .values({ blobKey: key, ownerId: who.userId, size: image.size, expiresAt: expiresAt.getTime() }),
       ])
     } catch (error) {
-      await blob.del(key)
+      await deleteBlobKeys([key])
       throw error
     }
     return { url: new URL(stored.url, event.req.url).href, expiresAt: expiresAt.toISOString() }

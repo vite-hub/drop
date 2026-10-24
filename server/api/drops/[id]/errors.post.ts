@@ -1,4 +1,4 @@
-import { defineValidatedHandler } from "h3"
+import { defineValidatedHandler, noContent } from "h3"
 import * as v from "valibot"
 import { RuntimeErrorSchema } from "#shared/schemas"
 import { requireRateLimit } from "vite-hub/rate-limit"
@@ -21,9 +21,8 @@ export default defineValidatedHandler({
   async handler(event) {
     const drop = await findDrop(await routeId(event), event)
     const who = await identify(event)
-    event.res.status = 204
     if (!drop || (drop.kind !== "app" && drop.kind !== "html") || drop.expired || !permissions(drop, who).view)
-      return null
+      return noContent()
     await requireRateLimit(event, "runtime-error", {
       key: `${drop.id}:${who?.userId ?? "guest"}`,
       limit: 10,
@@ -31,6 +30,6 @@ export default defineValidatedHandler({
     })
     const { version, errors } = await event.req.json()
     if (version === drop.version) await recordRuntimeErrors(drop.id, version, errors)
-    return null
+    return noContent()
   },
 })

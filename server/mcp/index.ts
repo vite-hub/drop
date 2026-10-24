@@ -86,6 +86,8 @@ export function mcpFor(origin: string) {
     { extensionPlugins: [mcpSkills()] },
   )
   server = { mcp, oauth }
+  // The origin comes from the request's Host, which a Node host passes through as sent: keep only the latest few.
+  if (servers.size >= 8) servers.delete(servers.keys().next().value!)
   servers.set(origin, server)
   return server
 }

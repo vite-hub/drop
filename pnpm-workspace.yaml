@@ -18,27 +18,17 @@ overrides:
   # Nuxt's payload serializer; 5.9.3+ fixes several uneval/stringify advisories.
   devalue: ^5.9.4
   vite@*: "catalog:"
-  # tldraw's @tiptap/react asks for ^3.12; without these, adding it moved Nuxt UI's menus to 3.32 beside core 3.31.4.
+  # Nuxt UI's editor menus stay on @tiptap/core's 3.31.4; a 3.32 menu beside core 3.31.4 breaks them.
   "@tiptap/extension-bubble-menu": 3.31.4
   "@tiptap/extension-floating-menu": 3.31.4
+  # One h3 v2 in the server bundle. Nitro and ViteHub asked for older release candidates; Nitro's rc.22 answered a
+  # malformed escape such as /f/%E0%A4 with a 500 before any of Drop's middleware ran.
+  "h3@2.0.1-rc.22": 2.0.1
+  "h3@2.0.1-rc.33": 2.0.1
 
 patchedDependencies:
-  # Keeps the Server Env resolver in Auth's global state. In dev, editing anything server/auth.ts imports re-ran the
-  # module and dropped it, so signed-in requests failed on `env.drop` until /api/auth ran again (vite-hub/vitehub#2469).
-  "@vite-hub/auth@0.0.4": patches/@vite-hub__auth@0.0.4.patch
-  # Under `nuxt dev` (cloudflare-dev), the Blob plugin stored unenv's process.env proxy as globalThis.__env__, which
-  # that proxy reads, so the first spread of process.env (Server Env) overflowed the stack. Prefers Nitro's bindings
-  # (vite-hub/vitehub#2468). Its serve() also answers a single byte Range with a 206, so videos seek (and play in Safari).
+  # serve() answers a single byte Range with a 206, so videos seek (and play in Safari). Not upstream yet.
   "@vite-hub/blob@0.0.4": patches/@vite-hub__blob@0.0.4.patch
-  # `vitehub schedule run` returned 500 under `nuxt dev` (ssrLoadModule needs a runnable ssr environment) and ran
-  # outside Nitro elsewhere. Runs Static Schedules through the Nitro dev handler, imports registry definitions by
-  # absolute path (the app/ Vite root broke relative ones), and reloads the registry on HMR (vite-hub/vitehub#2473).
-  "@vite-hub/schedule@0.0.4": patches/@vite-hub__schedule@0.0.4.patch
-  # files(): a Source over files bundled at build time, so the docs' Content runs on Workers without a file system.
-  # The vite-hub patch adds its `vite-hub/source/files` export (vite-hub/vitehub#2627).
-  "@vite-hub/source@0.0.4": patches/@vite-hub__source@0.0.4.patch
-  # AvatarStack, ConnectionStatus, SyncStatus, and caret styles from vite-hub/vitehub#2461 (still open).
-  "@vite-hub/ui@0.0.4": patches/@vite-hub__ui@0.0.4.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
@@ -52,11 +42,6 @@ patchedDependencies:
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
   # basic auth without sendError or a Node request, and request middlewares registered only for features in use.
   nuxt-security@2.6.0: patches/nuxt-security@2.6.0.patch
-  # Forwards vite-hub/ui/avatar-stack, connection-status, and sync-status to the patched @vite-hub/ui (#2461), and
-  # copies its collaboration CSS into vite-hub/ui/styles.css, a separate file; without it the avatars render full size.
-  # Keeps Rate Limit in memory under `nuxt dev`: the preset pinned the Cloudflare provider, whose bindings exist only
-  # in the built wrangler.json, so every limited route returned 500 in dev (vite-hub/vitehub#2467).
-  vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
   # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
   # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
   vite-doctor@0.0.12: patches/vite-doctor@0.0.12.patch
@@ -68,6 +53,11 @@ patchedDependencies:
   # originalOf, which Drop's frame runtime anchors comments in the zoom with). Drop both once a release has #25 and #15.
   comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
   comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
+  # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the
+  # overlay scrollbar of a comment past maxrows. Measures a hidden copy instead (nuxt/ui#7267). Also scrolls to the
+  # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
+  # padding, so keep this part after #7267 ships.
+  "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
@@ -95,6 +85,7 @@ minimumReleaseAgeExclude:
   - "@better-auth/mongo-adapter@1.7.10"
   - "@better-auth/oauth-provider@1.7.10"
   - "@better-auth/prisma-adapter@1.7.10"
+  - "@better-auth/stripe@1.7.10"
   - "@better-auth/telemetry@1.7.10"
   - better-auth@1.7.10
   - comark-annotate@0.2.0

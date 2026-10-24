@@ -15,12 +15,12 @@ export default defineValidatedHandler({
   async handler(event): Promise<DropLink> {
     const key = await routeId(event)
     const pinned = Number(event.url.searchParams.get("v")) || undefined
-    const who = await identify(event)
-    const found = await findDrop(key, event)
+    const [who, found] = await Promise.all([identify(event), findDrop(key, event)])
     // Sharing belongs to the whole doc, so the version that was found answers for all of them.
     if (!found || (!permissions(found, who).view && !waitingForReview(found, who) && !expiredLink(found, who)))
       throw new HTTPError({ status: 404, statusText: "This drop is private, or it was deleted." })
-    const chain = await versionChain(found)
+    // A link's key finds the doc's latest version already; only a pin or a version's own id needs the chain.
+    const chain = pinned || key === found.id ? await versionChain(found) : [found]
     const head = chain[0]!
     const target = pinned ? chain.find((row) => row.version === pinned) : head
     if (!target) throw new HTTPError({ status: 404, statusText: `This doc has no v${pinned}.` })

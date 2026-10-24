@@ -4,9 +4,10 @@ import type { DropCrumb, DropSummary } from "#shared/types"
 import { expiresAt } from "#shared/expiry"
 import { isPublic, type Share, shareLevel } from "#shared/share"
 import type { Identity } from "../identity"
-import { inTeamFolder } from "../nodes"
+import { type Grant, inTeamFolder } from "../nodes"
 import { expiryPolicy } from "../expiry"
 import { shareNow, sharePolicy } from "../share"
+import { onTeam, runsTeam, teamOf } from "../teams"
 import type { DropRow } from "./types"
 /**
  * What the caller may do with a drop. Admins act on every drop. A share reaches the team (everyone signed in to this
@@ -14,6 +15,9 @@ import type { DropRow } from "./types"
  * not their agents, so only the owner and admins publish through agents. A public link waiting for review reaches nobody
  * yet, while the team shares on its path still do. A team folder is the admins' to change; anyone on the team may trash
  * the drops in it. An expired drop is read-only for the people who can renew it and gone for everyone else.
+ *
+ * On a personal Drop with teams, "the team" is the team whose folders hold the drop (../teams.ts): only its members, and
+ * its owner and admins keep its folders.
  */
 export function permissions(drop: DropRow, who: Identity | null) {
   const admin = Boolean(who && who.role === "admin")
@@ -27,15 +31,16 @@ export function permissions(drop: DropRow, who: Identity | null) {
       trash: false,
     }
   const owner = Boolean(who && who.userId === drop.ownerId)
-  // On a team Drop, a public link waiting for review still reaches the team.
-  const held: Share | null = sharePolicy().mode === "team" ? "team" : null
+  const team = teamOf(drop)
+  // On a team Drop, or in a team's folders, a public link waiting for review still reaches the team.
+  const held: Share | null = sharePolicy().mode === "team" || team ? "team" : null
   const grants = (drop.grants ?? (drop.share === "private" ? [] : [{ share: drop.share }])).flatMap((grant) =>
     drop.shareReview && isPublic(grant.share) ? (held ? [{ share: held }] : []) : [grant],
   )
-  const level = drop.expired ? -1 : Math.max(-1, ...grants.map((grant) => shareLevel(grant.share, who !== null)))
+  const level = drop.expired ? -1 : Math.max(-1, ...grants.map((grant) => levelFor(grant, drop, who)))
   const available = !drop.ownerBanned
   const live = available && !drop.expired
-  const manage = drop.teamFolder ? admin : owner || admin
+  const manage = drop.teamFolder ? admin || runsTeam(team, who) : owner || admin
   return {
     owner,
     view: available && (owner || admin || level >= 0),
@@ -47,9 +52,15 @@ export function permissions(drop: DropRow, who: Identity | null) {
   }
 }
 
-/** Whether a share on the drop's path includes the caller, review and expiry aside. Team shares need a signed-in caller. */
-export const reaches = (drop: Pick<DropRow, "share" | "grants">, who: Identity | null) =>
-  (drop.grants ?? [{ share: drop.share }]).some((grant: Grant) => shareLevel(grant.share, who !== null) >= 0)
+/** What one share lets the caller do: a public link anyone signed in or not, a team share the drop's team only. */
+function levelFor(grant: Grant, drop: DropRow, who: Identity | null) {
+  if (isPublic(grant.share)) return shareLevel(grant.share, who !== null)
+  return shareLevel(grant.share, onTeam(teamOf(drop), who, sharePolicy().mode === "team"))
+}
+
+/** Whether a share on the drop's path includes the caller, review and expiry aside. Team shares need a teammate. */
+export const reaches = (drop: DropRow, who: Identity | null) =>
+  (drop.grants ?? [{ share: drop.share }]).some((grant: Grant) => levelFor(grant, drop, who) >= 0)
 
 /** A share that worked until its drop expired. Private drops stay indistinguishable from missing ones. */
 export const expiredLink = (drop: DropRow | null, who: Identity | null) =>
@@ -102,6 +113,7 @@ export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().
     trashedAt: row.trashedAt ?? (row.expired && expires !== null ? expires : null),
     trashReason: row.trashReason ?? (row.expired ? "expired" : null),
     ...(row.kind === "folder" && row.teamFolder ? { teamFolder: true } : {}),
+    ...(teamOf(row) ? { team: teamOf(row)! } : {}),
     ...(row.sharedFrom && row.raw ? { sharedFrom: row.sharedFrom, ownShare: row.raw.share } : {}),
   }
 }

@@ -52,6 +52,8 @@ export const FolderSchema = v.object({
   ),
   /** A team folder: on a team Drop, admins only. */
   team: v.optional(v.boolean()),
+  /** On a personal Drop with teams: the team it's for, whose owner and admins make its folders. */
+  teamId: v.optional(v.pipe(v.string(), v.maxLength(100))),
   /** The folder to create it in, by id or link. */
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
@@ -90,7 +92,11 @@ export const CommentSchema = v.pipe(
     (input) => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000,
     "The area must stay inside its anchor.",
   ),
-  v.check((input) => input.kind !== "area" || (input.ow > 0 && input.oh > 0), "An area needs a width and a height."),
+  // A spot on an element (the Comment tool's click) has neither.
+  v.check(
+    (input) => input.kind !== "area" || input.ow > 0 === input.oh > 0,
+    "An area needs both a width and a height.",
+  ),
   v.check(
     (input) =>
       input.kind !== "page" || (!input.selector && !input.ox && !input.oy && !input.ow && !input.oh && !input.quote),

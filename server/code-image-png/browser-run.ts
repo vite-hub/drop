@@ -30,11 +30,8 @@ export async function renderOgPng(event: H3Event, page: { html: string; width: n
     viewport: { width: page.width, height: page.height },
     gotoOptions: { waitUntil: "networkidle0", timeout: 15_000 },
     screenshotOptions: { type: "png" },
-  }).catch((error: unknown) => {
-    useLogger(event).error(error instanceof Error ? error : new Error(String(error)), { ogImage: { status: 0 } })
-    return null
   })
-  if (!response) return null
+  // runBrowserAction answers a failure with an error Response; it doesn't throw.
   if (!response.ok) {
     useLogger(event).error(new Error(await response.text()), { ogImage: { status: response.status } })
     return null

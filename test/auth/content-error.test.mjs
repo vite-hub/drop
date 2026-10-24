@@ -19,6 +19,8 @@ test("signed-out content errors offer sign-in and preserve the original link", a
   assert.match(html, /Sign in with GitHub/)
   assert.ok(html.includes(`/signin?redirect=${encodeURIComponent(path)}`))
   assert.doesNotMatch(html, /Internal details must not appear/)
+  // A pasted link unfurls as Drop's card, not as the error.
+  assert.match(html, /<meta property="og:image" content="https:\/\/drop\.example\/og\.png">/)
   assert.equal(response.headers.get("cache-control"), "private, no-store")
   assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow")
 })

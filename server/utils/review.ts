@@ -1,9 +1,9 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { textValue } from "#shared/utils/text"
 import { blob } from "vite-hub/blob"
+import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { newLink, slugify } from "#shared/links"
@@ -22,11 +22,11 @@ import { defaultShare, isPublic, type Share } from "#shared/share"
 import { comments, drops, user } from "../databases/config"
 import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
-import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions } from "./drops"
+import { type DropRow, findDrop, type LifetimeInput, lifetimeFields, permissions, storageFailure } from "./drops"
 import { type Identity, roleOf } from "./identity"
 import { isMember, membersOnly } from "./members"
-import { DropQuotaError, withDropQuota } from "./quotas"
-import { shareFields, sharePolicy } from "./share"
+import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
+import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
 
@@ -293,9 +293,11 @@ export async function createSiteDrop(
   const folder = input.folder ?? null
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
+  await requireKeepSlot(ownerId, life, false, !folder)
+  const mode = modeFor(folder, event)
   const { share, publicUntil } = input.share
-    ? shareFields(input.share, { kind: "site" }, event)
-    : { share: defaultShare(sharePolicy(event).mode), publicUntil: null }
+    ? shareFields(input.share, { kind: "site", team: mode === "team" }, event)
+    : { share: defaultShare(mode), publicUntil: null }
   return withDropQuota(ownerId, { drops: 1, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
     const host = siteHost(siteUrl)
@@ -330,6 +332,7 @@ export async function createSiteDrop(
       parentId: folder?.id ?? null,
       siteUrl,
       publishToken: null,
+      teamId: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     return row
@@ -338,16 +341,13 @@ export async function createSiteDrop(
 
 export type Screenshot = { bytes: Uint8Array; contentType: "image/png" | "image/jpeg" | "image/webp" }
 
+const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const
+
 /** The image's real type from its first bytes, whatever the page claimed. Only the three a browser canvas makes. */
 function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | null {
-  const at = (offset: number, ...values: number[]) => values.every((value, index) => bytes[offset + index] === value)
-  if (at(0, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png"
-  if (at(0, 0xff, 0xd8, 0xff)) return "image/jpeg"
-  if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return "image/webp"
-  return null
+  const type = detectContentType(bytes)
+  return type === "image/png" || type === "image/jpeg" || type === "image/webp" ? type : null
 }
-
-const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const
 
 /**
  * A review comment as multipart: `data` (JSON, ReviewCommentSchema) and an optional `screenshot`. Both the review
@@ -440,10 +440,7 @@ export async function addReviewComment(
       const id = crypto.randomUUID()
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
       const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
-      if (storageError) {
-        log.error({ action: "review-screenshot", error: storageError.message })
-        throw new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable." })
-      }
+      if (storageError) throw storageFailure(storageError)
       const path = input.page.replace(/[?#].*$/, "") || "/"
       const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
       const image: DropRow = {
@@ -477,6 +474,7 @@ export async function addReviewComment(
         parentId: site.id,
         siteUrl: null,
         publishToken: null,
+        teamId: null,
       }
       try {
         await quota.commit([
@@ -502,27 +500,26 @@ export async function siteItems(
   origin: string,
   page?: string,
 ): Promise<SiteReviewItem[]> {
-  const rows = await db
-    .select({
-      comment: comments,
-      shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
-    })
-    .from(comments)
-    .innerJoin(drops, eq(drops.id, comments.dropId))
-    .where(
-      and(
-        sql`${comments.dropId} IN (${siteFamily(site.id)})`,
-        page
-          ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
-          : undefined,
-      ),
-    )
-    .orderBy(asc(comments.createdAt))
-    .limit(500)
-  const extras = await commentExtras(
-    rows.map((item) => item.comment),
-    siteFamily(site.id),
-  )
+  const [rows, extras] = await Promise.all([
+    db
+      .select({
+        comment: comments,
+        shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
+      })
+      .from(comments)
+      .innerJoin(drops, eq(drops.id, comments.dropId))
+      .where(
+        and(
+          sql`${comments.dropId} IN (${siteFamily(site.id)})`,
+          page
+            ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
+            : undefined,
+        ),
+      )
+      .orderBy(asc(comments.createdAt))
+      .limit(500),
+    commentExtras(siteFamily(site.id)),
+  ])
   return rows.reverse().map(({ comment, shot }) => ({
     ...toComment(comment, who, 1, extras),
     screenshot:

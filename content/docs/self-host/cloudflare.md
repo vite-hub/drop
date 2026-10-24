@@ -69,11 +69,11 @@ To deploy on every push instead, connect the repository in Workers Builds with `
 extra:
   - ["CLOUDFLARE_D1_DATABASE_ID", "The id wrangler d1 create printed. Read at build time."]
   - ["CLOUDFLARE_D1_DATABASE_NAME", "The D1 database name, vitehub-drop by default."]
-  - ["DROP_CONTENT_ORIGIN", "Optional. Where apps and HTML docs run, one subdomain per drop on the same Worker, such as https://*-drop.example.com."]
+  - ["DROP_CONTENT_ORIGIN", "Optional. Where apps and HTML docs run, one subdomain per drop on the same Worker, such as https://*-drop.example.com. Needs VITEHUB_SECRET."]
 ---
 ::
 
-To [give apps their own domain](/docs/self-host#content-origin), add a proxied wildcard DNS record to your zone (`*`, `AAAA 100::`) and a Worker route `*-drop.example.com/*`; custom domains don't take wildcards. Then set `DROP_CONTENT_ORIGIN` to `https://*-drop.example.com`. The route only matches names that end in `-drop`, so your other subdomains are untouched, and the free certificate covers them because they're one level deep.
+To [give apps their own domain](/docs/self-host#content-origin), add a proxied wildcard DNS record to your zone (`*`, `AAAA 100::`) and a Worker route `*-drop.example.com/*`; custom domains don't take wildcards. Then set `DROP_CONTENT_ORIGIN` to `https://*-drop.example.com`, and `VITEHUB_SECRET` to the output of `openssl rand -base64 32`. The route only matches names that end in `-drop`, so your other subdomains are untouched, and the free certificate covers them because they're one level deep.
 
 ## Database {#database}
 

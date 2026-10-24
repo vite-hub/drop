@@ -151,6 +151,20 @@ test.skipIf(!origin || !state)(
     assert.equal(
       (
         await request("/api/auth/oauth2/register", {
+          body: {
+            client_name: "MCP mixed redirects",
+            redirect_uris: ["http://127.0.0.1/callback", "https://client.example/callback"],
+            token_endpoint_auth_method: "none",
+            grant_types: ["authorization_code", "refresh_token"],
+            response_types: ["code"],
+          },
+        })
+      ).status,
+      400,
+    )
+    assert.equal(
+      (
+        await request("/api/auth/oauth2/register", {
           body: { redirect_uris: Array(6).fill("http://localhost/callback") },
         })
       ).status,

@@ -1,5 +1,6 @@
 import type { ThemedToken } from "shiki/core"
 import { type CodeTheme, isCodeTheme, loadHighlighter } from "#shared/highlighter"
+import { escapeUTF8 as escapeXml } from "entities"
 
 /**
  * Code images, rendered here instead of scraped from another site: Shiki tokenizes the code, and the tokens
@@ -25,9 +26,6 @@ async function prepare(language: string | undefined, theme: string | undefined) 
   const { shiki, lang } = await loadHighlighter(language, [themeName])
   return { shiki, lang, theme: themeName }
 }
-
-const escapeXml = (value: string) =>
-  value.replace(/[<>&"']/g, (char) => `&${{ "<": "lt", ">": "gt", "&": "amp", '"': "quot", "'": "apos" }[char]};`)
 
 const FONT_SIZE = 14
 const LINE_HEIGHT = 22

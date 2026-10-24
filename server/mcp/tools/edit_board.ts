@@ -41,15 +41,12 @@ export default defineMcpTool({
       throw new HTTPError({ status: 404, message: `No board with id ${id} you can edit.` })
     if ((await versionsOf(drop))[0]?.id !== drop.id || drop.expired)
       throw new HTTPError({ status: 409, message: "That's an older version of the board; edit the latest one." })
-    const { board, put, remove } = await writeBoard(drop, { edit, who })
+    const { board, changed } = await writeBoard(drop, { edit, who })
     return {
       content: [
-        {
-          type: "text" as const,
-          text: `Changed ${put} records, removed ${remove}. The board now:\n\n${boardOutline(board)}`,
-        },
+        { type: "text" as const, text: `Changed ${changed} elements. The board now:\n\n${boardOutline(board)}` },
       ],
-      structuredContent: { id: drop.id, put, remove },
+      structuredContent: { id: drop.id, changed },
     }
   },
 })

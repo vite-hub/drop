@@ -3,11 +3,10 @@
 // or the optional tag in preview builds), and what people sent from its pages, newest first. Each screenshot opens as
 // its own image, where the box shows and the thread continues.
 import { dropPath } from "#shared/links"
-import { isSitePattern, reviewBookmarklet, reviewSnippet, siteHost, siteMatches } from "#shared/review"
+import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
 import type { DropDetail, SiteReviewItem } from "#shared/types"
 
-/** `inset`: room to leave on the right for the floating panel, in pixels. */
-const props = defineProps<{ drop: DropDetail; publicView: boolean; inset: number }>()
+const props = defineProps<{ drop: DropDetail; publicView: boolean }>()
 
 const state = injectDrop()!
 const items = useApi<SiteReviewItem[]>(() => `/api/drops/${props.drop.id}/review`, {
@@ -78,13 +77,7 @@ const steps = computed<Step[]>(() => {
 // Review it here: the address to open in ViewerSiteFrame. A pattern starts empty, since each preview has its own.
 const address = ref("")
 watch(siteLink, (link) => (address.value ||= link ?? ""), { immediate: true })
-const addressCovered = computed(() => {
-  try {
-    return Boolean(props.drop.siteUrl) && siteMatches(props.drop.siteUrl!, new URL(address.value).origin)
-  } catch {
-    return false
-  }
-})
+const addressCovered = computed(() => siteCovers(props.drop.siteUrl, address.value))
 const example = computed(() => props.drop.siteUrl?.replace("*", "pr123") ?? "")
 const framed = ref<string | null>(null)
 function openHere() {
@@ -99,12 +92,9 @@ const box = (item: SiteReviewItem) => ({
 </script>
 
 <template>
-  <ViewerSiteFrame v-if="framed" :address="framed" :drop="drop" :inset="inset" @close="framed = null" />
+  <ViewerSiteFrame v-if="framed" :address="framed" :drop="drop" @close="framed = null" />
   <div v-else class="min-h-0 flex-1 overflow-y-auto">
-    <div
-      class="mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6"
-      :style="{ paddingRight: inset ? `${inset}px` : undefined }"
-    >
+    <div class="mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6">
       <section class="space-y-3">
         <p class="label-mono">Site</p>
         <div class="flex flex-wrap items-center gap-3">

@@ -895,7 +895,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "false"
+          "default": false
         },
         "share_review": {
           "name": "share_review",

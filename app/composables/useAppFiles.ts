@@ -16,7 +16,7 @@ export function useAppFiles(drop: Ref<DropDetail>) {
   watch([() => route.query.file, () => drop.value.id], openFromQuery, { immediate: true })
   watch(page, (value) => {
     const file = value === "index.html" ? undefined : value
-    if (drop.value.kind === "app" && textValue(route.query.file) !== file) void setQuery({ file })
+    if (drop.value.kind === "app") void setQuery({ file })
   })
 
   return { files, pages, page }

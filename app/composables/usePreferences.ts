@@ -1,3 +1,5 @@
+import type { DocWidth } from "#shared/documents"
+import type { DeviceSize } from "~/utils/devices"
 import type { SideTab } from "~/utils/viewer"
 
 const year = 60 * 60 * 24 * 365
@@ -7,10 +9,26 @@ const year = 60 * 60 * 24 * 365
  * the same layout the browser will show: no flash of a closed panel, no hydration mismatch.
  */
 export function useSidePanel() {
-  const open = useCookie<boolean>("drop-side-open", { default: () => true, maxAge: year, sameSite: "lax" })
+  // Closed until someone opens it (the comments button, C, a `?comment=` link); then it stays as they left it. A new
+  // name, so the old cookie that defaulted to open doesn't keep it open.
+  const open = useCookie<boolean>("drop-side-panel", { default: () => false, maxAge: year, sameSite: "lax" })
   const tab = useCookie<SideTab>("drop-side-tab", { default: () => "comments", maxAge: year, sameSite: "lax" })
-  return { open, tab }
+  // In rem, like the sidebar's (UDashboardGroup's unit), so the server renders the width they left it at.
+  const width = useCookie<number>("drop-side-width", { default: () => 24, maxAge: year, sameSite: "lax" })
+  return { open, tab, width }
 }
+
+/** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */
+export const useDocWidth = () =>
+  useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
+
+/** Device mode for HTML docs, apps, Markdown docs, and reviewed sites (ViewerDevice), for every drop. */
+export const useDeviceSize = () =>
+  useCookie<DeviceSize>("drop-device-mode", {
+    default: () => ({ on: false, id: "iphone", width: 393, height: 852, zoom: null }),
+    maxAge: year,
+    sameSite: "lax",
+  })
 
 /** Whether the Drops page's Get started checklist was dismissed. A cookie, so a dismissed checklist never flashes in. */
 export const useGetStartedHidden = () =>

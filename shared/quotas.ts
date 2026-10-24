@@ -8,28 +8,41 @@ export type Tier = (typeof TIERS)[number]
 export const MIB = 1024 * 1024
 export const MAX_APP_FILES = 1000
 export const MAX_APP_BYTES = 25 * MIB
-export const DEFAULT_PRO_LIMITS = { drops: 100, bytes: 1024 * MIB, writes: 10_000 } as const
+/** Pro keeps any number of drops unless an operator caps them (`DROP_PRO_DROPS`); storage and writes stay capped. */
+export const DEFAULT_PRO_LIMITS = { drops: null, bytes: 1024 * MIB, writes: 10_000 } as const
+/** Drops a Free plan keeps forever at once (`DROP_FREE_KEPT`). Team folders and drops inside folders don't count. */
+export const DEFAULT_FREE_KEPT = 10
+/** Members a team has before it needs a subscription (`DROP_FREE_TEAM_MEMBERS`). */
+export const DEFAULT_FREE_TEAM_MEMBERS = 3
 
 export interface PlanLimits {
   drops: number | null
   bytes: number | null
   writes: number | null
+  /** Drops kept forever at once. */
+  kept: number | null
   appFiles: number
   appBytes: number
 }
 
 /** Global app safety limits also apply when owner quotas are disabled. */
-export function planLimits(plan: Plan, pro: { drops?: number; bytes?: number; writes?: number } = {}): PlanLimits {
-  if (plan === "free") return { drops: 50, bytes: 100 * MIB, writes: 1000, appFiles: 300, appBytes: 10 * MIB }
+export function planLimits(
+  plan: Plan,
+  pro: { drops?: number; bytes?: number; writes?: number } = {},
+  freeKept = DEFAULT_FREE_KEPT,
+): PlanLimits {
+  if (plan === "free")
+    return { drops: 50, bytes: 100 * MIB, writes: 1000, kept: freeKept, appFiles: 300, appBytes: 10 * MIB }
   if (plan === "pro")
     return {
       drops: pro.drops ?? DEFAULT_PRO_LIMITS.drops,
       bytes: pro.bytes ?? DEFAULT_PRO_LIMITS.bytes,
       writes: pro.writes ?? DEFAULT_PRO_LIMITS.writes,
+      kept: null,
       appFiles: MAX_APP_FILES,
       appBytes: MAX_APP_BYTES,
     }
-  return { drops: null, bytes: null, writes: null, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
+  return { drops: null, bytes: null, writes: null, kept: null, appFiles: MAX_APP_FILES, appBytes: MAX_APP_BYTES }
 }
 
 export interface Usage {
@@ -39,11 +52,14 @@ export interface Usage {
   drops: { used: number; limit: number | null }
   bytes: { used: number; limit: number | null }
   writes: { used: number; limit: number | null }
+  kept: { used: number; limit: number | null }
   app: { files: number; bytes: number }
+  /** A team subscription gives this plan (server/utils/teams.ts), not an admin or DROP_DEFAULT_PLAN. */
+  paid: boolean
   selfHostUrl: string
 }
 
-const QUOTA_UNITS = ["drops", "bytes", "writes", "appFiles", "appBytes", "burstPublishes"] as const
+const QUOTA_UNITS = ["drops", "bytes", "writes", "kept", "appFiles", "appBytes", "burstPublishes"] as const
 export type QuotaUnit = (typeof QUOTA_UNITS)[number]
 export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
@@ -91,6 +107,7 @@ export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retry
     drops: "drops",
     bytes: "storage",
     writes: "monthly file writes",
+    kept: "drops kept forever",
     appFiles: "app files",
     appBytes: "app size",
   }[unit]
@@ -103,6 +120,7 @@ export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retry
     drops: "Trash drops you no longer need, or ask the user.",
     bytes: "Trash large drops you no longer need, or ask the user.",
     writes: `It resets on ${resetAt?.slice(0, 10)}.`,
+    kept: "Pick review or temporary instead, or ask the user which kept drop can go.",
     appFiles: "Publish fewer files: leave source maps and unused assets out of the build.",
     appBytes: "Publish a smaller app: compress images or load large libraries from a CDN.",
   }[unit]

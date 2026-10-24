@@ -2,8 +2,7 @@
 // A video file, played with media-chrome's controls themed with Drop's shadcn tokens: Kibo UI's Video Player
 // (kibo-ui.com/components/video-player), as Vue. The elements register on the client; until then the video sits there
 // without controls.
-/** `inset`: room to leave on the right for the floating panel, in pixels. */
-defineProps<{ src: string; type?: string; title: string; inset: number }>()
+defineProps<{ src: string; type?: string; title: string }>()
 
 onMounted(() => import("media-chrome"))
 
@@ -19,10 +18,7 @@ const variables = {
 </script>
 
 <template>
-  <div
-    class="grid min-h-0 flex-1 place-items-center bg-elevated p-6 transition-[padding] duration-200 ease-out sm:p-10"
-    :style="{ paddingRight: inset ? `${inset}px` : undefined }"
-  >
+  <div class="grid min-h-0 flex-1 place-items-center bg-elevated p-6 sm:p-10">
     <media-controller
       class="block max-h-full w-full max-w-5xl overflow-hidden rounded-lg border border-default shadow-lg"
       :style="variables"
