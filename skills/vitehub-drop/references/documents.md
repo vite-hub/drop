@@ -77,7 +77,7 @@ Keep one local path while drafting. Publish each finished revision with `previou
 
 ## Markdown
 
-Drop renders a fixed set of Markdown and Comark syntax. Write a Markdown doc with [the Markdown reference](markdown.md): alerts, Mermaid, footnotes, code, annotated screenshots, front matter, and what Drop doesn't render.
+Drop renders a fixed set of Markdown and Comark syntax. Write a Markdown doc with [the Markdown reference](markdown.md): alerts, Mermaid, footnotes, code, annotated screenshots, front matter, what Drop doesn't render, and [blocks](blocks.md) such as steps, tabs, diffs, metrics, data tables, and charts.
 
 ## Remove machine writing
 
