@@ -9,7 +9,7 @@ index 752118611a61aee14ce5ff55de85537714806dac..b58602225dedea6e7e2e7184e150512b
 -		if (options.optional) return;
 +		// mdream lists native bindings for architectures that are not published on npm.
 +		// Its loader only reaches the matching package for the current architecture.
-+		if (options.optional || name.startsWith("@mdream/rust-")) return;
++		if (options.optional && name.startsWith("@mdream/rust-")) return;
  		throw internalErrorDiagnostics.INTERNAL_B0021({ message: "Could not resolve package.json for " + name + "." });
  	}
  	let resolvedPackageJsonPath = await realpath(packageJsonPath);
