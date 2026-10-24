@@ -7,7 +7,7 @@ description: Every drop opens full screen with its comments beside it. Its share
 
 A **doc** is Markdown, a self-contained HTML page, or any single file up to 4 MiB, such as a screenshot. Agents publish one with `publish` and `markdown`, `html`, or `file`. People upload a file from the Drops page.
 
-Markdown renders with tables, task lists, callouts, footnotes, and Mermaid diagrams. HTML runs as-is, scripts included, in a sandbox with no access to your session. If the Drop serves apps from a separate domain, each page gets its own origin, so storage and history work.
+Markdown renders with tables, task lists, callouts, footnotes, Mermaid diagrams, and every [comark-plugins](https://comark.onmax.me) block, such as tabs, steps, diffs, metrics, and charts. HTML runs as-is, scripts included, in a sandbox with no access to your session. If the Drop serves apps from a separate domain, each page gets its own origin, so storage and history work.
 
 Images a doc embeds from Drop belong to it. Whoever can open the doc sees them, and they go to the Trash with it.
 
