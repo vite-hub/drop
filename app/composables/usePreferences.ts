@@ -21,7 +21,7 @@ export function useSidePanel() {
 export const useFolderPreviewWidth = () =>
   useCookie<number>("drop-folder-preview-width", { default: () => 22, maxAge: year, sameSite: "lax" })
 
-/** How wide Markdown docs read (DOC_WIDTHS), from Details or W. */
+/** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
