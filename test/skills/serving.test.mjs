@@ -108,3 +108,14 @@ test("MCP Skills extension: skills/list names every file with its digest and siz
   const missing = await mcp("resources/read", { uri: "skill://prototype/assets/nothing.js" })
   assert.equal(missing.error.code, -32602)
 })
+
+test("pr-evidence serves bundled comark-ui references through discovery and MCP", async () => {
+  const path = "references/comark-ui/references/annotate.md"
+  const expected = await readFile(
+    new URL("../../node_modules/comark-ui/dist/skills/comark-ui/references/annotate.md", import.meta.url),
+    "utf8",
+  )
+  assert.equal(await (await get(`/.well-known/skills/pr-evidence/${path}`)).text(), expected)
+  const response = await mcp("resources/read", { uri: `skill://pr-evidence/${path}` })
+  assert.equal(response.result.contents[0].text, expected)
+})
