@@ -1,6 +1,5 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
 import type { Lifetime } from "./expiry"
-import type { Plan } from "./quotas"
 import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
 
@@ -236,22 +235,6 @@ export interface ReviewThread {
     createdAt: number
     images: { id: string; filename: string }[]
   }[]
-}
-
-export interface Member {
-  id: string
-  name: string
-  /** Only admins see other people's emails; GitHub may have handed over one its owner keeps private. */
-  email: string | null
-  image: string | null
-  role: Role
-  /** Their limits: the tier an admin gave them, else this Drop's default plan. Null when quotas are off. */
-  plan: Plan | null
-  banned: boolean
-  drops: number
-  /** Null until they first sign in. */
-  lastActiveAt: number | null
-  you: boolean
 }
 
 /** An MCP client someone approved on /oauth: it acts as them until disconnected. */

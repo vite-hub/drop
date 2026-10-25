@@ -39,8 +39,8 @@ async function ownerUsage(ownerId: string, month: string) {
   return row ?? { drops: 0, bytes: 0, writes: 0 }
 }
 
-/** A member's plan: the tier an admin gave them on the Members page, else DROP_DEFAULT_PLAN. */
-export function planOf(stored: string | null | undefined): Plan {
+/** A member's plan: the tier an admin gave them in the Auth Console, else DROP_DEFAULT_PLAN. */
+function planOf(stored: string | null | undefined): Plan {
   return stored === "free" || stored === "pro" ? stored : quotaConfig().defaultPlan
 }
 
@@ -64,7 +64,7 @@ async function keptCount(ownerId: string) {
 
 /**
  * Someone's plan and what they've used of it. A team that pays puts each member on Pro (./teams.ts); an admin's Pro on
- * the Members page, or DROP_DEFAULT_PLAN, applies otherwise.
+ * the Auth Console, or DROP_DEFAULT_PLAN, applies otherwise.
  */
 export async function getUsage(ownerId: string): Promise<Usage> {
   const config = quotaConfig()

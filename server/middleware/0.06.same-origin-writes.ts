@@ -8,7 +8,12 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
  * POST would reach the API as the viewer. Agents use bearer tokens and send no cookies, so they're unaffected.
  */
 export default defineHandler((event) => {
-  if (SAFE_METHODS.has(event.req.method) || !event.url.pathname.startsWith("/api/") || !event.req.headers.has("cookie"))
+  const path = event.url.pathname
+  if (
+    SAFE_METHODS.has(event.req.method) ||
+    !(path.startsWith("/api/") || path === "/_vitehub" || path.startsWith("/_vitehub/")) ||
+    !event.req.headers.has("cookie")
+  )
     return
   const site = event.req.headers.get("sec-fetch-site")
   const origin = event.req.headers.get("origin")

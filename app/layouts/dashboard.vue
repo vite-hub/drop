@@ -47,7 +47,7 @@ const { data: drops } = useDrops()
 const { data: shared } = useSharedWithMe()
 // A personal Drop's teams list their folders under Teams, not under Shared with me.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
-// Members is the admins' page. Members see Skills only while one is on, since only admins can switch them on.
+// Members see Skills only while one is on, since only admins can switch them on.
 const admin = computed(() => me.value?.role === "admin")
 const workspace = computed(() => [
   {
@@ -71,14 +71,29 @@ const workspace = computed(() => [
   ...(admin.value
     ? [
         {
-          label: "Members",
+          label: "Users",
           icon: "i-mingcute-group-2-line",
           activeIcon: "i-mingcute-group-2-fill",
-          to: "/members",
-          active: at("/members"),
+          to: "/_vitehub/auth",
+          external: true,
+          active: false,
+        },
+        {
+          label: "Review shares",
+          icon: "i-mingcute-safety-certificate-line",
+          activeIcon: "i-mingcute-safety-certificate-fill",
+          to: "/admin/review",
+          active: at("/admin/review"),
           count: me.value?.reviews,
           countLabel: "shares to review",
           alert: true,
+        },
+        {
+          label: "Reports",
+          icon: "i-mingcute-flag-1-line",
+          activeIcon: "i-mingcute-flag-1-fill",
+          to: "/admin/reports",
+          active: at("/admin/reports"),
         },
       ]
     : []),

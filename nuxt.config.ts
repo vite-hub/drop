@@ -129,7 +129,11 @@ const SIGNED_IN: RouteRule = { appMiddleware: { auth: true }, appLayout: "dashbo
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt", "nuxt-security"],
 
-  vitehub: { ...VITEHUB[host], auth: true },
+  vitehub: {
+    ...VITEHUB[host],
+    auth: true,
+    console: { auth: "app", authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
+  },
 
   alias: {
     // PNG code images are a Browser Run screenshot. Browser Run only exists on Cloudflare, and ViteHub only
@@ -217,7 +221,11 @@ export default defineNuxtConfig({
     // (pages/d/) pick their own layout in their own middleware.
     "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
     "/agents": SIGNED_IN,
-    "/members": SIGNED_IN,
+    // The standalone Console owns its scripts; Nuxt's renderer never adds its nonce to them.
+    "/_vitehub/**": {
+      headers: { "cache-control": "private, no-store" },
+      security: { headers: { contentSecurityPolicy: { "script-src": ["'self'"] } } },
+    },
     "/teams/**": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
