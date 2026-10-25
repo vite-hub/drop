@@ -1,5 +1,28 @@
 import { sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
+import { user as users } from "../databases/config"
+import { useServerEnv } from "#vitehub/env/server"
+import { roleFor, ROLES } from "#shared/roles"
+
+/** Console labels and its Admins filter read stored roles, including accounts that have not signed in recently. */
+export async function syncConsoleRoles() {
+  const env = useServerEnv()
+  const admins = env.drop.admins.unseal()
+  const trustUnverified = import.meta.dev === true || env.drop.testSignin
+  const rows = await db
+    .select({ id: users.id, email: users.email, emailVerified: users.emailVerified, role: users.role })
+    .from(users)
+  for (const role of ROLES) {
+    const ids = rows
+      .filter((row) => row.role !== role && roleFor(row, admins, trustUnverified) === role)
+      .map((row) => row.id)
+    if (ids.length)
+      await db
+        .update(users)
+        .set({ role })
+        .where(sql`${users.id} IN (SELECT value FROM json_each(${JSON.stringify(ids)}))`)
+  }
+}
 
 /** The user's Drops list: latest versions, no folders, embedded files, or Trash. One bind even for 100 users. */
 export async function countDropsByUser(userIds: readonly string[]): Promise<Record<string, number>> {

@@ -2,7 +2,8 @@ import { H3Event } from "h3"
 import * as v from "valibot"
 import { defineConsoleAuthorize } from "vite-hub/console/auth"
 import { contentHost } from "./utils/content-origin"
-import { roleOf, syncRole } from "./utils/identity"
+import { roleOf } from "./utils/identity"
+import { syncConsoleRoles } from "./utils/auth-console"
 import { isMember } from "./utils/members"
 
 const Operator = v.object({
@@ -18,7 +19,7 @@ export default defineConsoleAuthorize(async ({ request, user }) => {
   const parsed = v.safeParse(Operator, user)
   if (!parsed.success || parsed.output.banned || roleOf(parsed.output) !== "admin") return false
   if (!(await isMember(parsed.output.id))) return false
-  // Better Auth checks its stored role again for each management action, including permission discovery.
-  await syncRole(parsed.output.id)
+  // Refresh all accounts before Console reads roles or applies its Admins filter.
+  await syncConsoleRoles()
   return { sections: ["auth"] }
 })

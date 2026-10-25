@@ -88,3 +88,39 @@ test("access notes describe the configured allowlist, organization and sign-in m
   assert.match(restricted, /oauth2-proxy/)
   assert.match(restricted, /Email and password/)
 })
+
+test("Console roles and Admins membership follow policy changes for accounts without new sessions", async () => {
+  sql.exec(`INSERT INTO user (id, name, email, email_verified, role) VALUES
+    ('promoted', 'Promoted', 'Promoted@example.com', 1, 'member'),
+    ('removed', 'Removed', 'removed@example.com', 1, 'admin'),
+    ('unverified', 'Unverified', 'unverified@example.com', 0, 'admin')`)
+  state.admins = `${user.email}, PROMOTED@example.com unverified@example.com`
+  assert.deepEqual(await authorize({ request, user }), { sections: ["auth"] })
+  const rows = sql.prepare("SELECT id, role FROM user ORDER BY id").all()
+  assert.deepEqual(
+    rows.map(({ id, role }) => [id, role]),
+    [
+      ["operator", "admin"],
+      ["owner", "member"],
+      ["promoted", "admin"],
+      ["removed", "member"],
+      ["unverified", "member"],
+    ],
+  )
+  assert.deepEqual(
+    sql
+      .prepare("SELECT id FROM user WHERE role = 'admin' ORDER BY id")
+      .all()
+      .map((row) => row.id),
+    ["operator", "promoted"],
+  )
+  state.admins = `${user.email}, removed@example.com`
+  await authorize({ request, user })
+  assert.deepEqual(
+    sql
+      .prepare("SELECT id FROM user WHERE role = 'admin' ORDER BY id")
+      .all()
+      .map((row) => row.id),
+    ["operator", "removed"],
+  )
+})
