@@ -13,20 +13,24 @@ import { billingConfig, paidTeams, teamsEnabled } from "../utils/teams"
 export default defineHandler(async (event): Promise<Viewer | null> => {
   const who = await identify(event)
   if (!who) return null
-  const [row] = await db.select({ total: workspaceStats.members }).from(workspaceStats).where(eq(workspaceStats.id, 1))
-  const members = row?.total ?? 1
   const { mode, publicLinkDays } = sharePolicy(event)
   const ids = Object.keys(who.teams ?? {})
-  const rows = ids.length
-    ? await db
-        .select({ id: organization.id, name: organization.name, slug: organization.slug })
-        .from(organization)
-        .where(inArray(organization.id, ids))
-    : []
-  // The sidebar hides Skills from members while none is on.
-  const skills = (await enabledSkills()).length
   const billing = billingConfig(event)
-  const paid = billing.enabled ? await paidTeams(ids) : new Set<string>()
+  // The page waits for /api/me before loading the drop. These reads depend only on the identity, so start them
+  // together: separate awaits add database round trips, including the first skill-settings read per isolate.
+  const [[row], rows, skills, paid] = await Promise.all([
+    db.select({ total: workspaceStats.members }).from(workspaceStats).where(eq(workspaceStats.id, 1)),
+    ids.length
+      ? db
+          .select({ id: organization.id, name: organization.name, slug: organization.slug })
+          .from(organization)
+          .where(inArray(organization.id, ids))
+      : [],
+    // The sidebar hides Skills from members while none is on.
+    enabledSkills().then((enabled) => enabled.length),
+    billing.enabled ? paidTeams(ids) : new Set<string>(),
+  ])
+  const members = row?.total ?? 1
   const teams = rows
     .map((item) => ({ ...item, role: who.teams![item.id]!, paid: paid.has(item.id) }))
     .sort((a, b) => a.name.localeCompare(b.name))

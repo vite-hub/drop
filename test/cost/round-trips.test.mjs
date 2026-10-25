@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { beforeEach, test } from "vite-plus/test"
-import { sql, queries, state, migrate, reset, insertDrop, event } from "./harness.mjs"
+import { sql, queries, state, migrate, reset, insertDrop, event, who } from "./harness.mjs"
 
 // Each D1 query is a round trip from the Worker, ~55 ms in production. Queries that start together share one: here
 // every query waits for the current wave, which ends once nothing else can join it, so `waves` counts the round trips
@@ -39,6 +39,7 @@ const { default: linkHandler } = await import("../../server/api/links/[id].get.t
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
 const { default: commentsHandler } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
+const { default: meHandler } = await import("../../server/api/me.get.ts")
 
 migrate()
 beforeEach(reset)
@@ -121,4 +122,37 @@ test("the link answers for the doc it found, every version, and old version ids"
   const pinned = event(`/api/x/${LINK}?v=1`)
   pinned.context.params = { id: LINK }
   assert.deepEqual(await linkHandler(pinned), { id: "v1", link: LINK, slug: "v2", version: 1, latest: 2 })
+})
+
+test("a signed-in admin's page bootstrap reads independent sidebar data in one round trip", async () => {
+  state.who = { ...who, role: "admin" }
+  let viewer
+  const count = await roundTrips(async () => {
+    viewer = await meHandler(event("/api/me"))
+  })
+  assert.equal(viewer.id, who.userId)
+  assert.equal(viewer.members, 1)
+  assert.ok(viewer.skills > 0)
+  assert.equal(count, 1, `page bootstrap waited for ${count} sequential database round trips`)
+})
+
+test("team names and billing join the same bootstrap round trip and preserve the viewer's role", async () => {
+  state.teams = state.billing = true
+  state.who = { ...who, teams: { acme: "owner", other: "member" } }
+  sql.exec("INSERT INTO organization (id, name, slug) VALUES ('other', 'Other', 'other'), ('acme', 'Acme', 'acme')")
+  sql.exec("INSERT INTO subscription (id, plan, reference_id, status) VALUES ('s1', 'team', 'acme', 'active')")
+  let viewer
+  const count = await roundTrips(async () => {
+    viewer = await meHandler(event("/api/me"))
+  })
+  assert.deepEqual(viewer.teams, [
+    { id: "acme", name: "Acme", slug: "acme", role: "owner", paid: true },
+    { id: "other", name: "Other", slug: "other", role: "member", paid: false },
+  ])
+  assert.equal(viewer.paid, true)
+  assert.equal(count, 1, `team bootstrap waited for ${count} sequential database round trips`)
+})
+
+test("a signed-out bootstrap does not read sidebar data", async () => {
+  assert.equal(await roundTrips(async () => assert.equal(await meHandler(event("/api/me")), null)), 0)
 })

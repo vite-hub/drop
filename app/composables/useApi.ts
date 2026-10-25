@@ -8,10 +8,17 @@ import { QuotaFailureSchema, type QuotaFailure } from "#shared/quotas"
  * keeps the request in-process, including on Workers where fetching our own hostname would loop.
  */
 // doctor-disable-next-line nuxt/fetch/keyed-composable-registration-required -- Nuxt registers createUseFetch exports from composables/ itself (the build passes useApi its key); Doctor's manifest stringifies those entries to "[object Object]"
-export const useApi = createUseFetch(() => {
+export const useApi = createUseFetch((defaults) => {
   if (import.meta.client) return {}
   const origin = useRequestURL().origin
   return {
+    // Middleware, layouts, and their children ask for the same keys during SSR. Nuxt's default only reuses payload
+    // data while hydrating in the browser; on the server each subscriber otherwise starts another request.
+    // Reuse only this render's completed data and in-flight work. Explicit refreshes still fetch fresh data.
+    dedupe: defaults.dedupe ?? "defer",
+    getCachedData:
+      defaults.getCachedData ??
+      ((key, nuxtApp, context) => (context.cause === "initial" ? nuxtApp.payload.data[key] : undefined)),
     headers: useRequestHeaders(["cookie"]),
     // SAFETY: the same ofetch instance Nuxt's $fetch is, only with Nitro's in-process fetch; Nuxt's type adds the route typing.
     $fetch: createFetch({
