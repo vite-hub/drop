@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises"
 import { test } from "vite-plus/test"
 import { parseYAML } from "confbox/yaml"
 import { createMarkdownParser } from "@comark/html/parse"
-import annotate from "comark-annotate"
+import comarkUi from "comark-ui/html"
 import { migrate } from "../cost/harness.mjs"
 
 migrate()
@@ -28,22 +28,30 @@ for (const name of names) {
   })
 }
 
-test("pr-evidence serves comark-annotate's skill, without its front matter and with the CLI pinned", async () => {
+test("pr-evidence serves the renderer's comark-ui skill and all its references", async () => {
   const { findSkill } = await import("../../server/utils/skills.ts")
-  const { version } = JSON.parse(
-    await readFile(new URL("../../node_modules/comark-annotate/package.json", import.meta.url), "utf8"),
-  )
-  const reference = findSkill("pr-evidence").files.find((item) => item.path === "references/annotations.md").text
-  assert.match(reference, /^# /)
+  const files = findSkill("pr-evidence").files
+  const upstream = new URL("../../node_modules/comark-ui/dist/skills/comark-ui/", import.meta.url)
+  const skill = await readFile(new URL("SKILL.md", upstream), "utf8")
+  assert.equal(files.find((item) => item.path === "references/comark-ui/SKILL.md").text, skill)
+  const reference = files.find((item) => item.path === "references/annotations.md").text
+  assert.match(reference, /^# comark-ui/)
   assert.match(reference, /::compare/)
-  assert.ok(reference.includes(`npx comark-annotate@${version} check`))
-  assert.ok(!/npx comark-annotate /.test(reference))
+  for (const name of await readdir(new URL("references/", upstream))) {
+    assert.equal(
+      files.find((item) => item.path === `references/comark-ui/references/${name}`).text,
+      await readFile(new URL(`references/${name}`, upstream), "utf8"),
+    )
+  }
+  for (const [, target] of reference.matchAll(/\]\((comark-ui\/[^)]+)\)/g)) {
+    assert.ok(files.some((item) => item.path === `references/${target}`), `missing ${target}`)
+  }
 })
 
-test("show-me's annotated screenshot example is valid comark-annotate", async () => {
+test("show-me's annotated screenshot example is valid comark-ui", async () => {
   const skill = await readFile(new URL("show-me/SKILL.md", root), "utf8")
   const example = skill.match(/```md\n([\s\S]*?)\n```/)?.[1]
   assert.ok(example)
-  const document = await createMarkdownParser({ plugins: [annotate()] })(example)
+  const document = await createMarkdownParser({ plugins: comarkUi().plugins })(example)
   assert.deepEqual(document.meta.issues, [])
 })

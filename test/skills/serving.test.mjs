@@ -78,11 +78,10 @@ test("each skill file is served on its own with its content type, and v0.1.0 lis
     "text/markdown; charset=utf-8",
   )
   const v1 = await (await get("/.well-known/skills/index.json")).json()
-  assert.deepEqual(v1.skills.find((skill) => skill.name === "prototype").files, [
-    "SKILL.md",
-    "assets/picker.js",
-    "references/canvas.md",
-  ])
+  const v2 = await (await get("/.well-known/agent-skills/index.json")).json()
+  const prototype = v1.skills.find((skill) => skill.name === "prototype")
+  assert.equal(prototype.version, v2.skills.find((skill) => skill.name === "prototype").digest.slice(7, 19))
+  assert.deepEqual(prototype.files, ["SKILL.md", "assets/picker.js", "references/canvas.md"])
 })
 
 test("MCP Skills extension: skills/list names every file with its digest and size, and resources/read serves each", async () => {
@@ -108,4 +107,15 @@ test("MCP Skills extension: skills/list names every file with its digest and siz
   assert.deepEqual((await mcp("skills/get", { uri: skill.uri })).result.skill, skill)
   const missing = await mcp("resources/read", { uri: "skill://prototype/assets/nothing.js" })
   assert.equal(missing.error.code, -32602)
+})
+
+test("pr-evidence serves bundled comark-ui references through discovery and MCP", async () => {
+  const path = "references/comark-ui/references/annotate.md"
+  const expected = await readFile(
+    new URL("../../node_modules/comark-ui/dist/skills/comark-ui/references/annotate.md", import.meta.url),
+    "utf8",
+  )
+  assert.equal(await (await get(`/.well-known/skills/pr-evidence/${path}`)).text(), expected)
+  const response = await mcp("resources/read", { uri: `skill://pr-evidence/${path}` })
+  assert.equal(response.result.contents[0].text, expected)
 })

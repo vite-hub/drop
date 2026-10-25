@@ -162,8 +162,8 @@ const panelTabsUi = {
 }
 // Shared with someone, or waiting on review: its status sits beside the title. A private drop gets Share on the right.
 const shared = computed(() => drop.value.share !== "private" || Boolean(drop.value.shareReview))
-// Comments has its own button in the header: it opens the panel there, and closes it once open. History and Details
-// open from More, the panel's tabs, or H and I.
+// Comments and Details have their own buttons in the header: each opens the panel there, and closes it once open.
+// History opens from More, the panel's tabs, or H; Details from I too.
 const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
 const showing = (value: SideTab) => panelOpen.value && tab.value === value
 const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
@@ -352,16 +352,6 @@ const moreMenu = computed(() =>
             },
           ]
         : []),
-      ...(has("details")
-        ? [
-            {
-              label: "Details",
-              icon: "i-mingcute-information-line",
-              kbds: ["i"],
-              onSelect: () => panel.show("details"),
-            },
-          ]
-        : []),
     ],
     [
       ...(copiesMarkdown.value
@@ -392,7 +382,7 @@ const moreMenu = computed(() =>
       : []),
   ].filter((group) => group.length),
 )
-const moreActive = computed(() => areaMode.value || showing("history") || showing("details"))
+const moreActive = computed(() => areaMode.value || showing("history"))
 
 // Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
 // unless another one is open by then.
@@ -840,6 +830,18 @@ watch(
               :variant="moreActive ? 'soft' : 'ghost'"
             />
           </UDropdownMenu>
+          <!-- Details is the panel's own toggle, so it wears the panel icon and sits last before Share. -->
+          <UTooltip v-if="has('details')" :kbds="['I']" text="Details">
+            <UButton
+              aria-label="Details"
+              :aria-pressed="showing('details')"
+              color="neutral"
+              icon="i-mingcute-layout-right-line"
+              size="sm"
+              :variant="showing('details') ? 'soft' : 'ghost'"
+              @click="toggleTab('details')"
+            />
+          </UTooltip>
           <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
           <USeparator v-if="(owner && !shared) || visitor" class="ml-1 h-4" orientation="vertical" />
           <UButton

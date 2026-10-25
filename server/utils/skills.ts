@@ -2,8 +2,7 @@ import { parseYAML } from "confbox/yaml"
 import { eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { createTarGzip } from "nanotar"
-import annotateSkill from "comark-annotate/skills/comark-annotate/SKILL.md?raw"
-import { version as annotateVersion } from "comark-annotate/package.json"
+import comarkUiSkill from "comark-ui/skills/comark-ui/SKILL.md?raw"
 import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
@@ -64,11 +63,16 @@ function skill(files: SkillFile[]): Skill {
   return { name: String(frontmatter.name), description: String(frontmatter.description), frontmatter, files }
 }
 
-// pr-evidence's annotation reference is comark-annotate's own skill, from the version Drop renders with, so it never
-// describes syntax Drop can't draw. Its CLI commands get the same version, since a bare npx would run the latest.
-const prEvidenceAnnotations = annotateSkill
+// Bundle the renderer package's skill and references, keeping their relative links intact.
+const comarkUiReferences = import.meta.glob<string>("../../node_modules/comark-ui/dist/skills/comark-ui/references/*.md", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+})
+// Keep the existing annotation URL as the entry point to the complete comark-ui guide.
+const prEvidenceAnnotations = comarkUiSkill
   .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "")
-  .replaceAll("npx comark-annotate ", `npx comark-annotate@${annotateVersion} `)
+  .replaceAll("](references/", "](comark-ui/references/")
 
 /** Every built-in skill, enabled or not. Only the admin UI should see the disabled ones. */
 export const SKILLS: Skill[] = [
@@ -80,7 +84,14 @@ export const SKILLS: Skill[] = [
     file("references/board.md", boardGuide),
   ]),
   skill([file("SKILL.md", handoffMd)]),
-  skill([file("SKILL.md", prEvidenceMd), file("references/annotations.md", prEvidenceAnnotations)]),
+  skill([
+    file("SKILL.md", prEvidenceMd),
+    file("references/annotations.md", prEvidenceAnnotations),
+    file("references/comark-ui/SKILL.md", comarkUiSkill),
+    ...Object.entries(comarkUiReferences)
+      .map(([path, text]) => file(path.replace("../../node_modules/comark-ui/dist/skills/", "references/"), text))
+      .sort((a, b) => a.path.localeCompare(b.path)),
+  ]),
   skill([
     file("SKILL.md", prototypeMd),
     file("assets/picker.js", prototypePicker),

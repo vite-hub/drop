@@ -75,7 +75,7 @@ async function read(name: string, path: string) {
 
 /**
  * Skill files as `skill://` resources. URI template variables can't span a `/`, so one template matches
- * top-level files and one matches a file in a folder; the first also lists every enabled file.
+ * top-level files and others match the bundled reference folders; the first lists every enabled file.
  */
 export const skillResources = [
   defineMcpResource({
@@ -103,4 +103,14 @@ export const skillResources = [
     uriTemplate: "skill://{name}/{dir}/{file}",
     handler: (_uri, { name, dir, file }) => read(name!, `${dir}/${file}`),
   }),
+  ...[2, 3].map((depth) =>
+    defineMcpResource({
+      name: `skill-reference-${depth}`,
+      title: "Bundled skill reference",
+      description: "A file in a bundled upstream skill's reference tree.",
+      uriTemplate: `skill://{name}/${Array.from({ length: depth }, (_, index) => `{dir${index}}`).join("/")}/{file}`,
+      handler: (_uri, params) =>
+        read(params.name!, [...Array.from({ length: depth }, (_, index) => params[`dir${index}`]), params.file].join("/")),
+    }),
+  ),
 ]

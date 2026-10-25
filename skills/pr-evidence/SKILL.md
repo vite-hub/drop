@@ -1,11 +1,11 @@
 ---
 name: pr-evidence
-description: Builds pull-request evidence in Markdown, with before and after screenshots for UI changes or changed lines for code changes, then drops it into Drop and comments its link on the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
+description: "Builds a pull request's before/after evidence in Drop: screenshots with hand-drawn marks for a UI change, or the changed lines for a code change, then comments its link on the pull request. Use when a pull request changes something visible, the user asks for before/after screenshots or a visual review, or reviewers need to see what changed."
 ---
 
 # Pull-request evidence
 
-Show reviewers what changed, marked up so they don't have to hunt for it. You write Markdown with comark-annotate components; Drop renders it as a page with hand-drawn marks, numbered notes, and arrows. When nothing changes on screen, as in a refactor, skip [Capture](#capture) and show the code as a [code change](#code-changes).
+Show reviewers what changed on screen, marked up so they don't have to hunt for it. You write Markdown with comark-ui components; Drop renders it as a page with hand-drawn marks, numbered notes, and arrows. When nothing changes on screen, as in a refactor, the code is the evidence: skip [Capture](#capture) and show it as [a code change](#code-changes).
 
 ## Where it lives
 
@@ -67,7 +67,7 @@ The message is the heading, with one source excerpt under it.
 ::
 ```
 
-Before writing a mark, read [references/annotations.md](references/annotations.md) for the syntax used by the comark-annotate version Drop renders with.
+Before writing a mark, read [references/annotations.md](references/annotations.md) for the syntax used by the comark-ui version Drop renders with.
 
 Above the first board, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `href`, not in the text. Beyond the headings and captions, no tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
 
@@ -75,7 +75,7 @@ The doc shows the change; how the work went (the checks you ran, retries, CI cou
 
 ### Code changes
 
-A `::diff` shows one file's lines before and after, the way a review shows a suggested change. Copy the lines from the pull request's diff, a few around the change, and set `line` to where they start in the file, so a reviewer can find them. One diff shows one file: a change that adds a component and uses it is two diffs, the new file first with an empty before block. When the same change repeats across files, show one of them and name the others in the line above it, like "The same change in Forecast, Alerts, and 11 more pages." That line also says what the change does. The syntax is in [references/annotations.md](references/annotations.md#diff).
+A `::diff` shows one file's lines before and after, the way a review shows a suggested change. Copy the lines from the pull request's diff, a few around the change, and set `line` to where they start in the file, so a reviewer can find them. One diff shows one file: a change that adds a component and uses it is two diffs, the new file first with an empty before block. When the same change repeats across files, show one of them and name the others in the line above it, like "The same change in Forecast, Alerts, and 11 more pages." That line also says what the change does. The syntax is in [the diff reference](references/comark-ui/references/diff.md).
 
 ## Publish
 
