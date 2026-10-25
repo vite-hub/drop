@@ -1,10 +1,10 @@
 import { Buffer } from "node:buffer"
 import { and, eq } from "drizzle-orm"
 import { HTTPError } from "h3"
+import { lookup } from "mrmime"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { MAX_FILE_BYTES } from "#shared/schemas"
-import { contentTypeOf } from "#shared/project-bundle"
 import { dropFiles } from "../databases/config"
 import { permissions, type DropRow } from "./drops"
 import type { Identity } from "./identity"
@@ -36,6 +36,7 @@ export async function agentFile(drop: DropRow, who: Identity, path?: string, for
   if (headError && headError.code !== "BLOB_NOT_FOUND")
     throw new HTTPError({ status: 503, message: "File storage is temporarily unavailable." })
   if (!head) throw missing()
+  if (head.size === undefined) throw new HTTPError({ status: 503, message: "File size is temporarily unavailable." })
   if (head.size > MAX_FILE_BYTES) throw tooLarge()
   const [error, body] = await blob.get(file.blobKey)
   // Don't send provider errors or keys to MCP clients or logs.
@@ -48,7 +49,7 @@ export async function agentFile(drop: DropRow, who: Identity, path?: string, for
   if (bytes.byteLength > MAX_FILE_BYTES) throw tooLarge()
   const data = Buffer.from(bytes).toString("base64")
   const filename = "path" in file ? file.path : file.filename
-  const mimeType = "path" in file ? contentTypeOf(file.path) : file.contentType || "application/octet-stream"
+  const mimeType = ("path" in file ? lookup(file.path) : file.contentType) || "application/octet-stream"
   // An embedded resource identifier, not an unauthenticated download URL or a bearer capability.
   const uri = `drop-file:///${encodeURIComponent(drop.id)}/${encodeURIComponent(filename)}`
   const content =

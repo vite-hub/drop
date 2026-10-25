@@ -41,6 +41,8 @@ async function call(tool, input, protocolVersion = "2025-06-18") {
         "content-type": "application/json",
         accept: "application/json, text/event-stream",
         "mcp-protocol-version": protocolVersion,
+        "mcp-method": "tools/call",
+        "mcp-name": tool.name,
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -234,6 +236,31 @@ test("an app file is resolved within its authorized drop, never by an arbitrary 
     assert.match((await call(readFile, { id: "app", path })).message, /File not found/)
     assert.equal(calls.get, before)
   }
+})
+
+test("successful file reads refresh activity and count agent views, but never revive Trash", async () => {
+  const old = Date.now() - 3 * 86400000
+  insertDrop("pdf", { visibility: "private", kind: "file", content_type: "application/pdf", last_accessed_at: old })
+  await call(readFile, { id: "pdf" })
+  assert.ok(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at > old)
+  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+  sql.prepare("UPDATE drops SET trashed_at = ?, last_accessed_at = ? WHERE id = 'pdf'").run(Date.now(), old)
+  await call(readFile, { id: "pdf" })
+  assert.equal(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at, old)
+  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+})
+
+test("unknown app binaries have a binary MIME fallback", async () => {
+  insertDrop("app", { visibility: "private", kind: "app", blob_key: null })
+  sql
+    .prepare(
+      "INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES ('app', 'payload.custombinary', 'apps/payload', 3)",
+    )
+    .run()
+  objects.set("apps/payload", { body: new Blob([new Uint8Array([0, 255, 128])]) })
+  const result = await call(readFile, { id: "app", path: "payload.custombinary" })
+  assert.equal(result.content[0].resource.mimeType, "application/octet-stream")
+  assert.equal(result.content[0].resource.blob, "AP+A")
 })
 
 test("publish asks for one kind of content and a lifetime on new drops", async () => {

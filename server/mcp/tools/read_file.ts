@@ -5,6 +5,8 @@ import * as v from "valibot"
 import { agentFile } from "../../utils/agent-file"
 import { findDropByRef, permissions } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
+import { recordVisit } from "../../utils/expiry"
+import { countView } from "../../utils/views"
 
 export default defineMcpTool({
   name: "read_file",
@@ -25,6 +27,7 @@ export default defineMcpTool({
     const drop = await findDropByRef(id, event)
     if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, message: "File not found." })
     const result = await agentFile(drop, who, path, format)
+    await Promise.all([recordVisit(event, drop, who, "beacon"), countView(event, drop, who, "beacon")])
     return {
       content: [
         result.content,
