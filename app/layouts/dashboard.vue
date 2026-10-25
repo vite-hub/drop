@@ -71,29 +71,12 @@ const workspace = computed(() => [
   ...(admin.value
     ? [
         {
-          label: "Users",
-          icon: "i-mingcute-group-2-line",
-          activeIcon: "i-mingcute-group-2-fill",
+          label: "Console",
+          icon: "i-mingcute-settings-3-line",
+          activeIcon: "i-mingcute-settings-3-fill",
           to: "/_vitehub/auth",
           external: true,
           active: false,
-        },
-        {
-          label: "Review shares",
-          icon: "i-mingcute-safety-certificate-line",
-          activeIcon: "i-mingcute-safety-certificate-fill",
-          to: "/admin/review",
-          active: at("/admin/review"),
-          count: me.value?.reviews,
-          countLabel: "shares to review",
-          alert: true,
-        },
-        {
-          label: "Reports",
-          icon: "i-mingcute-flag-1-line",
-          activeIcon: "i-mingcute-flag-1-fill",
-          to: "/admin/reports",
-          active: at("/admin/reports"),
         },
       ]
     : []),

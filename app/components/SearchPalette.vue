@@ -119,7 +119,7 @@ const pages = computed<CommandPaletteItem[]>(() =>
     },
     ...(me.value?.role === "admin"
       ? [
-          { label: "Users", icon: "i-mingcute-group-2-line", to: "/_vitehub/auth", external: true },
+          { label: "Console", icon: "i-mingcute-settings-3-line", to: "/_vitehub/auth", external: true },
           { label: "Review shares", icon: "i-mingcute-safety-certificate-line", to: "/admin/review" },
           { label: "Reports", icon: "i-mingcute-flag-1-line", to: "/admin/reports" },
         ]
