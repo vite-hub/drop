@@ -14,13 +14,15 @@ interface PaletteFolder extends Pick<DropSummary, "id" | "title"> {
 interface PaletteContext {
   drop: ShallowRef<PaletteDrop | null>
   folder: ShallowRef<PaletteFolder | null>
+  /** The folder open on the page, which `in:` searches can name, whoever may add to it. */
+  scope: ShallowRef<Pick<DropSummary, "id" | "title"> | null>
 }
 
 const KEY: InjectionKey<PaletteContext> = Symbol("palette-context")
 
 /** The dashboard layout holds the context; the page inside it fills it in, and the palette beside the page reads it. */
 export function providePaletteContext() {
-  const context: PaletteContext = { drop: shallowRef(null), folder: shallowRef(null) }
+  const context: PaletteContext = { drop: shallowRef(null), folder: shallowRef(null), scope: shallowRef(null) }
   provide(KEY, context)
   return context
 }
@@ -41,4 +43,17 @@ export function offerToPalette<K extends keyof PaletteContext>(key: K, value: ()
   onBeforeUnmount(() => {
     if (slot.value === mine) slot.value = null
   })
+}
+
+/** What the palette's search holds. Shared, so a folder's search box opens it with the folder's `in:` typed in. */
+export const usePaletteTerm = () => useState("palette-term", () => "")
+
+/** Opens the ⌘K palette with a term in its search. Call it in setup; the function it returns, anywhere. */
+export function usePaletteOpener() {
+  const term = usePaletteTerm()
+  const nuxtApp = useNuxtApp()
+  return (value = "") => {
+    term.value = value
+    void nuxtApp.callHook("dashboard:search:toggle")
+  }
 }

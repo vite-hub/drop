@@ -5,7 +5,7 @@ import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { renderMarkdownCached } from "../markdown-document"
 import { renderSpreadsheetCached, SPREADSHEET_EXTENSIONS, spreadsheetExtension } from "../spreadsheet"
-import type { DropAttachment, DropCrumb, DropDetail, DropSummary, DropVersion } from "#shared/types"
+import type { DropAttachment, DropCrumb, DropDetail, DropKind, DropSummary, DropVersion } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
 import { hasEditorlessSyntax } from "#shared/frontmatter"
@@ -155,57 +155,65 @@ export function findDropByBlob(key: string, event?: H3Event) {
   return findOne(sql`${idOf(eq(drops.blobKey, key))}`, event)
 }
 
+/** Drops of these kinds, or of any kind when there are none. */
+const ofKinds = (kinds?: DropKind[]) => (kinds?.length ? inArray(drops.kind, kinds) : undefined)
+
 /**
  * Your drops, newest first: the ones at the top (folders hold the rest), the ones in your Trash, or with `query` the
- * matches at any depth. Older versions of a doc hide behind their latest, and files a doc embeds hide behind the doc.
- * A folder in the Trash takes its drops along, so only the top-most node in the Trash lists.
+ * matches at any depth; `kinds` keeps those kinds only, at any depth too. Older versions of a doc hide behind their
+ * latest, and files a doc embeds hide behind the doc. A folder in the Trash takes its drops along, so only the top-most
+ * node in the Trash lists.
  */
 export async function listDrops(
   who: Identity,
   event?: H3Event,
-  options: { trash?: boolean; query?: string; limit?: number } = {},
+  options: { trash?: boolean; query?: string; kinds?: DropKind[]; limit?: number } = {},
 ): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
+  const deep = words.length > 0 || Boolean(options.kinds?.length)
   // The team's folders list for everyone (listSharedWithMe), not as their creator's.
   const scope = options.trash
     ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt)))
-    : words.length
-      ? listedNode
+    : deep
+      ? and(listedNode, ofKinds(options.kinds))
       : and(isNull(drops.parentId), eq(drops.teamFolder, false))
   const found = await headsMatching(and(eq(dropHeads.ownerId, who.userId), scope), words, options.limit ?? 500)
   const rows = await resolveRows(found.rows, days)
   const listed = rows.filter((row) => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
-  return summarize(listed, days, { ownerId: who.userId, path: words.length > 0, snippets: found.snippets })
+  return summarize(listed, days, { ownerId: who.userId, path: deep, snippets: found.snippets })
 }
 
 /**
- * A folder's drops, newest first: the ones directly inside, or with `query` the matches anywhere below it. Drops someone
+ * A folder's drops, newest first: the ones directly inside, or with `query` or `kinds` the matches anywhere below it. Drops someone
  * moved to the Trash on their own list there instead. Anyone who may open the folder may open what it holds. A team
  * folder holds everyone's drops; any other folder only its owner's.
  */
 export async function listFolder(
   folder: DropRow,
   event?: H3Event,
-  options: { query?: string; who?: Identity | null } = {},
+  options: { query?: string; kinds?: DropKind[]; who?: Identity | null } = {},
 ): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
-  const inside = words.length ? inArray(drops.parentId, foldersUnder(folder.id)) : eq(drops.parentId, folder.id)
+  const deep = words.length > 0 || Boolean(options.kinds?.length)
+  const inside = deep ? inArray(drops.parentId, foldersUnder(folder.id)) : eq(drops.parentId, folder.id)
   const owned = folder.teamFolder ? undefined : eq(dropHeads.ownerId, folder.ownerId)
-  const found = await headsMatching(and(owned, inside, isNull(drops.trashedAt)), words, words.length ? 200 : 500)
+  const found = await headsMatching(
+    and(owned, inside, ofKinds(options.kinds), isNull(drops.trashedAt)),
+    words,
+    deep ? 200 : 500,
+  )
   // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
   const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
-  const rows = words.length
-    ? await resolveRows(found.rows, days)
-    : found.rows.map((row) => resolveNode(row, above, days))
+  const rows = deep ? await resolveRows(found.rows, days) : found.rows.map((row) => resolveNode(row, above, days))
   // The owner may open a folder in the Trash, and sees what it holds as it was.
   const listed = rows
     .filter((row) => folder.expired || !row.expired)
     .map((row) => ({ ...row, ownerBanned: folder.ownerBanned }))
   const summaries = await summarize(listed, days, {
     ownerId: folder.teamFolder ? undefined : folder.ownerId,
-    path: words.length > 0,
+    path: deep,
     below: folder.id,
     snippets: found.snippets,
   })
@@ -322,7 +330,13 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
  * it lists, at any depth. The same rules hold: nothing waiting for review, quarantined, in the Trash, or from a banned
  * owner, and admins find no one's private drops here. A path shows only the folders you may open.
  */
-async function searchShared(who: Identity, words: string[], limit: number, event?: H3Event): Promise<DropSummary[]> {
+async function searchShared(
+  who: Identity,
+  words: string[],
+  kinds: DropKind[],
+  limit: number,
+  event?: H3Event,
+): Promise<DropSummary[]> {
   const now = Date.now()
   const team = sharePolicy(event).mode === "team"
   const reachable = (node: string) => reachableSql(node, who, now, event)
@@ -338,6 +352,7 @@ async function searchShared(who: Identity, words: string[], limit: number, event
     and(
       ne(dropHeads.ownerId, who.userId),
       listedNode,
+      ofKinds(kinds),
       isNull(drops.trashedAt),
       isNull(drops.quarantinedAt),
       team ? undefined : isNull(drops.shareReview),
@@ -376,17 +391,22 @@ async function searchShared(who: Identity, words: string[], limit: number, event
 
 /**
  * Everything you can open that matches a search, for the search palette: your drops at any depth first, then other
- * people's (see `searchShared`). Each list keeps its newest `limit`.
+ * people's (see `searchShared`). Each list keeps its newest `limit`. `kinds` keeps those kinds only, and searches with
+ * no words too.
  */
 export async function searchEverything(
   who: Identity,
   query: string,
   event?: H3Event,
-  limit = 30,
+  options: { kinds?: DropKind[]; limit?: number } = {},
 ): Promise<DropSummary[]> {
+  const { kinds = [], limit = 30 } = options
   const words = searchWords(query)
-  if (!words.length) return []
-  return [...(await listDrops(who, event, { query, limit })), ...(await searchShared(who, words, limit, event))]
+  if (!words.length && !kinds.length) return []
+  return [
+    ...(await listDrops(who, event, { query, kinds, limit })),
+    ...(await searchShared(who, words, kinds, limit, event)),
+  ]
 }
 
 /** Remembers a public drop a signed-in person opened, at most once a day per drop. */

@@ -5,6 +5,7 @@ import { db } from "vite-hub/database/drizzle"
 import { dropHeads, drops, dropTexts } from "../databases/config"
 import { boardText, parseBoard } from "#shared/board"
 import { splitFrontmatter } from "#shared/frontmatter"
+import { DROP_KINDS } from "#shared/types"
 
 // Search matches a drop's title, file name and slug, and the words of a text doc, kept in `drop_texts` for latest
 // versions. Plain LIKE scans, no FTS5: D1's export breaks on virtual tables, and a person's docs scan in milliseconds.
@@ -67,6 +68,9 @@ export function searchableText(kind: string, source: string) {
 
 /** Search words: lower case, at most ten, each matched anywhere in the title, file name, slug, or a doc's text. */
 export const searchWords = (query?: string) => query?.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 10) ?? []
+
+/** `?kind=image,file`: the kinds a search keeps, the unknown ones left out. */
+export const searchKinds = (param?: string | null) => DROP_KINDS.filter((kind) => param?.split(",").includes(kind))
 
 const encoder = new TextEncoder()
 
