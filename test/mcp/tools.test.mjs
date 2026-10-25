@@ -4,9 +4,10 @@ import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { createTarGzip } from "nanotar"
-import { objects, sql, state, migrate, reset, who } from "../cost/harness.mjs"
+import { objects, sql, state, migrate, reset, who, calls, insertDrop } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
+const { default: readFile } = await import("../../server/mcp/tools/read_file.ts")
 const { default: listDrops } = await import("../../server/mcp/tools/list_drops.ts")
 const { default: updateDrop } = await import("../../server/mcp/tools/update_drop.ts")
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
@@ -15,6 +16,7 @@ const { default: viewBoard } = await import("../../server/mcp/tools/view_board.t
 const { default: commentsGet } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
+const { default: uploadFile } = await import("../../server/api/files.post.ts")
 
 const MIB = 1024 * 1024
 
@@ -29,22 +31,36 @@ const server = createMcpHandler({
   name: "drop-test",
   version: "1",
   origin: false,
-  tools: [publish, readDrop, reply, listDrops, updateDrop, editBoard, viewBoard],
+  tools: [publish, readDrop, readFile, reply, listDrops, updateDrop, editBoard, viewBoard],
 })
-async function call(tool, input) {
+async function call(tool, input, protocolVersion = "2025-06-18") {
   const request = new H3Event(
     new Request("https://drop.example/mcp", {
       method: "POST",
       headers: {
         "content-type": "application/json",
         accept: "application/json, text/event-stream",
-        "mcp-protocol-version": "2025-06-18",
+        "mcp-protocol-version": protocolVersion,
+        "mcp-method": "tools/call",
+        "mcp-name": tool.name,
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
         method: "tools/call",
-        params: { name: tool.name, arguments: input },
+        params: {
+          name: tool.name,
+          arguments: input,
+          ...(protocolVersion === "2026-07-28"
+            ? {
+                _meta: {
+                  "io.modelcontextprotocol/protocolVersion": protocolVersion,
+                  "io.modelcontextprotocol/clientInfo": { name: "file-test", version: "1" },
+                  "io.modelcontextprotocol/clientCapabilities": {},
+                },
+              }
+            : {}),
+        },
       }),
     }),
   )
@@ -55,6 +71,203 @@ async function call(tool, input) {
   const result = body.result
   return result.isError ? { isError: true, message: result.content.map((block) => block.text).join(" ") } : result
 }
+
+test("read_drop delivers a person's private upload as image bytes to their agent", async () => {
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+    "base64",
+  )
+  state.who = who
+  const form = new FormData()
+  form.set("file", new File([png], "screenshot.png", { type: "image/png" }))
+  const event = new H3Event(new Request("https://drop.example/api/files", { method: "POST", body: form }))
+  event.context.log = { set() {}, error() {}, warn() {} }
+  const uploaded = await uploadFile(event)
+  assert.equal(uploaded.share, "private")
+  state.who = { ...who, actorKind: "agent", actorName: "Executor" }
+  const read = await call(readDrop, { id: uploaded.page })
+  assert.deepEqual(
+    read.content.find((block) => block.type === "image"),
+    {
+      type: "image",
+      mimeType: "image/png",
+      data: png.toString("base64"),
+    },
+  )
+  assert.equal(read.structuredContent.share, "private")
+  assert.deepEqual((await call(readFile, { id: uploaded.id })).content[0], read.content[1])
+  const raw = await call(readFile, { id: uploaded.id, format: "resource" })
+  assert.equal(raw.content[0].type, "resource")
+  assert.equal(raw.content[0].resource.blob, png.toString("base64"))
+  assert.equal(raw.structuredContent.size, png.length)
+  assert.doesNotMatch(raw.content[0].resource.uri, /\/f\//)
+})
+
+test("MCP file retrieval rejects other users and anonymous callers before touching storage", async () => {
+  insertDrop("private", { visibility: "private", kind: "image", content_type: "image/png" })
+  for (const caller of [{ ...who, userId: "other", actorKind: "agent" }, null]) {
+    state.who = caller
+    for (const tool of [readDrop, readFile]) {
+      const before = calls.get
+      assert.equal((await call(tool, { id: "private" })).isError, true)
+      assert.equal(calls.get, before)
+    }
+  }
+  state.who = { ...who, actorKind: "agent" }
+  for (const id of ["absent", "private.md", "https://drop.example/f/private.md"]) {
+    assert.match((await call(readFile, { id })).message, /File not found/)
+  }
+  assert.match((await call(readFile, { id: "private", path: "private.md" })).message, /File not found/)
+})
+
+test("image and blob resource blocks survive modern and legacy MCP serialization without duplicating base64 in metadata", async () => {
+  insertDrop("image", { visibility: "private", kind: "image", content_type: "image/png" })
+  for (const protocol of ["2025-03-26", "2025-11-25", "2026-07-28"]) {
+    for (const format of ["auto", "resource"]) {
+      const result = await call(readFile, { id: "image", format }, protocol)
+      assert.notEqual(result.isError, true, result.message)
+      const encoded = format === "auto" ? result.content[0].data : result.content[0].resource.blob
+      assert.equal(Buffer.from(encoded, "base64").toString(), "# Source")
+      assert.doesNotMatch(JSON.stringify(result.structuredContent), /base64|blob|data/)
+    }
+  }
+})
+
+test("file reads preserve team and public grants, revocation, expiry and owner Trash access", async () => {
+  insertDrop("folder", { kind: "folder", blob_key: null, visibility: "team" })
+  insertDrop("child", { parent_id: "folder", visibility: "private", kind: "image", content_type: "image/png" })
+  state.mode = "team"
+  state.who = { ...who, userId: "teammate", actorKind: "agent" }
+  assert.equal((await call(readFile, { id: "child" })).content[0].type, "image")
+  state.mode = "personal"
+  assert.equal((await call(readFile, { id: "child" })).isError, true, "team-mode grant does not include outsiders")
+  sql.prepare("UPDATE drops SET share = 'public' WHERE id = 'folder'").run()
+  assert.equal((await call(readFile, { id: "child" })).content[0].type, "image")
+  sql.prepare("UPDATE drops SET trashed_at = ?, trash_reason = 'user' WHERE id = 'folder'").run(Date.now())
+  assert.equal((await call(readFile, { id: "child" })).isError, true, "Trash revokes the inherited public share")
+  state.who = { ...who, actorKind: "agent" }
+  assert.equal((await call(readFile, { id: "child" })).content[0].type, "image", "owner may still read their Trash")
+  sql.prepare("UPDATE drops SET trashed_at = NULL, trash_reason = NULL, last_accessed_at = 1 WHERE id = 'folder'").run()
+  state.who = { ...who, userId: "teammate", actorKind: "agent" }
+  assert.equal((await call(readFile, { id: "child" })).isError, true, "natural expiry also revokes inherited shares")
+  state.who = { ...who, actorKind: "agent" }
+  assert.equal((await call(readFile, { id: "child" })).content[0].type, "image")
+  sql.prepare("DELETE FROM drops WHERE id = 'child'").run()
+  assert.match((await call(readFile, { id: "child" })).message, /File not found/)
+})
+
+test("quarantine, owner bans and missing blobs never return private bytes", async () => {
+  insertDrop("file", { visibility: "private", kind: "image", content_type: "image/png" })
+  sql.prepare("UPDATE drops SET quarantined_at = ? WHERE id = 'file'").run(Date.now())
+  assert.equal((await call(readFile, { id: "file" })).isError, true)
+  assert.equal(calls.get, 0)
+  sql.prepare("UPDATE drops SET quarantined_at = NULL WHERE id = 'file'").run()
+  sql.prepare("UPDATE user SET banned = 1 WHERE id = 'owner'").run()
+  assert.equal((await call(readFile, { id: "file" })).isError, true)
+  assert.equal(calls.get, 0)
+  sql.prepare("UPDATE user SET banned = 0 WHERE id = 'owner'").run()
+  objects.clear()
+  assert.match((await call(readFile, { id: "file" })).message, /File not found/)
+})
+
+test("PDF, video, SVG and unknown files are complete embedded resources, never claimed as decoded images", async () => {
+  for (const [name, mime, bytes] of [
+    ["doc.pdf", "application/pdf", Buffer.from("%PDF-1.7\noriginal bytes")],
+    ["clip.mp4", "video/mp4", Buffer.from([0, 0, 0, 24, 102, 116, 121, 112])],
+    ["vector.svg", "image/svg+xml", Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')],
+    ["data.bin", "application/octet-stream", Buffer.from([0, 255, 128, 17])],
+  ]) {
+    insertDrop(name, {
+      visibility: "private",
+      kind: "file",
+      filename: name,
+      blob_key: name,
+      content_type: mime,
+      size: bytes.length,
+    })
+    objects.set(name, { body: new Blob([bytes]) })
+    const read = await call(readFile, { id: name })
+    assert.equal(read.content[0].type, "resource")
+    assert.equal(read.content[0].resource.mimeType, mime)
+    assert.deepEqual(Buffer.from(read.content[0].resource.blob, "base64"), bytes)
+    assert.equal(read.structuredContent.size, bytes.length)
+    const dropRead = await call(readDrop, { id: name })
+    assert.deepEqual(
+      dropRead.content.find((block) => block.type === "resource"),
+      read.content[0],
+      "existing read_drop clients receive binary bytes without refreshing their tool catalog",
+    )
+  }
+})
+
+test("file size checks bound both metadata and the stored object before encoding", async () => {
+  insertDrop("large", { visibility: "private", size: 4 * MIB + 1 })
+  assert.match((await call(readFile, { id: "large" })).message, /4 MiB/)
+  assert.equal(calls.get, 0)
+  sql.prepare("UPDATE drops SET size = 1 WHERE id = 'large'").run()
+  objects.set("large.md", {
+    body: {
+      size: 4 * MIB + 1,
+      arrayBuffer() {
+        assert.fail("oversized object was read")
+      },
+    },
+  })
+  assert.match((await call(readFile, { id: "large" })).message, /4 MiB/)
+  objects.set("large.md", { body: new Blob([new Uint8Array(4 * MIB)]) })
+  const result = await call(readFile, { id: "large" })
+  assert.equal(Buffer.from(result.content[0].resource.blob, "base64").length, 4 * MIB)
+})
+
+test("an app file is resolved within its authorized drop, never by an arbitrary asset key", async () => {
+  insertDrop("app", { visibility: "private", kind: "app", blob_key: null })
+  insertDrop("other-app", { visibility: "private", kind: "app", blob_key: null })
+  sql
+    .prepare(
+      "INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES ('app', 'assets/a.png', 'apps/app/a.png', 3), ('other-app', 'secret.pdf', 'apps/other/secret.pdf', 6)",
+    )
+    .run()
+  objects.set("apps/app/a.png", { body: new Blob([new Uint8Array([1, 2, 3])]) })
+  const read = await call(readFile, { id: "app", path: "assets/a.png" })
+  assert.equal(read.content[0].type, "image")
+  assert.equal(read.content[0].data, "AQID")
+  for (const path of [
+    undefined,
+    "secret.pdf",
+    "apps/other/secret.pdf",
+    "../other/secret.pdf",
+    "https://elsewhere.example/f/a.png",
+  ]) {
+    const before = calls.get
+    assert.match((await call(readFile, { id: "app", path })).message, /File not found/)
+    assert.equal(calls.get, before)
+  }
+})
+
+test("successful file reads refresh activity and count agent views, but never revive Trash", async () => {
+  const old = Date.now() - 3 * 86400000
+  insertDrop("pdf", { visibility: "private", kind: "file", content_type: "application/pdf", last_accessed_at: old })
+  await call(readFile, { id: "pdf" })
+  assert.ok(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at > old)
+  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+  sql.prepare("UPDATE drops SET trashed_at = ?, last_accessed_at = ? WHERE id = 'pdf'").run(Date.now(), old)
+  await call(readFile, { id: "pdf" })
+  assert.equal(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at, old)
+  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+})
+
+test("unknown app binaries have a binary MIME fallback", async () => {
+  insertDrop("app", { visibility: "private", kind: "app", blob_key: null })
+  sql
+    .prepare(
+      "INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES ('app', 'payload.custombinary', 'apps/payload', 3)",
+    )
+    .run()
+  objects.set("apps/payload", { body: new Blob([new Uint8Array([0, 255, 128])]) })
+  const result = await call(readFile, { id: "app", path: "payload.custombinary" })
+  assert.equal(result.content[0].resource.mimeType, "application/octet-stream")
+  assert.equal(result.content[0].resource.blob, "AP+A")
+})
 
 test("publish asks for one kind of content and a lifetime on new drops", async () => {
   assert.match((await call(publish, { note: "x", lifetime: "review" })).message, /exactly one/)
@@ -72,6 +285,11 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
     await call(publish, { file: { name: "before.png", base64: png }, note: "Before", lifetime: "temporary" })
   ).structuredContent
   assert.equal(shot.kind, "image")
+  assert.equal(
+    (await call(readDrop, { id: shot.id })).content[1].data,
+    png,
+    "agent-created private images use the same path",
+  )
   assert.match(shot.fileUrl, /^https:\/\/drop\.example\/f\/[0-9a-f-]{36}\.png$/)
 
   const doc = (
