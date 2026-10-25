@@ -324,6 +324,7 @@
     &:where(.cp) {
       display: inline-flex;
       align-items: center;
+      line-height: 1.25;
     }
 
     /* Media. */
