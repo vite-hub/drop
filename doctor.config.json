@@ -1,3 +1,10 @@
 {
-  "extends": ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict"]
+  "extends": ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict"],
+  "suppressions": [
+    {
+      "ruleId": "nuxt/middleware/no-route-middleware-api-security",
+      "file": "node_modules/*/vite-hub/dist/console/runtime/server/auth-manage.js",
+      "reason": "ViteHub wraps this dependency handler in withConsoleAccess with section auth and user required. Doctor cannot follow that wrapper. test/auth/console-runtime.mjs verifies signed-out and non-admin requests are denied by the built Worker."
+    }
+  ]
 }

@@ -45,7 +45,7 @@ Operators set `DROP_QUOTAS=true` to turn quotas on and `DROP_DEFAULT_PLAN` to `f
 
 ## Roles {#roles}
 
-Everyone who signs in joins as a Member. The people whose emails the operator lists in `DROP_ADMINS` are Admins, whichever way they sign in. Roles come from that list, not from the Members page, where admins ban and unban members.
+Everyone who signs in joins as a Member. The people whose verified emails the operator lists in `DROP_ADMINS` are Admins, whichever way they sign in. Admins open **Console**, the only admin sidebar link, to manage accounts and sessions in the [Auth Console](/_vitehub/auth). Roles come from `DROP_ADMINS` and cannot be changed in the Console. **Review shares** and **Reports** are available through Search.
 
 ::roles-table
 ::
