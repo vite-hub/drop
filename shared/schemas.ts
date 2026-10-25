@@ -211,13 +211,14 @@ export const ReportActionSchema = v.object({ action: v.picklist(["dismiss", "qua
  */
 export const DropsQuerySchema = v.object({
   q: v.optional(v.string()),
+  kind: v.optional(v.string()),
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
   trash: v.optional(v.string()),
   shared: v.optional(v.string()),
   folders: v.optional(v.string()),
 })
 
-export const SearchQuerySchema = v.object({ q: v.optional(v.string()) })
+export const SearchQuerySchema = v.object({ q: v.optional(v.string()), kind: v.optional(v.string()) })
 // The page forwards whatever `?v=` it was given; the route ignores what isn't a version number.
 export const LinkQuerySchema = v.object({ v: v.optional(v.string()) })
 export const ReviewCommentsQuerySchema = v.object({ page: v.optional(v.string()) })

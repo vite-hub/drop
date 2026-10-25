@@ -36,11 +36,6 @@ patchedDependencies:
   # Nitro's memory cache (Node hosts like Quiver) dropped every render with a 30-day TTL at once: a setTimeout over
   # 2^31-1 ms fires after 1 ms. Backport of unjs/unstorage#845 (in 2.0.0-alpha.11; Nitro pins alpha.7).
   unstorage@2.0.0-alpha.7: patches/unstorage@2.0.0-alpha.7.patch
-  # comark-plugins main plus onmax/comark-plugins#25 and #15, built: a zoomed annotated screenshot shows its notes
-  # beside it, a mark lights up its note there, and the zoom's events map copies to the page and back (copyOf and
-  # originalOf, which Drop's frame runtime anchors comments in the zoom with). Drop both once a release has #25 and #15.
-  comark-zoom@0.2.0: patches/comark-zoom@0.2.0.patch
-  comark-annotate@0.2.0: patches/comark-annotate@0.2.0.patch
   # The Nuxt module aliased @vite-hub/database/runtime/state to ViteHub's own re-export of it, which imports that
   # specifier, so the bundled module imported itself and every request failed with "runWithDatabaseRequest is not a
   # function". The alias names @vite-hub/database's file instead.
@@ -76,9 +71,6 @@ minimumReleaseAgeExclude:
   - "@better-auth/stripe@1.7.10"
   - "@better-auth/telemetry@1.7.10"
   - better-auth@1.7.10
-  - comark-annotate@0.2.0
-  - comark-carousel@0.2.0
-  - comark-zoom@0.2.0
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0

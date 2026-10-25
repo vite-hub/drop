@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: Builds a UI prototype as one Drop page holding several radically different variants behind a shared picker, so people switch between them, comment, and pick one; then drops the next round as a new version. Use when the user asks to prototype a screen, section, or flow, explore or compare design directions, or try a UI several ways.
+description: Prototypes a UI several radically different ways on one Drop page with a shared picker, so people switch between them, comment, and pick one; each round of feedback becomes the next version. Use when the user asks to prototype a screen, section, flow, or widget, compare design directions, or try a UI several ways.
 ---
 
 # Prototype

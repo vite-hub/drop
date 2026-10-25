@@ -1,6 +1,6 @@
 # Annotation syntax
 
-Drop renders these components with [comark-annotate](https://comark-annotate.onmax.me).
+Drop renders these components with [comark-annotate](https://comark.onmax.me/annotate/) and [comark-diff](https://comark.onmax.me/diff/).
 
 ```md
 ::compare
@@ -48,5 +48,33 @@ Direct children of a screenshot. The content is the note.
 ## `::compare`
 
 Exactly two screenshots, before then after. Numbers continue from the first to the second.
+
+## `::diff`
+
+Two fenced blocks, the file before and after. The first block's fence names the file.
+
+````md
+::diff{line=14}
+```vue [app/pages/dashboard.vue]
+<NuxtPage v-if="isChildRoute" />
+<main v-show="!isChildRoute">
+  <DashboardOverview />
+</main>
+```
+```vue
+<OverviewWithChild>
+  <DashboardOverview />
+</OverviewWithChild>
+```
+::
+````
+
+| Prop | |
+| --- | --- |
+| `line` | The line in the file where both blocks start. Without it, the diff has no line numbers. |
+| `label` | A heading before the file name, such as `Suggested change`. |
+| `file` | The file's path, when the fence doesn't name it. |
+
+Leave the before block empty for a new file, or the after block for a deleted one. A block holds at most 200 lines.
 
 When something is wrong with the document, Drop lists every problem with the block it belongs to. Fix each one and publish again.

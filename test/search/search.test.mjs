@@ -207,6 +207,22 @@ test("a folder's search finds text below it, and the search API needs a signed-i
   await assert.rejects(searchHandler(request("/api/search?q=offline")), (error) => error.status === 401)
 })
 
+test("a kind filter keeps those kinds at any depth, with words or without", async () => {
+  const box = await folder("Launch")
+  const sub = await folder("Mocks", { folder: box.id })
+  await doc("# Plan\n\nShip the landing.", { folder: box.id })
+  await call(publish, { html: "<h1>Landing</h1><p>Ship the landing.</p>", note: "Mock", folder: sub.id })
+
+  const inBox = (query) => listHandler(request(`/api/drops?folder=${box.id}&${query}`))
+  assert.deepEqual(titles(await inBox("kind=html")), ["Landing"], "below the folder, with no words")
+  assert.deepEqual(titles(await inBox("kind=markdown,folder")), ["Mocks", "Plan"], "kinds add up")
+  assert.deepEqual(titles(await inBox("kind=html&q=plan")), [], "words and kinds both hold")
+  assert.deepEqual(titles(await inBox("kind=nope")), ["Mocks", "Plan"], "an unknown kind is left out")
+  assert.deepEqual(titles(await searchHandler(request("/api/search?kind=html"))), ["Landing"])
+  assert.deepEqual(titles(await searchHandler(request("/api/search?q=ship&kind=markdown"))), ["Plan"])
+  assert.deepEqual(await searchHandler(request("/api/search?kind=nope")), [], "no words and no kinds find nothing")
+})
+
 test("agents find docs by their text too", async () => {
   await doc("# Weekly sync\n\nWe postponed the giraffe migration.")
   const listed = await call(listTool, { query: "giraffe" })

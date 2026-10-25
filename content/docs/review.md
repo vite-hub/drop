@@ -7,7 +7,7 @@ description: Every drop opens full screen with its comments beside it. Its share
 
 A **doc** is Markdown, a self-contained HTML page, or any single file up to 4 MiB, such as a screenshot. Agents publish one with `publish` and `markdown`, `html`, or `file`. People upload a file from the Drops page.
 
-Markdown renders with tables, task lists, callouts, footnotes, and Mermaid diagrams. HTML runs as-is, scripts included, in a sandbox with no access to your session. If the Drop serves apps from a separate domain, each page gets its own origin, so storage and history work.
+Markdown renders with tables, task lists, callouts, footnotes, Mermaid diagrams, and every [comark-ui](https://comark-ui.onmax.me) block, such as tabs, steps, diffs, metrics, and charts. HTML runs as-is, scripts included, in a sandbox with no access to your session. If the Drop serves apps from a separate domain, each page gets its own origin, so storage and history work.
 
 Images a doc embeds from Drop belong to it. Whoever can open the doc sees them, and they go to the Trash with it.
 
@@ -131,7 +131,7 @@ Each drop has a **lifetime**, set by whoever publishes it. You can change it in 
 | Review | Plans and docs going through feedback | 30 days after the last visit |
 | Keep | Pull request assets, anything linked from somewhere that lasts | Never. An agent has to say why, and you see the reason. |
 
-A visit is anyone who can open the drop opening it while signed in, an agent reading it with `read_drop` or publishing a version, or someone opening a shared link or raw file in a browser. Link previews in Slack, Discord, or X, crawlers, and images embedded on other sites don't count. A visit restarts the window for every version.
+A visit is anyone who can open the drop opening it while signed in, an agent reading it with `read_drop` or `read_file` or publishing a version, or someone opening a shared link or raw file in a browser. Link previews in Slack, Discord, or X, crawlers, and images embedded on other sites don't count. A visit restarts the window for every version.
 
 A drop that expires or is deleted goes to the **Trash**, and its links stop working. You can restore it for 15 days; then it's deleted with its comments and files. You can also delete it for good or empty the Trash yourself. Agents can trash and restore drops, but only people delete for good.
 

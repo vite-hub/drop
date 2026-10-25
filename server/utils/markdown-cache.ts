@@ -8,8 +8,10 @@ export interface MarkdownRender {
   title: string
   html: string
   source: string
+  /** A network failure left something out, such as an icon, so the render isn't kept and the next read tries again. */
+  retry?: true
 }
-type Render = (text: string) => Promise<{ title: string; html: string }>
+type Render = (text: string) => Promise<{ title: string; html: string; retry?: true }>
 
 /**
  * Renders keyed by blob key, in Nitro's `cache` storage (KV on Cloudflare, memory elsewhere). Blobs never change
@@ -32,8 +34,10 @@ const cached = defineCachedFunction(
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
     // Change this when the renderer's output changes (2: Shiki code blocks, 3: comark-annotate zooms a screenshot's stage
-    // with its notes beside it): every cached render rerenders on its next read.
-    integrity: "3",
+    // with its notes beside it, 4: every comark-plugins package, 5: comark-ui's preset, with quiz): every cached render
+    // rerenders on its next read.
+    integrity: "5",
+    validate: (entry: { value?: MarkdownRender }) => entry.value !== undefined && !entry.value.retry,
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
 )

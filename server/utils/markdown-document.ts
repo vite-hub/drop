@@ -3,16 +3,16 @@ import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
 import { log } from "evlog"
 import { createMarkdownParser } from "@comark/html/parse"
-import alert from "@comark/html/plugins/alert"
+import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
-import footnotes from "@comark/html/plugins/footnotes"
 import frontmatter from "@comark/html/plugins/frontmatter"
 import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { visitAsync } from "@comark/html/utils"
-import annotate, { components as annotations } from "comark-annotate/html"
+import comarkUi from "comark-ui/html"
 import { escapeUTF8 as escapeHtml } from "entities"
+import * as v from "valibot"
 import { stringifyTokenStyle } from "shiki/core"
 import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
@@ -20,18 +20,44 @@ import { codeLanguage, loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
 
 /**
- * The components Markdown may use, beyond plain HTML. The security plugin also checks an alert's kind (`> [!CAUTION]`
- * is `<blockquote as="caution">`) against this list. screenshot, compare, and annotation are comark-annotate's:
- * annotated screenshots for PR evidence. skills/vitehub-drop/references/markdown.md documents each one for agents.
+ * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
+ * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
+ * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments, and
+ * Mermaid stays Drop's, with its limits.
+ */
+const preset = comarkUi({ chips: { download: false }, mermaid: false, zoom: { images: false } })
+
+/**
+ * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
+ * kinds), Mermaid, and comark-annotate's screenshot, compare, and annotation for PR evidence. Its blocks.md documents
+ * every other plugin.
  */
 export const COMPONENT_TAGS =
   "alert annotation callout caution compare important info mermaid note screenshot tip warning".split(" ")
 const ALLOWED_TAGS = [
-  ..."a blockquote br code del em h1 h2 h3 h4 h5 h6 hr img input li ol p pre s section span strong sup table tbody td th thead tr ul".split(
+  // Markdown's own, and the raw HTML comark-github lets through: GitHub's allowlist.
+  ..."a abbr b bdo blockquote br caption cite code dd del details dfn div dl dt em figcaption figure h1 h2 h3 h4 h5 h6 hr i img input ins kbd li mark ol p picture pre q rp rt ruby s samp section small source span strike strong sub summary sup table tbody td tfoot th thead time tr tt ul var wbr".split(
     " ",
   ),
+  // What the plugins draw with that isn't a component of theirs: comark-table's sort buttons, comark-tabs' items, and the
+  // parts comark-quiz builds a question, poll, or recall card from.
+  "button",
+  "tabs-item",
+  ..."quiz-after quiz-answer quiz-explain quiz-hint quiz-label quiz-option quiz-options quiz-prompt quiz-rationale".split(
+    " ",
+  ),
+  ...Object.keys(preset.components),
   ...COMPONENT_TAGS,
 ]
+/**
+ * Markup a plugin's renderer writes as it is, trusting its parse plugin to have drawn it. An author can write the same
+ * component by hand, so these attributes go before the plugins run: comark-diagrams would otherwise print a
+ * `::diagram{svg="…"}` from the doc into the page.
+ */
+const DRAWN_ATTRIBUTES = new Map([
+  ["chart", ["svg", "marks"]],
+  ["diagram", ["svg"]],
+])
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
 const MAX_HIGHLIGHTED_CHARACTERS = 200_000
@@ -40,7 +66,7 @@ type MarkdownTree = Parameters<typeof visitAsync>[0]
 
 /**
  * Shiki colors for code blocks in a language Drop knows: GitHub light inline, GitHub dark as `--shiki-dark` for the
- * viewer's dark mode. It runs after `security`, and everything it adds comes from Shiki's tokens of the escaped code.
+ * viewer's dark mode. Everything it adds comes from Shiki's tokens of the escaped code, and `security` checks it after.
  * Past MAX_HIGHLIGHTED_CHARACTERS the rest stay plain, so a huge dump can't eat the Worker's CPU.
  */
 const highlight = () => ({
@@ -77,16 +103,36 @@ const highlight = () => ({
   },
 })
 
+/** Drops the markup in DRAWN_ATTRIBUTES that a doc wrote itself, before the plugins draw theirs. */
+const authored = () => ({
+  name: "drop-authored",
+  async post(state: { tree: MarkdownTree }) {
+    await visitAsync(
+      state.tree,
+      (node) => Array.isArray(node) && DRAWN_ATTRIBUTES.has(textValue(node[0]) ?? ""),
+      (node) => {
+        if (!Array.isArray(node)) return
+        for (const name of DRAWN_ATTRIBUTES.get(textValue(node[0]) ?? "") ?? []) delete node[1][name]
+      },
+    )
+  },
+})
+
+const pluginsBeforeCode = preset.plugins.findIndex((plugin) => plugin.name === "comark-code")
 const plugins = [
   frontmatter(),
-  alert(),
   taskList(),
-  footnotes(),
   components(),
+  attributes(),
   mermaid({ theme: "zinc-light" }),
-  annotate(),
+  authored(),
+  ...preset.plugins.slice(0, pluginsBeforeCode),
+  // Before comark-code, which marks and numbers the lines Shiki drew.
+  highlight(),
+  ...preset.plugins.slice(pluginsBeforeCode),
+  // Last, so it checks what every plugin drew from the doc.
   security({
-    allowedProtocols: ["http", "https", "mailto"],
+    allowedProtocols: ["http", "https", "mailto", "data"],
     allowedTags: ALLOWED_TAGS,
     tagFallback: ([tag, , ...children]) => [
       "aside",
@@ -95,8 +141,7 @@ const plugins = [
       ...children,
     ],
   }),
-  highlight(),
-] as const
+]
 
 const parse = createMarkdownParser({ plugins, registerDefaultPlugins: false })
 
@@ -115,7 +160,8 @@ const renameLegacyProps = (markdown: string) =>
     )
   })
 
-const parseMarkdown = (markdown: string) => parse(renameLegacyProps(markdown))
+/** The parse Drop renders with: every plugin, Drop's own, and the tag allowlist. Tests check docs against it. */
+export const parseMarkdown = (markdown: string) => parse(renameLegacyProps(markdown))
 
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
@@ -168,29 +214,54 @@ function createMermaidRenderer(): NodeHandler {
   }
 }
 
-/**
- * The one Markdown renderer: Comark with front matter, alerts, task lists, footnotes, server-rendered Mermaid SVG, and a
- * tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
- */
-/** Problems with a document's annotated screenshots, one readable sentence each. Empty when it has none. */
-export async function annotationIssues(markdown: string): Promise<string[]> {
-  return (await parseMarkdown(markdown)).meta.issues ?? []
+/** Problems a network failure caused, which the next render may not have: an icon or a Kroki server out of reach. */
+const RETRIED_RULE = /\/(?:download-failed|server-unreachable)$/
+
+type DocumentMeta = Awaited<ReturnType<typeof parseMarkdown>>["meta"]
+
+const Issues = v.fallback(v.array(v.string()), [])
+const IssueRules = v.fallback(v.record(v.string(), v.string()), {})
+
+/** Each plugin names its problems (`comark/<plugin>/<rule>`); one without a name counts as a block's. */
+function issuesOf(meta: DocumentMeta) {
+  const all = v.parse(Issues, meta.issues)
+  const rules = v.parse(IssueRules, meta.issueRules)
+  const annotated = (issue: string) => rules[issue]?.startsWith("comark/annotate/") === true
+  return {
+    all,
+    annotations: all.filter(annotated),
+    blocks: all.filter((issue) => !annotated(issue)),
+    retry: all.some((issue) => RETRIED_RULE.test(rules[issue] ?? "")),
+  }
 }
 
-async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string }> {
+/**
+ * A doc's problems, one readable sentence each: its annotated screenshots', which `publish` refuses, and every other
+ * block's, which the doc shows. Empty when it has none.
+ */
+export async function markdownIssues(markdown: string): Promise<{ annotations: string[]; blocks: string[] }> {
+  const { annotations, blocks } = issuesOf((await parseMarkdown(markdown)).meta)
+  return { annotations, blocks }
+}
+
+/**
+ * The one Markdown renderer: Comark with front matter, task lists, server-rendered Mermaid SVG, every comark-ui
+ * package, and a tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
+ */
+async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string; retry?: true }> {
   try {
     const document = await parseMarkdown(markdown)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     const revision = supersedes
       ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
       : ""
-    const issues = document.meta.issues ?? []
+    const { all: issues, retry } = issuesOf(document.meta)
     const problems = issues.length
-      ? `<aside class="render-error"><p>This document's annotated screenshots have ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
+      ? `<aside class="render-error"><p>This document has ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
       : ""
     const content = await renderHtmlFromDocument(document, {
       components: {
-        ...annotations,
+        ...preset.components,
         alert: renderCallout,
         callout: renderCallout,
         caution: renderCallout,
@@ -205,6 +276,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
     return {
       title: documentTitle(document),
       html: revision + problems + (content || '<p class="empty-document">This document is empty.</p>'),
+      ...(retry && { retry: true as const }),
     }
   } catch (error) {
     log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })

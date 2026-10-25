@@ -1,5 +1,5 @@
 import { defineHandler, HTTPError } from "h3"
-import { digest, enabledSkills, findEnabledSkill, type SkillFile, skillArchive } from "../utils/skills"
+import { digest, enabledSkills, findEnabledSkill, type Skill, type SkillFile, skillArchive } from "../utils/skills"
 
 const V2 = "/.well-known/agent-skills/"
 const V1 = "/.well-known/skills/"
@@ -8,6 +8,10 @@ const json = (body: unknown) =>
   new Response(JSON.stringify(body, null, 2), {
     headers: { "content-type": "application/json", "cache-control": "public, max-age=60" },
   })
+// What the v0.2.0 entry's digest covers: the file itself, or the archive of a multi-file skill.
+const skillDigest = async (skill: Skill) =>
+  digest(skill.files.length === 1 ? skill.files[0]!.bytes : await skillArchive(skill))
+
 const text = (file: SkillFile) =>
   new Response(file.text, {
     headers: { "content-type": `${file.mimeType}; charset=utf-8`, "cache-control": "public, max-age=60" },
@@ -16,7 +20,7 @@ const text = (file: SkillFile) =>
 /**
  * Agent Skills Discovery. v0.2.0 (`/.well-known/agent-skills/`): an index with a `$schema`, and per skill a
  * `skill-md` (one file) or an `archive` (several), each with a sha256 digest. v0.1.0 (`/.well-known/skills/`):
- * the older index with a `files` list, which `npx skills add` reads. Only enabled skills appear, and the short
+ * the older index with a `files` list and a `version`, which `npx skills add` and Executor read. Only enabled skills appear, and the short
  * cache lets an admin's toggle reach clients within a minute.
  */
 export default defineHandler(async (event) => {
@@ -26,13 +30,17 @@ export default defineHandler(async (event) => {
 
   if (path === "index.json") {
     const SKILLS = await enabledSkills()
+    // `version` changes whenever a skill's files do, so a client such as Executor reloads the files only then.
     if (!v2)
       return json({
-        skills: SKILLS.map((skill) => ({
-          name: skill.name,
-          description: skill.description,
-          files: skill.files.map((file) => file.path),
-        })),
+        skills: await Promise.all(
+          SKILLS.map(async (skill) => ({
+            name: skill.name,
+            description: skill.description,
+            version: (await skillDigest(skill)).slice("sha256:".length, "sha256:".length + 12),
+            files: skill.files.map((file) => file.path),
+          })),
+        ),
       })
     return json({
       $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
@@ -44,14 +52,14 @@ export default defineHandler(async (event) => {
                 type: "skill-md",
                 description: skill.description,
                 url: `${V2}${skill.name}/SKILL.md`,
-                digest: await digest(skill.files[0]!.bytes),
+                digest: await skillDigest(skill),
               }
             : {
                 name: skill.name,
                 type: "archive",
                 description: skill.description,
                 url: `${V2}${skill.name}.tar.gz`,
-                digest: await digest(await skillArchive(skill)),
+                digest: await skillDigest(skill),
               },
         ),
       ),
