@@ -61,7 +61,7 @@ export const state = (globalThis.dropTest = {
     head: async (key) => {
       calls.head++
       const file = objects.get(key)
-      return [null, file ? { ...file, size: file.body.size } : null]
+      return [null, file ? { ...file, size: file.body?.size ?? file.size } : null]
     },
     put: async (key, body) => {
       objects.set(key, { body: new Blob([body]), uploadedAt: new Date() })
