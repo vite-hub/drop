@@ -35,6 +35,17 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
     ],
   },
   {
+    title: "In a folder",
+    where: "A folder's page",
+    shortcuts: [
+      { keys: ["/"], label: "Search this folder" },
+      { keys: ["arrowdown"], label: "Preview the next drop, or the previous one with ↑", where: "A wide window" },
+      { keys: ["enter"], label: "Open the drop picked" },
+      { keys: ["F2"], label: "Rename the drop picked", where: "A drop you manage" },
+      { keys: ["escape"], label: "Close the preview" },
+    ],
+  },
+  {
     title: "Editing",
     where: "The live editor",
     shortcuts: [{ keys: ["meta", "s"], label: "Publish the draft as the next version" }],
@@ -45,4 +56,6 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
 export const KEY_LABELS = new Map([
   ["meta", "⌘"],
   ["escape", "Esc"],
+  ["arrowdown", "↓"],
+  ["enter", "Enter"],
 ])
