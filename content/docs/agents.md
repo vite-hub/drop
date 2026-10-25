@@ -46,6 +46,14 @@ What the server offers, read from the server itself:
 
 Every call runs as the person who allowed the client, with their role. New drops start with the Drop's default share: Team on a team Drop, Only me on a personal one. Agents make a drop public only when you ask, or when it's meant for people outside, like pull request assets.
 
+## Read uploaded files {#read-files}
+
+Your connected agent can read files you upload in the browser, including private files. `read_drop` includes the original image bytes as an MCP image for PNG, JPEG, WebP and GIF. Other image formats arrive as an embedded file resource.
+
+For a PDF, video, or any other file, call `read_file` with its drop id or `/d/` link. For one file inside an app, also pass its exact `path` from `read_drop`. The response contains the complete original bytes, up to 4 MiB per file. `format: "resource"` requests an embedded base64 blob resource for an image too, so a client can save it. Its `drop-file:` URI identifies the embedded content; it is not a public download link.
+
+File reads use the same access checks as opening the drop. They require no browser session or share change. Private files stay private, expired shares stop working, and owners can still read their own Trash until it is permanently deleted. Whether an agent can display an image, parse a PDF, or inspect a video depends on its client's format support.
+
 ## Where agents publish {#folders}
 
 Before publishing something new, an agent calls `list_folders`. It lists every folder you can publish into, the team's first, each with its path and description. The agent passes the folder whose description fits to `publish` and follows what the description asks, such as how to name the doc. When none fits, it publishes at the top.
