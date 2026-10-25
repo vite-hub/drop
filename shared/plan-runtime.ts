@@ -330,7 +330,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // Comark zooms its own blocks, such as annotated screenshots: its view keeps their marks and notes and pages
     // through a comparison, which Drop's lightbox of the bare image can't. The area tool still comments on them.
     const zoomed = target && target.closest("[data-zoom], .cz-dialog");
-    const img = !AUTHORED && !zoomed && target && target.closest("img");
+    const img = !AUTHORED && !zoomed && target && !target.closest("a[href]") && target.closest("img");
     // A srcdoc document resolves "#id" against Drop's page, so the frame would load Drop and be refused. Scroll here.
     const link = !img && location.protocol === "about:" && target && target.closest('a[href^="#"]');
     if (link && !host.contains(link)) {
