@@ -103,8 +103,23 @@ test("Drizzle applies the migrations once, in journal order", async () => {
         "quota_reservations",
         "quota_blobs",
         "abuse_reports",
+        "vitehub_auth_events",
       ])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
+      assert.deepEqual(
+        database
+          .prepare("PRAGMA index_list(vitehub_auth_events)")
+          .all()
+          .map((row) => row.name)
+          .filter((name) => !name.startsWith("sqlite_"))
+          .sort(),
+        [
+          "vitehub_auth_events_actor",
+          "vitehub_auth_events_time",
+          "vitehub_auth_events_type",
+          "vitehub_auth_events_user",
+        ],
+      )
       assert.ok(
         database
           .prepare("PRAGMA table_info(drops)")

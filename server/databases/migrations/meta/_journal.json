@@ -15,6 +15,13 @@
       "when": 1792593042706,
       "tag": "0001_teams",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792947600000,
+      "tag": "0002_auth_events",
+      "breakpoints": true
     }
   ]
 }

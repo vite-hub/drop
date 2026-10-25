@@ -1,20 +1,35 @@
 // Run against an isolated local Worker with DROP_TEST_SIGNIN=true, DROP_QUOTAS=true,
 // DROP_ADMINS=console-admin@example.com, and migrated local D1. Never point this at a deployment.
+// Start a fresh Worker for each run: its deployment-policy role sweep is cached.
 import assert from "node:assert/strict"
 import { readdirSync, writeFileSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { get } from "node:http"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "node:test"
+import { drizzle } from "drizzle-orm/sqlite-proxy"
+import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
+import { listAuthEvents } from "vite-hub/auth/server"
 
 const origin = process.env.DROP_CONSOLE_TEST_ORIGIN || "http://localhost:3417"
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname))
-const directory = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject"
+const directory = join(process.env.DROP_CONSOLE_TEST_STATE_DIR || ".wrangler/state", "v3/d1/miniflare-D1DatabaseObject")
 const file = readdirSync(directory).find((name) => name.endsWith(".sqlite") && name !== "metadata.sqlite")
 assert.ok(file, "Apply local D1 migrations first")
 const db = new DatabaseSync(join(directory, file))
 db.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=10000")
 const fixture = []
+// Read the Worker's local D1 with the published server reader, without exposing a new HTTP route.
+const eventDb = drizzle(async (query, params) => {
+  db.prepare(query).run(...params)
+  return { rows: [] }
+})
+eventDb.all = async (query) => {
+  const compiled = eventDb.dialect.sqlToQuery(query)
+  return db.prepare(compiled.sql).all(...compiled.params)
+}
+const eventDefinition = defineAuth({ events: { store: createDatabaseAuthEventStore({ db: eventDb }) } })
+const eventsFor = async (userId) => (await listAuthEvents({ userId, limit: 200 }, eventDefinition)).events
 
 async function request(path, { cookie = "", method = "GET", body, headers = {} } = {}) {
   const response = await fetch(`${origin}${path}`, {
@@ -66,6 +81,17 @@ await test("Worker Console authorization, actions, section limits and removed Me
   const member = await signup("Sam Rivera", "console-member@example.com")
   const other = await signup("Jamie Lee", "console-other@example.com")
   try {
+    // Seed a stale non-operator role before the first authorized Console request sweeps this policy.
+    db.prepare("UPDATE user SET role='admin' WHERE id=?").run(other.id)
+    const signIn = await request("/api/auth/sign-in/email", {
+      method: "POST",
+      body: { email: member.email, password: member.password },
+      headers: { "x-forwarded-for": "203.0.113.42", "user-agent": "Drop-private-test-agent/1.0" },
+    })
+    assert.equal(signIn.status, 200, signIn.text)
+    const signIns = (await eventsFor(member.id)).filter((event) => event.type === "user.signed_in")
+    assert.equal(signIns.length, 2, "Sign-up and explicit sign-in each record a completed authentication")
+    assert.ok(signIns.every((event) => event.metadata.method === "email-password"))
     for (const cookie of ["", member.cookie]) {
       const expected = cookie ? 403 : 401
       // ViteHub serves a static shell; every data request is guarded separately.
@@ -95,9 +121,17 @@ await test("Worker Console authorization, actions, section limits and removed Me
     assert.ok(description.data.access.some((line) => line.includes("DROP_MEMBERS is off")))
     assert.equal((await rpc(admin.cookie, "database")).status, 403)
     assert.equal((await rpc(admin.cookie, "env")).status, 403)
+    // Other users must also lose stale admin labels and filter membership without signing in again.
     const users = await manage(admin.cookie, { operation: "users" })
     assert.equal(users.status, 200, users.text)
     assert.ok(users.data.items.some((user) => user.id === member.id && user.fields.drops === 0))
+    assert.equal(users.data.items.find((user) => user.id === other.id).role, "member")
+    const admins = await manage(admin.cookie, { operation: "users", query: { filter: "admins" } })
+    assert.equal(admins.status, 200, admins.text)
+    assert.deepEqual(
+      admins.data.items.map((user) => user.id),
+      [admin.id],
+    )
     for (const action of ["setRole", "impersonate"])
       assert.equal((await manage(admin.cookie, { action, userId: member.id, role: "admin" })).status, 403)
     for (const action of ["ban", "remove"])
@@ -123,10 +157,39 @@ await test("Worker Console authorization, actions, section limits and removed Me
     const ban = await manage(admin.cookie, { action: "ban", userId: member.id, reason: "Local verification" })
     assert.equal(ban.status, 200, ban.text)
     assert.equal(db.prepare("SELECT banned FROM user WHERE id=?").get(member.id).banned, 1)
+    const bans = (await eventsFor(member.id)).filter((event) => event.type === "user.banned")
+    assert.equal(bans.length, 1)
+    assert.equal(bans[0].actor, `user:${admin.id}`)
+    assert.deepEqual(bans[0].metadata, {})
     assert.equal((await manage(member.cookie, { operation: "users" })).status, 401)
     const unban = await manage(admin.cookie, { action: "unban", userId: member.id })
     assert.equal(unban.status, 200, unban.text)
     assert.equal(db.prepare("SELECT banned FROM user WHERE id=?").get(member.id).banned, 0)
+    const recorded = JSON.stringify(await eventsFor(member.id))
+    for (const secret of [
+      member.email,
+      member.password,
+      signIn.data.token,
+      "203.0.113.42",
+      "Drop-private-test-agent/1.0",
+      "Local verification",
+    ])
+      assert.ok(!recorded.includes(secret), "Auth events must omit credentials, IPs, raw agents and ban reasons")
+    // A real database write failure must not turn a completed authentication into an error.
+    db.exec(
+      "CREATE TRIGGER fail_auth_event BEFORE INSERT ON vitehub_auth_events BEGIN SELECT RAISE(FAIL, 'injected event write failure'); END",
+    )
+    try {
+      const signIn = await request("/api/auth/sign-in/email", {
+        method: "POST",
+        body: { email: member.email, password: member.password },
+      })
+      assert.equal(signIn.status, 200, signIn.text)
+      assert.ok(db.prepare("SELECT id FROM session WHERE token=?").get(signIn.data.token))
+      assert.equal(JSON.stringify(await eventsFor(member.id)), recorded, "Failed writes leave no event")
+    } finally {
+      db.exec("DROP TRIGGER fail_auth_event")
+    }
     assert.equal((await request("/members", { cookie: admin.cookie })).status, 404)
     assert.equal((await request("/api/members", { cookie: admin.cookie })).status, 404)
     const people = await request("/api/people", { cookie: admin.cookie })
