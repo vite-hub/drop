@@ -44,7 +44,10 @@ test("pr-evidence serves the renderer's comark-ui skill and all its references",
     )
   }
   for (const [, target] of reference.matchAll(/\]\((comark-ui\/[^)]+)\)/g)) {
-    assert.ok(files.some((item) => item.path === `references/${target}`), `missing ${target}`)
+    assert.ok(
+      files.some((item) => item.path === `references/${target}`),
+      `missing ${target}`,
+    )
   }
 })
 

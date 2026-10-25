@@ -110,7 +110,10 @@ export const skillResources = [
       description: "A file in a bundled upstream skill's reference tree.",
       uriTemplate: `skill://{name}/${Array.from({ length: depth }, (_, index) => `{dir${index}}`).join("/")}/{file}`,
       handler: (_uri, params) =>
-        read(params.name!, [...Array.from({ length: depth }, (_, index) => params[`dir${index}`]), params.file].join("/")),
+        read(
+          params.name!,
+          [...Array.from({ length: depth }, (_, index) => params[`dir${index}`]), params.file].join("/"),
+        ),
     }),
   ),
 ]
