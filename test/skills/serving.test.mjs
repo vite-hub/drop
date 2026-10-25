@@ -78,11 +78,10 @@ test("each skill file is served on its own with its content type, and v0.1.0 lis
     "text/markdown; charset=utf-8",
   )
   const v1 = await (await get("/.well-known/skills/index.json")).json()
-  assert.deepEqual(v1.skills.find((skill) => skill.name === "prototype").files, [
-    "SKILL.md",
-    "assets/picker.js",
-    "references/canvas.md",
-  ])
+  const v2 = await (await get("/.well-known/agent-skills/index.json")).json()
+  const prototype = v1.skills.find((skill) => skill.name === "prototype")
+  assert.equal(prototype.version, v2.skills.find((skill) => skill.name === "prototype").digest.slice(7, 19))
+  assert.deepEqual(prototype.files, ["SKILL.md", "assets/picker.js", "references/canvas.md"])
 })
 
 test("MCP Skills extension: skills/list names every file with its digest and size, and resources/read serves each", async () => {

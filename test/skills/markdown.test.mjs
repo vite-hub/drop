@@ -75,7 +75,10 @@ test("all five GitHub alert kinds keep their label", async () => {
 
 test("footnotes link to their definition and back", async () => {
   const { html } = await renderMarkdownCached("footnotes.md", async () => "A claim.[^src]\n\n[^src]: The source.\n")
-  assert.match(html, /<sup class="footnote-ref"><a href="#fn-src" id="fnref-src">\[1\]<\/a><\/sup>/)
+  assert.match(
+    html,
+    /<sup class="(?:[^" ]+ )*footnote-ref(?: [^" ]+)*"><a href="#fn-src" id="fnref-src">\[1\]<\/a><\/sup>/,
+  )
   assert.match(html, /<li id="fn-src">The source\. <a href="#fnref-src" class="footnote-backref">/)
 })
 

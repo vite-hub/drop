@@ -1,6 +1,6 @@
 ---
 name: pr-evidence
-description: Builds pull-request evidence in Markdown, before and after screenshots with hand-drawn marks for a UI change or the changed lines for a code change, then drops it into Drop and comments its link on the pull request. Use when a pull request changes something visible, when the user asks for before/after screenshots or a visual review, or when reviewers need to see what changed.
+description: "Builds a pull request's before/after evidence in Drop: screenshots with hand-drawn marks for a UI change, or the changed lines for a code change, then comments its link on the pull request. Use when a pull request changes something visible, the user asks for before/after screenshots or a visual review, or reviewers need to see what changed."
 ---
 
 # Pull-request evidence

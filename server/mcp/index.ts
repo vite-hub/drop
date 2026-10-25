@@ -11,6 +11,7 @@ import listDrops from "./tools/list_drops"
 import listFolders from "./tools/list_folders"
 import publish from "./tools/publish"
 import readDrop from "./tools/read_drop"
+import readFile from "./tools/read_file"
 import reply from "./tools/reply"
 import updateDrop from "./tools/update_drop"
 import viewBoard from "./tools/view_board"
@@ -56,6 +57,7 @@ export function mcpFor(origin: string) {
       tools: [
         publish,
         readDrop,
+        readFile,
         reply,
         listDrops,
         listFolders,

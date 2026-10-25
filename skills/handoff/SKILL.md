@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Compacts the current conversation into a handoff document and drops it into Drop, so another agent, a colleague, or a new session can pick the work up from a link. Use when the work has to travel to another harness, directory, repo, person, or a forked side task, or when the user asks for a handoff.
+description: Writes a handoff document from the current conversation and publishes it to Drop, so another agent, a colleague, or a new session picks the work up from a link. Use when the user asks for a handoff, or the work has to move to another harness, repo, person, or a forked side task.
 ---
 
 # Handoff
