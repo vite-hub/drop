@@ -36,8 +36,8 @@ type PointerMessage = Extract<FrameMessage, { type: "selection" | "image" | "are
 export function useViewerAnnotations(options: {
   drop: Ref<DropDetail>
   editing: Ref<boolean>
-  wide: Ref<boolean>
-  mobileSide: Ref<boolean>
+  enabled?: Ref<boolean>
+  reviewOpen?: Ref<boolean>
 }) {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
@@ -59,7 +59,7 @@ export function useViewerAnnotations(options: {
     awaited = id
     return true
   }
-  const commenting = computed(() => drop.value.canComment && !editing.value)
+  const commenting = computed(() => drop.value.canComment && !editing.value && (options.enabled?.value ?? true))
 
   /**
    * Under Comment and Measure the frame lays a layer over the page that takes the pointer. Comment stays on after each
@@ -68,33 +68,34 @@ export function useViewerAnnotations(options: {
   const tool = ref<ViewerTool>("browse")
   const overlays = reactive<ViewerOverlays>({ rulers: false, xray: false, pins: true })
   const areaMode = computed(() => tool.value === "comment")
-  // TODO(file-comments): files without a preview (PDFs, zips) have nothing to anchor a comment to, so they take none yet.
-  // Comments on the file as a whole would close that gap.
-  // A site takes its comments on the site itself (ViewerSite).
+  // Boards and files take general feedback; sites annotate captured screenshots through ViewerSite.
   const canDrawArea = computed(
-    () =>
-      commenting.value &&
-      !lightbox.value &&
-      drop.value.kind !== "file" &&
-      drop.value.kind !== "folder" &&
-      drop.value.kind !== "site",
+    () => commenting.value && !lightbox.value && ["markdown", "image", "html", "app"].includes(drop.value.kind),
   )
   /** Picks a tool, or puts the one on back to Browse. */
   function setTool(next: ViewerTool) {
+    if (!(options.enabled?.value ?? true) && next !== "browse") return
     if (next === "comment" && !canDrawArea.value) return
+    if (next === "measure" && !["html", "app"].includes(drop.value.kind)) return
     awaited = null
     focusGeneration++
     popover.value = selection.value = null
     tool.value = tool.value === next ? "browse" : next
-    if (tool.value !== "browse" && !options.wide.value) options.mobileSide.value = false
   }
   const toggleArea = () => setTool("comment")
-  const toggleOverlay = (name: keyof ViewerOverlays) => (overlays[name] = !overlays[name])
+  function toggleOverlay(name: keyof ViewerOverlays) {
+    if (!(options.enabled?.value ?? true)) return
+    if (name !== "pins" && !["html", "app"].includes(drop.value.kind)) return
+    overlays[name] = !overlays[name]
+  }
   watch(canDrawArea, (value) => !value && tool.value === "comment" && (tool.value = "browse"))
   // The frame keeps the drawn rectangle while its comment is written, on the page or a zoomed screenshot; it drops it
-  // once the popover goes.
+  // once the review dock closes. The mounted composer keeps its unsent text and files.
   const draftingArea = computed(
-    () => popover.value?.type === "new" && ["area", "image"].includes(popover.value.pending.kind),
+    () =>
+      (options.reviewOpen?.value ?? true) &&
+      popover.value?.type === "new" &&
+      ["area", "image"].includes(popover.value.pending.kind),
   )
 
   /** Escape: close whatever is open, then put the tool down. */
@@ -186,7 +187,7 @@ export function useViewerAnnotations(options: {
 
   // Areas drawn over an image in the page anchor to that image, so the lightbox takes comments too.
   function pickImage(area: Area, x: number, y: number) {
-    if (!lightbox.value) return
+    if (!lightbox.value || !commenting.value) return
     popover.value = {
       type: "new",
       pending: { kind: "image", selector: lightbox.value.selector, ...area, label: lightbox.value.alt || "image" },
@@ -195,7 +196,10 @@ export function useViewerAnnotations(options: {
     }
   }
   const imageDraft = computed(() =>
-    popover.value?.type === "new" && popover.value.pending.kind === "image" && popover.value.pending.ow
+    (options.reviewOpen?.value ?? true) &&
+    popover.value?.type === "new" &&
+    popover.value.pending.kind === "image" &&
+    popover.value.pending.ow
       ? popover.value.pending
       : undefined,
   )
