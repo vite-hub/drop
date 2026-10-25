@@ -1,6 +1,6 @@
 ---
 name: show-me
-description: Helps the user understand the current topic visually with concise diagrams, code-shape sketches, and focused Markdown docs dropped into Drop. Use when the user asks to be shown how something works or what a change looks like.
+description: "Explains the current topic visually as a Drop link: a diagram, a code-shape sketch, or a short focused doc. Use when the user asks to be shown how something works or what a change looks like."
 disable-model-invocation: true
 ---
 

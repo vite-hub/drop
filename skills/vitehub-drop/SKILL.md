@@ -1,6 +1,6 @@
 ---
 name: vitehub-drop
-description: Drops plans, docs, and small static apps into Drop for review, reads the comments people leave, and publishes the next version. Also turns source code into temporary images. Use when the user asks to share a plan or document for review, publish a small app, read review feedback, or create a code image.
+description: Publishes a plan, doc, HTML page, screenshot, or small static app to Drop as a link people review and comment on, reads their comments, and publishes the next version. Also renders code as an image. Use when the user wants a link to review, share, or comment on something you wrote or built, asks what people said on a drop, or wants a code image.
 ---
 
 # ViteHub Drop
