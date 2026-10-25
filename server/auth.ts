@@ -11,11 +11,13 @@ import { db, schema } from "vite-hub/database/drizzle"
 import { member, user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { clientRegistrationLimits } from "./utils/oauth-clients"
+import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 import { billingConfig, memberLimit, teamSeats, teamsEnabled } from "./utils/teams"
+import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
 const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
@@ -52,6 +54,8 @@ export default defineAuth(({ env, requestOrigin }) => {
   const teams = teamsEnabled()
   const billing = billingConfig()
   const organization = env.drop.githubOrg.trim()
+  const password = import.meta.dev === true || env.drop.testSignin
+  const quotas = env.drop.quotas.enabled
   const githubOptions = {
     clientId: proxied ? "" : env.auth.github.clientId.unseal(),
     clientSecret: proxied ? "" : env.auth.github.clientSecret.unseal(),
@@ -89,10 +93,23 @@ export default defineAuth(({ env, requestOrigin }) => {
               : {}),
           },
         },
-    emailAndPassword: { enabled: import.meta.dev === true || env.drop.testSignin },
+    emailAndPassword: { enabled: password },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
-    // Free or Pro (shared/quotas.ts TIERS). Only admins set it, from the Members page through the admin plugin.
-    user: { additionalFields: { plan: { type: ["free", "pro"], required: false, input: false } } },
+    // Free or Pro (shared/quotas.ts TIERS). The Console edits it through Better Auth's admin plugin.
+    user: { additionalFields: { plan: { type: [...TIERS], required: false, input: false, returned: quotas } } },
+    console: {
+      fields: { plan: { label: "Plan", editable: quotas, reason: "Plans apply only when DROP_QUOTAS is on." } },
+      columns: {
+        drops: {
+          label: "Drops",
+          type: "number",
+          read: (people) => countDropsByUser(people.map((person) => person.id)),
+        },
+      },
+      roles: { editable: false, reason: "Admins come from DROP_ADMINS, set where Drop is deployed." },
+      actions: { impersonate: { editable: false, reason: "Drop does not allow signing in as another person." } },
+      access: authAccessLines({ members: Boolean(env.drop.members.unseal().trim()), organization, proxied, password }),
+    },
     hooks: { before: clientRegistrationLimits },
     databaseHooks: {
       account: {
@@ -114,7 +131,7 @@ export default defineAuth(({ env, requestOrigin }) => {
         },
       },
       user: {
-        // Nobody outside DROP_MEMBERS gets an account, so the Members page lists only the people it lets in.
+        // Nobody outside DROP_MEMBERS gets an account.
         create: {
           before: async (user) =>
             isListedMember(user) ? { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } } : false,

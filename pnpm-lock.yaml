@@ -205,8 +205,8 @@ importers:
         specifier: ^1.4.2
         version: 1.5.0(typescript@6.0.3)
       vite-hub:
-        specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(patch_hash=4aa4aef0bd18705489413f7bd36941990341a33b35badf8d89eedd61ded0140b)(b65d01897d208379f9f59a54b38bbeb8)
+        specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(patch_hash=4aa4aef0bd18705489413f7bd36941990341a33b35badf8d89eedd61ded0140b)(757f0a98657fa122514f147f13e3d868)
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -4819,8 +4819,8 @@ packages:
   '@vercel/sandbox@3.9.0':
     resolution: {integrity: sha512-l02jAULYqPdfKCnGr6Eyd58OfTXNmL1ffvNOwwsAtgiN+PuI6zhySpvtm0hnMoWQ3fIbhnSG7SRqoUuwx6XvDg==}
 
-  '@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-oGfb/6mIArFqQDWQMhJ0VSe6Q1UeI1155S8I6Z9GjLMIdVXW+BtjAoaPoej/KMJgArVrwQo0cZlWRCmbH2klNg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-rcpvuf3hf4eHubK4voXey0/SZxNor742jQd01T2RqyOPThZIrA5JvHnCO8POYQE2SAwdij3L1ORbZwRTIBGLYg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.15.0'}
     peerDependencies:
@@ -4885,8 +4885,8 @@ packages:
       vue:
         optional: true
 
-  '@vite-hub/auth@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-4Y6avxnUaAiRz35zDkw7VK/meHkdkwsrrxwwRVCzDPh+KicPSU5FiSdniDw9biBkDd8jQ1iEIblLBvUneqA8gA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/auth@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-wtFXCVR/rA6dpk5IARp58bErlztJwPeZ5N+vg0Mu65wHfYnDCoT9OlTUeGYS7NqpZfbh2Q/GBlvNY1Phh/ziIg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -4903,8 +4903,8 @@ packages:
       vue:
         optional: true
 
-  '@vite-hub/blob@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-0lAUIVWifrjQjRbCZEzllDIjClftepJ6a7RBnP7fn2trpwBP9KFiu1gzc6ZpBW24DjsBCqYUTywTFbf96IOSlA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/blob@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-XryeVEtok2u+HfsmCkRT0hwLUK9CGQEQ8D03xRuQyM2A79d0u8+BFlZWW0Zfi1aJHVbnfo/uND4dNfT5Ew/UDQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -4961,8 +4961,8 @@ packages:
       vue:
         optional: true
 
-  '@vite-hub/browser@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-1j1OjcWGmKkpPKmcwPTqRMnFSnxUdFcN3xH1B3oe5fJXJn98UrTR+OlRjoGt0ymoGA/Zva6ByWIEfX97qdmr0Q==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/browser@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-8QHJoLaCXtFP4avAddQrkK3qLZd+knnzLZyQszmrCxbjl4ti20U1okl1rSUYy6WLPRz3qpCY0/dh/Ve0wS5yRw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.15.0'}
     peerDependencies:
@@ -4977,8 +4977,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/channels@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-AQdLFsKQ5YnzuZlAJ7wvSQcPywj0IU66ozwsWGNrG/8rOzbyloX2O+MhU8nfmc8xWOazBKK1GrGNJNdpZ8JSTA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/channels@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-f4eBE4kNS774d4xpZVemsNzKVRVlyTx5VUnwVDmzJxRO57P1I+WPLJvLXH5LHQM4/UCCNz32hO0CFek/mhQNXg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -4987,8 +4987,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/cli@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-BcfyOI8rCDPB2BE/721c9JUaYnG5zOeZr9BGWWAABUidZLJA3gSelTt2818DajNjnTHtxXLCRHJVXmO/OmsRTA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/cli@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-nPAZ0uiIxgMDFmoPOIpb3cgNaUIzOE87tLzLXnciuNVtZsa9I1tVxmDSVgdF8VCtDOmi0zy/95bhNoZCIWzCYQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     hasBin: true
@@ -4999,8 +4999,8 @@ packages:
       nuxt:
         optional: true
 
-  '@vite-hub/connections@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-Y+TqQfR4IcsJTZVOxDGqejakSjmacte705bZMzM3p+ncFFUFgl6vK0RXygw7w/Q9k6GU0pE6cDEA4nULa63v5Q==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/connections@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-bD2zwMf4t3Cm5wdBo5f8oNDuj86TWhy5UVbUOytwUvSmxjJbqkMkOTj0BK0GZa1WnbkmEZ/0TkdB8F8mc3qlSA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5012,8 +5012,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/content@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-/LF++wYgLUJ+OPLH7TpcmNCe9F4G33qbzf/53+A4FPxzFo4mZxbjGk9nP+gktz0RElx5/FEnT2P1Meoj/XUqcA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/content@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-lBaaa57DKNDXBRtE28rXynU66LwqAIvllJi4B9uzTdBiP5H+jTWN+UyfDdiwjfBPFF6rKsM5cDDYioYXDuHVQg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5059,8 +5059,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/database@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-IcxyDm6Gq6iZVYX/2ybObw33m+4mIRcySo9I0iIFvh3p+K4H0F6+7eHSUWstaDLlNlbs6M02TaucUPd0xoLaCw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/database@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-Ixb5iWJPV9A8kpWMipU5vYHvEaYqJ+uN3IC/lL5nE5/F5Dhy8Xxuh+tZ7h7alhLCgynOsAIZ8hE0AddUCf7//w==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5074,8 +5074,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/email@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-9wdiFoVMW44OLlwRE55fh9hqoQsxh6xNTSkB5YXHeZwZXjiGlIqPgTwG3Rfs9RNCC4d8lu/C6+JGtPH9DQISrA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/email@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-SGiHGBNdjgyemqp/9VnUfhaVDDhU4n3yKkiKwSgKsiSitUqdpD+uxGtP3XlvwO7DvFiycOy2MtJqYhXRb+etIw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5084,8 +5084,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/env@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-mAsulRezG0HClLxegrUAMC/btok7azoOybqvs2cgL/VGfutbl+AvMx44EJZ5uHTzpddPI0AX65asZOXnY6IC2Q==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/env@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-Xtvx/+lSegfIxwzu5xvuQ1qY0AJAKSwu+veO/m6qAodmhCQuDTdjQcYhT0Hn8uP8v6yiyoTThEj5OXhShr/7ZA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5100,13 +5100,13 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-awGdKq8fsYinGG0b82D5jAFiY9YKvXTjCOUygO0KfuCB40kHIRAfrsbrcdE541SURBHyWIYYHseAKJS5FPITqA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-Wfq+Jmdy9x6UYqbRmRZzep7dSE6U3lAu4xOD/iPOJVFrDIZbh8ckcLu7PJ6Olo5IMPFqyA+ju7vjPIPSDMtfSA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
 
-  '@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-BXEo+7yXsiJNHRPCf4QbFjvszBqAwnwR6l4p7TJmE1vVtMzPN06IKEBQsei/+qr79EHdiF5qEtrS2jiqbNmvMg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-myKesZ5wgnNYSEOdvefXDosnuQz2YLMmbzse7anQuZb0me/zMEI3hCQZG+1211whlSZnStmEc9zkXnD2bVaPqA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5118,8 +5118,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/markdown-template@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-Uyh3m9wKkvdNgmwzAOSyNkfwwfjujl+rvjNgG64YxVpCWII2r9dL9YDmjmmtRAgPef5oszNNZZq8dKyLTTIDkQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/markdown-template@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-Uyh3m9wKkvdNgmwzAOSyNkfwwfjujl+rvjNgG64YxVpCWII2r9dL9YDmjmmtRAgPef5oszNNZZq8dKyLTTIDkQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5128,15 +5128,15 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/presets@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-fyuFEdFuwEXfFwkb1ihrkwlbgVfPvciLBKCItQfq15UCD+33e/Jm+eJ1aGa179//HN4K4xaGr7/PKu+P4wEGiQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/presets@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-PoiAml39yJ2Uvy/OC35i9sE94VxefhOZpBkGoB7/lwe3CaN3F/9TJ7/VKaA37EsF9mzKK1nYPcYoHhkPCZZ2ig==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.15.0'}
     peerDependencies:
       '@vite-hub/agent': 0.0.4
 
-  '@vite-hub/queue@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-IUv7bJr/ymnhfqJNrgw7ilQW2N30xIMjCKYZvEElp6eo+AFrcPzDYcyGX6Z2mhOIOepdrjwaTQwudRR7jFkfMg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/queue@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-+aHipg40BA2zPJgi5zCin1dR2mgyJnKM6tqRQ36k+F+vRkba4Jl4/B8WyYtSwESjOzNoV9lb0ZlebiaEj3T+mg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5145,8 +5145,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/rate-limit@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-3Ab9pyyJQm5LWvDQtz2WlZsAuY9nWfcL14Aj4wFoxiR37EvAKQ7Mc3YhKrrg//9K0h3cdeN17L8zN23wUXks9g==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/rate-limit@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-W3CXqQxM2tQbXV5IIQK1Akuarb9cA1TlYpEl9nwW57k3iZ7celYcAtmJmDWpd1SeUp5Ss90IUFbuSpdfXCC+Lg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5155,8 +5155,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/realtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-KZzDgMqdy1Vmw1O5wYY3N4cMsHznwbboMaAZLMDmIJLtfa0vrB2gZxNqh7545Xlyzlydkjvzw1wBLcIltl0Ckw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/realtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-ou5ViNxgSarPOsTOckjj4+ATB4AdgBZsxaWC/dBd09ADct8P/OfZkK5eJNoC5Ld1g6NJ9TAwg83jWHAHl5SCKg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.15.0'}
     peerDependencies:
@@ -5169,14 +5169,14 @@ packages:
       vue:
         optional: true
 
-  '@vite-hub/runtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-/Irv8+AvFeXRFWsVY0vVMbBEcZrUrSdLHY0wc7DBiL3FEUAGnSgZ9Yv49GJGs4u5ykulZ+CFMjs0HogMnj0qDQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/runtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-Yh2yHiY9kfZ2zd9eYeeTjyW2aaEp7bJU8ALGKxXiXXJu8TH3n4xhrVKgdl1FgVdoBcskVOiJTYMOE/4W9Nse8Q==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     hasBin: true
 
-  '@vite-hub/sandbox-task@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-XIkX0fccaaI2pXAqiSL7TEMkmPOk9UIeZTqVMsCiisDrKlrKstIoVGBXqrNbNH9do5EH80DQ+2yp6xNo7QMEsA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/sandbox-task@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-OQF8WYfA/kHgZTPpjmsoGj93HLAJ5WCxt0E+rlSWAZvy0xub3oKS1umPBmXUk6ByHz/3UZt7G1sTzlO2omhBhg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5191,8 +5191,8 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/sandbox@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-VN0CGYznCVyQHIYRQvAcaQA9coL/G1MInOKVQ+a4aw5bDG1HehduaMd+9+WedH3pV4Vj3IWSh/Gi1DzkWEV9Pw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/sandbox@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-kbC0Su+IPlcoOGLLfOWECpG3dU73FtOuB6l8HE0z36IiSfr4I15S6Fep3MD+iazgUfhuLQThkvR3J1NN1XZINQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5207,8 +5207,8 @@ packages:
       ssh2:
         optional: true
 
-  '@vite-hub/schedule@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-2bb32Z+y/BE26bAbjfupfOuAnBgV+h2cJ+Iwz/dzq78adbs7agR1ZIPfKk9Wf0S6+YzWdaCoYak9bfitZqmJcw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/schedule@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-hosCfkE7XE/t4GKlwdBXGDqfspm0k8zntZWO8nk8paOf02SE9gBdmtDq+4EhPdMebvfbmZHJY94kpuFKRZHwrg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.15.0'}
     peerDependencies:
@@ -5220,13 +5220,13 @@ packages:
       vite:
         optional: true
 
-  '@vite-hub/shell@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-B+5TKrlAIr21WUxSQL3ZUasoaSGm9ZQ4w66cBkDxIHJWHXeJJCDUOS6KmLsrgJV4GoC0QnyMKYn7HsYddUynIA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/shell@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-boKD+v6Uj38cCWYjV/0VkTjyWXigP0pZ0zkR2kGkTpPfk+XLVR3+/TSt3b9BMrJ8gu1vJlkxq5OuosNa6IEx3g==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
 
-  '@vite-hub/source@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-O07tRo25abNeLCqPqnwQzFwI0ReDDRQ7LFmXYh2h6fw1QYaABB6Bx7U7drT/sUN6/QuKGFaKxIuWOrU+AcRE1g==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/source@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-LbpY0pQB9NlzSEH83zH+Agg6FBAxVbS5mDzUDx2O5SikAqyylocnRvzqAswDOi0ERE49lVocXNWrp0vdTUUMOg==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5244,23 +5244,26 @@ packages:
       vue:
         optional: true
 
-  '@vite-hub/ui@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-KOxCAZy8jBxxKdmRH78L3EZtxaAHjH+EwfUT+uLzI1A1PGIlVnnZnqdPzQ9OcvN54HkCYDWB/r4dDTDmrEnBPQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/ui@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-YgpFTPIZDyrXbtVOv4McwIAgeTcQVsq+qDyf2XTM/pCFgSN69cwU/8RxR0oTYOTF7LNEJOjzWQ43gT8QdNhsTw==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.15.0'}
     peerDependencies:
+      '@iconify-json/ph': ^1.2.2
       '@nuxt/ui': ^4.11.0
       ai: ^6.0.0 || ^7.0.0-0
       vite: '>=8.0.0'
       vue: 3.5.44
     peerDependenciesMeta:
+      '@iconify-json/ph':
+        optional: true
       '@nuxt/ui':
         optional: true
       vite:
         optional: true
 
-  '@vite-hub/workflow@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-m7QJoiOnnrBB+rBEhNjgpiS7ysUs+JGbCEbKr8RUHQGS60DEfYnkJU550n9xntH3MSNPpMUv4N0mQWxvk3FKOA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/workflow@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-6UzQMiXSWi7pgZC4Z2tTvo4vulkPzbHwQEHlv+LuAue6tqb8kN6AAIf6PJBku5OsLLqNYop2ZDYsgAMDCWloyQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -5281,8 +5284,8 @@ packages:
       workflow:
         optional: true
 
-  '@vite-hub/workspace@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928':
-    resolution: {integrity: sha512-VDfLqxTgRgtjz2x3OimrxlW3DzYAjWKVmgGxqkr82oFORLW8D6O6qboCqP4bNMiZ4GnjkBH26IL5F6ZWYaPmGA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928}
+  '@vite-hub/workspace@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
+    resolution: {integrity: sha512-6RwjdviwfFVF3RzCY+zseQn9fGgpn5t4wVo4e8Avo/VXxFczyqkr9fiKyVfB6/pBqK9lYU960mihcfgxhKXmTQ==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -10559,6 +10562,9 @@ packages:
     resolution: {integrity: sha512-wPldCk3asibAjQ/kziWQQt1Wh3PgDFpC0XpwclzKcdT1vql6KeYxf5LIt4nlFkUeR8WuphYMKqUA56X4rjbfgQ==}
     engines: {node: '>=10.16.0'}
 
+  standard-context@0.0.4:
+    resolution: {integrity: sha512-nxlcWNOdLZmgICkHSUjAvlcZtKO0OUpoVBVKqGZJr2zKXvZzC/YTp7wI+WhzjBBZXvja8Y7k/OD6tC1l2WVBtQ==}
+
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
     engines: {node: '>= 0.8'}
@@ -11409,8 +11415,8 @@ packages:
       vite:
         optional: true
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722:
-    resolution: {integrity: sha512-kque2+5ulfJcM7cRjKt8MHuadAtjV++0UjYpRGfnQetWjkf1gsZVgRSEyx07wSVvGX2hT690d1WToCZoHT954g==, tarball: https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722}
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b:
+    resolution: {integrity: sha512-aAhVu5O+wfqwSDEt+9t3ORTO//iqR9NRoUeWdFkVMQafFbTpNswP5pCco7E5pGtDtKCjESOIyItZqn5lddsYbA==, tarball: https://pkg.pr.new/vite-hub/vitehub/vite-hub@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b}
     version: 0.0.4
     engines: {node: '>=24.15.0'}
     hasBin: true
@@ -16195,7 +16201,7 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  '@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8fac50c142ed7c03380abf338a1848de9e05928(c88aba4f8f7a74ad3617b7739bd79ba9)':
+  '@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(76afc0fefeb2817d2966c19edade9591)':
     dependencies:
       '@ai-sdk/gateway': 4.0.103(zod@4.6.7)
       '@cfworker/json-schema': 4.1.1
@@ -16208,13 +16214,13 @@ snapshots:
       '@valibot/to-json-schema': 1.8.0(valibot@1.5.0(typescript@6.0.3))
       '@vercel/connect': 2.4.0(@ai-sdk/mcp@2.0.69(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.6.7))(ai@7.0.130(zod@4.6.7))(better-auth@1.7.10(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3)))
       '@vercel/nft': 1.11.0(supports-color@8.1.1)
-      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)
-      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
-      '@vite-hub/rate-limit': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(ssh2@1.17.0)
-      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928(cbaf4e6d39954586115c57f2936dacb8)
+      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b
+      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+      '@vite-hub/rate-limit': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(ssh2@1.17.0)
+      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(f0f937b22572e2816ac00c449a754b04)
       '@yarnpkg/parsers': 3.1.0
       ai: 7.0.130(zod@4.6.7)
       chat: 4.43.0(ai@7.0.130(zod@4.6.7))(supports-color@8.1.1)(workflow@5.0.1(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)(ws@8.22.0))(zod@4.6.7)
@@ -16229,13 +16235,13 @@ snapshots:
       '@ai-sdk/mcp': 2.0.69(zod@4.6.7)
       '@ai-sdk/vue': 4.0.130(vue@3.5.44(typescript@6.0.3))(zod@4.6.7)
       '@vercel/functions': 3.10.3(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0)
-      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8fac50c142ed7c03380abf338a1848de9e05928(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/connections': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)
-      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
-      '@vite-hub/email': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(katex@0.17.0)(shiki@4.5.0)(typescript@6.0.3)
-      '@vite-hub/kv': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3)
-      '@vite-hub/schedule': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)
-      '@vite-hub/workflow': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@b8fac50c142ed7c03380abf338a1848de9e05928(358ffe082ffa5cdbd278807eac7bb031)
+      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/connections': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
+      '@vite-hub/email': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(katex@0.17.0)(ocache@0.3.1)(shiki@4.5.0)(typescript@6.0.3)
+      '@vite-hub/kv': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/schedule': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/workflow': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(d1ec3dbd8fe648e0a73318df0e7753db)
       evlog: 2.30.1(abdc173eaa54486133cb282a470c8f72)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
       vitest: 5.0.5(@types/node@25.9.9)(@vitest/browser-preview@5.0.5)(@vitest/ui@5.0.5(vitest@5.0.5))(@voidzero-dev/vite-plus-core@1.3.0)
@@ -16284,19 +16290,19 @@ snapshots:
       - workflow
       - zod
 
-  '@vite-hub/auth@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@b8fac50c142ed7c03380abf338a1848de9e05928(@types/json-schema@7.0.15)(@types/mdast@4.0.4)(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))':
+  '@vite-hub/auth@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@types/json-schema@7.0.15)(@types/mdast@4.0.4)(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))':
     dependencies:
       '@cloudflare/workers-types': 5.20261023.1
       '@types/json-schema': 7.0.15
       '@types/mdast': 4.0.4
       '@types/node': 24.19.2
-      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       better-auth: 1.7.10(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))
       bun-types: 1.4.4
       nostics: 1.3.0
     optionalDependencies:
-      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8fac50c142ed7c03380abf338a1848de9e05928(c88aba4f8f7a74ad3617b7739bd79ba9)
+      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(76afc0fefeb2817d2966c19edade9591)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
       vue: 3.5.44(typescript@6.0.3)
     transitivePeerDependencies:
@@ -16306,11 +16312,13 @@ snapshots:
       - '@sveltejs/kit'
       - '@tanstack/react-start'
       - '@tanstack/solid-start'
+      - crossws
       - drizzle-kit
       - drizzle-orm
       - mongodb
       - mysql2
       - next
+      - ocache
       - pg
       - prisma
       - react
@@ -16320,9 +16328,9 @@ snapshots:
       - typescript
       - vitest
 
-  '@vite-hub/blob@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8fac50c142ed7c03380abf338a1848de9e05928(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))':
+  '@vite-hub/blob@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       aws4fetch: 1.0.20
       cjs-module-lexer: 2.3.0
       defu: 6.1.7
@@ -16345,34 +16353,40 @@ snapshots:
       - ocache
       - typescript
 
-  '@vite-hub/browser@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)':
+  '@vite-hub/browser@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       esbuild: 0.28.2
       nostics: 1.3.0
     optionalDependencies:
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
+    transitivePeerDependencies:
+      - crossws
+      - ocache
 
-  '@vite-hub/channels@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)':
+  '@vite-hub/channels@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)':
     dependencies:
       nostics: 1.3.0
       pathe: 2.0.3
     optionalDependencies:
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
 
-  '@vite-hub/cli@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(nuxt-nightly@5.0.0-29766097.1e475df9)':
+  '@vite-hub/cli@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(nuxt-nightly@5.0.0-29766097.1e475df9)(ocache@0.3.1)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       nostics: 1.3.0
       pathe: 2.0.3
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     optionalDependencies:
       nuxt: nuxt-nightly@5.0.0-29766097.1e475df9(patch_hash=bcd24143fcf00377e7d327374a487779a871a24c60d4823333a143c2ada1517a)(ef672b31884af1dfe0ba86ac7e31f8e2)
+    transitivePeerDependencies:
+      - crossws
+      - ocache
 
-  '@vite-hub/connections@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)':
+  '@vite-hub/connections@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)':
     dependencies:
-      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       nostics: 1.3.0
       pathe: 2.0.3
       valibot: 1.5.0(typescript@6.0.3)
@@ -16381,15 +16395,17 @@ snapshots:
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     transitivePeerDependencies:
       - '@vite-hub/agent'
+      - crossws
+      - ocache
       - typescript
 
-  '@vite-hub/content@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@b8fac50c142ed7c03380abf338a1848de9e05928(0c3cd3af7fd0f2c5e11d94ab479cb519)':
+  '@vite-hub/content@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(46b60e2cc033eed34db659d6d2f46999)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@valibot/to-json-schema': 1.8.0(valibot@1.5.0(typescript@6.0.3))
-      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8fac50c142ed7c03380abf338a1848de9e05928(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/source': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/source': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))
       comark-content: 0.4.1(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0))(aws4fetch@1.0.20)(beautiful-mermaid@1.1.3)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1)))(katex@0.17.0)(shiki@4.5.0)
       diff: 9.0.0
       h3: 2.0.1(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
@@ -16402,9 +16418,9 @@ snapshots:
       '@tiptap/extension-table': 3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)
       '@tiptap/pm': 3.31.4
       '@tiptap/starter-kit': 3.32.0
-      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
-      '@vite-hub/realtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@b8fac50c142ed7c03380abf338a1848de9e05928(f5472273a873df79cba87657ebdce397)
-      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928(cbaf4e6d39954586115c57f2936dacb8)
+      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
+      '@vite-hub/realtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(077bc861a67f1877adb325804faa0659)
+      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(f0f937b22572e2816ac00c449a754b04)
       comark: 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
       comark-tiptap: 0.1.1(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-code-block@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-table@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.32.0)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       drizzle-orm: 0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1)
@@ -16432,10 +16448,10 @@ snapshots:
       - valibot
       - vue
 
-  '@vite-hub/database@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)':
+  '@vite-hub/database@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)':
     dependencies:
       '@libsql/client': 0.18.0
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       drizzle-kit: 0.31.11
       drizzle-orm: 0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1)
       esbuild: 0.28.2
@@ -16451,12 +16467,12 @@ snapshots:
       - ocache
       - utf-8-validate
 
-  '@vite-hub/email@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(katex@0.17.0)(shiki@4.5.0)(typescript@6.0.3)':
+  '@vite-hub/email@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(katex@0.17.0)(ocache@0.3.1)(shiki@4.5.0)(typescript@6.0.3)':
     dependencies:
       '@comark/html': 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
-      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)
-      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       esbuild: 0.28.2
       nostics: 1.3.0
       valibot: 1.5.0(typescript@6.0.3)
@@ -16465,31 +16481,35 @@ snapshots:
     transitivePeerDependencies:
       - '@vite-hub/agent'
       - beautiful-mermaid
+      - crossws
       - drizzle-orm
       - katex
+      - ocache
       - rangi
       - shiki
       - typescript
 
-  '@vite-hub/env@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)':
+  '@vite-hub/env@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       nostics: 1.3.0
       valibot: 1.5.0(typescript@6.0.3)
     optionalDependencies:
-      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8fac50c142ed7c03380abf338a1848de9e05928(c88aba4f8f7a74ad3617b7739bd79ba9)
+      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(76afc0fefeb2817d2966c19edade9591)
       drizzle-orm: 0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     transitivePeerDependencies:
+      - crossws
+      - ocache
       - typescript
 
-  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8fac50c142ed7c03380abf338a1848de9e05928':
+  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b':
     dependencies:
       nostics: 1.3.0
 
-  '@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3)':
+  '@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       defu: 6.1.7
       destr: 2.0.5
       nostics: 1.3.0
@@ -16498,9 +16518,11 @@ snapshots:
     optionalDependencies:
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     transitivePeerDependencies:
+      - crossws
+      - ocache
       - typescript
 
-  '@vite-hub/markdown-template@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)':
+  '@vite-hub/markdown-template@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)':
     dependencies:
       character-entities-legacy: 3.0.0
       comark: 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
@@ -16514,13 +16536,13 @@ snapshots:
       - rangi
       - shiki
 
-  '@vite-hub/presets@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@b8fac50c142ed7c03380abf338a1848de9e05928(3e43ba87eed03194f8499073a66f631b)':
+  '@vite-hub/presets@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(74365c00d4c55f746ff54fd91f9a0dac)':
     dependencies:
-      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8fac50c142ed7c03380abf338a1848de9e05928(c88aba4f8f7a74ad3617b7739bd79ba9)
-      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(ssh2@1.17.0)
-      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928(cbaf4e6d39954586115c57f2936dacb8)
+      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(76afc0fefeb2817d2966c19edade9591)
+      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(ssh2@1.17.0)
+      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(f0f937b22572e2816ac00c449a754b04)
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
       - '@aws-sdk/client-s3'
@@ -16563,12 +16585,12 @@ snapshots:
       - vite
       - vue
 
-  '@vite-hub/queue@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@b8fac50c142ed7c03380abf338a1848de9e05928(@aws-sdk/credential-provider-web-identity@3.972.49)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)':
+  '@vite-hub/queue@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@aws-sdk/credential-provider-web-identity@3.972.49)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)':
     dependencies:
       '@types/ws': 8.18.2
       '@vercel/functions': 3.10.3(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0)
       '@vercel/queue': 0.5.1
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       defu: 6.1.7
       esbuild: 0.28.2
       h3: 2.0.1(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
@@ -16586,7 +16608,7 @@ snapshots:
       - ocache
       - utf-8-validate
 
-  '@vite-hub/rate-limit@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)':
+  '@vite-hub/rate-limit@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)':
     dependencies:
       h3: 2.0.1(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       nostics: 1.3.0
@@ -16598,7 +16620,7 @@ snapshots:
       - ocache
       - typescript
 
-  '@vite-hub/realtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@b8fac50c142ed7c03380abf338a1848de9e05928(f5472273a873df79cba87657ebdce397)':
+  '@vite-hub/realtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(077bc861a67f1877adb325804faa0659)':
     dependencies:
       '@tiptap/core': 3.31.4(@tiptap/pm@3.31.4)
       '@tiptap/extension-collaboration': 3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/y-tiptap@3.0.9(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(yjs@13.6.33)
@@ -16610,9 +16632,9 @@ snapshots:
       '@tiptap/starter-kit': 3.32.0
       '@tiptap/y-tiptap': 3.0.9(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       '@types/json-schema': 7.0.15
-      '@vite-hub/auth': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@b8fac50c142ed7c03380abf338a1848de9e05928(@types/json-schema@7.0.15)(@types/mdast@4.0.4)(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928(cbaf4e6d39954586115c57f2936dacb8)
+      '@vite-hub/auth': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@types/json-schema@7.0.15)(@types/mdast@4.0.4)(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(f0f937b22572e2816ac00c449a754b04)
       h3: 2.0.1(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       lib0: 0.2.119
       marked: 17.0.6
@@ -16684,14 +16706,19 @@ snapshots:
       - utf-8-validate
       - vitest
 
-  '@vite-hub/runtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928':
+  '@vite-hub/runtime@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)':
     dependencies:
+      h3: 2.0.1(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       nostics: 1.3.0
+      standard-context: 0.0.4
+    transitivePeerDependencies:
+      - crossws
+      - ocache
 
-  '@vite-hub/sandbox-task@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(@voidzero-dev/vite-plus-core@1.3.0)(oxc-parser@0.153.0)(rolldown@1.2.15)(ssh2@1.17.0)':
+  '@vite-hub/sandbox-task@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(oxc-parser@0.153.0)(rolldown@1.2.15)(ssh2@1.17.0)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(ssh2@1.17.0)
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(ssh2@1.17.0)
       esbuild: 0.28.2
       local-pkg: 1.2.1
       mlly: 1.8.2
@@ -16709,6 +16736,8 @@ snapshots:
       - '@rsbuild/core'
       - '@rspack/core'
       - bun-types-no-globals
+      - crossws
+      - ocache
       - oxc-parser
       - rolldown
       - rollup
@@ -16716,41 +16745,49 @@ snapshots:
       - unloader
       - webpack
 
-  '@vite-hub/sandbox@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(ssh2@1.17.0)':
+  '@vite-hub/sandbox@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(ssh2@1.17.0)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       nostics: 1.3.0
       semver: 7.8.5
     optionalDependencies:
       '@cloudflare/sandbox': 0.12.14
       '@vercel/sandbox': 3.9.0
       ssh2: 1.17.0
+    transitivePeerDependencies:
+      - crossws
+      - ocache
 
-  '@vite-hub/schedule@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)':
+  '@vite-hub/schedule@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       cron-schedule: 6.0.0
       effect: 4.0.0-rc.112
       esbuild: 0.28.2
       nostics: 1.3.0
     optionalDependencies:
-      '@vite-hub/kv': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3)
+      '@vite-hub/kv': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
+    transitivePeerDependencies:
+      - crossws
+      - ocache
 
-  '@vite-hub/shell@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@b8fac50c142ed7c03380abf338a1848de9e05928(supports-color@8.1.1)':
+  '@vite-hub/shell@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(supports-color@8.1.1)':
     dependencies:
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       just-bash: 3.6.0(supports-color@8.1.1)
       nostics: 1.3.0
       sh-syntax: 0.7.0
     transitivePeerDependencies:
+      - crossws
+      - ocache
       - supports-color
 
-  '@vite-hub/source@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))':
+  '@vite-hub/source@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))':
     dependencies:
       '@standard-schema/spec': 1.1.0
-      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       h3: 2.0.1(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       mlly: 1.8.2
       nostics: 1.3.0
@@ -16764,10 +16801,9 @@ snapshots:
       - crossws
       - ocache
 
-  '@vite-hub/ui@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))':
+  '@vite-hub/ui@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@iconify-json/ph@1.2.2)(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))':
     dependencies:
       '@comark/vue': 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
-      '@iconify-json/ph': 1.2.2
       '@nuxt/kit': 4.6.2(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))
       '@shikijs/langs': 4.5.0
       '@types/node': 24.19.2
@@ -16778,6 +16814,7 @@ snapshots:
       shiki: 4.5.0
       vue: 3.5.44(typescript@6.0.3)
     optionalDependencies:
+      '@iconify-json/ph': 1.2.2
       '@nuxt/ui': 4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     transitivePeerDependencies:
@@ -16794,17 +16831,17 @@ snapshots:
       - rolldown
       - unplugin
 
-  '@vite-hub/workflow@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@b8fac50c142ed7c03380abf338a1848de9e05928(358ffe082ffa5cdbd278807eac7bb031)':
+  '@vite-hub/workflow@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(d1ec3dbd8fe648e0a73318df0e7753db)':
     dependencies:
       '@vercel/functions': 3.10.3(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0)
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       defu: 6.1.7
       esbuild: 0.28.2
       h3: 2.0.1(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
       nostics: 1.3.0
       pathe: 2.0.3
     optionalDependencies:
-      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
+      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
       '@workflow/builders': 5.0.1(@swc/helpers@0.5.23)(supports-color@8.1.1)(ws@8.22.0)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
       workflow: 5.0.1(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)(ws@8.22.0)
@@ -16814,17 +16851,17 @@ snapshots:
       - ocache
       - ws
 
-  '@vite-hub/workspace@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928(cbaf4e6d39954586115c57f2936dacb8)':
+  '@vite-hub/workspace@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(f0f937b22572e2816ac00c449a754b04)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@vercel/nft': 1.11.0(supports-color@8.1.1)
-      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8fac50c142ed7c03380abf338a1848de9e05928(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
-      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(ssh2@1.17.0)
-      '@vite-hub/source': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
+      '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b
+      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(ssh2@1.17.0)
+      '@vite-hub/source': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))
       ai: 7.0.130(zod@4.6.7)
       defu: 6.1.7
       esbuild: 0.28.2
@@ -16839,7 +16876,7 @@ snapshots:
       ofetch: 1.5.1
       valibot: 1.5.0(typescript@6.0.3)
     optionalDependencies:
-      '@vite-hub/shell': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@b8fac50c142ed7c03380abf338a1848de9e05928(supports-color@8.1.1)
+      '@vite-hub/shell': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(supports-color@8.1.1)
       drizzle-orm: 0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1)
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@vitejs/devtools@0.8.0)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     transitivePeerDependencies:
@@ -22496,6 +22533,8 @@ snapshots:
       cpu-features: 0.0.10
       nan: 2.30.0
 
+  standard-context@0.0.4: {}
+
   statuses@2.0.2: {}
 
   std-env@4.3.0: {}
@@ -23403,7 +23442,7 @@ snapshots:
       - magicast
       - supports-color
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@2722(patch_hash=4aa4aef0bd18705489413f7bd36941990341a33b35badf8d89eedd61ded0140b)(b65d01897d208379f9f59a54b38bbeb8):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(patch_hash=4aa4aef0bd18705489413f7bd36941990341a33b35badf8d89eedd61ded0140b)(757f0a98657fa122514f147f13e3d868):
     dependencies:
       '@cloudflare/sandbox': 0.12.14
       '@cloudflare/workers-types': 5.20261023.1
@@ -23422,32 +23461,32 @@ snapshots:
       '@tiptap/vue-3': 3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3))
       '@types/node': 24.19.2
       '@vercel/sandbox': 3.9.0
-      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8fac50c142ed7c03380abf338a1848de9e05928(c88aba4f8f7a74ad3617b7739bd79ba9)
-      '@vite-hub/auth': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@b8fac50c142ed7c03380abf338a1848de9e05928(@types/json-schema@7.0.15)(@types/mdast@4.0.4)(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8fac50c142ed7c03380abf338a1848de9e05928(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/browser': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)
-      '@vite-hub/channels': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)
-      '@vite-hub/cli': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(nuxt-nightly@5.0.0-29766097.1e475df9)
-      '@vite-hub/connections': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)
-      '@vite-hub/content': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@b8fac50c142ed7c03380abf338a1848de9e05928(0c3cd3af7fd0f2c5e11d94ab479cb519)
-      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
-      '@vite-hub/email': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(katex@0.17.0)(shiki@4.5.0)(typescript@6.0.3)
-      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(typescript@6.0.3)
-      '@vite-hub/kv': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3)
-      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
-      '@vite-hub/presets': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@b8fac50c142ed7c03380abf338a1848de9e05928(3e43ba87eed03194f8499073a66f631b)
-      '@vite-hub/queue': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@b8fac50c142ed7c03380abf338a1848de9e05928(@aws-sdk/credential-provider-web-identity@3.972.49)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
-      '@vite-hub/rate-limit': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)
-      '@vite-hub/realtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@b8fac50c142ed7c03380abf338a1848de9e05928(f5472273a873df79cba87657ebdce397)
-      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8fac50c142ed7c03380abf338a1848de9e05928
-      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(ssh2@1.17.0)
-      '@vite-hub/sandbox-task': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@b8fac50c142ed7c03380abf338a1848de9e05928(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(@voidzero-dev/vite-plus-core@1.3.0)(oxc-parser@0.153.0)(rolldown@1.2.15)(ssh2@1.17.0)
-      '@vite-hub/schedule': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@b8fac50c142ed7c03380abf338a1848de9e05928(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)
-      '@vite-hub/shell': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@b8fac50c142ed7c03380abf338a1848de9e05928(supports-color@8.1.1)
-      '@vite-hub/source': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8fac50c142ed7c03380abf338a1848de9e05928(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/ui': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8fac50c142ed7c03380abf338a1848de9e05928(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))
-      '@vite-hub/workflow': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@b8fac50c142ed7c03380abf338a1848de9e05928(358ffe082ffa5cdbd278807eac7bb031)
-      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8fac50c142ed7c03380abf338a1848de9e05928(cbaf4e6d39954586115c57f2936dacb8)
+      '@vite-hub/agent': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(76afc0fefeb2817d2966c19edade9591)
+      '@vite-hub/auth': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@types/json-schema@7.0.15)(@types/mdast@4.0.4)(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/blob': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@aws-sdk/client-s3@3.1156.0)(@aws-sdk/lib-storage@3.1156.0(@aws-sdk/client-s3@3.1156.0))(@aws-sdk/s3-presigned-post@3.1156.0)(@aws-sdk/s3-request-presigner@3.1156.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(sharp@0.35.4(@types/node@25.9.9))(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/browser': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/channels': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)
+      '@vite-hub/cli': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(nuxt-nightly@5.0.0-29766097.1e475df9)(ocache@0.3.1)
+      '@vite-hub/connections': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/content': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(46b60e2cc033eed34db659d6d2f46999)
+      '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
+      '@vite-hub/email': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(katex@0.17.0)(ocache@0.3.1)(shiki@4.5.0)(typescript@6.0.3)
+      '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/agent@0.0.4)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/kv': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+      '@vite-hub/presets': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(74365c00d4c55f746ff54fd91f9a0dac)
+      '@vite-hub/queue': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@aws-sdk/credential-provider-web-identity@3.972.49)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/rate-limit': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3)
+      '@vite-hub/realtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(077bc861a67f1877adb325804faa0659)
+      '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/sandbox': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(ssh2@1.17.0)
+      '@vite-hub/sandbox-task': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox-task@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@cloudflare/sandbox@0.12.14)(@vercel/sandbox@3.9.0)(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(oxc-parser@0.153.0)(rolldown@1.2.15)(ssh2@1.17.0)
+      '@vite-hub/schedule': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@vite-hub/kv@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(typescript@6.0.3))(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)
+      '@vite-hub/shell': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(crossws@0.4.16(srvx@1.0.6))(ocache@0.3.1)(supports-color@8.1.1)
+      '@vite-hub/source': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@voidzero-dev/vite-plus-core@1.3.0)(crossws@0.4.16(srvx@1.0.6))(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(nitro@3.0.260903-beta)(ocache@0.3.1)(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/ui': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(@iconify-json/ph@1.2.2)(@nuxt/schema-nightly@5.0.0-29766097.1e475df9)(@nuxt/ui@4.11.0(7a6a2ddbcced4dfaa1a73566c4bf28c5))(@voidzero-dev/vite-plus-core@1.3.0)(ai@7.0.130(zod@4.6.7))(beautiful-mermaid@1.1.3)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0)(esbuild@0.28.2)(rolldown@1.2.15))(vue@3.5.44(typescript@6.0.3))
+      '@vite-hub/workflow': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(d1ec3dbd8fe648e0a73318df0e7753db)
+      '@vite-hub/workspace': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@9c18f89c80eabc7eb2b485f93fff2a85f4331a4b(f0f937b22572e2816ac00c449a754b04)
       '@vueuse/core': 14.4.0(vue@3.5.44(typescript@6.0.3))
       '@workflow/builders': 5.0.1(@swc/helpers@0.5.23)(supports-color@8.1.1)(ws@8.22.0)
       ai: 7.0.130(zod@4.6.7)
@@ -23465,6 +23504,7 @@ snapshots:
       semver: 7.8.5
       shiki: 4.5.0
       ssh2: 1.17.0
+      standard-context: 0.0.4
       valibot: 1.5.0(typescript@6.0.3)
       workflow: 5.0.1(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)(ws@8.22.0)
     optionalDependencies:
@@ -23492,6 +23532,7 @@ snapshots:
       - '@electric-sql/pglite'
       - '@farmfe/core'
       - '@floating-ui/dom'
+      - '@iconify-json/ph'
       - '@libsql/client-wasm'
       - '@lynx-js/react'
       - '@neondatabase/serverless'

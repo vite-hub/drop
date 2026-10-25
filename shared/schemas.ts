@@ -3,7 +3,7 @@
 import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_SLUG, slugify } from "./links"
-import { MIB, TIERS } from "./quotas"
+import { MIB } from "./quotas"
 import { MAX_REVIEW_PAGE, SITE_ADDRESS_RULE, siteAddress } from "./review"
 import { SHARES } from "./share"
 
@@ -169,12 +169,6 @@ export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 
 export const CommentReplySchema = v.object({
   body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a reply."), v.maxLength(4000)),
-})
-
-export const MemberPatchSchema = v.object({
-  banned: v.optional(v.boolean()),
-  /** The member's tier; a Pro member gets the DROP_PRO_* limits. */
-  plan: v.optional(v.picklist(TIERS)),
 })
 
 export const SkillPatchSchema = v.object({ enabled: v.boolean("Say whether the skill is enabled.") })

@@ -64,11 +64,14 @@ function skill(files: SkillFile[]): Skill {
 }
 
 // Bundle the renderer package's skill and references, keeping their relative links intact.
-const comarkUiReferences = import.meta.glob<string>("../../node_modules/comark-ui/dist/skills/comark-ui/references/*.md", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-})
+const comarkUiReferences = import.meta.glob<string>(
+  "../../node_modules/comark-ui/dist/skills/comark-ui/references/*.md",
+  {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  },
+)
 // Keep the existing annotation URL as the entry point to the complete comark-ui guide.
 const prEvidenceAnnotations = comarkUiSkill
   .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "")

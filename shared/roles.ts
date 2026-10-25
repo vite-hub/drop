@@ -3,7 +3,6 @@
 export type Role = "admin" | "member"
 
 export const ROLES: Role[] = ["admin", "member"]
-export const DEFAULT_ROLE: Role = "member"
 
 export const ROLE_LABELS: Record<Role, string> = { admin: "Admin", member: "Member" }
 
