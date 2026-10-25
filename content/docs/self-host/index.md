@@ -24,7 +24,7 @@ Drop reads its settings when it runs, so a change needs a restart, not a rebuild
 
 - **Who signs in.** Anyone with a GitHub account, as a Member. `DROP_MEMBERS` lets in only the people whose emails it lists, plus the admins, for publishing and viewing, shared links and MCP included. Like `DROP_ADMINS`, it compares emails a sign-in method verified, so it keeps working if you swap GitHub for another provider. Take someone off and restart, and they're out. `DROP_GITHUB_ORG` requires active membership of that organization instead; sign-in then asks for `read:org`. With both, a person needs both.
 - **Who is Admin.** `DROP_ADMINS` lists admin emails, separated by commas or spaces, in any case. Whoever signs in with one, by a method that verified the email, is Admin. Restart to apply a change. In `nuxt dev` and with `DROP_TEST_SIGNIN`, an unverified email counts too.
-- **Roles come only from that list.** Admins ban and unban members on the Members page.
+- **Roles come only from that list.** Admins open **Console** in the sidebar, or `/_vitehub/auth`, to ban and unban users, revoke sessions, and change plans when `DROP_QUOTAS` is on. The Auth Console requires a verified email listed in `DROP_ADMINS` and the same membership checks as Drop. Roles are read-only and impersonation is disabled. Admins can find **Review shares** and **Reports** through Search.
 - **Other sign-in.** Change the Better Auth options in `server/auth.ts`, or [reuse an existing GitHub oauth2-proxy](/docs/self-host/vps#auth-proxy).
 
 ::roles-table

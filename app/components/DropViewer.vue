@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// The drop viewer (T3 Code's layout): a main column with its own header, and a full-height, resizable panel beside it
-// with tabs (Comments, History, Details). Docs and apps share it. People review and comment, agents
-// publish new versions, and people who may edit a Markdown doc edit it together live (useLiveEditor). State lives in
-// composables (useDrop, useViewerPanel, useAppFiles, useViewerFrame, useViewerAnnotations, useLiveEditor); this file
-// wires them up.
+// The header shares the drop, the bottom dock owns editing and comments, and the right sidebar holds Details and
+// History. Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
@@ -11,16 +8,25 @@ import { videoType } from "#shared/plans"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import type { DropComment, DropVersion } from "#shared/types"
+import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
-import type { SideTab } from "~/utils/viewer"
 
 const { publicView = false } = defineProps<{ publicView?: boolean }>()
 
 const state = injectDrop()!
 const drop = computed(() => state.drop.data.value!)
 const comments = computed(() => state.comments.data.value)
+
+// Site reviews attach screenshots to the same comment threads. Fetch the thumbnails once for list and thread.
+const siteReview =
+  drop.value.kind === "site"
+    ? useApi<SiteReviewItem[]>(() => `/api/drops/${drop.value.id}/review`, {
+        key: () => keys.review(drop.value.id),
+        default: () => [],
+      })
+    : undefined
+const screenshots = computed(() => new Map((siteReview?.data.value ?? []).map((item) => [item.id, item.screenshot])))
 
 const route = useRoute()
 const notify = useNotify()
@@ -57,16 +63,42 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-// A folder's description (what goes in it) is in Details, for everyone signed in who adds to it.
-const details = computed(
-  () => owner.value || (drop.value.kind === "folder" && Boolean(drop.value.note && me.value) && !publicView),
-)
-const panel = useViewerPanel({
-  details,
-  openCount,
-  versions: computed(() => drop.value.versions.length),
-  comments: computed(() => drop.value.kind !== "folder"),
-})
+const panel = useViewerPanel({ versions: computed(() => drop.value.versions.length) })
+const hasComments = computed(() => drop.value.kind !== "folder")
+const commentsOpen = ref(false)
+const siteRef = useTemplateRef<{
+  canDraw: boolean
+  drawing: boolean
+  pending: boolean
+  comment: () => Promise<void> | undefined
+  cancel: () => void
+}>("siteRef")
+const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
+const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
+function showComments() {
+  if (!hasComments.value || editing.value) return
+  tool.value = "browse"
+  siteRef.value?.cancel()
+  commentsOpen.value = true
+  if (!wide.value) panel.close()
+}
+function closeComments() {
+  commentsOpen.value = false
+  annotations.beginFocus()
+  selection.value = null
+  reviewDock.value?.focusTrigger()
+}
+function toggleComments() {
+  if (commentsOpen.value) closeComments()
+  else showComments()
+}
+async function backToComments() {
+  const selected = popover.value?.type === "thread" ? popover.value.id : undefined
+  popover.value = null
+  await nextTick()
+  if (selected) commentsRef.value?.focusComment(selected)
+  else commentsRef.value?.focusComposer()
+}
 const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const app = useAppFiles(drop)
 const { pages, page } = app
@@ -79,7 +111,8 @@ const liveLabels = { connecting: "Connecting", connected: "Live", reconnecting: 
 const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
-const annotations = useViewerAnnotations({ drop, editing, wide, mobileSide })
+const annotationsEnabled = computed(() => !route.query.changes && !trashed.value)
+const annotations = useViewerAnnotations({ drop, editing, enabled: annotationsEnabled, reviewOpen: commentsOpen })
 const {
   selection,
   lightbox,
@@ -120,11 +153,15 @@ const shareOpen = ref(false)
 // they're commenting, selecting, or sharing. Editors are left out: the live editor tells them itself (useLiveEditor).
 useLatestVersion(drop, {
   enabled: () => publicView && !route.query.v && !older.value && !trashed.value && !editing.value,
-  busy: () => Boolean(selection.value || popover.value || lightbox.value || shareOpen.value),
+  busy: () => Boolean(commentsOpen.value || selection.value || lightbox.value || shareOpen.value),
 })
 
 function startEdit() {
-  popover.value = selection.value = null
+  if (lightbox.value) return
+  closeComments()
+  popover.value = null
+  closeChanges()
+  tab.value = "details"
   void live.open()
 }
 // Both pages key this viewer by the drop's id and version, so another version (a teammate's "Open", the sidebar, an app
@@ -160,20 +197,46 @@ const panelTabsUi = {
     "h-6 gap-1 rounded-md py-0 pr-2 pl-1.5 font-normal after:hidden data-[state=active]:bg-elevated data-[state=active]:text-highlighted hover:data-[state=inactive]:not-disabled:bg-elevated/60 hover:data-[state=inactive]:not-disabled:text-highlighted",
   leadingIcon: "size-3.5",
 }
-// Shared with someone, or waiting on review: its status sits beside the title. A private drop gets Share on the right.
-const shared = computed(() => drop.value.share !== "private" || Boolean(drop.value.shareReview))
-// Comments and Details have their own buttons in the header: each opens the panel there, and closes it once open.
-// History opens from More, the panel's tabs, or H; Details from I too.
-const has = (value: SideTab) => tabs.value.some((item) => item.value === value)
-const showing = (value: SideTab) => panelOpen.value && tab.value === value
-const toggleTab = (value: SideTab) => (showing(value) ? panel.close() : panel.show(value))
+const has = (value: "history" | "details") => tabs.value.some((item) => item.value === value)
+function toggleDetails() {
+  if (panelOpen.value) panel.close()
+  else {
+    if (!wide.value) closeComments()
+    panel.show("details")
+  }
+}
+watch(mobileSide, (open) => open && closeComments())
+watch(popover, (value) => value && showComments())
+watch(areaMode, (active) => {
+  if (active) {
+    commentsOpen.value = false
+    if (!wide.value) panel.close()
+  }
+})
+watch(
+  () => siteRef.value?.drawing,
+  (active) => active && closeComments(),
+)
+watch(
+  () => siteRef.value?.pending,
+  (pending) => pending && showComments(),
+)
+function toggleCommentArea() {
+  if (!annotationsEnabled.value || lightbox.value) return
+  if (siteRef.value?.canDraw) void siteRef.value.comment()
+  else toggleArea()
+}
+function cancelArea() {
+  tool.value = "browse"
+  annotations.dismiss()
+  siteRef.value?.cancel()
+}
 // A `?changes=` link opens with History beside the diff, as if the version had been picked there.
 if (route.query.changes && has("history")) {
   tab.value = "history"
   sideOpen.value = true
 }
-// A folder someone else shares with you, with no description, has no tab to show (no comments, no Details), so no panel either.
-const docked = computed(() => sideOpen.value && wide.value && !editing.value && tabs.value.length > 0)
+const docked = computed(() => sideOpen.value && wide.value && tabs.value.length > 0)
 
 // A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
 const docWidth = useDocWidth()
@@ -231,6 +294,7 @@ let pushedChanges = false
 watch(shownVersion, (value) => !value && (pushedChanges = false))
 /** Picking the open version again goes back to the document. Below `lg` the panel is a slideover, so it steps aside. */
 function showVersion(version: DropVersion) {
+  if (editing.value) return
   if (shownVersion.value?.id === version.id) return closeChanges()
   const opening = !shownVersion.value
   void setQuery({ changes: version.version }, { push: opening })
@@ -265,11 +329,11 @@ function present() {
 }
 
 defineShortcuts({
-  c: () => !editing.value && panel.show("comments"),
-  e: () => !editing.value && drop.value.canEdit && startEdit(),
+  c: showComments,
+  e: () => !editing.value && !shownVersion.value && drop.value.canEdit && startEdit(),
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
-  r: toggleArea,
+  r: toggleCommentArea,
   v: () => (tool.value = "browse"),
   s: () => framed.value && setTool("measure"),
   u: () => framed.value && toggleOverlay("rulers"),
@@ -279,14 +343,16 @@ defineShortcuts({
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   w: () => widens.value && nextWidth(),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
-  escape: () => {
-    closeChanges()
-    annotations.dismiss()
-  },
+})
+// Dialogs and menus consume Escape first. Only handle it here when it reaches the document unhandled.
+onKeyStroke("Escape", (event) => {
+  if (event.defaultPrevented || mobileSide.value || shareOpen.value || lightbox.value || editing.value) return
+  closeChanges()
+  if (popover.value) popover.value = null
+  else if (commentsOpen.value) closeComments()
+  annotations.dismiss()
 })
 
-// An uploaded file or image is the thing itself, so its download sits in the bar; Drop's own kinds keep it in the menu.
-const downloadsInBar = computed(() => Boolean(drop.value.url) && ["file", "image"].includes(drop.value.kind))
 /** Saves the stored file under its uploaded name; the raw URL is same-origin, so `download` names it. */
 function download() {
   if (!drop.value.url) return
@@ -310,96 +376,47 @@ function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") shareOpen.value = true
   else void copy(link.value, { key: "link", announce })
 }
-// The header keeps Edit, Comments and Copy link; the rest lives in More, each with its key. The menu closes on copy, so
-// a toast says it worked.
-const moreMenu = computed(() =>
-  [
-    [
-      ...(presents.value
-        ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
-        : []),
-      ...(canDrawArea.value
-        ? [
-            {
-              label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
-              icon: "i-mingcute-message-1-line",
-              kbds: ["r"],
-              onSelect: toggleArea,
-            },
-          ]
-        : []),
-      ...(widens.value
-        ? [
-            {
-              label: "Width",
-              icon: "i-mingcute-spacing-horizontal-line",
-              children: widths.map((item) => ({
-                label: item.label,
-                type: "checkbox" as const,
-                checked: docWidth.value === item.value,
-                onUpdateChecked: () => (docWidth.value = item.value),
-              })),
-            },
-          ]
-        : []),
-      ...(has("history")
-        ? [
-            {
-              label: "History",
-              icon: "i-mingcute-history-line",
-              kbds: ["h"],
-              onSelect: () => panel.show("history"),
-            },
-          ]
-        : []),
-    ],
-    [
-      ...(copiesMarkdown.value
-        ? [
-            {
-              label: "Copy as Markdown",
-              icon: "i-mingcute-markdown-line",
-              kbds: ["m"],
-              onSelect: () => void copyMarkdown("Markdown copied"),
-            },
-          ]
-        : []),
-      ...(drop.value.url && !downloadsInBar.value
-        ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
-        : []),
-    ],
-    // Strangers report through the abuse queue; teammates can talk to the owner, so they don't get it.
-    ...(visitor.value
-      ? [
-          [
-            {
-              label: "Report",
-              icon: "i-mingcute-flag-1-line",
-              to: { path: "/report", query: { target: `/d/${drop.value.link}` } },
-            },
-          ],
-        ]
-      : []),
-  ].filter((group) => group.length),
+const showAreaTool = computed(
+  () =>
+    annotationsEnabled.value &&
+    !lightbox.value &&
+    (canDrawArea.value || (siteRef.value?.canDraw && !siteRef.value.pending)),
 )
-const moreActive = computed(() => areaMode.value || showing("history"))
+const inspectable = computed(
+  () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
+)
+const showEditTool = computed(
+  () =>
+    !lightbox.value &&
+    !shownVersion.value &&
+    (drop.value.canEdit || (drop.value.kind === "markdown" && drop.value.editNote)),
+)
+watch(shownVersion, (version) => {
+  if (version) {
+    tool.value = "browse"
+    annotations.dismiss()
+    siteRef.value?.cancel()
+    commentsOpen.value = false
+  }
+})
 
-// Optimistic: the box closes and the pin shows at once. If the server refuses, the box comes back with the text and why,
-// unless another one is open by then.
+// Keep drafts and image picks until the server accepts them, including after a retry.
 async function submit(body: string, files: File[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
+  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
+  if (popover.value !== open) return
+  if (!("value" in sent)) return popoverRef.value?.fail(sent.error, body)
   popover.value = null
   send({ type: "clear-selection" })
-  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
-  if (!("value" in sent) && !popover.value) popover.value = { ...open, body, error: sent.error }
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
-const addPageComment = (body: string) =>
+const addPageComment = (body: string, files: File[] = []) =>
   state.addComment(
     { kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) },
     body,
+    files,
   )
 
 async function resolve(id: string, resolved: boolean) {
@@ -432,32 +449,28 @@ function copyChangesLink(version: DropVersion) {
   void copy(url.href, { key: "changes", announce: "Link to the changes copied" })
 }
 
-/**
- * Scroll the document to the comment and open its thread there: the frame reports the pin, like a click on it. A comment
- * on the whole page has no pin: its thread opens beside its row in the panel (`row`), or at the top of the page.
- */
-async function focusComment(comment: DropComment, row?: DOMRect) {
+/** Select the thread immediately; the frame only scrolls to its anchor. */
+async function focusComment(comment: DropComment) {
+  popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
+  showComments()
   if (isApp.value && comment.page && comment.page !== page.value) {
     page.value = comment.page
-    // The new page reloads the frame; focus once it says it's ready rather than after a guessed delay.
     await nextTick()
-    await until(ready).toBe(true, { timeout: 5000 })
+    await until(ready)
+      .toBe(true, { timeout: 5000 })
+      .catch(() => {})
   }
-  if (!wide.value) mobileSide.value = false
-  if (comment.kind !== "page") return send({ type: "focus", id: comment.id, open: true })
-  // 352px wide (ViewerCommentPopover), so it sits just left of the panel.
-  const top = frame.value?.getBoundingClientRect()
-  popover.value =
-    row && wide.value
-      ? { type: "thread", id: comment.id, x: row.left - 360, y: row.top - 8 }
-      : { type: "thread", id: comment.id, x: (top?.left ?? 0) + 16, y: (top?.top ?? 48) + 8 }
+  if (comment.kind !== "page") send({ type: "focus", id: comment.id, open: false })
 }
 
 // `?comment=<n>` from a copied link: once the frame has placed the pins, open that thread with the comments showing.
 onMounted(async () => {
   const n = Number(route.query.comment)
-  if (!n || !["markdown", "image", "html", "app"].includes(drop.value.kind)) return
-  await until(ready).toBe(true, { timeout: 10000 })
+  if (!n || !hasComments.value) return
+  if (["markdown", "image", "html", "app"].includes(drop.value.kind))
+    await until(ready)
+      .toBe(true, { timeout: 10000 })
+      .catch(() => {})
   const comment = comments.value.find((item) => item.n === n)
   if (!comment)
     return notify.info({
@@ -465,7 +478,6 @@ onMounted(async () => {
       icon: "i-mingcute-chat-1-line",
       color: "neutral",
     })
-  if (wide.value && has("comments")) panel.show("comments")
   void focusComment(comment)
 })
 
@@ -478,7 +490,7 @@ const moveTo = useMoveDialog()
 const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
   publicView ? dropPath(crumb) : `/drops/${crumb.id}`
 
-// ⌘K lists what you can do with this drop, under its title: the More menu, the header's buttons, and Details' actions.
+// ⌘K offers the same actions as the header, review dock, and Details.
 offerToPalette("drop", () => {
   if (visitor.value) return null
   if (editing.value)
@@ -501,19 +513,19 @@ offerToPalette("drop", () => {
         : [],
     }
   const items: CommandPaletteItem[] = [
-    ...(drop.value.canEdit
+    ...(drop.value.canEdit && !lightbox.value && !shownVersion.value
       ? [{ label: "Edit together", icon: "i-mingcute-edit-2-line", kbds: ["e"], onSelect: startEdit }]
       : []),
-    ...(has("comments")
-      ? [{ label: "Comments", icon: "i-mingcute-chat-1-line", kbds: ["c"], onSelect: () => panel.show("comments") }]
+    ...(hasComments.value
+      ? [{ label: "Comments", icon: "i-mingcute-chat-1-line", kbds: ["c"], onSelect: showComments }]
       : []),
-    ...(canDrawArea.value
+    ...(showAreaTool.value
       ? [
           {
             label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
             icon: "i-mingcute-message-1-line",
             kbds: ["r"],
-            onSelect: toggleArea,
+            onSelect: toggleCommentArea,
           },
         ]
       : []),
@@ -530,7 +542,7 @@ offerToPalette("drop", () => {
     ...(slidev.value && contentOrigin.value
       ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
       : []),
-    ...(presents.value
+    ...(presents.value && !slidev.value
       ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
       : []),
     ...(drop.value.resources ?? []).map((resource) => ({
@@ -583,91 +595,75 @@ const threadComment = computed(() => {
 })
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
-  () => threadComment.value?.n,
+  () => (commentsOpen.value ? threadComment.value?.n : undefined),
   (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
 )
 </script>
 
 <template>
   <DefineSide>
-    <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default pr-2 pl-2">
+    <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default px-2">
       <UTabs
         v-model="tab"
-        class="min-w-0"
         color="neutral"
         :content="false"
-        :items="tabs"
+        :items="tabs.map((item) => ({ ...item, disabled: editing && item.value === 'history' }))"
         size="xs"
         :ui="panelTabsUi"
         variant="link"
-      >
-        <template #trailing="{ item }">
-          <span v-if="item.count" class="font-mono text-[11px] text-dimmed tabular-nums">{{ item.count }}</span>
-        </template>
-      </UTabs>
-      <div class="flex items-center gap-1">
-        <UButton
-          v-if="tab === 'comments' && comments.length"
-          aria-label="Copy feedback for your agent"
-          color="neutral"
-          :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-sparkles-line'"
-          size="sm"
-          title="Copy feedback for your agent"
-          variant="ghost"
-          @click="copyFeedback"
-        />
-        <UButton
-          aria-label="Close panel"
-          color="neutral"
-          icon="i-mingcute-close-line"
-          size="sm"
-          variant="ghost"
-          @click="panel.close"
-        />
-      </div>
-    </div>
-    <div class="min-h-0 flex-1 overflow-y-auto">
-      <ViewerComments
-        v-if="tab === 'comments'"
-        :can-comment="drop.canComment"
-        :can-manage="drop.isOwner"
-        :comments="comments"
-        :add-page-comment="addPageComment"
-        :outdated="outdated"
-        :version="drop.version"
-        :versions="drop.versions"
-        @focus="focusComment"
-        @resolve="resolve"
       />
+      <UButton
+        aria-label="Close details and history"
+        color="neutral"
+        icon="i-mingcute-close-line"
+        size="sm"
+        variant="ghost"
+        @click="panel.close"
+      />
+    </div>
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <ViewerHistory
-        v-else-if="tab === 'history'"
+        v-if="tab === 'history'"
         :comments="comments"
         :drop="drop"
         :selected="shownVersion?.id"
         @open="showVersion"
       />
-
-      <ViewerOverview v-else :drop="drop" @share="shareOpen = true">
+      <ViewerOverview v-else :drop="drop" :show-description="owner || (Boolean(me) && !publicView)">
         <template #actions>
-          <ViewerAction
-            :icon="copied('link') ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-            :label="copied('link') ? 'Link copied' : 'Copy link'"
-            @click="copyLink()"
-          />
+          <div v-if="widens" class="space-y-2 px-2 pb-4">
+            <label for="drop-reading-width" class="text-xs font-medium text-muted">Reading width</label>
+            <USelect id="drop-reading-width" v-model="docWidth" class="w-full" :items="widths" />
+          </div>
           <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
+          <ViewerAction
+            v-if="copiesMarkdown"
+            icon="i-mingcute-markdown-line"
+            label="Copy as Markdown"
+            @click="copyMarkdown('Markdown copied')"
+          />
+          <ViewerAction
+            v-if="presents && !slidev"
+            icon="i-mingcute-external-link-line"
+            label="Open in new window"
+            @click="openWindow"
+          />
           <ViewerAction
             v-if="owner && !trashed"
             icon="i-mingcute-new-folder-line"
             label="Move to folder"
             @click="moveTo({ drop })"
           />
-          <ViewerAction
-            v-if="drop.canTrash && !trashed"
-            destructive
-            icon="i-mingcute-delete-2-line"
-            label="Move to Trash"
-            @click="deleteDrop"
-          />
+          <NuxtLink
+            v-if="visitor"
+            class="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm text-muted hover:bg-elevated"
+            :to="{ path: '/report', query: { target: `/d/${drop.link}` } }"
+          >
+            <UIcon name="i-mingcute-flag-1-line" class="size-4" />Report
+          </NuxtLink>
+          <div v-if="drop.canTrash && !trashed" class="mt-2 border-t border-default pt-2">
+            <ViewerAction destructive icon="i-mingcute-delete-2-line" label="Move to Trash" @click="deleteDrop" />
+          </div>
         </template>
       </ViewerOverview>
     </div>
@@ -701,166 +697,23 @@ watch(
           />
         </template>
         <template #title>
-          <span class="flex min-w-0 items-center gap-2">
-            <nav
-              v-if="drop.ancestors.length"
-              aria-label="Folders"
-              class="hidden min-w-0 shrink items-center gap-1 text-sm text-muted sm:flex"
-            >
-              <template v-for="crumb in drop.ancestors" :key="crumb.id">
-                <NuxtLink class="max-w-40 truncate transition-colors hover:text-highlighted" :to="crumbTo(crumb)">{{
-                  crumb.title
-                }}</NuxtLink>
-                <UIcon name="i-mingcute-right-line" class="size-3 shrink-0 text-dimmed" />
-              </template>
-            </nav>
-            <span class="truncate text-sm font-medium">{{ drop.title }}</span>
-            <ConnectionStatus
-              v-if="editing"
-              class="label-mono shrink-0 data-[status=reconnecting]:text-error"
-              :status="live.status.value"
-            >
-              <ConnectionStatusLabel v-slot="{ state: connection }">{{ liveLabel(connection) }}</ConnectionStatusLabel>
-            </ConnectionStatus>
-          </span>
+          <ViewerLocation :drop="drop" :public-view="publicView" />
         </template>
-        <!-- After the title, not in it: the heading stays the drop's name. -->
-        <template v-if="(owner && shared) || (drop.resources && !editing)" #trailing>
-          <!-- Who can open it, beside its name; a private drop has a Share button on the right instead. -->
-          <UTooltip v-if="owner && shared" text="Change who can open it">
-            <UButton
-              class="shrink-0"
-              color="neutral"
-              :icon="SHARE_ICONS[drop.share]"
-              :label="shareStatus(drop, now)"
-              size="xs"
-              variant="subtle"
-              @click="shareOpen = true"
-            />
-          </UTooltip>
-          <ViewerResources v-if="drop.resources && !editing" :resources="drop.resources" />
+        <template #trailing>
+          <ViewerShare v-model:open="shareOpen" :drop="drop" />
         </template>
-        <template v-if="editing" #right>
-          <AvatarStack
-            v-if="live.people.value.length"
-            class="mr-1"
-            :max="5"
-            :people="live.people.value"
-            :style="{ '--vh-avatar-size': '1.25rem' }"
-            variant="outline"
-          />
-          <UButton color="neutral" label="Close" size="sm" variant="ghost" @click="live.close" />
-          <UButton
-            color="neutral"
-            :disabled="!live.synced.value"
-            label="Publish"
-            :loading="live.publishing.value"
-            size="sm"
-            @click="live.publish()"
-          />
-        </template>
-        <!-- Three tools at hand and More for the rest: icons only, shortcuts in the tooltips and the menu. -->
-        <template v-else #right>
-          <UTooltip v-if="slidev && contentOrigin" text="Deck in a new window, presenter view here">
+        <template #right>
+          <UTooltip text="Details and history" :kbds="['I']">
             <UButton
-              color="neutral"
-              icon="i-mingcute-presentation-2-line"
-              label="Present"
-              size="sm"
-              variant="ghost"
-              @click="present"
-            />
-          </UTooltip>
-          <UTooltip
-            v-if="drop.canEdit || drop.editNote"
-            :kbds="drop.canEdit ? ['E'] : undefined"
-            :text="drop.editNote ?? 'Edit together'"
-          >
-            <UButton
-              aria-label="Edit together"
-              color="neutral"
-              :disabled="!drop.canEdit"
-              icon="i-mingcute-pencil-line"
-              :loading="live.opening.value"
-              size="sm"
-              variant="ghost"
-              @click="startEdit"
-            />
-          </UTooltip>
-          <UTooltip v-if="has('comments')" :kbds="['C']" text="Comments">
-            <UButton
-              :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
-              :aria-pressed="showing('comments')"
-              color="neutral"
-              icon="i-mingcute-chat-3-line"
-              :label="openCount ? String(openCount) : undefined"
-              size="sm"
-              :ui="{ label: 'font-mono text-xs tabular-nums' }"
-              :variant="showing('comments') ? 'soft' : 'ghost'"
-              @click="toggleTab('comments')"
-            />
-          </UTooltip>
-          <UTooltip :kbds="['L']" text="Copy link">
-            <UButton
-              aria-label="Copy link"
-              color="neutral"
-              :icon="copied('link') ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-              size="sm"
-              variant="ghost"
-              @click="copyLink()"
-            />
-          </UTooltip>
-          <UTooltip v-if="downloadsInBar" :kbds="['D']" :text="`Download ${drop.filename}`">
-            <UButton
-              aria-label="Download"
-              color="neutral"
-              icon="i-mingcute-download-2-line"
-              size="sm"
-              variant="ghost"
-              @click="download"
-            />
-          </UTooltip>
-          <UDropdownMenu v-if="moreMenu.length" :content="{ align: 'end' }" :items="moreMenu">
-            <UButton
-              aria-label="More"
-              :aria-pressed="moreActive"
-              color="neutral"
-              icon="i-mingcute-more-1-line"
-              size="sm"
-              :variant="moreActive ? 'soft' : 'ghost'"
-            />
-          </UDropdownMenu>
-          <!-- Details is the panel's own toggle, so it wears the panel icon and sits last before Share. -->
-          <UTooltip v-if="has('details')" :kbds="['I']" text="Details">
-            <UButton
-              aria-label="Details"
-              :aria-pressed="showing('details')"
+              aria-label="Details and history"
+              :aria-expanded="panelOpen"
+              aria-controls="drop-details"
               color="neutral"
               icon="i-mingcute-layout-right-line"
-              size="sm"
-              :variant="showing('details') ? 'soft' : 'ghost'"
-              @click="toggleTab('details')"
+              :variant="panelOpen ? 'soft' : 'ghost'"
+              @click="toggleDetails"
             />
           </UTooltip>
-          <!-- No right margin: the ghost buttons after it pad themselves, and more air cut the share button off the tools. -->
-          <USeparator v-if="(owner && !shared) || visitor" class="ml-1 h-4" orientation="vertical" />
-          <UButton
-            v-if="owner && !shared"
-            color="neutral"
-            :icon="SHARE_ICONS[drop.share]"
-            label="Share"
-            size="sm"
-            @click="shareOpen = true"
-          />
-          <UButton
-            v-else-if="visitor"
-            class="hidden sm:inline-flex"
-            color="neutral"
-            label="Make Your Own"
-            size="sm"
-            to="/"
-            variant="outline"
-          />
         </template>
       </UDashboardNavbar>
     </template>
@@ -934,76 +787,223 @@ watch(
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <div class="relative flex min-h-0 flex-1 flex-col">
-        <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
-        <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
-        <ViewerSite v-else-if="drop.kind === 'site'" :drop="drop" :public-view="publicView" />
-        <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
-        <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
-        <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
-        <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
-          <div>
-            <UIcon name="i-mingcute-file-line" class="size-8 text-dimmed" />
-            <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
-            <p class="mt-1 text-sm text-muted">No preview for this file type.</p>
-            <UButton
-              v-if="drop.url"
-              class="mt-4"
-              color="neutral"
-              icon="i-mingcute-download-2-line"
-              label="Download"
-              variant="outline"
-              @click="download"
-            />
+      <div
+        class="relative flex min-h-0 flex-1 flex-col"
+        :class="(hasComments || editing) && !trashed ? 'pb-28 sm:pb-20' : ''"
+      >
+        <div class="relative flex min-h-0 flex-1 flex-col">
+          <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
+          <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
+          <ViewerSite v-else-if="drop.kind === 'site'" ref="siteRef" :drop="drop" :public-view="publicView" />
+          <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
+          <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
+          <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
+          <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
+            <div>
+              <UIcon name="i-mingcute-file-line" class="size-8 text-dimmed" />
+              <p class="mt-3 font-mono text-sm">{{ drop.filename }}</p>
+              <p class="mt-1 text-sm text-muted">No preview for this file type.</p>
+              <UButton
+                v-if="drop.url"
+                class="mt-4"
+                color="neutral"
+                icon="i-mingcute-download-2-line"
+                label="Download"
+                variant="outline"
+                @click="download"
+              />
+            </div>
           </div>
-        </div>
-        <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable">
-          <iframe
-            v-if="contentOrigin"
-            :key="frameKey"
-            ref="frame"
-            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-            :allow="frameAllow(drop.kind)"
-            :sandbox="CONTENT_SANDBOX"
-            :src="frameSrc"
-            :title="drop.title"
-          />
-          <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
+          <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable" :bottom="16">
+            <iframe
+              v-if="contentOrigin"
+              :key="frameKey"
+              ref="frame"
+              class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+              :allow="frameAllow(drop.kind)"
+              :sandbox="CONTENT_SANDBOX"
+              :src="frameSrc"
+              :title="drop.title"
+            />
+            <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
                backdrop behind it in dark mode. -->
-          <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
-          <iframe
-            v-else
-            ref="frame"
-            class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
-            data-allow-mismatch="attribute"
-            :allow="frameAllow(drop.kind)"
-            :sandbox="PREVIEW_SANDBOX"
-            :srcdoc="srcdoc"
-            :title="drop.title"
+            <!-- Hydration mismatch reason: SSR/client bundlers format the srcdoc resolver differently. -->
+            <iframe
+              v-else
+              ref="frame"
+              class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+              data-allow-mismatch="attribute"
+              :allow="frameAllow(drop.kind)"
+              :sandbox="PREVIEW_SANDBOX"
+              :srcdoc="srcdoc"
+              :title="drop.title"
+            />
+          </ViewerDevice>
+
+          <ViewerDiff
+            v-if="shownVersion && !editing"
+            :key="shownVersion.id"
+            :previous="previousVersion"
+            :copied="copied('changes')"
+            :version="shownVersion"
+            @close="closeChanges"
+            @copy-link="copyChangesLink(shownVersion)"
           />
-        </ViewerDevice>
-
-        <ViewerToolbar
-          v-if="framed && !shownVersion"
-          :can-comment="canDrawArea"
-          :overlays="overlays"
-          :sizable="sizable"
-          :tool="tool"
-          :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
-          @toggle="toggleOverlay"
-          @tool="setTool"
-          @width="nextWidth"
-        />
-
-        <ViewerDiff
-          v-if="shownVersion && !editing"
-          :key="shownVersion.id"
-          :previous="previousVersion"
-          :copied="copied('changes')"
-          :version="shownVersion"
-          @close="closeChanges"
-          @copy-link="copyChangesLink(shownVersion)"
-        />
+        </div>
+        <ViewerReviewDock
+          v-if="(hasComments || editing) && !trashed"
+          ref="reviewDock"
+          :open="commentsOpen && !editing"
+          :overlay="Boolean(lightbox)"
+          @close="closeComments"
+        >
+          <template #heading>
+            <span class="text-sm font-medium">{{
+              popover?.type === "new" || siteRef?.pending ? "New comment" : "Comments"
+            }}</span>
+            <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
+              <UButton
+                aria-label="Copy feedback for your agent"
+                color="neutral"
+                :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+                size="sm"
+                variant="ghost"
+                @click="copyFeedback"
+              />
+            </UTooltip>
+          </template>
+          <template #panel>
+            <div id="drop-site-composer" v-show="siteRef?.pending" class="flex min-h-0 flex-1 flex-col" />
+            <ViewerCommentThread
+              v-if="popover && !siteRef?.pending"
+              :key="popover.type === 'thread' ? popover.id : 'new'"
+              ref="popoverRef"
+              :can-manage="drop.isOwner"
+              :comment="threadComment"
+              :screenshot="threadComment ? screenshots.get(threadComment.id) : undefined"
+              :pending="popover.type === 'new' ? popover.pending : undefined"
+              :draft="popover.type === 'new' ? popover.body : undefined"
+              :draft-error="popover.type === 'new' ? popover.error : undefined"
+              :can-reply="drop.canComment"
+              @cancel="backToComments"
+              @copy-link="copyCommentLink"
+              @delete="removeComment"
+              @delete-reply="(id, replyId) => state.removeReply(id, replyId)"
+              @reply="reply"
+              @resolve="resolve"
+              @submit="submit"
+            />
+            <ViewerComments
+              v-else-if="!siteRef?.pending"
+              ref="commentsRef"
+              :can-comment="drop.canComment && !shownVersion && !lightbox"
+              :can-manage="drop.isOwner"
+              :comments="lightbox ? imageComments : comments"
+              :screenshots="screenshots"
+              :add-page-comment="addPageComment"
+              :outdated="outdated"
+              :version="drop.version"
+              :versions="drop.versions"
+              @focus="focusComment"
+              @resolve="resolve"
+            />
+          </template>
+          <template #toolbar>
+            <template v-if="editing">
+              <AvatarStack
+                v-if="live.people.value.length"
+                :max="3"
+                :people="live.people.value"
+                :style="{ '--vh-avatar-size': '1.25rem' }"
+                variant="outline"
+              />
+              <ConnectionStatus
+                class="px-2 text-xs text-muted data-[status=reconnecting]:text-error"
+                :status="live.status.value"
+              >
+                <ConnectionStatusLabel v-slot="{ state: connection }">{{
+                  liveLabel(connection)
+                }}</ConnectionStatusLabel>
+              </ConnectionStatus>
+              <UButton color="neutral" label="Close" variant="ghost" @click="live.close" />
+              <UButton
+                color="neutral"
+                :disabled="!live.synced.value"
+                label="Publish"
+                :loading="live.publishing.value"
+                @click="live.publish()"
+              />
+            </template>
+            <template v-else-if="areaMode || siteRef?.drawing">
+              <UIcon name="i-mingcute-scan-line" class="ml-2 size-4 shrink-0 text-muted" />
+              <span class="px-1 text-sm">Drag to mark an area</span>
+              <UButton color="neutral" label="Cancel" variant="soft" @click="cancelArea" />
+            </template>
+            <template v-else>
+              <ViewerToolbar
+                v-if="
+                  !lightbox &&
+                  !shownVersion &&
+                  (inspectable || sizable || (framed && pinned.length) || siteRef?.canDraw)
+                "
+                :tools="inspectable ? ['browse', 'measure'] : []"
+                :views="inspectable ? ['rulers', 'xray', 'pins'] : pinned.length ? ['pins'] : []"
+                :overlays="overlays"
+                :sizable="sizable || Boolean(siteRef?.canDraw)"
+                :tool="tool"
+                @toggle="toggleOverlay"
+                @tool="setTool"
+              />
+              <UButton
+                v-if="slidev && contentOrigin && !lightbox && !shownVersion"
+                color="neutral"
+                icon="i-mingcute-presentation-2-line"
+                label="Present"
+                variant="ghost"
+                @click="present"
+              />
+              <UTooltip
+                v-if="showEditTool"
+                :kbds="drop.canEdit ? ['E'] : undefined"
+                :text="drop.editNote ?? 'Edit together'"
+              >
+                <UButton
+                  color="neutral"
+                  :disabled="!drop.canEdit"
+                  icon="i-mingcute-pencil-line"
+                  label="Edit"
+                  :loading="live.opening.value"
+                  variant="ghost"
+                  @click="startEdit"
+                />
+              </UTooltip>
+              <USeparator v-if="showEditTool" class="mx-1 h-5" orientation="vertical" />
+              <UButton
+                data-review-trigger
+                :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
+                :aria-expanded="commentsOpen"
+                aria-controls="drop-comments"
+                color="neutral"
+                icon="i-mingcute-chat-3-line"
+                :variant="commentsOpen ? 'soft' : 'ghost'"
+                @click="toggleComments"
+              >
+                Comments
+                <span v-if="openCount && !commentsOpen" class="font-mono text-xs tabular-nums">{{ openCount }}</span>
+              </UButton>
+              <UTooltip v-if="showAreaTool" text="Mark an area" :kbds="['R']">
+                <UButton
+                  color="neutral"
+                  icon="i-mingcute-scan-line"
+                  aria-label="Mark area"
+                  variant="ghost"
+                  @click="toggleCommentArea"
+                  ><span class="max-[360px]:hidden">Mark area</span></UButton
+                >
+              </UTooltip>
+            </template>
+          </template>
+        </ViewerReviewDock>
       </div>
     </template>
   </UDashboardPanel>
@@ -1011,7 +1011,14 @@ watch(
        right border divides them, and the handle on it resizes the panel; double-click resets it. -->
   <template v-if="docked">
     <UDashboardResizeHandle
+      tabindex="0"
+      aria-label="Resize details sidebar"
       aria-orientation="vertical"
+      :aria-valuenow="panel.width.value"
+      :aria-valuemin="20"
+      :aria-valuemax="36"
+      class="focus-visible:outline-2 focus-visible:outline-inverted"
+      @keydown="panel.resize.key"
       @dblclick="panel.resize.reset"
       @lostpointercapture="panel.resize.end"
       @pointerdown="panel.resize.start"
@@ -1024,24 +1031,20 @@ watch(
       :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
     >
       <template #body>
-        <ReuseSide />
+        <div id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
       </template>
     </UDashboardPanel>
   </template>
-  <USlideover
-    v-if="!wide && !editing"
-    v-model:open="mobileSide"
-    side="right"
-    :ui="{ content: 'max-w-md' }"
-    title="Drop panel"
-  >
+  <USlideover v-if="!wide" v-model:open="mobileSide" side="right" :ui="{ content: 'max-w-md' }" title="Drop panel">
     <template #content>
-      <div class="flex h-full flex-col"><ReuseSide /></div>
+      <div class="flex h-full flex-col">
+        <div id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
+      </div>
     </template>
   </USlideover>
 
   <div
-    v-if="selection && !popover"
+    v-if="selection && (!commentsOpen || !popover)"
     class="fixed z-30 -translate-x-1/2 -translate-y-full"
     :style="{
       left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
@@ -1075,24 +1078,4 @@ watch(
     @pick="pickImage"
     @thread="(id, x, y) => (popover = { type: 'thread', id, x, y })"
   />
-
-  <ViewerCommentPopover
-    v-if="popover"
-    ref="popoverRef"
-    :can-manage="drop.isOwner"
-    :comment="threadComment"
-    :pending="popover.type === 'new' ? popover.pending : undefined"
-    :x="popover.x"
-    :y="popover.y"
-    :can-reply="drop.canComment"
-    @cancel="popover = null"
-    @copy-link="copyCommentLink"
-    @delete="removeComment"
-    @delete-reply="(id, replyId) => state.removeReply(id, replyId)"
-    @reply="reply"
-    @resolve="resolve"
-    @submit="submit"
-  />
-
-  <ViewerShareModal v-if="owner" v-model:open="shareOpen" :drop="drop" />
 </template>

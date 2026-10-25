@@ -71,6 +71,8 @@ Browser pages and shared links can require proxy authentication. Exempt `/oauth2
 
 Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
 
+Keep `/_vitehub/**` and `/api/_vitehub/console/**` behind the same proxy authentication as Drop's browser pages. Forward cookies, the public `Host` and `Origin`, and `X-Auth-Request-Access-Token` on Console requests, including its RPC POSTs. Drop establishes its session from the proxy before the Console checks the verified email against `DROP_ADMINS`; organization membership alone does not grant Console access.
+
 ## Keep an existing D1 database {#d1}
 
 Keep the four Cloudflare settings from your existing deployment and optionally set `DROP_DATABASE=d1`. Compose passes the database selection to the build and runs D1 migrations at startup. Changing to SQLite needs a rebuild and a separate data migration.

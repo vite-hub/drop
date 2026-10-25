@@ -15,7 +15,7 @@ export const keys = {
   team: (id: string) => `team:${id}`,
   search: "search",
   dropSearch: "drop-search",
-  members: "members",
+  people: "people",
   agents: "agents",
   skills: "skills",
   mcpCatalog: "mcp-catalog",

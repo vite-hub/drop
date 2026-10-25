@@ -4,6 +4,7 @@
   // nuxt.config names by path, ViteHub's conventions (auth, databases, realtime, schedules), MCP, scripts, and tests.
   "entry": [
     "server/auth.ts",
+    "server/console-authorize.ts",
     "server/database-migrate.ts",
     "server/handlers/*.ts",
     "server/code-image-png/*.ts",
@@ -26,6 +27,7 @@
     "test/e2e/*.mjs",
     // Run by hand against a local Worker with D1 fixtures.
     "test/quotas/*-runtime.mjs",
+    "test/auth/console-runtime.mjs",
     "skills/**/*.js",
   ],
   "project": [

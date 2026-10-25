@@ -1,18 +1,11 @@
 <script setup lang="ts">
 // A site drop's page: the website under review, the three ways to comment on it (open it here in Drop, the bookmarklet,
-// or the optional tag in preview builds), and what people sent from its pages, newest first. Each screenshot opens as
-// its own image, where the box shows and the thread continues.
-import { dropPath } from "#shared/links"
+// or the optional tag in preview builds). Feedback and screenshots live in the viewer's bottom review dock.
 import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
-import type { DropDetail, SiteReviewItem } from "#shared/types"
+import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView: boolean }>()
 
-const state = injectDrop()!
-const items = useApi<SiteReviewItem[]>(() => `/api/drops/${props.drop.id}/review`, {
-  key: () => keys.review(props.drop.id),
-  default: () => [],
-})
 const notify = useNotify()
 const origin = useRequestURL().origin
 const snippet = reviewSnippet(origin)
@@ -20,13 +13,6 @@ const bookmarklet = reviewBookmarklet(origin)
 const host = computed(() => (props.drop.siteUrl ? siteHost(props.drop.siteUrl) : ""))
 // A pattern has no one address to open; its comments carry their page's origin instead.
 const siteLink = computed(() => (props.drop.siteUrl && !isSitePattern(props.drop.siteUrl) ? props.drop.siteUrl : null))
-const pageLink = (page: string | null) =>
-  page?.startsWith("http") ? page : page && siteLink.value ? siteLink.value + page : null
-// Resolving from the panel updates the drop's comments; the list follows them.
-const resolved = (item: SiteReviewItem) =>
-  state.comments.data.value.find((comment) => comment.id === item.id)?.resolved ?? item.resolved
-const shotTo = (shot: NonNullable<SiteReviewItem["screenshot"]>) =>
-  props.publicView ? dropPath(shot) : `/drops/${shot.id}`
 // The bookmarklet's steps for the reader's browser. Guessed after mounting, so the server's HTML (Chrome's steps) and
 // the first client render match; the buttons fix a wrong guess.
 type Browser = "chrome" | "firefox" | "safari"
@@ -48,7 +34,7 @@ interface Step {
 }
 const steps = computed<Step[]>(() => {
   const open = {
-    text: `Open any page of ${host.value}, click Review with Drop in your bookmarks, press Comment, and drag over what you mean. Your note lands here with a screenshot.`,
+    text: `Open any page of ${host.value}, click Review with Drop in your bookmarks, press Comment, and drag over what you mean. Your note appears in Comments with a screenshot.`,
   }
   if (browser.value === "firefox")
     return [
@@ -80,19 +66,26 @@ watch(siteLink, (link) => (address.value ||= link ?? ""), { immediate: true })
 const addressCovered = computed(() => siteCovers(props.drop.siteUrl, address.value))
 const example = computed(() => props.drop.siteUrl?.replace("*", "pr123") ?? "")
 const framed = ref<string | null>(null)
+const siteFrame = useTemplateRef<{
+  comment: () => Promise<void>
+  cancel: () => void
+  drawing: boolean
+  pending: boolean
+}>("siteFrame")
+defineExpose({
+  canDraw: computed(() => Boolean(framed.value)),
+  drawing: computed(() => siteFrame.value?.drawing ?? false),
+  pending: computed(() => siteFrame.value?.pending ?? false),
+  comment: () => siteFrame.value?.comment(),
+  cancel: () => siteFrame.value?.cancel(),
+})
 function openHere() {
   if (addressCovered.value) framed.value = new URL(address.value).href
 }
-const box = (item: SiteReviewItem) => ({
-  left: `${item.ox / 10}%`,
-  top: `${item.oy / 10}%`,
-  width: `${item.ow / 10}%`,
-  height: `${item.oh / 10}%`,
-})
 </script>
 
 <template>
-  <ViewerSiteFrame v-if="framed" :address="framed" :drop="drop" @close="framed = null" />
+  <ViewerSiteFrame v-if="framed" ref="siteFrame" :address="framed" :drop="drop" @close="framed = null" />
   <div v-else class="min-h-0 flex-1 overflow-y-auto">
     <div class="mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6">
       <section class="space-y-3">
@@ -123,8 +116,8 @@ const box = (item: SiteReviewItem) => ({
       <section v-if="drop.canComment" class="space-y-3">
         <p class="label-mono">Review it here</p>
         <p class="text-sm text-muted">
-          Open the site inside Drop, press Comment, and drag over what you mean. Drop takes the screenshot with your
-          browser's screen sharing, which asks once. Nothing to install.
+          Open the site inside Drop, choose Mark area in the bottom bar, and drag over what you mean. Drop takes the
+          screenshot with your browser's screen sharing, which asks once. Nothing to install.
         </p>
         <form class="flex flex-wrap items-center gap-2" @submit.prevent="openHere">
           <UInput
@@ -200,66 +193,6 @@ const box = (item: SiteReviewItem) => ({
             </li>
           </ol>
         </div>
-      </section>
-
-      <section class="space-y-3">
-        <p class="label-mono">Comments</p>
-        <div
-          v-if="!items.data.value.length"
-          class="rounded-lg border border-dashed border-default px-4 py-10 text-center"
-        >
-          <UIcon name="i-mingcute-chat-1-line" class="size-6 text-dimmed" />
-          <p class="mt-3 font-medium text-highlighted">Nothing sent from {{ host }} yet</p>
-          <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
-            Open it here and press Comment, or use the bookmarklet on the site. Each note shows up here with its
-            screenshot.
-          </p>
-        </div>
-        <ul v-else class="grid gap-4 sm:grid-cols-2">
-          <li
-            v-for="item in items.data.value"
-            :key="item.id"
-            class="overflow-hidden rounded-lg border border-default"
-            :class="resolved(item) && 'opacity-60'"
-          >
-            <NuxtLink
-              v-if="item.screenshot"
-              class="flex h-56 items-center justify-center bg-muted p-3 transition-colors hover:bg-accented"
-              :to="shotTo(item.screenshot)"
-            >
-              <span class="relative min-w-0">
-                <img
-                  :alt="`Screenshot of ${item.page ?? 'the page'}`"
-                  class="block max-h-50 w-auto max-w-full rounded-sm shadow-sm"
-                  loading="lazy"
-                  :src="item.screenshot.url"
-                />
-                <span class="absolute rounded-sm border-2 border-inverted" :style="box(item)" />
-              </span>
-            </NuxtLink>
-            <div v-else class="flex h-56 flex-col items-center justify-center gap-2 bg-muted text-sm text-muted">
-              <UIcon name="i-mingcute-pic-2-line" class="size-6 text-dimmed" />
-              No screenshot from this page
-            </div>
-            <div class="space-y-2 border-t border-default p-3">
-              <ViewerCommentHeader :comment="{ ...item, resolved: resolved(item) }" />
-              <p v-if="item.quote" class="truncate font-mono text-xs text-muted">{{ item.quote }}</p>
-              <p class="line-clamp-3 text-sm">{{ item.body }}</p>
-              <ViewerCommentImages :attachments="item.attachments" />
-              <div class="flex items-center gap-3 text-xs">
-                <span v-if="resolved(item)" class="text-muted">Resolved</span>
-                <ULink
-                  v-if="pageLink(item.page)"
-                  class="text-muted hover:text-highlighted"
-                  external
-                  :href="pageLink(item.page)!"
-                  target="_blank"
-                  >Open page</ULink
-                >
-              </div>
-            </div>
-          </li>
-        </ul>
       </section>
     </div>
   </div>

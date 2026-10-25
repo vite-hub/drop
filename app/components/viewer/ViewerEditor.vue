@@ -13,11 +13,9 @@ const prompt = usePrompt()
 
 // Everyone in this Drop, for "@". Editors are always signed in. The editor only mounts in the browser, and nothing
 // waits on the list.
-const { data: members } = useMemberList()
+const { data: members } = useApi("/api/people", { key: keys.people, default: () => [] })
 const people = computed(() =>
-  members.value
-    .filter((member) => !member.banned)
-    .map((member) => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })),
+  members.value.map((member) => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })),
 )
 
 // GitHub's emoji set, loaded with the editor rather than with the page. Custom GitHub images have no character to insert.

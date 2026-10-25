@@ -8,6 +8,7 @@
 // what it counts to screen readers.
 defineProps<{
   to?: string
+  external?: boolean
   label: string
   icon: string
   activeIcon: string
@@ -32,6 +33,7 @@ const NuxtLink = resolveComponent("NuxtLink")
         $slots.default && 'pr-8',
       ]"
       :to="to"
+      :external="external"
       :type="to ? undefined : 'button'"
       @click="emit('navigate')"
     >

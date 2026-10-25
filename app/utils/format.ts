@@ -1,5 +1,4 @@
 import prettyBytes from "pretty-bytes"
-import type { Plan } from "#shared/quotas"
 import type { ActorKind, DropKind } from "#shared/types"
 
 export const formatBytes = (bytes: number) => prettyBytes(bytes)
@@ -25,8 +24,6 @@ export const KIND_LABELS: Record<DropKind, string> = {
   site: "Site",
   board: "Board",
 }
-
-export const PLAN_LABELS: Record<Plan, string> = { free: "Free", pro: "Pro", unlimited: "Unlimited" }
 
 export const VIA_LABELS: Record<ActorKind, string> = { agent: "MCP", browser: "the browser" }
 

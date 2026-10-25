@@ -231,7 +231,11 @@ export function useViewerFrame(options: {
         ),
       })
   })
-  watch([ready, annotations.tool], () => ready.value && send({ type: "tool", tool: annotations.tool.value }))
+  watch(
+    [ready, annotations.tool],
+    () =>
+      ready.value && send({ type: "tool", tool: annotations.tool.value, pointComments: drop.value.kind === "image" }),
+  )
   watch(
     [ready, () => ({ ...annotations.overlays })],
     () => ready.value && send({ type: "view", ...annotations.overlays }),

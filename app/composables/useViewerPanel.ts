@@ -9,43 +9,21 @@ const SIDE_WIDTH = { min: 20, max: 36, default: 24 }
  * slideover below `lg`. Open state, tab and width come from cookies (useSidePanel) so SSR renders the same layout; the
  * server assumes a laptop width.
  */
-export function useViewerPanel(options: {
-  details: Ref<boolean>
-  openCount: Ref<number>
-  versions: Ref<number>
-  comments: Ref<boolean>
-}) {
+export function useViewerPanel(options: { versions: Ref<number> }) {
   const wide = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 }).greaterOrEqual("lg")
   const { open: stored, tab: storedTab, width } = useSidePanel()
   const sideOpen = computed({ get: () => stored.value && wide.value, set: (value) => (stored.value = value) })
   const mobileSide = ref(false)
 
-  // A folder takes no comments of its own: what it holds does.
+  // Everyone who can view the drop can inspect its metadata. Management controls check ownership themselves.
   const tabs = computed(() => [
-    ...(options.comments.value
-      ? [
-          {
-            value: "comments" as const,
-            label: "Comments",
-            icon: "i-mingcute-chat-3-line",
-            count: options.openCount.value,
-          },
-        ]
-      : []),
-    // Anyone who can open the drop can read its history; Details (sharing, lifetime) stays with its managers, and with
-    // whoever files into a folder that says what goes in it.
+    { value: "details" as const, label: "Details", icon: "i-mingcute-information-line" },
     ...(options.versions.value > 1
       ? [{ value: "history" as const, label: "History", icon: "i-mingcute-history-line" }]
       : []),
-    ...(options.details.value
-      ? [{ value: "details" as const, label: "Details", icon: "i-mingcute-information-line" }]
-      : []),
   ])
   const tab = computed<SideTab>({
-    get: () =>
-      tabs.value.some((item) => item.value === storedTab.value)
-        ? storedTab.value
-        : (tabs.value[0]?.value ?? "comments"),
+    get: () => (tabs.value.some((item) => item.value === storedTab.value) ? storedTab.value : "details"),
     set: (value) => (storedTab.value = value),
   })
 
@@ -65,6 +43,21 @@ export function useViewerPanel(options: {
       width.value = Math.round(Math.min(SIDE_WIDTH.max, Math.max(SIDE_WIDTH.min, next)) * 10) / 10
     },
     end: () => (drag = undefined),
+    key(event: KeyboardEvent) {
+      const next =
+        event.key === "ArrowLeft"
+          ? width.value + 1
+          : event.key === "ArrowRight"
+            ? width.value - 1
+            : event.key === "Home"
+              ? SIDE_WIDTH.min
+              : event.key === "End"
+                ? SIDE_WIDTH.max
+                : undefined
+      if (next === undefined) return
+      event.preventDefault()
+      width.value = Math.min(SIDE_WIDTH.max, Math.max(SIDE_WIDTH.min, next))
+    },
     reset: () => (width.value = SIDE_WIDTH.default),
   }
 
