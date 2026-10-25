@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
-import { migrate, reset, sql, state } from "../cost/harness.mjs"
+import { migrate, queries, reset, sql, state } from "../cost/harness.mjs"
 
 const { default: authorize } = await import("../../server/console-authorize.ts")
 const { authAccessLines } = await import("../../server/utils/auth-console.ts")
@@ -123,4 +123,21 @@ test("Console roles and Admins membership follow policy changes for accounts wit
       .map((row) => row.id),
     ["operator", "removed"],
   )
+})
+
+test("Console role sweeps are shared by concurrent requests and cached until policy changes", async () => {
+  state.admins = `${user.email}, cache-test@example.com`
+  queries.length = 0
+  await Promise.all(Array.from({ length: 5 }, async () => authorize({ request, user })))
+  const sweeps = () =>
+    queries.filter(
+      ({ query }) => query.startsWith("select") && query.includes('from "user"') && !query.includes("where"),
+    )
+  assert.equal(sweeps().length, 1)
+  queries.length = 0
+  await authorize({ request, user })
+  assert.equal(sweeps().length, 0)
+  state.admins = user.email
+  await authorize({ request, user })
+  assert.equal(sweeps().length, 1)
 })

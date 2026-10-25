@@ -2,7 +2,7 @@ import { H3Event } from "h3"
 import * as v from "valibot"
 import { defineConsoleAuthorize } from "vite-hub/console/auth"
 import { contentHost } from "./utils/content-origin"
-import { roleOf } from "./utils/identity"
+import { roleOf, syncRole } from "./utils/identity"
 import { syncConsoleRoles } from "./utils/auth-console"
 import { isMember } from "./utils/members"
 
@@ -19,7 +19,8 @@ export default defineConsoleAuthorize(async ({ request, user }) => {
   const parsed = v.safeParse(Operator, user)
   if (!parsed.success || parsed.output.banned || roleOf(parsed.output) !== "admin") return false
   if (!(await isMember(parsed.output.id))) return false
-  // Refresh all accounts before Console reads roles or applies its Admins filter.
+  // Refresh all accounts once per deployment policy, and always repair the current operator.
   await syncConsoleRoles()
+  await syncRole(parsed.output.id)
   return { sections: ["auth"] }
 })

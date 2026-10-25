@@ -4,11 +4,30 @@ import { user as users } from "../databases/config"
 import { useServerEnv } from "#vitehub/env/server"
 import { roleFor, ROLES } from "#shared/roles"
 
+// One successful sweep per policy per worker. Account creation and sign-in already synchronize
+// individual roles; policy changes need a sweep for accounts that have not signed in again.
+let synchronizedPolicy: string | undefined
+let synchronization = Promise.resolve()
+
 /** Console labels and its Admins filter read stored roles, including accounts that have not signed in recently. */
 export async function syncConsoleRoles() {
   const env = useServerEnv()
   const admins = env.drop.admins.unseal()
   const trustUnverified = import.meta.dev === true || env.drop.testSignin
+  const policy = JSON.stringify([admins, trustUnverified])
+  // Serialize policy changes and share concurrent requests. Failed sweeps are retried, never cached.
+  const pending = synchronization.then(async () => {
+    if (synchronizedPolicy === policy) return
+    synchronizedPolicy = undefined
+    await synchronizeRoles(admins, trustUnverified)
+    synchronizedPolicy = policy
+    return undefined
+  })
+  synchronization = pending.catch(() => {})
+  await pending
+}
+
+async function synchronizeRoles(admins: string, trustUnverified: boolean) {
   const rows = await db
     .select({ id: users.id, email: users.email, emailVerified: users.emailVerified, role: users.role })
     .from(users)

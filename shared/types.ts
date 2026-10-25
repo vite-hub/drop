@@ -268,8 +268,6 @@ export interface Viewer {
   members: number
   /** How many skills are on: agents get them over MCP, and members see Skills only while one is. */
   skills: number
-  /** Admins only: public shares waiting for their review (/admin/review). */
-  reviews?: number
   /** On a personal Drop with `DROP_TEAMS`: the teams they're on. Absent when teams are off. */
   teams?: ViewerTeam[]
   /** Teams pay through Stripe here (`STRIPE_*`): past `freeMembers`, a team needs a subscription. */
