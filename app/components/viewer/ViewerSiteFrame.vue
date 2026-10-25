@@ -192,6 +192,12 @@ onKeyStroke("Escape", () => {
   else drawing.value = false
 })
 onBeforeUnmount(discard)
+defineExpose({
+  comment,
+  drawing,
+  pending: computed(() => Boolean(pending.value)),
+  cancel: () => (drawing.value = false),
+})
 </script>
 
 <template>
@@ -201,7 +207,7 @@ onBeforeUnmount(discard)
         color="neutral"
         icon="i-mingcute-arrow-left-line"
         variant="ghost"
-        aria-label="Back to the site's comments"
+        aria-label="Back to site setup"
         @click="emit('close')"
       />
       <form class="min-w-0 flex-1" @submit.prevent="go">
@@ -216,14 +222,6 @@ onBeforeUnmount(discard)
           spellcheck="false"
         />
       </form>
-      <ViewerDeviceButton />
-      <UButton
-        color="neutral"
-        :variant="drawing ? 'solid' : 'outline'"
-        icon="i-mingcute-chat-1-line"
-        :label="drawing ? 'Drawing…' : 'Comment'"
-        @click="comment"
-      />
     </div>
     <p v-if="!valid" class="border-b border-default px-3 py-1.5 text-xs text-error">
       That address isn't part of this site ({{ drop.siteUrl }}).
@@ -276,54 +274,55 @@ onBeforeUnmount(discard)
         </div>
       </ViewerDevice>
 
-      <form
-        v-if="pending"
-        class="absolute right-4 bottom-18 z-30 w-80 max-w-[calc(100%-2rem)] space-y-3 rounded-lg border border-default bg-default p-3 shadow-lg"
-        @dragover.prevent
-        @drop="dropImages"
-        @submit.prevent="send"
-      >
-        <div class="relative overflow-hidden rounded-md border border-default">
-          <img :alt="`Screenshot of ${pending.page}`" class="block w-full" :src="pending.url" />
-          <span
-            class="absolute rounded-sm border-2 border-inverted"
-            :style="{
-              left: percent(pending.box.left, pending.size.width),
-              top: percent(pending.box.top, pending.size.height),
-              width: percent(pending.box.width, pending.size.width),
-              height: percent(pending.box.height, pending.size.height),
-            }"
-          />
-        </div>
-        <UTextarea
-          v-model="note"
-          autofocus
-          autoresize
-          class="w-full"
-          :maxrows="8"
-          placeholder="What should change here?"
-          :rows="3"
-          @keydown.meta.enter="send"
-          @keydown.ctrl.enter="send"
-          @paste="paste"
-        />
-        <ViewerImagePicks :picks="picks" @remove="remove" />
-        <p v-if="problem" class="text-xs text-error" role="alert">{{ problem }}</p>
-        <div class="flex justify-end gap-2">
-          <UTooltip text="Add images">
-            <UButton
-              aria-label="Add images"
-              class="mr-auto"
-              color="neutral"
-              icon="i-mingcute-pic-line"
-              variant="ghost"
-              @click="pickImages"
+      <Teleport v-if="pending" to="#drop-site-composer">
+        <form
+          class="space-y-3 overflow-y-auto overscroll-contain p-3"
+          @dragover.prevent
+          @drop="dropImages"
+          @submit.prevent="send"
+        >
+          <div class="relative overflow-hidden rounded-md border border-default">
+            <img :alt="`Screenshot of ${pending.page}`" class="block w-full" :src="pending.url" />
+            <span
+              class="absolute rounded-sm border-2 border-inverted"
+              :style="{
+                left: percent(pending.box.left, pending.size.width),
+                top: percent(pending.box.top, pending.size.height),
+                width: percent(pending.box.width, pending.size.width),
+                height: percent(pending.box.height, pending.size.height),
+              }"
             />
-          </UTooltip>
-          <UButton color="neutral" label="Cancel" variant="ghost" @click="discard" />
-          <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
-        </div>
-      </form>
+          </div>
+          <UTextarea
+            v-model="note"
+            autofocus
+            autoresize
+            class="w-full"
+            :maxrows="8"
+            placeholder="What should change here?"
+            :rows="3"
+            @keydown.meta.enter="send"
+            @keydown.ctrl.enter="send"
+            @paste="paste"
+          />
+          <ViewerImagePicks :picks="picks" @remove="remove" />
+          <p v-if="problem" class="text-xs text-error" role="alert">{{ problem }}</p>
+          <div class="flex justify-end gap-2">
+            <UTooltip text="Add images">
+              <UButton
+                aria-label="Add images"
+                class="mr-auto"
+                color="neutral"
+                icon="i-mingcute-pic-line"
+                variant="ghost"
+                @click="pickImages"
+              />
+            </UTooltip>
+            <UButton color="neutral" label="Cancel" variant="ghost" @click="discard" />
+            <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
+          </div>
+        </form>
+      </Teleport>
     </div>
   </div>
 </template>

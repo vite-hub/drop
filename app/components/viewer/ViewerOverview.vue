@@ -1,15 +1,13 @@
 <script setup lang="ts">
 // Details in sections, not a label/value table: the drop itself first (its name, type and size, who dropped it, when,
-// where), then who can open it, how many have, its links and how long it lives. Each section's action sits in it. Versions have their own tab (ViewerHistory). A folder leads with
+// where), then views, related links, and lifetime. Versions have their own tab (ViewerHistory). A folder leads with
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
 // it in place.
 import { expiryLabel } from "#shared/expiry"
 import { resourceLabel } from "#shared/resources"
-import { SHARE_HINTS, SHARE_ICONS } from "#shared/share"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
-const emit = defineEmits<{ share: [] }>()
 const { data: me } = useMe()
 const now = useRelativeNow()
 // A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
@@ -23,12 +21,6 @@ const type = computed(() =>
       : [props.drop.kind === "folder" ? itemCount(props.drop.items ?? 0) : formatBytes(props.drop.size)]),
   ].join(" · "),
 )
-// The state's own name, as on rows and in the share dialog: "Team", "Public link · 5d left".
-const access = computed(
-  () =>
-    `${shareStatus(props.drop, now.value)}${props.drop.sharedFrom ? `, through ${props.drop.sharedFrom.title}` : ""}`,
-)
-const accessHint = computed(() => SHARE_HINTS[props.drop.share])
 // A site goes by its address, a folder by its title, anything else by its file's name.
 const name = computed(() =>
   site.value && props.drop.siteUrl
@@ -154,20 +146,6 @@ async function save() {
       <p v-else class="mt-1.5 text-pretty text-muted">
         What belongs here and how to name it. Agents read this before they publish into the folder.
       </p>
-    </section>
-
-    <section v-if="drop.isOwner" aria-labelledby="details-access" class="space-y-2.5 p-4">
-      <h3 id="details-access" class="text-xs font-medium text-muted">Access</h3>
-      <div class="flex items-start gap-3">
-        <span class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated text-muted">
-          <UIcon :name="SHARE_ICONS[drop.share]" class="size-4" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-sm text-highlighted">{{ access }}</p>
-          <p class="text-xs text-pretty text-muted">{{ accessHint }}</p>
-        </div>
-        <UButton color="neutral" label="Change" size="xs" variant="outline" @click="emit('share')" />
-      </div>
     </section>
 
     <section v-if="views" aria-labelledby="details-views" class="@container space-y-2.5 p-4">

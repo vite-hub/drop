@@ -357,11 +357,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   /**
    * Comment and measure tools: a layer over the page takes the pointer, so its clicks and hovers don't reach the page.
-   * Comment outlines the element under the pointer; a click pins a comment to that spot of it, a drag draws an area.
+   * Comment draws an area; image drops also take point comments. Element inspection belongs to Measure.
    * Measure shows the element's size and box model, its type and colors, and, once one is picked, the distances from
    * it to whatever the pointer is over.
    */
-  let tool = "browse", layer = null, hovered = null, picked = null;
+  let tool = "browse", layer = null, hovered = null, picked = null, pointComments = false;
   const view = { rulers: false, xray: false, pins: true };
   const fx = document.createElement("div");
   fx.className = "fx";
@@ -521,10 +521,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     fx.innerHTML = "";
     if (hovered && !hovered.isConnected) hovered = null;
     if (picked && !picked.isConnected) picked = null;
-    if (tool === "comment" && hovered && !(layer && layer.dragging)) {
-      const r = outline(hovered);
-      tag(nameOf(hovered) + "  " + px(r.width) + " × " + px(r.height), r.left, r.top - 22 < (view.rulers ? 20 : 0) ? r.bottom + 4 : r.top - 22);
-    }
     if (tool === "measure") {
       const over = hovered && hovered !== picked ? hovered : null;
       if (picked) boxModel(picked);
@@ -572,7 +568,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (box) {
           box.remove(); box = null;
           finishArea(Math.min(s.x, e.clientX), Math.min(s.y, e.clientY), Math.max(s.x, e.clientX), Math.max(s.y, e.clientY));
-        } else finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
+        } else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
         redraw();
       };
       layer.onpointerleave = () => { if (!start) { hovered = null; redraw(); } };
@@ -711,7 +707,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; render(); }
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); }
-    if (m.type === "tool" && /^(browse|comment|measure)$/.test(m.tool)) setTool(m.tool);
+    if (m.type === "tool" && /^(browse|comment|measure)$/.test(m.tool)) { pointComments = m.pointComments === true; setTool(m.tool); }
     if (m.type === "view") setView(m);
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
