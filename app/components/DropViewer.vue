@@ -84,6 +84,7 @@ function showComments() {
 }
 function closeComments() {
   commentsOpen.value = false
+  annotations.beginFocus()
   selection.value = null
   reviewDock.value?.focusTrigger()
 }
@@ -111,7 +112,7 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotationsEnabled = computed(() => !route.query.changes && !trashed.value)
-const annotations = useViewerAnnotations({ drop, editing, enabled: annotationsEnabled })
+const annotations = useViewerAnnotations({ drop, editing, enabled: annotationsEnabled, reviewOpen: commentsOpen })
 const {
   selection,
   lightbox,
@@ -152,7 +153,7 @@ const shareOpen = ref(false)
 // they're commenting, selecting, or sharing. Editors are left out: the live editor tells them itself (useLiveEditor).
 useLatestVersion(drop, {
   enabled: () => publicView && !route.query.v && !older.value && !trashed.value && !editing.value,
-  busy: () => Boolean(commentsOpen.value || selection.value || popover.value || lightbox.value || shareOpen.value),
+  busy: () => Boolean(commentsOpen.value || selection.value || lightbox.value || shareOpen.value),
 })
 
 function startEdit() {
@@ -594,7 +595,7 @@ const threadComment = computed(() => {
 })
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
-  () => threadComment.value?.n,
+  () => (commentsOpen.value ? threadComment.value?.n : undefined),
   (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
 )
 </script>
@@ -628,7 +629,7 @@ watch(
         :selected="shownVersion?.id"
         @open="showVersion"
       />
-      <ViewerOverview v-else :drop="drop">
+      <ViewerOverview v-else :drop="drop" :show-description="owner || (Boolean(me) && !publicView)">
         <template #actions>
           <div v-if="widens" class="space-y-2 px-2 pb-4">
             <label for="drop-reading-width" class="text-xs font-medium text-muted">Reading width</label>
@@ -826,7 +827,7 @@ watch(
             />
             <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
                backdrop behind it in dark mode. -->
-            <!-- Hydration mismatch reason: server and client bundlers format srcdoc's embedded app resolver differently. -->
+            <!-- Hydration mismatch reason: SSR/client bundlers format the srcdoc resolver differently. -->
             <iframe
               v-else
               ref="frame"
@@ -1043,7 +1044,7 @@ watch(
   </USlideover>
 
   <div
-    v-if="selection && !popover"
+    v-if="selection && (!commentsOpen || !popover)"
     class="fixed z-30 -translate-x-1/2 -translate-y-full"
     :style="{
       left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,

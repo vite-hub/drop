@@ -37,6 +37,7 @@ export function useViewerAnnotations(options: {
   drop: Ref<DropDetail>
   editing: Ref<boolean>
   enabled?: Ref<boolean>
+  reviewOpen?: Ref<boolean>
 }) {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
@@ -89,9 +90,12 @@ export function useViewerAnnotations(options: {
   }
   watch(canDrawArea, (value) => !value && tool.value === "comment" && (tool.value = "browse"))
   // The frame keeps the drawn rectangle while its comment is written, on the page or a zoomed screenshot; it drops it
-  // once the popover goes.
+  // once the review dock closes. The mounted composer keeps its unsent text and files.
   const draftingArea = computed(
-    () => popover.value?.type === "new" && ["area", "image"].includes(popover.value.pending.kind),
+    () =>
+      (options.reviewOpen?.value ?? true) &&
+      popover.value?.type === "new" &&
+      ["area", "image"].includes(popover.value.pending.kind),
   )
 
   /** Escape: close whatever is open, then put the tool down. */
@@ -192,7 +196,10 @@ export function useViewerAnnotations(options: {
     }
   }
   const imageDraft = computed(() =>
-    popover.value?.type === "new" && popover.value.pending.kind === "image" && popover.value.pending.ow
+    (options.reviewOpen?.value ?? true) &&
+    popover.value?.type === "new" &&
+    popover.value.pending.kind === "image" &&
+    popover.value.pending.ow
       ? popover.value.pending
       : undefined,
   )

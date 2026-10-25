@@ -7,7 +7,7 @@ import { expiryLabel } from "#shared/expiry"
 import { resourceLabel } from "#shared/resources"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail }>()
+const props = defineProps<{ drop: DropDetail; showDescription: boolean }>()
 const { data: me } = useMe()
 const now = useRelativeNow()
 // A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
@@ -112,7 +112,11 @@ async function save() {
       </ul>
     </section>
 
-    <section v-if="drop.kind === 'folder' && (drop.note || describable)" aria-label="Description" class="p-4 text-sm">
+    <section
+      v-if="showDescription && drop.kind === 'folder' && (drop.note || describable)"
+      aria-label="Description"
+      class="p-4 text-sm"
+    >
       <div class="flex items-center justify-between gap-3">
         <h3 class="text-xs font-medium text-muted">Description</h3>
         <UButton
