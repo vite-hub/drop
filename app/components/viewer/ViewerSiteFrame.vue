@@ -188,8 +188,8 @@ async function send() {
 }
 
 onKeyStroke("Escape", () => {
-  if (pending.value) discard()
-  else drawing.value = false
+  // The viewer collapses the review dock on Escape. Keep its screenshot draft until explicitly discarded or sent.
+  drawing.value = false
 })
 onBeforeUnmount(discard)
 defineExpose({
