@@ -17,6 +17,10 @@ export function useSidePanel() {
   return { open, tab, width }
 }
 
+/** How wide a folder's preview pane is, in rem like the side panel's, dragged from its left edge. */
+export const useFolderPreviewWidth = () =>
+  useCookie<number>("drop-folder-preview-width", { default: () => 22, maxAge: year, sameSite: "lax" })
+
 /** How wide Markdown docs read (DOC_WIDTHS), from Details or W. */
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
