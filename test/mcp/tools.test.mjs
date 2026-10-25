@@ -191,6 +191,12 @@ test("PDF, video, SVG and unknown files are complete embedded resources, never c
     assert.equal(read.content[0].resource.mimeType, mime)
     assert.deepEqual(Buffer.from(read.content[0].resource.blob, "base64"), bytes)
     assert.equal(read.structuredContent.size, bytes.length)
+    const dropRead = await call(readDrop, { id: name })
+    assert.deepEqual(
+      dropRead.content.find((block) => block.type === "resource"),
+      read.content[0],
+      "existing read_drop clients receive binary bytes without refreshing their tool catalog",
+    )
   }
 })
 

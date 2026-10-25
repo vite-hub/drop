@@ -31,7 +31,7 @@ export default defineMcpTool({
   name: "read_drop",
   title: "Read a drop",
   description:
-    "Read a drop, including original image bytes up to 4 MiB from private user uploads. PNG, JPEG, WebP and GIF arrive as MCP images; other image formats as embedded resources. Use read_file for PDF, video, other original files, or a single app path. Read a doc's source or every file of an app, its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. For a board, an outline of its frames, items and arrows, with who added each. Address the open comments and errors in the next version (publish with previous and resolves); a comment's replies follow it (↳), with the images people sent (Images: their addresses, to fetch and look at), and reply answers in its thread. For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; fix the site, then resolve them with update_drop. The links it shows at the top, like its pull request. For the drop's owner, how many viewed it: people signed in, anonymous visitors, and agents, each once a day.",
+    "Read a drop, including original file bytes up to 4 MiB from private user uploads. PNG, JPEG, WebP and GIF arrive as MCP images; PDF, video and other binaries as embedded blob resources. Use read_file for only the original bytes or a single app path. Read a doc's source or every file of an app, its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. For a board, an outline of its frames, items and arrows, with who added each. Address the open comments and errors in the next version (publish with previous and resolves); a comment's replies follow it (↳), with the images people sent (Images: their addresses, to fetch and look at), and reply answers in its thread. For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; fix the site, then resolve them with update_drop. The links it shows at the top, like its pull request. For the drop's owner, how many viewed it: people signed in, anonymous visitors, and agents, each once a day.",
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(
     v.object({
@@ -120,13 +120,13 @@ export default defineMcpTool({
         : [
             detail.files
               ? appFiles(detail.files, detail.sizes ?? {})
-              : `## Content\n${detail.content ?? `Binary file: ${detail.url}\nUse read_file with this drop's id for authenticated original bytes (up to 4 MiB).${drop.kind === "image" ? " Original image content is embedded below; client format support varies." : ""}`}`,
+              : `## Content\n${detail.content ?? `Binary file: ${detail.url}\nOriginal file content is embedded below (up to 4 MiB); client format support varies. Use read_file to request only the original bytes.`}`,
           ]),
     ]
     return {
       content: [
         { type: "text" as const, text: sections.join("\n\n") },
-        ...(drop.kind === "image" ? [(await agentFile(drop, who)).content] : []),
+        ...(drop.kind === "image" || drop.kind === "file" ? [(await agentFile(drop, who)).content] : []),
       ],
       structuredContent: {
         ...meta,
