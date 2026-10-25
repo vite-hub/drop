@@ -160,36 +160,27 @@ async function newSite() {
             {{ drop.title }}, or move a drop here with Move to folder in its menu.
           </p>
         </div>
-        <ul
-          v-else
-          ref="list"
-          :aria-label="`In ${drop.title}`"
-          class="divide-y divide-default overflow-hidden rounded-lg border border-default"
-          @keydown="walk"
-        >
+        <ul v-else ref="list" :aria-label="`In ${drop.title}`" class="-mx-2 flex flex-col gap-px" @keydown="walk">
           <li v-for="child in children" :key="child.id">
             <NuxtLink
               :aria-current="picked?.id === child.id ? 'true' : undefined"
-              class="flex items-center gap-3 px-3 py-2 transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) focus-visible:ring-inset"
+              class="flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) focus-visible:ring-inset"
               :class="picked?.id === child.id ? 'bg-elevated' : 'hover:bg-muted'"
               :to="to(child)"
               @click.capture="pick($event, child)"
             >
-              <span
-                class="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-elevated text-muted ring-1 ring-default ring-inset"
-              >
+              <!-- An image shows itself, with a hairline so a white one keeps its edge; the rest get their kind's icon. -->
+              <span class="grid size-7 shrink-0 place-items-center text-dimmed">
                 <img
                   v-if="child.thumbnail"
                   alt=""
-                  class="size-full object-cover"
+                  class="size-full rounded object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
                   loading="lazy"
                   :src="child.thumbnail"
                 />
-                <UIcon v-else :name="KIND_ICONS[child.kind]" class="size-4" />
+                <UIcon v-else :name="KIND_ICONS[child.kind]" class="size-[18px]" />
               </span>
-              <span class="min-w-0 flex-1 truncate text-sm font-medium text-highlighted" :title="child.title">
-                {{ child.title }}
-              </span>
+              <span class="min-w-0 flex-1 truncate text-sm font-medium text-highlighted">{{ child.title }}</span>
               <span class="hidden w-40 truncate text-xs text-muted sm:block">{{ meta(child) }}</span>
               <TimeAgo class="w-24 shrink-0 text-right text-xs text-muted tabular-nums" :at="child.updatedAt" />
             </NuxtLink>

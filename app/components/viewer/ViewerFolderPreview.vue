@@ -12,6 +12,8 @@ const { data: detail } = useApi<DropDetail>(() => `/api/drops/${props.child.id}`
   key: () => keys.drop(props.child.id),
   server: false,
 })
+const link = useShareUrl(() => props.child)
+const { copy, copied } = useCopy()
 const colorMode = useColorMode()
 const dark = computed(() => colorMode.value === "dark")
 const url = computed(() => detail.value?.url)
@@ -88,6 +90,16 @@ const facts = computed(() =>
       </dl>
       <div class="mt-4 flex gap-2">
         <UButton block class="flex-1" color="neutral" label="Open" size="sm" :to="to" />
+        <UTooltip text="Copy link">
+          <UButton
+            aria-label="Copy link"
+            color="neutral"
+            :icon="copied('link') ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
+            size="sm"
+            variant="outline"
+            @click="copy(link, { key: 'link' })"
+          />
+        </UTooltip>
         <UButton
           v-if="url && child.kind !== 'folder'"
           aria-label="Download"
