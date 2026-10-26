@@ -7,9 +7,10 @@ import { CALLOUT_CSS, TYPESET_CSS } from "./typeset"
 
 /**
  * How wide a Markdown doc's text column runs, the reader's choice in the viewer's More menu: a readable line, a wider
- * one for tables, or the whole frame. The doc reads it from --drop-column, which the viewer's "width" message changes.
+ * one for tables, or the widest, which still stops at 80rem like T3 Code's widest page so a big screen keeps margins.
+ * The doc reads it from --drop-column, which the viewer's "width" message changes.
  */
-export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "100vw" } as const
+export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "80rem" } as const
 export type DocWidth = keyof typeof DOC_WIDTHS
 
 const DOCUMENT_EXTRA_CSS =

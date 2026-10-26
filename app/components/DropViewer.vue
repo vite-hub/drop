@@ -243,7 +243,7 @@ const docWidth = useDocWidth()
 const widths: { value: DocWidth; label: string }[] = [
   { value: "readable", label: "Readable" },
   { value: "wide", label: "Wide" },
-  { value: "full", label: "Full width" },
+  { value: "full", label: "Widest" },
 ]
 const widens = computed(() => drop.value.kind === "markdown")
 function nextWidth() {
