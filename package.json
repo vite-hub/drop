@@ -56,7 +56,7 @@
     "beautiful-mermaid": "1.1.3",
     "better-auth": "1.7.10",
     "comark-content": "0.4.1",
-    "comark-ui": "https://pkg.pr.new/onmax/comark-ui/comark-ui@340d31d8",
+    "comark-ui": "https://pkg.pr.new/onmax/comark-ui/comark-ui@8de468d4b02d4a326d4c9e184ba96a2ab0348e59",
     "confbox": "^0.3.1",
     "drizzle-orm": "0.45.3",
     "entities": "^8.1.0",
