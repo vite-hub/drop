@@ -364,7 +364,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (previous && input.folder) await updateDrop((await findDrop(row.id, event))!, who, { folder: input.folder }, event)
 
   // Comments carry over from earlier versions (listComments), so this looks across the whole chain.
-  const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves) : []
+  const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves, who) : []
 
   const fresh = (await findDrop(row.id, event)) ?? row
   if (resources) await saveResources(fresh, resources)

@@ -4,7 +4,7 @@ import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { createTarGzip } from "nanotar"
-import { objects, sql, state, migrate, reset, who, calls, insertDrop } from "../cost/harness.mjs"
+import { objects, sql, state, migrate, reset, who, calls, insertDrop, threads } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: readFile } = await import("../../server/mcp/tools/read_file.ts")
@@ -16,6 +16,10 @@ const { default: viewBoard } = await import("../../server/mcp/tools/view_board.t
 const { siteCommentTools } = await import("../../server/mcp/site-comments.ts")
 const { default: commentsGet } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
+const { default: commentDelete } = await import("../../server/api/comments/[id]/index.delete.ts")
+const { addThread } = await import("../../server/utils/comments.ts")
+const { comments } = await import("../../server/comments.ts")
+const { deleteDrop, findDrop } = await import("../../server/utils/drops.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
 const { default: uploadFile } = await import("../../server/api/files.post.ts")
 
@@ -306,11 +310,23 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
   assert.equal(doc.lifetime, "keep")
   assert.equal(doc.keepReason, "Screenshots for vite-hub/drop#12.")
 
-  sql
-    .prepare(
-      "INSERT INTO comments (id, drop_id, n, kind, selector, ox, oy, ow, oh, label, body, author_name, created_at) VALUES ('c1', ?, 1, 'image', 'img', 100, 200, 300, 150, 'img \"before\"', 'Crop this', 'Ada', 1)",
-    )
-    .run(doc.id)
+  await addThread(await findDrop(doc.id), {
+    fields: {
+      kind: "image",
+      selector: "img",
+      ox: 100,
+      oy: 200,
+      ow: 300,
+      oh: 150,
+      quote: null,
+      label: 'img "before"',
+      page: null,
+      elementX: null,
+      elementY: null,
+    },
+    body: "Crop this",
+    author: { id: "ada", name: "Ada" },
+  })
   const read = await call(readDrop, { id: doc.id })
   assert.equal(read.structuredContent.attachments.length, 1, "the screenshot belongs to the doc")
   assert.match(read.structuredContent.comments[0].target, /area 10%–40% across, 20%–35% down/)
@@ -328,7 +344,12 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
   assert.deepEqual(next.resolved, [1])
   assert.equal(next.lifetime, "keep", "the next version keeps the lifetime")
   assert.equal(next.share, "public")
-  assert.equal(sql.prepare("SELECT resolved FROM comments WHERE id = 'c1'").get().resolved, 1)
+  assert.equal(threads()[0].status, "resolved")
+  assert.equal(
+    threads()[0].resolved_by,
+    JSON.stringify({ id: "owner", name: "Owner" }),
+    "the agent's person resolved it",
+  )
 
   const listed = (await call(listDrops, {})).structuredContent
   assert.deepEqual(
@@ -391,14 +412,16 @@ test("open comments follow a doc to its next versions, numbered across them, and
   ).structuredContent
   assert.deepEqual(v3.resolved, [1, 2])
   assert.deepEqual(
-    sql
-      .prepare("SELECT n, resolved FROM comments ORDER BY n")
-      .all()
-      .map((row) => [row.n, row.resolved]),
+    threads().map((thread) => [thread.number, thread.status]),
     [
-      [1, 1],
-      [2, 1],
+      [1, "resolved"],
+      [2, "resolved"],
     ],
+  )
+  assert.deepEqual(
+    threads().map((thread) => thread.scope),
+    Array(2).fill(`drop:${sql.prepare("SELECT link FROM drops WHERE id = ?").get(v1.id).link}`),
+    "one list for the doc, by the link its versions share",
   )
 })
 
@@ -510,9 +533,44 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
   assert.match(read.content[0].text, /Why Friday\? \(Owner, on v1\)\n {3}↳ Owner: QA signs off Thursday/)
   assert.equal(read.structuredContent.comments[0].replies.length, 1)
 
+  // A resolved thread still takes a reply, and stays resolved.
+  await call(publish, { previous: v2.id, markdown: "# Plan\n\nShip it on Friday.", note: "Same", resolves: [1] })
+  assert.equal((await call(reply, { id: v2.id, comment: 1, body: "Done." })).structuredContent.comment, 1)
+  assert.deepEqual([threads()[0].status, threads()[0].comments.length], ["resolved", 3])
+
   // Deleting the comment takes its thread with it.
-  sql.prepare("DELETE FROM comments").run()
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_replies").get().n, 0)
+  const remove = new H3Event(new Request(`https://drop.example/api/comments/${listed.id}`, { method: "DELETE" }))
+  remove.context.params = { id: listed.id }
+  assert.deepEqual(await commentDelete(remove), { ok: true })
+  assert.equal(threads().length, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_comments").get().n, 0)
+})
+
+test("deleting a doc for good deletes the comments on every version", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${id}/comments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init),
+      }),
+    )
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  const v1 = (await call(publish, { markdown: "# Plan", note: "Draft", lifetime: "review" })).structuredContent
+  const v2 = (await call(publish, { previous: v1.id, markdown: "# Plan v2", note: "Next" })).structuredContent
+  const other = (await call(publish, { markdown: "# Other", note: "Draft", lifetime: "review" })).structuredContent
+  for (const id of [v1.id, v2.id, other.id])
+    await commentsPost(route(id, { kind: "page", selector: "", ox: 0, oy: 0, body: `On ${id}` }))
+  assert.equal(threads().length, 3)
+  await deleteDrop(await findDrop(v2.id))
+  assert.deepEqual(
+    threads().map((thread) => thread.metadata.dropId),
+    [other.id],
+    "another doc keeps its comments",
+  )
 })
 
 test("update_drop shares, trashes, and restores; the Trash lists separately", async () => {
@@ -913,8 +971,28 @@ test("the comments on Drop's own pages are for admins only", async () => {
   assert.equal(member.isError, true)
   assert.match(member.message, /Only Drop admins/)
   state.who = { ...who, role: "admin" }
-  // The test server installs no Comments Database, so an admin gets past the check and reaches Comments.
+  // A comment on a drop is a thread too, but of the drop's own list: the page tools never show it.
+  const doc = (await call(publish, { markdown: "# Plan", note: "Draft", lifetime: "review" })).structuredContent
+  await addThread(await findDrop(doc.id), {
+    fields: {
+      kind: "page",
+      selector: "",
+      ox: 0,
+      oy: 0,
+      ow: 0,
+      oh: 0,
+      quote: null,
+      label: null,
+      page: null,
+      elementX: null,
+      elementY: null,
+    },
+    body: "On the drop",
+    author: { id: "owner", name: "Owner" },
+  })
   const admin = await call(list, {})
-  assert.equal(admin.isError, true)
-  assert.match(admin.message, /installs|installed/i)
+  assert.equal(admin.isError, false)
+  assert.deepEqual(admin.structuredContent.threads, [])
+  // Nor does `@` suggest the people who comment on drops.
+  assert.deepEqual(await comments.people({ query: "", user: null }), [undefined, []])
 })

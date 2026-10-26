@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { insertDrop, migrate, objects, reset, sql, state, who } from "../cost/harness.mjs"
+import { insertDrop, migrate, objects, reset, sql, state, threads, who } from "../cost/harness.mjs"
 const { reviewBookmarklet, siteAddress, siteAddressesFor, siteMatches } = await import("../../shared/review.ts")
 const { REVIEW_SCRIPT } = await import("../../shared/review-script.ts")
 const { readReviewToken, sealChoice, signReviewToken } = await import("../../server/utils/review.ts")
@@ -17,6 +17,8 @@ const { default: threadReply } = await import("../../server/api/review/comments/
 const { default: reviewImageGet } = await import("../../server/api/review/images/[id].get.ts")
 const { default: commentDelete } = await import("../../server/api/comments/[id]/index.delete.ts")
 const { default: replyPost } = await import("../../server/api/comments/[id]/replies.post.ts")
+const { default: replyDelete } = await import("../../server/api/replies/[id].delete.ts")
+const { deleteDrop, findDrop } = await import("../../server/utils/drops.ts")
 const { default: newSite } = await import("../../server/api/sites.post.ts")
 const { default: newFolder } = await import("../../server/api/folders.post.ts")
 const { default: reviewList } = await import("../../server/api/drops/[id]/review.get.ts")
@@ -456,7 +458,7 @@ test("CORS answers origins a review covers, and only the token's origin gets in"
   const sibling = await comment(body.token, {}, { origin: "https://pr13-acme.preview.quiver.dk" })
   assert.equal(sibling.status, 401)
   assert.equal(sibling.headers.get("access-control-allow-origin"), "https://pr13-acme.preview.quiver.dk")
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM comments").get().n, 0)
+  assert.equal(threads().length, 0)
   const sent = await comment(body.token, {})
   assert.equal(sent.status, 200)
   assert.equal(sent.headers.get("access-control-allow-origin"), SITE)
@@ -477,22 +479,26 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   assert.equal(image.note, "1440x900 viewport")
   assert.equal(image.title, "Screenshot of /pricing")
   assert.ok(objects.has(image.blob_key))
-  const first = sql.prepare("SELECT * FROM comments WHERE drop_id = ?").get(image.id)
+  const first = threads().find((thread) => thread.metadata.dropId === image.id)
   assert.deepEqual(
     {
-      kind: first.kind,
-      selector: first.selector,
-      ox: first.ox,
-      oy: first.oy,
-      ow: first.ow,
-      oh: first.oh,
-      label: first.label,
-      quote: first.quote,
+      scope: first.scope,
       page: first.page,
-      author_name: first.author_name,
-      author_id: first.author_id,
+      kind: first.metadata.kind,
+      selector: first.metadata.selector,
+      ox: first.metadata.ox,
+      oy: first.metadata.oy,
+      ow: first.metadata.ow,
+      oh: first.metadata.oh,
+      label: first.metadata.label,
+      quote: first.metadata.quote,
+      reviewPage: first.metadata.page,
+      author: first.createdBy.name,
+      guest: first.createdBy.guest,
     },
     {
+      scope: "site:site",
+      page: "/pricing",
       kind: "image",
       selector: "body > img",
       ox: 100,
@@ -501,11 +507,12 @@ test("a comment with a screenshot becomes an image of the site with the box on i
       oh: 150,
       label: "main > button",
       quote: 'button "Buy"',
-      page: "/pricing?plan=pro#faq",
-      author_name: "Ole (guest)",
-      author_id: null,
+      reviewPage: "/pricing?plan=pro#faq",
+      author: "Ole (guest)",
+      guest: true,
     },
   )
+  assert.match(first.createdBy.id, /^guest:/, "a guest is nobody's account")
 
   const plain = await comment(body.token, {
     body: "Typo in the footer",
@@ -513,7 +520,7 @@ test("a comment with a screenshot becomes an image of the site with the box on i
     label: 'a "Pricing" in a sticky header',
   })
   assert.equal((await json(plain)).n, 2, "numbered with the screenshots' comments")
-  const second = sql.prepare("SELECT * FROM comments WHERE drop_id = 'site'").get()
+  const second = threads().find((thread) => thread.metadata.dropId === "site").metadata
   assert.equal(second.kind, "area")
   assert.equal(second.selector, "main > button")
   assert.equal(
@@ -568,10 +575,7 @@ test("comments on a pattern keep the origin of the preview they came from", asyn
     200,
   )
   assert.deepEqual(
-    sql
-      .prepare("SELECT page FROM comments ORDER BY n")
-      .all()
-      .map((row) => row.page),
+    threads().map((thread) => thread.metadata.page),
     [`${SITE}/pricing?plan=pro#faq`, "https://pr13-acme.preview.quiver.dk/pricing"],
   )
   assert.equal(
@@ -614,9 +618,16 @@ test("Drop's embedded review stores a box on a screen capture like the script's,
   const image = sql.prepare("SELECT * FROM drops WHERE kind = 'image'").get()
   assert.equal(image.parent_id, "previews")
   assert.equal(image.title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
-  const row = sql.prepare("SELECT * FROM comments").get()
+  const [row] = threads()
   assert.deepEqual(
-    [row.drop_id, row.kind, row.page, row.author_id, row.author_name, row.label],
+    [
+      row.metadata.dropId,
+      row.metadata.kind,
+      row.metadata.page,
+      row.createdBy.id,
+      row.createdBy.name,
+      row.metadata.label,
+    ],
     [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null],
     "no element: Drop can't see inside the frame",
   )
@@ -641,7 +652,7 @@ test("the embedded review needs comment access to the site", async () => {
   site("viewonly", { site_url: PATTERN, visibility: "public", access: "view" })
   state.who = null
   assert.equal((await embedded("viewonly", {})).status, 403)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM comments").get().n, 0)
+  assert.equal(threads().length, 0)
 })
 
 test("Open in Drop opens the review only for people who could open it without its link", async () => {
@@ -685,7 +696,7 @@ test("what the page sends is checked: the token, the image's bytes, and the fiel
   assert.equal((await comment(body.token, { body: "x".repeat(4001) })).status, 400)
   assert.equal((await comment(body.token, { page: "https://elsewhere.example/" })).status, 400)
   assert.equal((await comment(body.token, { ox: 900, ow: 300 })).status, 400)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM comments").get().n, 0)
+  assert.equal(threads().length, 0)
   assert.equal(
     state.bursts.filter((burst) => burst.bucket === "review-comment").length,
     5,
@@ -891,8 +902,70 @@ test("comments and replies in Drop take images, which belong to the drop and go 
 
   const keys = sql.prepare("SELECT blob_key FROM drops WHERE parent_id = 'doc'").all()
   assert.equal(keys.length, 2)
+  // A reply goes by its own id, with its image. The thread's first comment is no reply.
+  const opening = threads().find((thread) => thread.id === posted.id).comments[0].id
+  const first = request(`/api/replies/${opening}`, { method: "DELETE", id: opening })
+  assert.equal((await answer(replyDelete, first)).status, 404)
+  const gone = request(`/api/replies/${answered.id}`, { method: "DELETE", id: answered.id })
+  assert.deepEqual(await replyDelete(gone), { ok: true })
+  assert.deepEqual((await dropComments(request("/api/drops/doc/comments", { id: "doc" })))[0].replies, [])
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE parent_id = 'doc'").get().n, 1)
   await commentDelete(request(`/api/comments/${posted.id}`, { method: "DELETE", id: posted.id }))
   assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE parent_id = 'doc'").get().n, 0)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, 0)
   for (const { blob_key } of keys) assert.equal(objects.has(blob_key), false)
+})
+
+test("deleting a screenshot takes its own comments, and deleting the site takes them all", async () => {
+  site()
+  const { body } = await token(SITE, { name: "Ole" })
+  assert.equal((await comment(body.token, {}, { screenshot: PNG })).status, 200)
+  assert.equal((await comment(body.token, { body: "Footer typo", page: "/" })).status, 200)
+  const image = sql.prepare("SELECT id FROM drops WHERE parent_id = 'site'").get()
+  await deleteDrop(await findDrop(image.id))
+  assert.deepEqual(
+    threads().map((thread) => [thread.number, thread.metadata.dropId]),
+    [[2, "site"]],
+  )
+  // The next comment still counts on from the site's list.
+  assert.deepEqual(await json(await comment(body.token, { body: "Again", page: "/" })), { n: 3 })
+  await deleteDrop(await findDrop("site"))
+  assert.deepEqual(threads(), [])
+})
+
+test("a resolved comment in Drop still takes replies from people who may comment, guests too, and stays resolved", async () => {
+  insertDrop("doc", { visibility: "public", access: "comment" })
+  state.who = null
+  const posted = await dropCommentsPost(
+    request("/api/drops/doc/comments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "page", selector: "", ox: 0, oy: 0, body: "From a guest" }),
+      id: "doc",
+    }),
+  )
+  assert.deepEqual([posted.authorName, posted.mine, posted.n], ["Guest", false, 1])
+  state.who = who
+  const [listed] = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
+  assert.equal(listed.mine, false, "a guest's comment is nobody's")
+  sql
+    .prepare("UPDATE vitehub_comment_threads SET status = 'resolved', resolved_by = ? WHERE id = ?")
+    .run(JSON.stringify({ id: "owner", name: "Owner" }), posted.id)
+  state.who = null
+  const reply = await replyPost(
+    request(`/api/comments/${posted.id}/replies`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body: "Still here" }),
+      id: posted.id,
+    }),
+  )
+  assert.deepEqual([reply.authorName, reply.mine], ["Guest", false])
+  const [after] = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
+  assert.equal(after.resolved, true)
+  assert.deepEqual(
+    after.replies.map((item) => item.body),
+    ["Still here"],
+  )
+  assert.equal(threads()[0].resolved_by, JSON.stringify({ id: "owner", name: "Owner" }), "as its resolver left it")
 })

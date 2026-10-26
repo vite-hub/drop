@@ -8,6 +8,7 @@ import { DAY_MS, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { LIVE_EDITING } from "#live-drafts"
 import { draftPath } from "../draft-paths"
 import { deleteRetainedDrop } from "../quota-deletion"
+import { removeCommentsOf } from "../comments"
 import { chainOf, expiryPolicy } from "../expiry"
 import type { Identity } from "../identity"
 import type { DropRow } from "./types"
@@ -52,6 +53,8 @@ export async function deleteDrop(row: DropRow, gone = new Set<string>()) {
     .where(sql`${drops.parentId} IN (${chainOf(row)})`)
   for (const child of children) if (!gone.has(child.id)) await deleteDrop(child, gone)
   await deleteRetainedDrop(row, deleteBlobKeys)
+  // Comments live in ViteHub Comments, apart from the drops, so no foreign key takes them along.
+  await removeCommentsOf(row, ids, gone)
   // Live drafts are Blob files too (#live-drafts), one per version anyone opened in the editor.
   if (row.kind === "markdown" && LIVE_EDITING) await deleteBlobKeys(ids.map(draftPath))
 }
