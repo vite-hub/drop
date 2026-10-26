@@ -176,11 +176,12 @@ async function send() {
   }
 }
 
+function cancelDrawing() {
+  from = null
+  box.value = null
+}
 watch(drawing, (active) => {
-  if (!active) {
-    from = null
-    box.value = null
-  }
+  if (!active) cancelDrawing()
 })
 onBeforeUnmount(discard)
 defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
@@ -239,10 +240,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             @pointerdown="down"
             @pointermove="move"
             @pointerup="up"
-            @pointercancel="
-              from = null
-              box = null
-            "
+            @pointercancel="cancelDrawing"
           >
             <div
               v-if="box"
