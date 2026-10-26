@@ -66,24 +66,23 @@ async function restoreDrop() {
 const panel = useViewerPanel({ versions: computed(() => drop.value.versions.length) })
 const hasComments = computed(() => drop.value.kind !== "folder")
 const commentsOpen = ref(false)
+const reviewDraft = provideReviewDraft()
 const siteRef = useTemplateRef<{
   canDraw: boolean
-  drawing: boolean
+  capturing: boolean
   pending: boolean
-  comment: () => Promise<void> | undefined
-  cancel: () => void
 }>("siteRef")
 const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
 const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
   tool.value = "browse"
-  siteRef.value?.cancel()
   commentsOpen.value = true
   if (!wide.value) panel.close()
 }
 function closeComments() {
   commentsOpen.value = false
+  tool.value = "browse"
   annotations.beginFocus()
   selection.value = null
   reviewDock.value?.focusTrigger()
@@ -122,7 +121,6 @@ const {
   areaMode,
   canDrawArea,
   imageDraft,
-  toggleArea,
   setTool,
   toggleOverlay,
   commentOnSelection,
@@ -207,29 +205,13 @@ function toggleDetails() {
 }
 watch(mobileSide, (open) => open && closeComments())
 watch(popover, (value) => value && showComments())
-watch(areaMode, (active) => {
-  if (active) {
-    commentsOpen.value = false
-    if (!wide.value) panel.close()
-  }
-})
-watch(
-  () => siteRef.value?.drawing,
-  (active) => active && closeComments(),
-)
+watch(areaMode, (active) => active && showComments())
 watch(
   () => siteRef.value?.pending,
   (pending) => pending && showComments(),
 )
 function toggleCommentArea() {
-  if (!annotationsEnabled.value || lightbox.value) return
-  if (siteRef.value?.canDraw) void siteRef.value.comment()
-  else toggleArea()
-}
-function cancelArea() {
-  tool.value = "browse"
-  annotations.dismiss()
-  siteRef.value?.cancel()
+  if (canMarkArea.value) showComments()
 }
 // A `?changes=` link opens with History beside the diff, as if the version had been picked there.
 if (route.query.changes && has("history")) {
@@ -376,11 +358,11 @@ function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") shareOpen.value = true
   else void copy(link.value, { key: "link", announce })
 }
-const showAreaTool = computed(
+const canMarkArea = computed(
   () =>
     annotationsEnabled.value &&
     !lightbox.value &&
-    (canDrawArea.value || (siteRef.value?.canDraw && !siteRef.value.pending)),
+    (canDrawArea.value || (drop.value.canComment && siteRef.value?.canDraw && !siteRef.value.pending)),
 )
 const inspectable = computed(
   () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
@@ -395,7 +377,6 @@ watch(shownVersion, (version) => {
   if (version) {
     tool.value = "browse"
     annotations.dismiss()
-    siteRef.value?.cancel()
     commentsOpen.value = false
   }
 })
@@ -405,8 +386,10 @@ async function submit(body: string, files: File[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
   const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
-  if (popover.value !== open) return
+  if (popover.value !== open) return popoverRef.value?.fail()
   if (!("value" in sent)) return popoverRef.value?.fail(sent.error, body)
+  reviewDraft.body.value = ""
+  reviewDraft.images.clear()
   popover.value = null
   send({ type: "clear-selection" })
 }
@@ -519,10 +502,10 @@ offerToPalette("drop", () => {
     ...(hasComments.value
       ? [{ label: "Comments", icon: "i-mingcute-chat-1-line", kbds: ["c"], onSelect: showComments }]
       : []),
-    ...(showAreaTool.value
+    ...(canMarkArea.value
       ? [
           {
-            label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
+            label: "Comment on an area",
             icon: "i-mingcute-message-1-line",
             kbds: ["r"],
             onSelect: toggleCommentArea,
@@ -794,7 +777,13 @@ watch(
         <div class="relative flex min-h-0 flex-1 flex-col">
           <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
           <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
-          <ViewerSite v-else-if="drop.kind === 'site'" ref="siteRef" :drop="drop" :public-view="publicView" />
+          <ViewerSite
+            v-else-if="drop.kind === 'site'"
+            ref="siteRef"
+            :drop="drop"
+            :public-view="publicView"
+            :reviewing="commentsOpen && drop.canComment && annotationsEnabled && !editing"
+          />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
           <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
           <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
@@ -853,6 +842,7 @@ watch(
         <ViewerReviewDock
           v-if="(hasComments || editing) && !trashed"
           ref="reviewDock"
+          :class="{ invisible: siteRef?.capturing }"
           :open="commentsOpen && !editing"
           :overlay="Boolean(lightbox)"
           @close="closeComments"
@@ -934,11 +924,6 @@ watch(
                 @click="live.publish()"
               />
             </template>
-            <template v-else-if="areaMode || siteRef?.drawing">
-              <UIcon name="i-mingcute-scan-line" class="ml-2 size-4 shrink-0 text-muted" />
-              <span class="px-1 text-sm">Drag to mark an area</span>
-              <UButton color="neutral" label="Cancel" variant="soft" @click="cancelArea" />
-            </template>
             <template v-else>
               <ViewerToolbar
                 v-if="
@@ -991,16 +976,6 @@ watch(
                 Comments
                 <span v-if="openCount && !commentsOpen" class="font-mono text-xs tabular-nums">{{ openCount }}</span>
               </UButton>
-              <UTooltip v-if="showAreaTool" text="Mark an area" :kbds="['R']">
-                <UButton
-                  color="neutral"
-                  icon="i-mingcute-scan-line"
-                  aria-label="Mark area"
-                  variant="ghost"
-                  @click="toggleCommentArea"
-                  ><span class="max-[360px]:hidden">Mark area</span></UButton
-                >
-              </UTooltip>
             </template>
           </template>
         </ViewerReviewDock>

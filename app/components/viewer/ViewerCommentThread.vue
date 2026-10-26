@@ -27,9 +27,11 @@ const emit = defineEmits<{
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
 }>()
-const body = ref(props.draft ?? "")
+const draft = props.pending ? injectReviewDraft()! : { body: ref(""), images: useImagePicks() }
+const body = draft.body
+if (props.draft && !body.value) body.value = props.draft
 const busy = ref(false)
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = draft.images
 // Why the last send failed, under the box that sent it; editing the text clears it.
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
@@ -107,7 +109,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         <span class="text-sm text-muted">{{
           pending.quote ? "Selected text" : pending.kind === "image" ? "Selected image area" : "Selected area"
         }}</span>
-        <UButton color="neutral" label="Cancel" size="sm" variant="ghost" @click="emit('cancel')" />
+        <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
       </div>
       <p v-if="pending.quote" class="mb-3 line-clamp-3 border-l-2 border-default pl-3 text-sm text-muted">
         {{ pending.quote }}

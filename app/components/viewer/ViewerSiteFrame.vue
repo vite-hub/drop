@@ -7,7 +7,7 @@
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; address: string }>()
+const props = defineProps<{ drop: DropDetail; address: string; reviewing: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const notify = useNotify()
@@ -24,7 +24,8 @@ function go() {
 
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
-const drawing = ref(false)
+const capturing = ref(false)
+const drawing = computed(() => props.reviewing && !pending.value && !capturing.value)
 const box = ref<Box | null>(null)
 let from: { x: number; y: number } | null = null
 const pending = ref<{
@@ -35,34 +36,8 @@ const pending = ref<{
   page: string
   origin: string
 } | null>(null)
-const note = ref("")
+const { body: note, images } = injectReviewDraft()!
 const sending = ref(false)
-
-async function comment() {
-  if (pending.value) return
-  if (drawing.value) return (drawing.value = false)
-  if (!capture.supported()) {
-    notify.info({
-      title: "This browser can't capture the screen",
-      description: "Use the bookmarklet on the site instead.",
-      color: "error",
-      icon: "i-mingcute-warning-line",
-    })
-    return
-  }
-  if (!capture.active.value) {
-    try {
-      await capture.start()
-    } catch (error) {
-      // Closing the browser's share dialog is a choice, not a failure.
-      if (!(error instanceof DOMException && error.name === "NotAllowedError"))
-        notify.fail("Couldn't start the screen capture", error)
-      return
-    }
-  }
-  box.value = null
-  drawing.value = true
-}
 
 // In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
@@ -75,6 +50,7 @@ function point(event: PointerEvent) {
   }
 }
 function down(event: PointerEvent) {
+  if (event.button !== 0) return
   if (event.target instanceof Element) event.target.setPointerCapture(event.pointerId)
   from = point(event)
   box.value = { left: from.x, top: from.y, width: 0, height: 0 }
@@ -112,11 +88,21 @@ async function up() {
   }
   if (crop.width < 1 || crop.height < 1) return (box.value = null)
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
-  drawing.value = false
+  capturing.value = true
   box.value = null
-  await nextTick()
-  await new Promise(requestAnimationFrame)
   try {
+    if (!capture.supported()) {
+      notify.info({
+        title: "This browser can't capture the screen",
+        description: "Write a comment without an area, or use the bookmarklet on the site instead.",
+        color: "error",
+      })
+      return
+    }
+    if (!capture.active.value) await capture.start()
+    if (!props.reviewing) return
+    await nextTick()
+    await new Promise(requestAnimationFrame)
     const blob = await capture.grab({
       left: visible.left,
       top: visible.top,
@@ -133,18 +119,19 @@ async function up() {
       origin: url.origin,
     }
   } catch (error) {
-    notify.fail("Couldn't take the screenshot", error)
+    if (!(error instanceof DOMException && error.name === "NotAllowedError"))
+      notify.fail("Couldn't take the screenshot", error)
+  } finally {
+    capturing.value = false
   }
 }
 
 // Images the reviewer adds beside the screenshot: from the button, a paste, or a drop on the form.
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop: dropImages } = useImagePicks()
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop: dropImages } = images
 
 function discard() {
   if (pending.value) URL.revokeObjectURL(pending.value.url)
   pending.value = null
-  note.value = ""
-  clear()
 }
 
 // The box in thousandths of the screenshot, as every review comment stores it.
@@ -176,6 +163,8 @@ async function send() {
   try {
     await sendSiteComment(props.drop.id, shot.origin, form)
     notify.done("Comment sent", "It's on the site's page with its screenshot.")
+    note.value = ""
+    clear()
     discard()
     // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
     // events go nowhere.
@@ -187,17 +176,14 @@ async function send() {
   }
 }
 
-onKeyStroke("Escape", () => {
-  // The viewer collapses the review dock on Escape. Keep its screenshot draft until explicitly discarded or sent.
-  drawing.value = false
+watch(drawing, (active) => {
+  if (!active) {
+    from = null
+    box.value = null
+  }
 })
 onBeforeUnmount(discard)
-defineExpose({
-  comment,
-  drawing,
-  pending: computed(() => Boolean(pending.value)),
-  cancel: () => (drawing.value = false),
-})
+defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
 </script>
 
 <template>
@@ -253,6 +239,10 @@ defineExpose({
             @pointerdown="down"
             @pointermove="move"
             @pointerup="up"
+            @pointercancel="
+              from = null
+              box = null
+            "
           >
             <div
               v-if="box"
@@ -268,7 +258,7 @@ defineExpose({
               v-else
               class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
             >
-              Drag over what you mean. <UKbd value="escape" /> cancels.
+              Drag to include an area in your comment.
             </p>
           </div>
         </div>
@@ -318,7 +308,7 @@ defineExpose({
                 @click="pickImages"
               />
             </UTooltip>
-            <UButton color="neutral" label="Cancel" variant="ghost" @click="discard" />
+            <UButton color="neutral" label="Remove area" variant="ghost" @click="discard" />
             <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
           </div>
         </form>

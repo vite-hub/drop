@@ -49,11 +49,11 @@ const repliers = (comment: DropComment) => [
   ...new Map(comment.replies.toReversed().map((reply) => [reply.authorName, reply])).values(),
 ]
 
-const pageBody = ref("")
+const { body: pageBody, images } = injectReviewDraft()!
 const sending = ref(false)
 const pageError = ref<string>()
 watch(pageBody, () => (pageError.value = undefined))
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = images
 async function sendPageComment() {
   if (!pageBody.value.trim() || sending.value) return
   sending.value = true

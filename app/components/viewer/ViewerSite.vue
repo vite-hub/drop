@@ -5,7 +5,7 @@
 import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; publicView: boolean }>()
+const props = defineProps<{ drop: DropDetail; publicView: boolean; reviewing: boolean }>()
 
 const notify = useNotify()
 const origin = useRequestURL().origin
@@ -42,17 +42,13 @@ watch(address, () => (addressError.value = ""))
 const example = computed(() => props.drop.siteUrl?.replace("*", "pr123") ?? "")
 const framed = ref<string | null>(null)
 const siteFrame = useTemplateRef<{
-  comment: () => Promise<void>
-  cancel: () => void
-  drawing: boolean
   pending: boolean
+  capturing: boolean
 }>("siteFrame")
 defineExpose({
+  capturing: computed(() => siteFrame.value?.capturing ?? false),
   canDraw: computed(() => Boolean(framed.value)),
-  drawing: computed(() => siteFrame.value?.drawing ?? false),
   pending: computed(() => siteFrame.value?.pending ?? false),
-  comment: () => siteFrame.value?.comment(),
-  cancel: () => siteFrame.value?.cancel(),
 })
 function openHere(event: SubmitEvent) {
   if (addressCovered.value) {
@@ -67,7 +63,14 @@ function openHere(event: SubmitEvent) {
 </script>
 
 <template>
-  <ViewerSiteFrame v-if="framed" ref="siteFrame" :address="framed" :drop="drop" @close="framed = null" />
+  <ViewerSiteFrame
+    v-if="framed"
+    ref="siteFrame"
+    :address="framed"
+    :drop="drop"
+    :reviewing="reviewing"
+    @close="framed = null"
+  />
   <div v-else class="min-h-0 flex-1 overflow-y-auto">
     <div class="mx-auto max-w-3xl space-y-10 px-4 py-10 sm:px-6">
       <section class="space-y-3">
@@ -134,8 +137,9 @@ function openHere(event: SubmitEvent) {
             Paste any preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span
             >.
           </template>
-          Then choose Mark area in the bottom bar, or press <UKbd value="R" />, and drag over what you mean. Your
-          browser asks once to share the screen for the screenshot.
+          Open Comments to write feedback. You can also drag over the page to include an area, or press
+          <UKbd value="R" />
+          to start. Your browser asks to share the screen only when you mark an area.
         </p>
         <p v-else-if="pattern" class="text-sm text-pretty text-muted">
           Covers every preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span

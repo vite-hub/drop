@@ -37,9 +37,9 @@ Reviewers comment in one of three ways:
 
 ## Review it in Drop {#here}
 
-On the site review's page, type a page address and press **Review here**. Then press **Comment** in the toolbar under the page, or <kbd>R</kbd>, and drag a box over what you mean. Nothing changes on the site.
+On the site review's page, type a page address and press **Review here**. Open **Comments** in the bottom bar and write your feedback. To include an area, drag a box over the page while Comments is open. <kbd>R</kbd> also opens commenting. A plain comment needs no area or screenshot. Nothing changes on the site.
 
-Drop takes the screenshot with your browser's screen sharing, which asks once per visit. Chrome, Edge, and Brave share **This tab**, so the screenshot matches the page. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off. You see the screenshot before you send it.
+When you mark an area, Drop takes its screenshot with your browser's screen sharing, which asks once per visit. Opening Comments alone does not ask for screen sharing. Chrome, Edge, and Brave share **This tab**, so the screenshot matches the page. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off. You see the screenshot before you send it.
 
 These comments carry the screenshot, your box, your note, and the address in the row above the page, but not the element under the box. Clicks inside the page don't change that address, so type the page you're on. A site that refuses to be framed stays blank; use the bookmarklet there.
 
