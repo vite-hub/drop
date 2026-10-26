@@ -1,7 +1,9 @@
 // What a site under review loads from Drop: /review.js (server/routes/review.js.get.ts), from a script tag in its
 // preview builds or from the "Review with Drop" bookmarklet. It adds one element, a toolbar in a closed shadow root,
-// so the page's CSS can't reach it and it touches nothing else on the page. It does nothing until someone presses
-// Comment. It carries no key: Drop finds the site drop from the page's origin when someone connects.
+// so the page's CSS can't reach it and it touches nothing else on the page. Presses, focus, and keys inside it stop at
+// that element, so the page doesn't take them for its own: a menu it has open stays open while someone comments on it.
+// It does nothing until someone presses Comment. It carries no key: Drop finds the site drop from the page's origin
+// when someone connects.
 import { ELEMENT_NAMING } from "./plan-runtime"
 
 /** Pinned, and loaded only when someone presses Comment. A page whose CSP blocks it sends comments without a screenshot. */
@@ -107,7 +109,7 @@ const COMPOSE = (label: string, placeholder: string, send: string, cancel: boole
 const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
-<div class="bar"><button class="btn primary" type="button" data-act="comment">${ICONS.comment}Comment</button><button class="btn ghost" type="button" data-act="list" aria-label="Comments on this page">${ICONS.list}<span class="count"></span></button><button class="icon" type="button" data-act="pins" hidden aria-pressed="true" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="bar"><button class="btn primary" type="button" data-act="comment">${ICONS.comment}Comment</button><button class="btn ghost" type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button class="icon" type="button" data-act="pins" hidden aria-pressed="true" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
@@ -438,10 +440,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function render() {
     const shown = token ? visible() : [];
     const open = threads.filter((item) => !item.resolved).length;
-    pinsButton.hidden = !threads.length;
-    count.hidden = !token;
+    // The list shows once the page has threads: before someone connects there is nothing to count.
+    pinsButton.hidden = listButton.hidden = !threads.length;
+    if (listButton.hidden) list.hidden = true;
     count.textContent = String(open);
-    listButton.title = token ? open + " open comment" + (open === 1 ? "" : "s") + " on this page" : "Show the comments on this page";
+    listButton.title = open + " open comment" + (open === 1 ? "" : "s") + " on this page";
+    listButton.setAttribute("aria-label", listButton.title);
     for (const [n, pin] of pinFor) if (!shown.some((item) => item.n === n)) { pin.remove(); pinFor.delete(n); }
     for (const item of shown) {
       let pin = pinFor.get(item.n);
@@ -741,11 +745,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     catch (error) { if (error.message) say(error.message); return; }
     startDrawing();
   });
-  listButton.addEventListener("click", async () => {
-    if (list.hidden) {
-      try { await ensureToken(); }
-      catch (error) { if (error.message) say(error.message); return; }
-    }
+  listButton.addEventListener("click", () => {
     list.hidden = !list.hidden;
     if (!list.hidden) { closeThread(); renderList(); }
   });
@@ -856,6 +856,11 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   setInterval(() => { if (token && document.visibilityState === "visible" && !busy) void refresh(); }, 30000);
   addEventListener("focus", () => { if (token) void refresh(); });
 
+  // A page's menus and popovers close on a press or focus outside them, which they listen for on the document (Reka
+  // UI, Radix). Stopped here, after the toolbar's own listeners, so commenting on an open menu keeps it open, and
+  // typing a note doesn't run the page's shortcuts.
+  for (const type of ["pointerdown", "mousedown", "touchstart", "click", "focusin", "focusout", "keydown", "keyup"])
+    host.addEventListener(type, (e) => e.stopPropagation());
   document.documentElement.appendChild(host);
   void refresh();
 })();`
