@@ -99,6 +99,11 @@
   }
 }
 
+body {
+  background-image: var(--surface-grain);
+  background-size: var(--surface-grain-size);
+}
+
 /* Mono uppercase section labels, Executor's signature. */
 @utility label-mono {
   font-family: var(--font-mono);
