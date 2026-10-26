@@ -288,22 +288,13 @@ export const setResolved = (thread: CommentThread, resolved: boolean, who: Ident
   done(resolved ? comments.resolve(thread.id, { by: authorOf(who, who?.name ?? "Guest") }) : comments.reopen(thread.id))
 
 /**
- * Adds a reply to a thread; the callers check who may. Drop takes replies on resolved threads too, which Comments
- * doesn't: such a thread opens for the reply and resolves again, as its resolver left it.
+ * Adds a reply to a thread; the callers check who may. Drop takes replies on resolved threads too, and the thread
+ * stays resolved.
  */
 export async function replyTo(thread: CommentThread, author: CommentAuthor, body: string) {
-  const reply = async () => {
-    const [error, comment] = await comments.reply(thread.id, { body, author })
-    if (error) throw commentsFailure(error)
-    return comment
-  }
-  if (thread.status !== "resolved") return reply()
-  await done(comments.reopen(thread.id))
-  try {
-    return await reply()
-  } finally {
-    await done(comments.resolve(thread.id, { by: thread.resolvedBy ?? author }))
-  }
+  const [error, comment] = await comments.reply(thread.id, { body, author }, { allowResolved: true })
+  if (error) throw commentsFailure(error)
+  return comment
 }
 
 /** A reply with words only, as an agent sends it. */
