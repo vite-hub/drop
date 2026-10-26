@@ -385,13 +385,23 @@ watch(shownVersion, (version) => {
 async function submit(body: string, files: File[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
-  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
-  if (popover.value !== open) return popoverRef.value?.fail()
-  if (!("value" in sent)) return popoverRef.value?.fail(sent.error, body)
-  reviewDraft.body.value = ""
-  reviewDraft.images.clear()
-  popover.value = null
-  send({ type: "clear-selection" })
+  const finish = reviewDraft.beginSend()
+  if (!finish) return
+  const composer = popoverRef.value
+  try {
+    const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
+    if (!("value" in sent)) {
+      if (popoverRef.value === composer) composer?.fail(sent.error)
+      return
+    }
+    const cleared = finish(true)
+    if (popover.value !== open || popoverRef.value !== composer) return
+    if (!cleared) return composer?.fail()
+    popover.value = null
+    send({ type: "clear-selection" })
+  } finally {
+    finish(false)
+  }
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
@@ -413,9 +423,11 @@ async function removeComment(id: string) {
 }
 
 async function reply(id: string, body: string, files: File[] = []) {
+  const composer = popoverRef.value
   const sent = await state.addReply(id, body, files)
-  if ("value" in sent) await popoverRef.value?.sent()
-  else await popoverRef.value?.fail(sent.error, body)
+  if (popoverRef.value !== composer) return
+  if ("value" in sent) await composer?.sent()
+  else await composer?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so

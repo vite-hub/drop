@@ -36,8 +36,7 @@ const pending = ref<{
   page: string
   origin: string
 } | null>(null)
-const { body: note, images } = injectReviewDraft()!
-const sending = ref(false)
+const { body: note, images, sending, beginSend } = injectReviewDraft()!
 
 // In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
@@ -127,7 +126,7 @@ async function up() {
 }
 
 // Images the reviewer adds beside the screenshot: from the button, a paste, or a drop on the form.
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop: dropImages } = images
+const { picks, problem, files, remove, open: pickImages, paste, drop: dropImages } = images
 
 function discard() {
   if (pending.value) URL.revokeObjectURL(pending.value.url)
@@ -159,20 +158,20 @@ async function send() {
   )
   form.append("screenshot", shot.blob, "screenshot")
   for (const file of files.value) form.append("image", file, file.name || "image")
-  sending.value = true
+  const finish = beginSend()
+  if (!finish) return
   try {
     await sendSiteComment(props.drop.id, shot.origin, form)
     notify.done("Comment sent", "It's on the site's page with its screenshot.")
-    note.value = ""
-    clear()
-    discard()
+    finish(true)
+    if (pending.value === shot) discard()
     // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
     // events go nowhere.
     void refreshNuxtData([keys.review(props.drop.id), keys.comments(props.drop.id)])
   } catch (error) {
     notify.fail("Couldn't send the comment", error)
   } finally {
-    sending.value = false
+    finish(false)
   }
 }
 

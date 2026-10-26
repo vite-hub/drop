@@ -1,5 +1,27 @@
 // A new comment keeps its text and images when the reviewer adds or removes an area.
-export const [provideReviewDraft, injectReviewDraft] = createInjectionState(() => ({
-  body: ref(""),
-  images: useImagePicks(),
-}))
+export const [provideReviewDraft, injectReviewDraft] = createInjectionState(() => {
+  const body = ref("")
+  const images = useImagePicks()
+  const sending = ref(false)
+  let revision = 0
+  watch([body, images.picks], () => revision++, { flush: "sync" })
+
+  // Ownership lives with the draft, so replacing a composer cannot start a second send.
+  function beginSend() {
+    if (sending.value) return
+    sending.value = true
+    const sentRevision = revision
+    let finished = false
+    return (accepted: boolean) => {
+      if (finished) return false
+      finished = true
+      sending.value = false
+      if (!accepted || revision !== sentRevision) return false
+      body.value = ""
+      images.clear()
+      return true
+    }
+  }
+
+  return { body, images, sending, beginSend }
+})

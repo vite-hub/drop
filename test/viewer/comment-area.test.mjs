@@ -172,6 +172,38 @@ test("text and attached images survive plain/area composer replacement, then rel
     assert.deepEqual(composer.images.files.value, [image])
     assert.equal((await fetch(preview)).status, 200)
   }
-  app.unmount()
+  const finish = composer.beginSend()
+  mode.value = "area"
+  await nextTick()
+  assert.equal(composer.sending.value, true)
+  assert.equal(composer.beginSend(), undefined)
+  composer.body.value = "New feedback while uploading"
+  const secondImage = new File(["second"], "second.png", { type: "image/png" })
+  composer.images.drop({ dataTransfer: { files: [secondImage] }, preventDefault() {} })
+  const secondPreview = composer.images.picks.value[1].url
+  assert.equal(finish(true), false)
+  assert.equal(composer.body.value, "New feedback while uploading")
+  assert.deepEqual(composer.images.files.value, [image, secondImage])
+  assert.equal((await fetch(secondPreview)).status, 200)
+
+  // Failure retains the draft; a stale completion cannot release a later request.
+  const failed = composer.beginSend()
+  assert.equal(failed(false), false)
+  const accepted = composer.beginSend()
+  finish(true)
+  assert.equal(composer.sending.value, true)
+  assert.equal(accepted(true), true)
+  assert.equal(composer.body.value, "")
+  assert.deepEqual(composer.images.files.value, [])
   await assert.rejects(fetch(preview))
+  await assert.rejects(fetch(secondPreview))
+
+  // Editing back to the submitted text still constitutes a newer draft.
+  composer.body.value = "Original"
+  const edited = composer.beginSend()
+  composer.body.value = "Edited"
+  composer.body.value = "Original"
+  assert.equal(edited(true), false)
+  assert.equal(composer.body.value, "Original")
+  app.unmount()
 })

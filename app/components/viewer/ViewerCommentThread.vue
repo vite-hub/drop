@@ -27,11 +27,13 @@ const emit = defineEmits<{
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
 }>()
-const draft = props.pending ? injectReviewDraft()! : { body: ref(""), images: useImagePicks() }
-const body = draft.body
+const sharedDraft = props.pending ? injectReviewDraft()! : undefined
+const composerDraft = sharedDraft ?? { body: ref(""), images: useImagePicks() }
+const body = composerDraft.body
 if (props.draft && !body.value) body.value = props.draft
-const busy = ref(false)
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = draft.images
+const replying = ref(false)
+const busy = sharedDraft?.sending ?? replying
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = composerDraft.images
 // Why the last send failed, under the box that sent it; editing the text clears it.
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
@@ -50,19 +52,19 @@ function escape(event: KeyboardEvent) {
 
 function send() {
   if (!body.value.trim() || busy.value) return
-  busy.value = true
+  if (props.comment) replying.value = true
   if (props.comment) emit("reply", props.comment.id, body.value, files.value)
   else emit("submit", body.value, files.value)
 }
 defineExpose({
   fail: (reason?: string, text?: string) => {
-    busy.value = false
+    replying.value = false
     if (text && !body.value) body.value = text
     error.value = reason
   },
   /** A reply went through: clear the box for the next one, and show it at the bottom of the thread. */
   sent: async () => {
-    busy.value = false
+    replying.value = false
     body.value = ""
     clear()
     await nextTick()

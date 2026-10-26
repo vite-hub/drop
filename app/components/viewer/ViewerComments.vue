@@ -49,21 +49,23 @@ const repliers = (comment: DropComment) => [
   ...new Map(comment.replies.toReversed().map((reply) => [reply.authorName, reply])).values(),
 ]
 
-const { body: pageBody, images } = injectReviewDraft()!
-const sending = ref(false)
+const { body: pageBody, images, sending, beginSend } = injectReviewDraft()!
 const pageError = ref<string>()
 watch(pageBody, () => (pageError.value = undefined))
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = images
+const { picks, problem, files, remove, open: pickImages, paste, drop } = images
 async function sendPageComment() {
   if (!pageBody.value.trim() || sending.value) return
-  sending.value = true
-  const sent = await props.addPageComment(pageBody.value, files.value)
-  if ("value" in sent) {
-    pageBody.value = ""
-    clear()
-    filter.value = "open"
-  } else pageError.value = sent.error
-  sending.value = false
+  const finish = beginSend()
+  if (!finish) return
+  try {
+    const sent = await props.addPageComment(pageBody.value, files.value)
+    if ("value" in sent) {
+      finish(true)
+      filter.value = "open"
+    } else pageError.value = sent.error
+  } finally {
+    finish(false)
+  }
 }
 </script>
 
