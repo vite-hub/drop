@@ -36,11 +36,6 @@ patchedDependencies:
   # Nitro's memory cache (Node hosts like Quiver) dropped every render with a 30-day TTL at once: a setTimeout over
   # 2^31-1 ms fires after 1 ms. Backport of unjs/unstorage#845 (in 2.0.0-alpha.11; Nitro pins alpha.7).
   unstorage@2.0.0-alpha.7: patches/unstorage@2.0.0-alpha.7.patch
-  # The Nuxt module aliased @vite-hub/database/runtime/state to ViteHub's own re-export of it, which imports that
-  # specifier, so the bundled module imported itself and every request failed with "runWithDatabaseRequest is not a
-  # function". The alias names @vite-hub/database's file instead.
-  vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
-  # Deno's package copier sees mdream's architecture branches even when those native packages are not published.
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
