@@ -43,9 +43,10 @@ test("every component Drop renders is in the Markdown reference agents read", ()
 
 test("every comark-ui package Drop renders has a section in the Markdown references", () => {
   const preset = createRequire(import.meta.url)("comark-ui/package.json")
-  // include reads files, which Drop turns off, reading-time only measures, and Drop draws Mermaid itself, not with pele.
+  // include reads files, which Drop turns off, reading-time only measures, Drop draws Mermaid itself, not with pele, and
+  // the security plugin drops mathml's MathML, so markdown.md lists math under what Drop doesn't render.
   const packages = Object.keys(preset.dependencies).filter(
-    (name) => !["comark-include", "comark-pele", "comark-reading-time"].includes(name),
+    (name) => !["comark-include", "comark-mathml", "comark-pele", "comark-reading-time"].includes(name),
   )
   const missing = packages.filter(
     (name) => !(reference + blocks).includes(`https://comark-ui.onmax.me/${name.replace(/^comark-/, "")}/`),
