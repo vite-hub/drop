@@ -41,10 +41,16 @@ const addressError = ref("")
 watch(address, () => (addressError.value = ""))
 const example = computed(() => props.drop.siteUrl?.replace("*", "pr123") ?? "")
 const framed = ref<string | null>(null)
-const siteFrame = useTemplateRef<{ comment: () => Promise<void>; cancel: () => void; drawing: boolean }>("siteFrame")
+const siteFrame = useTemplateRef<{
+  comment: () => Promise<void>
+  cancel: () => void
+  drawing: boolean
+  pending: boolean
+}>("siteFrame")
 defineExpose({
   canDraw: computed(() => Boolean(framed.value)),
   drawing: computed(() => siteFrame.value?.drawing ?? false),
+  pending: computed(() => siteFrame.value?.pending ?? false),
   comment: () => siteFrame.value?.comment(),
   cancel: () => siteFrame.value?.cancel(),
 })
@@ -56,7 +62,7 @@ function openHere(event: SubmitEvent) {
   addressError.value = pattern.value
     ? `Enter a preview that matches ${props.drop.siteUrl}, like ${example.value}.`
     : `Enter an address on ${props.drop.siteUrl}.`
-  ;(event.target as HTMLFormElement).querySelector("input")?.focus()
+  if (event.currentTarget instanceof HTMLFormElement) event.currentTarget.querySelector("input")?.focus()
 }
 </script>
 
