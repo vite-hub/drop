@@ -82,7 +82,7 @@
     "stripe": "22.6.2",
     "tailwindcss": "4.3.3",
     "valibot": "^1.4.2",
-    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@097d8f3afa41db3f7d802e68b91deaec329388be",
+    "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@cf2778c0b3fb5808286605cb59bb2092d414ff1f",
     "vue": "3.5.44",
     "vue-router": "5.2.0",
     "yjs": "13.6.33"

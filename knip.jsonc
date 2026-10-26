@@ -28,6 +28,8 @@
     // Run by hand against a local Worker with D1 fixtures.
     "test/quotas/*-runtime.mjs",
     "test/auth/console-runtime.mjs",
+    // Launched by ssr-fetch.test.mjs in a Node subprocess.
+    "test/auth/ssr-fetch-runtime.mjs",
     "skills/**/*.js",
   ],
   "project": [

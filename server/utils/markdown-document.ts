@@ -160,7 +160,7 @@ const renameLegacyProps = (markdown: string) =>
     )
   })
 
-/** The parse Drop renders with: every plugin, Drop's own, and the tag allowlist. Tests check docs against it. */
+/** The parse Drop renders with: every plugin, Drop's own, and the tag allowlist. */
 export const parseMarkdown = (markdown: string) => parse(renameLegacyProps(markdown))
 
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
