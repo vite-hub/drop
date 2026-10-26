@@ -782,9 +782,15 @@ watch(
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
+      <!-- Documents and images run under the glass; Markdown and the live editor already have trailing room.
+           Interactive viewers need clearance so their bottom controls stay clickable. -->
       <div
         class="relative flex min-h-0 flex-1 flex-col"
-        :class="(hasComments || editing) && !trashed ? 'pb-28 sm:pb-20' : ''"
+        :class="
+          hasComments && !editing && !trashed && ['board', 'site', 'html', 'app', 'file'].includes(drop.kind)
+            ? 'pb-28 sm:pb-20'
+            : ''
+        "
       >
         <div class="relative flex min-h-0 flex-1 flex-col">
           <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />

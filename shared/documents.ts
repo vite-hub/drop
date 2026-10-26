@@ -23,6 +23,9 @@ body { margin: 0; background: var(--background); color: var(--foreground); trans
   --drop-right: calc(var(--drop-inset, 0px) + var(--drop-outline, 0px));
   --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
   padding-right: var(--drop-shift); }
+/* The app's grain (shared/theme.css) on the doc too, so the frame doesn't read as a flat sheet inside the page. The
+   root carries it where a short doc's body ends. */
+html, body { background-image: var(--surface-grain); background-size: var(--surface-grain-size); }
 main { width: min(100% - 2rem, var(--drop-column, 46rem)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 @media (max-width: 36rem) { main { width: min(100% - 1.25rem, var(--drop-column, 46rem)); } }
 .task-list-item { list-style: none; margin-left: -1.25rem; }
