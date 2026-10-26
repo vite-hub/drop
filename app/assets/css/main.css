@@ -76,6 +76,29 @@
     0 3px 8px oklch(0 0 0 / 12.5%);
 }
 
+/* T3 Code's glass: --ui-bg at 80% over a blur, slightly saturated, so what scrolls under a floating bar stays readable
+   instead of ending at its edge. */
+:root {
+  --glass-blur: 12px;
+  --glass-opacity: 80%;
+  --glass-saturation: 1.14;
+}
+
+.dark {
+  --glass-blur: 16px;
+  --glass-saturation: 1.08;
+}
+
+@utility surface-glass {
+  background-color: color-mix(in srgb, var(--ui-bg) var(--glass-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    background-color: var(--ui-bg);
+  }
+}
+
 /* Mono uppercase section labels, Executor's signature. */
 @utility label-mono {
   font-family: var(--font-mono);

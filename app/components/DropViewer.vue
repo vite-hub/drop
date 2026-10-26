@@ -782,10 +782,9 @@ watch(
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <div
-        class="relative flex min-h-0 flex-1 flex-col"
-        :class="(hasComments || editing) && !trashed ? 'pb-28 sm:pb-20' : ''"
-      >
+      <!-- Every drop runs under the review dock's glass, like T3 Code's chat under its composer; no strip is kept clear
+           for it. A Markdown doc and the live editor end in 6rem of room, more than the dock covers. -->
+      <div class="relative flex min-h-0 flex-1 flex-col">
         <div class="relative flex min-h-0 flex-1 flex-col">
           <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
           <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
