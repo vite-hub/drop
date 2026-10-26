@@ -22,5 +22,6 @@ export default defineConsoleAuthorize(async ({ request, user }) => {
   // Refresh all accounts once per deployment policy, and always repair the current operator.
   await syncConsoleRoles()
   await syncRole(parsed.output.id)
-  return { sections: ["auth"] }
+  // Comments: the toolbar on Drop's own pages, the Console triage list, and the Comments tools of ViteHub MCP.
+  return { sections: ["auth", "comments"] }
 })

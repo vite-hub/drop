@@ -30,7 +30,7 @@ test("the Console denies signed-out, non-admin, unverified and banned users", as
 })
 
 test("DROP_ADMINS grants only Auth, even when the stored role is stale; removal takes effect immediately", async () => {
-  assert.deepEqual(await authorize({ request, user }), { sections: ["auth"] })
+  assert.deepEqual(await authorize({ request, user }), { sections: ["auth", "comments"] })
   state.admins = "someone-else@example.com"
   assert.equal(await authorize({ request, user: { ...user, role: "admin" } }), false)
 })
@@ -95,7 +95,7 @@ test("Console roles and Admins membership follow policy changes for accounts wit
     ('removed', 'Removed', 'removed@example.com', 1, 'admin'),
     ('unverified', 'Unverified', 'unverified@example.com', 0, 'admin')`)
   state.admins = `${user.email}, PROMOTED@example.com unverified@example.com`
-  assert.deepEqual(await authorize({ request, user }), { sections: ["auth"] })
+  assert.deepEqual(await authorize({ request, user }), { sections: ["auth", "comments"] })
   const rows = sql.prepare("SELECT id, role FROM user ORDER BY id").all()
   assert.deepEqual(
     rows.map(({ id, role }) => [id, role]),

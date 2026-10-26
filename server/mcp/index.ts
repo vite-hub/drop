@@ -15,6 +15,7 @@ import readFile from "./tools/read_file"
 import reply from "./tools/reply"
 import updateDrop from "./tools/update_drop"
 import viewBoard from "./tools/view_board"
+import { siteCommentTools } from "./site-comments"
 
 /**
  * Drop's MCP server (nitro-mcp-toolkit on h3-mcp): the 2026-07-28 revision plus the 2025 ones, one file per
@@ -66,6 +67,7 @@ export function mcpFor(origin: string) {
         createCodeImage,
         editBoard,
         viewBoard,
+        ...siteCommentTools,
       ],
       prompts: [addressFeedback],
       resources: skillResources,

@@ -13,6 +13,7 @@ const { default: updateDrop } = await import("../../server/mcp/tools/update_drop
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
 const { default: editBoard } = await import("../../server/mcp/tools/edit_board.ts")
 const { default: viewBoard } = await import("../../server/mcp/tools/view_board.ts")
+const { siteCommentTools } = await import("../../server/mcp/site-comments.ts")
 const { default: commentsGet } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
@@ -31,7 +32,7 @@ const server = createMcpHandler({
   name: "drop-test",
   version: "1",
   origin: false,
-  tools: [publish, readDrop, readFile, reply, listDrops, updateDrop, editBoard, viewBoard],
+  tools: [publish, readDrop, readFile, reply, listDrops, updateDrop, editBoard, viewBoard, ...siteCommentTools],
 })
 async function call(tool, input, protocolVersion = "2025-06-18") {
   const request = new H3Event(
@@ -818,6 +819,7 @@ test("tools/list publishes every tool's input schema", async () => {
       .filter((file) => file.endsWith(".ts"))
       .map(async (file) => (await import(new URL(file, dir).href)).default),
   )
+  tools.push(...siteCommentTools)
   const all = createMcpHandler({ name: "drop-test", version: "1", origin: false, tools })
   const request = new H3Event(
     new Request("https://drop.example/mcp", {
@@ -902,4 +904,17 @@ test("an agent publishes a board, reads its outline, and edits it", async () => 
   ).structuredContent
   assert.equal(next.version, 2)
   assert.equal(next.title, "Onboarding")
+})
+
+test("the comments on Drop's own pages are for admins only", async () => {
+  const [list] = siteCommentTools
+  state.who = who
+  const member = await call(list, {})
+  assert.equal(member.isError, true)
+  assert.match(member.message, /Only Drop admins/)
+  state.who = { ...who, role: "admin" }
+  // The test server installs no Comments Database, so an admin gets past the check and reaches Comments.
+  const admin = await call(list, {})
+  assert.equal(admin.isError, true)
+  assert.match(admin.message, /installs|installed/i)
 })
