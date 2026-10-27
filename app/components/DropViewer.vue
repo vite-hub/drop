@@ -980,7 +980,6 @@ watch(
                   @click="startEdit"
                 />
               </UTooltip>
-              <USeparator v-if="showEditTool" class="mx-1 h-5" orientation="vertical" />
               <UButton
                 data-review-trigger
                 :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
