@@ -26,9 +26,17 @@ test("direct Markdown initializes Mermaid copy under its CSP and keeps copying a
   assert.match(policy, /script-src 'self'/)
   assert.doesNotMatch(policy.match(/script-src[^;]+/)[0], /unsafe-inline|unsafe-eval/)
 
+  // Vitest empties CSS imports, including ?raw. Keep the browser on the document's actual styles.
+  const styles = await Promise.all(
+    ["../../shared/typeset.css", "../../shared/document-shell.css"].map((file) =>
+      readFile(new URL(file, import.meta.url), "utf8"),
+    ),
+  )
+  const body = (await response.text()).replace("</head>", `<style>${styles.join("\n")}</style></head>`)
+
   // Serve the real middleware output and both deferred assets, so Chromium enforces the response CSP and load order.
   const assets = new Map([
-    [path, { headers: Object.fromEntries(response.headers), body: await response.text() }],
+    [path, { headers: Object.fromEntries(response.headers), body }],
     ...(await Promise.all(
       [
         ["/document-zoom.js", "../../public/document-zoom.js"],
@@ -63,14 +71,84 @@ test("direct Markdown initializes Mermaid copy under its CSP and keeps copying a
     assert.equal(await page.locator(".mermaid[data-zoom]").count(), 2)
     assert.deepEqual(await page.evaluate(() => window.cspViolations), [])
 
+    const layout = () =>
+      page.locator(".drop-mermaid").evaluateAll((figures) =>
+        figures.map((figure) => {
+          const box = figure.getBoundingClientRect()
+          return {
+            top: box.top,
+            height: box.height,
+            diagramHeight: figure.querySelector(".mermaid").getBoundingClientRect().height,
+          }
+        }),
+      )
+    const initialLayout = await layout()
+    assert.ok(initialLayout.every(({ height, diagramHeight }) => height === diagramHeight))
+    assert.equal(
+      await page
+        .locator(".drop-mermaid-tools")
+        .first()
+        .evaluate((el) => getComputedStyle(el).opacity),
+      "0",
+    )
+
+    // The diagram and both actions remain in the natural tab order, even while their icons are visually hidden.
+    await page.keyboard.press("Tab")
+    assert.ok(
+      await page
+        .locator(".mermaid[data-zoom]")
+        .first()
+        .evaluate((el) => el === document.activeElement),
+    )
+    assert.equal(
+      await page
+        .locator(".drop-mermaid-tools")
+        .first()
+        .evaluate((el) => getComputedStyle(el).opacity),
+      "1",
+    )
+    await page.keyboard.press("Tab")
+    assert.ok(
+      await page
+        .getByRole("button", { name: "Copy image", exact: true })
+        .first()
+        .evaluate((el) => el === document.activeElement && getComputedStyle(el).outlineStyle !== "none"),
+    )
+    await page.keyboard.press("Tab")
+    await page.keyboard.press("Enter")
+    await page.waitForFunction(() => document.querySelector("[role=status]").textContent === "Markdown copied")
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "```mermaid\n" + source + "```")
+    assert.deepEqual(await layout(), initialLayout, "copy feedback must not move or resize the diagrams")
+
+    await page.locator(".drop-mermaid").last().hover()
     await page.getByRole("button", { name: "Copy Markdown", exact: true }).last().click()
     await page.waitForFunction(() =>
       [...document.querySelectorAll("[role=status]")].some((node) => node.textContent === "Markdown copied"),
     )
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "```mermaid\n" + source + "```")
 
-    await page.getByRole("button", { name: "Copy image", exact: true }).first().click()
+    await page.locator(".drop-mermaid").first().hover()
+    await page.getByRole("button", { name: "Copy image", exact: true }).first().focus()
+    await page.keyboard.press("Enter")
     await page.waitForFunction(() => document.querySelector("[role=status]").textContent === "Image copied")
+    assert.ok(
+      await page
+        .getByRole("button", { name: "Copy image", exact: true })
+        .first()
+        .evaluate((el) => el === document.activeElement),
+      "PNG conversion must preserve keyboard focus",
+    )
+    assert.ok(
+      await page
+        .getByRole("button", { name: "Copy image", exact: true })
+        .first()
+        .evaluate(
+          (el) =>
+            el.hasAttribute("data-copied") &&
+            getComputedStyle(el.querySelector(".drop-mermaid-check")).display !== "none",
+        ),
+    )
+    assert.deepEqual(await layout(), initialLayout)
     const png = await page.evaluate(async () => {
       const [item] = await navigator.clipboard.read()
       const blob = await item.getType("image/png")
@@ -93,6 +171,32 @@ test("direct Markdown initializes Mermaid copy under its CSP and keeps copying a
     assert.ok(png.width <= 4096 && png.height <= 4096)
     assert.ok(png.drawn, "the copied PNG contains the diagram, not just its background")
     assert.ok(png.opaque, "the copied PNG has an opaque background")
+
+    await page.waitForFunction(() => !document.querySelector(".drop-mermaid-tools button").hasAttribute("data-copied"))
+
+    const touch = await browser.newContext({ viewport: { width: 320, height: 700 }, hasTouch: true, isMobile: true })
+    const phone = await touch.newPage()
+    await phone.goto(`http://127.0.0.1:${server.address().port}${path}`)
+    const touchControls = await phone
+      .locator(".drop-mermaid-tools")
+      .first()
+      .evaluate((el) => {
+        const button = el.querySelector("button").getBoundingClientRect()
+        return { opacity: getComputedStyle(el).opacity, width: button.width, height: button.height }
+      })
+    assert.equal(touchControls.opacity, "1", "touch readers can discover actions without hovering")
+    assert.ok(touchControls.width >= 44 && touchControls.height >= 44)
+    assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+
+    // Denied clipboard access keeps a visible, persistent fallback instead of reporting a successful copy.
+    await phone.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true }))
+    await phone.getByRole("button", { name: "Copy image", exact: true }).first().tap()
+    await phone.getByRole("link", { name: "Open PNG", exact: true }).waitFor({ state: "visible" })
+    assert.match(await phone.locator("[role=status]").first().innerText(), /Couldn't copy the image/)
+    await phone.getByRole("button", { name: "Copy Markdown", exact: true }).first().tap()
+    assert.match(await phone.locator("[role=status]").first().innerText(), /Markdown is selected/)
+    assert.equal(await phone.evaluate(() => getSelection().toString()), "```mermaid\n" + source + "```")
+    await touch.close()
 
     await page.locator(".mermaid[data-zoom]").first().click()
     await page.locator(".cz-dialog").waitFor()
