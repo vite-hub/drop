@@ -97,7 +97,7 @@ test("reservation cleanup runs even when subsequent blob cleanup fails", async (
   const warnings = vi.spyOn(log, "warn").mockImplementation(() => {})
   reservation("crashed", cutoff - 1)
   sql
-    .prepare("INSERT INTO quota_blobs (blob_key,owner_id,size,expires_at) VALUES ('expired','owner',10,?)")
+    .prepare("INSERT INTO code_images (blob_key,owner_id,size,expires_at) VALUES ('expired','owner',10,?)")
     .run(now - 1)
   state.failDelete = true
   await assert.rejects(cleanup.handler({ scheduledAt: new Date(now) }), /injected blob delete failure/)
