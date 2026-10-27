@@ -7,9 +7,10 @@ import { CALLOUT_CSS, TYPESET_CSS } from "./typeset"
 
 /**
  * How wide a Markdown doc's text column runs, the reader's choice in the viewer's More menu: a readable line, a wider
- * one for tables, or the whole frame. The doc reads it from --drop-column, which the viewer's "width" message changes.
+ * one for tables, or the widest, which still stops at 80rem like T3 Code's widest page so a big screen keeps margins.
+ * The doc reads it from --drop-column, which the viewer's "width" message changes.
  */
-export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "100vw" } as const
+export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "80rem" } as const
 export type DocWidth = keyof typeof DOC_WIDTHS
 
 const DOCUMENT_EXTRA_CSS =
@@ -22,6 +23,9 @@ body { margin: 0; background: var(--background); color: var(--foreground); trans
   --drop-right: calc(var(--drop-inset, 0px) + var(--drop-outline, 0px));
   --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
   padding-right: var(--drop-shift); }
+/* The app's grain (shared/theme.css) on the doc too, so the frame doesn't read as a flat sheet inside the page. The
+   root carries it where a short doc's body ends. */
+html, body { background-image: var(--surface-grain); background-size: var(--surface-grain-size); }
 main { width: min(100% - 2rem, var(--drop-column, 46rem)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 @media (max-width: 36rem) { main { width: min(100% - 1.25rem, var(--drop-column, 46rem)); } }
 .task-list-item { list-style: none; margin-left: -1.25rem; }

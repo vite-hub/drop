@@ -52,6 +52,14 @@ async function request(path, { cookie = "", method = "GET", body, headers = {} }
   return { status: response.status, headers: response.headers, data, text }
 }
 
+// A browser opening a page. fetch always sends `sec-fetch-mode: cors`, so node:http sends this one.
+const navigate = (path, cookie = "") =>
+  new Promise((resolve, reject) => {
+    get(`${origin}${path}`, { headers: { cookie, "sec-fetch-mode": "navigate" } }, (response) => {
+      response.resume()
+      resolve({ status: response.statusCode, location: response.headers.location })
+    }).on("error", reject)
+  })
 const manage = (cookie, body) => request("/_vitehub/auth/manage", { cookie, method: "POST", body })
 const rpc = (cookie, method) =>
   request("/_vitehub/rpc/__call", { cookie, method: "POST", body: { method: `vitehub:console:${method}`, input: {} } })
@@ -75,7 +83,7 @@ async function signup(name, email) {
   return person
 }
 
-await test("Worker Console authorization, actions, section limits and removed Members routes", async () => {
+await test("Worker Console authorization, admin-only pages, every section for admins, actions and removed Members routes", async () => {
   let succeeded = false
   const admin = await signup("Alex Morgan", "console-admin@example.com")
   const member = await signup("Sam Rivera", "console-member@example.com")
@@ -94,9 +102,13 @@ await test("Worker Console authorization, actions, section limits and removed Me
     assert.ok(signIns.every((event) => event.metadata.method === "email-password"))
     for (const cookie of ["", member.cookie]) {
       const expected = cookie ? 403 : 401
-      // ViteHub serves a static shell; every data request is guarded separately.
+      // Only admins get the Console's pages: a member gets a 404, and a signed-out browser goes to sign in.
+      const page = await navigate("/_vitehub/auth", cookie)
+      assert.equal(page.status, cookie ? 404 : 302)
+      if (!cookie) assert.equal(page.location, "/signin?redirect=%2F_vitehub%2Fauth")
+      // A script or tool fetching the page gets no more than the static shell.
       const shell = await request("/_vitehub/auth", { cookie })
-      assert.equal(shell.status, 200)
+      assert.equal(shell.status, cookie ? 404 : 200)
       assert.doesNotMatch(shell.text, /console-(?:admin|member|other)@example\.com/)
       assert.equal((await manage(cookie, { operation: "users" })).status, expected)
       assert.equal((await rpc(cookie, "sections")).status, expected)
@@ -119,8 +131,13 @@ await test("Worker Console authorization, actions, section limits and removed Me
     assert.equal(description.data.actions.setRole.reason, "Admins come from DROP_ADMINS, set where Drop is deployed.")
     assert.equal(description.data.actions.impersonate.enabled, false)
     assert.ok(description.data.access.some((line) => line.includes("DROP_MEMBERS is off")))
-    assert.equal((await rpc(admin.cookie, "database")).status, 403)
-    assert.equal((await rpc(admin.cookie, "env")).status, 403)
+    // Admins see every section, Blob included.
+    const sections = await rpc(admin.cookie, "sections")
+    assert.equal(sections.status, 200, sections.text)
+    assert.ok(sections.data.value.sections.includes("blob"), sections.text)
+    assert.equal(sections.data.value.scoped, undefined)
+    assert.equal((await rpc(admin.cookie, "database")).status, 200)
+    assert.equal((await rpc(admin.cookie, "env")).status, 200)
     // Other users must also lose stale admin labels and filter membership without signing in again.
     const users = await manage(admin.cookie, { operation: "users" })
     assert.equal(users.status, 200, users.text)

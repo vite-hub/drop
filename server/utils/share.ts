@@ -2,7 +2,7 @@ import { and, inArray, isNotNull, lte, sql } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
-import { type DropMode, isPublic, liveShare, publicUntilFrom, type Share, sharesFor } from "#shared/share"
+import { type DropMode, isPublic, liveShare, publicUntilFrom, type Share, shareBlock } from "#shared/share"
 import type { DropKind } from "#shared/types"
 import { drops } from "../databases/config"
 import type { DropRow } from "./drops/types"
@@ -52,19 +52,15 @@ export function shareFields(
   const policy = sharePolicy(event)
   const { publicLinkDays } = policy
   const mode: DropMode = policy.mode === "team" || drop.team ? "team" : "personal"
-  if (!sharesFor(mode, publicLinkDays, drop).includes(share))
-    throw new HTTPError({ status: 400, statusText: shareRefusal(share, mode) })
+  const blocked = shareBlock(share, mode, publicLinkDays, drop, teamsEnabled(event))
+  if (blocked) throw new HTTPError({ status: 400, statusText: `${blocked}${nextStep(share, mode)}` })
   return { share, publicUntil: isPublic(share) ? publicUntilFrom(publicLinkDays, now) : null }
 }
 
-function shareRefusal(share: Share, mode: DropMode) {
-  if (share === "private") return "A team folder is the team's: it can't be private."
-  if (isPublic(share)) return "Public links are off on this Drop."
-  if (mode !== "team")
-    return teamsEnabled()
-      ? "Only drops in a team's folders share with a team. Keep it private, or share it with a public link."
-      : "This Drop is personal: keep it private, or share it with a public link."
-  return "Only Markdown docs and folders can be edited together; share it with the team instead."
+// What an agent refused a team share can pick instead, after the reason the dialog shows people.
+function nextStep(share: Share, mode: DropMode) {
+  if (share === "team_edit" && mode === "team") return " Share it with the team instead."
+  return share === "team" || share === "team_edit" ? " Keep it private, or share it with a public link." : ""
 }
 
 /**

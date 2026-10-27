@@ -109,7 +109,7 @@ Set `title` when the first heading isn't the doc's title. Add `supersedes`, the 
 
 | Written | Shows as | Write instead |
 | --- | --- | --- |
-| `$x^2$` math | the dollar signs and source | a code span or a `text` block |
+| `$x^2$` math | its TeX source, in monospace | a code span or a `text` block |
 | `:rocket:` | an "Unsupported component" box | the emoji itself, when it carries meaning |
 | `#123` | plain text | `owner/repo#123`, or a full link: `[#123](https://github.com/owner/repo/pull/123)` |
 | `<script>`, `<style>`, `<iframe>`, or a tag GitHub doesn't allow | nothing | Markdown, a [block](blocks.md), or publish `html` |

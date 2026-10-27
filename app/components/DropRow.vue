@@ -48,8 +48,8 @@ async function copyLink(announce?: string) {
     const shareAndCopy = (next: Share) => async () => {
       if (await pick(next)) await copy(link.value, { announce: `${SHARED_TITLES[next]}. Link copied` })
     }
-    const team = choices.value.some((item) => item.value === "team")
-    const canPublic = choices.value.some((item) => item.value === "public")
+    const team = choices.value.some((item) => item.value === "team" && !item.disabled)
+    const canPublic = choices.value.some((item) => item.value === "public" && !item.disabled)
     notify.info({
       title: "Only you can open this",
       description: team
