@@ -123,7 +123,7 @@ export function event(path, method = "GET") {
 }
 export function reset() {
   sql.exec(
-    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comments; DELETE FROM vitehub_comment_threads; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
+    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comments; DELETE FROM vitehub_comment_threads; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM comment_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
   )
   state.bursts.length = 0
   state.failBurst = false

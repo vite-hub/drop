@@ -1,12 +1,13 @@
-import { eq, type SQL, sql } from "drizzle-orm"
+import { and, eq, type SQL, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { HTTPError } from "h3"
 import * as v from "valibot"
 import type { Comment, CommentAuthor, CommentThread } from "vite-hub/comments"
+import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database/drizzle"
 import type { CommentAttachment, CommentReply, DropComment } from "#shared/types"
 import { comments } from "../comments"
-import { drops } from "../databases/config"
+import { commentCleanup, drops } from "../databases/config"
 import { attachmentsUnder, deleteImagesOf, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
 import type { Identity } from "./identity"
@@ -302,16 +303,46 @@ export async function removeReply(reply: Comment) {
 export const undoThread = (thread: CommentThread) => done(comments.remove(thread.id))
 export const undoReply = (reply: Comment) => done(comments.removeComment(reply.id))
 
-/**
- * Deletes the threads on a drop that is going for good, across every version. A site or a doc takes
- * its whole list. A screenshot takes only its own threads, unless its site goes too (`gone`), whose list goes then.
- * Their images are drops under the drop, which go with it.
- */
-export async function removeCommentsOf(row: Commented, gone: Set<string>) {
-  const list = row.parentId && gone.has(row.parentId) ? ownList(row) : await commentList(row)
-  if (!list.shot) {
-    await done(comments.removeScope(list.scope))
+/** Capture the scope while the drop and its parent still exist, to queue with permanent deletion. */
+export async function commentCleanupFor(row: Commented) {
+  const { scope, shot } = await commentList(row)
+  return { scope, shot }
+}
+
+/** Deletes a queued scope, or every thread of one screenshot in its site's shared scope. */
+async function removeQueuedComments(pending: typeof commentCleanup.$inferSelect) {
+  if (!pending.shot) {
+    await done(comments.removeScope(pending.scope))
     return
   }
-  for (const thread of await threadsOf(list)) if (thread.meta.dropId === row.id) await done(comments.remove(thread.id))
+  // The viewer's 500-thread list is not exhaustive. Select only this screenshot's ids from the exported schema,
+  // in bounded batches, and let the primitive remove each thread and its replies.
+  const threads = commentsSchema.vitehubCommentThreads
+  while (true) {
+    const batch = await db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(
+        and(eq(threads.scope, pending.scope), sql`json_extract(${threads.metadata}, '$.dropId') = ${pending.dropId}`),
+      )
+      .limit(50)
+    if (!batch.length) return
+    for (const thread of batch) {
+      const [error] = await comments.remove(thread.id)
+      if (error && error.code !== "COMMENTS_NOT_FOUND") throw commentsFailure(error)
+    }
+  }
+}
+
+/** Retry deletions after requests or processes stop. A failure keeps the work for the next hourly cleanup. */
+export async function drainCommentCleanup() {
+  const pending = await db.select().from(commentCleanup).orderBy(commentCleanup.createdAt).limit(20)
+  for (const item of pending) {
+    try {
+      await removeQueuedComments(item)
+      await db.delete(commentCleanup).where(eq(commentCleanup.dropId, item.dropId))
+    } catch (error) {
+      log.error({ action: "comment-cleanup", drop: item.dropId, error: String(error) })
+    }
+  }
 }

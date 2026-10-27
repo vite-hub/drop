@@ -213,6 +213,14 @@ export const blobCleanup = sqliteTable("blob_cleanup", {
   createdAt: integer("created_at").notNull(),
 })
 
+/** Comment cleanup committed with Drop deletion, without a foreign key to the deleted row. */
+export const commentCleanup = sqliteTable("comment_cleanup", {
+  dropId: text("drop_id").primaryKey(),
+  scope: text("scope").notNull(),
+  shot: integer("shot", { mode: "boolean" }).notNull(),
+  createdAt: integer("created_at").notNull(),
+})
+
 /**
  * Temporary public images. They still belong to an account, follow its ban, and count toward its storage until the
  * hourly cleanup has deleted the blob and then the row.
