@@ -32,16 +32,17 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem)); margin: 0 auto; paddi
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
 .mermaid svg { max-width: 100%; height: auto; }
 .typeset :is(h2, h3) { scroll-margin-top: 1.5rem; }
-/* An image on its way (DEFERRED_IMAGES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
+/* An image on its way (DEFERRED_FILES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
 .typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }
 `
 
 /**
- * Asks the viewer for each image deferImages left waiting (shared/embedded-images.ts) as it comes within a screen and a
- * half of view, and shows it once the viewer sends it as a data URL. Every copy of the image takes it, Comark zoom's too.
+ * Asks the viewer for each image deferImages and each video or audio deferMedia left waiting (shared/embedded-images.ts)
+ * as it comes within a screen and a half of view. An image shows once the viewer sends it as a data URL, every copy of
+ * it, Comark zoom's too; a video or audio gets the file itself and plays it from a blob: URL of the frame's own.
  */
-const DEFERRED_IMAGES_SCRIPT = String.raw`(() => {
-  const waiting = document.querySelectorAll("img[data-drop-image]");
+const DEFERRED_FILES_SCRIPT = String.raw`(() => {
+  const waiting = document.querySelectorAll("img[data-drop-image], [data-drop-media]");
   if (!waiting.length) return;
   const asked = new Set();
   // The document as root: a sandboxed frame is cross-origin, and browsers ignore rootMargin on its implicit root.
@@ -50,18 +51,28 @@ const DEFERRED_IMAGES_SCRIPT = String.raw`(() => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue;
       near.unobserve(entry.target);
-      const path = entry.target.dataset.dropImage;
+      const path = entry.target.dataset.dropImage || entry.target.dataset.dropMedia;
       if (path && !asked.has(path)) { asked.add(path); paths.push(path); }
     }
-    if (paths.length) parent.postMessage({ __drop: true, type: "images", paths }, "*");
+    if (paths.length) parent.postMessage({ __drop: true, type: "files", paths }, "*");
   }, { root: document, rootMargin: "150% 0px" });
-  waiting.forEach((image) => near.observe(image));
+  waiting.forEach((element) => near.observe(element));
   addEventListener("message", (e) => {
     const m = e.data;
-    if (!m || !m.__drop || e.source !== parent || m.type !== "image-data" || !String(m.url).startsWith("data:image/")) return;
+    if (!m || !m.__drop || e.source !== parent || m.type !== "file-data") return;
+    if (m.data instanceof Blob) {
+      let url;
+      for (const media of document.querySelectorAll("[data-drop-media]")) {
+        if (media.dataset.dropMedia !== m.path) continue;
+        media.src = url ||= URL.createObjectURL(m.data);
+        media.removeAttribute("data-drop-media");
+      }
+      return;
+    }
+    if (!String(m.data).startsWith("data:image/")) return;
     for (const image of document.querySelectorAll("img[data-drop-image]")) {
       if (image.dataset.dropImage !== m.path) continue;
-      image.src = m.url;
+      image.src = m.data;
       image.removeAttribute("data-drop-image");
     }
   });
@@ -238,7 +249,7 @@ export function planDocument(
   }
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_IMAGES_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )
