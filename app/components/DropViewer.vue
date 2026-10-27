@@ -135,8 +135,8 @@ const framed = computed(
     !(drop.value.kind === "file" && !drop.value.html),
 )
 watch(framed, (value) => !value && (tool.value = "browse"))
-/** Whether the page can show at a device's size (ViewerDevice): pages, not images or spreadsheets. */
-const sizable = computed(() => framed.value && ["html", "app", "markdown"].includes(drop.value.kind))
+/** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
+const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
