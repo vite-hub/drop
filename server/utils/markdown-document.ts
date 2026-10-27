@@ -27,9 +27,9 @@ import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
  * Mermaid stays Drop's, with its limits.
  */
 const preset = comarkUi({ chips: { download: false }, mermaid: false, zoom: { images: false } })
-// Writes comark-zoom's script once per render (it keeps count in the render's state); it never waits on anything.
+// Writes comark-zoom's script once per render, using the renderer's context to track it.
 const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
-  preset.components["zoom-runtime"]!(["zoom-runtime", {}], state) as string
+  preset.components["zoom-runtime"]!(["zoom-runtime", {}], state)
 
 /**
  * The inline scripts the renderer writes itself, which the /f/ pages' CSP allows by hash: Mermaid's copy buttons and
@@ -37,7 +37,9 @@ const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
  */
 export const RENDERER_SCRIPTS = [
   MERMAID_COPY_SCRIPT,
-  zoomRuntime({ context: {} } as Parameters<NodeHandler>[1]).match(/<script>([\s\S]*)<\/script>/)![1]!,
+  (await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })).match(
+    /<script>([\s\S]*)<\/script>/,
+  )![1]!,
 ]
 
 /**
@@ -213,7 +215,7 @@ function createMermaidRenderer(): NodeHandler {
   let sourceCharacters = 0
   let hasCopyRuntime = false
 
-  return (node, state) => {
+  return async (node, state) => {
     const content = textValue(node[1].content) ?? ""
     const fallback = `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
 
@@ -232,7 +234,7 @@ function createMermaidRenderer(): NodeHandler {
       rendered
         .replace('<div class="mermaid">', '<div class="mermaid" data-zoom tabindex="0">')
         .replace(/^\s*@import url\([^\n]+\);\s*$/gm, "") +
-      `</figure>${runtime}${zoomRuntime(state)}`
+      `</figure>${runtime}${await zoomRuntime(state)}`
     )
   }
 }
