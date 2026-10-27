@@ -3,7 +3,7 @@ import { escapeUTF8 as escapeHtml } from "entities"
 import { contentUnavailable, contentUnavailableIcon } from "../../shared/content-unavailable.ts"
 import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
-import DROP_MARK from "../../public/favicon.svg?raw"
+import DROP_MARK from "../../shared/drop-mark.svg?raw"
 import { readAuthProxyConfig as authProxy } from "../utils/proxy-auth-config.ts"
 
 const theme = `${THEME_CSS.replace(":root.dark {", "@media (prefers-color-scheme: dark) { :root {")}\n}`
