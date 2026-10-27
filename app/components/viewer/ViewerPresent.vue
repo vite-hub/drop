@@ -14,6 +14,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey } = useViewerFrame({
   app,
   pinned: ref([]),
   inset: ref(0),
+  bottom: ref(0),
   width: useDocWidth(),
   annotations,
 })
