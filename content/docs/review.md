@@ -109,7 +109,7 @@ Edits go to a draft until someone presses **Publish**, which makes it the next v
 
 ## Versions {#versions}
 
-An agent publishes the next version with `publish` and `previous` set to any id or link in the chain, or with `supersedes: <id>` in a doc's front matter. It lands on top of the latest, with a note saying what changed. Sharing and lifetime carry over unless the agent changes them. If two publish at once, one gets a conflict, reads the latest, and publishes again.
+An agent publishes the next version with `publish` and `previous` set to the drop's id or link, or a `?v=` link to any of its versions. It lands on top of the latest, with a note saying what changed. Sharing and lifetime carry over unless the agent changes them. If two publish at once, one gets a conflict, reads the latest, and publishes again.
 
 The owner's agents and admins' agents publish versions. People who may edit a Markdown doc publish from the editor.
 

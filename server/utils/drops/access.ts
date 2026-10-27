@@ -88,7 +88,7 @@ export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().
   const expires = expiresAt(row, days)
   return {
     id: row.id,
-    link: row.link ?? row.id,
+    link: row.id,
     slug: row.slug ?? slugify(row.title),
     kind: row.kind,
     title: row.title,
@@ -127,6 +127,6 @@ export const toCrumb = (row: typeof drops.$inferSelect): DropCrumb => ({
   id: row.id,
   kind: row.kind,
   title: row.title,
-  link: row.link ?? row.id,
+  link: row.id,
   slug: row.slug ?? slugify(row.title),
 })

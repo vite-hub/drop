@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a2fb0c29-836b-4e55-b26a-64cdd3f82428",
+  "id": "769d6d27-fe33-4057-aace-7f272a98a878",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "abuse_reports": {
@@ -508,6 +508,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
         "n": {
           "name": "n",
           "type": "integer",
@@ -634,14 +642,6 @@
         }
       },
       "indexes": {
-        "comments_drop_idx": {
-          "name": "comments_drop_idx",
-          "columns": [
-            "drop_id",
-            "n"
-          ],
-          "isUnique": false
-        },
         "comments_drop_n_unique": {
           "name": "comments_drop_n_unique",
           "columns": [
@@ -731,106 +731,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "drop_heads": {
-      "name": "drop_heads",
-      "columns": {
-        "drop_id": {
-          "name": "drop_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "drop_heads_owner_idx": {
-          "name": "drop_heads_owner_idx",
-          "columns": [
-            "owner_id",
-            "updated_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "drop_heads_drop_id_drops_id_fk": {
-          "name": "drop_heads_drop_id_drops_id_fk",
-          "tableFrom": "drop_heads",
-          "tableTo": "drops",
-          "columnsFrom": [
-            "drop_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "drop_resources": {
-      "name": "drop_resources",
-      "columns": {
-        "link": {
-          "name": "link",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "drop_resources_link_url_pk": {
-          "columns": [
-            "link",
-            "url"
-          ],
-          "name": "drop_resources_link_url_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "drop_texts": {
       "name": "drop_texts",
       "columns": {
@@ -869,11 +769,143 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "drop_versions": {
+      "name": "drop_versions",
+      "columns": {
+        "drop_id": {
+          "name": "drop_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "filename": {
+          "name": "filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "blob_key": {
+          "name": "blob_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "size": {
+          "name": "size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor_kind": {
+          "name": "actor_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_name": {
+          "name": "actor_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "agent": {
+          "name": "agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "drop_versions_blob_key_idx": {
+          "name": "drop_versions_blob_key_idx",
+          "columns": [
+            "blob_key"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "drop_versions_drop_id_drops_id_fk": {
+          "name": "drop_versions_drop_id_drops_id_fk",
+          "tableFrom": "drop_versions",
+          "tableTo": "drops",
+          "columnsFrom": [
+            "drop_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "drop_versions_drop_id_version_pk": {
+          "columns": [
+            "drop_id",
+            "version"
+          ],
+          "name": "drop_versions_drop_id_version_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "drop_viewers": {
       "name": "drop_viewers",
       "columns": {
-        "link": {
-          "name": "link",
+        "drop_id": {
+          "name": "drop_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -910,15 +942,29 @@
           "isUnique": false
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "drop_viewers_drop_id_drops_id_fk": {
+          "name": "drop_viewers_drop_id_drops_id_fk",
+          "tableFrom": "drop_viewers",
+          "tableTo": "drops",
+          "columnsFrom": [
+            "drop_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {
-        "drop_viewers_link_day_id_pk": {
+        "drop_viewers_drop_id_day_id_pk": {
           "columns": [
-            "link",
+            "drop_id",
             "day",
             "id"
           ],
-          "name": "drop_viewers_link_day_id_pk"
+          "name": "drop_viewers_drop_id_day_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -927,8 +973,8 @@
     "drop_views": {
       "name": "drop_views",
       "columns": {
-        "link": {
-          "name": "link",
+        "drop_id": {
+          "name": "drop_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -957,15 +1003,29 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "drop_views_drop_id_drops_id_fk": {
+          "name": "drop_views_drop_id_drops_id_fk",
+          "tableFrom": "drop_views",
+          "tableTo": "drops",
+          "columnsFrom": [
+            "drop_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {
-        "drop_views_link_day_viewer_pk": {
+        "drop_views_drop_id_day_viewer_pk": {
           "columns": [
-            "link",
+            "drop_id",
             "day",
             "viewer"
           ],
-          "name": "drop_views_link_day_viewer_pk"
+          "name": "drop_views_drop_id_day_viewer_pk"
         }
       },
       "uniqueConstraints": {},
@@ -1005,7 +1065,21 @@
           "isUnique": false
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "drop_visits_drop_id_drops_id_fk": {
+          "name": "drop_visits_drop_id_drops_id_fk",
+          "tableFrom": "drop_visits",
+          "tableTo": "drops",
+          "columnsFrom": [
+            "drop_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {
         "drop_visits_user_id_drop_id_pk": {
           "columns": [
@@ -1085,20 +1159,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 1
-        },
-        "supersedes_id": {
-          "name": "supersedes_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "link": {
-          "name": "link",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "slug": {
           "name": "slug",
@@ -1249,6 +1309,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "resources": {
+          "name": "resources",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1264,13 +1331,6 @@
           "name": "drops_blob_key_idx",
           "columns": [
             "blob_key"
-          ],
-          "isUnique": true
-        },
-        "drops_supersedes_unique": {
-          "name": "drops_supersedes_unique",
-          "columns": [
-            "supersedes_id"
           ],
           "isUnique": true
         },
@@ -1301,14 +1361,6 @@
           "columns": [
             "share",
             "updated_at"
-          ],
-          "isUnique": false
-        },
-        "drops_link_idx": {
-          "name": "drops_link_idx",
-          "columns": [
-            "link",
-            "version"
           ],
           "isUnique": false
         }

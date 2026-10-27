@@ -320,7 +320,7 @@ export async function createSiteDrop(
     const host = siteHost(siteUrl)
     const title = (input.title?.trim() || host).slice(0, 160)
     const row: DropRow = {
-      id: crypto.randomUUID(),
+      id: newLink(),
       ownerId,
       kind: "site",
       title,
@@ -329,8 +329,6 @@ export async function createSiteDrop(
       contentType: null,
       size: 0,
       version: 1,
-      supersedesId: null,
-      link: newLink(),
       slug: await uniqueSlug(folder?.id ?? null, (input.slug && slugify(input.slug)) || slugify(title)),
       share,
       publicUntil,
@@ -351,6 +349,7 @@ export async function createSiteDrop(
       siteUrl,
       publishToken: null,
       teamId: null,
+      resources: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     return row
@@ -513,7 +512,7 @@ async function insertReviewComment(
  * it. Comments reads at most 500 threads at once, so a site with more lists its 500 most active.
  */
 export async function siteItems(
-  site: Pick<DropRow, "id" | "kind" | "link" | "parentId" | "version">,
+  site: Pick<DropRow, "id" | "kind" | "parentId" | "version">,
   who: Identity | null,
   origin: string,
   page?: string,
@@ -521,7 +520,7 @@ export async function siteItems(
   const [{ threads, attachments }, shots] = await Promise.all([
     threadsFor(site),
     db
-      .select({ id: drops.id, link: drops.link, slug: drops.slug, blobKey: drops.blobKey })
+      .select({ id: drops.id, slug: drops.slug, blobKey: drops.blobKey })
       .from(drops)
       .where(and(eq(drops.parentId, site.id), eq(drops.kind, "image"))),
   ])
@@ -533,12 +532,12 @@ export async function siteItems(
       const { meta } = thread
       const shot = byId.get(meta.dropId)
       return {
-        ...toComment(thread, who, 1, attachments),
+        ...toComment(thread, who, attachments),
         spot: meta.elementX !== null && meta.elementY !== null ? { x: meta.elementX, y: meta.elementY } : null,
         screenshot: shot?.blobKey
           ? {
               id: shot.id,
-              link: shot.link ?? shot.id,
+              link: shot.id,
               slug: shot.slug ?? "screenshot",
               url: new URL(`/f/${shot.blobKey}`, origin).href,
             }

@@ -18,13 +18,13 @@ import type { Identity } from "./identity"
  */
 
 /** A drop as the comment helpers need it. Rows from `findDrop` carry their ancestors, which saves a query for images. */
-type Commented = Pick<DropRow, "id" | "kind" | "link" | "parentId" | "version"> & {
+type Commented = Pick<DropRow, "id" | "kind" | "parentId" | "version"> & {
   ancestors?: Pick<DropRow, "id" | "kind">[]
 }
 
 /**
- * Where a drop's comments are numbered, so "#3" names one comment: a doc's version chain, which shares one link
- * (`drop:<link>`), or a site with the screenshots sent from it (`site:<id>`). `shot` marks a screenshot (any image of a
+ * Where a drop's comments are numbered, so "#3" names one comment: a doc's versions, which share one id
+ * (`drop:<id>`), or a site with the screenshots sent from it (`site:<id>`). `shot` marks a screenshot (any image of a
  * site): its own view shows only its own comments, numbered with the site's. `parents` selects the drops that hold the
  * list's comment images.
  */
@@ -41,14 +41,14 @@ export const siteCommentList = (site: Pick<DropRow, "id">, shot = false): Commen
   parents: sql`${site.id}`,
 })
 
-/** A drop's own list: a site's, or its version chain's. Every version of a doc has its link; a drop from before links has its id. */
+/** A drop's own list: a site's, or a doc's across every version, under its stable id. */
 const ownList = (row: Commented): CommentList =>
   row.kind === "site"
     ? siteCommentList(row)
     : {
-        scope: `drop:${row.link ?? row.id}`,
+        scope: `drop:${row.id}`,
         shot: false,
-        parents: row.link ? sql`SELECT id FROM drops WHERE link = ${row.link}` : sql`${row.id}`,
+        parents: sql`${row.id}`,
       }
 
 async function parentKind(row: Commented & { parentId: string }) {
@@ -66,7 +66,7 @@ async function commentList(row: Commented): Promise<CommentList> {
 }
 
 /** Where a new thread is, for the Comments API: the drop's link. Drop shows its threads only in its own views. */
-const commentPage = (row: Pick<DropRow, "id" | "link">) => `/d/${row.link ?? row.id}`
+const commentPage = (row: Pick<DropRow, "id">) => `/d/${row.id}`
 
 /**
  * What a thread keeps in `metadata`: the drop and version it was written on, and its anchor as Drop's viewers draw it.
@@ -141,13 +141,8 @@ export const toReply = (comment: Comment, who: Identity | null, attachments: Att
   attachments: attachments.get(comment.id) ?? [],
 })
 
-/** A thread as Drop's API answers it (DropComment). `version` is the version it counts as written on. */
-export function toComment(
-  thread: DropThread,
-  who: Identity | null,
-  version: number,
-  attachments: Attachments,
-): DropComment {
+/** A thread as Drop's API answers it (DropComment), with the version it was written on. */
+export function toComment(thread: DropThread, who: Identity | null, attachments: Attachments): DropComment {
   const [first, ...replies] = thread.comments
   const { meta } = thread
   return {
@@ -167,7 +162,7 @@ export function toComment(
     authorImage: thread.createdBy.image ?? null,
     resolved: thread.status === "resolved",
     createdAt: Date.parse(thread.createdAt),
-    version,
+    version: meta.version,
     mine: isMine(thread.createdBy, who),
     replies: replies.map((reply) => toReply(reply, who, attachments)),
     attachments: (first && attachments.get(first.id)) || [],
@@ -202,19 +197,10 @@ export async function threadsFor(row: Commented) {
   const list = await commentList(row)
   const [threads, attachments] = await Promise.all([threadsOf(list), imagesOf(list)])
   const shown = threads.filter((thread) =>
-    list.shot
-      ? thread.meta.dropId === row.id
-      : row.kind === "site" || thread.meta.dropId === row.id || thread.meta.version <= row.version,
+    list.shot ? thread.meta.dropId === row.id : row.kind === "site" || thread.meta.version <= row.version,
   )
   return { threads: shown, attachments }
 }
-
-/**
- * A thread counts as written on the version it names, except on the drop it's on: an app is republished in place, so
- * its comments are all its current version's.
- */
-const versionOf = (thread: DropThread, row: Pick<DropRow, "id" | "version">) =>
-  thread.meta.dropId === row.id ? row.version : thread.meta.version
 
 /**
  * A version's comments and those of every version before it, by number. The viewer decides which of the older ones
@@ -222,9 +208,7 @@ const versionOf = (thread: DropThread, row: Pick<DropRow, "id" | "version">) =>
  */
 export async function listComments(row: Commented, who: Identity | null) {
   const { threads, attachments } = await threadsFor(row)
-  return threads
-    .sort((a, b) => a.number - b.number)
-    .map((thread) => toComment(thread, who, versionOf(thread, row), attachments))
+  return threads.sort((a, b) => a.number - b.number).map((thread) => toComment(thread, who, attachments))
 }
 
 /** Starts a thread on `row`'s list. `page` is where the Comments API files it; it defaults to the drop's link. */
@@ -319,16 +303,15 @@ export const undoThread = (thread: CommentThread) => done(comments.remove(thread
 export const undoReply = (reply: Comment) => done(comments.removeComment(reply.id))
 
 /**
- * Deletes the threads on a drop that is going for good, with every version (`ids`). A site or a version chain takes
+ * Deletes the threads on a drop that is going for good, across every version. A site or a doc takes
  * its whole list. A screenshot takes only its own threads, unless its site goes too (`gone`), whose list goes then.
  * Their images are drops under the drop, which go with it.
  */
-export async function removeCommentsOf(row: Commented, ids: string[], gone: Set<string>) {
+export async function removeCommentsOf(row: Commented, gone: Set<string>) {
   const list = row.parentId && gone.has(row.parentId) ? ownList(row) : await commentList(row)
   if (!list.shot) {
     await done(comments.removeScope(list.scope))
     return
   }
-  const going = new Set(ids)
-  for (const thread of await threadsOf(list)) if (going.has(thread.meta.dropId)) await done(comments.remove(thread.id))
+  for (const thread of await threadsOf(list)) if (thread.meta.dropId === row.id) await done(comments.remove(thread.id))
 }

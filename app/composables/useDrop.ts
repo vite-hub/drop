@@ -16,14 +16,19 @@ function withImages(data: Partial<CommentInput>, files: File[]) {
 }
 
 /**
- * One drop and its comments, with the actions the viewer needs. Keys follow the id, so the cache
- * stays right when the router reuses the page for another drop (the next version, for instance).
+ * One drop and its comments, with the actions the viewer needs: its latest version, or the earlier one `version`
+ * names. Keys follow both, so the cache stays right when the router reuses the page for another drop or version.
  */
-function useDrop(id: MaybeRefOrGetter<string>) {
+function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number | undefined>) {
   const notify = useNotify()
-  const drop = useApi<DropDetail>(() => `/api/drops/${toValue(id)}`, { key: () => keys.drop(toValue(id)) })
+  const query = computed(() => (toValue(version) ? { v: toValue(version) } : {}))
+  const drop = useApi<DropDetail>(() => `/api/drops/${toValue(id)}`, {
+    key: () => keys.drop(toValue(id), toValue(version)),
+    query,
+  })
   const comments = useApi<DropComment[]>(() => `/api/drops/${toValue(id)}/comments`, {
-    key: () => keys.comments(toValue(id)),
+    key: () => keys.comments(toValue(id), toValue(version)),
+    query,
     default: () => [],
   })
 
@@ -36,6 +41,7 @@ function useDrop(id: MaybeRefOrGetter<string>) {
     try {
       const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, {
         method: "POST",
+        query: query.value,
         body: withImages({ ...input, body }, files),
       })
       comments.data.value = [...comments.data.value, comment]
@@ -105,10 +111,10 @@ export const [provideDrop, injectDrop] = createInjectionState(useDrop)
 export function useVersionTo() {
   const route = useRoute()
   const state = injectDrop()!
-  return (version: Pick<DropVersion, "id" | "version">) =>
+  return (version: Pick<DropVersion, "version">) =>
     route.path.startsWith("/d/") && state.drop.data.value
       ? dropPath(state.drop.data.value, version.version)
-      : `/drops/${version.id}`
+      : `/drops/${state.drop.data.value?.id}?v=${version.version}`
 }
 
 /** The drop API refused because the drop's share waits for the operator's review (server/api/drops/[id].get.ts). */

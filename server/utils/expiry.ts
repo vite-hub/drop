@@ -1,4 +1,4 @@
-import { and, sql } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { log } from "evlog"
 import type { H3Event } from "h3"
 import { isbot } from "isbot"
@@ -7,7 +7,6 @@ import { useServerEnv } from "#vitehub/env/server"
 import { DAY_MS, DEFAULT_EXPIRY_DAYS, expiresAt } from "#shared/expiry"
 import { drops } from "../databases/config"
 import type { Identity } from "./identity"
-import { bindQuotaSQL, deletionChainSQL } from "./quota-sql"
 
 export interface ExpiryPolicy {
   /** Days a `review` drop lives after its last visit (`temporary` ones get at most 14). 0 turns expiry off. */
@@ -27,10 +26,6 @@ export function isExpired(row: ExpiryFields, now: number, days: number) {
   const at = expiresAt(row, days)
   return at !== null && at <= now
 }
-
-/** Every row of a drop's version chain, so all versions share one expiry. */
-export const chainOf = (row: { id: string; ownerId: string }) =>
-  bindQuotaSQL(deletionChainSQL, [row.id, row.ownerId, row.ownerId, row.id, row.ownerId, row.ownerId])
 
 /**
  * Whether an anonymous request looks like a person in a browser. Link unfurlers, crawlers, and uptime checks
@@ -78,9 +73,9 @@ export async function recordVisit(
   }
 }
 
-/** Starts a fresh window for every version of the drop. */
-export const renewDrop = (row: { id: string; ownerId: string }, now = Date.now(), when = sql`1`) =>
+/** Starts a fresh window for the drop. */
+export const renewDrop = (row: { id: string }, now = Date.now(), when = sql`1`) =>
   db
     .update(drops)
     .set({ lastAccessedAt: now })
-    .where(and(sql`${drops.id} IN (${chainOf(row)})`, when))
+    .where(and(eq(drops.id, row.id), when))

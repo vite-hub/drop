@@ -11,7 +11,7 @@ import { isHumanVisit } from "./expiry"
 import type { Identity } from "./identity"
 import { isAttachment } from "./nodes"
 
-type Viewed = Pick<DropRow, "id" | "link" | "ownerId" | "parentId" | "ancestors">
+type Viewed = Pick<DropRow, "id" | "ownerId" | "parentId" | "ancestors">
 
 const dayOf = (at: number) => Math.floor(at / DAY_MS)
 
@@ -24,17 +24,16 @@ const dayOf = (at: number) => Math.floor(at / DAY_MS)
 export async function countView(event: H3Event, row: Viewed, who: Identity | null, kind: "beacon" | "document") {
   if (isAttachment(row) || (who?.actorKind === "browser" && who.userId === row.ownerId)) return
   if (!(who && kind === "beacon") && !isHumanVisit(event.req.headers, kind)) return
-  const link = row.link ?? row.id
   const day = dayOf(Date.now())
   const viewer: ViewerKind = !who ? "anonymous" : who.actorKind === "agent" ? "agent" : "person"
   const id = !who
-    ? await visitorId(event, link, day)
+    ? await visitorId(event, row.id, day)
     : who.actorKind === "agent"
       ? `agent:${who.userId}:${who.actorName}`
       : `user:${who.userId}`
   try {
     // A new row counts the view (the drop_viewers_count trigger); a repeat visit the same day writes nothing.
-    await db.insert(dropViewers).values({ link, day, id, viewer }).onConflictDoNothing()
+    await db.insert(dropViewers).values({ dropId: row.id, day, id, viewer }).onConflictDoNothing()
   } catch (error) {
     log.error({ action: "drop-view", error: String(error) })
   }
@@ -42,17 +41,17 @@ export async function countView(event: H3Event, row: Viewed, who: Identity | nul
 
 /**
  * An anonymous visitor for one drop and one day, with no cookie: an HMAC of their address and browser, keyed with the
- * auth secret, the day, and the link. The same person gets another id tomorrow and on another drop, and the cleanup
+ * auth secret, the day, and the drop. The same person gets another id tomorrow and on another drop, and the cleanup
  * deletes the day's ids once it's over.
  */
-async function visitorId(event: H3Event, link: string, day: number) {
+async function visitorId(event: H3Event, dropId: string, day: number) {
   const headers = event.req.headers
   const address = headers.get("cf-connecting-ip") ?? getRequestIP(event, { xForwardedFor: true }) ?? ""
   // Optional: an environment without the auth secret (the tests' one) still tells visitors apart.
   const secret = useServerEnv(event).auth?.secret?.unseal() || "drop-views"
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(`drop-views:${secret}:${day}:${link}`),
+    new TextEncoder().encode(`drop-views:${secret}:${day}:${dropId}`),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
@@ -63,12 +62,12 @@ async function visitorId(event: H3Event, link: string, day: number) {
 }
 
 /** A drop's views since it was published, every version together, by who viewed it. */
-export async function viewsOf(row: Pick<DropRow, "id" | "link">): Promise<Record<ViewerKind, number>> {
+export async function viewsOf(row: Pick<DropRow, "id">): Promise<Record<ViewerKind, number>> {
   const views: Record<ViewerKind, number> = { person: 0, anonymous: 0, agent: 0 }
   for (const count of await db
     .select({ viewer: dropViews.viewer, views: sql`sum(${dropViews.views})`.mapWith(Number) })
     .from(dropViews)
-    .where(eq(dropViews.link, row.link ?? row.id))
+    .where(eq(dropViews.dropId, row.id))
     .groupBy(dropViews.viewer))
     views[count.viewer] = count.views
   return views

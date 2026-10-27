@@ -20,6 +20,7 @@ CREATE INDEX `account_userId_idx` ON `account` (`user_id`);
 CREATE TABLE `comments` (
 	`id` text PRIMARY KEY NOT NULL,
 	`drop_id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
 	`n` integer NOT NULL,
 	`kind` text NOT NULL,
 	`selector` text NOT NULL,
@@ -39,8 +40,6 @@ CREATE TABLE `comments` (
 	`element_y` integer,
 	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
 );
---> statement-breakpoint
-CREATE INDEX `comments_drop_idx` ON `comments` (`drop_id`,`n`);
 --> statement-breakpoint
 CREATE TABLE `drop_files` (
 	`drop_id` text NOT NULL,
@@ -62,7 +61,6 @@ CREATE TABLE `drops` (
 	`content_type` text,
 	`size` integer DEFAULT 0 NOT NULL,
 	`version` integer DEFAULT 1 NOT NULL,
-	`supersedes_id` text,
 	`share` text DEFAULT 'private' NOT NULL,
 	`public_until` integer,
 	`team_folder` integer DEFAULT false NOT NULL,
@@ -80,18 +78,37 @@ CREATE TABLE `drops` (
 	`trashed_at` integer,
 	`trash_reason` text,
 	`parent_id` text,
-	`link` text,
 	`slug` text,
 	`site_url` text,
 	`team_id` text,
-	`agent` text
+	`agent` text,
+	`resources` text
 );
+--> statement-breakpoint
+-- The versions of a doc before its latest, which is its `drops` row (server/utils/drops/write.ts).
+CREATE TABLE `drop_versions` (
+	`drop_id` text NOT NULL,
+	`version` integer NOT NULL,
+	`kind` text NOT NULL,
+	`title` text NOT NULL,
+	`filename` text NOT NULL,
+	`blob_key` text,
+	`content_type` text,
+	`size` integer DEFAULT 0 NOT NULL,
+	`note` text,
+	`actor_kind` text NOT NULL,
+	`actor_name` text NOT NULL,
+	`agent` text,
+	`created_at` integer NOT NULL,
+	PRIMARY KEY(`drop_id`, `version`),
+	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `drop_versions_blob_key_idx` ON `drop_versions` (`blob_key`);
 --> statement-breakpoint
 CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);
 --> statement-breakpoint
 CREATE UNIQUE INDEX `drops_blob_key_idx` ON `drops` (`blob_key`);
---> statement-breakpoint
-CREATE INDEX `drops_link_idx` ON `drops` (`link`,`version`);
 --> statement-breakpoint
 CREATE INDEX `drops_expiry_idx` ON `drops` (`lifetime`,`last_accessed_at`);
 --> statement-breakpoint
@@ -149,8 +166,6 @@ CREATE TABLE `verification` (
 );
 --> statement-breakpoint
 CREATE INDEX `verification_identifier_idx` ON `verification` (`identifier`);
---> statement-breakpoint
-CREATE UNIQUE INDEX `drops_supersedes_unique` ON `drops` (`supersedes_id`);
 --> statement-breakpoint
 CREATE UNIQUE INDEX `comments_drop_n_unique` ON `comments` (`drop_id`,`n`);
 --> statement-breakpoint
@@ -417,33 +432,6 @@ CREATE INDEX `code_images_owner_idx` ON `code_images` (`owner_id`);
 --> statement-breakpoint
 CREATE INDEX `code_images_expires_idx` ON `code_images` (`expires_at`);
 --> statement-breakpoint
-CREATE TABLE `drop_heads` (
-  `drop_id` text PRIMARY KEY NOT NULL REFERENCES `drops` (`id`) ON DELETE CASCADE,
-  `owner_id` text NOT NULL,
-  `updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `drop_heads_owner_idx` ON `drop_heads` (`owner_id`, `updated_at`);
---> statement-breakpoint
-CREATE TRIGGER `drop_heads_insert` AFTER INSERT ON `drops` BEGIN
-  INSERT INTO `drop_heads` (`drop_id`, `owner_id`, `updated_at`)
-  SELECT NEW.id, NEW.owner_id, NEW.updated_at
-  WHERE NOT EXISTS (SELECT 1 FROM drops n WHERE n.supersedes_id = NEW.id AND n.owner_id = NEW.owner_id);
-  DELETE FROM `drop_heads` WHERE `drop_id` = NEW.supersedes_id AND `owner_id` = NEW.owner_id;
-END;
---> statement-breakpoint
-CREATE TRIGGER `drop_heads_update` AFTER UPDATE OF `updated_at` ON `drops` BEGIN
-  UPDATE `drop_heads` SET `updated_at` = NEW.updated_at WHERE `drop_id` = NEW.id;
-END;
---> statement-breakpoint
-CREATE TRIGGER `drop_heads_delete` AFTER DELETE ON `drops` BEGIN
-  DELETE FROM `drop_heads` WHERE `drop_id` = OLD.id;
-  INSERT OR IGNORE INTO `drop_heads` (`drop_id`, `owner_id`, `updated_at`)
-  SELECT d.id, d.owner_id, d.updated_at FROM drops d
-  WHERE d.id = OLD.supersedes_id AND d.owner_id = OLD.owner_id
-    AND NOT EXISTS (SELECT 1 FROM drops n WHERE n.supersedes_id = d.id AND n.owner_id = d.owner_id);
-END;
---> statement-breakpoint
 CREATE TABLE `quota_reservations` (
   `id` text PRIMARY KEY NOT NULL,
   `owner_id` text NOT NULL,
@@ -491,24 +479,12 @@ CREATE TABLE `drop_visits` (
 	`user_id` text NOT NULL,
 	`drop_id` text NOT NULL,
 	`at` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `drop_id`)
+	PRIMARY KEY(`user_id`, `drop_id`),
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `drop_visits_drop_idx` ON `drop_visits` (`drop_id`);--> statement-breakpoint
--- "Shared with me" follows a drop to its newest version and forgets it with the last one.
-CREATE TRIGGER `drop_visits_new_version` AFTER INSERT ON `drops` WHEN NEW.supersedes_id IS NOT NULL BEGIN
-  UPDATE OR REPLACE `drop_visits` SET `drop_id` = NEW.id WHERE `drop_id` = NEW.supersedes_id;
-END;
---> statement-breakpoint
-CREATE TRIGGER `drop_visits_drop_delete` AFTER DELETE ON `drops` BEGIN
-  UPDATE OR REPLACE `drop_visits` SET `drop_id` = OLD.supersedes_id
-  WHERE `drop_id` = OLD.id AND EXISTS (SELECT 1 FROM drops d WHERE d.id = OLD.supersedes_id);
-  DELETE FROM `drop_visits` WHERE `drop_id` = OLD.id;
-END;
---> statement-breakpoint
-CREATE TRIGGER `drop_visits_user_delete` AFTER DELETE ON `user` BEGIN
-  DELETE FROM `drop_visits` WHERE `user_id` = OLD.id;
-END;
+CREATE INDEX `drop_visits_drop_idx` ON `drop_visits` (`drop_id`);
 --> statement-breakpoint
 -- Search reads a text doc's words from here, latest versions only (server/utils/search.ts).
 CREATE TABLE `drop_texts` (
@@ -545,44 +521,26 @@ CREATE INDEX `comment_attachments_comment_idx` ON `comment_attachments` (`commen
 --> statement-breakpoint
 -- A drop's views for its Details (server/utils/views.ts): a new viewer of the day counts one view.
 CREATE TABLE `drop_views` (
-	`link` text NOT NULL,
+	`drop_id` text NOT NULL,
 	`day` integer NOT NULL,
 	`viewer` text NOT NULL,
 	`views` integer NOT NULL,
-	PRIMARY KEY(`link`, `day`, `viewer`)
+	PRIMARY KEY(`drop_id`, `day`, `viewer`),
+	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE TABLE `drop_viewers` (
-	`link` text NOT NULL,
+	`drop_id` text NOT NULL,
 	`day` integer NOT NULL,
 	`id` text NOT NULL,
 	`viewer` text NOT NULL,
-	PRIMARY KEY(`link`, `day`, `id`)
+	PRIMARY KEY(`drop_id`, `day`, `id`),
+	FOREIGN KEY (`drop_id`) REFERENCES `drops`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `drop_viewers_day_idx` ON `drop_viewers` (`day`);--> statement-breakpoint
+CREATE INDEX `drop_viewers_day_idx` ON `drop_viewers` (`day`);
+--> statement-breakpoint
 CREATE TRIGGER `drop_viewers_count` AFTER INSERT ON `drop_viewers` BEGIN
-  INSERT OR IGNORE INTO `drop_views` (`link`, `day`, `viewer`, `views`) VALUES (NEW.link, NEW.day, NEW.viewer, 0);
-  UPDATE `drop_views` SET `views` = `views` + 1 WHERE `link` = NEW.link AND `day` = NEW.day AND `viewer` = NEW.viewer;
-END;
---> statement-breakpoint
--- The count goes with the doc's last version. A drop from before links were per doc is keyed on its id.
-CREATE TRIGGER `drop_views_drop_delete` AFTER DELETE ON `drops`
-WHEN NOT EXISTS (SELECT 1 FROM drops d WHERE d.link = OLD.link) BEGIN
-  DELETE FROM `drop_views` WHERE `link` = coalesce(OLD.link, OLD.id);
-  DELETE FROM `drop_viewers` WHERE `link` = coalesce(OLD.link, OLD.id);
-END;
---> statement-breakpoint
--- The links a drop points to (server/utils/resources.ts), per doc: they go with its last version.
-CREATE TABLE `drop_resources` (
-	`link` text NOT NULL,
-	`url` text NOT NULL,
-	`title` text,
-	`position` integer NOT NULL,
-	PRIMARY KEY(`link`, `url`)
-);
---> statement-breakpoint
-CREATE TRIGGER `drop_resources_drop_delete` AFTER DELETE ON `drops`
-WHEN NOT EXISTS (SELECT 1 FROM drops d WHERE d.link = OLD.link) BEGIN
-  DELETE FROM `drop_resources` WHERE `link` = coalesce(OLD.link, OLD.id);
+  INSERT OR IGNORE INTO `drop_views` (`drop_id`, `day`, `viewer`, `views`) VALUES (NEW.drop_id, NEW.day, NEW.viewer, 0);
+  UPDATE `drop_views` SET `views` = `views` + 1 WHERE `drop_id` = NEW.drop_id AND `day` = NEW.day AND `viewer` = NEW.viewer;
 END;

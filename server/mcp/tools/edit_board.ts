@@ -3,7 +3,7 @@ import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { boardOutline } from "#shared/board"
-import { findDropByRef, permissions, versionsOf } from "../../utils/drops"
+import { findDropByRef, permissions } from "../../utils/drops"
 import { writeBoard } from "../../utils/boards"
 import { requireIdentity } from "../../utils/identity"
 import { BoardEdgeInput, BoardItemInput } from "../board"
@@ -39,7 +39,7 @@ export default defineMcpTool({
     const drop = await findDropByRef(id, event)
     if (!drop || drop.kind !== "board" || !permissions(drop, who).edit)
       throw new HTTPError({ status: 404, message: `No board with id ${id} you can edit.` })
-    if ((await versionsOf(drop))[0]?.id !== drop.id || drop.expired)
+    if (drop.head || drop.expired)
       throw new HTTPError({ status: 409, message: "That's an older version of the board; edit the latest one." })
     const { board, changed } = await writeBoard(drop, { edit, who })
     return {

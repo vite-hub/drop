@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { beforeEach, test } from "vite-plus/test"
-import { sql, queries, state, migrate, reset, insertDrop, event, who } from "./harness.mjs"
+import { sql, queries, state, migrate, reset, insertDrop, insertVersion, event, who } from "./harness.mjs"
 
 // Each D1 query is a round trip from the Worker, ~55 ms in production. Queries that start together share one: here
 // every query waits for the current wave, which ends once nothing else can join it, so `waves` counts the round trips
@@ -50,11 +50,11 @@ const IMAGE = "00000000-0000-4000-8000-000000000002.png"
 /** A public doc in a folder, at its second version, with an image it embeds and a comment thread on it. */
 function publicDoc() {
   insertDrop("folder", { kind: "folder", blob_key: null, share: "public" })
-  insertDrop("v1", { link: LINK, parent_id: "folder", share: "public" })
-  insertDrop("v2", { link: LINK, version: 2, supersedes_id: "v1", parent_id: "folder", share: "public" })
-  insertDrop("image", { kind: "image", blob_key: IMAGE, parent_id: "v2", share: "public" })
+  insertDrop(LINK, { title: "Doc", version: 2, parent_id: "folder", share: "public" })
+  insertVersion(LINK, 1)
+  insertDrop("image", { kind: "image", blob_key: IMAGE, parent_id: LINK, share: "public" })
   // A ViteHub Comments thread on the doc's list (server/utils/comments.ts), with a guest's reply.
-  const metadata = { dropId: "v2", version: 2, kind: "text", selector: "p", ox: 0, oy: 0, ow: 0, oh: 0 }
+  const metadata = { dropId: LINK, version: 2, kind: "text", selector: "p", ox: 0, oy: 0, ow: 0, oh: 0 }
   const owner = JSON.stringify({ id: "owner", name: "Owner" })
   sql
     .prepare(
@@ -89,8 +89,8 @@ test("a shared doc's page and the APIs it calls wait for few round trips, one af
   publicDoc()
   const counts = {
     link: await roundTrips(() => get(linkHandler, LINK)),
-    detail: await roundTrips(() => get(detailHandler, "v2")),
-    comments: await roundTrips(() => get(commentsHandler, "v2")),
+    detail: await roundTrips(() => get(detailHandler, LINK)),
+    comments: await roundTrips(() => get(commentsHandler, LINK)),
     image: await roundTrips(() => requireBlobAccess(event(`/f/${IMAGE}`), IMAGE)),
   }
   // The page reads the link, then the doc and its comments side by side (pages/d/[id]/[[slug]].vue). Comments reads a
@@ -99,38 +99,36 @@ test("a shared doc's page and the APIs it calls wait for few round trips, one af
   assert.deepEqual({ ...counts, page }, { link: 1, detail: 2, comments: 3, image: 1, page: 4 })
 })
 
-test("a link's key finds the latest version and the folders above it in one indexed query", async () => {
+test("a link's key finds the drop and the folders above it in one indexed query", async () => {
   publicDoc()
-  for (let i = 0; i < 2000; i++) insertDrop(`other${i}`, { link: `other${i}` })
+  for (let i = 0; i < 2000; i++) insertDrop(`other${i}`)
   const { findDrop } = await import("../../server/utils/drops.ts")
-  for (const [key, id] of [
-    [LINK, "v2"],
-    ["v1", "v1"],
-  ]) {
-    queries.length = 0
-    const found = await findDrop(key)
-    assert.equal(found.id, id)
-    assert.deepEqual(
-      found.ancestors.map((node) => node.id),
-      ["folder"],
-    )
-    assert.equal(queries.length, 1)
-    const plan = sql
-      .prepare(`EXPLAIN QUERY PLAN ${queries[0].query}`)
-      .all(...queries[0].params)
-      .map((row) => row.detail)
-      .join("\n")
-    assert.doesNotMatch(plan, /SCAN (drops|"drops")\b(?! USING)/, plan)
-  }
+  queries.length = 0
+  const found = await findDrop(LINK)
+  assert.equal(found.id, LINK)
+  assert.deepEqual(
+    found.ancestors.map((node) => node.id),
+    ["folder"],
+  )
+  assert.equal(queries.length, 1)
+  const plan = sql
+    .prepare(`EXPLAIN QUERY PLAN ${queries[0].query}`)
+    .all(...queries[0].params)
+    .map((row) => row.detail)
+    .join("\n")
+  assert.doesNotMatch(plan, /SCAN (drops|"drops")\b(?! USING)/, plan)
 })
 
-test("the link answers for the doc it found, every version, and old version ids", async () => {
+test("the link answers for the drop, its latest version, and the version `?v=` pins", async () => {
   publicDoc()
-  assert.deepEqual(await get(linkHandler, LINK), { id: "v2", link: LINK, slug: "v2", version: 2, latest: 2 })
-  assert.deepEqual(await get(linkHandler, "v1"), { id: "v2", link: LINK, slug: "v2", version: 2, latest: 2, from: 1 })
-  const pinned = event(`/api/x/${LINK}?v=1`)
-  pinned.context.params = { id: LINK }
-  assert.deepEqual(await linkHandler(pinned), { id: "v1", link: LINK, slug: "v2", version: 1, latest: 2 })
+  assert.deepEqual(await get(linkHandler, LINK), { id: LINK, link: LINK, slug: "doc", version: 2, latest: 2 })
+  const pinned = (v) => {
+    const request = event(`/api/x/${LINK}?v=${v}`)
+    request.context.params = { id: LINK }
+    return linkHandler(request)
+  }
+  assert.deepEqual(await pinned(1), { id: LINK, link: LINK, slug: "doc", version: 1, latest: 2 })
+  await assert.rejects(pinned(3), (error) => error.status === 404)
 })
 
 test("a signed-in admin's page bootstrap reads independent sidebar data in one round trip", async () => {

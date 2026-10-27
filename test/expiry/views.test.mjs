@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event } from "h3"
-import { sql, state, migrate, reset, insertDrop, who } from "../cost/harness.mjs"
+import { sql, state, migrate, reset, insertDrop, insertVersion, who } from "../cost/harness.mjs"
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
 const { default: visitHandler } = await import("../../server/api/drops/[id]/visit.post.ts")
@@ -35,9 +35,9 @@ function request(path, { method = "GET", headers = {}, id } = {}) {
   if (id) event.context.params = { id }
   return event
 }
-const open = (id, as) => {
+const open = (id, as, version) => {
   state.who = as
-  return detailHandler(request(`/api/drops/${id}`, { id }))
+  return detailHandler(request(`/api/drops/${id}${version ? `?v=${version}` : ""}`, { id }))
 }
 const visit = (id, headers) => {
   state.who = null
@@ -47,31 +47,35 @@ const viewsOf = async (id) => (await open(id, who)).views
 
 test("each viewer counts once a day, across every version; the owner's own visits don't", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
-  insertDrop("v1", { visibility: "shared", link: "doc" })
-  insertDrop("v2", { visibility: "shared", link: "doc", supersedes_id: "v1", version: 2 })
+  insertDrop("doc", { visibility: "shared", version: 2 })
+  insertVersion("doc", 1)
 
-  await open("v2", who)
-  await open("v1", reader)
-  await open("v2", reader)
-  await open("v2", agent)
-  await open("v2", { ...agent, actorName: "Codex" })
-  await visit("v2", { ...beacon, "x-forwarded-for": "198.51.100.7" })
-  await visit("v2", { ...beacon, "x-forwarded-for": "198.51.100.7" })
-  await visit("v2", { ...beacon, "x-forwarded-for": "203.0.113.9" })
-  await visit("v2", { "user-agent": "Slackbot-LinkExpanding 1.0", "x-forwarded-for": "192.0.2.1" })
-  assert.deepEqual(await viewsOf("v2"), { person: 1, anonymous: 2, agent: 2 })
-  assert.deepEqual(await viewsOf("v1"), { person: 1, anonymous: 2, agent: 2 }, "old versions show the doc's views")
-  assert.equal((await open("v2", reader)).views, undefined, "only the owner and admins see them")
+  await open("doc", who)
+  await open("doc", reader, 1)
+  await open("doc", reader)
+  await open("doc", agent)
+  await open("doc", { ...agent, actorName: "Codex" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "198.51.100.7" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "198.51.100.7" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "203.0.113.9" })
+  await visit("doc", { "user-agent": "Slackbot-LinkExpanding 1.0", "x-forwarded-for": "192.0.2.1" })
+  assert.deepEqual(await viewsOf("doc"), { person: 1, anonymous: 2, agent: 2 })
+  assert.deepEqual(
+    (await open("doc", who, 1)).views,
+    { person: 1, anonymous: 2, agent: 2 },
+    "old versions show the doc's views",
+  )
+  assert.equal((await open("doc", reader)).views, undefined, "only the owner and admins see them")
 
   vi.advanceTimersByTime(DAY_MS)
-  await open("v2", reader)
-  await visit("v2", { ...beacon, "x-forwarded-for": "198.51.100.7" })
-  assert.deepEqual(await viewsOf("v2"), { person: 2, anonymous: 3, agent: 2 }, "the next day counts again")
+  await open("doc", reader)
+  await visit("doc", { ...beacon, "x-forwarded-for": "198.51.100.7" })
+  assert.deepEqual(await viewsOf("doc"), { person: 2, anonymous: 3, agent: 2 }, "the next day counts again")
 })
 
 test("anonymous visitors' ids last the day; the counts stay until the doc is deleted", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
-  insertDrop("doc", { visibility: "shared", link: "doc" })
+  insertDrop("doc", { visibility: "shared" })
   await visit("doc", { ...beacon, "x-forwarded-for": "198.51.100.7" })
   const [viewer] = sql.prepare("SELECT id FROM drop_viewers").all()
   assert.match(viewer.id, /^anon:[0-9a-f]{32}$/, "a hash, never the address")
@@ -87,14 +91,14 @@ test("anonymous visitors' ids last the day; the counts stay until the doc is del
 
 test("a raw file counts when opened, not when embedded; a doc's own images never count", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
-  insertDrop("photo", { visibility: "shared", link: "photo", kind: "image", blob_key: "photo.png" })
-  insertDrop("doc", { visibility: "shared", link: "doc" })
-  insertDrop("shot", { visibility: "shared", link: "shot", kind: "image", blob_key: "shot.png", parent_id: "doc" })
+  insertDrop("photo", { visibility: "shared", kind: "image", blob_key: "photo.png" })
+  insertDrop("doc", { visibility: "shared" })
+  insertDrop("shot", { visibility: "shared", kind: "image", blob_key: "shot.png", parent_id: "doc" })
   const embedded = { "user-agent": CHROME, "sec-fetch-dest": "image", "sec-fetch-mode": "no-cors" }
   await requireBlobAccess(request("/f/photo.png", { headers: embedded }), "photo.png")
   assert.deepEqual(await viewsOf("photo"), { person: 0, anonymous: 0, agent: 0 })
   await requireBlobAccess(request("/f/photo.png", { headers: navigation }), "photo.png")
   await requireBlobAccess(request("/f/shot.png", { headers: navigation }), "shot.png")
   assert.deepEqual(await viewsOf("photo"), { person: 0, anonymous: 1, agent: 0 })
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_views WHERE link = 'shot'").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_views WHERE drop_id = 'shot'").get().n, 0)
 })

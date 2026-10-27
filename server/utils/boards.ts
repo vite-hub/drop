@@ -66,7 +66,7 @@ export async function writeBoard(
   const now = Date.now()
   await db.batch([
     db.update(drops).set({ size: bytes.byteLength, updatedAt: now }).where(eq(drops.id, drop.id)),
-    ...textStatements(drop, text, drop.id),
+    ...textStatements(drop, text),
   ])
   return { board, changed, updatedAt: now }
 }
@@ -76,7 +76,7 @@ export async function writeBoard(
 
 // Frame ids come from the board's elements, which may name any string: one that would leave the board's folder once the
 // blob store decodes it gets no image.
-const imageKey = (drop: DropRow, name: string) => (escapesFolder(name) ? null : `boards/${drop.link}/${name}.png`)
+const imageKey = (drop: DropRow, name: string) => (escapesFolder(name) ? null : `boards/${drop.id}/${name}.png`)
 export const OVERVIEW = "overview"
 
 export async function storeBoardImages(drop: DropRow, images: { frame: string; png: string }[]) {

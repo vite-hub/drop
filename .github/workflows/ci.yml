@@ -37,5 +37,6 @@ jobs:
       - run: pnpm typecheck
       # `run`: pnpm 11's own `pnpm doctor` checks the pnpm install, not the project.
       - run: pnpm run doctor
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
       - run: pnpm build
