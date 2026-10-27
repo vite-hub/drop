@@ -45,7 +45,7 @@ Operators set `DROP_QUOTAS=true` to turn quotas on and `DROP_DEFAULT_PLAN` to `f
 
 ## Roles {#roles}
 
-Everyone who signs in joins as a Member. The people whose verified emails the operator lists in `DROP_ADMINS` are Admins, whichever way they sign in. Admins open **Console**, the only admin sidebar link, to manage accounts and sessions in the [Auth Console](/_vitehub/auth). Roles come from `DROP_ADMINS` and cannot be changed in the Console. **Review shares** and **Reports** are available through Search.
+Everyone who signs in joins as a Member. The people whose verified emails the operator lists in `DROP_ADMINS` are Admins, whichever way they sign in. Admins open **Console**, the only admin sidebar link, to manage accounts and sessions in the [Auth Console](/_vitehub/auth) and to look through what this Drop runs on: the files in Blob, the keys in KV, the database's tables, Env, Schedules, and Rate Limits. Only Admins can open the Console; for everyone else its address doesn't exist. Roles come from `DROP_ADMINS` and cannot be changed in the Console. **Review shares** and **Reports** are available through Search.
 
 ::roles-table
 ::

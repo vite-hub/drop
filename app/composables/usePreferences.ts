@@ -25,7 +25,7 @@ export const useFolderPreviewWidth = () =>
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
-/** Device mode for HTML docs, apps, Markdown docs, and reviewed sites (ViewerDevice), for every drop. */
+/** Device mode for HTML docs, apps, and reviewed sites (ViewerDevice), for every drop. */
 export const useDeviceSize = () =>
   useCookie<DeviceSize>("drop-device-mode", {
     default: () => ({ on: false, id: "iphone", width: 393, height: 852, zoom: null }),

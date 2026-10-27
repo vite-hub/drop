@@ -13,7 +13,7 @@ const Operator = v.object({
   banned: v.optional(v.nullable(v.boolean())),
 })
 
-/** Console data and operations need a current, verified Drop admin using a browser session. */
+/** Console data and operations need a current, verified Drop admin using a browser session, who sees every section. */
 export default defineConsoleAuthorize(async ({ request, user }) => {
   if (contentHost(new H3Event(request)) || request.headers.has("authorization")) return false
   const parsed = v.safeParse(Operator, user)
@@ -22,6 +22,6 @@ export default defineConsoleAuthorize(async ({ request, user }) => {
   // Refresh all accounts once per deployment policy, and always repair the current operator.
   await syncConsoleRoles()
   await syncRole(parsed.output.id)
-  // Comments: the toolbar on Drop's own pages, the Console triage list, and the Comments tools of ViteHub MCP.
-  return { sections: ["auth", "comments"] }
+  // Grant all sections, including Comments for the page toolbar, Console triage, and ViteHub MCP tools.
+  return true
 })

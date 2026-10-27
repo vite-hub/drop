@@ -7,9 +7,9 @@ description: People comment on a running website, such as a preview deploy, stag
 
 A **site review** is a drop for one website. Create one with **New › Site review** on the Drops page or in a folder, or have an agent call `publish` with `site`. Give it the address people review:
 
-| Address | Covers |
-| --- | --- |
-| One origin, like `https://pr123-acme.preview.example.com` | That scheme, host, and port. |
+| Address                                                                     | Covers                                                                                                                  |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| One origin, like `https://pr123-acme.preview.example.com`                   | That scheme, host, and port.                                                                                            |
 | A pattern with `*` as the first label, like `https://*.preview.example.com` | Every host one level under it, so one review covers every pull request's preview. Not deeper levels or the bare domain. |
 
 Addresses must be `https`, or `http` on `localhost`, `127.0.0.1`, or `*.localhost`. Each comment keeps the address it came from, so you can tell pull requests apart.
@@ -21,7 +21,7 @@ publish({
   slug: "acme-previews",
   share: "team",
   note: "Review the pull request previews",
-  lifetime: "review"
+  lifetime: "review",
 })
 ```
 
@@ -29,17 +29,17 @@ publish({
 
 Reviewers comment in one of three ways:
 
-| Way | Use it when | Setup |
-| --- | --- | --- |
-| [Inside Drop](#here) | The site can be shown in a frame. | None. |
-| [Script tag](#install) | You build the site's previews. | One tag in preview builds. |
+| Way                         | Use it when                                       | Setup                          |
+| --------------------------- | ------------------------------------------------- | ------------------------------ |
+| [Inside Drop](#here)        | The site can be shown in a frame.                 | None.                          |
+| [Script tag](#install)      | You build the site's previews.                    | One tag in preview builds.     |
 | [Bookmarklet](#bookmarklet) | You can't change the site and it can't be framed. | Each reviewer adds a bookmark. |
 
 ## Review it in Drop {#here}
 
-On the site review's page, type a page address and press **Open here**. Then press **Comment** in the toolbar under the page, or <kbd>R</kbd>, and drag a box over what you mean. Nothing changes on the site.
+On the site review's page, type a page address and press **Review here**. Open **Comments** in the bottom bar and write your feedback. To include an area, drag a box over the page while Comments is open. <kbd>R</kbd> also opens commenting. A plain comment needs no area or screenshot. Nothing changes on the site.
 
-Drop takes the screenshot with your browser's screen sharing, which asks once per visit. Chrome, Edge, and Brave share **This tab**, so the screenshot matches the page. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off. You see the screenshot before you send it.
+When you mark an area, Drop takes its screenshot with your browser's screen sharing, which asks once per visit. Opening Comments alone does not ask for screen sharing. Chrome, Edge, and Brave share **This tab**, so the screenshot matches the page. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off. You see the screenshot before you send it.
 
 These comments carry the screenshot, your box, your note, and the address in the row above the page, but not the element under the box. Clicks inside the page don't change that address, so type the page you're on. A site that refuses to be framed stays blank; use the bookmarklet there.
 
@@ -57,9 +57,7 @@ For a Nuxt app, behind a flag your preview builds set:
 export default defineNuxtConfig({
   app: {
     head: {
-      script: process.env.PREVIEW
-        ? [{ src: "$ORIGIN/review.js", defer: true }]
-        : [],
+      script: process.env.PREVIEW ? [{ src: "$ORIGIN/review.js", defer: true }] : [],
     },
   },
 })

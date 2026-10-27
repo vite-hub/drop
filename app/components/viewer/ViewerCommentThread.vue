@@ -27,9 +27,13 @@ const emit = defineEmits<{
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
 }>()
-const body = ref(props.draft ?? "")
-const busy = ref(false)
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
+const sharedDraft = props.pending ? injectReviewDraft()! : undefined
+const composerDraft = sharedDraft ?? { body: ref(""), images: useImagePicks() }
+const body = composerDraft.body
+if (props.draft && !body.value) body.value = props.draft
+const replying = ref(false)
+const busy = sharedDraft?.sending ?? replying
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = composerDraft.images
 // Why the last send failed, under the box that sent it; editing the text clears it.
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
@@ -48,19 +52,19 @@ function escape(event: KeyboardEvent) {
 
 function send() {
   if (!body.value.trim() || busy.value) return
-  busy.value = true
+  if (props.comment) replying.value = true
   if (props.comment) emit("reply", props.comment.id, body.value, files.value)
   else emit("submit", body.value, files.value)
 }
 defineExpose({
   fail: (reason?: string, text?: string) => {
-    busy.value = false
+    replying.value = false
     if (text && !body.value) body.value = text
     error.value = reason
   },
   /** A reply went through: clear the box for the next one, and show it at the bottom of the thread. */
   sent: async () => {
-    busy.value = false
+    replying.value = false
     body.value = ""
     clear()
     await nextTick()
@@ -107,7 +111,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         <span class="text-sm text-muted">{{
           pending.quote ? "Selected text" : pending.kind === "image" ? "Selected image area" : "Selected area"
         }}</span>
-        <UButton color="neutral" label="Cancel" size="sm" variant="ghost" @click="emit('cancel')" />
+        <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
       </div>
       <p v-if="pending.quote" class="mb-3 line-clamp-3 border-l-2 border-default pl-3 text-sm text-muted">
         {{ pending.quote }}

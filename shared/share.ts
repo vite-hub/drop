@@ -23,11 +23,11 @@ export const SHARE_LABELS: Record<Share, string> = {
   public_comment: "Public, anyone comments",
 }
 export const SHARE_HINTS: Record<Share, string> = {
-  private: "Only you. Your connected agents can still read it.",
-  team: "Everyone on the team can find it, open it, and comment.",
-  team_edit: "Everyone on the team can comment and edit it together.",
-  public: "Anyone with the link can open it, no sign-in needed. People signed in can comment.",
-  public_comment: "Anyone with the link can open it and comment, guests included.",
+  private: "Only you. Your agents can still read it.",
+  team: "The team finds it, opens it, and comments.",
+  team_edit: "The team also edits it with you.",
+  public: "Anyone with the link opens it. Sign in to comment.",
+  public_comment: "Anyone with the link opens it and comments, no sign-in.",
 }
 export const SHARE_ICONS: Record<Share, string> = {
   private: "i-mingcute-lock-line",
@@ -65,20 +65,34 @@ export function liveShare(share: Share, publicUntil: number | null, mode: DropMo
 export const defaultShare = (mode: DropMode): Share => (mode === "team" ? "team" : "private")
 
 /**
- * The states someone may pick for a drop. Team states need a team Drop; editing together needs Markdown (or a folder,
- * for the Markdown in it); a team folder always reaches the team; `publicLinkDays` 0 turns public links off.
+ * Why a drop can't take a share here, or null when it can. Team states need a team Drop (or, with `teams` on a personal
+ * one, a team's folder); editing together needs Markdown (or a folder, for the Markdown in it); a team folder always
+ * reaches the team; `publicLinkDays` 0 turns public links off. The share dialog shows it under the choice it greys out,
+ * and the server refuses with it.
  */
+export function shareBlock(
+  share: Share,
+  mode: DropMode,
+  publicLinkDays: number | null,
+  drop: { kind: DropKind; teamFolder?: boolean },
+  teams = false,
+): string | null {
+  if (share === "private") return drop.teamFolder ? "A team folder always reaches the team." : null
+  if (isPublic(share)) return publicLinkDays === 0 ? "Public links are off on this Drop." : null
+  if (mode !== "team")
+    return teams ? "Only drops in a team's folders share with a team." : "This Drop is personal, so it has no team."
+  if (share === "team_edit" && drop.kind !== "markdown" && drop.kind !== "folder")
+    return "Only Markdown docs and folders can be edited together."
+  return null
+}
+
+/** The states someone may pick for a drop: every one `shareBlock` lets through. */
 export function sharesFor(
   mode: DropMode,
   publicLinkDays: number | null,
   drop: { kind: DropKind; teamFolder?: boolean },
 ): Share[] {
-  return SHARES.filter((share) => {
-    if (share === "private") return !drop.teamFolder
-    if (isPublic(share)) return publicLinkDays !== 0
-    if (mode !== "team") return false
-    return share === "team" || drop.kind === "markdown" || drop.kind === "folder"
-  })
+  return SHARES.filter((share) => !shareBlock(share, mode, publicLinkDays, drop))
 }
 
 /** When a link made public now closes. Null keeps it open until someone changes it. */
