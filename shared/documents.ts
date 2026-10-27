@@ -2,7 +2,7 @@
 // renderer (see server/utils/markdown-document.ts), so every Markdown drop looks the same at /f/ and in Drop.
 import { escapeUTF8 as escapeHtml } from "entities"
 import type { PlanKind } from "./plans"
-import { injectRuntime, THEME_CSS } from "./plan-runtime"
+import { injectRuntime, QUIZ_BRIDGE, THEME_CSS } from "./plan-runtime"
 import { CALLOUT_CSS, TYPESET_CSS } from "./typeset"
 
 /**
@@ -249,7 +249,7 @@ export function planDocument(
   }
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><script>${QUIZ_BRIDGE}</script><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )

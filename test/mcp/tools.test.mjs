@@ -679,6 +679,70 @@ test("read_drop tells the owner's agents how many viewed the drop, and nobody el
   assert.doesNotMatch(theirs.content[0].text, /Views:/)
 })
 
+test("read_drop gives a doc's results for every block and the user's own answers, never anyone else's", async () => {
+  const { recordAnswer } = await import("../../server/utils/answers.ts")
+  const doc = (await call(publish, { markdown: "# Lesson", share: "public", note: "v1", lifetime: "review" }))
+    .structuredContent
+  const blank = await call(readDrop, { id: doc.id })
+  assert.deepEqual(blank.structuredContent.answers, [])
+  assert.doesNotMatch(blank.content[0].text, /## Answers/)
+
+  const link = doc.id
+  const answer = (id, kind, choice, correct = null) => ({ id, kind, choice, correct })
+  await recordAnswer(link, "owner", answer("capital", "question", ["lyon"], false))
+  await recordAnswer(link, "owner", answer("capital", "question", ["paris"], true))
+  await recordAnswer(link, "ada", answer("capital", "question", ["paris"], true))
+  await recordAnswer(link, "ada", answer("lunch", "poll", ["pizza"]))
+  await recordAnswer(link, "bob", answer("lunch", "poll", ["tacos", "pizza"]))
+  await recordAnswer(link, "owner", answer("card", "recall", ["missed"]))
+
+  const read = await call(readDrop, { id: doc.id })
+  const at = /^\d{4}-\d\d-\d\dT/
+  assert.deepEqual(
+    read.structuredContent.answers.map(({ userAnswer, ...block }) => ({
+      ...block,
+      ...(userAnswer && { userAnswer: { ...userAnswer, at: at.test(userAnswer.at) } }),
+    })),
+    [
+      {
+        id: "capital",
+        kind: "question",
+        people: 2,
+        counts: { lyon: 1, paris: 1 },
+        userAnswer: {
+          first: { choice: ["lyon"], correct: false },
+          latest: { choice: ["paris"], correct: true },
+          attempts: 2,
+          at: true,
+        },
+      },
+      {
+        id: "card",
+        kind: "recall",
+        userAnswer: {
+          first: { choice: ["missed"], correct: null },
+          latest: { choice: ["missed"], correct: null },
+          attempts: 1,
+          at: true,
+        },
+      },
+      { id: "lunch", kind: "poll", people: 2, counts: { pizza: 2, tacos: 1 } },
+    ],
+  )
+  const text = read.content[0].text
+  assert.match(text, /## Answers\nPeople signed in, each counted once/)
+  assert.match(
+    text,
+    /\n- capital \(question, 2 people\): lyon 1, paris 1\. The user: lyon \(wrong\) first, paris \(right\) last, 2 tries\n/,
+  )
+  assert.match(text, /\n- card \(recall\)\. The user: missed\n/)
+  assert.match(text, /\n- lunch \(poll, 2 people\): pizza 2, tacos 1\n/)
+  assert.doesNotMatch(JSON.stringify(read), /ada|bob/)
+
+  const page = (await call(publish, { html: "<p>Hi</p>", note: "v1", lifetime: "review" })).structuredContent
+  assert.equal((await call(readDrop, { id: page.id })).structuredContent.answers, undefined)
+})
+
 test("an agent links a drop to its pull request and preview; publishing again adds without doubling", async () => {
   const pr = "https://github.com/acme/portal/pull/42"
   const bad = await call(publish, {
