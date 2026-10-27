@@ -51,7 +51,7 @@ watch(
     <div
       role="group"
       aria-label="Document tools"
-      class="pointer-events-auto flex max-w-full shrink-0 flex-wrap items-center justify-center gap-0.5 rounded-xl border border-black/8 surface-glass p-1 shadow-[0_1px_2px_rgb(0_0_0/5%)] dark:border-white/5 dark:shadow-[inset_0_1px_rgb(255_255_255/3%)]"
+      class="pointer-events-auto flex max-w-full shrink-0 flex-wrap items-center justify-center gap-0.5 rounded-lg border border-black/8 surface-glass p-0.5 shadow-[0_1px_2px_rgb(0_0_0/5%)] dark:border-white/5 dark:shadow-[inset_0_1px_rgb(255_255_255/3%)]"
     >
       <slot name="toolbar" />
     </div>
