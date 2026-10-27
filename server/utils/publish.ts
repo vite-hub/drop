@@ -1,5 +1,6 @@
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
+import { AgentMetadataSchema } from "#shared/agent"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues } from "#shared/project-bundle"
@@ -9,16 +10,7 @@ import { BoardInput } from "../mcp/board"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
 import { applyChanges, boardChanges, emptyBoard, serializeBoard } from "#shared/board"
 import { resolveComments } from "./comments"
-import {
-  createDocDrop,
-  findDrop,
-  findDropByRef,
-  MAX_FILE_BYTES,
-  permissions,
-  publishApp,
-  toSummary,
-  versionChain,
-} from "./drops"
+import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary } from "./drops"
 import { updateDrop } from "./drop-update"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
@@ -31,6 +23,14 @@ import { signUpload } from "./uploads"
 
 // No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
 export const PublishInput = v.object({
+  agent: v.optional(
+    v.pipe(
+      AgentMetadataSchema,
+      v.description(
+        "Your model, harness, and reasoning level for this publish. Report known values from your runtime; omit unknown fields. Supplied separately on every version, never inherited.",
+      ),
+    ),
+  ),
   markdown: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A doc in Markdown."))),
   html: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A self-contained HTML page."))),
   files: v.optional(
@@ -201,7 +201,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         status: 400,
         message: "A site has no versions. Change it with update_drop, and resolve its comments there.",
       })
-    const resources = links && (await addedResources(null, links))
+    const resources = links && addedResources(null, links)
     const row = await createSiteDrop(
       who,
       {
@@ -213,6 +213,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         lifetime: input.lifetime,
         keepReason: input.keepReason,
         note: input.note,
+        agent: input.agent,
       },
       event,
     )
@@ -237,10 +238,11 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       status: 400,
       message: "previous is a site, which has no versions. Change it with update_drop.",
     })
-  if (previous) previous = (await versionChain(previous))[0] ?? previous
-  const resources = links && (await addedResources(previous, links))
+  // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest.
+  if (previous?.head) previous = await findDrop(previous.id, event)
+  const resources = links && addedResources(previous, links)
   const share = input.share ? { share: input.share } : {}
-  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
+  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent: input.agent }
 
   let row
   let warnings: string[] = []
@@ -363,7 +365,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   }
   if (previous && input.folder) await updateDrop((await findDrop(row.id, event))!, who, { folder: input.folder }, event)
 
-  // Comments carry over from earlier versions (listComments), so this looks across the whole chain.
+  // Comments carry over from earlier versions (listComments), so this looks across all of them.
   const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves) : []
 
   const fresh = (await findDrop(row.id, event)) ?? row

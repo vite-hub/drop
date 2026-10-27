@@ -4,6 +4,7 @@
   // nuxt.config names by path, ViteHub's conventions (auth, databases, realtime, schedules), MCP, scripts, and tests.
   "entry": [
     "server/auth.ts",
+    "server/console-authorize.ts",
     "server/database-migrate.ts",
     "server/handlers/*.ts",
     "server/code-image-png/*.ts",
@@ -26,6 +27,9 @@
     "test/e2e/*.mjs",
     // Run by hand against a local Worker with D1 fixtures.
     "test/quotas/*-runtime.mjs",
+    "test/auth/console-runtime.mjs",
+    // Launched by ssr-fetch.test.mjs in a Node subprocess.
+    "test/auth/ssr-fetch-runtime.mjs",
     "skills/**/*.js",
   ],
   "project": [
@@ -38,6 +42,8 @@
     "*.ts",
   ],
   "ignoreDependencies": [
+    // nuxt/schema re-exports this package from the installed Nuxt 5 nightly.
+    "@nuxt/schema-nightly",
     // nuxt.config `css` names these packages; knip doesn't resolve a package's stylesheet entry.
     "@fontsource-variable/geist",
     "@fontsource-variable/geist-mono",

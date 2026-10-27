@@ -59,7 +59,11 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
     const before = answers.get(answer.id) ?? drop.value.quiz?.answers[answer.id]
     answers.set(answer.id, { choice: answer.choice, correct: answer.correct })
     try {
-      const saved = await $fetch<QuizSaved>(`/api/drops/${drop.value.id}/answers`, { method: "POST", body: answer })
+      const saved = await $fetch<QuizSaved>(`/api/drops/${drop.value.id}/answers`, {
+        method: "POST",
+        query: { v: drop.value.version },
+        body: answer,
+      })
       answers.set(answer.id, saved.answer)
       if (saved.results) results.set(answer.id, saved.results)
     } catch (error) {

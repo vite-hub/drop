@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// A drop's frame alone, filling its window: what More › Open in new window shows, for a projector or a second screen.
+// A drop's frame alone, filling its window: what Details > Open in new window shows, for a projector or a second screen.
 // It runs on the drop's own origin like the viewer's frame, so a deck's own presenter sync reaches it (Slidev's
 // presenter view in the viewer drives this window over BroadcastChannel). No comments, no panel.
 const state = injectDrop()!
@@ -7,13 +7,14 @@ const drop = computed(() => state.drop.data.value!)
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const app = useAppFiles(drop)
 // Presenting takes no comments: as in the editor, the frame's comment layer stays off.
-const annotations = useViewerAnnotations({ drop, editing: ref(true), wide: ref(true), mobileSide: ref(false) })
+const annotations = useViewerAnnotations({ drop, editing: ref(true) })
 const { srcdoc, contentOrigin, frameSrc, frameKey } = useViewerFrame({
   drop,
   frame,
   app,
   pinned: ref([]),
   inset: ref(0),
+  bottom: ref(0),
   width: useDocWidth(),
   annotations,
 })

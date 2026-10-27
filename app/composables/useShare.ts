@@ -1,15 +1,24 @@
 import { daysUntil } from "#shared/expiry"
-import { isPublic, type Share, SHARE_HINTS, SHARE_ICONS, SHARE_LABELS, sharesFor } from "#shared/share"
+import { isPublic, type Share, SHARE_HINTS, SHARE_ICONS, SHARE_LABELS, SHARES, shareBlock } from "#shared/share"
 import type { DropSummary, Viewer } from "#shared/types"
 
-/** The share states this Drop offers for a drop, as picker items: label, icon, and what each one lets people do. */
-export function shareItems(viewer: Viewer | null | undefined, drop: Pick<DropSummary, "kind" | "teamFolder">) {
-  return sharesFor(viewer?.mode ?? "personal", viewer?.publicLinkDays ?? null, drop).map((value) => ({
-    value,
-    label: SHARE_LABELS[value],
-    icon: SHARE_ICONS[value],
-    description: SHARE_HINTS[value],
-  }))
+/**
+ * Every share state as picker items: label, icon, and what it lets people do. One this Drop doesn't offer for the drop
+ * stays in the list, disabled, and says why instead, so the list keeps its shape and nothing seems to be missing.
+ */
+export function shareItems(viewer: Viewer | null | undefined, drop: Pick<DropSummary, "kind" | "teamFolder" | "team">) {
+  // In a team's folders a personal Drop shares like a team one (server/utils/share.ts `modeFor`).
+  const mode = drop.team ? "team" : (viewer?.mode ?? "personal")
+  return SHARES.map((value) => {
+    const blocked = shareBlock(value, mode, viewer?.publicLinkDays ?? null, drop, Boolean(viewer?.teams))
+    return {
+      value,
+      label: SHARE_LABELS[value],
+      icon: SHARE_ICONS[value],
+      description: blocked ?? SHARE_HINTS[value],
+      disabled: Boolean(blocked),
+    }
+  })
 }
 
 /**

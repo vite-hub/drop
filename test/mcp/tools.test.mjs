@@ -249,11 +249,17 @@ test("successful file reads refresh activity and count agent views, but never re
   insertDrop("pdf", { visibility: "private", kind: "file", content_type: "application/pdf", last_accessed_at: old })
   await call(readFile, { id: "pdf" })
   assert.ok(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at > old)
-  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+  assert.equal(
+    sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE drop_id = 'pdf' AND viewer = 'agent'").get().n,
+    1,
+  )
   sql.prepare("UPDATE drops SET trashed_at = ?, last_accessed_at = ? WHERE id = 'pdf'").run(Date.now(), old)
   await call(readFile, { id: "pdf" })
   assert.equal(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at, old)
-  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+  assert.equal(
+    sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE drop_id = 'pdf' AND viewer = 'agent'").get().n,
+    1,
+  )
 })
 
 test("unknown app binaries have a binary MIME fallback", async () => {
@@ -267,6 +273,74 @@ test("unknown app binaries have a binary MIME fallback", async () => {
   const result = await call(readFile, { id: "app", path: "payload.custombinary" })
   assert.equal(result.content[0].resource.mimeType, "application/octet-stream")
   assert.equal(result.content[0].resource.blob, "AP+A")
+})
+
+test("each version reports its own agent metadata in MCP and the detail API", async () => {
+  const firstAgent = { model: "gpt-6-astra", harness: "Codex", reasoningLevel: "high" }
+  const first = (await call(publish, { markdown: "# First", note: "First", lifetime: "review", agent: firstAgent }))
+    .structuredContent
+  const secondAgent = { model: "another-model", harness: "Claude Code" }
+  const second = (await call(publish, { previous: first.id, markdown: "# Second", note: "Second", agent: secondAgent }))
+    .structuredContent
+  const third = (await call(publish, { previous: second.id, markdown: "# Third", note: "No runtime information" }))
+    .structuredContent
+  const read = await call(readDrop, { id: third.id })
+  assert.deepEqual(
+    read.structuredContent.versions.map(({ agent }) => agent),
+    [null, secondAgent, firstAgent],
+  )
+  assert.match(read.content[0].text, /gpt-6-astra · Codex · high reasoning/)
+  const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
+  const detail = await dropDetail(await findDrop(third.id), state.who, "https://drop.example")
+  assert.deepEqual(
+    detail.versions.map(({ agent }) => agent),
+    [null, secondAgent, firstAgent],
+  )
+
+  const { createDocDrop } = await import("../../server/utils/drops.ts")
+  const browser = await createDocDrop(
+    { ...who, actorKind: "browser" },
+    {
+      filename: "edit.md",
+      bytes: new TextEncoder().encode("# Browser edit"),
+      supersedes: third.id,
+      agent: firstAgent,
+    },
+  )
+  const browserRead = await call(readDrop, { id: browser.id })
+  assert.equal(browserRead.structuredContent.versions[0].agent, null)
+  assert.deepEqual(browserRead.structuredContent.versions.at(-1).agent, firstAgent)
+})
+
+test("publish accepts partial agent metadata and rejects invalid labels before writing", async () => {
+  for (const agent of [{ model: "" }, { harness: "   " }, { reasoningLevel: 42 }, { model: "x".repeat(161) }]) {
+    assert.equal(
+      (await call(publish, { markdown: "# Invalid", note: "Invalid", lifetime: "review", agent })).isError,
+      true,
+    )
+  }
+  assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0)
+  const agent = { harness: "Codex" }
+  const doc = (await call(publish, { markdown: "# Partial", note: "Known harness only", lifetime: "review", agent }))
+    .structuredContent
+  assert.deepEqual((await call(readDrop, { id: doc.id })).structuredContent.versions[0].agent, agent)
+})
+
+test("app replacement records the current publisher without inheriting earlier metadata", async () => {
+  const agent = { model: "gpt-6-astra", harness: "Codex", reasoningLevel: "high" }
+  const app = (
+    await call(publish, { files: { "index.html": "<p>First</p>" }, note: "First", lifetime: "review", agent })
+  ).structuredContent
+  assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.versions[0].agent, agent)
+  await call(publish, {
+    previous: app.id,
+    files: { "index.html": "<p>Second</p>" },
+    note: "Second",
+    agent: { harness: "Other" },
+  })
+  assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.versions[0].agent, { harness: "Other" })
+  await call(publish, { previous: app.id, files: { "index.html": "<p>Third</p>" }, note: "Third" })
+  assert.equal((await call(readDrop, { id: app.id })).structuredContent.versions[0].agent, null)
 })
 
 test("publish asks for one kind of content and a lifetime on new drops", async () => {
@@ -338,10 +412,10 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
 })
 
 test("open comments follow a doc to its next versions, numbered across them, and resolve from any later version", async () => {
-  const route = (id, init) => {
+  const route = (id, init, version) => {
     const event = new H3Event(
       new Request(
-        `https://drop.example/api/drops/${id}/comments`,
+        `https://drop.example/api/drops/${id}/comments${version ? `?v=${version}` : ""}`,
         init && { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init) },
       ),
     )
@@ -368,7 +442,7 @@ test("open comments follow a doc to its next versions, numbered across them, and
     ],
   )
   assert.deepEqual(
-    (await commentsGet(route(v1.id))).map((comment) => comment.n),
+    (await commentsGet(route(v1.id, undefined, 1))).map((comment) => comment.n),
     [1],
     "an older version doesn't see later comments",
   )
@@ -613,7 +687,7 @@ test("read_drop gives a doc's results for every block and the user's own answers
   assert.deepEqual(blank.structuredContent.answers, [])
   assert.doesNotMatch(blank.content[0].text, /## Answers/)
 
-  const { link } = sql.prepare("SELECT coalesce(link, id) AS link FROM drops WHERE id = ?").get(doc.id)
+  const link = doc.id
   const answer = (id, kind, choice, correct = null) => ({ id, kind, choice, correct })
   await recordAnswer(link, "owner", answer("capital", "question", ["lyon"], false))
   await recordAnswer(link, "owner", answer("capital", "question", ["paris"], true))
@@ -732,10 +806,9 @@ test("an agent links a drop to its pull request and preview; publishing again ad
   assert.equal((await call(readDrop, { id: v2.id })).structuredContent.resources, undefined)
 
   await call(updateDrop, { id: v2.id, resources: [{ url: pr }] })
-  sql.prepare("DELETE FROM drops WHERE id = ?").run(v2.id)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 1, "they stay while a version does")
-  sql.prepare("DELETE FROM drops WHERE id = ?").run(doc.id)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 0, "and go with the last one")
+  assert.deepEqual(JSON.parse(sql.prepare("SELECT resources FROM drops WHERE id = ?").get(doc.id).resources), [
+    { url: pr },
+  ])
 })
 
 test("a file without base64 gets an upload URL; curl -T creates the drop once, and a changed ticket does nothing", async () => {
@@ -749,6 +822,7 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
     const ticket = (
       await call(publish, {
         file: { name: "after.png" },
+        agent: { model: "upload-model", harness: "Codex", reasoningLevel: "high" },
         note: "After",
         lifetime: "keep",
         keepReason: "Screenshots for vite-hub/drop#12.",
@@ -784,6 +858,11 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
     assert.ok(chunks < 10, `read ${chunks} MiB`)
     const shot = await put(ticket.uploadUrl)
     assert.equal(shot.kind, "image")
+    assert.deepEqual(JSON.parse(sql.prepare("SELECT agent FROM drops WHERE id = ?").get(shot.id).agent), {
+      model: "upload-model",
+      harness: "Codex",
+      reasoningLevel: "high",
+    })
     assert.equal(shot.share, "public")
     assert.equal(shot.lifetime, "keep")
     assert.match(shot.fileUrl, /^https:\/\/drop\.example\/f\/[0-9a-f-]{36}\.png$/)

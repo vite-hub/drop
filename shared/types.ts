@@ -1,6 +1,6 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
+import type { AgentMetadata } from "./agent"
 import type { Lifetime } from "./expiry"
-import type { Plan } from "./quotas"
 import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
 
@@ -81,12 +81,12 @@ export interface DropCrumb {
 }
 
 export interface DropVersion {
-  id: string
   title: string
   version: number
   createdAt: number
   note: string | null
   actorName: string
+  agent: AgentMetadata | null
   current?: boolean
 }
 
@@ -270,22 +270,6 @@ export interface ReviewThread {
   }[]
 }
 
-export interface Member {
-  id: string
-  name: string
-  /** Only admins see other people's emails; GitHub may have handed over one its owner keeps private. */
-  email: string | null
-  image: string | null
-  role: Role
-  /** Their limits: the tier an admin gave them, else this Drop's default plan. Null when quotas are off. */
-  plan: Plan | null
-  banned: boolean
-  drops: number
-  /** Null until they first sign in. */
-  lastActiveAt: number | null
-  you: boolean
-}
-
 /** An MCP client someone approved on /oauth: it acts as them until disconnected. */
 /** A built-in Agent Skill as the catalog shows it. Members only see enabled ones; admins see all. */
 export interface SkillSummary {
@@ -314,11 +298,8 @@ export interface Viewer {
   mode: DropMode
   /** Days a public link stays open before it closes (null: until changed, 0: public links are off). */
   publicLinkDays: number | null
-  members: number
   /** How many skills are on: agents get them over MCP, and members see Skills only while one is. */
   skills: number
-  /** Admins only: public shares waiting for their review (/admin/review). */
-  reviews?: number
   /** On a personal Drop with `DROP_TEAMS`: the teams they're on. Absent when teams are off. */
   teams?: ViewerTeam[]
   /** Teams pay through Stripe here (`STRIPE_*`): past `freeMembers`, a team needs a subscription. */

@@ -1,12 +1,19 @@
 import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
+import type { NuxtSecurityRouteRules } from "nuxt-security"
 import { env } from "vite-hub/env"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
+
+declare module "nuxt/schema" {
+  interface RouteRuleConfigExtensions {
+    security?: NuxtSecurityRouteRules
+  }
+}
 
 const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
 const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
@@ -129,7 +136,11 @@ const SIGNED_IN: RouteRule = { appMiddleware: { auth: true }, appLayout: "dashbo
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt", "nuxt-security"],
 
-  vitehub: { ...VITEHUB[host], auth: true },
+  vitehub: {
+    ...VITEHUB[host],
+    auth: true,
+    console: { auth: "app", authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
+  },
 
   alias: {
     // PNG code images are a Browser Run screenshot. Browser Run only exists on Cloudflare, and ViteHub only
@@ -217,7 +228,11 @@ export default defineNuxtConfig({
     // (pages/d/) pick their own layout in their own middleware.
     "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
     "/agents": SIGNED_IN,
-    "/members": SIGNED_IN,
+    // The standalone Console owns its scripts; Nuxt's renderer never adds its nonce to them.
+    "/_vitehub/**": {
+      headers: { "cache-control": "private, no-store" },
+      security: { headers: { contentSecurityPolicy: { "script-src": ["'self'"] } } },
+    },
     "/teams/**": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
@@ -366,6 +381,8 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    // Keep Node for local development; ViteHub emulates Cloudflare bindings separately.
+    devServer: { runner: "node-worker" },
     // Drizzle applies the existing migration journal before a local Node instance serves requests.
     plugins: database === "sqlite" ? [fileURLToPath(new URL("./server/database-migrate.ts", import.meta.url))] : [],
     // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
@@ -414,10 +431,7 @@ export default defineNuxtConfig({
       if (host === "cloudflare")
         nitro.hooks.hook("compiled", () => syncCloudflareTemplate(nitro.options.output.serverDir))
     },
-    // The CLI nightly adds a dev-only socket-cleanup plugin from @nuxt/cli, which this Nuxt nightly's
-    // server import protection rejects. Dev works without it.
     "nitro:config": function (config) {
-      config.plugins = config.plugins?.filter((plugin) => !plugin.includes("dev-close-sockets"))
       // Raw files and share pages get their own error page (server/handlers/content-error.ts); everything else keeps
       // Nuxt's, which renders app/error.vue. Nuxt only adds its handler when nitro.errorHandler is unset, so ours goes
       // in front of it here instead.

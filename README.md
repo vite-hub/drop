@@ -17,6 +17,9 @@
   <a href="https://github.com/vite-hub/drop">Source</a>
 </p>
 
+[![license](https://comark-ui.onmax.me/badge.svg?label=license&value=Apache-2.0)](https://github.com/vite-hub/drop/blob/main/LICENSE)
+[![docs](https://comark-ui.onmax.me/badge.svg?label=docs&value=drop.vitehub.dev)](https://drop.vitehub.dev)
+
 ## How it works
 
 1. **Your agent drops its work** over MCP: a Markdown plan, an HTML page, or a small static app. It signs in through your browser once; there are no API keys.

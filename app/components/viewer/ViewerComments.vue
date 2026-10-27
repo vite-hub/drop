@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DropComment, DropVersion } from "#shared/types"
+import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
 import type { Sent } from "~/composables/useDrop"
 
 // `addPageComment` posts a comment on the page as a whole, written in the box at the bottom; the box only clears once it
@@ -10,14 +10,25 @@ const props = defineProps<{
   canManage: boolean
   version: number
   versions: DropVersion[]
+  screenshots?: Map<string, SiteReviewItem["screenshot"]>
   outdated: Set<string>
   addPageComment: (body: string, files: File[]) => Promise<Sent<DropComment>>
 }>()
-const emit = defineEmits<{ focus: [comment: DropComment, row: DOMRect]; resolve: [id: string, resolved: boolean] }>()
+const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
+const root = useTemplateRef<HTMLElement>("root")
+defineExpose({
+  focusComposer: () => root.value?.querySelector("textarea")?.focus(),
+  focusComment: (id: string) =>
+    root.value?.querySelector<HTMLButtonElement>(`[data-comment-id="${CSS.escape(id)}"]`)?.focus(),
+})
 const filter = ref<"open" | "resolved">("open")
+const resolvedCount = computed(() => props.comments.filter((comment) => comment.resolved).length)
+watch(resolvedCount, (count) => {
+  if (!count) filter.value = "open"
+})
 const tabs = computed(() => [
   { label: "Open", value: "open", badge: props.comments.filter((comment) => !comment.resolved).length },
-  { label: "Resolved", value: "resolved", badge: props.comments.filter((comment) => comment.resolved).length },
+  { label: "Resolved", value: "resolved", badge: resolvedCount.value },
 ])
 const visible = computed(() =>
   props.comments.filter((comment) =>
@@ -38,27 +49,30 @@ const repliers = (comment: DropComment) => [
   ...new Map(comment.replies.toReversed().map((reply) => [reply.authorName, reply])).values(),
 ]
 
-const pageBody = ref("")
-const sending = ref(false)
+const { body: pageBody, images, sending, beginSend } = injectReviewDraft()!
 const pageError = ref<string>()
 watch(pageBody, () => (pageError.value = undefined))
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
+const { picks, problem, files, remove, open: pickImages, paste, drop } = images
 async function sendPageComment() {
   if (!pageBody.value.trim() || sending.value) return
-  sending.value = true
-  const sent = await props.addPageComment(pageBody.value, files.value)
-  if ("value" in sent) {
-    pageBody.value = ""
-    clear()
-    filter.value = "open"
-  } else pageError.value = sent.error
-  sending.value = false
+  const finish = beginSend()
+  if (!finish) return
+  try {
+    const sent = await props.addPageComment(pageBody.value, files.value)
+    if ("value" in sent) {
+      finish(true)
+      filter.value = "open"
+    } else pageError.value = sent.error
+  } finally {
+    finish(false)
+  }
 }
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
+  <div ref="root" class="flex min-h-0 flex-1 flex-col">
     <UTabs
+      v-if="resolvedCount"
       v-model="filter"
       class="shrink-0 px-4"
       color="neutral"
@@ -67,25 +81,33 @@ async function sendPageComment() {
       size="sm"
       variant="link"
     />
-    <ul class="min-h-0 flex-1 divide-y divide-default overflow-y-auto border-t border-default">
+    <ul
+      class="min-h-0 flex-1 divide-y divide-default overflow-y-auto overscroll-contain border-t border-default wrap-anywhere"
+    >
       <li v-if="!visible.length && !earlier.length" class="px-4 py-10 text-center text-sm text-muted">
         {{
           filter === "resolved"
             ? "Nothing resolved yet."
             : canComment
-              ? "Select text, click an image, or press R to comment on an area. For the page as a whole, write below."
+              ? "No comments yet. Start the conversation below."
               : "No comments yet."
         }}
       </li>
       <li v-for="comment in visible" :key="comment.id" class="space-y-2 px-4 py-3">
+        <ViewerReviewScreenshot
+          v-if="screenshots?.get(comment.id)"
+          :comment="comment"
+          :screenshot="screenshots.get(comment.id)!"
+        />
         <button
+          :data-comment-id="comment.id"
           class="w-full cursor-pointer space-y-2 text-left"
           type="button"
-          @click="emit('focus', comment, ($event.currentTarget as HTMLElement).getBoundingClientRect())"
+          @click="emit('focus', comment)"
         >
           <ViewerCommentHeader :comment="comment" :current="version" />
           <p v-if="comment.kind === 'page'" class="flex items-center gap-1.5 text-xs text-muted">
-            <UIcon name="i-mingcute-web-line" class="size-3.5" />Whole page
+            <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />General feedback
           </p>
           <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
@@ -106,7 +128,7 @@ async function sendPageComment() {
         </button>
         <button
           v-if="canManage || comment.mine"
-          class="cursor-pointer text-xs text-muted hover:text-highlighted"
+          class="min-h-6 cursor-pointer text-xs text-muted hover:text-highlighted"
           type="button"
           @click="emit('resolve', comment.id, !comment.resolved)"
         >
@@ -135,7 +157,7 @@ async function sendPageComment() {
           >
           <button
             v-if="canManage || comment.mine"
-            class="cursor-pointer text-muted hover:text-highlighted"
+            class="min-h-6 cursor-pointer text-muted hover:text-highlighted"
             type="button"
             @click="emit('resolve', comment.id, true)"
           >
@@ -155,13 +177,13 @@ async function sendPageComment() {
     >
       <UTextarea
         v-model="pageBody"
-        aria-label="Comment on the whole page"
+        aria-label="Write a comment"
         autoresize
         class="flex-1"
         :maxrows="6"
-        placeholder="Comment on the whole page"
+        placeholder="Write a comment…"
         :rows="1"
-        :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
+        :ui="{ base: 'px-1 py-1.5 text-base leading-relaxed sm:text-sm' }"
         variant="none"
         @keydown.enter.exact.prevent="sendPageComment"
         @paste="paste"

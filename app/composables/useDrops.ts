@@ -11,7 +11,7 @@ export const useDrops = () => useApi("/api/drops", { key: keys.drops, default: (
 
 /** What others share with you: on a team Drop the team's folders and teammates' drops, on a personal one the public links you opened. */
 export const useSharedWithMe = () =>
-  useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: 1 }, default: () => [] })
+  useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: "1" }, default: () => [] })
 
 /** The drops directly in a folder, for an expanded row in the tree or the Drops page. Keyed `folder:<id>`. */
 export const useFolder = (id: MaybeRefOrGetter<string>) =>

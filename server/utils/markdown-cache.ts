@@ -1,6 +1,7 @@
 import type { H3Event } from "h3"
 import { defineCachedFunction } from "nitro/cache"
 import { useStorage } from "nitro/storage"
+import { resolveCacheKeys } from "ocache"
 
 export const MARKDOWN_CACHE_TTL = 60 * 60 * 24 * 30
 
@@ -33,10 +34,8 @@ const cached = defineCachedFunction(
     name: "markdown",
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
-    // Change this when the renderer's output changes (2: Shiki code blocks, 3: comark-annotate zooms a screenshot's stage
-    // with its notes beside it, 4: every comark-plugins package, 5: comark-ui's preset, with quiz): every cached render
-    // rerenders on its next read.
-    integrity: "5",
+    // Bump when the renderer changes so existing documents pick up the current preset on their next read.
+    integrity: "8",
     validate: (entry: { value?: MarkdownRender }) => entry.value !== undefined && !entry.value.retry,
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
@@ -47,9 +46,11 @@ export const cachedMarkdown = (key: string, source: () => Promise<string>, rende
 
 export async function deleteMarkdownCache(key: string) {
   if (key.startsWith("apps/") || key.startsWith("code-images/")) return
-  // Nitro's cached-function key is part of its storage contract; keep this in sync with the `name` above.
-  // A spreadsheet's preview (server/utils/spreadsheet.ts) is cached the same way, under its own name.
+  const storage = useStorage("cache")
   await Promise.all(
-    ["markdown", "spreadsheet"].map((name) => useStorage("cache").removeItem(`nitro:functions:${name}:${key}.json`)),
+    ["markdown", "spreadsheet"].map(async (name) => {
+      const keys = await resolveCacheKeys({ options: { base: "", group: "nitro/functions", name, getKey: () => key } })
+      await Promise.all(keys.map((entry) => storage.removeItem(entry)))
+    }),
   )
 }

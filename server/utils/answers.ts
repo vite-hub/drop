@@ -9,14 +9,13 @@ import type { DropRow } from "./drops"
 import type { Identity } from "./identity"
 
 // What signed-in readers answered to a Markdown doc's questions, polls, and recall cards (#shared/quiz): one row per
-// person and block, keyed on the doc's link so answers carry across versions, with the first answer kept beside the
-// latest. Like drop_resources, each isolate creates the table before its first write or a read that finds none, so
-// neither production D1 nor Quiver needs a step of its own. The primary key serves the counts; the index serves a
-// reader's own answers.
+// person and block, keyed on the doc's stable id so answers carry across versions, with the first answer kept beside
+// the latest. Each isolate creates the table before its first write or a read that finds none, so neither production
+// D1 nor Quiver needs a step of its own. The primary key serves the counts; the index serves a reader's own answers.
 const TABLE = [
   "CREATE TABLE IF NOT EXISTS `drop_answers` (`link` text NOT NULL, `question` text NOT NULL, `user_id` text NOT NULL, `kind` text NOT NULL, `first_choice` text NOT NULL, `first_correct` integer, `choice` text NOT NULL, `correct` integer, `attempts` integer NOT NULL, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, PRIMARY KEY(`link`, `question`, `user_id`))",
   "CREATE INDEX IF NOT EXISTS `drop_answers_user_idx` ON `drop_answers` (`link`, `user_id`)",
-  "CREATE TRIGGER IF NOT EXISTS `drop_answers_drop_delete` AFTER DELETE ON `drops` WHEN NOT EXISTS (SELECT 1 FROM drops d WHERE d.link = OLD.link) BEGIN DELETE FROM `drop_answers` WHERE `link` = coalesce(OLD.link, OLD.id); END",
+  "CREATE TRIGGER IF NOT EXISTS `drop_answers_drop_delete` AFTER DELETE ON `drops` BEGIN DELETE FROM `drop_answers` WHERE `link` = OLD.id; END",
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_user_delete` AFTER DELETE ON `user` BEGIN DELETE FROM `drop_answers` WHERE `user_id` = OLD.id; END",
 ]
 let table: Promise<void> | undefined
@@ -38,8 +37,6 @@ const reading = <T>(read: () => Promise<T>) =>
     await ensureTable()
     return read()
   })
-
-type Linked = Pick<DropRow, "id" | "link">
 
 /** Whether `who`'s answers on a drop count: a person signed in, in the browser, on a Markdown doc out of the Trash. */
 export const answerable = (row: Pick<DropRow, "kind" | "expired">, who: Identity | null) =>
@@ -157,8 +154,8 @@ export async function quizResults(
 }
 
 /** The reader's side of a doc's blocks, for its page: their answers, and results for the ones they answered. */
-export async function quizOf(row: Linked, userId: string): Promise<DropQuiz> {
-  const link = row.link ?? row.id
+export async function quizOf(row: Pick<DropRow, "id">, userId: string): Promise<DropQuiz> {
+  const link = row.id
   try {
     const [mine, results] = await Promise.all([answersOf(link, userId), quizResults(link, { answeredBy: userId })])
     return {

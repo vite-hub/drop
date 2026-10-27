@@ -23,6 +23,8 @@ Before publishing something new, call `list_folders` and pick its folder (see [F
 - `file`: any other file up to 4 MiB. Use it for screenshots: people pin comments on an image or drag an area on it. For a file on disk, pass only `{ name }`: `publish` answers with an `uploadUrl`, good for 15 minutes and one upload. Run `curl -T <path> '<uploadUrl>'`; it creates the drop and prints it as JSON, with its `fileUrl`. Pass `{ name, base64 }` only for a few bytes you already hold as text.
 - `board`: a whiteboard people draw on together, made of frames, sticky notes, text, shapes and arrows. Use it for flows, maps and retros. Read [the board reference](references/board.md) before you publish, read or edit one.
 
+On every `publish`, pass `agent` with the values your runtime exposes: `model` (the exact model name or id), `harness` (such as Codex or Claude Code), and `reasoningLevel` (such as high). For example: `agent: { model: "gpt-6-astra", harness: "Codex", reasoningLevel: "high" }`. Use your own runtime values and omit unknown fields. This metadata belongs to that version; supply it again on revisions. History shows it alongside who published the version.
+
 Every publish needs a `note`: what this is, or for a new version what changed, like a commit message. People read it in the version history.
 
 A new drop also needs a `lifetime`. Pick it from what the drop is for:

@@ -3,7 +3,7 @@ import { requireRateLimit } from "vite-hub/rate-limit"
 import { MAX_QUIZ_BLOCKS, QuizAnswerInput } from "#shared/quiz"
 import type { QuizSaved } from "#shared/types"
 import { answerable, quizBlocks, quizResults, recordAnswer } from "../../../utils/answers"
-import { expiredLink, findDrop, permissions, readText, waitingForReview } from "../../../utils/drops"
+import { expiredLink, findDropAt, permissions, readText, waitingForReview } from "../../../utils/drops"
 import { requireIdentity } from "../../../utils/identity"
 import { renderMarkdownCached } from "../../../utils/markdown-document"
 import { routeId } from "../../../utils/params"
@@ -18,7 +18,8 @@ export default defineValidatedHandler({
   validate: { body: QuizAnswerInput },
   async handler(event): Promise<QuizSaved> {
     const who = await requireIdentity(event)
-    const drop = await findDrop(await routeId(event), event)
+    const version = Number(event.url.searchParams.get("v")) || undefined
+    const drop = await findDropAt(await routeId(event), version, event)
     if (waitingForReview(drop, who))
       throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
     if (expiredLink(drop, who))
@@ -36,7 +37,7 @@ export default defineValidatedHandler({
       (answer.kind !== "recall" && answer.choice.some((option) => !block.keys.has(option)))
     )
       throw new HTTPError({ status: 400, statusText: "That isn't a block of this doc, or one of its options." })
-    const link = drop.link ?? drop.id
+    const link = drop.id
     if (!(await recordAnswer(link, who.userId, answer)))
       throw new HTTPError({ status: 409, statusText: `A doc keeps answers to ${MAX_QUIZ_BLOCKS} blocks at most.` })
     if (answer.kind === "recall") return { answer: { choice: answer.choice, correct: answer.correct } }

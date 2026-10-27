@@ -9,7 +9,7 @@ export default defineHandler(async (event) => {
   const { FRAME_HOST_HTML, contentHost } = await import("../utils/content-origin")
   const host = contentHost(event)
   if (!host) return
-  if (host === "stray")
+  if (host === "stray" || /^\/(?:_vitehub|api\/_vitehub\/console)(?:\/|$)/.test(event.url.pathname))
     return new Response("Not found", {
       status: 404,
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },

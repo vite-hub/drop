@@ -1,6 +1,6 @@
 import { defineHandler, HTTPError } from "h3"
 import { splitFrontmatter } from "#shared/frontmatter"
-import { findDrop, liveEditable, readText, versionsOf } from "../../../utils/drops"
+import { findDrop, liveEditable, readText } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { ensureDraft } from "#live-drafts"
 import { routeId } from "../../../utils/params"
@@ -9,8 +9,8 @@ import { routeId } from "../../../utils/params"
 export default defineHandler(async (event) => {
   const drop = await findDrop(await routeId(event), event)
   const who = await identify(event)
-  if (!drop || !drop.blobKey || !liveEditable(drop, who, await versionsOf(drop)))
+  if (!drop || !drop.blobKey || !liveEditable(drop, who))
     throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
   const { body } = splitFrontmatter(await readText(drop.blobKey))
-  return { documentId: await ensureDraft(drop.id, body) }
+  return { documentId: await ensureDraft(drop, body) }
 })

@@ -83,7 +83,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
     '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
     '.a{position:absolute;box-sizing:border-box;border:calc(1.5px * var(--drop-z,1)) solid var(--foreground);border-radius:3px;background:color-mix(in oklab,var(--foreground) 6%,transparent);pointer-events:none;transition:background 120ms}' +
-    '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
+    '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}.a.t{background:none}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
     '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--hi);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
@@ -109,7 +109,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
   const pageStyle = document.createElement("style");
-  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--foreground) 45%,transparent);text-underline-offset:3px}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img{cursor:zoom-in}");
+  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent)}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img{cursor:zoom-in}") +
+    // Drop's review dock floats over the frame's bottom edge (--drop-bottom), out of reach of the page's own layers, so
+    // Comark's zoom ends above it and its thumbnails stay clickable. Its backdrop still runs under the dock.
+    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
   // Highlights draw on the page itself, so without Drop's theme they take a grey that shows on light and dark pages.
   if (!THEMED) pageStyle.textContent = pageStyle.textContent.replaceAll("var(--foreground)", "#808080");
   let markers = [], active = null;
@@ -262,6 +265,16 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (zoom) continue;
         const rects = range.getClientRects(), last = rects[rects.length - 1];
         if (!last) continue;
+        // Outlined like an area, one box per line: a highlight alone can't draw a border, and its tint barely shows on
+        // colored code. A line's pieces (one per token in highlighted code) join into one box.
+        const lines = [];
+        for (const r of rects) {
+          if (!r.width) continue;
+          const line = lines.find((l) => r.top < l.bottom && r.bottom > l.top);
+          if (line) { line.left = Math.min(line.left, r.left); line.right = Math.max(line.right, r.right); line.top = Math.min(line.top, r.top); line.bottom = Math.max(line.bottom, r.bottom); }
+          else lines.push({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+        }
+        for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
       const dot = document.createElement("div");
@@ -331,7 +344,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // Comark zooms its own blocks, such as annotated screenshots: its view keeps their marks and notes and pages
     // through a comparison, which Drop's lightbox of the bare image can't. The area tool still comments on them.
     const zoomed = target && target.closest("[data-zoom], .cz-dialog");
-    const img = !AUTHORED && !zoomed && target && target.closest("img");
+    const img = !AUTHORED && !zoomed && target && !target.closest("a[href]") && target.closest("img");
     // A srcdoc document resolves "#id" against Drop's page, so the frame would load Drop and be refused. Scroll here.
     const link = !img && location.protocol === "about:" && target && target.closest('a[href^="#"]');
     if (link && !host.contains(link)) {
@@ -358,11 +371,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   /**
    * Comment and measure tools: a layer over the page takes the pointer, so its clicks and hovers don't reach the page.
-   * Comment outlines the element under the pointer; a click pins a comment to that spot of it, a drag draws an area.
+   * Comment draws an area; image drops also take point comments. Element inspection belongs to Measure.
    * Measure shows the element's size and box model, its type and colors, and, once one is picked, the distances from
    * it to whatever the pointer is over.
    */
-  let tool = "browse", layer = null, hovered = null, picked = null;
+  let tool = "browse", layer = null, hovered = null, picked = null, pointComments = false;
   const view = { rulers: false, xray: false, pins: true };
   const fx = document.createElement("div");
   fx.className = "fx";
@@ -522,10 +535,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     fx.innerHTML = "";
     if (hovered && !hovered.isConnected) hovered = null;
     if (picked && !picked.isConnected) picked = null;
-    if (tool === "comment" && hovered && !(layer && layer.dragging)) {
-      const r = outline(hovered);
-      tag(nameOf(hovered) + "  " + px(r.width) + " × " + px(r.height), r.left, r.top - 22 < (view.rulers ? 20 : 0) ? r.bottom + 4 : r.top - 22);
-    }
     if (tool === "measure") {
       const over = hovered && hovered !== picked ? hovered : null;
       if (picked) boxModel(picked);
@@ -573,7 +582,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (box) {
           box.remove(); box = null;
           finishArea(Math.min(s.x, e.clientX), Math.min(s.y, e.clientY), Math.max(s.x, e.clientX), Math.max(s.y, e.clientY));
-        } else finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
+        } else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
         redraw();
       };
       layer.onpointerleave = () => { if (!start) { hovered = null; redraw(); } };
@@ -712,11 +721,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; render(); }
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); }
-    if (m.type === "tool" && /^(browse|comment|measure)$/.test(m.tool)) setTool(m.tool);
+    if (m.type === "tool" && /^(browse|comment|measure)$/.test(m.tool)) { pointComments = m.pointComments === true; setTool(m.tool); }
     if (m.type === "view") setView(m);
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
-    if (m.type === "inset") { document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px"); render(); }
+    if (m.type === "inset") {
+      document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px");
+      document.documentElement.style.setProperty("--drop-bottom", (Number(m.bottom) || 0) + "px");
+      render();
+    }
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     if (m.type === "focus") {

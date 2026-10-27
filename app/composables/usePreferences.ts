@@ -9,10 +9,9 @@ const year = 60 * 60 * 24 * 365
  * the same layout the browser will show: no flash of a closed panel, no hydration mismatch.
  */
 export function useSidePanel() {
-  // Closed until someone opens it (the comments button, C, a `?comment=` link); then it stays as they left it. A new
-  // name, so the old cookie that defaulted to open doesn't keep it open.
+  // Details and History live here. Comments have their own bottom dock.
   const open = useCookie<boolean>("drop-side-panel", { default: () => false, maxAge: year, sameSite: "lax" })
-  const tab = useCookie<SideTab>("drop-side-tab", { default: () => "comments", maxAge: year, sameSite: "lax" })
+  const tab = useCookie<SideTab>("drop-side-tab", { default: () => "details", maxAge: year, sameSite: "lax" })
   // In rem, like the sidebar's (UDashboardGroup's unit), so the server renders the width they left it at.
   const width = useCookie<number>("drop-side-width", { default: () => 24, maxAge: year, sameSite: "lax" })
   return { open, tab, width }
@@ -26,7 +25,7 @@ export const useFolderPreviewWidth = () =>
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
-/** Device mode for HTML docs, apps, Markdown docs, and reviewed sites (ViewerDevice), for every drop. */
+/** Device mode for HTML docs, apps, and reviewed sites (ViewerDevice), for every drop. */
 export const useDeviceSize = () =>
   useCookie<DeviceSize>("drop-device-mode", {
     default: () => ({ on: false, id: "iphone", width: 393, height: 852, zoom: null }),

@@ -2,15 +2,16 @@
 // A doc's versions one after the other, newest first, like a commit log: what each one changed (its note), who
 // published it, and the comments written on it. A version shows what it changed (ViewerDiff) in place of the document;
 // `selected` is the one showing. Each one's link stays on that version, while the doc's link follows the latest.
+import { agentLabel } from "#shared/agent"
 import { dropPath } from "#shared/links"
 import type { DropComment, DropDetail, DropVersion } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; comments: DropComment[]; selected?: string }>()
+const props = defineProps<{ drop: DropDetail; comments: DropComment[]; selected?: number }>()
 const emit = defineEmits<{ open: [version: DropVersion] }>()
 const { copy, copied } = useCopy()
 const origin = useRequestURL().origin
 const copyLink = (version: DropVersion) =>
-  copy(`${origin}${dropPath(props.drop, version.version)}`, { key: version.id })
+  copy(`${origin}${dropPath(props.drop, version.version)}`, { key: `v${version.version}` })
 
 // Comments come up to the version being viewed (listComments), so later versions have none to count here.
 function talk(version: DropVersion) {
@@ -24,7 +25,7 @@ function talk(version: DropVersion) {
   <!-- TODO(repo-mirror): once versions also go to a repo the owner picks (@vite-hub/forge, see server/utils/drops.ts),
        link each version to its commit here. -->
   <ol class="p-2">
-    <li v-for="(version, index) in drop.versions" :key="version.id" class="group/row relative">
+    <li v-for="(version, index) in drop.versions" :key="version.version" class="group/row relative">
       <span
         v-if="index < drop.versions.length - 1"
         class="absolute top-6 bottom-0 left-[19.5px] w-px translate-y-1.5 bg-(--ui-border)"
@@ -32,7 +33,8 @@ function talk(version: DropVersion) {
       />
       <button
         :aria-label="`What changed in v${version.version}`"
-        :aria-pressed="selected === version.id"
+        :aria-describedby="agentLabel(version.agent) ? `version-agent-${version.version}` : undefined"
+        :aria-pressed="selected === version.version"
         class="group relative flex w-full cursor-pointer gap-3 rounded-md py-2.5 pr-11 pl-3 text-left text-sm outline-none hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) aria-pressed:bg-elevated"
         type="button"
         @click="emit('open', version)"
@@ -54,6 +56,13 @@ function talk(version: DropVersion) {
               · {{ talk(version) }}</template
             ></span
           >
+          <span
+            v-if="agentLabel(version.agent)"
+            :id="`version-agent-${version.version}`"
+            class="block text-xs leading-relaxed wrap-anywhere text-muted"
+          >
+            {{ agentLabel(version.agent) }}
+          </span>
         </span>
         <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-mingcute-right-line" />
       </button>
@@ -62,7 +71,7 @@ function talk(version: DropVersion) {
           :aria-label="`Copy link to v${version.version}`"
           class="absolute top-1.5 right-1.5 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-visible:opacity-100"
           color="neutral"
-          :icon="copied(version.id) ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
+          :icon="copied(`v${version.version}`) ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
           size="xs"
           variant="ghost"
           @click="copyLink(version)"

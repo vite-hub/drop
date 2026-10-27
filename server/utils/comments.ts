@@ -1,10 +1,9 @@
 import { and, asc, eq, inArray, lte, type SQL, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
-import { commentReplies, comments, drops, user } from "../databases/config"
+import { commentReplies, comments, user } from "../databases/config"
 import type { CommentAttachment, CommentReply, DropComment } from "#shared/types"
 import { attachmentsOf, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
-import { chainOf } from "./expiry"
 import type { Identity } from "./identity"
 
 export type CommentRow = typeof comments.$inferSelect
@@ -30,12 +29,7 @@ const toReply = (row: ReplyRow, who: Identity | null, extras?: Partial<CommentEx
   attachments: extras?.attachments?.get(row.id) ?? [],
 })
 
-export const toComment = (
-  row: CommentRow,
-  who: Identity | null,
-  version: number,
-  extras?: CommentExtras,
-): DropComment => ({
+export const toComment = (row: CommentRow, who: Identity | null, extras?: CommentExtras): DropComment => ({
   id: row.id,
   n: row.n,
   kind: row.kind,
@@ -52,7 +46,7 @@ export const toComment = (
   authorImage: (row.authorId && extras?.images.get(row.authorId)) || null,
   resolved: row.resolved,
   createdAt: row.createdAt,
-  version,
+  version: row.version,
   mine: Boolean(who && row.authorId === who.userId),
   replies: (extras?.replies.get(row.id) ?? []).map((reply) => toReply(reply, who, extras)),
   attachments: extras?.attachments?.get(row.id) ?? [],
@@ -118,43 +112,31 @@ const siteOf = (row: Pick<DropRow, "id" | "kind" | "parentId">) => (row.kind ===
  * The viewer decides which of the older ones still fit the page (see `outdated` in DropViewer.vue). Apps have no
  * versions, so theirs are always their own. A site has no versions either; its list takes in its screenshots'.
  */
-export async function listComments(row: Pick<DropRow, "id" | "ownerId" | "version" | "kind">, who: Identity | null) {
-  if (row.kind === "site") {
-    const [rows, extras] = await Promise.all([
-      db
-        .select()
-        .from(comments)
-        .where(sql`${comments.dropId} IN (${siteFamily(row.id)})`)
-        .orderBy(asc(comments.n)),
-      commentExtras(siteFamily(row.id)),
-    ])
-    return rows.map((item) => toComment(item, who, 1, extras))
-  }
+export async function listComments(row: Pick<DropRow, "id" | "version" | "kind">, who: Identity | null) {
+  const scope =
+    row.kind === "site"
+      ? sql`${comments.dropId} IN (${siteFamily(row.id)})`
+      : and(eq(comments.dropId, row.id), lte(comments.version, row.version))!
   const [rows, extras] = await Promise.all([
-    db
-      .select({ comment: comments, version: drops.version })
-      .from(comments)
-      .innerJoin(drops, eq(drops.id, comments.dropId))
-      .where(and(sql`${comments.dropId} IN (${chainOf(row)})`, lte(drops.version, row.version)))
-      .orderBy(asc(comments.n), asc(drops.version)),
-    commentExtras(chainOf(row)),
+    db.select().from(comments).where(scope).orderBy(asc(comments.n)),
+    commentExtras(row.kind === "site" ? siteFamily(row.id) : sql`SELECT ${row.id}`),
   ])
-  return rows.map((item) => toComment(item.comment, who, item.version, extras))
+  return rows.map((item) => toComment(item, who, extras))
 }
 
 /**
- * The next comment number, counted across the version chain so a carried-over #3 and a new #3 can't meet, and
+ * The next comment number, counted across the drop's versions so a carried-over #3 and a new #3 can't meet, and
  * across a site's screenshots so the site's list has one #3.
  */
-export const nextCommentNumber = (row: Pick<DropRow, "id" | "ownerId" | "kind" | "parentId">) =>
-  sql<number>`(SELECT coalesce(max(n), 0) + 1 FROM comments WHERE drop_id IN (${chainOf(row)}) OR drop_id IN (${siteFamily(siteOf(row))}))`
+export const nextCommentNumber = (row: Pick<DropRow, "id" | "kind" | "parentId">) =>
+  sql<number>`(SELECT coalesce(max(n), 0) + 1 FROM comments WHERE drop_id = ${row.id} OR drop_id IN (${siteFamily(siteOf(row))}))`
 
-/** Where a drop's comment numbers live: its version chain, or a site and its screenshots. */
-const commentScope = (row: Pick<DropRow, "id" | "ownerId" | "kind">) =>
-  sql`${comments.dropId} IN (${row.kind === "site" ? siteFamily(row.id) : chainOf(row)})`
+/** Where a drop's comment numbers live: the drop, or a site and its screenshots. */
+const commentScope = (row: Pick<DropRow, "id" | "kind">) =>
+  row.kind === "site" ? sql`${comments.dropId} IN (${siteFamily(row.id)})` : eq(comments.dropId, row.id)
 
 /** Marks the open comments numbered `numbers` resolved, on any version of the drop. Returns the numbers it resolved. */
-export async function resolveComments(row: Pick<DropRow, "id" | "ownerId" | "kind">, numbers: number[]) {
+export async function resolveComments(row: Pick<DropRow, "id" | "kind">, numbers: number[]) {
   const scope = commentScope(row)
   const open = await db
     .select({ n: comments.n })
@@ -169,16 +151,12 @@ export async function resolveComments(row: Pick<DropRow, "id" | "ownerId" | "kin
   return resolved
 }
 
-/** Comment #n on a drop: numbers count across the version chain, and across a site with its screenshots. */
-export async function findCommentByNumber(row: Pick<DropRow, "id" | "ownerId" | "kind" | "parentId">, n: number) {
-  const where =
-    row.kind === "site"
-      ? sql`${comments.dropId} IN (${siteFamily(row.id)})`
-      : sql`${comments.dropId} IN (${chainOf(row)})`
+/** Comment #n on a drop: numbers count across its versions, and across a site with its screenshots. */
+export async function findCommentByNumber(row: Pick<DropRow, "id" | "kind">, n: number) {
   const [comment] = await db
     .select()
     .from(comments)
-    .where(and(where, eq(comments.n, n)))
+    .where(and(commentScope(row), eq(comments.n, n)))
     .limit(1)
   return comment ?? null
 }

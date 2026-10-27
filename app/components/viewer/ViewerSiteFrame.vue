@@ -7,7 +7,7 @@
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; address: string }>()
+const props = defineProps<{ drop: DropDetail; address: string; reviewing: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const notify = useNotify()
@@ -24,7 +24,8 @@ function go() {
 
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
-const drawing = ref(false)
+const capturing = ref(false)
+const drawing = computed(() => props.reviewing && !pending.value && !capturing.value)
 const box = ref<Box | null>(null)
 let from: { x: number; y: number } | null = null
 const pending = ref<{
@@ -35,34 +36,7 @@ const pending = ref<{
   page: string
   origin: string
 } | null>(null)
-const note = ref("")
-const sending = ref(false)
-
-async function comment() {
-  if (pending.value) return
-  if (drawing.value) return (drawing.value = false)
-  if (!capture.supported()) {
-    notify.info({
-      title: "This browser can't capture the screen",
-      description: "Use the bookmarklet on the site instead.",
-      color: "error",
-      icon: "i-mingcute-warning-line",
-    })
-    return
-  }
-  if (!capture.active.value) {
-    try {
-      await capture.start()
-    } catch (error) {
-      // Closing the browser's share dialog is a choice, not a failure.
-      if (!(error instanceof DOMException && error.name === "NotAllowedError"))
-        notify.fail("Couldn't start the screen capture", error)
-      return
-    }
-  }
-  box.value = null
-  drawing.value = true
-}
+const { body: note, images, sending, beginSend } = injectReviewDraft()!
 
 // In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
@@ -75,6 +49,7 @@ function point(event: PointerEvent) {
   }
 }
 function down(event: PointerEvent) {
+  if (event.button !== 0) return
   if (event.target instanceof Element) event.target.setPointerCapture(event.pointerId)
   from = point(event)
   box.value = { left: from.x, top: from.y, width: 0, height: 0 }
@@ -112,11 +87,21 @@ async function up() {
   }
   if (crop.width < 1 || crop.height < 1) return (box.value = null)
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
-  drawing.value = false
+  capturing.value = true
   box.value = null
-  await nextTick()
-  await new Promise(requestAnimationFrame)
   try {
+    if (!capture.supported()) {
+      notify.info({
+        title: "This browser can't capture the screen",
+        description: "Write a comment without an area, or use the bookmarklet on the site instead.",
+        color: "error",
+      })
+      return
+    }
+    if (!capture.active.value) await capture.start()
+    if (!props.reviewing) return
+    await nextTick()
+    await new Promise(requestAnimationFrame)
     const blob = await capture.grab({
       left: visible.left,
       top: visible.top,
@@ -133,18 +118,19 @@ async function up() {
       origin: url.origin,
     }
   } catch (error) {
-    notify.fail("Couldn't take the screenshot", error)
+    if (!(error instanceof DOMException && error.name === "NotAllowedError"))
+      notify.fail("Couldn't take the screenshot", error)
+  } finally {
+    capturing.value = false
   }
 }
 
 // Images the reviewer adds beside the screenshot: from the button, a paste, or a drop on the form.
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop: dropImages } = useImagePicks()
+const { picks, problem, files, remove, open: pickImages, paste, drop: dropImages } = images
 
 function discard() {
   if (pending.value) URL.revokeObjectURL(pending.value.url)
   pending.value = null
-  note.value = ""
-  clear()
 }
 
 // The box in thousandths of the screenshot, as every review comment stores it.
@@ -172,26 +158,32 @@ async function send() {
   )
   form.append("screenshot", shot.blob, "screenshot")
   for (const file of files.value) form.append("image", file, file.name || "image")
-  sending.value = true
+  const finish = beginSend()
+  if (!finish) return
   try {
     await sendSiteComment(props.drop.id, shot.origin, form)
     notify.done("Comment sent", "It's on the site's page with its screenshot.")
-    discard()
+    finish(true)
+    if (pending.value === shot) discard()
     // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
     // events go nowhere.
     void refreshNuxtData([keys.review(props.drop.id), keys.comments(props.drop.id)])
   } catch (error) {
     notify.fail("Couldn't send the comment", error)
   } finally {
-    sending.value = false
+    finish(false)
   }
 }
 
-onKeyStroke("Escape", () => {
-  if (pending.value) discard()
-  else drawing.value = false
+function cancelDrawing() {
+  from = null
+  box.value = null
+}
+watch(drawing, (active) => {
+  if (!active) cancelDrawing()
 })
 onBeforeUnmount(discard)
+defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
 </script>
 
 <template>
@@ -201,7 +193,7 @@ onBeforeUnmount(discard)
         color="neutral"
         icon="i-mingcute-arrow-left-line"
         variant="ghost"
-        aria-label="Back to the site's comments"
+        aria-label="Back to site setup"
         @click="emit('close')"
       />
       <form class="min-w-0 flex-1" @submit.prevent="go">
@@ -216,14 +208,6 @@ onBeforeUnmount(discard)
           spellcheck="false"
         />
       </form>
-      <ViewerDeviceButton />
-      <UButton
-        color="neutral"
-        :variant="drawing ? 'solid' : 'outline'"
-        icon="i-mingcute-chat-1-line"
-        :label="drawing ? 'Drawing…' : 'Comment'"
-        @click="comment"
-      />
     </div>
     <p v-if="!valid" class="border-b border-default px-3 py-1.5 text-xs text-error">
       That address isn't part of this site ({{ drop.siteUrl }}).
@@ -255,6 +239,7 @@ onBeforeUnmount(discard)
             @pointerdown="down"
             @pointermove="move"
             @pointerup="up"
+            @pointercancel="cancelDrawing"
           >
             <div
               v-if="box"
@@ -270,60 +255,61 @@ onBeforeUnmount(discard)
               v-else
               class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
             >
-              Drag over what you mean. <UKbd value="escape" /> cancels.
+              Drag to include an area in your comment.
             </p>
           </div>
         </div>
       </ViewerDevice>
 
-      <form
-        v-if="pending"
-        class="absolute right-4 bottom-18 z-30 w-80 max-w-[calc(100%-2rem)] space-y-3 rounded-lg border border-default bg-default p-3 shadow-lg"
-        @dragover.prevent
-        @drop="dropImages"
-        @submit.prevent="send"
-      >
-        <div class="relative overflow-hidden rounded-md border border-default">
-          <img :alt="`Screenshot of ${pending.page}`" class="block w-full" :src="pending.url" />
-          <span
-            class="absolute rounded-sm border-2 border-inverted"
-            :style="{
-              left: percent(pending.box.left, pending.size.width),
-              top: percent(pending.box.top, pending.size.height),
-              width: percent(pending.box.width, pending.size.width),
-              height: percent(pending.box.height, pending.size.height),
-            }"
-          />
-        </div>
-        <UTextarea
-          v-model="note"
-          autofocus
-          autoresize
-          class="w-full"
-          :maxrows="8"
-          placeholder="What should change here?"
-          :rows="3"
-          @keydown.meta.enter="send"
-          @keydown.ctrl.enter="send"
-          @paste="paste"
-        />
-        <ViewerImagePicks :picks="picks" @remove="remove" />
-        <p v-if="problem" class="text-xs text-error" role="alert">{{ problem }}</p>
-        <div class="flex justify-end gap-2">
-          <UTooltip text="Add images">
-            <UButton
-              aria-label="Add images"
-              class="mr-auto"
-              color="neutral"
-              icon="i-mingcute-pic-line"
-              variant="ghost"
-              @click="pickImages"
+      <Teleport v-if="pending" to="#drop-site-composer">
+        <form
+          class="space-y-3 overflow-y-auto overscroll-contain p-3"
+          @dragover.prevent
+          @drop="dropImages"
+          @submit.prevent="send"
+        >
+          <div class="relative overflow-hidden rounded-md border border-default">
+            <img :alt="`Screenshot of ${pending.page}`" class="block w-full" :src="pending.url" />
+            <span
+              class="absolute rounded-sm border-2 border-inverted"
+              :style="{
+                left: percent(pending.box.left, pending.size.width),
+                top: percent(pending.box.top, pending.size.height),
+                width: percent(pending.box.width, pending.size.width),
+                height: percent(pending.box.height, pending.size.height),
+              }"
             />
-          </UTooltip>
-          <UButton color="neutral" label="Cancel" variant="ghost" @click="discard" />
-          <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
-        </div>
-      </form>
+          </div>
+          <UTextarea
+            v-model="note"
+            autofocus
+            autoresize
+            class="w-full"
+            :maxrows="8"
+            placeholder="What should change here?"
+            :rows="3"
+            @keydown.meta.enter="send"
+            @keydown.ctrl.enter="send"
+            @paste="paste"
+          />
+          <ViewerImagePicks :picks="picks" @remove="remove" />
+          <p v-if="problem" class="text-xs text-error" role="alert">{{ problem }}</p>
+          <div class="flex justify-end gap-2">
+            <UTooltip text="Add images">
+              <UButton
+                aria-label="Add images"
+                class="mr-auto"
+                color="neutral"
+                icon="i-mingcute-pic-line"
+                variant="ghost"
+                @click="pickImages"
+              />
+            </UTooltip>
+            <UButton color="neutral" label="Remove area" variant="ghost" @click="discard" />
+            <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
+          </div>
+        </form>
+      </Teleport>
     </div>
   </div>
 </template>

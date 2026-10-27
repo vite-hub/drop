@@ -5,13 +5,12 @@
 // take images: from the image button, a paste, or a drop.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
-import type { DropComment } from "#shared/types"
+import type { DropComment, SiteReviewItem } from "#shared/types"
 
 type PendingComment = Omit<CommentInput, "body">
 
 const props = defineProps<{
-  x: number
-  y: number
+  screenshot?: SiteReviewItem["screenshot"]
   pending?: PendingComment
   comment?: DropComment
   canManage: boolean
@@ -28,50 +27,51 @@ const emit = defineEmits<{
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
 }>()
-const body = ref(props.draft ?? "")
-const busy = ref(false)
-const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = useImagePicks()
+const sharedDraft = props.pending ? injectReviewDraft()! : undefined
+const composerDraft = sharedDraft ?? { body: ref(""), images: useImagePicks() }
+const body = composerDraft.body
+if (props.draft && !body.value) body.value = props.draft
+const replying = ref(false)
+const busy = sharedDraft?.sending ?? replying
+const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = composerDraft.images
 // Why the last send failed, under the box that sent it; editing the text clears it.
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
-const viewport = useWindowSize()
-const card = useTemplateRef("card")
-const { height } = useElementSize(card)
-const width = computed(() => Math.min(props.comment ? 352 : 320, Math.max(0, viewport.width.value - 16)))
-// Below the pin when it fits, else as high as the thread needs; never under the header or off the bottom.
-const style = computed(() => {
-  const left = Math.min(Math.max(8, props.x), Math.max(8, viewport.width.value - width.value - 8))
-  const top = Math.max(56, Math.min(props.y + 8, viewport.height.value - Math.max(height.value, 120) - 8))
-  return { left: `${left}px`, top: `${top}px`, width: `${width.value}px` }
-})
+const card = useTemplateRef<HTMLElement>("card")
+const motion = usePreferredReducedMotion()
+onMounted(() =>
+  (card.value?.querySelector<HTMLElement>("textarea") ?? card.value?.querySelector<HTMLElement>("button"))?.focus({
+    preventScroll: true,
+  }),
+)
 
 function escape(event: KeyboardEvent) {
   if (!body.value.trim()) return emit("cancel")
   if (event.target instanceof HTMLElement) event.target.blur()
 }
-let typing = false
-const press = () => (typing = Boolean(body.value.trim() && card.value?.contains(document.activeElement)))
-const clickAway = () => typing || emit("cancel")
 
 function send() {
   if (!body.value.trim() || busy.value) return
-  busy.value = true
+  if (props.comment) replying.value = true
   if (props.comment) emit("reply", props.comment.id, body.value, files.value)
   else emit("submit", body.value, files.value)
 }
 defineExpose({
   fail: (reason?: string, text?: string) => {
-    busy.value = false
+    replying.value = false
     if (text && !body.value) body.value = text
     error.value = reason
   },
   /** A reply went through: clear the box for the next one, and show it at the bottom of the thread. */
   sent: async () => {
-    busy.value = false
+    replying.value = false
     body.value = ""
     clear()
     await nextTick()
-    thread.value?.scrollTo({ top: thread.value.scrollHeight, behavior: "smooth" })
+    thread.value?.scrollTo({
+      top: thread.value.scrollHeight,
+      behavior: motion.value === "reduce" ? "instant" : "smooth",
+    })
   },
 })
 const thread = useTemplateRef("thread")
@@ -100,14 +100,22 @@ const menu = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
-  <div class="fixed inset-0 z-40" @click="clickAway" @pointerdown="press" />
   <div
     ref="card"
-    class="fixed z-50 flex origin-top-left flex-col overflow-hidden rounded-xl border border-default bg-default text-default shadow-lg shadow-black/5 [animation:pop-in_160ms_var(--ease-out)]"
-    :class="pending ? 'p-1.5 pl-2.5' : 'max-h-[min(32rem,calc(100dvh-4.5rem))]'"
-    :style="style"
+    data-comment-editor
+    class="flex min-h-0 flex-1 flex-col overflow-hidden bg-default text-default"
+    :class="pending && 'p-3'"
   >
     <template v-if="pending">
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <span class="text-sm text-muted">{{
+          pending.quote ? "Selected text" : pending.kind === "image" ? "Selected image area" : "Selected area"
+        }}</span>
+        <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
+      </div>
+      <p v-if="pending.quote" class="mb-3 line-clamp-3 border-l-2 border-default pl-3 text-sm text-muted">
+        {{ pending.quote }}
+      </p>
       <div class="flex items-end gap-1" @dragover.prevent @drop="drop">
         <UTextarea
           v-model="body"
@@ -120,7 +128,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'
           "
           :rows="1"
-          :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
+          :ui="{ base: 'px-1 py-1.5 text-base leading-relaxed sm:text-sm' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
           @keydown.esc.stop="escape"
@@ -151,6 +159,14 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     </template>
     <template v-else-if="comment">
       <div class="flex h-10 shrink-0 items-center gap-1 border-b border-default pr-1.5 pl-3">
+        <UButton
+          aria-label="Back to comments"
+          color="neutral"
+          icon="i-mingcute-arrow-left-line"
+          size="sm"
+          variant="ghost"
+          @click="emit('cancel')"
+        />
         <span class="label-mono">Comment #{{ comment.n }}</span>
         <span v-if="comment.resolved" class="ml-1.5 text-xs text-muted">Resolved</span>
         <span class="flex-1" />
@@ -167,18 +183,11 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         <UDropdownMenu :content="{ align: 'end' }" :items="menu">
           <UButton aria-label="More" color="neutral" icon="i-mingcute-more-1-line" size="sm" variant="ghost" />
         </UDropdownMenu>
-        <UButton
-          aria-label="Close"
-          color="neutral"
-          icon="i-mingcute-close-line"
-          size="sm"
-          variant="ghost"
-          @click="emit('cancel')"
-        />
       </div>
 
-      <div ref="thread" class="min-h-0 flex-1 divide-y divide-default overflow-y-auto">
+      <div ref="thread" class="min-h-0 flex-1 divide-y divide-default overflow-y-auto overscroll-contain wrap-anywhere">
         <div class="space-y-2 px-3 py-3">
+          <ViewerReviewScreenshot v-if="screenshot" :comment="comment" :screenshot="screenshot" />
           <ViewerCommentHeader :comment="comment" :numbered="false" />
           <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
@@ -224,10 +233,10 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           :maxrows="6"
           placeholder="Reply"
           :rows="1"
-          :ui="{ base: 'px-1 py-1.5 text-sm leading-relaxed' }"
+          :ui="{ base: 'px-1 py-1.5 text-base leading-relaxed sm:text-sm' }"
           variant="none"
           @keydown.enter.exact.prevent="send"
-          @keydown.esc="emit('cancel')"
+          @keydown.esc.stop="escape"
           @paste="paste"
         />
         <UTooltip text="Add images">

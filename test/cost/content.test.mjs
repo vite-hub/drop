@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
+import { resolveCacheKeys } from "ocache"
 import { beforeEach, test } from "vite-plus/test"
 import { readFileSync } from "node:fs"
-import { sql, queries, state, calls, migrate, reset, insertDrop, who, event } from "./harness.mjs"
-const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionChain, deleteDrop, publishApp } =
+import { sql, queries, state, calls, migrate, reset, insertDrop, insertVersion, who, event } from "./harness.mjs"
+const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionsOf, deleteDrop, publishApp } =
   await import("../../server/utils/drops.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 const { default: accessMiddleware } = await import("../../server/middleware/0.drop-access.ts")
@@ -15,58 +16,60 @@ migrate()
 beforeEach(reset)
 const missing = (action) => assert.rejects(action, (error) => error.status === 404)
 
-test("a chain uses one indexed query and preserves older/newer bounds", async () => {
-  for (let i = 0; i < 150; i++) insertDrop(`v${i}`, { supersedes_id: i ? `v${i - 1}` : null, version: i + 1 })
-  for (let i = 0; i < 2000; i++) insertDrop(`unrelated${i}`)
-  const row = await findDrop("v74")
+test("a drop's versions take one indexed query, at most 100 of them", async () => {
+  insertDrop("doc", { version: 150 })
+  for (let i = 1; i < 150; i++) insertVersion("doc", i)
+  for (let i = 0; i < 500; i++) {
+    insertDrop(`unrelated${i}`, { version: 2 })
+    insertVersion(`unrelated${i}`, 1)
+  }
+  const row = await findDrop("doc")
   queries.length = 0
-  const chain = await versionChain(row)
+  const versions = await versionsOf(row)
   assert.equal(queries.length, 1)
-  assert.equal(chain.length, 100)
-  assert.equal(chain[0].id, "v124")
-  assert.equal(chain.at(-1).id, "v25")
+  assert.equal(versions.length, 100)
+  assert.equal(versions[0].version, 150)
+  assert.equal(versions.at(-1).version, 51)
   const { query, params } = queries[0]
   const plan = sql
     .prepare(`EXPLAIN QUERY PLAN ${query}`)
     .all(...params)
     .map((row) => row.detail)
     .join("\n")
-  assert.match(plan, /SEARCH d USING INDEX drops_supersedes/)
-  assert.doesNotMatch(plan, /SCAN d\b/)
-  assert.match(query, /WITH RECURSIVE/)
+  assert.match(plan, /SEARCH drop_versions USING INDEX/)
+  assert.doesNotMatch(plan, /SCAN drop_versions/)
 })
 
-test("listing limits latest drops, rather than losing slots to old versions", async () => {
-  for (let i = 0; i < 600; i++) insertDrop(`v${i}`, { supersedes_id: i ? `v${i - 1}` : null, updated_at: 2000 - i })
-  for (let i = 0; i < 500; i++) insertDrop(`other${i}`)
+test("listing reads the owner's newest drops through their index", async () => {
+  for (let i = 0; i < 600; i++) insertDrop(`v${i}`, { updated_at: 2000 - i })
+  for (let i = 0; i < 500; i++) insertDrop(`other${i}`, { owner_id: "other" })
   const rows = await listDrops(who)
   assert.equal(rows.length, 500)
-  assert.equal(rows.filter((row) => row.id.startsWith("v")).length, 1)
-  assert.ok(rows.some((row) => row.id === "v599"))
+  assert.equal(rows[0].id, "v0")
   const plan = sql
     .prepare(`EXPLAIN QUERY PLAN ${queries[0].query}`)
     .all(...queries[0].params)
     .map((row) => row.detail)
     .join("\n")
-  assert.match(plan, /drop_heads_owner_idx/)
-  assert.doesNotMatch(plan, /SCAN drops|drops_owner_idx/)
+  assert.match(plan, /drops_owner_idx/)
+  assert.doesNotMatch(plan, /SCAN drops\b/)
 })
 
-test("publishing from an older doc id still extends the latest version in its chain", async () => {
-  insertDrop("first")
-  insertDrop("second", { supersedes_id: "first", version: 2 })
-  insertDrop("third", { supersedes_id: "second", version: 3 })
+test("publishing from an older version's file still extends the latest version", async () => {
+  insertDrop("doc", { version: 3 })
+  insertVersion("doc", 1)
+  insertVersion("doc", 2)
   insertDrop("unrelated", { version: 99 })
   const next = await createDocDrop(who, {
     filename: "plan.md",
     bytes: new TextEncoder().encode("# Fourth"),
-    supersedes: "first",
+    supersedes: "doc-v1.md",
   })
-  assert.equal(next.supersedesId, "third")
+  assert.equal(next.id, "doc")
   assert.equal(next.version, 4)
   assert.deepEqual(
-    (await versionChain(next)).map((row) => row.id),
-    [next.id, "third", "second", "first"],
+    (await versionsOf(await findDrop("doc"))).map((row) => row.version),
+    [4, 3, 2, 1],
   )
 })
 
@@ -94,7 +97,7 @@ test("a banned owner's shared doc, downloads, page, app, and code image all retu
   insertDrop("doc", { blob_key: key })
   insertDrop("app", { kind: "app", blob_key: null })
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
-  sql.prepare("INSERT INTO code_images VALUES (?, ?, ?)").run(imageKey, "owner", Date.now() + 300000)
+  sql.prepare("INSERT INTO code_images VALUES (?, ?, ?, ?)").run(imageKey, "owner", 1, Date.now() + 300000)
   sql.exec("UPDATE user SET banned = 1 WHERE id = 'owner'")
   for (const path of [`/f/${key}`, `/f/${key}?raw`, `/f/${imageKey}`, "/f/apps/app/file.html", "/d/doc", "/d/app"])
     for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
@@ -118,7 +121,7 @@ test("a banned owner's shared doc, downloads, page, app, and code image all retu
 test("normal shared files and code images use one owner join, and unban restores access", async () => {
   insertDrop("doc")
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
-  sql.prepare("INSERT INTO code_images VALUES (?, ?, ?)").run(imageKey, "owner", Date.now() + 300000)
+  sql.prepare("INSERT INTO code_images VALUES (?, ?, ?, ?)").run(imageKey, "owner", 1, Date.now() + 300000)
   for (const key of ["doc.md", imageKey]) {
     queries.length = 0
     await requireBlobAccess(event(`/f/${key}`), key)
@@ -199,7 +202,7 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
 
 test("reports quarantine code images while image access stays one query", async () => {
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
-  sql.prepare("INSERT INTO code_images VALUES (?, ?, ?)").run(imageKey, "owner", Date.now() + 300000)
+  sql.prepare("INSERT INTO code_images VALUES (?, ?, ?, ?)").run(imageKey, "owner", 1, Date.now() + 300000)
   sql
     .prepare(
       "INSERT INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)",
@@ -224,7 +227,10 @@ test("failed blob deletion never turns a private file public, and retries remove
   insertDrop("doc", { visibility: "private" })
   const row = await findDrop("doc")
   await dropDetail(row, who, "https://drop.example")
-  state.entries.set("nitro:functions:markdown:doc.md.json", { value: "old html" })
+  const [cacheKey] = await resolveCacheKeys({
+    options: { base: "", group: "nitro/functions", name: "markdown", getKey: () => "doc.md" },
+  })
+  state.entries.set(cacheKey, { value: "old html" })
   state.failDelete = true
   await deleteDrop(row)
   assert.equal(await findDrop("doc"), null)
@@ -260,22 +266,7 @@ test("a blob with no drop behind it is never served, and access needs no storage
   assert.equal(calls.head, 0)
 })
 
-test("/api/me reads the maintained member counter after inserts and deletes", async () => {
-  state.who = who
-  assert.equal((await meHandler(event("/api/me"))).members, 1)
-  sql.exec("INSERT INTO user (id, name, email) VALUES ('second', 'Second', 'second@example.com')")
-  queries.length = 0
-  const viewer = await meHandler(event("/api/me"))
-  assert.equal(viewer.members, 2)
-  assert.equal(viewer.mode, "personal")
-  assert.equal(viewer.publicLinkDays, null)
-  assert.equal(queries.length, 1)
-  assert.doesNotMatch(queries[0].query, /count\(/)
-  sql.exec("DELETE FROM user WHERE id = 'second'")
-  assert.equal((await meHandler(event("/api/me"))).members, 1)
-})
-
-test("/api/me counts the public shares waiting for review, for admins only", async () => {
+test("/api/me does not count review shares for the removed sidebar badge", async () => {
   insertDrop("waiting", { share: "public", share_review: "pending" })
   insertDrop("waiting-comments", { share: "public_comment", share_review: "pending" })
   insertDrop("rejected", { share: "public", share_review: "rejected" })
@@ -283,7 +274,9 @@ test("/api/me counts the public shares waiting for review, for admins only", asy
   state.who = who
   assert.equal((await meHandler(event("/api/me"))).reviews, undefined)
   state.who = { ...who, role: "admin" }
-  assert.equal((await meHandler(event("/api/me"))).reviews, 2)
+  queries.length = 0
+  assert.equal((await meHandler(event("/api/me"))).reviews, undefined)
+  for (const { query } of queries) assert.doesNotMatch(query, /count\(/)
 })
 
 test("app publishing keeps only the latest file set, as the docs promise", async () => {
@@ -414,9 +407,11 @@ test("cleanup releases image quota only after deleting its blob and retains OAut
 })
 
 test("full-history deletion queues every blob beyond the version display bounds", async () => {
-  for (let i = 0; i < 300; i++) insertDrop(`long${i}`, { supersedes_id: i ? `long${i - 1}` : null })
+  insertDrop("long", { version: 300 })
+  for (let i = 1; i < 300; i++) insertVersion("long", i)
   state.failDelete = true
-  await deleteDrop(await findDrop("long150"))
+  await deleteDrop(await findDrop("long"))
   assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_versions").get().n, 0)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM blob_cleanup").get().n, 300)
 })

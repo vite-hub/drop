@@ -107,7 +107,7 @@ const pages = computed<CommandPaletteItem[]>(() =>
       : { label: "Shared with me", icon: "i-mingcute-inbox-line", to: "/drops?tab=with-me" },
     { label: "Trash", icon: "i-mingcute-delete-2-line", to: "/drops?tab=trash" },
     { label: "Agents", icon: "i-mingcute-sparkles-line", to: "/agents" },
-    // As in the sidebar: members see Skills while one is on, and Members is the admins' page.
+    // As in the sidebar: members see Skills while one is on.
     ...(me.value?.role === "admin" || me.value?.skills
       ? [{ label: "Skills", icon: "i-mingcute-plugin-2-line", to: "/skills" }]
       : []),
@@ -119,7 +119,7 @@ const pages = computed<CommandPaletteItem[]>(() =>
     },
     ...(me.value?.role === "admin"
       ? [
-          { label: "Members", icon: "i-mingcute-group-2-line", to: "/members" },
+          { label: "Console", icon: "i-mingcute-settings-3-line", to: "/_vitehub/auth", external: true },
           { label: "Review shares", icon: "i-mingcute-safety-certificate-line", to: "/admin/review" },
           { label: "Reports", icon: "i-mingcute-flag-1-line", to: "/admin/reports" },
         ]
@@ -137,6 +137,26 @@ const docs = DOCS_PAGES.map((page) => ({
 const account: CommandPaletteItem[] = [
   { label: "Sign out", icon: "i-mingcute-exit-line", onSelect: () => void signOut() },
 ]
+
+const colorMode = useColorMode()
+const appConfig = useAppConfig()
+const theme = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() =>
+  colorMode.forced
+    ? []
+    : [
+        {
+          id: "theme",
+          label: "Theme",
+          items: (["system", "light", "dark"] as const).map((mode) => ({
+            id: `theme-${mode}`,
+            label: mode.charAt(0).toUpperCase() + mode.slice(1),
+            icon: appConfig.ui.icons[mode],
+            active: colorMode.preference === mode,
+            onSelect: () => (colorMode.preference = mode),
+          })),
+        },
+      ],
+)
 
 const picker = useFileDialog({ multiple: false, reset: true })
 picker.onChange((files) => void uploadPicked(files))
@@ -213,7 +233,7 @@ const create = computed<CommandPaletteItem[]>(() => {
 const settled = computed(() => JSON.stringify(asked.value) === JSON.stringify(request.value))
 const unknownFolder = computed(() => Boolean(named.value) && !searched.value)
 // The open drop's commands lead: they're about what's on screen. With words, matching pages and new drops follow: there
-// are few, and most searches match none. Without, your latest drops, then what you can make. Nuxt UI adds the theme last.
+// are few, and most searches match none. Theme commands stay ahead of delayed results so Enter keeps its target.
 const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
   // With a filter on, only drops can match it.
   ...(filtered.value
@@ -222,7 +242,7 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
           id: "drops",
           label: searched.value ? `In ${searched.value.title}` : "Drops",
           ignoreFilter: true,
-          items: settled.value && !unknownFolder.value ? found.value.map(toItem) : [],
+          items: settled.value && status.value === "success" && !unknownFolder.value ? found.value.map(toItem) : [],
         },
       ]
     : []),
@@ -237,7 +257,13 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
           { id: "create", label: "Create", items: create.value },
           { id: "docs", label: "Docs", items: docs },
           { id: "account", label: "Account", items: account },
-          { id: "drops", label: "Drops", ignoreFilter: true, items: settled.value ? found.value.map(toItem) : [] },
+          ...theme.value,
+          {
+            id: "drops",
+            label: "Drops",
+            ignoreFilter: true,
+            items: settled.value && status.value === "success" ? found.value.map(toItem) : [],
+          },
         ]
       : [
           { id: "recent", label: "Recent", ignoreFilter: true, items: recent.value.slice(0, 5).map(toItem) },
@@ -245,6 +271,7 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
           { id: "pages", label: "Go to", items: pages.value },
           { id: "docs", label: "Docs", items: docs },
           { id: "account", label: "Account", items: account },
+          ...theme.value,
         ]),
 ])
 </script>
@@ -255,6 +282,9 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
     v-model:search-term="term"
     description="Search your drops, drops shared with you, and pages, act on the drop open, or make a new drop. Type in: and a folder, or kind: and a kind, to narrow the drops."
     :groups="groups"
+    :color-mode="false"
+    preserve-group-order
+    :search-delay="0"
     :loading="pending && !unknownFolder"
     placeholder="Search drops, docs and pages, or make one"
     title="Search"

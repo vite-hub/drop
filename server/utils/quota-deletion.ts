@@ -1,17 +1,16 @@
-import { like, sql } from "drizzle-orm"
+import { eq, like, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, drops } from "../databases/config"
+import { blobCleanup, dropFiles, drops, dropVersions } from "../databases/config"
 import type { DropRow } from "./drops"
-import { bindQuotaSQL, deletionChainSQL } from "./quota-sql"
 
-/** Remove the whole logical drop at the batch's snapshot, including a concurrent revision that already committed. */
+/** Removes the drop and every version of it at the batch's snapshot, including a version committed meanwhile. */
 export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string[]) => Promise<void>) {
-  const chain = bindQuotaSQL(deletionChainSQL, [row.id, row.ownerId, row.ownerId, row.id, row.ownerId, row.ownerId])
   const token = crypto.randomUUID()
-  // Queue every key before its metadata disappears. The recursive query has a fixed number of parameters.
+  // Queue every key before its metadata disappears.
   const keys = sql`(
-    SELECT ${drops.blobKey} AS blob_key FROM ${drops} WHERE ${drops.id} IN (${chain}) AND ${drops.blobKey} IS NOT NULL
-    UNION SELECT ${dropFiles.blobKey} AS blob_key FROM ${dropFiles} WHERE ${dropFiles.dropId} IN (${chain})
+    SELECT ${drops.blobKey} AS blob_key FROM ${drops} WHERE ${drops.id} = ${row.id} AND ${drops.blobKey} IS NOT NULL
+    UNION SELECT ${dropVersions.blobKey} AS blob_key FROM ${dropVersions} WHERE ${dropVersions.dropId} = ${row.id} AND ${dropVersions.blobKey} IS NOT NULL
+    UNION SELECT ${dropFiles.blobKey} AS blob_key FROM ${dropFiles} WHERE ${dropFiles.dropId} = ${row.id}
   ) AS quota_keys`
   const queue = db
     .insert(blobCleanup)
@@ -26,7 +25,7 @@ export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string
         .where(sql`1`),
     )
     .onConflictDoNothing()
-  const remove = db.delete(drops).where(sql`${drops.id} IN (${chain})`)
+  const remove = db.delete(drops).where(eq(drops.id, row.id))
   const pending = db
     .select({ key: blobCleanup.blobKey })
     .from(blobCleanup)

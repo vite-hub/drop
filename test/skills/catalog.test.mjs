@@ -2,7 +2,11 @@ import assert from "node:assert/strict"
 import { readdir, readFile } from "node:fs/promises"
 import { test } from "vite-plus/test"
 import { parseYAML } from "confbox/yaml"
-const { parseMarkdown } = await import("../../server/utils/markdown-document.ts")
+import { createMarkdownParser } from "@comark/html/parse"
+import comarkUi from "comark-ui/html"
+import { migrate } from "../cost/harness.mjs"
+
+migrate()
 
 const root = new URL("../../skills/", import.meta.url)
 const names = (await readdir(root, { withFileTypes: true }))
@@ -24,20 +28,33 @@ for (const name of names) {
   })
 }
 
-test("pr-evidence's annotation examples render in Drop without a problem", async () => {
-  const reference = await readFile(new URL("pr-evidence/references/annotations.md", root), "utf8")
-  const examples = [...reference.matchAll(/^(`{3,})md\n([\s\S]*?)\n\1$/gm)].map((match) => match[2])
-  assert.equal(examples.length, 2)
-  for (const example of examples) {
-    const document = await parseMarkdown(example)
-    assert.deepEqual(document.meta.issues, [], example)
+test("pr-evidence serves the renderer's comark-ui skill and all its references", async () => {
+  const { findSkill } = await import("../../server/utils/skills.ts")
+  const files = findSkill("pr-evidence").files
+  const upstream = new URL("../../node_modules/comark-ui/dist/skills/comark-ui/", import.meta.url)
+  const skill = await readFile(new URL("SKILL.md", upstream), "utf8")
+  assert.equal(files.find((item) => item.path === "references/comark-ui/SKILL.md").text, skill)
+  const reference = files.find((item) => item.path === "references/annotations.md").text
+  assert.match(reference, /^# comark-ui/)
+  assert.match(reference, /::compare/)
+  for (const name of await readdir(new URL("references/", upstream))) {
+    assert.equal(
+      files.find((item) => item.path === `references/comark-ui/references/${name}`).text,
+      await readFile(new URL(`references/${name}`, upstream), "utf8"),
+    )
+  }
+  for (const [, target] of reference.matchAll(/\]\((comark-ui\/[^)]+)\)/g)) {
+    assert.ok(
+      files.some((item) => item.path === `references/${target}`),
+      `missing ${target}`,
+    )
   }
 })
 
-test("show-me's annotated screenshot example renders in Drop without a problem", async () => {
+test("show-me's annotated screenshot example is valid comark-ui", async () => {
   const skill = await readFile(new URL("show-me/SKILL.md", root), "utf8")
   const example = skill.match(/```md\n([\s\S]*?)\n```/)?.[1]
   assert.ok(example)
-  const document = await parseMarkdown(example)
+  const document = await createMarkdownParser({ plugins: comarkUi().plugins })(example)
   assert.deepEqual(document.meta.issues, [])
 })

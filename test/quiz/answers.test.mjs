@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { H3Event } from "h3"
 import { beforeEach, test } from "vite-plus/test"
-import { insertDrop, migrate, reset, sql, state, who } from "../cost/harness.mjs"
+import { insertDrop, insertVersion, migrate, reset, sql, state, who } from "../cost/harness.mjs"
 const { answersOf, quizBlocks, quizResults, recordAnswer } = await import("../../server/utils/answers.ts")
 const { cachedMarkdown } = await import("../../server/utils/markdown-cache.ts")
 const { MAX_QUIZ_BLOCKS } = await import("../../shared/quiz.ts")
@@ -37,9 +37,9 @@ async function quizDoc(id, overrides) {
   )
 }
 
-function post(id, body) {
+function post(id, body, version) {
   const event = new H3Event(
-    new Request(`https://drop.example/api/drops/${id}/answers`, {
+    new Request(`https://drop.example/api/drops/${id}/answers${version ? `?v=${version}` : ""}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -50,8 +50,8 @@ function post(id, body) {
   return answersPost(event)
 }
 
-function detail(id) {
-  const event = new H3Event(new Request(`https://drop.example/api/drops/${id}`))
+function detail(id, version) {
+  const event = new H3Event(new Request(`https://drop.example/api/drops/${id}${version ? `?v=${version}` : ""}`))
   event.context.log = { set() {}, error() {} }
   event.context.params = { id }
   return detailHandler(event)
@@ -129,17 +129,17 @@ test("a doc keeps answers to a limited number of blocks, and the ones it has kee
   assert.equal((await quizResults("doc")).has("one-more"), false)
 })
 
-test("deleting a doc's last version, or a person, deletes the answers that went with them", async () => {
-  insertDrop("v1", { link: "doc" })
-  insertDrop("v2", { link: "doc", supersedes_id: "v1", version: 2 })
+test("deleting a doc or person deletes their answers; removing an archived version keeps them", async () => {
+  insertDrop("doc", { version: 2 })
+  insertVersion("doc", 1)
   sql.prepare("INSERT INTO user (id, name, email) VALUES ('ada', 'Ada', 'ada@example.com')").run()
   await recordAnswer("doc", "ada", { id: "capital", kind: "question", choice: ["paris"], correct: true })
   await recordAnswer("doc", "bob", { id: "capital", kind: "question", choice: ["lyon"], correct: false })
   sql.exec("DELETE FROM user WHERE id = 'ada'")
   assert.deepEqual(await answersOf("doc", "ada"), [])
-  sql.exec("DELETE FROM drops WHERE id = 'v2'")
-  assert.equal((await answersOf("doc", "bob")).length, 1, "an earlier version keeps them")
-  sql.exec("DELETE FROM drops WHERE id = 'v1'")
+  sql.exec("DELETE FROM drop_versions WHERE drop_id = 'doc' AND version = 1")
+  assert.equal((await answersOf("doc", "bob")).length, 1, "the doc keeps them across versions")
+  sql.exec("DELETE FROM drops WHERE id = 'doc'")
   assert.deepEqual(await answersOf("doc", "bob"), [])
 })
 
@@ -206,6 +206,29 @@ test("a signed-in reader's answer is checked against the doc, kept, and comes ba
     capital: { kind: "question", counts: { lyon: 1 }, total: 1 },
     lunch: { kind: "poll", counts: { tacos: 1 }, total: 1 },
   })
+})
+
+test("answers are validated against the displayed version and shared across the doc's versions", async () => {
+  await quizDoc("quiz", { version: 2, visibility: "public", access: "view" })
+  insertVersion("quiz", 1)
+  await cachedMarkdown(
+    "quiz-v1.md",
+    async () => "# Earlier quiz",
+    async () => ({ title: "Earlier quiz", html: QUIZ_HTML.replaceAll("paris", "rome") }),
+  )
+  state.who = ada
+  const earlier = { id: "capital", kind: "question", choice: ["rome"], correct: true }
+  const current = { ...earlier, choice: ["paris"] }
+  await assert.rejects(post("quiz", earlier), status(400), "the latest version has different options")
+  assert.deepEqual((await post("quiz", earlier, 1)).answer, { choice: ["rome"], correct: true })
+  await assert.rejects(post("quiz", current, 1), status(400), "only the displayed version's options count")
+  await assert.rejects(post("quiz", current, 3), status(404), "a missing version cannot accept answers")
+  assert.deepEqual(await post("quiz", current, 2), {
+    answer: { choice: ["paris"], correct: true },
+    results: { counts: { rome: 1 }, total: 1 },
+  })
+  assert.equal((await answersOf("quiz", "ada"))[0].attempts, 2)
+  assert.deepEqual((await detail("quiz", 1)).quiz, (await detail("quiz")).quiz)
 })
 
 test("only people who can open the doc answer, and not while it's in the Trash", async () => {

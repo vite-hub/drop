@@ -15,7 +15,7 @@ export const keys = {
   team: (id: string) => `team:${id}`,
   search: "search",
   dropSearch: "drop-search",
-  members: "members",
+  people: "people",
   agents: "agents",
   skills: "skills",
   mcpCatalog: "mcp-catalog",
@@ -24,13 +24,13 @@ export const keys = {
   adminReports: "admin-reports",
   adminReview: "admin-review",
   githubStars: "github-stars",
-  drop: (id: string) => `drop:${id}`,
-  comments: (id: string) => `comments:${id}`,
+  drop: (id: string, version?: number) => `drop:${id}${version ? `@${version}` : ""}`,
+  comments: (id: string, version?: number) => `comments:${id}${version ? `@${version}` : ""}`,
   /** The drops directly in a folder. */
   folder: (id: string) => `folder:${id}`,
   folderSearch: (id: string) => `folder-search:${id}`,
   /** One version's detail, for History's diff. */
-  version: (id: string) => `version:${id}`,
+  version: (id: string, version: number) => `version:${id}@${version}`,
   review: (id: string) => `review:${id}`,
   dropLink: (id: string, version?: number) => `drop-link:${id}:${version ?? ""}`,
 } as const

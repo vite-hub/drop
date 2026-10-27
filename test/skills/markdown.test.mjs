@@ -43,9 +43,10 @@ test("every component Drop renders is in the Markdown reference agents read", ()
 
 test("every comark-ui package Drop renders has a section in the Markdown references", () => {
   const preset = createRequire(import.meta.url)("comark-ui/package.json")
-  // include reads files, which Drop turns off, reading-time only measures, and Drop draws Mermaid itself, not with pele.
+  // include reads files, which Drop turns off, reading-time only measures, Drop draws Mermaid itself, not with pele, and
+  // the security plugin drops mathml's MathML, so markdown.md lists math under what Drop doesn't render.
   const packages = Object.keys(preset.dependencies).filter(
-    (name) => !["comark-include", "comark-pele", "comark-reading-time"].includes(name),
+    (name) => !["comark-include", "comark-mathml", "comark-pele", "comark-reading-time"].includes(name),
   )
   const missing = packages.filter(
     (name) => !(reference + blocks).includes(`https://comark-ui.onmax.me/${name.replace(/^comark-/, "")}/`),
@@ -75,8 +76,19 @@ test("all five GitHub alert kinds keep their label", async () => {
 
 test("footnotes link to their definition and back", async () => {
   const { html } = await renderMarkdownCached("footnotes.md", async () => "A claim.[^src]\n\n[^src]: The source.\n")
-  assert.match(html, /<sup class="footnote-ref"><a href="#fn-src" id="fnref-src">\[1\]<\/a><\/sup>/)
+  assert.match(
+    html,
+    /<sup class="(?:[^" ]+ )*footnote-ref(?: [^" ]+)*"><a href="#fn-src" id="fnref-src">\[1\]<\/a><\/sup>/,
+  )
   assert.match(html, /<li id="fn-src">The source\. <a href="#fnref-src" class="footnote-backref">/)
+})
+
+test("a link chip with code in its label adds no space after the code", async () => {
+  const { html } = await renderMarkdownCached(
+    "chip-code.md",
+    async () => "Tested on [commit `5b5bd21`](https://github.com/nitrojs/nitro/tree/5b5bd21), built from source.\n",
+  )
+  assert.match(html, /<a class="cp" [^>]*><img class="cp-img" [^>]*>commit <code>5b5bd21<\/code><\/a>, built/)
 })
 
 test("a doc written before comark-annotate 0.2 keeps its screenshot's url and label, without a problem", async () => {

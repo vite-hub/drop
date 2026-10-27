@@ -17,17 +17,17 @@ const users = []
 async function request(path, method = "GET", body) {
   const response = await fetch(`${origin}${path}`, {
     method,
-    headers: { cookie, origin, ...(body ? { "content-type": "application/json" } : {}) },
+    headers: { cookie, origin, ...(body ? { "content-type": "application/json", "x-vitehub-console": "1" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   })
   return { status: response.status, data: await response.json() }
 }
-async function signup() {
+async function signup(admin = false) {
   const response = await fetch(`${origin}/api/auth/sign-up/email`, {
     method: "POST",
     headers: { "content-type": "application/json", origin },
     body: JSON.stringify({
-      email: `quota-plan-${crypto.randomUUID()}@example.com`,
+      email: admin ? "console-admin@example.com" : `quota-plan-${crypto.randomUUID()}@example.com`,
       password: `Quota-${crypto.randomUUID()}`,
       name: "Plan test",
     }),
@@ -45,14 +45,34 @@ async function signup() {
   }
 }
 try {
-  const admin = await signup()
+  const admin = await signup(true)
   const owner = await signup()
-  // Only the test fixture changes the role directly.
-  db.prepare("UPDATE user SET role='admin' WHERE id=?").run(admin.id)
+  // Run with DROP_ADMINS=console-admin@example.com. The Console must repair this stale stored role.
+  db.prepare("UPDATE user SET role='member', email_verified=1 WHERE id=?").run(admin.id)
   cookie = admin.cookie
   // Admins move a member between Free and Pro through Better Auth's admin plugin; there's no Unlimited tier.
-  assert.equal((await request(`/api/members/${owner.id}`, "PATCH", { plan: "unlimited" })).status, 400)
-  assert.equal((await request(`/api/members/${admin.id}`, "PATCH", { plan: "pro" })).status, 200)
+  assert.equal(
+    (
+      await request("/_vitehub/auth/manage", "POST", {
+        action: "editField",
+        userId: owner.id,
+        field: "plan",
+        value: "unlimited",
+      })
+    ).status,
+    400,
+  )
+  assert.equal(
+    (
+      await request("/_vitehub/auth/manage", "POST", {
+        action: "editField",
+        userId: admin.id,
+        field: "plan",
+        value: "pro",
+      })
+    ).status,
+    200,
+  )
   assert.equal((await request("/api/usage")).data.plan, "pro")
   cookie = owner.cookie
   const doc = await request("/api/drops", "POST", { filename: "doc.md", content: "# Owner" })
@@ -119,7 +139,7 @@ try {
   assert.equal((await request("/api/usage")).data.drops.used, 3)
   assert.equal((await request(`/api/drops/${fixtureId}`, "DELETE")).status, 200)
   assert.equal((await request("/api/usage")).data.drops.used, 2)
-  db.prepare("UPDATE quota_blobs SET expires_at=0 WHERE owner_id=?").run(owner.id)
+  db.prepare("UPDATE code_images SET expires_at=0 WHERE owner_id=?").run(owner.id)
   const cleanup = await fetch(`${origin}/cdn-cgi/local/scheduled?cron=${encodeURIComponent("0 * * * *")}`)
   assert.equal(cleanup.status, 200)
   const afterCleanup = (await request("/api/usage")).data
