@@ -4,8 +4,8 @@ import { blob } from "vite-hub/blob"
 
 const DOCUMENT_PATH =
   /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html|htm))$/i
-const markdownContentSecurityPolicy = (copyScriptHash: string) =>
-  `default-src 'none'; img-src https: data:; script-src 'self' 'sha256-${copyScriptHash}'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+const markdownContentSecurityPolicy = (scriptHashes: string[]) =>
+  `default-src 'none'; img-src https: data:; script-src 'self' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(" ")}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
 // Scripts run, but in a sandbox without allow-same-origin: the page gets an opaque origin, so it can't read
 // Drop's cookies or call its API with the viewer's session.
 const HTML_CONTENT_SECURITY_POLICY =
@@ -47,12 +47,15 @@ export default defineHandler(async (event) => {
   }
   // Loaded lazily: middleware lands in the Worker's entry module, and its static imports would be re-exported
   // from there, which Workers rejects for anything that isn't a handler.
-  const { renderMarkdownDocument } = await import("../utils/markdown-document")
-  const { MERMAID_COPY_SCRIPT } = await import("#shared/mermaid-copy")
-  // Authorize only the renderer's exact inline runtime, never scripts supplied by the document's author.
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(MERMAID_COPY_SCRIPT))
-  const copyScriptHash = btoa(String.fromCharCode(...new Uint8Array(digest)))
-  event.res.headers.set("Content-Security-Policy", markdownContentSecurityPolicy(copyScriptHash))
+  const { renderMarkdownDocument, RENDERER_SCRIPTS } = await import("../utils/markdown-document")
+  // Authorize only the renderer's exact inline runtimes, never scripts supplied by the document's author.
+  const scriptHashes = await Promise.all(
+    RENDERER_SCRIPTS.map(async (script) => {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(script))
+      return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    }),
+  )
+  event.res.headers.set("Content-Security-Policy", markdownContentSecurityPolicy(scriptHashes))
   const rendered = await renderMarkdownDocument(readSource, event.url.pathname, key, event)
   return event.req.method === "HEAD" ? "" : rendered
 })

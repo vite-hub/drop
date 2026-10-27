@@ -9,16 +9,22 @@ beforeEach(reset)
 
 const render = async (source) => (await renderMarkdownCached("mermaid-copy.md", async () => source)).html
 
-test("Mermaid preserves its source as escaped text and loads copy controls once per document", async () => {
+test("Mermaid preserves its source as escaped text and loads copy controls and zoom once per document", async () => {
   const source = 'graph TD\n A["A & B"] --> B["Copy <text>"]\n'
   const html = await render(("```mermaid\n" + source + "```\n\n").repeat(2))
-  const sources = [...html.matchAll(/<figure class="drop-mermaid" data-source="([^"]*)">/g)]
+  const sources = [
+    ...html.matchAll(/<figure class="drop-mermaid" data-source="([^"]*)" style="--mermaid-width: (\d+)px">/g),
+  ]
   assert.equal(sources.length, 2)
-  for (const [, escaped] of sources) assert.equal(decodeHTML(escaped), source)
-  assert.equal([...html.matchAll(/<script>/g)].length, 1)
+  for (const [, escaped, width] of sources) {
+    assert.equal(decodeHTML(escaped), source)
+    assert.ok(Number(width) > 0, "the figure carries the diagram's own width")
+  }
+  // Copy buttons and comark-zoom.
+  assert.equal([...html.matchAll(/<script>/g)].length, 2)
   assert.match(html, /Copy image/)
   assert.match(html, /Copy Markdown/)
-  assert.match(html, /<div class="mermaid"><svg/)
+  assert.match(html, /<div class="mermaid" data-zoom tabindex="0"><svg/)
   assert.doesNotMatch(html, /@import url/)
 })
 

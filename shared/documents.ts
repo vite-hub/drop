@@ -138,36 +138,49 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   });
   document.body.append(host);
 
-  // A compare spreads past the text into the room beside it, where the outline goes. So in a doc with one, the outline
-  // keeps a 200px column 4rem right of the compares, and the text moves left only as far as that needs (like for the
-  // viewer's panel). It only shows while the compares keep at least the text's width.
-  const wide = document.querySelector(".typeset .ca-compare");
+  // A compare, or a Mermaid diagram wider than the text, spreads past the text into the room beside it, where the
+  // outline goes. So in a doc with one, the outline keeps a 200px column 4rem right of them, and the text moves left
+  // only as far as that needs (like for the viewer's panel). It only shows while they keep at least the text's width.
+  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .drop-mermaid")];
   const column = 264;
   const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
     const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
-    if (wide) {
-      const fits = innerWidth - inset - column - 48 >= main.getBoundingClientRect().width;
+    const text = main.getBoundingClientRect().width - 48;
+    const wide = blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--mermaid-width")) > text);
+    if (wide.length) {
       const body = document.body.style;
+      const keep = (on) => {
+        if (on) {
+          body.setProperty("--drop-outline", column + "px");
+          body.setProperty("--drop-shift", "clamp(0px, calc(2 * " + right + " + 75rem - 100vw), calc" + right + ")");
+        } else {
+          body.removeProperty("--drop-outline");
+          body.removeProperty("--drop-shift");
+        }
+        return on;
+      };
+      const diagrams = () => wide.reduce((sum, block) => sum + (block.classList.contains("ca-compare") ? 0 : block.getBoundingClientRect().width), 0);
+      let fits = keep(innerWidth - inset - column - 48 >= main.getBoundingClientRect().width);
+      // A diagram's labels matter more than the outline, so the outline goes when its column would shrink a diagram.
       if (fits) {
-        body.setProperty("--drop-outline", column + "px");
-        body.setProperty("--drop-shift", "clamp(0px, calc(2 * " + right + " + 75rem - 100vw), calc" + right + ")");
-      } else {
-        body.removeProperty("--drop-outline");
-        body.removeProperty("--drop-shift");
+        const beside = diagrams();
+        keep(false);
+        fits = keep(diagrams() <= beside);
       }
       host.toggleAttribute("data-fits", fits);
-      host.style.left = Math.min(wide.getBoundingClientRect().right + 64, innerWidth - inset - 224) + "px";
+      const edge = Math.max(...wide.map((block) => block.getBoundingClientRect().right));
+      host.style.left = Math.min(edge + 64, innerWidth - inset - 224) + "px";
       host.style.width = "200px";
       return;
     }
     // The text ends 1.5rem inside <main>. The outline keeps 4rem clear of it, closing to 2.5rem only when its full
     // 15rem width needs the room, and never drifts further out on wide screens.
-    const text = main.getBoundingClientRect().right - 24;
-    const space = innerWidth - inset - 24 - text;
+    const end = main.getBoundingClientRect().right - 24;
+    const space = innerWidth - inset - 24 - end;
     const gap = Math.min(64, Math.max(40, space - 240));
     host.toggleAttribute("data-fits", space - gap >= 176);
-    host.style.left = text + gap + "px";
+    host.style.left = end + gap + "px";
     host.style.width = Math.min(space - gap, 240) + "px";
   }
   function mark() {
