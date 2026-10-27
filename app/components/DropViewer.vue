@@ -703,6 +703,7 @@ watch(
           <ViewerLocation :drop="drop" :public-view="publicView" />
         </template>
         <template #trailing>
+          <ViewerResources v-if="drop.resources?.length" :resources="drop.resources" />
           <ViewerShare v-model:open="shareOpen" :drop="drop" />
         </template>
         <template #right>
