@@ -1,3 +1,4 @@
+import type { AgentMetadata } from "../../shared/agent.ts"
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { ACTOR_KINDS, DROP_KINDS, VIEWER_KINDS } from "../../shared/types.ts"
@@ -38,6 +39,7 @@ export const drops = sqliteTable(
     quarantinedAt: integer("quarantined_at"),
     actorKind: text("actor_kind", { enum: ACTOR_KINDS }).notNull(),
     actorName: text("actor_name").notNull(),
+    agent: text("agent", { mode: "json" }).$type<AgentMetadata>(),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
     /** Last real visit by a person or an agent. Expiry counts from here, falling back to `createdAt`. */

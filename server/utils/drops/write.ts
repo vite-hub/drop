@@ -1,3 +1,4 @@
+import type { AgentMetadata } from "#shared/agent"
 import { and, eq, exists, inArray, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
@@ -140,6 +141,7 @@ export async function deleteBlobKeys(keys: string[]) {
 export async function createDocDrop(
   who: Identity,
   input: LifetimeInput & {
+    agent?: AgentMetadata
     filename: string
     bytes: Uint8Array
     title?: string
@@ -280,6 +282,7 @@ export async function createDocDrop(
         teamFolder: false,
         actorKind: who.actorKind,
         actorName: who.actorName,
+        agent: who.actorKind === "agent" ? (input.agent ?? null) : null,
         createdAt: now,
         updatedAt: now,
         lastAccessedAt: now,
@@ -393,6 +396,7 @@ export function escapesFolder(path: string) {
 export async function publishApp(
   who: Identity,
   input: LifetimeInput & {
+    agent?: AgentMetadata
     id?: string
     name?: string
     slug?: string
@@ -551,6 +555,7 @@ export async function publishApp(
           teamFolder: false,
           actorKind: who.actorKind,
           actorName: who.actorName,
+          agent: who.actorKind === "agent" ? (input.agent ?? null) : null,
           createdAt: row?.createdAt ?? now,
           updatedAt: now,
           publishToken: token,
@@ -590,6 +595,7 @@ export async function publishApp(
               version: next.version,
               actorKind: next.actorKind,
               actorName: next.actorName,
+              agent: next.agent,
               updatedAt: now,
               lastAccessedAt: now,
               publishToken: token,

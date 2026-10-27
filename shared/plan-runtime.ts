@@ -108,7 +108,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
   const pageStyle = document.createElement("style");
-  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent)}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img{cursor:zoom-in}");
+  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent)}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img{cursor:zoom-in}") +
+    // Drop's review dock floats over the frame's bottom edge (--drop-bottom), out of reach of the page's own layers, so
+    // Comark's zoom ends above it and its thumbnails stay clickable. Its backdrop still runs under the dock.
+    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
   // Highlights draw on the page itself, so without Drop's theme they take a grey that shows on light and dark pages.
   if (!THEMED) pageStyle.textContent = pageStyle.textContent.replaceAll("var(--foreground)", "#808080");
   let markers = [], active = null;
@@ -721,7 +724,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "view") setView(m);
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
-    if (m.type === "inset") { document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px"); render(); }
+    if (m.type === "inset") {
+      document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px");
+      document.documentElement.style.setProperty("--drop-bottom", (Number(m.bottom) || 0) + "px");
+      render();
+    }
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     if (m.type === "focus") {

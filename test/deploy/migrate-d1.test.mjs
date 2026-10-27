@@ -56,7 +56,7 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
   }
 })
 
-test("Drizzle applies the migrations once, in journal order", async () => {
+test("Drizzle applies the migrations once, in journal order, on fresh and existing databases", async () => {
   const directory = new URL("../../server/databases/migrations/", import.meta.url)
   const journal = JSON.parse(readFileSync(new URL("meta/_journal.json", directory), "utf8"))
   const filenames = readdirSync(directory)
@@ -74,9 +74,20 @@ test("Drizzle applies the migrations once, in journal order", async () => {
     assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  {
+  for (const appliedTags of [[], ["0000_init", "0001_teams", "0002_agent_metadata"]]) {
     const database = new DatabaseSync(":memory:")
     try {
+      // Model a database already migrated on main: Drizzle only runs entries newer than its latest timestamp.
+      database.exec(
+        "CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)",
+      )
+      for (const tag of appliedTags) {
+        const migration = migrations[journal.entries.findIndex((entry) => entry.tag === tag)]
+        database.exec(migration.sql.join(";\n"))
+        database
+          .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
+          .run(migration.hash, migration.folderMillis)
+      }
       const db = drizzle(async (query, params, method) => {
         const statement = database.prepare(query)
         if (method === "run") {
@@ -125,6 +136,12 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           .prepare("PRAGMA table_info(drops)")
           .all()
           .some((column) => column.name === "quarantined_at"),
+      )
+      assert.ok(
+        database
+          .prepare("PRAGMA table_info(drops)")
+          .all()
+          .some((column) => column.name === "agent"),
       )
       await migrate(db, apply, config)
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
