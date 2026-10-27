@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "6",
-      "when": 1792997514331,
-      "tag": "0002_vitehub_comments",
+      "when": 1793089140860,
+      "tag": "0002_agent_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793091156010,
+      "tag": "0003_vitehub_comments",
       "breakpoints": true
     }
   ]

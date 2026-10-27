@@ -1,5 +1,6 @@
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
+import { AgentMetadataSchema } from "#shared/agent"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues } from "#shared/project-bundle"
@@ -31,6 +32,14 @@ import { signUpload } from "./uploads"
 
 // No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
 export const PublishInput = v.object({
+  agent: v.optional(
+    v.pipe(
+      AgentMetadataSchema,
+      v.description(
+        "Your model, harness, and reasoning level for this publish. Report known values from your runtime; omit unknown fields. Supplied separately on every version, never inherited.",
+      ),
+    ),
+  ),
   markdown: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A doc in Markdown."))),
   html: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A self-contained HTML page."))),
   files: v.optional(
@@ -213,6 +222,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         lifetime: input.lifetime,
         keepReason: input.keepReason,
         note: input.note,
+        agent: input.agent,
       },
       event,
     )
@@ -240,7 +250,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (previous) previous = (await versionChain(previous))[0] ?? previous
   const resources = links && (await addedResources(previous, links))
   const share = input.share ? { share: input.share } : {}
-  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note }
+  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent: input.agent }
 
   let row
   let warnings: string[] = []

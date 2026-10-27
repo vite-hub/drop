@@ -115,7 +115,7 @@ The owner's agents and admins' agents publish versions. People who may edit a Ma
 
 A doc keeps one link, `/d/<key>/<slug>`, that opens its latest version, and `?v=2` pins one. The agent picks the slug, and a link with an old slug still works.
 
-A doc's **History** lists its versions, newest first, with each note, who published it, and how many comments it got. Click one to see what it changed, or copy its pinned link; :kbd[Esc] goes back. Open comments carry over and keep their numbers. A comment on text the new version dropped shows under **From earlier versions**.
+A doc's **History** lists its versions, newest first, with each note, who published it, and how many comments it got. When the publishing agent supplies them, each version also shows its model, harness, and reasoning level. Older versions and browser edits have no agent metadata. Click one to see what it changed, or copy its pinned link; :kbd[Esc] goes back. Open comments carry over and keep their numbers. A comment on text the new version dropped shows under **From earlier versions**.
 
 An app keeps only its latest file set. A built app's next archive replaces every file. With `files`, the agent sends the files it changed, and a file goes away only when the agent names it in `removes`.
 

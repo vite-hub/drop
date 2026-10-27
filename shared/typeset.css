@@ -496,6 +496,14 @@
   overflow-x: auto;
 }
 
+/* Mermaid's inline palette and text tokens must follow the page, whose muted/accent tokens are backgrounds. */
+.typeset .mermaid svg {
+  --bg: var(--background) !important;
+  --fg: var(--foreground) !important;
+  --muted: var(--muted-foreground);
+  --accent: var(--foreground);
+}
+
 .typeset .mermaid svg,
 .typeset .mermaid-image {
   display: block;

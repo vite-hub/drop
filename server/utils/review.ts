@@ -1,3 +1,4 @@
+import type { AgentMetadata } from "#shared/agent"
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
@@ -289,7 +290,14 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
 /** A new site drop: no file, just the address people review. In a folder it lives with the folder, like any drop. */
 export async function createSiteDrop(
   who: Identity,
-  input: LifetimeInput & { url: string; title?: string; slug?: string; share?: Share; folder?: DropRow },
+  input: LifetimeInput & {
+    agent?: AgentMetadata
+    url: string
+    title?: string
+    slug?: string
+    share?: Share
+    folder?: DropRow
+  },
   event?: H3Event,
 ) {
   const siteUrl = siteAddress(input.url)
@@ -331,6 +339,7 @@ export async function createSiteDrop(
       quarantinedAt: null,
       actorKind: who.actorKind,
       actorName: who.actorName,
+      agent: who.actorKind === "agent" ? (input.agent ?? null) : null,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
