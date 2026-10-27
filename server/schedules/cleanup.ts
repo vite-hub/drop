@@ -1,8 +1,5 @@
-import { lte } from "drizzle-orm"
-import { db } from "vite-hub/database/drizzle"
-import { codeImages } from "../databases/config"
 import { defineSchedule } from "vite-hub/schedule"
-import { cleanupQuotaBlobs, cleanupQuotaReservations } from "../utils/quotas"
+import { cleanupCodeImages, cleanupQuotaReservations } from "../utils/quotas"
 
 /** The hourly cleanup: expired reservations and code images, the Trash, closed public links, unused OAuth clients, yesterday's viewers, and the search index's backlog. */
 export default defineSchedule({
@@ -12,11 +9,7 @@ export default defineSchedule({
     const errors: unknown[] = []
     const steps: Array<() => Promise<unknown>> = [
       () => cleanupQuotaReservations(scheduledAt),
-      // Code images expire through their quota_blobs row; their own rows go once the blobs are gone.
-      async () => {
-        await cleanupQuotaBlobs(scheduledAt)
-        await db.delete(codeImages).where(lte(codeImages.expiresAt, scheduledAt.getTime()))
-      },
+      () => cleanupCodeImages(scheduledAt),
       async () => (await import("../utils/drops")).deleteExpiredDrops(scheduledAt),
       async () => (await import("../utils/share")).closePublicLinks(scheduledAt),
       async () => (await import("../utils/oauth-cleanup")).cleanupUnusedOAuthClients(scheduledAt),

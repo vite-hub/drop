@@ -70,7 +70,6 @@ export const drops = sqliteTable(
   (table) => [
     index("drops_owner_idx").on(table.ownerId, table.updatedAt),
     uniqueIndex("drops_blob_key_idx").on(table.blobKey),
-    index("drops_supersedes_idx").on(table.supersedesId),
     uniqueIndex("drops_supersedes_unique").on(table.supersedesId),
     index("drops_expiry_idx").on(table.lifetime, table.lastAccessedAt),
     index("drops_trash_idx").on(table.trashedAt),
@@ -261,23 +260,21 @@ export const blobCleanup = sqliteTable("blob_cleanup", {
   createdAt: integer("created_at").notNull(),
 })
 
-/** Temporary public images still belong to an account and follow its ban. */
+/**
+ * Temporary public images. They still belong to an account, follow its ban, and count toward its storage until the
+ * hourly cleanup has deleted the blob and then the row.
+ */
 export const codeImages = sqliteTable(
   "code_images",
   {
     blobKey: text("blob_key").primaryKey(),
     ownerId: text("owner_id").notNull(),
+    size: integer("size").notNull(),
     expiresAt: integer("expires_at").notNull(),
   },
-  (table) => [index("code_images_expires_idx").on(table.expiresAt)],
-)
-
-/** Maintained by user insert/delete triggers, so /api/me never counts the whole user table. */
-export const workspaceStats = sqliteTable(
-  "workspace_stats",
-  {
-    id: integer("id").primaryKey(),
-    members: integer("members").notNull(),
-  },
-  (table) => [check("workspace_stats_singleton", sql`${table.id} = 1`)],
+  (table) => [
+    index("code_images_owner_idx").on(table.ownerId),
+    index("code_images_expires_idx").on(table.expiresAt),
+    check("code_images_size", sql`${table.size} >= 0`),
+  ],
 )

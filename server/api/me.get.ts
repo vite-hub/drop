@@ -1,8 +1,8 @@
 // doctor-disable nuxt/middleware/no-route-middleware-api-security -- public on purpose: signed out, it answers null.
-import { eq, inArray } from "drizzle-orm"
+import { inArray } from "drizzle-orm"
 import { defineHandler } from "h3"
 import { db } from "vite-hub/database/drizzle"
-import { organization, workspaceStats } from "../databases/config"
+import { organization } from "../databases/config"
 import type { Viewer } from "#shared/types"
 import { expiryPolicy } from "../utils/expiry"
 import { identify } from "../utils/identity"
@@ -18,8 +18,7 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
   const billing = billingConfig(event)
   // The page waits for /api/me before loading the drop. These reads depend only on the identity, so start them
   // together: separate awaits add database round trips, including the first skill-settings read per isolate.
-  const [[row], rows, skills, paid] = await Promise.all([
-    db.select({ total: workspaceStats.members }).from(workspaceStats).where(eq(workspaceStats.id, 1)),
+  const [rows, skills, paid] = await Promise.all([
     ids.length
       ? db
           .select({ id: organization.id, name: organization.name, slug: organization.slug })
@@ -30,7 +29,6 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
     enabledSkills().then((enabled) => enabled.length),
     billing.enabled ? paidTeams(ids) : new Set<string>(),
   ])
-  const members = row?.total ?? 1
   const teams = rows
     .map((item) => ({ ...item, role: who.teams![item.id]!, paid: paid.has(item.id) }))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -43,7 +41,6 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
     expiry: expiryPolicy(event),
     mode,
     publicLinkDays,
-    members,
     skills,
     ...(teamsEnabled(event) ? { teams } : {}),
     ...(billing.enabled

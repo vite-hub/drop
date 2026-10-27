@@ -33,7 +33,7 @@ const usageCTE = `WITH RECURSIVE scope AS (SELECT ? AS owner, ? AS month, ? AS c
       + (SELECT coalesce(sum(drops), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND committed = 0 AND created_at >= (SELECT cutoff FROM scope)) AS drops,
     (SELECT coalesce(sum(size), 0) FROM drops WHERE owner_id = (SELECT owner FROM scope) AND kind != 'app')
       + (SELECT coalesce(sum(f.size), 0) FROM drop_files f JOIN drops d ON d.id = f.drop_id WHERE d.owner_id = (SELECT owner FROM scope))
-      + (SELECT coalesce(sum(size), 0) FROM quota_blobs WHERE owner_id = (SELECT owner FROM scope))
+      + (SELECT coalesce(sum(size), 0) FROM code_images WHERE owner_id = (SELECT owner FROM scope))
       + (SELECT coalesce(sum(bytes), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND committed = 0 AND created_at >= (SELECT cutoff FROM scope)) AS bytes,
     (SELECT coalesce(sum(writes), 0) FROM quota_reservations WHERE owner_id = (SELECT owner FROM scope) AND month = (SELECT month FROM scope) AND (committed = 1 OR created_at >= (SELECT cutoff FROM scope))) AS writes
 )`
