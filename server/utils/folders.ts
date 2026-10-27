@@ -144,6 +144,7 @@ export async function createFolder(
       quarantinedAt: null,
       actorKind: who.actorKind,
       actorName: who.actorName,
+      agent: null,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,

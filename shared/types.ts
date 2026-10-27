@@ -1,4 +1,5 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
+import type { AgentMetadata } from "./agent"
 import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
@@ -86,6 +87,7 @@ export interface DropVersion {
   createdAt: number
   note: string | null
   actorName: string
+  agent: AgentMetadata | null
   current?: boolean
 }
 
