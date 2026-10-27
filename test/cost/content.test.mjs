@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { resolveCacheKeys } from "ocache"
 import { beforeEach, test } from "vite-plus/test"
 import { readFileSync } from "node:fs"
 import { sql, queries, state, calls, migrate, reset, insertDrop, who, event } from "./harness.mjs"
@@ -224,7 +225,10 @@ test("failed blob deletion never turns a private file public, and retries remove
   insertDrop("doc", { visibility: "private" })
   const row = await findDrop("doc")
   await dropDetail(row, who, "https://drop.example")
-  state.entries.set("nitro:functions:markdown:doc.md.json", { value: "old html" })
+  const [cacheKey] = await resolveCacheKeys({
+    options: { base: "", group: "nitro/functions", name: "markdown", getKey: () => "doc.md" },
+  })
+  state.entries.set(cacheKey, { value: "old html" })
   state.failDelete = true
   await deleteDrop(row)
   assert.equal(await findDrop("doc"), null)

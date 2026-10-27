@@ -42,6 +42,8 @@
     "*.ts",
   ],
   "ignoreDependencies": [
+    // nuxt/schema re-exports this package from the installed Nuxt 5 nightly.
+    "@nuxt/schema-nightly",
     // nuxt.config `css` names these packages; knip doesn't resolve a package's stylesheet entry.
     "@fontsource-variable/geist",
     "@fontsource-variable/geist-mono",
