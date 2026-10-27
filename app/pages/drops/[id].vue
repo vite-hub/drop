@@ -1,6 +1,10 @@
 <script setup lang="ts">
 const route = useRoute("drops-id")
-const { drop, comments } = provideDrop(() => route.params.id)
+// `?v=<n>` opens an earlier version, as History does.
+const { drop, comments } = provideDrop(
+  () => route.params.id,
+  () => Number(route.query.v) || undefined,
+)
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop" })
 const waiting = computed(() => waitingForReview(drop.error.value))

@@ -11,7 +11,7 @@ const generic = () => redirect("/og.png", 302)
 const Params = v.object({ id: v.pipe(v.string(), v.regex(/^[\w-]{1,64}\.png$/)) })
 
 /**
- * `/og/<version id>.png`, a public drop's link preview card (server/utils/og.ts). Unfurlers never sign in, so it
+ * `/og/<drop id>.png`, a public drop's link preview card (server/utils/og.ts). Unfurlers never sign in, so it
  * answers as nobody: anything a stranger can't open, and every host without Browser Run, gets the generic /og.png,
  * which says nothing about whether the drop exists. A card renders once per look and stays in Nitro's cache.
  */

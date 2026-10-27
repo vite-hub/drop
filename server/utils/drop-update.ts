@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import type * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
@@ -7,7 +7,7 @@ import { isPublic, type Share } from "#shared/share"
 import { slugify } from "#shared/links"
 import { drops } from "../databases/config"
 import { type DropRow, findDrop, lifetimeFields, permissions, restoreDrop, toSummary, trashDrop } from "./drops"
-import { chainOf, expiryPolicy, renewDrop } from "./expiry"
+import { expiryPolicy, renewDrop } from "./expiry"
 import { MAX_FOLDER_DESCRIPTION, moveNode } from "./folders"
 import type { Identity } from "./identity"
 import { isAttachment, parentNode, resolveNode, rootOf, uniqueSlug } from "./nodes"
@@ -87,16 +87,9 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
       : {}
   if (body.lifetime !== undefined)
     await requireKeepSlot(drop.ownerId, { lifetime: body.lifetime }, drop.lifetime === "keep", !drop.parentId)
-  const slug = body.slug !== undefined ? { slug: await uniqueSlug(drop.parentId, slugify(body.slug), own.link) } : {}
-  const chainChange = { ...share, ...life, ...slug }
-  if (Object.keys(chainChange).length) {
-    // A link, its name and its lifetime belong to the document chain, so every version carries the same state.
-    await db
-      .update(drops)
-      .set(chainChange)
-      .where(sql`${drops.id} IN (${chainOf(drop)})`)
-  }
-  if (Object.keys(title).length) await db.update(drops).set(title).where(eq(drops.id, drop.id))
+  const slug = body.slug !== undefined ? { slug: await uniqueSlug(drop.parentId, slugify(body.slug), own.id) } : {}
+  const change = { ...share, ...life, ...slug, ...title }
+  if (Object.keys(change).length) await db.update(drops).set(change).where(eq(drops.id, drop.id))
   // Choosing a lifetime starts its window now, so turning a kept drop temporary doesn't expire it on the spot. A drop
   // in a folder renews the folder at the top, whose window it lives by.
   const renewed = body.renew || body.lifetime ? { lastAccessedAt: now } : {}
@@ -108,7 +101,7 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
       : {}
   // In a folder, the share it ends up with depends on the folders above: read it back.
   if (drop.parentId && Object.keys(share).length) drop = (await findDrop(drop.id, event)) ?? drop
-  else drop = { ...drop, ...chainChange, raw: { ...own, ...chainChange } }
+  else drop = { ...drop, ...change, raw: { ...own, ...change } }
   return toSummary({ ...drop, ...title, ...renewed, ...trashed }, undefined, days)
 }
 

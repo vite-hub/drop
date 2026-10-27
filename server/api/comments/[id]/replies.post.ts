@@ -6,7 +6,7 @@ import { CommentReplySchema } from "#shared/schemas"
 import { commentReplies, comments } from "../../../databases/config"
 import { attachImages, imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
 import { insertReply, replyOf } from "../../../utils/comments"
-import { findDrop, findDropByLink, permissions } from "../../../utils/drops"
+import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 
@@ -17,17 +17,15 @@ export default defineHandler(async (event) => {
     .from(comments)
     .where(eq(comments.id, await routeId(event)))
     .limit(1)
-  // Open comments carry over to later versions, so a thread may hang off an old one: ask the latest version.
-  const written = comment ? await findDrop(comment.dropId, event) : null
-  const drop = written?.link ? ((await findDropByLink(written.link, undefined, event)) ?? written) : written
+  const drop = comment ? await findDrop(comment.dropId, event) : null
   const who = await identify(event)
-  if (!comment || !written || !drop || !permissions(drop, who).comment)
+  if (!comment || !drop || !permissions(drop, who).comment)
     throw new HTTPError({ status: 404, statusText: "You can't reply to this comment." })
   // Replies share the comment limit: a thread is no way around it.
   await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
   const { input, images } = await readCommentBody(event, CommentReplySchema)
-  // The images go where the comment's own would: under the version it was written on.
-  const parent = images.length ? await imageParent(written) : written
+  // The images go where the comment's own would.
+  const parent = images.length ? await imageParent(drop) : drop
   const { row, attachments } = await withImages(
     images,
     () => insertReply(comment, who, input.body),

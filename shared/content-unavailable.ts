@@ -38,12 +38,19 @@ export function contentUnavailable(
       action: { label: "My drops", to: "/drops" },
     }
   return {
-    title: email ? "This content isn't available to your account." : "This content may be private or deleted.",
+    title: email ? "This content isn't available to your account." : "This drop isn't available",
     // Most people who land here were sent a team link, not someone who connected an agent: say what to do first.
     description: email
       ? "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it with you, or sign in with another account."
-      : "If it was shared with your team, sign in to open it. Otherwise ask whoever sent you the link to share it.",
+      : "This link may be private or deleted. If it was shared with you or your team, sign in to check access.",
     email: email ?? null,
     action: { label: email ? "Use another account" : "Sign in with GitHub", to: signIn },
   }
+}
+
+export function contentUnavailableIcon(status: number, waitingForReview = false) {
+  if (status >= 500 || status === 429)
+    return "m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0M12 9v4m0 4h.01"
+  if (status === 410 || waitingForReview) return "M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"
+  return "M7 10V7a5 5 0 0 1 10 0v3M6 10h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2m6 5v2"
 }

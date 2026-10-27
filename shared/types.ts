@@ -1,4 +1,5 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
+import type { AgentMetadata } from "./agent"
 import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
@@ -80,12 +81,12 @@ export interface DropCrumb {
 }
 
 export interface DropVersion {
-  id: string
   title: string
   version: number
   createdAt: number
   note: string | null
   actorName: string
+  agent: AgentMetadata | null
   current?: boolean
 }
 
@@ -265,7 +266,6 @@ export interface Viewer {
   mode: DropMode
   /** Days a public link stays open before it closes (null: until changed, 0: public links are off). */
   publicLinkDays: number | null
-  members: number
   /** How many skills are on: agents get them over MCP, and members see Skills only while one is. */
   skills: number
   /** On a personal Drop with `DROP_TEAMS`: the teams they're on. Absent when teams are off. */

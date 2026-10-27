@@ -11,13 +11,7 @@ import { H3Event, HTTPError, toResponse } from "h3"
 import { createMcpHandler, defineMcpTool } from "nitro-mcp-toolkit"
 import { MCP_LATEST, MCP_LEGACY } from "../../shared/mcp.ts"
 import { MIB, planLimits, quotaFailure, quotaToolFailure, usageNearLimit } from "../../shared/quotas.ts"
-import {
-  appFileChunks,
-  deletionChainSQL,
-  QUOTA_RESERVATION_TTL_MS,
-  reserveSQL,
-  usageSQL,
-} from "../../server/utils/quota-sql.ts"
+import { appFileChunks, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "../../server/utils/quota-sql.ts"
 
 function setup(path = ":memory:") {
   const db = new DatabaseSync(path)
@@ -61,10 +55,17 @@ function reserve(
     )
   return row ? id : null
 }
-function doc(db, id, { size = 10, previous = null, owner = "owner", kind = "markdown" } = {}) {
+function doc(db, id, { size = 10, owner = "owner", kind = "markdown" } = {}) {
   db.prepare(
-    `INSERT INTO drops (id, owner_id, kind, title, filename, size, supersedes_id, actor_kind, actor_name, created_at, updated_at) VALUES (?, ?, ?, 'Doc', 'doc.md', ?, ?, 'browser', 'Tester', 0, 0)`,
-  ).run(id, owner, kind, size, previous)
+    `INSERT INTO drops (id, owner_id, kind, title, filename, size, actor_kind, actor_name, created_at, updated_at) VALUES (?, ?, ?, 'Doc', 'doc.md', ?, 'browser', 'Tester', 0, 0)`,
+  ).run(id, owner, kind, size)
+}
+/** Publishes the next version of `id`, as createDocDrop does: the latest moves to drop_versions. */
+function revise(db, id, size) {
+  db.prepare(
+    "INSERT INTO drop_versions (drop_id, version, kind, title, filename, size, actor_kind, actor_name, created_at) SELECT id, version, kind, title, filename, size, actor_kind, actor_name, created_at FROM drops WHERE id = ?",
+  ).run(id)
+  db.prepare("UPDATE drops SET version = version + 1, size = ? WHERE id = ?").run(size, id)
 }
 function commit(db, id, operation, success = true) {
   db.exec("BEGIN")
@@ -128,9 +129,9 @@ test("three logical drops allow revisions, count all retained versions, and dele
   }
   assert.equal(reserve(db), null)
   const revision = reserve(db, { drops: 0, bytes: 20, target: "doc0" })
-  commit(db, revision, () => doc(db, "revision", { previous: "doc0", size: 20 }))
+  commit(db, revision, () => revise(db, "doc0", 20))
   assert.deepEqual(used(db), { drops: 3, bytes: 50, writes: 4 })
-  db.exec("DELETE FROM drops WHERE id IN ('doc0', 'revision')")
+  db.exec("DELETE FROM drops WHERE id = 'doc0'")
   assert.deepEqual(used(db), { drops: 2, bytes: 20, writes: 4 })
   assert.ok(reserve(db))
   db.close()
@@ -271,11 +272,11 @@ test("temporary code images charge a write and bytes until blob cleanup, with no
   const id = reserve(db, { drops: 0, bytes: 15 })
   commit(db, id, () =>
     db.exec(
-      "INSERT INTO quota_blobs (blob_key,owner_id,size,expires_at) VALUES ('code-images/old/image.svg','owner',15,0)",
+      "INSERT INTO code_images (blob_key,owner_id,size,expires_at) VALUES ('code-images/old/image.svg','owner',15,0)",
     ),
   )
   assert.deepEqual(used(db), { drops: 0, bytes: 15, writes: 1 })
-  db.exec("DELETE FROM quota_blobs WHERE blob_key='code-images/old/image.svg'")
+  db.exec("DELETE FROM code_images WHERE blob_key='code-images/old/image.svg'")
   assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 1 })
   db.close()
 })
@@ -400,40 +401,18 @@ test("REST quota errors preserve the same top-level JSON fields with 402", async
   for (const [key, value] of Object.entries(failure)) assert.deepEqual(body[key], value)
 })
 
-test("deleting a long version chain frees every retained byte and slot without refunding writes", () => {
+test("deleting a drop with a long history frees every retained byte and its slot without refunding writes", () => {
   const db = setup()
-  for (let i = 0; i < 300; i++) doc(db, `long${i}`, { size: 1, previous: i ? `long${i - 1}` : null })
+  doc(db, "long", { size: 1 })
+  for (let i = 0; i < 299; i++) revise(db, "long", 1)
   doc(db, "unrelated", { size: 1 })
   doc(db, "other", { owner: "other" })
   const ledger = reserve(db, { drops: 0, bytes: 0, writes: 7 })
   commit(db, ledger, () => {})
-  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run(
-    "long150",
-    "owner",
-    "owner",
-    "long150",
-    "owner",
-    "owner",
-  )
+  assert.deepEqual(used(db), { drops: 2, bytes: 301, writes: 7 })
+  db.exec("DELETE FROM drops WHERE id = 'long'")
+  assert.equal(db.prepare("SELECT count(*) AS n FROM drop_versions").get().n, 0)
   assert.deepEqual(used(db), { drops: 1, bytes: 1, writes: 7 })
-  assert.deepEqual(used(db, "other"), { drops: 1, bytes: 10, writes: 0 })
-  db.close()
-})
-
-test("full-chain deletion never follows a parent belonging to another owner", () => {
-  const db = setup()
-  doc(db, "foreign", { owner: "other" })
-  doc(db, "owned", { previous: "foreign" })
-  doc(db, "owned-next", { previous: "owned" })
-  db.prepare(`DELETE FROM drops WHERE id IN (${deletionChainSQL})`).run(
-    "owned",
-    "owner",
-    "owner",
-    "owned",
-    "owner",
-    "owner",
-  )
-  assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 0 })
   assert.deepEqual(used(db, "other"), { drops: 1, bytes: 10, writes: 0 })
   db.close()
 })

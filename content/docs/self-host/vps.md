@@ -40,7 +40,7 @@ drop.example.com {
 }
 ```
 
-Caddy forwards the host and HTTPS scheme. With nginx, set `proxy_set_header Host $host` and `proxy_set_header X-Forwarded-Proto $scheme`. Keep the OAuth app's homepage and callback on that HTTPS domain.
+Caddy forwards the host and HTTPS scheme. With nginx, set `proxy_set_header Host $host`, `proxy_set_header X-Forwarded-Proto $scheme`, and `client_max_body_size 32m`. nginx's default of 1m answers 413 to any upload over 1 MB; Drop takes files up to 4 MiB and app archives up to about 27 MiB. Keep the OAuth app's homepage and callback on that HTTPS domain.
 
 To [give apps their own domain](/docs/self-host#content-origin), proxy a wildcard hostname (with a wildcard certificate) to the same port, with the same headers, and set `DROP_CONTENT_ORIGIN` to it, such as `https://*.drop-usercontent.example.com`, and `VITEHUB_SECRET` to the output of `openssl rand -base64 32`.
 
@@ -67,7 +67,7 @@ Configure oauth2-proxy with `--provider=github`, `--scope=user:email read:org`, 
 
 Use a Secure, host-only proxy cookie with `Path=/`, such as `__Host-drop-auth`, and set `DROP_AUTH_PROXY_COOKIE` to the same name for logout. Keep the Drop backend accessible only through your proxy. Leave the `DROP_CONTENT_ORIGIN` hostname out of oauth2-proxy: it serves no drop content itself.
 
-Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too.
+Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. For [site review](/docs/sites), exempt `/review.js` and `/api/review/comments`.
 
 Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
 

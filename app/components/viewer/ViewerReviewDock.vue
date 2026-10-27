@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The list, thread, and new annotation share one panel above the document toolbar.
+// The list, thread, and new annotation share one panel above the document toolbar. Both are T3 Code's composer glass
+// (surface-glass), so a drop scrolling under them blurs out instead of stopping at their edge.
 const props = defineProps<{ open: boolean; overlay?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const root = useTemplateRef<HTMLElement>("root")
@@ -31,7 +32,7 @@ watch(
       ref="panel"
       aria-label="Comments"
       tabindex="-1"
-      class="pointer-events-auto flex h-[min(28rem,60dvh)] min-h-0 w-full max-w-md flex-col overflow-hidden rounded-xl border border-default bg-default shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-inverted"
+      class="pointer-events-auto flex h-[min(28rem,60dvh)] min-h-0 w-full max-w-md flex-col overflow-hidden rounded-xl border border-default surface-glass shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-inverted"
       @keydown.esc.stop.prevent="emit('close')"
     >
       <div class="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-default pr-1.5 pl-4">
@@ -50,7 +51,7 @@ watch(
     <div
       role="group"
       aria-label="Document tools"
-      class="pointer-events-auto flex max-w-full shrink-0 flex-wrap items-center justify-center gap-0.5 rounded-xl border border-default bg-default p-1 shadow-md"
+      class="pointer-events-auto flex max-w-full shrink-0 flex-wrap items-center justify-center gap-0.5 rounded-lg border border-black/8 surface-glass p-0.5 shadow-[0_1px_2px_rgb(0_0_0/5%)] dark:border-white/5 dark:shadow-[inset_0_1px_rgb(255_255_255/3%)]"
     >
       <slot name="toolbar" />
     </div>

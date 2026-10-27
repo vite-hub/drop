@@ -101,7 +101,7 @@ export function imageDrop(
   now = Date.now(),
 ): DropRow {
   return {
-    id: crypto.randomUUID(),
+    id: newLink(),
     ownerId: parent.ownerId,
     kind: "image",
     title: image.title.slice(0, 160),
@@ -110,8 +110,6 @@ export function imageDrop(
     contentType: image.contentType,
     size: image.size,
     version: 1,
-    supersedesId: null,
-    link: newLink(),
     slug:
       image.filename
         .replace(/\.[^.]*$/, "")
@@ -125,6 +123,7 @@ export function imageDrop(
     quarantinedAt: null,
     actorKind: "browser",
     actorName,
+    agent: null,
     createdAt: now,
     updatedAt: now,
     lastAccessedAt: now,
@@ -137,6 +136,7 @@ export function imageDrop(
     siteUrl: null,
     publishToken: null,
     teamId: parent.teamId,
+    resources: null,
   }
 }
 

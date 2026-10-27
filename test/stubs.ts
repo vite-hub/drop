@@ -13,10 +13,10 @@ const stubs: Record<string, string> = {
   "vite-hub/database": "export const defineDatabase = v => v",
   "vite-hub/blob": "export const blob = globalThis.dropTest.blob",
   // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".
-  "nitro/cache": `import { defineCachedFunction as define, setStorage } from ${JSON.stringify(ocache)}
+  "nitro/cache": `import { defineCachedFunction as define } from ${JSON.stringify(ocache)}
 const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
-setStorage({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, value, options) => globalThis.dropTest.storage.setItem(key(k), value, options?.ttl ? { ttl: options.ttl } : undefined) })
-export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/functions", ...options })`,
+const storage = () => ({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, value, options) => globalThis.dropTest.storage.setItem(key(k), value, options?.ttl ? { ttl: options.ttl } : undefined) })
+export const defineCachedFunction = (fn, options) => define(fn, { storage, group: "nitro/functions", ...options })`,
   "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
   "vite-hub/rate-limit":
     "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { name: 'HTTPError', status: 429 }) }",
@@ -26,7 +26,7 @@ export const defineCachedFunction = (fn, options) => define(fn, { group: "nitro/
   "#code-image-png":
     "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "#live-drafts":
-    "export const LIVE_EDITING = false; export const ensureDraft = async id => `drafts/${id}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}; export const refreshLatest = async link => { globalThis.dropTest.refreshedLinks.push(link) }",
+    "export const LIVE_EDITING = false; export const ensureDraft = async drop => `drafts/${drop.id}/v${drop.version}.md`; export const readDraft = async () => null; export const deleteDrafts = async () => {}; export const refreshLatest = async id => { globalThis.dropTest.refreshedLinks.push(id) }",
 }
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.
 const baseline = new Set([

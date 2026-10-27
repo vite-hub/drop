@@ -1,3 +1,4 @@
+import { agentLabel } from "#shared/agent"
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
@@ -47,11 +48,11 @@ export default defineMcpTool({
     await Promise.all([recordVisit(event, drop, who, "beacon"), countView(event, drop, who, "beacon")])
     const detail = await dropDetail(drop, who, event.url.origin, event, "agent")
     const comments = (await listComments(drop, who)).filter((comment) => resolved || !comment.resolved)
-    const versions = detail.versions.map(({ id: versionId, version, note, actorName, createdAt }) => ({
-      id: versionId,
+    const versions = detail.versions.map(({ version, note, actorName, agent, createdAt }) => ({
       version,
       note,
       by: actorName,
+      agent,
       at: new Date(createdAt).toISOString(),
     }))
     const meta = mcpDrop(detail, event.url.origin, drop)
@@ -103,7 +104,7 @@ export default defineMcpTool({
     const sections = [
       `${meta.title} (${meta.kind} v${meta.version}, ${meta.share}${meta.sharedThrough ? ` through ${meta.sharedThrough}` : ""}, ${meta.lifetime}, ${meta.status.toLowerCase()}) ${meta.url}${folder ? `\nIn ${folder}` : ""}${views ? `\n${viewsLine(views)}` : ""}${links}`,
       ...(children ? [`## In this folder\n${children.map(dropLine).join("\n") || "Nothing yet."}`] : []),
-      `## Versions\n${versions.map((item) => `v${item.version} ${item.id}${item.note ? `: ${item.note}` : ""} (${item.by})`).join("\n")}`,
+      `## Versions\n${versions.map((item) => `v${item.version}${item.note ? `: ${item.note}` : ""} (${item.by}${agentLabel(item.agent) ? ` · ${agentLabel(item.agent)}` : ""})`).join("\n")}`,
       `## ${resolved ? "Comments" : "Open comments"}\n${comments.map((comment) => `${commentLine(comment, drop.version, event.url.origin)}${comment.resolved ? " [resolved]" : ""}`).join("\n") || "None."}`,
       ...(errors.length
         ? [

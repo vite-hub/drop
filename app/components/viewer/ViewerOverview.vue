@@ -1,10 +1,9 @@
 <script setup lang="ts">
 // Details in sections, not a label/value table: the drop itself first (its name, type and size, who dropped it, when,
-// where), then views, related links, and lifetime. Versions have their own tab (ViewerHistory). A folder leads with
+// where), then views and lifetime. Versions have their own tab (ViewerHistory). A folder leads with
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
 // it in place.
 import { expiryLabel } from "#shared/expiry"
-import { resourceLabel } from "#shared/resources"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; showDescription: boolean }>()
@@ -173,24 +172,6 @@ async function save() {
           </div>
         </UTooltip>
       </dl>
-    </section>
-
-    <section v-if="drop.resources" aria-labelledby="details-links" class="space-y-2 p-4">
-      <h3 id="details-links" class="text-xs font-medium text-muted">Links</h3>
-      <ul class="space-y-1.5 text-sm">
-        <li v-for="resource in drop.resources" :key="resource.url">
-          <a
-            class="flex min-w-0 items-center gap-2 text-highlighted hover:underline"
-            :href="resource.url"
-            rel="noopener noreferrer"
-            target="_blank"
-            :title="resource.url"
-          >
-            <ViewerResourceIcon :url="resource.url" />
-            <span class="truncate">{{ resourceLabel(resource) }}</span>
-          </a>
-        </li>
-      </ul>
     </section>
 
     <!-- The team's folders never expire, so there's nothing to choose. -->

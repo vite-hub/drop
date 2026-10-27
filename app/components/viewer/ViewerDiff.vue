@@ -8,15 +8,18 @@ import type { DropDetail, DropVersion } from "#shared/types"
 const props = defineProps<{ version: DropVersion; previous: DropVersion | null; copied?: boolean }>()
 const emit = defineEmits<{ close: []; copyLink: [] }>()
 const versionTo = useVersionTo()
+const id = computed(() => injectDrop()!.drop.data.value!.id)
 
 const options = { lazy: true, server: false }
-const after = useApi<DropDetail>(() => `/api/drops/${props.version.id}`, {
-  key: () => keys.version(props.version.id),
+const after = useApi<DropDetail>(() => `/api/drops/${id.value}`, {
+  key: () => keys.version(id.value, props.version.version),
+  query: computed(() => ({ v: props.version.version })),
   ...options,
 })
 // The first version has nothing before it; the same request (same key) stands in rather than a conditional fetch.
-const before = useApi<DropDetail>(() => `/api/drops/${props.previous?.id ?? props.version.id}`, {
-  key: () => keys.version(props.previous?.id ?? props.version.id),
+const before = useApi<DropDetail>(() => `/api/drops/${id.value}`, {
+  key: () => keys.version(id.value, (props.previous ?? props.version).version),
+  query: computed(() => ({ v: (props.previous ?? props.version).version })),
   ...options,
 })
 
@@ -129,7 +132,7 @@ const counts = computed(() => ({
       >
         <figure
           v-for="side in [older, after.data.value!].filter(Boolean) as DropDetail[]"
-          :key="side.id"
+          :key="side.version"
           class="space-y-2"
         >
           <figcaption class="label-mono">v{{ side.version }}</figcaption>
@@ -141,7 +144,7 @@ const counts = computed(() => ({
       <ul v-else class="mx-auto max-w-md space-y-2 py-6 text-sm">
         <li
           v-for="side in [older, after.data.value!].filter(Boolean) as DropDetail[]"
-          :key="side.id"
+          :key="side.version"
           class="flex items-center gap-3"
         >
           <span class="label-mono w-8">v{{ side.version }}</span>

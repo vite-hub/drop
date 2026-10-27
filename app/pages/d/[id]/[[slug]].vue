@@ -2,7 +2,7 @@
 // What someone with the link sees: the doc's latest version, or the one `?v=` pins, full screen, no sidebar. Private
 // drops 404. Signed-in people read it inside the app instead, so the link never strands them; opened straight away, it
 // keeps the sidebar out of the way until they ask for it (useOpenedOnLink).
-// The address settles on the doc's link (`/d/<link>/<slug>`): an old version's id or an outdated slug moves there.
+// The address settles on the doc's link (`/d/<link>/<slug>`): an outdated slug moves there.
 import { type DropLink, dropPath } from "#shared/links"
 import { isPublic } from "#shared/share"
 
@@ -35,11 +35,15 @@ await settle()
 watch(() => target.data.value, settle)
 
 // Until the link resolves (or when it can't), the drop API answers for the key itself and says why it can't open.
-const { drop, comments } = provideDrop(() => target.data.value?.id ?? route.params.id)
+const { drop, comments } = provideDrop(
+  () => target.data.value?.id ?? route.params.id,
+  () =>
+    target.data.value && target.data.value.version !== target.data.value.latest ? target.data.value.version : undefined,
+)
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
 // A pasted link's preview names the drop. Unfurlers aren't signed in, so only public drops reach them; the rest keep
-// app.vue's Drop card. The card image is the version's own (server/routes/og/[id].get.ts).
+// app.vue's Drop card. The card image is the drop's own (server/routes/og/[id].get.ts).
 const origin = useRequestURL().origin
 const shown = computed(() => (drop.data.value && isPublic(drop.data.value.share) ? drop.data.value : null))
 useSeoMeta({

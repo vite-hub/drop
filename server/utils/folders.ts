@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { newLink, slugify } from "#shared/links"
@@ -6,7 +6,6 @@ import { MAX_DEPTH } from "#shared/nodes"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { drops } from "../databases/config"
 import { type DropRow, findDropByRef, lifetimeFields, type LifetimeInput, permissions } from "./drops"
-import { chainOf } from "./expiry"
 import type { Identity } from "./identity"
 import { depthOf, heightOf, touchFolder, uniqueSlug } from "./nodes"
 import { requireKeepSlot, withDropQuota } from "./quotas"
@@ -124,7 +123,7 @@ export async function createFolder(
     const now = Date.now()
     const slug = await uniqueSlug(parent?.id ?? null, (input.slug && slugify(input.slug)) || slugify(title))
     const row: DropRow = {
-      id: crypto.randomUUID(),
+      id: newLink(),
       ownerId,
       kind: "folder",
       title,
@@ -133,8 +132,6 @@ export async function createFolder(
       contentType: null,
       size: 0,
       version: 1,
-      supersedesId: null,
-      link: newLink(),
       slug,
       share,
       publicUntil,
@@ -144,6 +141,7 @@ export async function createFolder(
       quarantinedAt: null,
       actorKind: who.actorKind,
       actorName: who.actorName,
+      agent: null,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
@@ -154,6 +152,7 @@ export async function createFolder(
       parentId: parent?.id ?? null,
       siteUrl: null,
       publishToken: null,
+      resources: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(parent ? [touchFolder(parent.id, now)] : [])])
     return row
@@ -161,7 +160,7 @@ export async function createFolder(
 }
 
 /**
- * Moves a drop, every version of it, into a folder, or to the top with null. From then on it shares and lives with
+ * Moves a drop into a folder, or to the top with null. From then on it shares and lives with
  * its new ancestors, and its slug gets a number if the folder has one like it. A drop leaving the folders keeps the
  * lifetime it lived by, from now, so it doesn't expire on the spot.
  */
@@ -170,11 +169,11 @@ export async function moveNode(drop: DropRow, ref: string | null, who: Identity,
   if ((target?.id ?? null) === drop.parentId) return
   const now = Date.now()
   const own = drop.raw ?? drop
-  const slug = await uniqueSlug(target?.id ?? null, own.slug ?? slugify(own.title), own.link)
+  const slug = await uniqueSlug(target?.id ?? null, own.slug ?? slugify(own.title), own.id)
   const life = target ? {} : { lifetime: drop.lifetime, keepReason: drop.keepReason, lastAccessedAt: now }
   await db
     .update(drops)
     .set({ parentId: target?.id ?? null, slug, ...life })
-    .where(sql`${drops.id} IN (${chainOf(drop)})`)
+    .where(eq(drops.id, drop.id))
   if (target) await touchFolder(target.id, now)
 }

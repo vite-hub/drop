@@ -39,7 +39,9 @@ export default defineHandler(async (event) => {
   const target = await read<DropLink>(
     `/api/links/${encodeURIComponent(key)}${pinned ? `?v=${encodeURIComponent(pinned)}` : ""}`,
   )
-  const drop = target && (await read<DropDetail>(`/api/drops/${target.id}`))
+  const drop =
+    target &&
+    (await read<DropDetail>(`/api/drops/${target.id}${target.version === target.latest ? "" : `?v=${target.version}`}`))
   if (!drop) return
   const { dropMarkdown } = await import("../utils/drop-markdown")
   const markdown = await dropMarkdown(drop, event.url.origin)

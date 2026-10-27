@@ -3,7 +3,7 @@
 import { defineDatabase } from "vite-hub/database"
 import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
-import { quotaBlobs, quotaReservations } from "./quotas"
+import { quotaReservations } from "./quotas"
 import { abuseReports } from "./trust"
 import { skillSettings } from "./skills"
 import { invitation, member, organization, subscription } from "./teams"
@@ -14,14 +14,12 @@ import {
   commentReplies,
   comments,
   dropFiles,
-  dropHeads,
-  dropResources,
   drops,
   dropTexts,
   dropViewers,
   dropViews,
+  dropVersions,
   dropVisits,
-  workspaceStats,
 } from "./drops"
 import {
   jwks,
@@ -129,7 +127,6 @@ export {
   member,
   organization,
   subscription,
-  quotaBlobs,
   quotaReservations,
   abuseReports,
   skillSettings,
@@ -139,24 +136,25 @@ export {
   commentReplies,
   comments,
   dropFiles,
-  dropHeads,
-  dropResources,
   drops,
   dropTexts,
   dropViewers,
   dropViews,
+  dropVersions,
   dropVisits,
-  workspaceStats,
+  jwks,
   oauthAccessToken,
   oauthClient,
+  oauthClientAssertion,
+  oauthClientResource,
   oauthConsent,
   oauthRefreshToken,
+  oauthResource,
 }
 
 // Where it lives (D1 binding, D1 over HTTP, or local SQLite) is per host, in nuxt.config.ts `vitehub.database`.
 export default defineDatabase({
   schema: {
-    quotaBlobs,
     quotaReservations,
     abuseReports,
     skillSettings,
@@ -167,14 +165,12 @@ export default defineDatabase({
     commentReplies,
     comments,
     dropFiles,
-    dropHeads,
-    dropResources,
     drops,
     dropTexts,
     dropViewers,
     dropViews,
+    dropVersions,
     dropVisits,
-    workspaceStats,
     invitation,
     jwks,
     member,

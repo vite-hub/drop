@@ -179,8 +179,8 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
   state.contentOrigin = "https://*-drop.example"
   state.authSecret = "test-secret"
   try {
-    insertDrop("app", { kind: "app", filename: "app/", blob_key: null, link: "applink" })
-    insertDrop("other", { kind: "app", filename: "other/", blob_key: null, link: "otherlink" })
+    insertDrop("app", { kind: "app", filename: "app/", blob_key: null })
+    insertDrop("other", { kind: "app", filename: "other/", blob_key: null })
     const font = new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0xff, 0x00])
     for (const [path, body] of [
       ["index.html", '<script type="module" src="/_nuxt/entry.js"></script>'],
@@ -459,7 +459,7 @@ test("the frame host keeps a written page hidden until its stylesheets load, fai
 })
 
 test("an app on a shared content origin or none gets no grant, and its text files for the viewer to inline", async () => {
-  insertDrop("app", { kind: "app", filename: "app/", blob_key: null, link: "applink" })
+  insertDrop("app", { kind: "app", filename: "app/", blob_key: null })
   for (const [path, body] of [
     ["index.html", "<p>Hi</p>"],
     ["logo.png", "PNG"],

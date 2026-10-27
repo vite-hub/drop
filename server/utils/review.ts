@@ -1,3 +1,4 @@
+import type { AgentMetadata } from "#shared/agent"
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
@@ -289,7 +290,14 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
 /** A new site drop: no file, just the address people review. In a folder it lives with the folder, like any drop. */
 export async function createSiteDrop(
   who: Identity,
-  input: LifetimeInput & { url: string; title?: string; slug?: string; share?: Share; folder?: DropRow },
+  input: LifetimeInput & {
+    agent?: AgentMetadata
+    url: string
+    title?: string
+    slug?: string
+    share?: Share
+    folder?: DropRow
+  },
   event?: H3Event,
 ) {
   const siteUrl = siteAddress(input.url)
@@ -312,7 +320,7 @@ export async function createSiteDrop(
     const host = siteHost(siteUrl)
     const title = (input.title?.trim() || host).slice(0, 160)
     const row: DropRow = {
-      id: crypto.randomUUID(),
+      id: newLink(),
       ownerId,
       kind: "site",
       title,
@@ -321,8 +329,6 @@ export async function createSiteDrop(
       contentType: null,
       size: 0,
       version: 1,
-      supersedesId: null,
-      link: newLink(),
       slug: await uniqueSlug(folder?.id ?? null, (input.slug && slugify(input.slug)) || slugify(title)),
       share,
       publicUntil,
@@ -331,6 +337,7 @@ export async function createSiteDrop(
       quarantinedAt: null,
       actorKind: who.actorKind,
       actorName: who.actorName,
+      agent: who.actorKind === "agent" ? (input.agent ?? null) : null,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
@@ -342,6 +349,7 @@ export async function createSiteDrop(
       siteUrl,
       publishToken: null,
       teamId: null,
+      resources: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     return row
@@ -452,6 +460,7 @@ async function insertReviewComment(
       .values({
         ...fields,
         dropId: site.id,
+        version: 1,
         n: nextCommentNumber(site),
         kind: "area",
         selector: input.selector || "body",
@@ -491,6 +500,7 @@ async function insertReviewComment(
           db.insert(comments).values({
             ...fields,
             dropId: image.id,
+            version: 1,
             n: nextCommentNumber(image),
             kind: "image",
             selector: "body > img",
@@ -517,7 +527,7 @@ export async function siteItems(
     db
       .select({
         comment: comments,
-        shot: { id: drops.id, kind: drops.kind, link: drops.link, slug: drops.slug, blobKey: drops.blobKey },
+        shot: { id: drops.id, kind: drops.kind, slug: drops.slug, blobKey: drops.blobKey },
       })
       .from(comments)
       .innerJoin(drops, eq(drops.id, comments.dropId))
@@ -534,13 +544,13 @@ export async function siteItems(
     commentExtras(siteFamily(site.id)),
   ])
   return rows.reverse().map(({ comment, shot }) => ({
-    ...toComment(comment, who, 1, extras),
+    ...toComment(comment, who, extras),
     spot: comment.elementX !== null && comment.elementY !== null ? { x: comment.elementX, y: comment.elementY } : null,
     screenshot:
       shot.kind === "image" && shot.blobKey
         ? {
             id: shot.id,
-            link: shot.link ?? shot.id,
+            link: shot.id,
             slug: shot.slug ?? "screenshot",
             url: new URL(`/f/${shot.blobKey}`, origin).href,
           }

@@ -49,8 +49,8 @@ const trashed = computed(() => drop.value.trashedAt !== null)
 // A doc's link opens its latest version. Someone reading an earlier one, pinned (`?v=`) or from History, can go to the
 // latest; someone whose old link moved them to the latest (`?from=`) can go back to the version they were sent.
 const latest = computed(() => drop.value.versions[0] ?? drop.value)
-const older = computed(() => latest.value.id !== drop.value.id)
-const latestTo = computed(() => (publicView ? dropPath(drop.value) : `/drops/${latest.value.id}`))
+const older = computed(() => latest.value.version !== drop.value.version)
+const latestTo = computed(() => (publicView ? dropPath(drop.value) : `/drops/${drop.value.id}`))
 const sentVersion = computed(() => {
   const version = Number(route.query.from)
   return publicView && !older.value && version > 0 && version < drop.value.version ? version : 0
@@ -66,24 +66,23 @@ async function restoreDrop() {
 const panel = useViewerPanel({ versions: computed(() => drop.value.versions.length) })
 const hasComments = computed(() => drop.value.kind !== "folder")
 const commentsOpen = ref(false)
+const reviewDraft = provideReviewDraft()
 const siteRef = useTemplateRef<{
   canDraw: boolean
-  drawing: boolean
+  capturing: boolean
   pending: boolean
-  comment: () => Promise<void> | undefined
-  cancel: () => void
 }>("siteRef")
 const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
 const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
   tool.value = "browse"
-  siteRef.value?.cancel()
   commentsOpen.value = true
   if (!wide.value) panel.close()
 }
 function closeComments() {
   commentsOpen.value = false
+  tool.value = "browse"
   annotations.beginFocus()
   selection.value = null
   reviewDock.value?.focusTrigger()
@@ -122,7 +121,6 @@ const {
   areaMode,
   canDrawArea,
   imageDraft,
-  toggleArea,
   setTool,
   toggleOverlay,
   commentOnSelection,
@@ -137,8 +135,13 @@ const framed = computed(
     !(drop.value.kind === "file" && !drop.value.html),
 )
 watch(framed, (value) => !value && (tool.value = "browse"))
-/** Whether the page can show at a device's size (ViewerDevice): pages, not images or spreadsheets. */
-const sizable = computed(() => framed.value && ["html", "app", "markdown"].includes(drop.value.kind))
+/** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
+const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
+/** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. */
+const dockClearance = computed(
+  () =>
+    hasComments.value && !editing.value && !trashed.value && ["board", "site", "app", "file"].includes(drop.value.kind),
+)
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
@@ -207,29 +210,13 @@ function toggleDetails() {
 }
 watch(mobileSide, (open) => open && closeComments())
 watch(popover, (value) => value && showComments())
-watch(areaMode, (active) => {
-  if (active) {
-    commentsOpen.value = false
-    if (!wide.value) panel.close()
-  }
-})
-watch(
-  () => siteRef.value?.drawing,
-  (active) => active && closeComments(),
-)
+watch(areaMode, (active) => active && showComments())
 watch(
   () => siteRef.value?.pending,
   (pending) => pending && showComments(),
 )
 function toggleCommentArea() {
-  if (!annotationsEnabled.value || lightbox.value) return
-  if (siteRef.value?.canDraw) void siteRef.value.comment()
-  else toggleArea()
-}
-function cancelArea() {
-  tool.value = "browse"
-  annotations.dismiss()
-  siteRef.value?.cancel()
+  if (canMarkArea.value) showComments()
 }
 // A `?changes=` link opens with History beside the diff, as if the version had been picked there.
 if (route.query.changes && has("history")) {
@@ -243,7 +230,7 @@ const docWidth = useDocWidth()
 const widths: { value: DocWidth; label: string }[] = [
   { value: "readable", label: "Readable" },
   { value: "wide", label: "Wide" },
-  { value: "full", label: "Full width" },
+  { value: "full", label: "Widest" },
 ]
 const widens = computed(() => drop.value.kind === "markdown")
 function nextWidth() {
@@ -259,6 +246,8 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
   pinned,
   // The panel sits beside the frame, not over it: the doc has nothing to make room for.
   inset: ref(0),
+  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
   width: docWidth,
   annotations,
 })
@@ -285,7 +274,8 @@ const shownVersion = computed(() => {
 })
 const previousVersion = computed(() =>
   shownVersion.value
-    ? (drop.value.versions[drop.value.versions.findIndex((item) => item.id === shownVersion.value!.id) + 1] ?? null)
+    ? (drop.value.versions[drop.value.versions.findIndex((item) => item.version === shownVersion.value!.version) + 1] ??
+      null)
     : null,
 )
 // Opening a diff from the document adds a history entry; moving between versions replaces it, so one Back always
@@ -295,7 +285,7 @@ watch(shownVersion, (value) => !value && (pushedChanges = false))
 /** Picking the open version again goes back to the document. Below `lg` the panel is a slideover, so it steps aside. */
 function showVersion(version: DropVersion) {
   if (editing.value) return
-  if (shownVersion.value?.id === version.id) return closeChanges()
+  if (shownVersion.value?.version === version.version) return closeChanges()
   const opening = !shownVersion.value
   void setQuery({ changes: version.version }, { push: opening })
   if (opening) pushedChanges = true
@@ -376,11 +366,11 @@ function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") shareOpen.value = true
   else void copy(link.value, { key: "link", announce })
 }
-const showAreaTool = computed(
+const canMarkArea = computed(
   () =>
     annotationsEnabled.value &&
     !lightbox.value &&
-    (canDrawArea.value || (siteRef.value?.canDraw && !siteRef.value.pending)),
+    (canDrawArea.value || (drop.value.canComment && siteRef.value?.canDraw && !siteRef.value.pending)),
 )
 const inspectable = computed(
   () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
@@ -395,7 +385,6 @@ watch(shownVersion, (version) => {
   if (version) {
     tool.value = "browse"
     annotations.dismiss()
-    siteRef.value?.cancel()
     commentsOpen.value = false
   }
 })
@@ -404,11 +393,23 @@ watch(shownVersion, (version) => {
 async function submit(body: string, files: File[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
-  const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
-  if (popover.value !== open) return
-  if (!("value" in sent)) return popoverRef.value?.fail(sent.error, body)
-  popover.value = null
-  send({ type: "clear-selection" })
+  const finish = reviewDraft.beginSend()
+  if (!finish) return
+  const composer = popoverRef.value
+  try {
+    const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
+    if (!("value" in sent)) {
+      if (popoverRef.value === composer) composer?.fail(sent.error)
+      return
+    }
+    const cleared = finish(true)
+    if (popover.value !== open || popoverRef.value !== composer) return
+    if (!cleared) return composer?.fail()
+    popover.value = null
+    send({ type: "clear-selection" })
+  } finally {
+    finish(false)
+  }
 }
 
 /** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
@@ -430,9 +431,11 @@ async function removeComment(id: string) {
 }
 
 async function reply(id: string, body: string, files: File[] = []) {
+  const composer = popoverRef.value
   const sent = await state.addReply(id, body, files)
-  if ("value" in sent) await popoverRef.value?.sent()
-  else await popoverRef.value?.fail(sent.error, body)
+  if (popoverRef.value !== composer) return
+  if ("value" in sent) await composer?.sent()
+  else await composer?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
@@ -519,10 +522,10 @@ offerToPalette("drop", () => {
     ...(hasComments.value
       ? [{ label: "Comments", icon: "i-mingcute-chat-1-line", kbds: ["c"], onSelect: showComments }]
       : []),
-    ...(showAreaTool.value
+    ...(canMarkArea.value
       ? [
           {
-            label: areaMode.value ? "Stop commenting on an area" : "Comment on an area",
+            label: "Comment on an area",
             icon: "i-mingcute-message-1-line",
             kbds: ["r"],
             onSelect: toggleCommentArea,
@@ -626,7 +629,7 @@ watch(
         v-if="tab === 'history'"
         :comments="comments"
         :drop="drop"
-        :selected="shownVersion?.id"
+        :selected="shownVersion?.version"
         @open="showVersion"
       />
       <ViewerOverview v-else :drop="drop" :show-description="owner || (Boolean(me) && !publicView)">
@@ -700,6 +703,7 @@ watch(
           <ViewerLocation :drop="drop" :public-view="publicView" />
         </template>
         <template #trailing>
+          <ViewerResources v-if="drop.resources?.length" :resources="drop.resources" />
           <ViewerShare v-model:open="shareOpen" :drop="drop" />
         </template>
         <template #right>
@@ -787,14 +791,19 @@ watch(
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <div
-        class="relative flex min-h-0 flex-1 flex-col"
-        :class="(hasComments || editing) && !trashed ? 'pb-28 sm:pb-20' : ''"
-      >
+      <!-- Documents, HTML docs and images run under the glass; Markdown and the live editor already have trailing room.
+           Interactive viewers need clearance so their bottom controls stay clickable. -->
+      <div class="relative flex min-h-0 flex-1 flex-col" :class="dockClearance ? 'pb-28 sm:pb-20' : ''">
         <div class="relative flex min-h-0 flex-1 flex-col">
           <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
           <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
-          <ViewerSite v-else-if="drop.kind === 'site'" ref="siteRef" :drop="drop" :public-view="publicView" />
+          <ViewerSite
+            v-else-if="drop.kind === 'site'"
+            ref="siteRef"
+            :drop="drop"
+            :public-view="publicView"
+            :reviewing="commentsOpen && drop.canComment && annotationsEnabled && !editing"
+          />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
           <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
           <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
@@ -814,7 +823,7 @@ watch(
               />
             </div>
           </div>
-          <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable" :bottom="16">
+          <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable" :bottom="dockClearance ? 16 : undefined">
             <iframe
               v-if="contentOrigin"
               :key="frameKey"
@@ -842,7 +851,7 @@ watch(
 
           <ViewerDiff
             v-if="shownVersion && !editing"
-            :key="shownVersion.id"
+            :key="shownVersion.version"
             :previous="previousVersion"
             :copied="copied('changes')"
             :version="shownVersion"
@@ -853,6 +862,7 @@ watch(
         <ViewerReviewDock
           v-if="(hasComments || editing) && !trashed"
           ref="reviewDock"
+          :class="{ invisible: siteRef?.capturing }"
           :open="commentsOpen && !editing"
           :overlay="Boolean(lightbox)"
           @close="closeComments"
@@ -925,19 +935,15 @@ watch(
                   liveLabel(connection)
                 }}</ConnectionStatusLabel>
               </ConnectionStatus>
-              <UButton color="neutral" label="Close" variant="ghost" @click="live.close" />
+              <UButton size="xs" color="neutral" label="Close" variant="ghost" @click="live.close" />
               <UButton
+                size="xs"
                 color="neutral"
                 :disabled="!live.synced.value"
                 label="Publish"
                 :loading="live.publishing.value"
                 @click="live.publish()"
               />
-            </template>
-            <template v-else-if="areaMode || siteRef?.drawing">
-              <UIcon name="i-mingcute-scan-line" class="ml-2 size-4 shrink-0 text-muted" />
-              <span class="px-1 text-sm">Drag to mark an area</span>
-              <UButton color="neutral" label="Cancel" variant="soft" @click="cancelArea" />
             </template>
             <template v-else>
               <ViewerToolbar
@@ -955,6 +961,7 @@ watch(
                 @tool="setTool"
               />
               <UButton
+                size="xs"
                 v-if="slidev && contentOrigin && !lightbox && !shownVersion"
                 color="neutral"
                 icon="i-mingcute-presentation-2-line"
@@ -968,6 +975,7 @@ watch(
                 :text="drop.editNote ?? 'Edit together'"
               >
                 <UButton
+                  size="xs"
                   color="neutral"
                   :disabled="!drop.canEdit"
                   icon="i-mingcute-pencil-line"
@@ -977,8 +985,8 @@ watch(
                   @click="startEdit"
                 />
               </UTooltip>
-              <USeparator v-if="showEditTool" class="mx-1 h-5" orientation="vertical" />
               <UButton
+                size="xs"
                 data-review-trigger
                 :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
                 :aria-expanded="commentsOpen"
@@ -991,16 +999,6 @@ watch(
                 Comments
                 <span v-if="openCount && !commentsOpen" class="font-mono text-xs tabular-nums">{{ openCount }}</span>
               </UButton>
-              <UTooltip v-if="showAreaTool" text="Mark an area" :kbds="['R']">
-                <UButton
-                  color="neutral"
-                  icon="i-mingcute-scan-line"
-                  aria-label="Mark area"
-                  variant="ghost"
-                  @click="toggleCommentArea"
-                  ><span class="max-[360px]:hidden">Mark area</span></UButton
-                >
-              </UTooltip>
             </template>
           </template>
         </ViewerReviewDock>
@@ -1043,39 +1041,43 @@ watch(
     </template>
   </USlideover>
 
-  <div
-    v-if="selection && (!commentsOpen || !popover)"
-    class="fixed z-30 -translate-x-1/2 -translate-y-full"
-    :style="{
-      left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
-      top: `${Math.max(56, selection.rect.top - 8)}px`,
-    }"
-  >
+  <!-- On <body>: as the dashboard's last child they'd put the panel's lg:not-last:border-e on it, and the doc would
+       shift a pixel whenever text is selected. -->
+  <Teleport to="body">
     <div
-      class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]"
+      v-if="selection && (!commentsOpen || !popover)"
+      class="fixed z-30 -translate-x-1/2 -translate-y-full"
+      :style="{
+        left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
+        top: `${Math.max(56, selection.rect.top - 8)}px`,
+      }"
     >
-      <UButton
-        color="neutral"
-        icon="i-mingcute-chat-1-line"
-        label="Comment"
-        size="sm"
-        variant="ghost"
-        @click="commentOnSelection"
-        @mousedown.prevent
-      />
+      <div
+        class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]"
+      >
+        <UButton
+          color="neutral"
+          icon="i-mingcute-chat-1-line"
+          label="Comment"
+          size="sm"
+          variant="ghost"
+          @click="commentOnSelection"
+          @mousedown.prevent
+        />
+      </div>
     </div>
-  </div>
 
-  <ViewerLightbox
-    v-if="lightbox"
-    :alt="lightbox.alt"
-    :can-comment="drop.canComment"
-    :comments="imageComments"
-    :draft="imageDraft"
-    :from="lightbox.from"
-    :src="lightbox.src"
-    @close="closeLightbox"
-    @pick="pickImage"
-    @thread="(id, x, y) => (popover = { type: 'thread', id, x, y })"
-  />
+    <ViewerLightbox
+      v-if="lightbox"
+      :alt="lightbox.alt"
+      :can-comment="drop.canComment"
+      :comments="imageComments"
+      :draft="imageDraft"
+      :from="lightbox.from"
+      :src="lightbox.src"
+      @close="closeLightbox"
+      @pick="pickImage"
+      @thread="(id, x, y) => (popover = { type: 'thread', id, x, y })"
+    />
+  </Teleport>
 </template>

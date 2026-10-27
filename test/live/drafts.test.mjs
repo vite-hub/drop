@@ -4,8 +4,8 @@ import { objects } from "../cost/harness.mjs"
 const { deleteDrafts, draftDocument, ensureDraft, readDraft } = await import("../../server/live-drafts/realtime.ts")
 const { isRealtimeDocumentConflict } = await import("vite-hub/realtime")
 
-const ID = "3f1c7a52-0000-4000-8000-000000000000"
-const room = { authority: "memory", definition: "drops", documentId: `drafts/${ID}.md` }
+const ID = { id: "3f1c7a520000", version: 2 }
+const room = { authority: "memory", definition: "drops", documentId: "drafts/3f1c7a520000/v2.md" }
 const saving = (ifDigest, reason = "idle") => ({ editors: [], ifDigest, reason })
 
 beforeEach(() => objects.clear())

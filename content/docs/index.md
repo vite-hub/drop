@@ -35,7 +35,7 @@ Every drop opens full screen and has its own link. Docs keep earlier versions; p
 
 Quotas are off unless the operator turns them on. When they're on, everyone in the Drop gets the same plan, set in the environment. Free includes 50 drops, 100 MiB of storage, and 1,000 file writes per calendar month. An app can contain up to 300 files and 10 MiB. Pro includes any number of drops, 1 GiB, and 10,000 writes per month, with apps up to 1,000 files and 25 MiB. Unlimited has no owner limits.
 
-A drop is one doc, app, or uploaded file with its version chain. Every retained document version and app file counts toward storage. A document version uses one write; an app publish uses one per file. Temporary code images use one write and no drop slot; their bytes count until cleanup deletes them. The owner's plan applies even when someone else edits.
+A drop is one doc, app, or uploaded file with its versions. Every retained document version and app file counts toward storage. A document version uses one write; an app publish uses one per file. Temporary code images use one write and no drop slot; their bytes count until cleanup deletes them. The owner's plan applies even when someone else edits.
 
 At a limit, your existing drops and shared links keep working. Revisions are allowed while storage and writes remain available. Moving a drop to the Trash frees its slot; its storage is freed when it's deleted for good, 15 days later or when you empty the Trash. Files a doc embeds don't take a slot. Deleting never refunds monthly writes. Monthly budgets reset at the start of each UTC calendar month. Publishing also has a short burst limit.
 
@@ -45,7 +45,7 @@ Operators set `DROP_QUOTAS=true` to turn quotas on and `DROP_DEFAULT_PLAN` to `f
 
 ## Roles {#roles}
 
-Everyone who signs in joins as a Member. The people whose verified emails the operator lists in `DROP_ADMINS` are Admins, whichever way they sign in. Admins open **Console**, the only admin sidebar link, to manage accounts and sessions in the [Auth Console](/_vitehub/auth). Roles come from `DROP_ADMINS` and cannot be changed in the Console. **Review shares** and **Reports** are available through Search.
+Everyone who signs in joins as a Member. The people whose verified emails the operator lists in `DROP_ADMINS` are Admins, whichever way they sign in. Admins open **Console**, the only admin sidebar link, to manage accounts and sessions in the [Auth Console](/_vitehub/auth) and to look through what this Drop runs on: the files in Blob, the keys in KV, the database's tables, Env, Schedules, and Rate Limits. Only Admins can open the Console; for everyone else its address doesn't exist. Roles come from `DROP_ADMINS` and cannot be changed in the Console. **Review shares** and **Reports** are available through Search.
 
 ::roles-table
 ::
