@@ -496,18 +496,19 @@
   overflow-x: auto;
 }
 
-/* Mermaid's inline palette and text tokens must follow the page, whose muted/accent tokens are backgrounds. */
-.typeset .mermaid svg {
+/* Mermaid's inline palette and text tokens must follow the page, whose muted/accent tokens are backgrounds. The
+   zoomed copy sits outside the doc, in comark-zoom's dialog. */
+:is(.typeset, .cz-dialog) .mermaid svg {
   --bg: var(--background) !important;
   --fg: var(--foreground) !important;
   --muted: var(--muted-foreground);
   --accent: var(--foreground);
 }
 
-.typeset .mermaid svg,
-.typeset .mermaid-image {
+/* A wide diagram scrolls rather than shrink past 28rem; a small one keeps its own size. */
+.typeset .mermaid svg {
   display: block;
-  min-width: 28rem;
+  min-width: min(28rem, var(--mermaid-width, 28rem));
   max-width: 100%;
   height: auto;
   margin: auto;
