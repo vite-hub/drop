@@ -6,7 +6,7 @@ import { admin, jwt, organization as teamsPlugin } from "better-auth/plugins"
 import { and, eq, inArray } from "drizzle-orm"
 import { Stripe } from "stripe"
 import * as v from "valibot"
-import { defineAuth } from "vite-hub/auth"
+import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
 import { db, schema } from "vite-hub/database/drizzle"
 import { member, user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
@@ -65,6 +65,8 @@ export default defineAuth(({ env, requestOrigin }) => {
     appName: "Drop",
     baseURL: requestOrigin,
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
+    // Default retention: 90 days / 100,000 events. ViteHub strips IPs and secrets and isolates write failures.
+    events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
     route: false,
     // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
