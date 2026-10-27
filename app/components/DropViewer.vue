@@ -246,6 +246,8 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
   pinned,
   // The panel sits beside the frame, not over it: the doc has nothing to make room for.
   inset: ref(0),
+  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
   width: docWidth,
   annotations,
 })
