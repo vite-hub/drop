@@ -42,7 +42,7 @@ export const QuizAnswerInput = v.variant("kind", [
 ])
 export type QuizAnswerInput = v.InferOutput<typeof QuizAnswerInput>
 
-/** Browser action order within one page view; optional for clients using the original answer API. */
+/** Browser action order across page views; optional for clients using the original answer API. */
 export const QuizAnswerRequest = v.intersect([
   QuizAnswerInput,
   v.object({
@@ -50,6 +50,8 @@ export const QuizAnswerRequest = v.intersect([
       v.object({
         session: v.pipe(v.string(), v.uuid()),
         sequence: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+        /** Epoch microseconds; older clients only supplied a page session and sequence. */
+        issuedAt: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(0))),
       }),
     ),
   }),

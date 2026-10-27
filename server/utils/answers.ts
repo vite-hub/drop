@@ -18,8 +18,15 @@ const TABLE = [
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_drop_delete` AFTER DELETE ON `drops` BEGIN DELETE FROM `drop_answers` WHERE `link` = OLD.id; END",
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_user_delete` AFTER DELETE ON `user` BEGIN DELETE FROM `drop_answers` WHERE `user_id` = OLD.id; END",
 ]
-// Added lazily to existing installations, just like the table itself. Each page has an independent action sequence.
-const ORDER_COLUMNS = { first_session: "text", first_sequence: "integer", session: "text", sequence: "integer" }
+// Added lazily to existing installations, just like the table itself. Action times compare independent page sequences.
+const ORDER_COLUMNS = {
+  first_session: "text",
+  first_sequence: "integer",
+  session: "text",
+  sequence: "integer",
+  first_issued_at: "integer",
+  issued_at: "integer",
+}
 let table: Promise<void> | undefined
 function ensureTable() {
   table ??= (async () => {
@@ -56,9 +63,10 @@ export const answerable = (row: Pick<DropRow, "kind" | "expired">, who: Identity
   who?.actorKind === "browser" && row.kind === "markdown" && !row.expired
 
 /**
- * Keeps a reader's first and latest actions even when requests from a page arrive out of order. Separate page views
- * retain arrival order. A block the doc has no answers to yet counts against MAX_QUIZ_BLOCKS, checked in the same
- * statement; past it nothing is kept, and this returns false. Otherwise it returns the latest stored answer.
+ * Keeps a reader's first and latest actions even when requests from different pages arrive out of order. Legacy
+ * unordered requests still work until the reader uses an ordered client. A block the doc has no answers to yet counts
+ * against MAX_QUIZ_BLOCKS, checked in the same statement; past it nothing is kept, and this returns false. Otherwise it
+ * returns the latest stored answer.
  */
 export async function recordAnswer(link: string, userId: string, answer: QuizAnswerRequest, now = Date.now()) {
   await ensureTable()
@@ -66,25 +74,37 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
   const correct = answer.correct === null ? null : Number(answer.correct)
   const session = answer.order?.session ?? null
   const sequence = answer.order?.sequence ?? null
-  const first = sql`excluded.first_session IS NOT NULL AND excluded.first_session = first_session AND excluded.first_sequence < first_sequence`
-  const latest = sql`excluded.session IS NULL OR session IS NULL OR excluded.session <> session OR excluded.sequence > sequence`
+  const issuedAt = answer.order?.issuedAt ?? null
+  // Sequences take precedence within a page. Across pages, action time wins, with a stable session tie-break.
+  const first = sql`(excluded.first_session = first_session AND excluded.first_sequence < first_sequence)
+    OR (excluded.first_session <> first_session AND (excluded.first_issued_at < first_issued_at
+      OR (excluded.first_issued_at = first_issued_at AND excluded.first_session < first_session)))`
+  const latest = sql`CASE
+    WHEN excluded.session = session THEN excluded.sequence > sequence
+    WHEN excluded.issued_at IS NOT NULL THEN issued_at IS NULL OR excluded.issued_at > issued_at
+      OR (excluded.issued_at = issued_at AND excluded.session > session)
+    WHEN excluded.session IS NOT NULL THEN issued_at IS NULL
+    ELSE session IS NULL END`
   const kept = await db.all<{ choice: string; correct: number | null }>(sql`INSERT INTO drop_answers
       (link, question, user_id, kind, first_choice, first_correct, choice, correct, attempts, created_at, updated_at,
-       first_session, first_sequence, session, sequence)
+       first_session, first_sequence, session, sequence, first_issued_at, issued_at)
     SELECT ${link}, ${answer.id}, ${userId}, ${answer.kind}, ${choice}, ${correct}, ${choice}, ${correct}, 1, ${now}, ${now},
-      ${session}, ${sequence}, ${session}, ${sequence}
+      ${session}, ${sequence}, ${session}, ${sequence}, ${issuedAt}, ${issuedAt}
     WHERE EXISTS (SELECT 1 FROM drop_answers WHERE link = ${link} AND question = ${answer.id})
       OR (SELECT count(DISTINCT question) FROM drop_answers WHERE link = ${link}) < ${MAX_QUIZ_BLOCKS}
     ON CONFLICT (link, question, user_id) DO UPDATE SET
       first_choice = CASE WHEN ${first} THEN excluded.first_choice ELSE first_choice END,
       first_correct = CASE WHEN ${first} THEN excluded.first_correct ELSE first_correct END,
+      first_session = CASE WHEN ${first} THEN excluded.first_session ELSE first_session END,
       first_sequence = CASE WHEN ${first} THEN excluded.first_sequence ELSE first_sequence END,
+      first_issued_at = CASE WHEN ${first} THEN COALESCE(excluded.first_issued_at, first_issued_at) ELSE first_issued_at END,
       kind = CASE WHEN ${latest} THEN excluded.kind ELSE kind END,
       choice = CASE WHEN ${latest} THEN excluded.choice ELSE choice END,
       correct = CASE WHEN ${latest} THEN excluded.correct ELSE correct END,
       updated_at = CASE WHEN ${latest} THEN excluded.updated_at ELSE updated_at END,
       session = CASE WHEN ${latest} THEN excluded.session ELSE session END,
       sequence = CASE WHEN ${latest} THEN excluded.sequence ELSE sequence END,
+      issued_at = CASE WHEN ${latest} THEN COALESCE(excluded.issued_at, issued_at) ELSE issued_at END,
       attempts = attempts + 1
     RETURNING choice, correct`)
   const row = kept[0]

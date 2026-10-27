@@ -73,9 +73,9 @@ test("a database without the answers table gets it on the first read, index and 
     sql
       .prepare("PRAGMA table_info(drop_answers)")
       .all()
-      .slice(-4)
+      .slice(-6)
       .map((column) => column.name),
-    ["first_session", "first_sequence", "session", "sequence"],
+    ["first_session", "first_sequence", "session", "sequence", "first_issued_at", "issued_at"],
   )
 })
 
@@ -302,8 +302,45 @@ test("reversed requests keep the first action and latest vote, including concurr
     { session, sequence: 0 },
     { session, sequence: 1.5 },
     { session: "invalid", sequence: 1 },
+    { session, sequence: 1, issuedAt: -1 },
+    { session, sequence: 1, issuedAt: 1.5 },
+    { session, sequence: 1, issuedAt: Number.MAX_SAFE_INTEGER + 1 },
   ])
     await assert.rejects(post("ordered", { ...vote(5, ["tacos"]), order }), status(400))
+})
+
+test("delayed actions from another page and unordered callers cannot overwrite a newer ordered vote", async () => {
+  await quizDoc("tabs", { visibility: "public", access: "view" })
+  state.who = ada
+  const older = "00000000-0000-4000-8000-000000000001"
+  const newer = "00000000-0000-4000-8000-000000000002"
+  const vote = (session, sequence, issuedAt, choice) => ({
+    id: "lunch",
+    kind: "poll",
+    choice,
+    order: { session, sequence, issuedAt },
+  })
+  await post("tabs", vote(newer, 1, 200, ["tacos"]))
+  assert.deepEqual((await post("tabs", vote(older, 1, 100, ["pizza"]))).answer, {
+    choice: ["tacos"],
+    correct: null,
+  })
+  assert.deepEqual((await post("tabs", { id: "lunch", kind: "poll", choice: ["pizza"] })).answer, {
+    choice: ["tacos"],
+    correct: null,
+  })
+  assert.deepEqual((await post("tabs", vote(older, 2, undefined, ["pizza"]))).answer, {
+    choice: ["tacos"],
+    correct: null,
+  })
+  // An older page can still make a genuinely later action.
+  await post("tabs", vote(older, 3, 300, ["pizza"]))
+  await post("tabs", vote(newer, 2, 250, []))
+  const stored = (await answersOf("tabs", "ada"))[0]
+  assert.deepEqual(stored.first, { choice: ["pizza"], correct: null })
+  assert.deepEqual(stored.latest, { choice: ["pizza"], correct: null })
+  assert.equal(stored.attempts, 6)
+  assert.deepEqual((await quizResults("tabs")).get("lunch"), { kind: "poll", counts: { pizza: 1 }, total: 1 })
 })
 
 test("only people who can open the doc answer, and not while it's in the Trash", async () => {

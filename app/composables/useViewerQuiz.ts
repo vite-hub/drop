@@ -16,7 +16,9 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
   const answers = new Map<string, QuizAnswer>()
   const results = new Map<string, QuizResult>()
   const sequences = new Map<string, number>()
-  const confirmed = new Map<string, { sequence: number; answer: QuizAnswer }>()
+  const confirmed = new Map<string, { sequence: number; saved: QuizSaved }>()
+  const failedPolls = new Set<string>()
+  let issuedAt = 0
   let session = crypto.randomUUID()
   /** The blocks on the page, from the frame. */
   let shown: string[] = []
@@ -27,6 +29,7 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
       results.clear()
       sequences.clear()
       confirmed.clear()
+      failedPolls.clear()
       session = crypto.randomUUID()
     },
   )
@@ -65,8 +68,11 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
     const before = drop.value.quiz?.answers[answer.id]
     const sequence = (sequences.get(answer.id) ?? 0) + 1
     sequences.set(answer.id, sequence)
-    const order = { session, sequence }
+    // Epoch microseconds compare actions across tabs; the sequence also orders actions within one page.
+    issuedAt = Math.max(issuedAt + 1, Math.round((performance.timeOrigin + performance.now()) * 1000))
+    const order = { session, sequence, issuedAt }
     const current = () => session === order.session && sequences.get(answer.id) === sequence
+    failedPolls.delete(answer.id)
     answers.set(answer.id, { choice: answer.choice, correct: answer.correct })
     try {
       const saved = await $fetch<QuizSaved>(`/api/drops/${drop.value.id}/answers`, {
@@ -75,16 +81,23 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
         body: { ...answer, order },
       })
       if (session !== order.session) return
-      if (sequence > (confirmed.get(answer.id)?.sequence ?? 0))
-        confirmed.set(answer.id, { sequence, answer: saved.answer })
-      if (!current()) return
+      if (sequence <= (confirmed.get(answer.id)?.sequence ?? 0)) return
+      confirmed.set(answer.id, { sequence, saved })
+      // A failed newest vote rolls back to the latest success, even if that success finishes later.
+      if (!current() && !failedPolls.has(answer.id)) return
       answers.set(answer.id, saved.answer)
       if (saved.results) results.set(answer.id, saved.results)
+      else results.delete(answer.id)
     } catch (error) {
       if (!current()) return
       // A vote that wasn't saved doesn't show as one. A question still grades on the page.
-      if (answer.kind === "poll")
-        answers.set(answer.id, confirmed.get(answer.id)?.answer ?? before ?? { choice: [], correct: null })
+      if (answer.kind === "poll") {
+        failedPolls.add(answer.id)
+        const saved = confirmed.get(answer.id)?.saved
+        answers.set(answer.id, saved?.answer ?? before ?? { choice: [], correct: null })
+        if (saved?.results) results.set(answer.id, saved.results)
+        else results.delete(answer.id)
+      }
       notify.fail("Couldn't save your answer", error)
     }
     push()
