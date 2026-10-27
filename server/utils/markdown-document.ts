@@ -18,6 +18,7 @@ import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { codeLanguage, loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
+import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
 
 /**
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
@@ -198,6 +199,7 @@ const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render })
 function createMermaidRenderer(): NodeHandler {
   let diagrams = 0
   let sourceCharacters = 0
+  let hasCopyRuntime = false
 
   return (node) => {
     const content = textValue(node[1].content) ?? ""
@@ -208,9 +210,14 @@ function createMermaidRenderer(): NodeHandler {
     if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback
 
     const rendered = Mermaid(node)
-    return rendered.startsWith('<div class="mermaid">')
-      ? rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
-      : fallback
+    if (!rendered.startsWith('<div class="mermaid">')) return fallback
+    const runtime = hasCopyRuntime ? "" : `<style>${MERMAID_COPY_CSS}</style><script>${MERMAID_COPY_SCRIPT}</script>`
+    hasCopyRuntime = true
+    return (
+      `<figure class="drop-mermaid" data-source="${escapeHtml(content)}">` +
+      rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "") +
+      `</figure>${runtime}`
+    )
   }
 }
 
