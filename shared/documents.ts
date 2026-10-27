@@ -32,16 +32,17 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem)); margin: 0 auto; paddi
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
 .mermaid svg { max-width: 100%; height: auto; }
 .typeset :is(h2, h3) { scroll-margin-top: 1.5rem; }
-/* An image on its way (DEFERRED_IMAGES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
+/* An image on its way (DEFERRED_FILES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
 .typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }
 `
 
 /**
- * Asks the viewer for each image deferImages left waiting (shared/embedded-images.ts) as it comes within a screen and a
- * half of view, and shows it once the viewer sends it as a data URL. Every copy of the image takes it, Comark zoom's too.
+ * Asks the viewer for each image deferImages and each video or audio deferMedia left waiting (shared/embedded-images.ts)
+ * as it comes within a screen and a half of view. An image shows once the viewer sends it as a data URL, every copy of
+ * it, Comark zoom's too; a video or audio gets the file itself and plays it from a blob: URL of the frame's own.
  */
-const DEFERRED_IMAGES_SCRIPT = String.raw`(() => {
-  const waiting = document.querySelectorAll("img[data-drop-image]");
+const DEFERRED_FILES_SCRIPT = String.raw`(() => {
+  const waiting = document.querySelectorAll("img[data-drop-image], [data-drop-media]");
   if (!waiting.length) return;
   const asked = new Set();
   // The document as root: a sandboxed frame is cross-origin, and browsers ignore rootMargin on its implicit root.
@@ -50,18 +51,28 @@ const DEFERRED_IMAGES_SCRIPT = String.raw`(() => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue;
       near.unobserve(entry.target);
-      const path = entry.target.dataset.dropImage;
+      const path = entry.target.dataset.dropImage || entry.target.dataset.dropMedia;
       if (path && !asked.has(path)) { asked.add(path); paths.push(path); }
     }
-    if (paths.length) parent.postMessage({ __drop: true, type: "images", paths }, "*");
+    if (paths.length) parent.postMessage({ __drop: true, type: "files", paths }, "*");
   }, { root: document, rootMargin: "150% 0px" });
-  waiting.forEach((image) => near.observe(image));
+  waiting.forEach((element) => near.observe(element));
   addEventListener("message", (e) => {
     const m = e.data;
-    if (!m || !m.__drop || e.source !== parent || m.type !== "image-data" || !String(m.url).startsWith("data:image/")) return;
+    if (!m || !m.__drop || e.source !== parent || m.type !== "file-data") return;
+    if (m.data instanceof Blob) {
+      let url;
+      for (const media of document.querySelectorAll("[data-drop-media]")) {
+        if (media.dataset.dropMedia !== m.path) continue;
+        media.src = url ||= URL.createObjectURL(m.data);
+        media.removeAttribute("data-drop-media");
+      }
+      return;
+    }
+    if (!String(m.data).startsWith("data:image/")) return;
     for (const image of document.querySelectorAll("img[data-drop-image]")) {
       if (image.dataset.dropImage !== m.path) continue;
-      image.src = m.url;
+      image.src = m.data;
       image.removeAttribute("data-drop-image");
     }
   });
@@ -138,36 +149,49 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   });
   document.body.append(host);
 
-  // A compare spreads past the text into the room beside it, where the outline goes. So in a doc with one, the outline
-  // keeps a 200px column 4rem right of the compares, and the text moves left only as far as that needs (like for the
-  // viewer's panel). It only shows while the compares keep at least the text's width.
-  const wide = document.querySelector(".typeset .ca-compare");
+  // A compare, or a Mermaid diagram wider than the text, spreads past the text into the room beside it, where the
+  // outline goes. So in a doc with one, the outline keeps a 200px column 4rem right of them, and the text moves left
+  // only as far as that needs (like for the viewer's panel). It only shows while they keep at least the text's width.
+  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .drop-mermaid")];
   const column = 264;
   const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
     const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
-    if (wide) {
-      const fits = innerWidth - inset - column - 48 >= main.getBoundingClientRect().width;
+    const text = main.getBoundingClientRect().width - 48;
+    const wide = blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--mermaid-width")) > text);
+    if (wide.length) {
       const body = document.body.style;
+      const keep = (on) => {
+        if (on) {
+          body.setProperty("--drop-outline", column + "px");
+          body.setProperty("--drop-shift", "clamp(0px, calc(2 * " + right + " + 75rem - 100vw), calc" + right + ")");
+        } else {
+          body.removeProperty("--drop-outline");
+          body.removeProperty("--drop-shift");
+        }
+        return on;
+      };
+      const diagrams = () => wide.reduce((sum, block) => sum + (block.classList.contains("ca-compare") ? 0 : block.getBoundingClientRect().width), 0);
+      let fits = keep(innerWidth - inset - column - 48 >= main.getBoundingClientRect().width);
+      // A diagram's labels matter more than the outline, so the outline goes when its column would shrink a diagram.
       if (fits) {
-        body.setProperty("--drop-outline", column + "px");
-        body.setProperty("--drop-shift", "clamp(0px, calc(2 * " + right + " + 75rem - 100vw), calc" + right + ")");
-      } else {
-        body.removeProperty("--drop-outline");
-        body.removeProperty("--drop-shift");
+        const beside = diagrams();
+        keep(false);
+        fits = keep(diagrams() <= beside);
       }
       host.toggleAttribute("data-fits", fits);
-      host.style.left = Math.min(wide.getBoundingClientRect().right + 64, innerWidth - inset - 224) + "px";
+      const edge = Math.max(...wide.map((block) => block.getBoundingClientRect().right));
+      host.style.left = Math.min(edge + 64, innerWidth - inset - 224) + "px";
       host.style.width = "200px";
       return;
     }
     // The text ends 1.5rem inside <main>. The outline keeps 4rem clear of it, closing to 2.5rem only when its full
     // 15rem width needs the room, and never drifts further out on wide screens.
-    const text = main.getBoundingClientRect().right - 24;
-    const space = innerWidth - inset - 24 - text;
+    const end = main.getBoundingClientRect().right - 24;
+    const space = innerWidth - inset - 24 - end;
     const gap = Math.min(64, Math.max(40, space - 240));
     host.toggleAttribute("data-fits", space - gap >= 176);
-    host.style.left = text + gap + "px";
+    host.style.left = end + gap + "px";
     host.style.width = Math.min(space - gap, 240) + "px";
   }
   function mark() {
@@ -225,7 +249,7 @@ export function planDocument(
   }
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><script>${QUIZ_BRIDGE}</script><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_IMAGES_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><script>${QUIZ_BRIDGE}</script><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )

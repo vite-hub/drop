@@ -35,7 +35,7 @@ const cached = defineCachedFunction(
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
     // Bump when the renderer changes so existing documents pick up the current preset on their next read.
-    integrity: "8",
+    integrity: "11",
     validate: (entry: { value?: MarkdownRender }) => entry.value !== undefined && !entry.value.retry,
     getKey: (_event: H3Event | undefined, key: string) => key,
   },

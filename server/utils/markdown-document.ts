@@ -18,6 +18,7 @@ import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { codeLanguage, loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
+import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
 
 /**
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
@@ -26,6 +27,18 @@ import { cachedMarkdown } from "./markdown-cache"
  * Mermaid stays Drop's, with its limits.
  */
 const preset = comarkUi({ chips: { download: false }, mermaid: false, zoom: { images: false } })
+// Writes comark-zoom's script once per render (it keeps count in the render's state); it never waits on anything.
+const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
+  preset.components["zoom-runtime"]!(["zoom-runtime", {}], state) as string
+
+/**
+ * The inline scripts the renderer writes itself, which the /f/ pages' CSP allows by hash: Mermaid's copy buttons and
+ * comark-zoom, which zooms diagrams and annotated screenshots. Scripts in a document's own source stay blocked.
+ */
+export const RENDERER_SCRIPTS = [
+  MERMAID_COPY_SCRIPT,
+  zoomRuntime({ context: {} } as Parameters<NodeHandler>[1]).match(/<script>([\s\S]*)<\/script>/)![1]!,
+]
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
@@ -198,8 +211,9 @@ const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render })
 function createMermaidRenderer(): NodeHandler {
   let diagrams = 0
   let sourceCharacters = 0
+  let hasCopyRuntime = false
 
-  return (node) => {
+  return (node, state) => {
     const content = textValue(node[1].content) ?? ""
     const fallback = `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
 
@@ -208,9 +222,18 @@ function createMermaidRenderer(): NodeHandler {
     if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback
 
     const rendered = Mermaid(node)
-    return rendered.startsWith('<div class="mermaid">')
-      ? rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "")
-      : fallback
+    if (!rendered.startsWith('<div class="mermaid">')) return fallback
+    const runtime = hasCopyRuntime ? "" : `<style>${MERMAID_COPY_CSS}</style><script>${MERMAID_COPY_SCRIPT}</script>`
+    hasCopyRuntime = true
+    // The diagram's own width lets a wide one spread past the text column (document-shell.css), and a click zooms it.
+    const width = Number(rendered.match(/<svg[^>]* width="([\d.]+)"/)?.[1]) || 0
+    return (
+      `<figure class="drop-mermaid" data-source="${escapeHtml(content)}" style="--mermaid-width: ${Math.ceil(width)}px">` +
+      rendered
+        .replace('<div class="mermaid">', '<div class="mermaid" data-zoom tabindex="0">')
+        .replace(/^\s*@import url\([^\n]+\);\s*$/gm, "") +
+      `</figure>${runtime}${zoomRuntime(state)}`
+    )
   }
 }
 
