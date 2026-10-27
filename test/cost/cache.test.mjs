@@ -1,11 +1,14 @@
 import assert from "node:assert/strict"
+import { resolveCacheKeys } from "ocache"
 import { beforeEach, test } from "vite-plus/test"
 import { createRequire } from "node:module"
 import { pathToFileURL } from "node:url"
 import { state, calls } from "./harness.mjs"
 const { cachedMarkdown, deleteMarkdownCache, MARKDOWN_CACHE_TTL } = await import("../../server/utils/markdown-cache.ts")
 
-const KEY = "nitro:functions:markdown:doc.md.json"
+const [KEY] = await resolveCacheKeys({
+  options: { base: "", group: "nitro/functions", name: "markdown", getKey: () => "doc.md" },
+})
 beforeEach(() => {
   state.entries.clear()
   calls.writes.length = 0
@@ -36,8 +39,7 @@ test("KV writes physically expire in 30 days through the actual unstorage driver
 })
 
 test("off Cloudflare the memory cache keeps a 30-day render instead of dropping it at once", async () => {
-  // Nitro's default cache storage on Node. Unpatched, unstorage turns the TTL into a setTimeout above 2^31-1 ms, which
-  // Node fires after 1 ms (TimeoutOverflowWarning), so every render was thrown away (patches/unstorage@*.patch).
+  // Before unstorage alpha.11, this TTL overflowed setTimeout and evicted the render after 1 ms.
   const require = createRequire(import.meta.resolve("nitro/package.json"))
   const { createStorage } = await import(pathToFileURL(require.resolve("unstorage")))
   const previous = state.storage

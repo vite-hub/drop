@@ -1,6 +1,7 @@
 import type { H3Event } from "h3"
 import { defineCachedFunction } from "nitro/cache"
 import { useStorage } from "nitro/storage"
+import { resolveCacheKeys } from "ocache"
 
 export const MARKDOWN_CACHE_TTL = 60 * 60 * 24 * 30
 
@@ -45,9 +46,11 @@ export const cachedMarkdown = (key: string, source: () => Promise<string>, rende
 
 export async function deleteMarkdownCache(key: string) {
   if (key.startsWith("apps/") || key.startsWith("code-images/")) return
-  // Nitro's cached-function key is part of its storage contract; keep this in sync with the `name` above.
-  // A spreadsheet's preview (server/utils/spreadsheet.ts) is cached the same way, under its own name.
+  const storage = useStorage("cache")
   await Promise.all(
-    ["markdown", "spreadsheet"].map((name) => useStorage("cache").removeItem(`nitro:functions:${name}:${key}.json`)),
+    ["markdown", "spreadsheet"].map(async (name) => {
+      const keys = await resolveCacheKeys({ options: { base: "", group: "nitro/functions", name, getKey: () => key } })
+      await Promise.all(keys.map((entry) => storage.removeItem(entry)))
+    }),
   )
 }
