@@ -512,6 +512,7 @@ export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
     createdAt: item.createdAt,
     note: item.note,
     actorName: item.actorName,
+    agent: item.agent,
     current: item.id === row.id,
   }))
 }

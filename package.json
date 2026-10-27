@@ -56,7 +56,7 @@
     "beautiful-mermaid": "1.1.3",
     "better-auth": "1.7.10",
     "comark-content": "0.4.1",
-    "comark-ui": "https://pkg.pr.new/onmax/comark-ui/comark-ui@ec5769238df1f8523f836317817c4076e376be42",
+    "comark-ui": "https://pkg.pr.new/onmax/comark-ui/comark-ui@8de468d4b02d4a326d4c9e184ba96a2ab0348e59",
     "confbox": "^0.3.1",
     "drizzle-orm": "0.45.3",
     "entities": "^8.1.0",
@@ -72,8 +72,9 @@
     "mrmime": "^2.0.1",
     "nanotar": "^0.3.0",
     "nitro-mcp-toolkit": "0.4.0",
-    "nuxt": "npm:nuxt-nightly@5.0.0-29766097.1e475df9",
+    "nuxt": "npm:nuxt-nightly@5.0.0-2610270115-58d7824",
     "nuxt-security": "2.6.0",
+    "ocache": "0.3.1",
     "ofetch": "2.0.0-alpha.3",
     "pretty-bytes": "^7.2.0",
     "react": "19.3.1",
@@ -84,7 +85,7 @@
     "valibot": "^1.4.2",
     "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@35beecaa48f86e66c16e1f5fb7df02668ba546e0",
     "vue": "3.5.44",
-    "vue-router": "5.2.0",
+    "vue-router": "5.4.0",
     "yjs": "13.6.33"
   },
   "devDependencies": {
@@ -93,7 +94,7 @@
     "@types/react-dom": "19.3.0",
     "drizzle-kit": "^0.31.10",
     "knip": "6.41.0",
-    "nitro": "3.0.260610-beta",
+    "nitro": "3.0.260903-beta",
     "typescript": "^6.0.3",
     "vite-doctor": "0.0.12",
     "vite-plus": "catalog:",
@@ -101,7 +102,7 @@
     "wrangler": "4.148.0"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=24.11.0"
   },
   "packageManager": "pnpm@11.18.0",
   "cloudflare": {

@@ -74,9 +74,32 @@ test("Drizzle applies the migrations once, in journal order", async () => {
     assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  {
+  // Cover a fresh database, main's schema, and the parent PR's Comments schema.
+  for (const alreadyApplied of [0, 3, 4]) {
     const database = new DatabaseSync(":memory:")
     try {
+      database.exec("PRAGMA foreign_keys = ON")
+      if (alreadyApplied) {
+        database.exec(
+          "CREATE TABLE __drizzle_migrations (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at numeric)",
+        )
+        for (const migration of migrations.slice(0, alreadyApplied)) {
+          database.exec(migration.sql.join(";\n"))
+          database
+            .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
+            .run(migration.hash, migration.folderMillis)
+        }
+        database.exec(`
+          INSERT INTO drops (id, owner_id, kind, title, filename, actor_kind, actor_name, created_at, updated_at)
+          VALUES ('legacy-image', 'owner', 'image', 'Image', 'image.png', 'human', 'Owner', 1, 1);
+          INSERT INTO comments (id, drop_id, n, kind, selector, body, author_name, created_at)
+          VALUES ('legacy-comment', 'legacy-image', 1, 'page', '', 'Comment', 'Owner', 1);
+          INSERT INTO comment_replies (id, comment_id, body, author_name, created_at)
+          VALUES ('legacy-reply', 'legacy-comment', 'Reply', 'Owner', 1);
+          INSERT INTO comment_attachments (drop_id, comment_id, reply_id, created_at)
+          VALUES ('legacy-image', 'legacy-comment', 'legacy-reply', 1);
+        `)
+      }
       const db = drizzle(async (query, params, method) => {
         const statement = database.prepare(query)
         if (method === "run") {
@@ -103,6 +126,8 @@ test("Drizzle applies the migrations once, in journal order", async () => {
         "quota_reservations",
         "quota_blobs",
         "abuse_reports",
+        "vitehub_comment_threads",
+        "vitehub_comments",
       ])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
       assert.ok(
@@ -111,6 +136,19 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           .all()
           .some((column) => column.name === "quarantined_at"),
       )
+      assert.ok(
+        database
+          .prepare("PRAGMA table_info(drops)")
+          .all()
+          .some((column) => column.name === "agent"),
+      )
+      const threadColumns = database.prepare("PRAGMA table_info(vitehub_comment_threads)").all()
+      for (const name of ["scope", "number", "metadata"])
+        assert.ok(threadColumns.some((column) => column.name === name))
+      for (const table of ["comments", "comment_replies"])
+        assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table), undefined)
+      assert.equal(database.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, alreadyApplied ? 1 : 0)
+      assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
       await migrate(db, apply, config)
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
     } finally {

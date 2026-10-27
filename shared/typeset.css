@@ -320,13 +320,6 @@
       padding-block: 0.25em;
     }
 
-    /* A chip centers its favicon against its label, independent of the font's x-height. */
-    &:where(.cp) {
-      display: inline-flex;
-      align-items: center;
-      line-height: 1.25;
-    }
-
     /* Media. */
     &:where(img, video) {
       border-radius: var(--radius, 0.5em);
@@ -501,6 +494,14 @@
   max-width: 100%;
   margin-block: var(--typeset-flow);
   overflow-x: auto;
+}
+
+/* Mermaid's inline palette and text tokens must follow the page, whose muted/accent tokens are backgrounds. */
+.typeset .mermaid svg {
+  --bg: var(--background) !important;
+  --fg: var(--foreground) !important;
+  --muted: var(--muted-foreground);
+  --accent: var(--foreground);
 }
 
 .typeset .mermaid svg,

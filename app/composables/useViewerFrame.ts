@@ -25,6 +25,8 @@ export function useViewerFrame(options: {
   pinned: Ref<DropComment[]>
   /** Room the floating panel takes on the right, in pixels. */
   inset: Ref<number>
+  /** How much of the bottom edge the review dock covers, so the doc's own overlays stop above it. */
+  bottom: Ref<number>
   /** How wide a Markdown doc's text runs. */
   width: Ref<DocWidth>
   annotations: ReturnType<typeof useViewerAnnotations>
@@ -232,16 +234,20 @@ export function useViewerFrame(options: {
       })
   })
   watch(
-    [ready, annotations.tool],
+    [ready, annotations.frameTool],
     () =>
-      ready.value && send({ type: "tool", tool: annotations.tool.value, pointComments: drop.value.kind === "image" }),
+      ready.value &&
+      send({ type: "tool", tool: annotations.frameTool.value, pointComments: drop.value.kind === "image" }),
   )
   watch(
     [ready, () => ({ ...annotations.overlays })],
     () => ready.value && send({ type: "view", ...annotations.overlays }),
   )
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
-  watch([ready, options.inset], () => ready.value && send({ type: "inset", right: options.inset.value }))
+  watch(
+    [ready, options.inset, options.bottom],
+    () => ready.value && send({ type: "inset", right: options.inset.value, bottom: options.bottom.value }),
+  )
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
 
   return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath }

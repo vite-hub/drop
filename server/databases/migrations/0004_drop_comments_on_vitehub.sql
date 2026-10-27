@@ -1,4 +1,4 @@
--- Drop's comments move to ViteHub Comments (vitehub_comment_threads and vitehub_comments, 0002). The old comments and
+-- Drop's comments move to ViteHub Comments (vitehub_comment_threads and vitehub_comments, 0003). The old comments and
 -- replies go. comment_attachments loses its foreign keys to them, since its ids now name ViteHub comments. Its rows
 -- stay: they keep the images of the old comments out of their drops' embedded files, and the images go with their drop.
 -- The rebuild comes first: dropping `comments` while the old comment_attachments exists would cascade into it. It needs

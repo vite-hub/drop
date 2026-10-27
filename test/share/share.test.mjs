@@ -8,7 +8,7 @@ const { findDrop, listDrops, listFolders, listSharedWithMe, permissions, toSumma
 const { updateDrop } = await import("../../server/utils/drop-update.ts")
 const { createFolder: makeFolder, requireFolder } = await import("../../server/utils/folders.ts")
 const { closePublicLinks } = await import("../../server/utils/share.ts")
-const { liveShare, sharesFor } = await import("../../shared/share.ts")
+const { liveShare, shareBlock, sharesFor } = await import("../../shared/share.ts")
 const { roleFor } = await import("../../shared/roles.ts")
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: listFoldersTool } = await import("../../server/mcp/tools/list_folders.ts")
@@ -99,6 +99,21 @@ test("one share state resolves what it lets people do, and a closed public link 
     ["team", "team_edit"],
     "a team folder is never private; 0 days turns public links off",
   )
+  // The share dialog greys out every state the list leaves out and shows why.
+  assert.equal(shareBlock("team", "personal", null, { kind: "markdown" }), "This Drop is personal, so it has no team.")
+  assert.equal(
+    shareBlock("team", "personal", null, { kind: "markdown" }, true),
+    "Only drops in a team's folders share with a team.",
+  )
+  assert.equal(
+    shareBlock("team_edit", "team", 7, { kind: "html" }),
+    "Only Markdown docs and folders can be edited together.",
+  )
+  assert.equal(
+    shareBlock("private", "team", 0, { kind: "folder", teamFolder: true }),
+    "A team folder always reaches the team.",
+  )
+  assert.equal(shareBlock("public", "team", 0, { kind: "markdown" }), "Public links are off on this Drop.")
 
   const drop = (share) => ({ ownerId: "owner", share, shareReview: null, quarantinedAt: null })
   assert.deepEqual([permissions(drop("public"), null).view, permissions(drop("public"), null).comment], [true, false])

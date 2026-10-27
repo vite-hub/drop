@@ -5,8 +5,10 @@ overrides:
   better-auth: 1.7.10
   # Nuxt and Nuxt UI must share one Vue instance. 3.5.42+ fixes an SSR attribute-name XSS (@vue/server-renderer).
   vue: 3.5.44
-  # Nuxt's payload serializer; 5.9.3+ fixes several uneval/stringify advisories.
-  devalue: ^5.9.4
+  # Keep older consumers on the patched v5 serializer without downgrading Nuxt's v6.
+  devalue@5: ^5.9.4
+  # alpha.10 still overflows setTimeout for the 30-day Markdown cache TTL.
+  nitro>unstorage: 2.0.0-alpha.11
   vite@*: "catalog:"
   # Nuxt UI's editor menus stay on @tiptap/core's 3.31.4; a 3.32 menu beside core 3.31.4 breaks them.
   "@tiptap/extension-bubble-menu": 3.31.4
@@ -20,12 +22,6 @@ patchedDependencies:
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
-  # Types `handleCacheHeaders` on cachedEventHandler options, and guards `nuxt dev`, where the nightly CLI gives Vite
-  # no httpServer for WebSocket upgrades. In dev it also resolves bare imports from virtual modules (Nuxt's paths.mjs
-  # imports ufo) through the plugins: Vite looked for them in the project root, where pnpm hoists nothing, and 500ed.
-  nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch
-  # Keeps Nuxt's dev-only module URL out of the Workers bundle.
-  nuxt-nightly@5.0.0-29766097.1e475df9: patches/nuxt-nightly@5.0.0-29766097.1e475df9.patch
   # Runs nuxt-security 2.6.0 on Nuxt 5 / Nitro v3 / h3 v2: Nitro v3 imports, headers set in render:html (Nuxt 5 has no
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
   # basic auth without sendError or a Node request, and request middlewares registered only for features in use.
@@ -33,9 +29,11 @@ patchedDependencies:
   # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
   # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
   vite-doctor@0.0.12: patches/vite-doctor@0.0.12.patch
-  # Nitro's memory cache (Node hosts like Quiver) dropped every render with a 30-day TTL at once: a setTimeout over
-  # 2^31-1 ms fires after 1 ms. Backport of unjs/unstorage#845 (in 2.0.0-alpha.11; Nitro pins alpha.7).
-  unstorage@2.0.0-alpha.7: patches/unstorage@2.0.0-alpha.7.patch
+  # A chip's HTML renderer rendered its label's children without their parent, so comark read `<code>` as a block and
+  # wrote a newline after it: [commit `abc`](…) showed a space before whatever followed the chip.
+  comark-chips@0.5.0: patches/comark-chips@0.5.0.patch
+  # Nuxt runs Vite without an HTTP server; virtual importers also need the plugin resolver.
+  nitro@3.0.260903-beta: patches/nitro@3.0.260903-beta.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
@@ -66,6 +64,12 @@ minimumReleaseAgeExclude:
   - "@better-auth/stripe@1.7.10"
   - "@better-auth/telemetry@1.7.10"
   - better-auth@1.7.10
+  - "@nuxt/kit-nightly@5.0.0-2610270115-58d7824"
+  - "@nuxt/nitro-server-nightly@5.0.0-2610270115-58d7824"
+  - "@nuxt/schema-nightly@5.0.0-2610270115-58d7824"
+  - "@nuxt/vite-builder-nightly@5.0.0-2610270115-58d7824"
+  - "@nuxt/vite-server-nightly@5.0.0-2610270115-58d7824"
+  - nuxt-nightly@5.0.0-2610270115-58d7824
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0

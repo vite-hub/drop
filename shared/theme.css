@@ -49,6 +49,10 @@
   --positive: #16a34a;
   --caution: #d97706;
   --negative: #dc2626;
+  /* T3 Code's grain (apps/web/src/index.css): fractal noise at 3.5% in a 256px tile, painted into each surface's own
+     background rather than laid over the page, so nothing re-blends it while something animates. */
+  --surface-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  --surface-grain-size: 256px 256px;
 }
 
 :root.dark {

@@ -72,11 +72,18 @@ export function useViewerAnnotations(options: {
   const canDrawArea = computed(
     () => commenting.value && !lightbox.value && ["markdown", "image", "html", "app"].includes(drop.value.kind),
   )
+  // Opening Comments makes dragging available without replacing the plain-comment composer.
+  const frameTool = computed<ViewerTool>(() =>
+    canDrawArea.value && options.reviewOpen?.value && tool.value === "browse" && popover.value?.type !== "thread"
+      ? "comment"
+      : tool.value,
+  )
   /** Picks a tool, or puts the one on back to Browse. */
   function setTool(next: ViewerTool) {
     if (!(options.enabled?.value ?? true) && next !== "browse") return
     if (next === "comment" && !canDrawArea.value) return
     if (next === "measure" && !["html", "app"].includes(drop.value.kind)) return
+    if (options.reviewOpen && next !== "comment") options.reviewOpen.value = false
     awaited = null
     focusGeneration++
     popover.value = selection.value = null
@@ -164,9 +171,16 @@ export function useViewerAnnotations(options: {
 
   /** A toolbar key pressed while the page had focus. Apps may use these keys themselves, so only under a tool there. */
   function pressed(key: Extract<PointerMessage, { type: "key" }>["key"], under?: ViewerTool) {
-    if (key === "Escape") return dismiss()
+    if (key === "Escape") {
+      if (!options.reviewOpen?.value) return dismiss()
+      options.reviewOpen.value = false
+      tool.value = "browse"
+      selection.value = null
+      beginFocus()
+      return
+    }
     if (drop.value.kind === "app" && (under ?? "browse") === "browse") return
-    if (key === "v") tool.value = "browse"
+    if (key === "v") setTool("browse")
     if (key === "r") setTool("comment")
     if (key === "s") setTool("measure")
     if (key === "u") toggleOverlay("rulers")
@@ -209,6 +223,7 @@ export function useViewerAnnotations(options: {
     lightbox,
     popover,
     tool,
+    frameTool,
     overlays,
     areaMode,
     canDrawArea,

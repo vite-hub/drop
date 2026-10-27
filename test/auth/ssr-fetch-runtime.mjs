@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
-import { stripTypeScriptTypes } from "node:module"
+import { createRequire, stripTypeScriptTypes } from "node:module"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { SourceTextModule, SyntheticModule } from "node:vm"
@@ -12,6 +12,7 @@ import * as ofetch from "ofetch"
 // context and HTTP transport are supplied here; its caching, deduplication, cancellation, and refresh code are real.
 const root = fileURLToPath(new URL("../../", import.meta.url))
 const nuxt = dirname(fileURLToPath(import.meta.resolve("nuxt/package.json")))
+const nuxtRequire = createRequire(import.meta.resolve("nuxt/package.json"))
 let app
 let calls
 let answer
@@ -52,6 +53,7 @@ const defaults = {
   tracingChannelNuxt: false,
   alwaysRunFetchOnKeyChange: false,
   fetchDefaults: {},
+  vapor: false,
 }
 const stubs = {
   vue,
@@ -61,6 +63,8 @@ const stubs = {
   "#build/nuxt.config.mjs": defaults,
   "#build/fetch": { $fetch: () => assert.fail("useApi must use its request-local transport") },
   "#shared/quotas": { QuotaFailureSchema: valibot.unknown() },
+  "./ssr.js": { useRequestFetch: () => assert.fail("useApi must use its request-local transport") },
+  "../diagnostics/core.js": { appDiagnostics: {} },
   "../nuxt.js": { useNuxtApp: () => app },
   "../internal/tracing.js": { traceAsync: () => assert.fail("tracing is off") },
   "../utils.js": { getUserCaller: () => undefined, toArray: (value) => (Array.isArray(value) ? value : [value]) },
@@ -103,10 +107,15 @@ async function load(path, isApp = false) {
     },
   })
   modules.set(path, module)
-  await module.link(async (id) => (id in stubs ? synthetic(id, stubs[id]) : load(resolve(dirname(path), id))))
   return module
 }
+async function link(id, parent) {
+  if (id in stubs) return synthetic(id, stubs[id])
+  if (!id.startsWith(".")) return synthetic(id, await import(nuxtRequire.resolve(id)))
+  return load(resolve(dirname(parent.identifier), id))
+}
 const fetchModule = await load(resolve(nuxt, "dist/app/composables/fetch.js"))
+await fetchModule.link(link)
 await fetchModule.evaluate()
 stubs["#test/context"] = {
   createUseFetch: fetchModule.namespace.createUseFetch,
@@ -116,6 +125,7 @@ stubs["#test/context"] = {
 }
 const source = process.env.DROP_SSR_SOURCE || resolve(root, "app/composables/useApi.ts")
 const apiModule = await load(source, true)
+await apiModule.link(link)
 await apiModule.evaluate()
 const { useMe, useApi } = apiModule.namespace
 

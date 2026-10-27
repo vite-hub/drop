@@ -2,6 +2,7 @@
 // A doc's versions one after the other, newest first, like a commit log: what each one changed (its note), who
 // published it, and the comments written on it. A version shows what it changed (ViewerDiff) in place of the document;
 // `selected` is the one showing. Each one's link stays on that version, while the doc's link follows the latest.
+import { agentLabel } from "#shared/agent"
 import { dropPath } from "#shared/links"
 import type { DropComment, DropDetail, DropVersion } from "#shared/types"
 
@@ -32,6 +33,7 @@ function talk(version: DropVersion) {
       />
       <button
         :aria-label="`What changed in v${version.version}`"
+        :aria-describedby="agentLabel(version.agent) ? `version-agent-${version.id}` : undefined"
         :aria-pressed="selected === version.id"
         class="group relative flex w-full cursor-pointer gap-3 rounded-md py-2.5 pr-11 pl-3 text-left text-sm outline-none hover:bg-elevated focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) aria-pressed:bg-elevated"
         type="button"
@@ -54,6 +56,13 @@ function talk(version: DropVersion) {
               · {{ talk(version) }}</template
             ></span
           >
+          <span
+            v-if="agentLabel(version.agent)"
+            :id="`version-agent-${version.id}`"
+            class="block text-xs leading-relaxed wrap-anywhere text-muted"
+          >
+            {{ agentLabel(version.agent) }}
+          </span>
         </span>
         <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-mingcute-right-line" />
       </button>
