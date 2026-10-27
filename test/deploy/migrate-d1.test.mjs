@@ -95,7 +95,7 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           .some((column) => column.name === "plan"),
       )
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
-      for (const table of ["drop_heads", "code_images", "quota_reservations", "abuse_reports"])
+      for (const table of ["drop_versions", "code_images", "quota_reservations", "abuse_reports"])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
       assert.ok(
         database

@@ -2,13 +2,12 @@ import { and, eq, inArray, isNotNull, isNull, type SQL, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
-import { dropHeads, drops, dropTexts } from "../databases/config"
+import { drops, dropTexts } from "../databases/config"
 import { boardText, parseBoard } from "#shared/board"
 import { splitFrontmatter } from "#shared/frontmatter"
 import { DROP_KINDS } from "#shared/types"
 
-// Search matches a drop's title, file name and slug, and the words of a text doc, kept in `drop_texts` for latest
-// versions. Plain LIKE scans, no FTS5: D1's export breaks on virtual tables, and a person's docs scan in milliseconds.
+// Search matches a drop's title, file name and slug, and the words of a text doc's latest version, kept in `drop_texts`. Plain LIKE scans, no FTS5: D1's export breaks on virtual tables, and a person's docs scan in milliseconds.
 
 /** Text docs keep this many characters for search; the rest of a long doc isn't searchable. */
 export const MAX_SEARCH_TEXT = 64_000
@@ -91,7 +90,7 @@ const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coa
 
 /**
  * One condition per word: the word is in the drop's name, or in its text. SQLite's LIKE ignores ASCII case already, so
- * the text isn't lowered row by row. Needs `drop_texts` left-joined (see `searchHeads`).
+ * the text isn't lowered row by row. Needs `drop_texts` left-joined (see `searchDrops`).
  */
 export const matching = (words: string[]) =>
   words.map(
@@ -129,35 +128,28 @@ export function cleanSnippet(snippet: string | null) {
 }
 
 /**
- * Latest versions matching `words` (every word, in the name or the text), newest first, with a snippet when only the
- * text has them. `where` scopes the rows; it may use `drops` and `drop_heads`.
+ * Drops matching `words` (every word, in the name or the text), newest first, with a snippet when only the text has
+ * them. `where` scopes the rows on `drops`.
  */
-export async function searchHeads(where: SQL | undefined, words: string[], limit: number) {
+export async function searchDrops(where: SQL | undefined, words: string[], limit: number) {
   const rows = await db
     .select({ drop: drops, snippet: snippetOf(words) })
-    .from(dropHeads)
-    .innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .from(drops)
     .leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
     .where(and(where, ...matching(words)))
-    .orderBy(sql`${dropHeads.updatedAt} DESC`)
+    .orderBy(sql`${drops.updatedAt} DESC`)
     .limit(limit)
   return rows.map((row) => ({ drop: row.drop, snippet: cleanSnippet(row.snippet) }))
 }
 
 /**
- * The statements that keep a version's text: a row for the new version, and none for the one it replaces. Part of the
- * publish's batch, after the drop's own insert.
+ * The statements that keep a drop's text: the new version's replaces the one before. Part of the publish's batch,
+ * after the drop's own write.
  */
-export function textStatements(
-  row: { id: string; kind: string },
-  source: string | undefined,
-  previousId?: string | null,
-) {
-  const statements = []
-  if (previousId) statements.push(db.delete(dropTexts).where(eq(dropTexts.dropId, previousId)))
-  if (source !== undefined && SEARCH_KINDS.some((kind) => kind === row.kind))
-    statements.push(db.insert(dropTexts).values({ dropId: row.id, text: searchableText(row.kind, source) }))
-  return statements
+export function textStatements(row: { id: string; kind: string }, source: string | undefined) {
+  const remove = db.delete(dropTexts).where(eq(dropTexts.dropId, row.id))
+  if (source === undefined || !SEARCH_KINDS.some((kind) => kind === row.kind)) return [remove] as const
+  return [remove, db.insert(dropTexts).values({ dropId: row.id, text: searchableText(row.kind, source) })] as const
 }
 
 /**
@@ -168,8 +160,7 @@ export function textStatements(
 export async function indexMissingTexts(limit = 100) {
   const missing = await db
     .select({ id: drops.id, kind: drops.kind, blobKey: drops.blobKey })
-    .from(dropHeads)
-    .innerJoin(drops, eq(drops.id, dropHeads.dropId))
+    .from(drops)
     .leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
     .where(and(isNull(dropTexts.dropId), inArray(drops.kind, [...SEARCH_KINDS]), isNotNull(drops.blobKey)))
     .limit(limit)
