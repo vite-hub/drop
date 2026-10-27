@@ -50,7 +50,7 @@ export const QuizAnswerRequest = v.intersect([
       v.object({
         session: v.pipe(v.string(), v.uuid()),
         sequence: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
-        /** Epoch microseconds; older clients only supplied a page session and sequence. */
+        /** Epoch microseconds, capped at server receipt time; older clients only supplied a session and sequence. */
         issuedAt: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(0))),
       }),
     ),

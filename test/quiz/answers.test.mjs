@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { H3Event } from "h3"
-import { beforeEach, test } from "vite-plus/test"
+import { beforeEach, test, vi } from "vite-plus/test"
 import { insertDrop, insertVersion, migrate, reset, sql, state, who } from "../cost/harness.mjs"
 const { answersOf, quizBlocks, quizResults, recordAnswer } = await import("../../server/utils/answers.ts")
 const { cachedMarkdown } = await import("../../server/utils/markdown-cache.ts")
@@ -310,6 +310,9 @@ test("reversed requests keep the first action and latest vote, including concurr
 })
 
 test("delayed actions from another page and unordered callers cannot overwrite a newer ordered vote", async () => {
+  const now = Date.now()
+  vi.useFakeTimers({ toFake: ["Date"] })
+  vi.setSystemTime(now)
   await quizDoc("tabs", { visibility: "public", access: "view" })
   state.who = ada
   const older = "00000000-0000-4000-8000-000000000001"
@@ -318,7 +321,7 @@ test("delayed actions from another page and unordered callers cannot overwrite a
     id: "lunch",
     kind: "poll",
     choice,
-    order: { session, sequence, issuedAt },
+    order: { session, sequence, issuedAt: issuedAt === undefined ? undefined : now * 1000 + issuedAt },
   })
   await post("tabs", vote(newer, 1, 200, ["tacos"]))
   assert.deepEqual((await post("tabs", vote(older, 1, 100, ["pizza"]))).answer, {
@@ -342,6 +345,51 @@ test("delayed actions from another page and unordered callers cannot overwrite a
   assert.equal(stored.attempts, 6)
   assert.deepEqual((await quizResults("tabs")).get("lunch"), { kind: "poll", counts: { pizza: 1 }, total: 1 })
 })
+
+for (const kind of ["question", "poll"]) {
+  for (const legacy of [false, true]) {
+    test(`a ${legacy ? "previously stored future timestamp" : "future client clock"} cannot pin the latest ${kind} answer across pages`, async () => {
+      const now = Date.now()
+      vi.useFakeTimers({ toFake: ["Date"] })
+      vi.setSystemTime(now)
+      await quizDoc("clock", { visibility: "public", access: "view" })
+      state.who = ada
+      const id = kind === "question" ? "capital" : "lunch"
+      const before = kind === "question" ? ["lyon"] : ["pizza"]
+      const choice = kind === "question" ? ["paris"] : ["tacos"]
+      await post("clock", {
+        id,
+        kind,
+        choice: before,
+        order: { session: crypto.randomUUID(), sequence: 1, issuedAt: Number.MAX_SAFE_INTEGER },
+      })
+      if (legacy) {
+        // Simulate a row accepted before timestamps were bounded at the server.
+        sql
+          .prepare("UPDATE drop_answers SET first_issued_at = ?, issued_at = ? WHERE link = 'clock'")
+          .run(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
+      } else {
+        const stored = sql.prepare("SELECT issued_at FROM drop_answers WHERE link = 'clock'").get()
+        assert.ok(stored.issued_at < (now + 1) * 1000, "future timestamps are bounded by server receipt time")
+      }
+      vi.setSystemTime(now + 10)
+      const saved = await post("clock", {
+        id,
+        kind,
+        choice,
+        order: { session: crypto.randomUUID(), sequence: 1, issuedAt: (now + 10) * 1000 },
+      })
+      assert.deepEqual(saved.answer, { choice, correct: kind === "question" ? true : null })
+      const storedAnswer = (await answersOf("clock", "ada"))[0]
+      assert.deepEqual(storedAnswer.latest, saved.answer)
+      assert.deepEqual(storedAnswer.first.choice, before)
+      assert.equal(
+        sql.prepare("SELECT issued_at FROM drop_answers WHERE link = 'clock'").get().issued_at,
+        (now + 10) * 1000,
+      )
+    })
+  }
+}
 
 test("only people who can open the doc answer, and not while it's in the Trash", async () => {
   await quizDoc("mine", { visibility: "private" })

@@ -74,15 +74,20 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
   const correct = answer.correct === null ? null : Number(answer.correct)
   const session = answer.order?.session ?? null
   const sequence = answer.order?.sequence ?? null
-  const issuedAt = answer.order?.issuedAt ?? null
+  // A future client clock must never pin the latest action. Retain microseconds within the server's receipt
+  // millisecond, since Date.now() has lower precision than the browser clock used for cross-page ordering.
+  const issuedAt = answer.order?.issuedAt === undefined ? null : Math.min(answer.order.issuedAt, (now + 1) * 1000 - 1)
+  // Apply the same bound to rows accepted before this cap existed, using their trusted server receipt time.
+  const previousFirstIssuedAt = sql`min(first_issued_at, (created_at + 1) * 1000 - 1)`
+  const previousIssuedAt = sql`min(issued_at, (updated_at + 1) * 1000 - 1)`
   // Sequences take precedence within a page. Across pages, action time wins, with a stable session tie-break.
   const first = sql`(excluded.first_session = first_session AND excluded.first_sequence < first_sequence)
-    OR (excluded.first_session <> first_session AND (excluded.first_issued_at < first_issued_at
-      OR (excluded.first_issued_at = first_issued_at AND excluded.first_session < first_session)))`
+    OR (excluded.first_session <> first_session AND (excluded.first_issued_at < ${previousFirstIssuedAt}
+      OR (excluded.first_issued_at = ${previousFirstIssuedAt} AND excluded.first_session < first_session)))`
   const latest = sql`CASE
     WHEN excluded.session = session THEN excluded.sequence > sequence
-    WHEN excluded.issued_at IS NOT NULL THEN issued_at IS NULL OR excluded.issued_at > issued_at
-      OR (excluded.issued_at = issued_at AND excluded.session > session)
+    WHEN excluded.issued_at IS NOT NULL THEN issued_at IS NULL OR excluded.issued_at > ${previousIssuedAt}
+      OR (excluded.issued_at = ${previousIssuedAt} AND excluded.session > session)
     WHEN excluded.session IS NOT NULL THEN issued_at IS NULL
     ELSE session IS NULL END`
   const kept = await db.all<{ choice: string; correct: number | null }>(sql`INSERT INTO drop_answers
