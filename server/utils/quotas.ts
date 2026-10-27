@@ -17,7 +17,7 @@ import {
   type Usage,
 } from "#shared/quotas"
 import { useServerEnv } from "#vitehub/env/server"
-import { codeImages, dropFiles, dropHeads, drops, quotaReservations, user } from "../databases/config"
+import { codeImages, dropFiles, drops, quotaReservations, user } from "../databases/config"
 import { isPaying } from "./teams"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
@@ -49,10 +49,9 @@ async function keptCount(ownerId: string) {
   const [row] = await db
     .select({ kept: count() })
     .from(drops)
-    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
     .where(
       and(
-        eq(dropHeads.ownerId, ownerId),
+        eq(drops.ownerId, ownerId),
         eq(drops.lifetime, "keep"),
         isNull(drops.parentId),
         eq(drops.teamFolder, false),

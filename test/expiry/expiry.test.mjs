@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event } from "h3"
-import { sql, state, migrate, reset, insertDrop, who, objects } from "../cost/harness.mjs"
-const { createDocDrop, findDrop, findDropByBlob, permissions, listDrops, publishApp } =
+import { sql, state, migrate, reset, insertDrop, insertVersion, who, objects } from "../cost/harness.mjs"
+const { createDocDrop, findDrop, findDropAt, findDropByBlob, permissions, listDrops, publishApp } =
   await import("../../server/utils/drops.ts")
 const { isHumanVisit, recordVisit } = await import("../../server/utils/expiry.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
@@ -68,19 +68,18 @@ test("only browsers that ran the page or opened the file count as anonymous visi
   )
 })
 
-test("a visit restarts the window for every version, at most once a day", async () => {
+test("a visit to any version restarts the drop's window, at most once a day", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
-  insertDrop("v1", { last_accessed_at: visitedDaysAgo(10) })
-  insertDrop("v2", { supersedes_id: "v1", version: 2, last_accessed_at: visitedDaysAgo(10) })
-  await recordVisit(request("/api/drops/v1"), await findDrop("v1"), who, "beacon")
-  assert.equal(lastAccess("v1"), now)
-  assert.equal(lastAccess("v2"), now)
+  insertDrop("doc", { version: 2, last_accessed_at: visitedDaysAgo(10) })
+  insertVersion("doc", 1)
+  await recordVisit(request("/api/drops/doc?v=1"), await findDropAt("doc", 1), who, "beacon")
+  assert.equal(lastAccess("doc"), now)
 
   vi.advanceTimersByTime(DAY_MS / 2)
   const before = sql.prepare("SELECT total_changes() AS n").get().n
-  await recordVisit(request("/api/drops/v2"), await findDrop("v2"), who, "beacon")
+  await recordVisit(request("/api/drops/doc"), await findDrop("doc"), who, "beacon")
   assert.equal(sql.prepare("SELECT total_changes() AS n").get().n, before, "a second visit the same day writes nothing")
-  assert.equal(lastAccess("v2"), now)
+  assert.equal(lastAccess("doc"), now)
 })
 
 test("anonymous unfurlers don't keep a drop alive; a reader's beacon does", async () => {
@@ -197,27 +196,27 @@ test("temporary drops expire after 14 days, review after 30, kept ones never", a
 
 test("agents keep a drop when they say why; people just choose; admins can limit keeping to themselves", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
-  insertDrop("doc")
-  insertDrop("doc2", { supersedes_id: "doc", version: 2 })
+  insertDrop("doc", { version: 2 })
+  insertVersion("doc", 1)
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
   await assert.rejects(
-    patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "keep" } })),
+    patchHandler(request("/api/drops/doc", { method: "PATCH", id: "doc", body: { lifetime: "keep" } })),
     (error) => error.status === 400,
   )
   await assert.rejects(
     patchHandler(
-      request("/api/drops/doc2", {
+      request("/api/drops/doc", {
         method: "PATCH",
-        id: "doc2",
+        id: "doc",
         body: { lifetime: "keep", keepReason: "x".repeat(281) },
       }),
     ),
     (error) => error.status === 400,
   )
   const kept = await patchHandler(
-    request("/api/drops/doc2", {
+    request("/api/drops/doc", {
       method: "PATCH",
-      id: "doc2",
+      id: "doc",
       body: { lifetime: "keep", keepReason: "Screenshot for vite-hub/drop#12." },
     }),
   )
@@ -226,30 +225,30 @@ test("agents keep a drop when they say why; people just choose; admins can limit
   assert.equal(kept.expiresAt, null)
   assert.equal(
     sql.prepare("SELECT count(*) AS n FROM drops WHERE lifetime = 'keep' AND keep_reason IS NOT NULL").get().n,
-    2,
+    1,
   )
 
   state.who = who
   const temporary = await patchHandler(
-    request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "temporary" } }),
+    request("/api/drops/doc", { method: "PATCH", id: "doc", body: { lifetime: "temporary" } }),
   )
   assert.equal(temporary.keepReason, null)
   assert.equal(temporary.expiresAt, now + 14 * DAY_MS, "choosing a lifetime starts its window now")
   assert.equal(
-    (await patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "keep" } })))
+    (await patchHandler(request("/api/drops/doc", { method: "PATCH", id: "doc", body: { lifetime: "keep" } })))
       .keepReason,
     null,
   )
 
   state.customExpiry = false
-  await patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "review" } }))
+  await patchHandler(request("/api/drops/doc", { method: "PATCH", id: "doc", body: { lifetime: "review" } }))
   await assert.rejects(
-    patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "keep" } })),
+    patchHandler(request("/api/drops/doc", { method: "PATCH", id: "doc", body: { lifetime: "keep" } })),
     (error) => error.status === 403,
   )
   state.who = { ...who, role: "admin" }
   assert.equal(
-    (await patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { lifetime: "keep" } })))
+    (await patchHandler(request("/api/drops/doc", { method: "PATCH", id: "doc", body: { lifetime: "keep" } })))
       .lifetime,
     "keep",
   )
@@ -257,51 +256,55 @@ test("agents keep a drop when they say why; people just choose; admins can limit
 
 test("deleting moves a drop to the Trash; only people delete for good", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
-  insertDrop("doc")
-  insertDrop("doc2", { supersedes_id: "doc", version: 2 })
+  insertDrop("doc", { version: 2 })
+  insertVersion("doc", 1)
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
-  const trashed = await deleteHandler(request("/api/drops/doc2", { method: "DELETE", id: "doc2" }))
+  const trashed = await deleteHandler(request("/api/drops/doc", { method: "DELETE", id: "doc" }))
   assert.equal(trashed.trashReason, "deleted")
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE trashed_at = ?").get(now).n, 2, "every version goes")
+  assert.equal(sql.prepare("SELECT trashed_at AS at FROM drops WHERE id = 'doc'").get().at, now)
   const agent = state.who
   state.who = null
-  await assert.rejects(
-    requireBlobAccess(request("/f/doc2.md", { headers: navigation }), "doc2.md"),
-    (error) => error.status === 404,
-    "its link stops working",
-  )
+  for (const key of ["doc.md", "doc-v1.md"])
+    await assert.rejects(
+      requireBlobAccess(request(`/f/${key}`, { headers: navigation }), key),
+      (error) => error.status === 404,
+      "its links stop working, older versions' too",
+    )
   state.who = agent
   await assert.rejects(
-    deleteHandler(request("/api/drops/doc2?forever", { method: "DELETE", id: "doc2" })),
+    deleteHandler(request("/api/drops/doc?forever", { method: "DELETE", id: "doc" })),
     (error) => error.status === 403,
   )
-  await patchHandler(request("/api/drops/doc2", { method: "PATCH", id: "doc2", body: { trashed: false } }))
-  assert.equal((await findDrop("doc2")).expired, false)
+  await patchHandler(request("/api/drops/doc", { method: "PATCH", id: "doc", body: { trashed: false } }))
+  assert.equal((await findDrop("doc")).expired, false)
 
   state.who = who
-  await deleteHandler(request("/api/drops/doc2?forever", { method: "DELETE", id: "doc2" }))
+  await deleteHandler(request("/api/drops/doc?forever", { method: "DELETE", id: "doc" }))
   assert.equal(exists("doc"), false)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_versions").get().n, 0)
   assert.equal(objects.has("doc.md"), false)
+  assert.equal(objects.has("doc-v1.md"), false)
 })
 
 test("hourly cleanup moves expired drops to the Trash and deletes them 15 days later, with their files", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
-  insertDrop("gone", { last_accessed_at: visitedDaysAgo(46) })
-  insertDrop("gone-v2", { supersedes_id: "gone", version: 2, last_accessed_at: visitedDaysAgo(46) })
-  insertDrop("shot", { kind: "image", blob_key: "shot.png", filename: "shot.png", parent_id: "gone-v2" })
+  insertDrop("gone", { version: 2, last_accessed_at: visitedDaysAgo(46) })
+  insertVersion("gone", 1)
+  insertDrop("shot", { kind: "image", blob_key: "shot.png", filename: "shot.png", parent_id: "gone" })
   insertDrop("trash", { last_accessed_at: visitedDaysAgo(40) })
   insertDrop("deleted", { trashed_at: now - 16 * DAY_MS, trash_reason: "deleted" })
   insertDrop("temp", { lifetime: "temporary", last_accessed_at: visitedDaysAgo(20) })
   insertDrop("kept", { last_accessed_at: visitedDaysAgo(400), lifetime: "keep" })
   insertDrop("fresh", { last_accessed_at: visitedDaysAgo(1) })
   await cleanup.handler({ scheduledAt: new Date(now) })
-  assert.deepEqual(["gone", "gone-v2", "shot", "trash", "deleted", "temp", "kept", "fresh"].filter(exists), [
+  assert.deepEqual(["gone", "shot", "trash", "deleted", "temp", "kept", "fresh"].filter(exists), [
     "trash",
     "temp",
     "kept",
     "fresh",
   ])
   assert.equal(objects.has("gone.md"), false)
+  assert.equal(objects.has("gone-v1.md"), false)
   assert.equal(objects.has("shot.png"), false, "a doc's attachments go with it")
   assert.equal(objects.has("trash.md"), true)
   const moved = (id) => sql.prepare("SELECT trashed_at AS at, trash_reason AS reason FROM drops WHERE id = ?").get(id)

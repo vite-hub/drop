@@ -111,7 +111,13 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
           .some((column) => column.name === "plan"),
       )
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
-      for (const table of ["drop_heads", "code_images", "quota_reservations", "abuse_reports", "vitehub_auth_events"])
+      for (const table of [
+        "drop_versions",
+        "code_images",
+        "quota_reservations",
+        "abuse_reports",
+        "vitehub_auth_events",
+      ])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
       assert.deepEqual(
         database

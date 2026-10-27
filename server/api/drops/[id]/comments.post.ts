@@ -6,16 +6,17 @@ import { CommentSchema } from "#shared/schemas"
 import { comments } from "../../../databases/config"
 import { attachImages, imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
 import { authorImages, nextCommentNumber, toComment } from "../../../utils/comments"
-import { findDrop, permissions } from "../../../utils/drops"
+import { findDropAt, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 
 /**
  * Anyone allowed to comment, including people on a "Can comment" link who aren't signed in. JSON, or multipart with
- * the JSON in `data` and images in `image` (see readCommentBody).
+ * the JSON in `data` and images in `image` (see readCommentBody). `?v=<n>` is the version it's written on.
  */
 export default defineHandler(async (event) => {
-  const drop = await findDrop(await routeId(event), event)
+  const version = Number(event.url.searchParams.get("v")) || undefined
+  const drop = await findDropAt(await routeId(event), version, event)
   const who = await identify(event)
   if (!drop || !permissions(drop, who).comment)
     throw new HTTPError({ status: 404, statusText: "You can't comment on this drop." })
@@ -33,6 +34,7 @@ export default defineHandler(async (event) => {
         .values({
           id: crypto.randomUUID(),
           dropId: drop.id,
+          version: drop.version,
           n: nextCommentNumber(drop),
           ...body,
           quote: body.quote ?? null,
@@ -49,7 +51,7 @@ export default defineHandler(async (event) => {
     (added) => attachImages(parent, images, { commentId: added.id, replyId: null, n: added.n }, authorName),
     (added) => db.delete(comments).where(eq(comments.id, added.id)),
   )
-  return toComment(row, who, drop.version, {
+  return toComment(row, who, {
     images: await authorImages([row]),
     replies: new Map(),
     attachments: new Map([[row.id, attachments]]),

@@ -106,7 +106,8 @@ test("a doc's text is searchable on its latest version only, with a snippet arou
   )
 
   const v2 = await doc("# Mortgage plan\n\nThe bank offers a fixed rate now.", { previous: v1.id })
-  assert.equal(textOf(v1.id), undefined, "the older version gives its text up")
+  assert.equal(v2.id, v1.id)
+  assert.doesNotMatch(textOf(v2.id), /pineapple/, "the new version's text replaces the older one's")
   assert.deepEqual(await listDrops(owner, undefined, { query: "pineapple" }), [])
   assert.deepEqual(
     (await listDrops(owner, undefined, { query: "fixed rate" })).map((drop) => drop.id),

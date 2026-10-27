@@ -1,16 +1,18 @@
 import type { AgentMetadata } from "../../shared/agent.ts"
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { ACTOR_KINDS, DROP_KINDS, VIEWER_KINDS } from "../../shared/types.ts"
+import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../shared/types.ts"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
  * file) stored as one blob, an app stored as a folder of blobs in `drop_files`, a folder of other drops, or a site:
- * a live website people review in place, whose comments arrive with screenshots.
+ * a live website people review in place, whose comments arrive with screenshots. The row is the drop as it is now, its
+ * latest version included; `drop_versions` keeps the versions before it.
  */
 export const drops = sqliteTable(
   "drops",
   {
+    /** The share link's key (`/d/<id>/<slug>`), the same for every version, so the link opens the latest one. */
     id: text("id").primaryKey(),
     ownerId: text("owner_id").notNull(),
     kind: text("kind", { enum: DROP_KINDS }).notNull(),
@@ -20,13 +22,11 @@ export const drops = sqliteTable(
     blobKey: text("blob_key"),
     contentType: text("content_type"),
     size: integer("size").notNull().default(0),
+    /** The latest version's number. The ones before it are in `drop_versions`. */
     version: integer("version").notNull().default(1),
-    supersedesId: text("supersedes_id"),
-    /** The share link's key (`/d/<link>`), the same on every version of a doc, so the link opens the latest one. */
-    link: text("link"),
-    /** The readable part of the link, picked by the agent or taken from the title. The latest version's is the doc's. */
+    /** The readable part of the link, picked by the agent or taken from the title. */
     slug: text("slug"),
-    /** Who can open it and what they can do, as one state (#shared/share). Every version of a doc carries the same. */
+    /** Who can open it and what they can do, as one state (#shared/share). */
     share: text("share", { enum: ["private", "team", "team_edit", "public", "public_comment"] })
       .notNull()
       .default("private"),
@@ -53,9 +53,9 @@ export const drops = sqliteTable(
       .default("review"),
     /** Why an agent kept the drop, shown to its owner. Null when a person chose `keep`. */
     keepReason: text("keep_reason"),
-    /** What changed in this version, like a commit message. Agents write one for every version they publish. */
+    /** What changed in the latest version, like a commit message. A folder's is its description. */
     note: text("note"),
-    /** When the drop went to the Trash; it's purged 15 days later. Set on every version of the chain. */
+    /** When the drop went to the Trash; it's purged 15 days later. */
     trashedAt: integer("trashed_at"),
     trashReason: text("trash_reason", { enum: ["deleted", "expired"] }),
     /** The doc an image belongs to. Attachments share the doc's sharing, lifetime, and Trash, and don't count as drops. */
@@ -66,36 +66,52 @@ export const drops = sqliteTable(
     publishToken: text("publish_token"),
     /** Team folders on a personal Drop: the team (organization) whose members it reaches. Null on a team Drop's own. */
     teamId: text("team_id"),
+    /**
+     * Links the drop points to, like its pull request and that PR's preview, shown with their sites' icons at the top
+     * of its page. Agents set them (../utils/resources.ts). Null when it has none.
+     */
+    resources: text("resources", { mode: "json" }).$type<DropResource[]>(),
   },
   (table) => [
     index("drops_owner_idx").on(table.ownerId, table.updatedAt),
     uniqueIndex("drops_blob_key_idx").on(table.blobKey),
-    uniqueIndex("drops_supersedes_unique").on(table.supersedesId),
     index("drops_expiry_idx").on(table.lifetime, table.lastAccessedAt),
     index("drops_trash_idx").on(table.trashedAt),
     index("drops_parent_idx").on(table.parentId),
     index("drops_share_idx").on(table.share, table.updatedAt),
-    index("drops_link_idx").on(table.link, table.version),
   ],
 )
 
-/** Current versions, maintained by drop insert/delete/update triggers for bounded listing reads. */
-export const dropHeads = sqliteTable(
-  "drop_heads",
+/**
+ * The versions of a doc before its latest, which is the `drops` row. Publishing a version copies the row's version
+ * here and writes the new one over it. Sharing, lifetime, and the Trash belong to the drop, not to a version.
+ */
+export const dropVersions = sqliteTable(
+  "drop_versions",
   {
     dropId: text("drop_id")
-      .primaryKey()
+      .notNull()
       .references(() => drops.id, { onDelete: "cascade" }),
-    ownerId: text("owner_id").notNull(),
-    updatedAt: integer("updated_at").notNull(),
+    version: integer("version").notNull(),
+    kind: text("kind", { enum: DROP_KINDS }).notNull(),
+    title: text("title").notNull(),
+    filename: text("filename").notNull(),
+    blobKey: text("blob_key"),
+    contentType: text("content_type"),
+    size: integer("size").notNull().default(0),
+    note: text("note"),
+    actorKind: text("actor_kind", { enum: ACTOR_KINDS }).notNull(),
+    actorName: text("actor_name").notNull(),
+    agent: text("agent", { mode: "json" }).$type<AgentMetadata>(),
+    createdAt: integer("created_at").notNull(),
   },
-  (table) => [index("drop_heads_owner_idx").on(table.ownerId, table.updatedAt)],
+  (table) => [
+    primaryKey({ columns: [table.dropId, table.version] }),
+    uniqueIndex("drop_versions_blob_key_idx").on(table.blobKey),
+  ],
 )
 
-/**
- * The words of a text doc (Markdown, HTML as plain text), for search. Its own table so the many `select drops.*` reads
- * don't carry it. Only latest versions keep a row: publishing a version moves the text to it.
- */
+/** The words of a text doc's latest version (Markdown, HTML as plain text), for search. Its own table so the many `select drops.*` reads don't carry it. */
 export const dropTexts = sqliteTable("drop_texts", {
   dropId: text("drop_id")
     .primaryKey()
@@ -104,63 +120,56 @@ export const dropTexts = sqliteTable("drop_texts", {
 })
 
 /**
- * Public drops someone else owns that a signed-in person opened, for their "Shared with me" list. Triggers move a
- * row to each new version and drop it with the last one. Team drops need no row: everyone in the Drop sees those.
+ * Public drops someone else owns that a signed-in person opened, for their "Shared with me" list. Team drops need no
+ * row: everyone in the Drop sees those.
  */
 export const dropVisits = sqliteTable(
   "drop_visits",
   {
     userId: text("user_id").notNull(),
-    dropId: text("drop_id").notNull(),
+    dropId: text("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
     at: integer("at").notNull(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.dropId] }), index("drop_visits_drop_idx").on(table.dropId)],
 )
 
 /**
- * A drop's views a day, by who viewed it: signed-in people, anonymous visitors, or agents. Keyed on the doc's link,
- * so every version adds to one count. A trigger on `drop_viewers` counts each viewer once a day.
+ * A drop's views a day, by who viewed it: signed-in people, anonymous visitors, or agents. Every version adds to one
+ * count. A trigger on `drop_viewers` counts each viewer once a day.
  */
 export const dropViews = sqliteTable(
   "drop_views",
   {
-    link: text("link").notNull(),
+    dropId: text("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
     day: integer("day").notNull(),
     viewer: text("viewer", { enum: VIEWER_KINDS }).notNull(),
     views: integer("views").notNull(),
   },
-  (table) => [primaryKey({ columns: [table.link, table.day, table.viewer] })],
+  (table) => [primaryKey({ columns: [table.dropId, table.day, table.viewer] })],
 )
 
 /**
- * Who viewed a drop today: a user id, an agent, or an anonymous visitor's hash under a key of the day and the link
+ * Who viewed a drop today: a user id, an agent, or an anonymous visitor's hash under a key of the day and the drop
  * (./utils/views.ts). Inserting a new row counts a view; the hourly cleanup deletes earlier days.
  */
 export const dropViewers = sqliteTable(
   "drop_viewers",
   {
-    link: text("link").notNull(),
+    dropId: text("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
     day: integer("day").notNull(),
     id: text("id").notNull(),
     viewer: text("viewer", { enum: VIEWER_KINDS }).notNull(),
   },
-  (table) => [primaryKey({ columns: [table.link, table.day, table.id] }), index("drop_viewers_day_idx").on(table.day)],
-)
-
-/**
- * Links a drop points to, like its pull request and that PR's preview, shown with their sites' icons at the top of its
- * page. Agents set them (./utils/resources.ts). Keyed on the doc's link, so every version shows the same ones.
- */
-export const dropResources = sqliteTable(
-  "drop_resources",
-  {
-    link: text("link").notNull(),
-    url: text("url").notNull(),
-    /** What it is, like "PR #123". Null shows the site's host. */
-    title: text("title"),
-    position: integer("position").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.link, table.url] })],
+  (table) => [
+    primaryKey({ columns: [table.dropId, table.day, table.id] }),
+    index("drop_viewers_day_idx").on(table.day),
+  ],
 )
 
 /** Files of an app drop. Publishing a new version replaces the set. */
@@ -184,6 +193,9 @@ export const comments = sqliteTable(
     dropId: text("drop_id")
       .notNull()
       .references(() => drops.id, { onDelete: "cascade" }),
+    /** The version it was written on. A comment carries over to later versions until someone resolves it. */
+    version: integer("version").notNull().default(1),
+    /** Its number on the drop, counted across versions: #3 names one comment whichever version shows it. */
     n: integer("n").notNull(),
     /** `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of an HTML page. */
     kind: text("kind", { enum: ["text", "image", "area", "page"] }).notNull(),
@@ -208,10 +220,7 @@ export const comments = sqliteTable(
     elementX: integer("element_x"),
     elementY: integer("element_y"),
   },
-  (table) => [
-    index("comments_drop_idx").on(table.dropId, table.n),
-    uniqueIndex("comments_drop_n_unique").on(table.dropId, table.n),
-  ],
+  (table) => [uniqueIndex("comments_drop_n_unique").on(table.dropId, table.n)],
 )
 
 /**

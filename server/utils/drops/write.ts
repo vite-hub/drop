@@ -1,12 +1,12 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, eq, exists, inArray, sql } from "drizzle-orm"
+import { and, eq, exists, inArray, isNull, ne, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, drops } from "../../databases/config"
+import { blobCleanup, dropFiles, drops, dropVersions } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
@@ -19,7 +19,7 @@ import { MAX_KEEP_REASON } from "#shared/expiry"
 import { shareReviewFor } from "../trust"
 import type { Identity } from "../identity"
 import { requireKeepSlot, withDropQuota } from "../quotas"
-import { chainOf, expiryPolicy, renewDrop } from "../expiry"
+import { expiryPolicy } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
 import { modeFor, shareFields } from "../share"
 import { textStatements } from "../search"
@@ -27,9 +27,8 @@ import type { DropKind } from "#shared/types"
 import type { DropRow, LifetimeInput } from "./types"
 import { MAX_FILE_BYTES } from "#shared/schemas"
 import { MAX_APP_BYTES, MAX_APP_FILES, MIB } from "#shared/quotas"
-import { splitFrontmatter } from "#shared/frontmatter"
 import { permissions } from "./access"
-import { findDrop, findDropByBlob, versionChain, storageFailure } from "./query"
+import { findDrop, findDropByBlob, storageFailure } from "./query"
 
 // Storage that was down (503), not a row someone else published first.
 const Unavailable = v.object({ status: v.literal(503) })
@@ -41,19 +40,24 @@ const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 /**
  * Makes the files a doc embeds its attachments, so they share its sharing, lifetime, and Trash. Only the doc owner's
  * own files that aren't docs themselves: embedding never exposes someone else's file. A file already attached to
- * another doc stays with that one, unless it's an older version of this doc.
+ * another doc, or in a folder, stays where it is.
  */
-async function adoptAttachments(doc: DropRow, source: string, previous: DropRow | null) {
+async function adoptAttachments(doc: DropRow, source: string) {
   // 90 keys and the other parameters stay under D1's 100 bound parameters per query.
   const keys = [...new Set([...source.matchAll(FILE_LINK)].map((match) => match[1]!))].slice(0, 90)
   if (!keys.length) return
-  const chain = previous ? (await versionChain(previous)).map((item) => item.id) : []
-  const owned = await db
-    .select({ id: drops.id, parentId: drops.parentId })
-    .from(drops)
-    .where(and(inArray(drops.blobKey, keys), eq(drops.ownerId, doc.ownerId), inArray(drops.kind, ["image", "file"])))
-  const ids = owned.filter((item) => !item.parentId || chain.includes(item.parentId)).map((item) => item.id)
-  if (ids.length) await db.update(drops).set({ parentId: doc.id }).where(inArray(drops.id, ids))
+  await db
+    .update(drops)
+    .set({ parentId: doc.id })
+    .where(
+      and(
+        inArray(drops.blobKey, keys),
+        eq(drops.ownerId, doc.ownerId),
+        inArray(drops.kind, ["image", "file"]),
+        isNull(drops.parentId),
+        ne(drops.id, doc.id),
+      ),
+    )
 }
 
 /** What the publisher says about a drop's life. Later versions inherit it unless they say otherwise. */
@@ -133,8 +137,9 @@ export async function deleteBlobKeys(keys: string[]) {
 }
 
 /**
- * Stores one file as a private doc drop. Markdown and HTML must be UTF-8. `slug` names the link (the previous
- * version's, or the title's, otherwise); with `nameFromSlug` the file is called after it too, keeping the extension.
+ * Stores one file as a private doc drop, or as the next version of the drop `supersedes` names. Markdown and HTML must
+ * be UTF-8. `slug` names the link (the previous version's, or the title's, otherwise); with `nameFromSlug` the file is
+ * called after it too, keeping the extension.
  * `folder` (checked by `requireFolder`) places a new drop in it. A drop in a folder lives as long as the folder, so it
  * takes no lifetime of its own, and its slug gets a number when another drop in the folder has it.
  */
@@ -192,15 +197,8 @@ export async function createDocDrop(
   if (kind === "file" && contentType === "application/octet-stream") contentType = videoType(filename) ?? contentType
 
   let previous: DropRow | null = null
-  const supersedes =
-    input.supersedes ??
-    (text
-      ? splitFrontmatter(text).frontmatter?.match(
-          /^supersedes:\s*["']?(?:\S*\/)?([0-9a-f-]{36})(?:\.\w+)?["']?\s*$/m,
-        )?.[1]
-      : undefined)
-  if (supersedes) {
-    const found = (await findDrop(supersedes)) ?? (await findDropByBlob(supersedes))
+  if (input.supersedes) {
+    const found = (await findDrop(input.supersedes)) ?? (await findDropByBlob(input.supersedes))
     const can = found && permissions(found, who)
     // An expired drop is read-only even for its owner, so check the Trash before the edit right.
     if (found?.expired && can && can.manage)
@@ -213,24 +211,25 @@ export async function createDocDrop(
         throw new HTTPError({ status: 400, statusText: "That drop is an app; publish its next version with files." })
       if (!can.manage && kind !== found.kind)
         throw new HTTPError({ status: 403, statusText: "Only the drop's owner can change what kind of file it is." })
-      previous = (await versionChain(found))[0] ?? found
+      // A file of an earlier version names the drop too; the next version goes on top of the latest.
+      previous = found.head ? await findDrop(found.id) : found
     }
   }
+  // What the drop stores itself, before its folders widen its share or lend it their lifetime.
+  const own = previous?.raw ?? previous
   const folder = previous ? null : (input.folder ?? null)
   const parentId = previous?.parentId ?? folder?.id ?? null
   // A drop in someone's folder is theirs (admins add to anyone's); in a team folder it stays its publisher's.
   const ownerId = previous?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
-  const life = parentId
-    ? lifetimeFields(who, {}, previous ?? folder, event)
-    : lifetimeFields(who, input, previous, event)
-  await requireKeepSlot(ownerId, life, previous?.lifetime === "keep", !parentId)
+  const life = parentId ? lifetimeFields(who, {}, own ?? folder, event) : lifetimeFields(who, input, own, event)
+  await requireKeepSlot(ownerId, life, own?.lifetime === "keep", !parentId)
   // In a team's folders a drop shares like one on a team Drop (../share.ts modeFor).
   const mode = modeFor(previous ?? folder, event)
   const share =
     input.share !== undefined
       ? shareFields(input.share, { kind, team: mode === "team" }, event)
-      : previous
-        ? { share: previous.share, publicUntil: previous.publicUntil }
+      : own
+        ? { share: own.share, publicUntil: own.publicUntil }
         : { share: defaultShare(mode), publicUntil: null }
 
   return withDropQuota(
@@ -263,10 +262,10 @@ export async function createDocDrop(
         titleFromSource(text ?? "", kind, filename, previous?.title)
       ).slice(0, 160)
       const named = (input.slug && slugify(input.slug)) || previous?.slug || slugify(title)
-      const slug = named === previous?.slug ? named : await uniqueSlug(parentId, named, previous?.link)
+      const slug = named === previous?.slug ? named : await uniqueSlug(parentId, named, previous?.id)
       if (input.nameFromSlug) filename = `${slug || "doc"}${extension}`
       const row: DropRow = {
-        id: crypto.randomUUID(),
+        id: previous?.id ?? newLink(),
         ownerId,
         kind,
         title,
@@ -275,8 +274,6 @@ export async function createDocDrop(
         contentType,
         size: input.bytes.byteLength,
         version: (previous?.version ?? 0) + 1,
-        supersedesId: previous?.id ?? null,
-        link: previous?.link ?? newLink(),
         slug,
         ...share,
         teamFolder: false,
@@ -293,30 +290,53 @@ export async function createDocDrop(
         parentId,
         // A public link waits for an admin's review again with each version: what it shows changed.
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
-        quarantinedAt: null,
+        quarantinedAt: own?.quarantinedAt ?? null,
         publishToken: null,
         teamId: null,
         siteUrl: null,
+        resources: own?.resources ?? null,
       }
       try {
-        // A new version is a visit: the older versions restart their window with it, and take its lifetime.
-        const chain = previous
+        // The latest version moves to drop_versions and the new one takes its place, only if no one else's did first:
+        // the guard sees this publish's file on the drop, or rolls the whole batch back.
+        const write = own
           ? [
-              renewDrop(previous, now),
+              db.insert(dropVersions).select((qb) =>
+                qb
+                  .select({
+                    dropId: drops.id,
+                    version: drops.version,
+                    kind: drops.kind,
+                    title: drops.title,
+                    filename: drops.filename,
+                    blobKey: drops.blobKey,
+                    contentType: drops.contentType,
+                    size: drops.size,
+                    note: drops.note,
+                    actorKind: drops.actorKind,
+                    actorName: drops.actorName,
+                    agent: drops.agent,
+                    createdAt: drops.createdAt,
+                  })
+                  .from(drops)
+                  .where(and(eq(drops.id, own.id), eq(drops.version, own.version))),
+              ),
               db
                 .update(drops)
-                .set(life)
-                .where(sql`${drops.id} IN (${chainOf(previous)})`),
+                .set(row)
+                .where(and(eq(drops.id, own.id), eq(drops.version, own.version))),
             ]
-          : []
+          : [db.insert(drops).values(row)]
         await quota.commit(
-          [
-            db.insert(drops).values(row),
-            ...textStatements(row, text, previous?.id),
-            ...chain,
-            ...(folder ? [touchFolder(folder.id, now)] : []),
-          ],
-          previous ? exists(db.select({ id: drops.id }).from(drops).where(eq(drops.id, previous.id))) : sql`1`,
+          [...write, ...textStatements(row, text), ...(folder ? [touchFolder(folder.id, now)] : [])],
+          own
+            ? exists(
+                db
+                  .select({ id: drops.id })
+                  .from(drops)
+                  .where(and(eq(drops.id, row.id), eq(drops.blobKey, key))),
+              )
+            : sql`1`,
         )
       } catch (error) {
         await deleteBlobKeys([key])
@@ -328,9 +348,9 @@ export async function createDocDrop(
           })
         throw error
       }
-      if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text, previous)
+      if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text)
       // People reading the doc's link follow it to this version.
-      if (previous && row.link) await refreshLatest(row.link)
+      if (previous) await refreshLatest(row.id)
       // TODO(repo-mirror): also commit this version to a repo the owner picks, one commit per version with the note
       // as its message. Drop stays the source of truth: versions keep living in Blob and the database on every host.
       // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
@@ -437,7 +457,7 @@ export async function publishApp(
   const now = Date.now()
   let row: DropRow | null = input.id ? await findDrop(input.id) : null
   if (input.id && (!row || row.kind !== "app")) throw new HTTPError({ status: 404, statusText: "No app with that id." })
-  // An expired app is read-only even for its owner, so check the Trash before the edit right. Apps have no version chain.
+  // An expired app is read-only even for its owner, so check the Trash before the edit right. Apps keep no older versions.
   if (row?.expired && permissions(row, who).manage)
     throw new HTTPError({
       status: 409,
@@ -465,7 +485,7 @@ export async function publishApp(
       ? (own.shareReview ?? null)
       : await shareReviewFor(ownerId, event)
 
-  const id = row?.id ?? crypto.randomUUID()
+  const id = row?.id ?? newLink()
   const prefix = `apps/${id}/${crypto.randomUUID()}`
   const token = crypto.randomUUID()
   const old = row
@@ -535,7 +555,7 @@ export async function publishApp(
 
         const name = input.name?.trim() || row?.title || "Untitled app"
         const named = (input.slug && slugify(input.slug)) || row?.slug || slugify(name)
-        const slug = named === row?.slug ? named : await uniqueSlug(parentId, named, row?.link)
+        const slug = named === row?.slug ? named : await uniqueSlug(parentId, named, row?.id)
         const next: DropRow = {
           id,
           ownerId,
@@ -546,8 +566,6 @@ export async function publishApp(
           contentType: null,
           size,
           version: (row?.version ?? 0) + 1,
-          supersedesId: row?.supersedesId ?? null,
-          link: row?.link ?? newLink(),
           slug,
           shareReview,
           quarantinedAt: own?.quarantinedAt ?? null,
@@ -567,6 +585,7 @@ export async function publishApp(
           trashReason: null,
           parentId,
           siteUrl: null,
+          resources: own?.resources ?? null,
         }
         const fileRows = [
           ...kept.map((file) => ({ dropId: id, path: file.path, blobKey: file.blobKey, size: file.size })),
@@ -589,7 +608,6 @@ export async function publishApp(
             .update(drops)
             .set({
               title: next.title,
-              link: next.link,
               slug,
               size,
               version: next.version,
@@ -627,7 +645,7 @@ export async function publishApp(
           await quota.commit([update, replace, ...inserts], exists(db.select({ id: drops.id }).from(drops).where(won)))
           committedPublish = true
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
-          if (next.link) await refreshLatest(next.link)
+          await refreshLatest(next.id)
         }
         return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths) })
       } catch (error) {

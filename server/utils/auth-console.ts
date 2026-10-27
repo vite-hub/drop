@@ -43,13 +43,13 @@ async function synchronizeRoles(admins: string, trustUnverified: boolean) {
   }
 }
 
-/** The user's Drops list: latest versions, no folders, embedded files, or Trash. One bind even for 100 users. */
+/** The user's Drops list: no folders, embedded files, or Trash. One bind even for 100 users. */
 export async function countDropsByUser(userIds: readonly string[]): Promise<Record<string, number>> {
   if (!userIds.length) return {}
   const counts = await db.all<{ id: string; drops: number }>(sql`
     SELECT ids.value AS id,
-      (SELECT count(*) FROM drop_heads h JOIN drops d ON d.id = h.drop_id
-       WHERE h.owner_id = ids.value AND d.kind != 'folder' AND d.trashed_at IS NULL
+      (SELECT count(*) FROM drops d
+       WHERE d.owner_id = ids.value AND d.kind != 'folder' AND d.trashed_at IS NULL
        AND (d.parent_id IS NULL OR EXISTS (SELECT 1 FROM drops p WHERE p.id = d.parent_id AND p.kind = 'folder'))) AS drops
     FROM json_each(${JSON.stringify(userIds)}) ids
   `)

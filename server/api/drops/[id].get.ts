@@ -1,16 +1,27 @@
 import { defineHandler, HTTPError } from "h3"
 import { appFilesGrant } from "../../utils/app-files"
 import { contentOrigin, perDropOrigins } from "../../utils/content-origin"
-import { dropDetail, expiredLink, findDrop, permissions, recordSharedVisit, waitingForReview } from "../../utils/drops"
+import {
+  dropDetail,
+  expiredLink,
+  findDropAt,
+  permissions,
+  recordSharedVisit,
+  waitingForReview,
+} from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
 import { identify } from "../../utils/identity"
 import { routeId } from "../../utils/params"
 import { countView } from "../../utils/views"
 
-/** Owners, editors, admins, and anyone the drop is shared with. Private drops 404 for everyone else. */
+/**
+ * Owners, editors, admins, and anyone the drop is shared with. Private drops 404 for everyone else. `?v=<n>` reads an
+ * earlier version.
+ */
 export default defineHandler(async (event) => {
   const id = await routeId(event)
-  const [drop, who] = await Promise.all([findDrop(id, event), identify(event)])
+  const version = Number(event.url.searchParams.get("v")) || undefined
+  const [drop, who] = await Promise.all([findDropAt(id, version, event), identify(event)])
   if (waitingForReview(drop, who))
     throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
   if (expiredLink(drop, who))
@@ -27,9 +38,8 @@ export default defineHandler(async (event) => {
         recordSharedVisit(drop, who),
       ])
     : undefined
-  // Named after the doc's link, so every version of an HTML doc keeps the browser storage the last one left.
-  const link = drop.link ?? drop.id
-  const frameOrigin = drop.kind === "app" || drop.kind === "html" ? await contentOrigin(event, link) : null
+  // Named after the drop, so every version of an HTML doc keeps the browser storage the last one left.
+  const frameOrigin = drop.kind === "app" || drop.kind === "html" ? await contentOrigin(event, drop.id) : null
   // An app on its own origin loads its files from there, so the viewer needs only its pages, and a grant to the rest.
   const served = drop.kind === "app" && !!frameOrigin && perDropOrigins(event)
   const [detail] = await Promise.all([
@@ -40,6 +50,6 @@ export default defineHandler(async (event) => {
   return {
     ...detail,
     contentOrigin: frameOrigin,
-    ...(served ? { contentGrant: await appFilesGrant(event, link) } : {}),
+    ...(served ? { contentGrant: await appFilesGrant(event, drop.id) } : {}),
   }
 })
