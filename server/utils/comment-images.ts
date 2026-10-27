@@ -125,6 +125,7 @@ export function imageDrop(
     quarantinedAt: null,
     actorKind: "browser",
     actorName,
+    agent: null,
     createdAt: now,
     updatedAt: now,
     lastAccessedAt: now,
