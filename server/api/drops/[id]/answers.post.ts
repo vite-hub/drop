@@ -1,6 +1,6 @@
 import { defineValidatedHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
-import { MAX_QUIZ_BLOCKS, QuizAnswerInput } from "#shared/quiz"
+import { MAX_QUIZ_BLOCKS, QuizAnswerRequest } from "#shared/quiz"
 import type { QuizSaved } from "#shared/types"
 import { answerable, quizBlocks, quizResults, recordAnswer } from "../../../utils/answers"
 import { expiredLink, findDropAt, permissions, readText, waitingForReview } from "../../../utils/drops"
@@ -15,7 +15,7 @@ import { routeId } from "../../../utils/params"
  * back with how everyone answered that block, which they may see now that they have.
  */
 export default defineValidatedHandler({
-  validate: { body: QuizAnswerInput },
+  validate: { body: QuizAnswerRequest },
   async handler(event): Promise<QuizSaved> {
     const who = await requireIdentity(event)
     const version = Number(event.url.searchParams.get("v")) || undefined
@@ -37,14 +37,20 @@ export default defineValidatedHandler({
       (answer.kind !== "recall" && answer.choice.some((option) => !block.keys.has(option)))
     )
       throw new HTTPError({ status: 400, statusText: "That isn't a block of this doc, or one of its options." })
+    // Match comark-quiz's exact-set grading. Recall self-assessment lives in choice, never in correct.
+    answer.correct =
+      answer.kind === "question"
+        ? answer.choice.length === block.correct.size && answer.choice.every((option) => block.correct.has(option))
+        : null
     const link = drop.id
-    if (!(await recordAnswer(link, who.userId, answer)))
+    const kept = await recordAnswer(link, who.userId, answer)
+    if (!kept)
       throw new HTTPError({ status: 409, statusText: `A doc keeps answers to ${MAX_QUIZ_BLOCKS} blocks at most.` })
-    if (answer.kind === "recall") return { answer: { choice: answer.choice, correct: answer.correct } }
+    if (answer.kind === "recall") return { answer: kept }
     const { counts, total } = (await quizResults(link, { question: answer.id })).get(answer.id) ?? {
       counts: {},
       total: 0,
     }
-    return { answer: { choice: answer.choice, correct: answer.correct }, results: { counts, total } }
+    return { answer: kept, results: { counts, total } }
   },
 })

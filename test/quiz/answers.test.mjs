@@ -20,7 +20,7 @@ const bob = { ...who, userId: "bob", name: "Bob", email: "bob@example.com", acto
 // What comark-quiz renders, as far as Drop reads it: each block's id and kind, and its options' keys.
 const QUIZ_HTML = [
   '<div class="quiz" data-quiz-id="capital" data-quiz-kind="question"><p>Capital of France?</p>',
-  '<button data-key="paris">Paris</button><button data-key="lyon">Lyon</button></div>',
+  '<button data-key="paris" data-correct>Paris</button><button data-key="lyon">Lyon</button></div>',
   '<div data-quiz-kind="poll" data-quiz-id="lunch"><button data-key="pizza">Pizza</button>',
   '<button data-key="tacos">Tacos</button></div>',
   '<div data-quiz-id="photosynthesis" data-quiz-kind="recall"><p>What is photosynthesis?</p></div>',
@@ -28,12 +28,12 @@ const QUIZ_HTML = [
 ].join("")
 
 /** A Markdown doc whose render holds the quiz, as if the server had rendered it with comark-quiz. */
-async function quizDoc(id, overrides) {
+async function quizDoc(id, overrides, html = QUIZ_HTML) {
   insertDrop(id, overrides)
   await cachedMarkdown(
     `${id}.md`,
     async () => "# Quiz",
-    async () => ({ title: "Quiz", html: QUIZ_HTML }),
+    async () => ({ title: "Quiz", html }),
   )
 }
 
@@ -68,6 +68,14 @@ test("a database without the answers table gets it on the first read, index and 
       .all()
       .map((row) => row.name),
     ["drop_answers", "drop_answers_drop_delete", "drop_answers_user_delete", "drop_answers_user_idx"],
+  )
+  assert.deepEqual(
+    sql
+      .prepare("PRAGMA table_info(drop_answers)")
+      .all()
+      .slice(-4)
+      .map((column) => column.name),
+    ["first_session", "first_sequence", "session", "sequence"],
   )
 })
 
@@ -122,10 +130,10 @@ test("a reader's first answer stays beside their latest; results count first tri
 
 test("a doc keeps answers to a limited number of blocks, and the ones it has keep taking answers", async () => {
   const answer = (id) => ({ id, kind: "poll", choice: ["a"], correct: null })
-  for (let n = 0; n < MAX_QUIZ_BLOCKS; n++) assert.equal(await recordAnswer("doc", "ada", answer(`q${n}`)), true)
+  for (let n = 0; n < MAX_QUIZ_BLOCKS; n++) assert.ok(await recordAnswer("doc", "ada", answer(`q${n}`)))
   assert.equal(await recordAnswer("doc", "ada", answer("one-more")), false)
-  assert.equal(await recordAnswer("doc", "bob", answer("q0")), true)
-  assert.equal(await recordAnswer("another-doc", "ada", answer("one-more")), true)
+  assert.ok(await recordAnswer("doc", "bob", answer("q0")))
+  assert.ok(await recordAnswer("another-doc", "ada", answer("one-more")))
   assert.equal((await quizResults("doc")).has("one-more"), false)
 })
 
@@ -146,12 +154,16 @@ test("deleting a doc or person deletes their answers; removing an archived versi
 test("a rendered doc's blocks are read with their kind and the keys of their own options", () => {
   const blocks = quizBlocks(QUIZ_HTML)
   assert.deepEqual([...blocks.keys()], ["capital", "lunch", "photosynthesis"])
-  assert.deepEqual(blocks.get("capital"), { kind: "question", keys: new Set(["paris", "lyon"]) })
-  assert.deepEqual(blocks.get("lunch"), { kind: "poll", keys: new Set(["pizza", "tacos"]) })
-  assert.deepEqual(blocks.get("photosynthesis"), { kind: "recall", keys: new Set() })
+  assert.deepEqual(blocks.get("capital"), {
+    kind: "question",
+    keys: new Set(["paris", "lyon"]),
+    correct: new Set(["paris"]),
+  })
+  assert.deepEqual(blocks.get("lunch"), { kind: "poll", keys: new Set(["pizza", "tacos"]), correct: new Set() })
+  assert.deepEqual(blocks.get("photosynthesis"), { kind: "recall", keys: new Set(), correct: new Set() })
   assert.deepEqual(
     quizBlocks('<div data-quiz-id="a&amp;b" data-quiz-kind="poll"><i data-key="&quot;x&quot;"></i></div>').get("a&b"),
-    { kind: "poll", keys: new Set(['"x"']) },
+    { kind: "poll", keys: new Set(['"x"']), correct: new Set() },
   )
 })
 
@@ -229,6 +241,69 @@ test("answers are validated against the displayed version and shared across the 
   })
   assert.equal((await answersOf("quiz", "ada"))[0].attempts, 2)
   assert.deepEqual((await detail("quiz", 1)).quiz, (await detail("quiz")).quiz)
+})
+
+test("authoritative rendered options determine correctness, including exact multiple-choice sets", async () => {
+  const multi =
+    '<div data-quiz-id="multi" data-quiz-kind="question"><i data-correct data-key="a&amp;b"></i>' +
+    '<i data-key="c" data-correct="true"></i><i data-key="d"></i></div>'
+  await quizDoc("grading", { visibility: "public", access: "view" }, QUIZ_HTML + multi)
+  state.who = ada
+  for (const [id, kind, choice, correct, expected] of [
+    ["capital", "question", ["lyon"], true, false],
+    ["capital", "question", ["paris"], false, true],
+    ["capital", "question", ["paris", "lyon"], true, false],
+    ["multi", "question", ["a&b"], true, false],
+    ["multi", "question", ["c", "a&b"], false, true],
+    ["multi", "question", ["a&b", "c", "d"], true, false],
+    ["lunch", "poll", ["pizza"], true, null],
+    ["photosynthesis", "recall", ["knew"], true, null],
+    ["photosynthesis", "recall", ["missed"], false, null],
+  ]) {
+    assert.deepEqual((await post("grading", { id, kind, choice, correct })).answer, { choice, correct: expected })
+    assert.deepEqual((await answersOf("grading", "ada")).find((answer) => answer.id === id).latest, {
+      choice,
+      correct: expected,
+    })
+  }
+  assert.deepEqual((await answersOf("grading", "ada")).find((answer) => answer.id === "capital").first, {
+    choice: ["lyon"],
+    correct: false,
+  })
+})
+
+test("reversed requests keep the first action and latest vote, including concurrent writes and a new page", async () => {
+  await quizDoc("ordered", { visibility: "public", access: "view" })
+  state.who = ada
+  const session = "00000000-0000-4000-8000-000000000001"
+  const vote = (sequence, choice) => ({ id: "lunch", kind: "poll", choice, order: { session, sequence } })
+  await post("ordered", vote(2, ["tacos"]))
+  assert.deepEqual((await post("ordered", vote(1, ["pizza"]))).answer, { choice: ["tacos"], correct: null })
+  let stored = (await answersOf("ordered", "ada"))[0]
+  assert.deepEqual(stored.first, { choice: ["pizza"], correct: null })
+  assert.deepEqual(stored.latest, { choice: ["tacos"], correct: null })
+  await Promise.all([post("ordered", vote(4, [])), post("ordered", vote(3, ["pizza"]))])
+  stored = (await answersOf("ordered", "ada"))[0]
+  assert.deepEqual(stored.latest, { choice: [], correct: null })
+  assert.equal(stored.attempts, 4)
+  assert.deepEqual(Object.fromEntries(await quizResults("ordered")), {})
+  await post("ordered", { ...vote(1, ["pizza"]), order: { session: crypto.randomUUID(), sequence: 1 } })
+  assert.deepEqual((await answersOf("ordered", "ada"))[0].latest, { choice: ["pizza"], correct: null })
+  // Questions count the first action, even if it arrived last.
+  const question = (sequence, choice) => ({ id: "capital", kind: "question", choice, order: { session, sequence } })
+  await post("ordered", question(2, ["paris"]))
+  await post("ordered", question(1, ["lyon"]))
+  assert.deepEqual((await quizResults("ordered")).get("capital"), {
+    kind: "question",
+    counts: { lyon: 1 },
+    total: 1,
+  })
+  for (const order of [
+    { session, sequence: 0 },
+    { session, sequence: 1.5 },
+    { session: "invalid", sequence: 1 },
+  ])
+    await assert.rejects(post("ordered", { ...vote(5, ["tacos"]), order }), status(400))
 })
 
 test("only people who can open the doc answer, and not while it's in the Trash", async () => {

@@ -15,6 +15,9 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
   // come from the doc, and `__proto__` must stay an ordinary key.
   const answers = new Map<string, QuizAnswer>()
   const results = new Map<string, QuizResult>()
+  const sequences = new Map<string, number>()
+  const confirmed = new Map<string, { sequence: number; answer: QuizAnswer }>()
+  let session = crypto.randomUUID()
   /** The blocks on the page, from the frame. */
   let shown: string[] = []
   watch(
@@ -22,6 +25,9 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
     () => {
       answers.clear()
       results.clear()
+      sequences.clear()
+      confirmed.clear()
+      session = crypto.randomUUID()
     },
   )
 
@@ -56,19 +62,29 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
   }
 
   async function save(answer: Extract<QuizMessage, { type: "quiz-answer" }>["answer"]) {
-    const before = answers.get(answer.id) ?? drop.value.quiz?.answers[answer.id]
+    const before = drop.value.quiz?.answers[answer.id]
+    const sequence = (sequences.get(answer.id) ?? 0) + 1
+    sequences.set(answer.id, sequence)
+    const order = { session, sequence }
+    const current = () => session === order.session && sequences.get(answer.id) === sequence
     answers.set(answer.id, { choice: answer.choice, correct: answer.correct })
     try {
       const saved = await $fetch<QuizSaved>(`/api/drops/${drop.value.id}/answers`, {
         method: "POST",
         query: { v: drop.value.version },
-        body: answer,
+        body: { ...answer, order },
       })
+      if (session !== order.session) return
+      if (sequence > (confirmed.get(answer.id)?.sequence ?? 0))
+        confirmed.set(answer.id, { sequence, answer: saved.answer })
+      if (!current()) return
       answers.set(answer.id, saved.answer)
       if (saved.results) results.set(answer.id, saved.results)
     } catch (error) {
+      if (!current()) return
       // A vote that wasn't saved doesn't show as one. A question still grades on the page.
-      if (answer.kind === "poll") answers.set(answer.id, before ?? { choice: [], correct: null })
+      if (answer.kind === "poll")
+        answers.set(answer.id, confirmed.get(answer.id)?.answer ?? before ?? { choice: [], correct: null })
       notify.fail("Couldn't save your answer", error)
     }
     push()

@@ -27,7 +27,8 @@ const correct = v.nullish(v.boolean(), null)
 
 /**
  * One answer, as comark-quiz reports it: the options picked for a question, the vote for a poll (none takes it back),
- * and how a recall card went. `correct` is the block's own grading; a poll and a recall card have none.
+ * and how a recall card went. The server regrades questions from the rendered options; polls and recall cards have
+ * no correctness (a recall card's choice records its self-assessment).
  */
 export const QuizAnswerInput = v.variant("kind", [
   v.object({ id: QuizId, kind: v.literal("question"), choice: keys(1), correct }),
@@ -40,3 +41,17 @@ export const QuizAnswerInput = v.variant("kind", [
   }),
 ])
 export type QuizAnswerInput = v.InferOutput<typeof QuizAnswerInput>
+
+/** Browser action order within one page view; optional for clients using the original answer API. */
+export const QuizAnswerRequest = v.intersect([
+  QuizAnswerInput,
+  v.object({
+    order: v.optional(
+      v.object({
+        session: v.pipe(v.string(), v.uuid()),
+        sequence: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+      }),
+    ),
+  }),
+])
+export type QuizAnswerRequest = v.InferOutput<typeof QuizAnswerRequest>

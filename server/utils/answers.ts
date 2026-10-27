@@ -3,7 +3,7 @@ import { decodeHTMLAttribute } from "entities"
 import { log } from "evlog"
 import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
-import { MAX_QUIZ_BLOCKS, QUIZ_KINDS, type QuizAnswerInput, type QuizKind } from "#shared/quiz"
+import { MAX_QUIZ_BLOCKS, QUIZ_KINDS, type QuizAnswerRequest, type QuizKind } from "#shared/quiz"
 import type { DropQuiz, QuizAnswer, QuizResult } from "#shared/types"
 import type { DropRow } from "./drops"
 import type { Identity } from "./identity"
@@ -18,10 +18,23 @@ const TABLE = [
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_drop_delete` AFTER DELETE ON `drops` BEGIN DELETE FROM `drop_answers` WHERE `link` = OLD.id; END",
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_user_delete` AFTER DELETE ON `user` BEGIN DELETE FROM `drop_answers` WHERE `user_id` = OLD.id; END",
 ]
+// Added lazily to existing installations, just like the table itself. Each page has an independent action sequence.
+const ORDER_COLUMNS = { first_session: "text", first_sequence: "integer", session: "text", sequence: "integer" }
 let table: Promise<void> | undefined
 function ensureTable() {
   table ??= (async () => {
     for (const statement of TABLE) await db.run(sql.raw(statement))
+    const columns = await db.all<{ name: string }>(sql`PRAGMA table_info(drop_answers)`)
+    for (const [name, type] of Object.entries(ORDER_COLUMNS)) {
+      if (columns.some((column) => column.name === name)) continue
+      try {
+        await db.run(sql.raw(`ALTER TABLE drop_answers ADD COLUMN ${name} ${type}`))
+      } catch (error) {
+        // Another isolate may have added it since our PRAGMA read.
+        if (!/duplicate column name/i.test(`${String(error)} ${error instanceof Error ? String(error.cause) : ""}`))
+          throw error
+      }
+    }
   })().catch((error: unknown) => {
     table = undefined
     throw error
@@ -43,23 +56,39 @@ export const answerable = (row: Pick<DropRow, "kind" | "expired">, who: Identity
   who?.actorKind === "browser" && row.kind === "markdown" && !row.expired
 
 /**
- * Keeps a reader's answer: their first stays as it was, and this one becomes their latest. A block the doc has no
- * answers to yet counts against MAX_QUIZ_BLOCKS, checked in the same statement; past it nothing is kept, and this
- * returns false.
+ * Keeps a reader's first and latest actions even when requests from a page arrive out of order. Separate page views
+ * retain arrival order. A block the doc has no answers to yet counts against MAX_QUIZ_BLOCKS, checked in the same
+ * statement; past it nothing is kept, and this returns false. Otherwise it returns the latest stored answer.
  */
-export async function recordAnswer(link: string, userId: string, answer: QuizAnswerInput, now = Date.now()) {
+export async function recordAnswer(link: string, userId: string, answer: QuizAnswerRequest, now = Date.now()) {
   await ensureTable()
   const choice = JSON.stringify(answer.choice)
   const correct = answer.correct === null ? null : Number(answer.correct)
-  const kept = await db.all<{ attempts: number }>(sql`INSERT INTO drop_answers
-      (link, question, user_id, kind, first_choice, first_correct, choice, correct, attempts, created_at, updated_at)
-    SELECT ${link}, ${answer.id}, ${userId}, ${answer.kind}, ${choice}, ${correct}, ${choice}, ${correct}, 1, ${now}, ${now}
+  const session = answer.order?.session ?? null
+  const sequence = answer.order?.sequence ?? null
+  const first = sql`excluded.first_session IS NOT NULL AND excluded.first_session = first_session AND excluded.first_sequence < first_sequence`
+  const latest = sql`excluded.session IS NULL OR session IS NULL OR excluded.session <> session OR excluded.sequence > sequence`
+  const kept = await db.all<{ choice: string; correct: number | null }>(sql`INSERT INTO drop_answers
+      (link, question, user_id, kind, first_choice, first_correct, choice, correct, attempts, created_at, updated_at,
+       first_session, first_sequence, session, sequence)
+    SELECT ${link}, ${answer.id}, ${userId}, ${answer.kind}, ${choice}, ${correct}, ${choice}, ${correct}, 1, ${now}, ${now},
+      ${session}, ${sequence}, ${session}, ${sequence}
     WHERE EXISTS (SELECT 1 FROM drop_answers WHERE link = ${link} AND question = ${answer.id})
       OR (SELECT count(DISTINCT question) FROM drop_answers WHERE link = ${link}) < ${MAX_QUIZ_BLOCKS}
-    ON CONFLICT (link, question, user_id) DO UPDATE SET kind = excluded.kind, choice = excluded.choice,
-      correct = excluded.correct, attempts = attempts + 1, updated_at = excluded.updated_at
-    RETURNING attempts`)
-  return kept.length > 0
+    ON CONFLICT (link, question, user_id) DO UPDATE SET
+      first_choice = CASE WHEN ${first} THEN excluded.first_choice ELSE first_choice END,
+      first_correct = CASE WHEN ${first} THEN excluded.first_correct ELSE first_correct END,
+      first_sequence = CASE WHEN ${first} THEN excluded.first_sequence ELSE first_sequence END,
+      kind = CASE WHEN ${latest} THEN excluded.kind ELSE kind END,
+      choice = CASE WHEN ${latest} THEN excluded.choice ELSE choice END,
+      correct = CASE WHEN ${latest} THEN excluded.correct ELSE correct END,
+      updated_at = CASE WHEN ${latest} THEN excluded.updated_at ELSE updated_at END,
+      session = CASE WHEN ${latest} THEN excluded.session ELSE session END,
+      sequence = CASE WHEN ${latest} THEN excluded.sequence ELSE sequence END,
+      attempts = attempts + 1
+    RETURNING choice, correct`)
+  const row = kept[0]
+  return row ? { choice: v.parse(Keys, row.choice), correct: v.parse(Correct, row.correct) } : false
 }
 
 const Keys = v.pipe(v.string(), v.parseJson(), v.array(v.string()))
@@ -171,18 +200,26 @@ export async function quizOf(row: Pick<DropRow, "id">, userId: string): Promise<
 
 /**
  * The blocks a rendered doc holds, in order: comark-quiz marks each with data-quiz-id and data-quiz-kind, and each of
- * its options with data-key. A block's options are the keys between it and the next block.
+ * its options with data-key and the right ones with data-correct. A block's options are between it and the next block.
  */
 export function quizBlocks(html: string) {
-  const blocks = new Map<string, { kind: string; keys: Set<string> }>()
+  const blocks = new Map<string, { kind: string; keys: Set<string>; correct: Set<string> }>()
   const found = [...html.matchAll(/<[a-z][^>]*\sdata-quiz-id="([^"]*)"[^>]*>/gi)].slice(0, MAX_QUIZ_BLOCKS)
   for (const [index, match] of found.entries()) {
     const id = decodeHTMLAttribute(match[1]!)
     if (blocks.has(id)) continue
     const options = html.slice(match.index + match[0].length, found[index + 1]?.index ?? html.length)
+    const keys = new Set<string>()
+    const correct = new Set<string>()
+    for (const option of options.matchAll(/<[a-z][^>]*\sdata-key="([^"]*)"[^>]*>/gi)) {
+      const key = decodeHTMLAttribute(option[1]!)
+      keys.add(key)
+      if (/\sdata-correct(?=[\s=>])/.test(option[0])) correct.add(key)
+    }
     blocks.set(id, {
       kind: decodeHTMLAttribute(/\sdata-quiz-kind="([^"]*)"/.exec(match[0])?.[1] ?? ""),
-      keys: new Set(Array.from(options.matchAll(/\sdata-key="([^"]*)"/g), (key) => decodeHTMLAttribute(key[1]!))),
+      keys,
+      correct,
     })
   }
   return blocks
