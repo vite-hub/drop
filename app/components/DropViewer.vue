@@ -137,6 +137,11 @@ const framed = computed(
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
+/** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. */
+const dockClearance = computed(
+  () =>
+    hasComments.value && !editing.value && !trashed.value && ["board", "site", "app", "file"].includes(drop.value.kind),
+)
 function closeLightbox() {
   lightbox.value = null
   popover.value = null
@@ -782,16 +787,9 @@ watch(
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <!-- Documents and images run under the glass; Markdown and the live editor already have trailing room.
+      <!-- Documents, HTML docs and images run under the glass; Markdown and the live editor already have trailing room.
            Interactive viewers need clearance so their bottom controls stay clickable. -->
-      <div
-        class="relative flex min-h-0 flex-1 flex-col"
-        :class="
-          hasComments && !editing && !trashed && ['board', 'site', 'html', 'app', 'file'].includes(drop.kind)
-            ? 'pb-28 sm:pb-20'
-            : ''
-        "
-      >
+      <div class="relative flex min-h-0 flex-1 flex-col" :class="dockClearance ? 'pb-28 sm:pb-20' : ''">
         <div class="relative flex min-h-0 flex-1 flex-col">
           <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
           <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
@@ -821,7 +819,7 @@ watch(
               />
             </div>
           </div>
-          <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable" :bottom="16">
+          <ViewerDevice v-else-if="contentOrigin || srcdoc" :on="sizable" :bottom="dockClearance ? 16 : undefined">
             <iframe
               v-if="contentOrigin"
               :key="frameKey"
