@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { decodeHTML } from "entities"
 import { beforeEach, test } from "vite-plus/test"
 import { migrate, reset } from "../cost/harness.mjs"
-const { renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
+const { renderMarkdownCached, RENDERER_SCRIPTS } = await import("../../server/utils/markdown-document.ts")
 
 migrate()
 beforeEach(reset)
@@ -22,6 +22,9 @@ test("Mermaid preserves its source as escaped text and loads copy controls and z
   }
   // Copy buttons and comark-zoom.
   assert.equal([...html.matchAll(/<script>/g)].length, 2)
+  for (const [, script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+    assert.ok(RENDERER_SCRIPTS.includes(script), "every renderer script is allowed by the CSP")
+  }
   assert.match(html, /Copy image/)
   assert.match(html, /Copy Markdown/)
   assert.match(html, /<div class="mermaid" data-zoom tabindex="0"><svg/)
