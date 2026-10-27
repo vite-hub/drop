@@ -81,7 +81,6 @@ export interface DropCrumb {
 }
 
 export interface DropVersion {
-  id: string
   title: string
   version: number
   createdAt: number

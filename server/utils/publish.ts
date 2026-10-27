@@ -10,16 +10,7 @@ import { BoardInput } from "../mcp/board"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
 import { applyChanges, boardChanges, emptyBoard, serializeBoard } from "#shared/board"
 import { resolveComments } from "./comments"
-import {
-  createDocDrop,
-  findDrop,
-  findDropByRef,
-  MAX_FILE_BYTES,
-  permissions,
-  publishApp,
-  toSummary,
-  versionChain,
-} from "./drops"
+import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary } from "./drops"
 import { updateDrop } from "./drop-update"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
@@ -210,7 +201,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         status: 400,
         message: "A site has no versions. Change it with update_drop, and resolve its comments there.",
       })
-    const resources = links && (await addedResources(null, links))
+    const resources = links && addedResources(null, links)
     const row = await createSiteDrop(
       who,
       {
@@ -247,8 +238,9 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       status: 400,
       message: "previous is a site, which has no versions. Change it with update_drop.",
     })
-  if (previous) previous = (await versionChain(previous))[0] ?? previous
-  const resources = links && (await addedResources(previous, links))
+  // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest.
+  if (previous?.head) previous = await findDrop(previous.id, event)
+  const resources = links && addedResources(previous, links)
   const share = input.share ? { share: input.share } : {}
   const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent: input.agent }
 
@@ -373,7 +365,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   }
   if (previous && input.folder) await updateDrop((await findDrop(row.id, event))!, who, { folder: input.folder }, event)
 
-  // Comments carry over from earlier versions (listComments), so this looks across the whole chain.
+  // Comments carry over from earlier versions (listComments), so this looks across all of them.
   const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves) : []
 
   const fresh = (await findDrop(row.id, event)) ?? row

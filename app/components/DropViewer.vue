@@ -49,8 +49,8 @@ const trashed = computed(() => drop.value.trashedAt !== null)
 // A doc's link opens its latest version. Someone reading an earlier one, pinned (`?v=`) or from History, can go to the
 // latest; someone whose old link moved them to the latest (`?from=`) can go back to the version they were sent.
 const latest = computed(() => drop.value.versions[0] ?? drop.value)
-const older = computed(() => latest.value.id !== drop.value.id)
-const latestTo = computed(() => (publicView ? dropPath(drop.value) : `/drops/${latest.value.id}`))
+const older = computed(() => latest.value.version !== drop.value.version)
+const latestTo = computed(() => (publicView ? dropPath(drop.value) : `/drops/${drop.value.id}`))
 const sentVersion = computed(() => {
   const version = Number(route.query.from)
   return publicView && !older.value && version > 0 && version < drop.value.version ? version : 0
@@ -274,7 +274,8 @@ const shownVersion = computed(() => {
 })
 const previousVersion = computed(() =>
   shownVersion.value
-    ? (drop.value.versions[drop.value.versions.findIndex((item) => item.id === shownVersion.value!.id) + 1] ?? null)
+    ? (drop.value.versions[drop.value.versions.findIndex((item) => item.version === shownVersion.value!.version) + 1] ??
+      null)
     : null,
 )
 // Opening a diff from the document adds a history entry; moving between versions replaces it, so one Back always
@@ -284,7 +285,7 @@ watch(shownVersion, (value) => !value && (pushedChanges = false))
 /** Picking the open version again goes back to the document. Below `lg` the panel is a slideover, so it steps aside. */
 function showVersion(version: DropVersion) {
   if (editing.value) return
-  if (shownVersion.value?.id === version.id) return closeChanges()
+  if (shownVersion.value?.version === version.version) return closeChanges()
   const opening = !shownVersion.value
   void setQuery({ changes: version.version }, { push: opening })
   if (opening) pushedChanges = true
@@ -628,7 +629,7 @@ watch(
         v-if="tab === 'history'"
         :comments="comments"
         :drop="drop"
-        :selected="shownVersion?.id"
+        :selected="shownVersion?.version"
         @open="showVersion"
       />
       <ViewerOverview v-else :drop="drop" :show-description="owner || (Boolean(me) && !publicView)">
@@ -849,7 +850,7 @@ watch(
 
           <ViewerDiff
             v-if="shownVersion && !editing"
-            :key="shownVersion.id"
+            :key="shownVersion.version"
             :previous="previousVersion"
             :copied="copied('changes')"
             :version="shownVersion"

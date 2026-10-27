@@ -250,11 +250,17 @@ test("successful file reads refresh activity and count agent views, but never re
   insertDrop("pdf", { visibility: "private", kind: "file", content_type: "application/pdf", last_accessed_at: old })
   await call(readFile, { id: "pdf" })
   assert.ok(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at > old)
-  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+  assert.equal(
+    sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE drop_id = 'pdf' AND viewer = 'agent'").get().n,
+    1,
+  )
   sql.prepare("UPDATE drops SET trashed_at = ?, last_accessed_at = ? WHERE id = 'pdf'").run(Date.now(), old)
   await call(readFile, { id: "pdf" })
   assert.equal(sql.prepare("SELECT last_accessed_at AS at FROM drops WHERE id = 'pdf'").get().at, old)
-  assert.equal(sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE link = 'pdf' AND viewer = 'agent'").get().n, 1)
+  assert.equal(
+    sql.prepare("SELECT sum(views) AS n FROM drop_views WHERE drop_id = 'pdf' AND viewer = 'agent'").get().n,
+    1,
+  )
 })
 
 test("unknown app binaries have a binary MIME fallback", async () => {
@@ -407,10 +413,10 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
 })
 
 test("open comments follow a doc to its next versions, numbered across them, and resolve from any later version", async () => {
-  const route = (id, init) => {
+  const route = (id, init, version) => {
     const event = new H3Event(
       new Request(
-        `https://drop.example/api/drops/${id}/comments`,
+        `https://drop.example/api/drops/${id}/comments${version ? `?v=${version}` : ""}`,
         init && { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init) },
       ),
     )
@@ -437,7 +443,7 @@ test("open comments follow a doc to its next versions, numbered across them, and
     ],
   )
   assert.deepEqual(
-    (await commentsGet(route(v1.id))).map((comment) => comment.n),
+    (await commentsGet(route(v1.id, undefined, 1))).map((comment) => comment.n),
     [1],
     "an older version doesn't see later comments",
   )
@@ -737,10 +743,9 @@ test("an agent links a drop to its pull request and preview; publishing again ad
   assert.equal((await call(readDrop, { id: v2.id })).structuredContent.resources, undefined)
 
   await call(updateDrop, { id: v2.id, resources: [{ url: pr }] })
-  sql.prepare("DELETE FROM drops WHERE id = ?").run(v2.id)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 1, "they stay while a version does")
-  sql.prepare("DELETE FROM drops WHERE id = ?").run(doc.id)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_resources").get().n, 0, "and go with the last one")
+  assert.deepEqual(JSON.parse(sql.prepare("SELECT resources FROM drops WHERE id = ?").get(doc.id).resources), [
+    { url: pr },
+  ])
 })
 
 test("a file without base64 gets an upload URL; curl -T creates the drop once, and a changed ticket does nothing", async () => {

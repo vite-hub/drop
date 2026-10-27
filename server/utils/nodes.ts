@@ -1,9 +1,9 @@
-import { and, eq, inArray, isNull, like, or, type SQL, sql } from "drizzle-orm"
+import { and, eq, inArray, isNull, like, ne, or, type SQL, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { MAX_SLUG } from "#shared/links"
 import { MAX_DEPTH } from "#shared/nodes"
 import { type Share, SHARE_RANK } from "#shared/share"
-import { dropHeads, drops } from "../databases/config"
+import { drops } from "../databases/config"
 import type { DropRow } from "./drops"
 import { isExpired } from "./expiry"
 import { shareNow, sharePolicy } from "./share"
@@ -186,19 +186,18 @@ export const listedNode = sql`("drops"."parent_id" IS NULL OR EXISTS (SELECT 1 F
 
 /**
  * `slug`, or `slug-2`, `slug-3` and so on when another drop in the same folder has it, like file names in a directory.
- * Drops at the top need no unique slug: their links tell them apart. `link` is the drop being named, which may keep its own.
+ * Drops at the top need no unique slug: their links tell them apart. `id` is the drop being named, which may keep its own.
  */
-export async function uniqueSlug(parentId: string | null, slug: string, link?: string | null) {
+export async function uniqueSlug(parentId: string | null, slug: string, id?: string | null) {
   if (!parentId || !slug) return slug
   const siblings = await db
     .select({ slug: drops.slug })
     .from(drops)
-    .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
     .where(
       and(
         eq(drops.parentId, parentId),
         isNull(drops.trashedAt),
-        link ? sql`coalesce(${drops.link}, '') != ${link}` : sql`1`,
+        id ? ne(drops.id, id) : undefined,
         or(eq(drops.slug, slug), like(drops.slug, `${slug}-%`)),
       ),
     )
@@ -222,7 +221,6 @@ export async function itemCounts(ids: string[]) {
     const rows = await db
       .select({ parentId: drops.parentId, count: sql<number>`count(*)`.mapWith(Number) })
       .from(drops)
-      .innerJoin(dropHeads, eq(dropHeads.dropId, drops.id))
       .where(and(inArray(drops.parentId, ids.slice(offset, offset + 90)), isNull(drops.trashedAt)))
       .groupBy(drops.parentId)
     for (const row of rows) counts.set(row.parentId!, row.count)

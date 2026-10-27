@@ -66,7 +66,7 @@ test("Drizzle applies the migrations once, in journal order", async () => {
     journal.entries.map((entry) => `${entry.tag}.sql`),
     filenames,
   )
-  // Main squashed 0001 and 0002 into 0000. Keep Comments' filename and timestamp so existing ledgers skip it.
+  // Main squashed 0001 and 0002 into 0000. Keep Comments' filename so Wrangler's ledger skips it.
   for (const entry of journal.entries) assert.equal(entry.idx, Number.parseInt(entry.tag, 10))
   for (let index = 1; index < journal.entries.length; index++) {
     assert.ok(journal.entries[index].idx > journal.entries[index - 1].idx)
@@ -74,8 +74,13 @@ test("Drizzle applies the migrations once, in journal order", async () => {
   }
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  // Cover a fresh database, main's squashed schema, and a database that already has Comments.
-  for (const alreadyApplied of [0, 1, 2]) {
+  // Comments follows main's new baseline timestamp. Upgraded databases may have its tables at the old timestamp.
+  for (const { alreadyApplied, oldComments = false } of [
+    { alreadyApplied: 0 },
+    { alreadyApplied: 1 },
+    { alreadyApplied: 2 },
+    { alreadyApplied: 2, oldComments: true },
+  ]) {
     const database = new DatabaseSync(":memory:")
     try {
       if (alreadyApplied) {
@@ -86,8 +91,16 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           database.exec(migration.sql.join(";\n"))
           database
             .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
-            .run(migration.hash, migration.folderMillis)
+            .run(migration.hash, oldComments && migration === migrations[1] ? 1793091156010 : migration.folderMillis)
         }
+      }
+      if (alreadyApplied === 2) {
+        database.exec(`
+          INSERT INTO vitehub_comment_threads (id, page, anchor, status, created_by, created_at, updated_at)
+            VALUES ('existing-thread', '/', '{}', 'open', 'admin', 1, 1);
+          INSERT INTO vitehub_comments (id, thread_id, body, mentions, author, created_at)
+            VALUES ('existing-comment', 'existing-thread', 'Keep this comment', '[]', 'admin', 1);
+        `)
       }
       const db = drizzle(async (query, params, method) => {
         const statement = database.prepare(query)
@@ -106,9 +119,10 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           .all()
           .some((column) => column.name === "plan"),
       )
-      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
+      const expectedMigrations = migrations.length + Number(oldComments)
+      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
       for (const table of [
-        "drop_heads",
+        "drop_versions",
         "code_images",
         "quota_reservations",
         "abuse_reports",
@@ -131,8 +145,18 @@ test("Drizzle applies the migrations once, in journal order", async () => {
       const threadColumns = database.prepare("PRAGMA table_info(vitehub_comment_threads)").all()
       for (const name of ["scope", "number", "metadata"])
         assert.ok(threadColumns.some((column) => column.name === name))
+      if (alreadyApplied === 2) {
+        assert.equal(
+          database.prepare("SELECT body FROM vitehub_comments WHERE id = 'existing-comment'").get().body,
+          "Keep this comment",
+        )
+        assert.equal(
+          database.prepare("SELECT page FROM vitehub_comment_threads WHERE id = 'existing-thread'").get().page,
+          "/",
+        )
+      }
       await migrate(db, apply, config)
-      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
+      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
     } finally {
       database.close()
     }

@@ -27,7 +27,7 @@ onMounted(async () => {
       import("react"),
       import("react-dom/client"),
       import("@excalidraw/excalidraw"),
-      $fetch<{ snapshot: Board; canEdit: boolean }>(`/api/drops/${id}/board`),
+      $fetch<{ snapshot: Board; canEdit: boolean }>(`/api/drops/${id}/board`, { query: { v: props.drop.version } }),
       import("@excalidraw/excalidraw/index.css"),
     ])
     // The reader left while Excalidraw loaded: there's no host to mount in any more.

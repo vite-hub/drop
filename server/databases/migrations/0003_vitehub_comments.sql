@@ -1,4 +1,4 @@
-CREATE TABLE `vitehub_comment_threads` (
+CREATE TABLE IF NOT EXISTS `vitehub_comment_threads` (
 	`id` text PRIMARY KEY NOT NULL,
 	`scope` text DEFAULT 'pages' NOT NULL,
 	`number` integer DEFAULT 0 NOT NULL,
@@ -14,10 +14,10 @@ CREATE TABLE `vitehub_comment_threads` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `vitehub_comment_threads_page` ON `vitehub_comment_threads` (`page`,`status`);--> statement-breakpoint
-CREATE UNIQUE INDEX `vitehub_comment_threads_number` ON `vitehub_comment_threads` (`scope`,`number`);--> statement-breakpoint
-CREATE INDEX `vitehub_comment_threads_updated` ON `vitehub_comment_threads` (`updated_at`);--> statement-breakpoint
-CREATE TABLE `vitehub_comments` (
+CREATE INDEX IF NOT EXISTS `vitehub_comment_threads_page` ON `vitehub_comment_threads` (`page`,`status`);--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS `vitehub_comment_threads_number` ON `vitehub_comment_threads` (`scope`,`number`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `vitehub_comment_threads_updated` ON `vitehub_comment_threads` (`updated_at`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `vitehub_comments` (
 	`id` text PRIMARY KEY NOT NULL,
 	`thread_id` text NOT NULL,
 	`body` text NOT NULL,
@@ -28,4 +28,4 @@ CREATE TABLE `vitehub_comments` (
 	FOREIGN KEY (`thread_id`) REFERENCES `vitehub_comment_threads`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `vitehub_comments_thread` ON `vitehub_comments` (`thread_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `vitehub_comments_thread` ON `vitehub_comments` (`thread_id`,`created_at`);

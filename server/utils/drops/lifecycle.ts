@@ -2,58 +2,47 @@ import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event } from "h3"
 import { db } from "vite-hub/database/drizzle"
-import { dropHeads, drops } from "../../databases/config"
+import { drops, dropVersions } from "../../databases/config"
 import { slugify, dropPath } from "#shared/links"
 import { DAY_MS, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { LIVE_EDITING } from "#live-drafts"
 import { draftPath } from "../draft-paths"
 import { deleteRetainedDrop } from "../quota-deletion"
-import { chainOf, expiryPolicy } from "../expiry"
+import { expiryPolicy } from "../expiry"
 import type { Identity } from "../identity"
 import type { DropRow } from "./types"
 import { listDrops, findDrop } from "./query"
 import { drainBlobCleanup, deleteBlobKeys } from "./write"
 
 /**
- * Moves a drop (every version) to the Trash. Its links stop working; it's purged after 15 days. Everything below it goes
- * with it: the drops below read the Trash from their ancestors, so a folder takes one write.
+ * Moves a drop to the Trash. Its links stop working; it's purged after 15 days. Everything below it goes with it: the
+ * drops below read the Trash from their ancestors, so a folder takes one write.
  */
 export async function trashDrop(row: DropRow, now = Date.now()) {
-  await db
-    .update(drops)
-    .set({ trashedAt: now, trashReason: "deleted" })
-    .where(sql`${drops.id} IN (${chainOf(row)})`)
+  await db.update(drops).set({ trashedAt: now, trashReason: "deleted" }).where(eq(drops.id, row.id))
 }
 
 /** Brings a drop back from the Trash with a fresh window, whether it was deleted or expired, and everything below it. */
 export async function restoreDrop(row: DropRow, now = Date.now()) {
-  await db
-    .update(drops)
-    .set({ trashedAt: null, trashReason: null, lastAccessedAt: now })
-    .where(sql`${drops.id} IN (${chainOf(row)})`)
+  await db.update(drops).set({ trashedAt: null, trashReason: null, lastAccessedAt: now }).where(eq(drops.id, row.id))
 }
 
 /**
  * Removes a drop for good: every version, its files, its comments, the files it embeds, and for a folder everything
- * in it, depth first. `gone` collects the deleted ids, so a chain is deleted once however many of its versions point here.
+ * in it, depth first. `gone` collects the deleted ids, so nothing is deleted twice.
  */
 export async function deleteDrop(row: DropRow, gone = new Set<string>()) {
   await drainBlobCleanup()
-  const ids = (
-    await db
-      .select({ id: drops.id })
-      .from(drops)
-      .where(sql`${drops.id} IN (${chainOf(row)})`)
-  ).map((item) => item.id)
-  for (const id of ids) gone.add(id)
-  const children = await db
-    .select()
-    .from(drops)
-    .where(sql`${drops.parentId} IN (${chainOf(row)})`)
+  gone.add(row.id)
+  const [children, versions] = await Promise.all([
+    db.select().from(drops).where(eq(drops.parentId, row.id)),
+    db.select({ version: dropVersions.version }).from(dropVersions).where(eq(dropVersions.dropId, row.id)),
+  ])
   for (const child of children) if (!gone.has(child.id)) await deleteDrop(child, gone)
   await deleteRetainedDrop(row, deleteBlobKeys)
   // Live drafts are Blob files too (#live-drafts), one per version anyone opened in the editor.
-  if (row.kind === "markdown" && LIVE_EDITING) await deleteBlobKeys(ids.map(draftPath))
+  if (row.kind === "markdown" && LIVE_EDITING)
+    await deleteBlobKeys([row.version, ...versions.map((item) => item.version)].map((n) => draftPath(row.id, n)))
 }
 
 /** Every drop in someone's Trash, for "Empty Trash". */
@@ -92,14 +81,11 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
         ),
       )
   }
-  const due = (
-    await db
-      .select({ drop: drops })
-      .from(dropHeads)
-      .innerJoin(drops, eq(drops.id, dropHeads.dropId))
-      .where(lte(drops.trashedAt, at - TRASH_DAYS * DAY_MS))
-      .limit(limit)
-  ).map((row) => row.drop)
+  const due = await db
+    .select()
+    .from(drops)
+    .where(lte(drops.trashedAt, at - TRASH_DAYS * DAY_MS))
+    .limit(limit)
   const orphans = await db
     .select()
     .from(drops)
@@ -114,8 +100,6 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
   return due.length + orphans.length
 }
 
-/** The doc's share link, which opens its latest version. */
-export const dropPageUrl = (
-  origin: string,
-  drop: Pick<DropRow, "id" | "title"> & { link: string | null; slug: string | null },
-) => new URL(dropPath({ link: drop.link ?? drop.id, slug: drop.slug ?? slugify(drop.title) }), origin).href
+/** The drop's share link, which opens its latest version. */
+export const dropPageUrl = (origin: string, drop: Pick<DropRow, "id" | "title" | "slug">) =>
+  new URL(dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) }), origin).href

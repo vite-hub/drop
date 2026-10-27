@@ -27,10 +27,11 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const editing = computed(() => Boolean(documentId.value))
   const people = computed(() => realtime.value?.people.value ?? [])
 
-  const url = (id: string, edit = false) => ({
-    path: `${options.publicView ? "/d" : "/drops"}/${id}`,
-    query: edit ? { edit: "1" } : {},
-  })
+  // A new version keeps the drop's id, so the page reloads the drop's data rather than finding a new address.
+  async function openLatest(id: string, edit = false) {
+    await refreshNuxtData([keys.drop(id), keys.comments(id)])
+    await navigateTo({ path: `${options.publicView ? "/d" : "/drops"}/${id}`, query: edit ? { edit: "1" } : {} })
+  }
 
   // A teammate published: their client leaves `published` on its awareness state before it goes.
   let announced = ""
@@ -42,8 +43,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         for (const [clientId, state] of provider.awareness.getStates()) {
           const parsed = v.safeParse(v.object({ published: PublishedSchema }), state)
           const published = parsed.success ? parsed.output.published : undefined
-          if (clientId === provider.awareness.clientID || !published || published.id === announced) continue
-          announced = published.id
+          if (clientId === provider.awareness.clientID || !published) continue
+          const key = `${published.id}@${published.version}`
+          if (key === announced) continue
+          announced = key
           notify.info({
             title: `${published.name} published v${published.version}`,
             description: "Keep editing the new version.",
@@ -53,7 +56,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
                 label: "Open",
                 color: "neutral",
                 variant: "outline",
-                onClick: () => void navigateTo(url(published.id, true)),
+                onClick: () => void openLatest(published.id, true),
               },
             ],
           })
@@ -95,7 +98,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       await realtime.value?.save()
       const next = await $fetch<DropSummary & { unchanged?: boolean }>(`/api/drops/${drop.value.id}/versions`, {
         method: "POST",
-        body: { force },
+        body: { version: drop.value.version, force },
       })
       if (next.unchanged) {
         notify.done("Nothing to publish", "The draft matches the published version.")
@@ -114,7 +117,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       // Let the announcement reach the room before this client leaves it.
       await promiseTimeout(300)
       close()
-      await navigateTo(url(next.id))
+      await openLatest(next.id)
     } catch (error) {
       const head = errorData(error, v.object({ head: v.object({ id: v.string(), version: v.number() }) }))?.head
       if (!head) {
@@ -141,7 +144,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
             variant: "outline",
             onClick: () => {
               close()
-              void navigateTo(url(head.id))
+              void openLatest(head.id)
             },
           },
         ],

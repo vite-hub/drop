@@ -91,7 +91,7 @@ test("each new version tells the readers of its link, docs and apps alike, and a
   assert.deepEqual(state.refreshedLinks, [app.url.split("/")[4]])
 })
 
-test("a doc keeps one link across versions; it opens the latest, ?v= pins one, and an old version's id moves to the latest", async () => {
+test("a doc keeps one link across versions; it opens the latest, and ?v= pins one", async () => {
   const v1 = await call(publish, {
     markdown: "# Hipoteca de 75.000 €",
     note: "First",
@@ -104,31 +104,30 @@ test("a doc keeps one link across versions; it opens the latest, ?v= pins one, a
   assert.equal(v2.version, 2)
   assert.equal(v2.url, v1.url, "the link stays the same")
   const link = v1.url.split("/")[4]
-  const row = (id) => sql.prepare("SELECT link, slug, filename FROM drops WHERE id = ?").get(id)
-  assert.deepEqual({ ...row(v1.id) }, { link, slug: "hipoteca-madrid", filename: "hipoteca-madrid.md" })
-  assert.deepEqual({ ...row(v2.id) }, { link, slug: "hipoteca-madrid", filename: "hipoteca-madrid.md" })
+  assert.equal(v1.id, link, "a drop's id is its link's key")
+  assert.equal(v2.id, link)
+  assert.deepEqual(
+    { ...sql.prepare("SELECT slug, filename, version FROM drops WHERE id = ?").get(link) },
+    { slug: "hipoteca-madrid", filename: "hipoteca-madrid.md", version: 2 },
+  )
+  assert.deepEqual(
+    { ...sql.prepare("SELECT filename, note FROM drop_versions WHERE drop_id = ? AND version = 1").get(link) },
+    { filename: "hipoteca-madrid.md", note: "First" },
+  )
 
   state.who = null
-  assert.deepEqual(await get(linkHandler, link), { id: v2.id, link, slug: "hipoteca-madrid", version: 2, latest: 2 })
+  assert.deepEqual(await get(linkHandler, link), { id: link, link, slug: "hipoteca-madrid", version: 2, latest: 2 })
   assert.deepEqual(await get(linkHandler, link, "?v=1"), {
-    id: v1.id,
+    id: link,
     link,
     slug: "hipoteca-madrid",
     version: 1,
     latest: 2,
   })
-  assert.deepEqual(await get(linkHandler, v1.id), {
-    id: v2.id,
-    link,
-    slug: "hipoteca-madrid",
-    version: 2,
-    latest: 2,
-    from: 1,
-  })
-  assert.deepEqual(await get(linkHandler, v2.id), { id: v2.id, link, slug: "hipoteca-madrid", version: 2, latest: 2 })
   assert.equal((await get(linkHandler, link, "?v=7")).status, 404)
   assert.equal((await get(linkHandler, "nolinklikethis")).status, 404)
-  assert.equal((await get(detailHandler, link)).id, v2.id, "the drop API takes the link too")
+  assert.equal((await get(detailHandler, link)).version, 2, "the drop API opens the latest")
+  assert.equal((await get(detailHandler, link, "?v=1")).note, "First", "and ?v= an earlier one")
 })
 
 test("a private doc's link answers like a missing one", async () => {
@@ -145,29 +144,17 @@ test("an agent names drops by id, link, or URL, and renames the link for every v
   const v1 = await call(publish, { markdown: "# Plan", note: "x", lifetime: "review", slug: "plan" })
   const v2 = await call(publish, { previous: v1.id, markdown: "# Plan 2", note: "y" })
   const link = v1.url.split("/")[4]
-  assert.equal((await call(readDrop, { id: link })).id, v2.id)
-  assert.equal((await call(readDrop, { id: `${v1.url}?v=1` })).id, v1.id)
+  assert.equal((await call(readDrop, { id: link })).version, 2)
+  assert.equal((await call(readDrop, { id: `${v1.url}?v=1` })).version, 1)
   assert.match((await call(updateDrop, { id: v2.id, slug: "!!" })).message, /letters or numbers/)
   assert.match((await call(updateDrop, { id: v2.id, slug: "Launch Plan" })).url, /\/launch-plan$/)
-  assert.deepEqual(
-    sql
-      .prepare("SELECT DISTINCT slug FROM drops WHERE link = ?")
-      .all(link)
-      .map((row) => row.slug),
-    ["launch-plan"],
-  )
+  assert.equal(sql.prepare("SELECT slug FROM drops WHERE id = ?").get(link).slug, "launch-plan")
   const v3 = await call(publish, { previous: link, markdown: "# Plan 3", note: "z", slug: "final-plan" })
   assert.equal(v3.version, 3)
-  assert.deepEqual(
-    sql
-      .prepare("SELECT DISTINCT slug FROM drops WHERE link = ?")
-      .all(link)
-      .map((row) => row.slug),
-    ["final-plan"],
-  )
+  assert.equal(sql.prepare("SELECT slug FROM drops WHERE id = ?").get(link).slug, "final-plan")
 })
 
-test("without a slug the title names the link; drops from before links open under their id", async () => {
+test("without a slug the title names the link; a drop's id opens it", async () => {
   const doc = await call(publish, { markdown: "# Año nuevo", note: "x", lifetime: "review" })
   assert.match(doc.url, /\/ano-nuevo$/)
   insertDrop("old-drop", { title: "Old Plan" })

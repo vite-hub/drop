@@ -105,7 +105,7 @@ export function event(path, method = "GET") {
 }
 export function reset() {
   sql.exec(
-    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM drop_resources; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
+    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
   )
   state.bursts.length = 0
   state.failBurst = false
@@ -174,6 +174,28 @@ export function insertDrop(id, { visibility, access, ...overrides } = {}) {
   const keys = Object.keys(values)
   sql
     .prepare(`INSERT INTO drops (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`)
+    .run(...Object.values(values))
+  if (values.blob_key) objects.set(values.blob_key, { body: new Blob(["# Source"]), uploadedAt: new Date() })
+}
+
+/** An earlier version of drop `id`, as publishing a later one leaves it in `drop_versions`. */
+export function insertVersion(id, version, overrides = {}) {
+  const values = {
+    drop_id: id,
+    version,
+    kind: "markdown",
+    title: `${id} v${version}`,
+    filename: `${id}.md`,
+    blob_key: `${id}-v${version}.md`,
+    size: 8,
+    actor_kind: "browser",
+    actor_name: "Owner",
+    created_at: version,
+    ...overrides,
+  }
+  const keys = Object.keys(values)
+  sql
+    .prepare(`INSERT INTO drop_versions (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`)
     .run(...Object.values(values))
   if (values.blob_key) objects.set(values.blob_key, { body: new Blob(["# Source"]), uploadedAt: new Date() })
 }
