@@ -1035,39 +1035,43 @@ watch(
     </template>
   </USlideover>
 
-  <div
-    v-if="selection && (!commentsOpen || !popover)"
-    class="fixed z-30 -translate-x-1/2 -translate-y-full"
-    :style="{
-      left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
-      top: `${Math.max(56, selection.rect.top - 8)}px`,
-    }"
-  >
+  <!-- On <body>: as the dashboard's last child they'd put the panel's lg:not-last:border-e on it, and the doc would
+       shift a pixel whenever text is selected. -->
+  <Teleport to="body">
     <div
-      class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]"
+      v-if="selection && (!commentsOpen || !popover)"
+      class="fixed z-30 -translate-x-1/2 -translate-y-full"
+      :style="{
+        left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
+        top: `${Math.max(56, selection.rect.top - 8)}px`,
+      }"
     >
-      <UButton
-        color="neutral"
-        icon="i-mingcute-chat-1-line"
-        label="Comment"
-        size="sm"
-        variant="ghost"
-        @click="commentOnSelection"
-        @mousedown.prevent
-      />
+      <div
+        class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]"
+      >
+        <UButton
+          color="neutral"
+          icon="i-mingcute-chat-1-line"
+          label="Comment"
+          size="sm"
+          variant="ghost"
+          @click="commentOnSelection"
+          @mousedown.prevent
+        />
+      </div>
     </div>
-  </div>
 
-  <ViewerLightbox
-    v-if="lightbox"
-    :alt="lightbox.alt"
-    :can-comment="drop.canComment"
-    :comments="imageComments"
-    :draft="imageDraft"
-    :from="lightbox.from"
-    :src="lightbox.src"
-    @close="closeLightbox"
-    @pick="pickImage"
-    @thread="(id, x, y) => (popover = { type: 'thread', id, x, y })"
-  />
+    <ViewerLightbox
+      v-if="lightbox"
+      :alt="lightbox.alt"
+      :can-comment="drop.canComment"
+      :comments="imageComments"
+      :draft="imageDraft"
+      :from="lightbox.from"
+      :src="lightbox.src"
+      @close="closeLightbox"
+      @pick="pickImage"
+      @thread="(id, x, y) => (popover = { type: 'thread', id, x, y })"
+    />
+  </Teleport>
 </template>

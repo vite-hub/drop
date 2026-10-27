@@ -17,7 +17,7 @@ import {
   type Usage,
 } from "#shared/quotas"
 import { useServerEnv } from "#vitehub/env/server"
-import { dropFiles, dropHeads, drops, quotaBlobs, quotaReservations, user } from "../databases/config"
+import { codeImages, dropFiles, dropHeads, drops, quotaReservations, user } from "../databases/config"
 import { isPaying } from "./teams"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
@@ -289,24 +289,21 @@ export async function cleanupQuotaReservations(now: Date) {
     log.warn({ action: "quota-reservation-release", reservation, ageMs: now.getTime() - reservation.createdAt })
 }
 
-async function releaseQuotaBlobs(keys: string[]) {
-  // D1's bind limit is lower than a blob-list page size.
-  for (let offset = 0; offset < keys.length; offset += 80)
-    await db.delete(quotaBlobs).where(inArray(quotaBlobs.blobKey, keys.slice(offset, offset + 80)))
-}
-
-/** Retry tracked images first, including a prior deletion whose ledger cleanup failed. */
-export async function cleanupQuotaBlobs(now: Date) {
+/**
+ * Deletes expired code images: the blob first, then the row, so a failed delete is retried next hour and the image
+ * keeps counting toward storage until it's gone. 80 keys a batch stays under D1's bind limit.
+ */
+export async function cleanupCodeImages(now: Date) {
   for (;;) {
     const rows = await db
-      .select({ key: quotaBlobs.blobKey })
-      .from(quotaBlobs)
-      .where(lte(quotaBlobs.expiresAt, now.getTime()))
+      .select({ key: codeImages.blobKey })
+      .from(codeImages)
+      .where(lte(codeImages.expiresAt, now.getTime()))
       .limit(80)
     if (!rows.length) return
     const keys = rows.map((row) => row.key)
     const [error] = await blob.del(keys)
     if (error) throw error
-    await releaseQuotaBlobs(keys)
+    await db.delete(codeImages).where(inArray(codeImages.blobKey, keys))
   }
 }

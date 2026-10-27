@@ -12,20 +12,6 @@
     {
       "idx": 1,
       "version": "6",
-      "when": 1792593042706,
-      "tag": "0001_teams",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1793089140860,
-      "tag": "0002_agent_metadata",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
       "when": 1793091000000,
       "tag": "0003_auth_events",
       "breakpoints": true

@@ -2,7 +2,7 @@ import { useLogger } from "evlog/nitro/v3"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
-import { codeImages, quotaBlobs } from "../databases/config"
+import { codeImages } from "../databases/config"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { PNG_CODE_IMAGES, renderCodePng } from "#code-image-png"
 import type { CodeImageInput } from "#shared/schemas"
@@ -43,9 +43,8 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
     }
     try {
       await quota.commit([
-        db.insert(codeImages).values({ blobKey: key, ownerId: who.userId, expiresAt: expiresAt.getTime() }),
         db
-          .insert(quotaBlobs)
+          .insert(codeImages)
           .values({ blobKey: key, ownerId: who.userId, size: image.size, expiresAt: expiresAt.getTime() }),
       ])
     } catch (error) {

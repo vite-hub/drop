@@ -74,20 +74,25 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
     assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  for (const appliedTags of [[], ["0000_init", "0001_teams", "0002_agent_metadata"]]) {
+  // Existing databases can retain the ledger timestamps of migrations consolidated into 0000 on main.
+  for (const appliedTimestamps of [
+    [],
+    [migrations[0].folderMillis],
+    [migrations[0].folderMillis, 1792593042706, 1793089140860],
+  ]) {
     const database = new DatabaseSync(":memory:")
     try {
       // Model a database already migrated on main: Drizzle only runs entries newer than its latest timestamp.
       database.exec(
         "CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)",
       )
-      for (const tag of appliedTags) {
-        const migration = migrations[journal.entries.findIndex((entry) => entry.tag === tag)]
-        database.exec(migration.sql.join(";\n"))
+      if (appliedTimestamps.length) database.exec(migrations[0].sql.join(";\n"))
+      for (const timestamp of appliedTimestamps) {
         database
           .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
-          .run(migration.hash, migration.folderMillis)
+          .run(`applied-${timestamp}`, timestamp)
       }
+      const expectedMigrations = appliedTimestamps.length ? appliedTimestamps.length + 1 : migrations.length
       const db = drizzle(async (query, params, method) => {
         const statement = database.prepare(query)
         if (method === "run") {
@@ -105,17 +110,8 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
           .all()
           .some((column) => column.name === "plan"),
       )
-      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
-      assert.equal(database.prepare("SELECT members FROM workspace_stats WHERE id = 1").get().members, 0)
-      for (const table of [
-        "drop_heads",
-        "code_images",
-        "workspace_stats",
-        "quota_reservations",
-        "quota_blobs",
-        "abuse_reports",
-        "vitehub_auth_events",
-      ])
+      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
+      for (const table of ["drop_heads", "code_images", "quota_reservations", "abuse_reports", "vitehub_auth_events"])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
       assert.deepEqual(
         database
@@ -144,7 +140,7 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
           .some((column) => column.name === "agent"),
       )
       await migrate(db, apply, config)
-      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
+      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
     } finally {
       database.close()
     }

@@ -139,7 +139,7 @@ try {
   assert.equal((await request("/api/usage")).data.drops.used, 3)
   assert.equal((await request(`/api/drops/${fixtureId}`, "DELETE")).status, 200)
   assert.equal((await request("/api/usage")).data.drops.used, 2)
-  db.prepare("UPDATE quota_blobs SET expires_at=0 WHERE owner_id=?").run(owner.id)
+  db.prepare("UPDATE code_images SET expires_at=0 WHERE owner_id=?").run(owner.id)
   const cleanup = await fetch(`${origin}/cdn-cgi/local/scheduled?cron=${encodeURIComponent("0 * * * *")}`)
   assert.equal(cleanup.status, 200)
   const afterCleanup = (await request("/api/usage")).data

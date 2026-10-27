@@ -271,11 +271,11 @@ test("temporary code images charge a write and bytes until blob cleanup, with no
   const id = reserve(db, { drops: 0, bytes: 15 })
   commit(db, id, () =>
     db.exec(
-      "INSERT INTO quota_blobs (blob_key,owner_id,size,expires_at) VALUES ('code-images/old/image.svg','owner',15,0)",
+      "INSERT INTO code_images (blob_key,owner_id,size,expires_at) VALUES ('code-images/old/image.svg','owner',15,0)",
     ),
   )
   assert.deepEqual(used(db), { drops: 0, bytes: 15, writes: 1 })
-  db.exec("DELETE FROM quota_blobs WHERE blob_key='code-images/old/image.svg'")
+  db.exec("DELETE FROM code_images WHERE blob_key='code-images/old/image.svg'")
   assert.deepEqual(used(db), { drops: 0, bytes: 0, writes: 1 })
   db.close()
 })

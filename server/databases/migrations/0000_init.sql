@@ -82,7 +82,9 @@ CREATE TABLE `drops` (
 	`parent_id` text,
 	`link` text,
 	`slug` text,
-	`site_url` text
+	`site_url` text,
+	`team_id` text,
+	`agent` text
 );
 --> statement-breakpoint
 CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);
@@ -90,8 +92,6 @@ CREATE INDEX `drops_owner_idx` ON `drops` (`owner_id`,`updated_at`);
 CREATE UNIQUE INDEX `drops_blob_key_idx` ON `drops` (`blob_key`);
 --> statement-breakpoint
 CREATE INDEX `drops_link_idx` ON `drops` (`link`,`version`);
---> statement-breakpoint
-CREATE INDEX `drops_supersedes_idx` ON `drops` (`supersedes_id`);
 --> statement-breakpoint
 CREATE INDEX `drops_expiry_idx` ON `drops` (`lifetime`,`last_accessed_at`);
 --> statement-breakpoint
@@ -110,6 +110,7 @@ CREATE TABLE `session` (
 	`ip_address` text,
 	`user_agent` text,
 	`impersonated_by` text,
+	`active_organization_id` text,
 	`user_id` text NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -132,7 +133,8 @@ CREATE TABLE `user` (
 	`updated_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
 	`plan` text CHECK (`plan` IN ('free', 'pro', 'unlimited')),
 	`share_approved_at` integer,
-	`github_created_at` integer
+	`github_created_at` integer,
+	`stripe_customer_id` text
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `user_email_unique` ON `user` (`email`);
@@ -152,13 +154,77 @@ CREATE UNIQUE INDEX `drops_supersedes_unique` ON `drops` (`supersedes_id`);
 --> statement-breakpoint
 CREATE UNIQUE INDEX `comments_drop_n_unique` ON `comments` (`drop_id`,`n`);
 --> statement-breakpoint
+CREATE TABLE `invitation` (
+	`id` text PRIMARY KEY NOT NULL,
+	`organization_id` text NOT NULL,
+	`email` text NOT NULL,
+	`role` text,
+	`team_id` text,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`inviter_id` text NOT NULL,
+	`expires_at` integer NOT NULL,
+	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `invitation_organization_idx` ON `invitation` (`organization_id`);
+--> statement-breakpoint
+CREATE INDEX `invitation_email_idx` ON `invitation` (`email`);
+--> statement-breakpoint
+CREATE TABLE `member` (
+	`id` text PRIMARY KEY NOT NULL,
+	`organization_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`role` text NOT NULL,
+	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `member_organization_idx` ON `member` (`organization_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `member_user_organization_idx` ON `member` (`user_id`,`organization_id`);
+--> statement-breakpoint
+CREATE TABLE `organization` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`slug` text NOT NULL,
+	`logo` text,
+	`metadata` text,
+	`stripe_customer_id` text,
+	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `organization_slug_idx` ON `organization` (`slug`);
+--> statement-breakpoint
+CREATE TABLE `subscription` (
+	`id` text PRIMARY KEY NOT NULL,
+	`plan` text NOT NULL,
+	`reference_id` text NOT NULL,
+	`stripe_customer_id` text,
+	`stripe_subscription_id` text,
+	`status` text DEFAULT 'incomplete',
+	`period_start` integer,
+	`period_end` integer,
+	`trial_start` integer,
+	`trial_end` integer,
+	`cancel_at_period_end` integer DEFAULT false,
+	`cancel_at` integer,
+	`canceled_at` integer,
+	`ended_at` integer,
+	`seats` integer,
+	`billing_interval` text,
+	`stripe_schedule_id` text
+);
+--> statement-breakpoint
+CREATE INDEX `subscription_reference_idx` ON `subscription` (`reference_id`);
+--> statement-breakpoint
 CREATE TABLE `blob_cleanup` (
 	`id` text PRIMARY KEY NOT NULL,
 	`blob_key` text NOT NULL,
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `blob_cleanup_key_unique` ON `blob_cleanup` (`blob_key`);
+CREATE UNIQUE INDEX `blob_cleanup_blob_key_unique` ON `blob_cleanup` (`blob_key`);
 --> statement-breakpoint
 CREATE TABLE `jwks` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -342,26 +408,14 @@ CREATE TABLE `oauth_client_assertion` (
 CREATE TABLE `code_images` (
   `blob_key` text PRIMARY KEY NOT NULL,
   `owner_id` text NOT NULL,
-  `expires_at` integer NOT NULL
+  `size` integer NOT NULL,
+  `expires_at` integer NOT NULL,
+  CONSTRAINT `code_images_size` CHECK (`size` >= 0)
 );
+--> statement-breakpoint
+CREATE INDEX `code_images_owner_idx` ON `code_images` (`owner_id`);
 --> statement-breakpoint
 CREATE INDEX `code_images_expires_idx` ON `code_images` (`expires_at`);
---> statement-breakpoint
-CREATE TABLE `workspace_stats` (
-  `id` integer PRIMARY KEY NOT NULL,
-  `members` integer NOT NULL,
-  CONSTRAINT `workspace_stats_singleton` CHECK (`id` = 1)
-);
---> statement-breakpoint
-INSERT INTO `workspace_stats` (`id`, `members`) VALUES (1, 0);
---> statement-breakpoint
-CREATE TRIGGER `workspace_members_insert` AFTER INSERT ON `user` BEGIN
-  UPDATE `workspace_stats` SET `members` = `members` + 1 WHERE `id` = 1;
-END;
---> statement-breakpoint
-CREATE TRIGGER `workspace_members_delete` AFTER DELETE ON `user` BEGIN
-  UPDATE `workspace_stats` SET `members` = `members` - 1 WHERE `id` = 1;
-END;
 --> statement-breakpoint
 CREATE TABLE `drop_heads` (
   `drop_id` text PRIMARY KEY NOT NULL REFERENCES `drops` (`id`) ON DELETE CASCADE,
@@ -407,15 +461,6 @@ CREATE INDEX `quota_owner_month_idx` ON `quota_reservations` (`owner_id`, `month
 CREATE UNIQUE INDEX `quota_pending_target_idx` ON `quota_reservations` (`target_id`) WHERE `committed` = 0;
 --> statement-breakpoint
 CREATE INDEX `quota_owner_pending_idx` ON `quota_reservations` (`owner_id`, `committed`);
---> statement-breakpoint
-CREATE TABLE `quota_blobs` (
-  `blob_key` text PRIMARY KEY NOT NULL,
-  `owner_id` text NOT NULL,
-  `size` integer NOT NULL CHECK (`size` >= 0),
-  `expires_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `quota_blobs_owner_idx` ON `quota_blobs` (`owner_id`);
 --> statement-breakpoint
 CREATE TABLE abuse_reports (
   id text PRIMARY KEY NOT NULL,
