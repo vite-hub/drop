@@ -14,7 +14,7 @@ export const MERMAID_COPY_CSS = `
 export const MERMAID_COPY_SCRIPT = String.raw`(() => {
   function start() {
     for (const figure of document.querySelectorAll(".drop-mermaid[data-source]")) {
-      const svg = figure.querySelector(".mermaid > svg");
+      const svg = figure.querySelector(".mermaid svg");
       if (!svg || figure.querySelector(".drop-mermaid-tools")) continue;
       const tools = document.createElement("div");
       tools.className = "drop-mermaid-tools";
