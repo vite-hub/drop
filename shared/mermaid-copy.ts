@@ -1,6 +1,6 @@
 export const MERMAID_COPY_CSS = `
 .drop-mermaid { margin: 1.5rem 0; }
-.drop-mermaid .mermaid { display: flex; justify-content: center; margin: 0; }
+.drop-mermaid .mermaid { display: flex; justify-content: safe center; margin: 0; }
 .drop-mermaid .mermaid svg { max-width: 100%; height: auto; }
 .drop-mermaid-tools { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; font: 13px/1.5 system-ui, sans-serif; }
 .drop-mermaid-tools button, .drop-mermaid-tools a { border: 1px solid var(--border, #e4e4e7); border-radius: 6px; padding: .375rem .625rem; background: var(--background, #fff); color: var(--foreground, #18181b); font: inherit; cursor: pointer; }

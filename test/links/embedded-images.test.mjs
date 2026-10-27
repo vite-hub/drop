@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { deferImages, embeddedImagePaths } from "../../shared/embedded-images.ts"
+import { deferImages, deferMedia, embeddedImagePaths, embeddedMediaPaths } from "../../shared/embedded-images.ts"
 
 const a = "11111111-1111-4111-8111-111111111111"
 const b = "22222222-2222-4222-8222-222222222222"
@@ -52,4 +52,26 @@ test("srcset candidates are deferred and srcset-only images get a placeholder", 
     ),
   )
   assert.doesNotMatch(deferred, /srcset|sizes/)
+})
+
+test("a doc's videos and audio on this Drop are handed in too, and its attachments that play", () => {
+  const markdown = `![The flow](https://drop.quiver.dk/f/${a}.mp4){loop muted}\n![](/f/${b}.mp3)\n![](https://drop.vitehub.dev/f/${c}.webm)\n![](/f/${c}.png)`
+  assert.deepEqual(embeddedMediaPaths([markdown], "drop.quiver.dk", [`/f/${c}.mov`, `/f/${c}.pdf`]), [
+    `/f/${c}.mov`,
+    `/f/${a}.mp4`,
+    `/f/${b}.mp3`,
+  ])
+})
+
+test("a Markdown doc's videos and audio wait in the frame without a source; other players stay as they are", () => {
+  const html = `<span class="cm cm-video"><video src="https://drop.quiver.dk/f/${a}.mp4" controls playsinline preload="metadata" loop muted><a href="https://drop.quiver.dk/f/${a}.mp4">The flow</a></video></span><audio src="/f/${b}.mp3" controls></audio><video src="https://example.com/x.mp4" controls></video>`
+  const deferred = deferMedia(html, [`/f/${a}.mp4`, `/f/${b}.mp3`])
+  assert.match(
+    deferred,
+    new RegExp(
+      `<video data-drop-media="/f/${a}.mp4" controls playsinline preload="metadata" loop muted><a href="https://drop.quiver.dk/f/${a}.mp4">`,
+    ),
+  )
+  assert.match(deferred, new RegExp(`<audio data-drop-media="/f/${b}.mp3" controls>`))
+  assert.match(deferred, /<video src="https:\/\/example.com\/x.mp4" controls>/)
 })

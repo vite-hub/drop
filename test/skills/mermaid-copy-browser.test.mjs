@@ -60,7 +60,7 @@ test("direct Markdown initializes Mermaid copy under its CSP and keeps copying a
     })
     await page.goto(`http://127.0.0.1:${server.address().port}${path}`)
     assert.equal(await page.locator(".drop-mermaid-tools").count(), 2)
-    assert.equal(await page.locator(".mermaid-image.medium-zoom-image").count(), 2)
+    assert.equal(await page.locator(".mermaid[data-zoom]").count(), 2)
     assert.deepEqual(await page.evaluate(() => window.cspViolations), [])
 
     await page.getByRole("button", { name: "Copy Markdown", exact: true }).last().click()
@@ -94,8 +94,8 @@ test("direct Markdown initializes Mermaid copy under its CSP and keeps copying a
     assert.ok(png.drawn, "the copied PNG contains the diagram, not just its background")
     assert.ok(png.opaque, "the copied PNG has an opaque background")
 
-    await page.locator(".mermaid-image").first().click()
-    await page.locator(".medium-zoom-overlay").waitFor()
+    await page.locator(".mermaid[data-zoom]").first().click()
+    await page.locator(".cz-dialog").waitFor()
     await page.keyboard.press("Escape")
 
     // Author-provided inline code remains blocked; only the exact copy runtime is authorized.

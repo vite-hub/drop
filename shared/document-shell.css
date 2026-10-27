@@ -136,6 +136,23 @@ main {
   margin-inline: calc((100% - var(--ca-wide)) / 2);
 }
 
+/* A Mermaid diagram wider than the text takes the same room, up to its own width, so its labels keep their size
+   instead of shrinking to fit the column. OUTLINE_SCRIPT moves the text and the outline aside for it as for a compare.
+   Where even that room is too narrow, it shrinks, and a click zooms it. */
+.typeset .drop-mermaid {
+  --ca-wide: max(
+    100%,
+    min(
+      var(--mermaid-width, 0px),
+      72rem,
+      100vw - 2 * var(--drop-right, 0px) + var(--drop-shift, 0px) - 3rem,
+      100vw - var(--drop-shift, 0px) - 3rem
+    )
+  );
+  width: var(--ca-wide);
+  margin-inline: calc((100% - var(--ca-wide)) / 2);
+}
+
 /* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.
    The backdrop still fills the frame. */
 .cz-dialog {

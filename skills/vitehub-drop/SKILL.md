@@ -53,9 +53,9 @@ When you're done, tell the user the link, who can open it, how long it lives (`s
 
 If the call fails with `DROP_LIMIT_REACHED` and `retryable: true`, you hit the per-minute publish limit: wait `retryAfterSeconds` and make the same call once more. Any other limit needs the user: nothing was created or changed, so ask them, and don't retry or trash their work.
 
-## Images in a doc
+## Images and recordings in a doc
 
-Publish each image with `file` first, then embed its `fileUrl` in the doc (`![alt](fileUrl)` or `::screenshot{src="fileUrl"}`). An embedded image belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the image. When people comment on it inside the doc, the comment lands on the doc.
+Publish each image or screen recording with `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change. An embedded file belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the file. When people comment on it inside the doc, the comment lands on the doc.
 
 ## Folders
 

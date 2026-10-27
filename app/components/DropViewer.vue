@@ -703,6 +703,7 @@ watch(
           <ViewerLocation :drop="drop" :public-view="publicView" />
         </template>
         <template #trailing>
+          <ViewerResources v-if="drop.resources?.length" :resources="drop.resources" />
           <ViewerShare v-model:open="shareOpen" :drop="drop" />
         </template>
         <template #right>
@@ -934,8 +935,9 @@ watch(
                   liveLabel(connection)
                 }}</ConnectionStatusLabel>
               </ConnectionStatus>
-              <UButton color="neutral" label="Close" variant="ghost" @click="live.close" />
+              <UButton size="xs" color="neutral" label="Close" variant="ghost" @click="live.close" />
               <UButton
+                size="xs"
                 color="neutral"
                 :disabled="!live.synced.value"
                 label="Publish"
@@ -959,6 +961,7 @@ watch(
                 @tool="setTool"
               />
               <UButton
+                size="xs"
                 v-if="slidev && contentOrigin && !lightbox && !shownVersion"
                 color="neutral"
                 icon="i-mingcute-presentation-2-line"
@@ -972,6 +975,7 @@ watch(
                 :text="drop.editNote ?? 'Edit together'"
               >
                 <UButton
+                  size="xs"
                   color="neutral"
                   :disabled="!drop.canEdit"
                   icon="i-mingcute-pencil-line"
@@ -982,6 +986,7 @@ watch(
                 />
               </UTooltip>
               <UButton
+                size="xs"
                 data-review-trigger
                 :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
                 :aria-expanded="commentsOpen"

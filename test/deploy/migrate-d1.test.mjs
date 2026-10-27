@@ -56,7 +56,7 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
   }
 })
 
-test("Drizzle applies the migrations once, in journal order", async () => {
+test("Drizzle applies the migrations once, in journal order, on fresh and existing databases", async () => {
   const directory = new URL("../../server/databases/migrations/", import.meta.url)
   const journal = JSON.parse(readFileSync(new URL("meta/_journal.json", directory), "utf8"))
   const filenames = readdirSync(directory)
@@ -66,34 +66,58 @@ test("Drizzle applies the migrations once, in journal order", async () => {
     journal.entries.map((entry) => `${entry.tag}.sql`),
     filenames,
   )
-  // Main squashed 0001 and 0002 into 0000. Keep Comments' filename so Wrangler's ledger skips it.
-  for (const entry of journal.entries) assert.equal(entry.idx, Number.parseInt(entry.tag, 10))
+  // Keep existing filenames for Wrangler's ledger; journal indexes can have gaps after main's squash.
   for (let index = 1; index < journal.entries.length; index++) {
     assert.ok(journal.entries[index].idx > journal.entries[index - 1].idx)
     assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
   }
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  // Comments follows main's new baseline timestamp. Upgraded databases may have its tables at the old timestamp.
-  for (const { alreadyApplied, oldComments = false } of [
-    { alreadyApplied: 0 },
-    { alreadyApplied: 1 },
-    { alreadyApplied: 2 },
-    { alreadyApplied: 2, oldComments: true },
+  const [baseline, authEvents, comments] = migrations
+  // Comments must follow main's auth migration. Earlier previews can already contain comments at either old timestamp.
+  for (const {
+    appliedMigrations,
+    appliedTimestamps = appliedMigrations.map((migration) => migration.folderMillis),
+    expectedMigrations,
+  } of [
+    { appliedMigrations: [], expectedMigrations: migrations.length },
+    { appliedMigrations: [baseline], expectedMigrations: migrations.length },
+    {
+      appliedMigrations: [baseline],
+      appliedTimestamps: [baseline.folderMillis, 1792593042706, 1793089140860],
+      expectedMigrations: migrations.length + 2,
+    },
+    { appliedMigrations: [baseline, authEvents], expectedMigrations: migrations.length },
+    {
+      appliedMigrations: [baseline, comments],
+      appliedTimestamps: [baseline.folderMillis, 1793091156010],
+      expectedMigrations: migrations.length + 1,
+    },
+    {
+      appliedMigrations: [baseline, comments],
+      appliedTimestamps: [baseline.folderMillis, 1793094947398],
+      expectedMigrations: migrations.length + 1,
+    },
+    {
+      appliedMigrations: [baseline, authEvents, comments],
+      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793094947398],
+      expectedMigrations: migrations.length + 1,
+    },
+    { appliedMigrations: [baseline, authEvents, comments], expectedMigrations: migrations.length },
   ]) {
     const database = new DatabaseSync(":memory:")
     try {
       database.exec("PRAGMA foreign_keys = ON")
-      if (alreadyApplied) {
-        database.exec(
-          "CREATE TABLE __drizzle_migrations (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at numeric)",
-        )
-        for (const migration of migrations.slice(0, alreadyApplied)) {
-          database.exec(migration.sql.join(";\n"))
-          database
-            .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
-            .run(migration.hash, oldComments && migration === migrations[1] ? 1793091156010 : migration.folderMillis)
-        }
+      database.exec(
+        "CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)",
+      )
+      for (const migration of appliedMigrations) database.exec(migration.sql.join(";\n"))
+      for (const timestamp of appliedTimestamps) {
+        database
+          .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
+          .run(`applied-${timestamp}`, timestamp)
+      }
+      if (appliedMigrations.includes(baseline)) {
         database.exec(`
           INSERT INTO drops (id, owner_id, kind, title, filename, actor_kind, actor_name, created_at, updated_at)
           VALUES ('legacy-image', 'owner', 'image', 'Image', 'image.png', 'human', 'Owner', 1, 1);
@@ -105,7 +129,7 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           VALUES ('legacy-image', 'legacy-comment', 'legacy-reply', 1);
         `)
       }
-      if (alreadyApplied === 2) {
+      if (appliedMigrations.includes(comments)) {
         database.exec(`
           INSERT INTO vitehub_comment_threads (id, page, anchor, status, created_by, created_at, updated_at)
             VALUES ('existing-thread', '/', '{}', 'open', 'admin', 1, 1);
@@ -130,7 +154,6 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           .all()
           .some((column) => column.name === "plan"),
       )
-      const expectedMigrations = migrations.length + Number(oldComments)
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
       for (const table of [
         "drop_versions",
@@ -139,8 +162,24 @@ test("Drizzle applies the migrations once, in journal order", async () => {
         "abuse_reports",
         "vitehub_comment_threads",
         "vitehub_comments",
+        "vitehub_auth_events",
+        "comment_cleanup",
       ])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
+      assert.deepEqual(
+        database
+          .prepare("PRAGMA index_list(vitehub_auth_events)")
+          .all()
+          .map((row) => row.name)
+          .filter((name) => !name.startsWith("sqlite_"))
+          .sort(),
+        [
+          "vitehub_auth_events_actor",
+          "vitehub_auth_events_time",
+          "vitehub_auth_events_type",
+          "vitehub_auth_events_user",
+        ],
+      )
       assert.ok(
         database
           .prepare("PRAGMA table_info(drops)")
@@ -158,9 +197,12 @@ test("Drizzle applies the migrations once, in journal order", async () => {
         assert.ok(threadColumns.some((column) => column.name === name))
       for (const table of ["comments", "comment_replies"])
         assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table), undefined)
-      assert.equal(database.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, alreadyApplied ? 1 : 0)
+      assert.equal(
+        database.prepare("SELECT count(*) AS n FROM comment_attachments").get().n,
+        appliedMigrations.includes(baseline) ? 1 : 0,
+      )
       assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
-      if (alreadyApplied === 2) {
+      if (appliedMigrations.includes(comments)) {
         assert.equal(
           database.prepare("SELECT body FROM vitehub_comments WHERE id = 'existing-comment'").get().body,
           "Keep this comment",

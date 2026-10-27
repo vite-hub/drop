@@ -27,6 +27,20 @@ import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
  * Mermaid stays Drop's, with its limits.
  */
 const preset = comarkUi({ chips: { download: false }, mermaid: false, zoom: { images: false } })
+// Writes comark-zoom's script once per render, using the renderer's context to track it.
+const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
+  preset.components["zoom-runtime"]!(["zoom-runtime", {}], state)
+
+/**
+ * The inline scripts the renderer writes itself, which the /f/ pages' CSP allows by hash: Mermaid's copy buttons and
+ * comark-zoom, which zooms diagrams and annotated screenshots. Scripts in a document's own source stay blocked.
+ */
+export const RENDERER_SCRIPTS = [
+  MERMAID_COPY_SCRIPT,
+  (await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })).match(
+    /<script>([\s\S]*)<\/script>/,
+  )![1]!,
+]
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
@@ -201,7 +215,7 @@ function createMermaidRenderer(): NodeHandler {
   let sourceCharacters = 0
   let hasCopyRuntime = false
 
-  return (node) => {
+  return async (node, state) => {
     const content = textValue(node[1].content) ?? ""
     const fallback = `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
 
@@ -213,10 +227,14 @@ function createMermaidRenderer(): NodeHandler {
     if (!rendered.startsWith('<div class="mermaid">')) return fallback
     const runtime = hasCopyRuntime ? "" : `<style>${MERMAID_COPY_CSS}</style><script>${MERMAID_COPY_SCRIPT}</script>`
     hasCopyRuntime = true
+    // The diagram's own width lets a wide one spread past the text column (document-shell.css), and a click zooms it.
+    const width = Number(rendered.match(/<svg[^>]* width="([\d.]+)"/)?.[1]) || 0
     return (
-      `<figure class="drop-mermaid" data-source="${escapeHtml(content)}">` +
-      rendered.replace(/^\s*@import url\([^\n]+\);\s*$/gm, "") +
-      `</figure>${runtime}`
+      `<figure class="drop-mermaid" data-source="${escapeHtml(content)}" style="--mermaid-width: ${Math.ceil(width)}px">` +
+      rendered
+        .replace('<div class="mermaid">', '<div class="mermaid" data-zoom tabindex="0">')
+        .replace(/^\s*@import url\([^\n]+\);\s*$/gm, "") +
+      `</figure>${runtime}${await zoomRuntime(state)}`
     )
   }
 }

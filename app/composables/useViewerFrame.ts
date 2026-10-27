@@ -183,10 +183,10 @@ export function useViewerFrame(options: {
         return
       case "copy":
         return void copy(message.text)
-      case "images":
+      case "files":
         // Each as soon as it's read, so the first one on screen doesn't wait for the rest.
         for (const path of message.paths)
-          void attached.load(path).then((url) => url && send({ type: "image-data", path, url }))
+          void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
         return
       case "unplaced":
         unplaced.value = new Set(message.ids)
