@@ -1,6 +1,6 @@
 // Better Auth OAuth provider + JWT plugin tables: MCP clients sign people in through Drop (OAuth 2.1).
 // Generated from the plugins' own schema (better-auth/db getAuthTables); arrays and JSON are stored as text.
-// Foreign keys live in migration 0002 only: the adapter doesn't need them, and declaring them here would cycle with config.ts.
+// Foreign keys live in 0000_init.sql only: the adapter doesn't need them, and declaring them here would cycle with config.ts.
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 
 export const jwks = sqliteTable("jwks", {

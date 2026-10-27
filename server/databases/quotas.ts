@@ -23,15 +23,3 @@ export const quotaReservations = sqliteTable(
       .where(sql`${table.committed} = 0`),
   ],
 )
-
-/** Temporary code images still consume storage until the cleanup has deleted their blob. */
-export const quotaBlobs = sqliteTable(
-  "quota_blobs",
-  {
-    blobKey: text("blob_key").primaryKey(),
-    ownerId: text("owner_id").notNull(),
-    size: integer("size").notNull(),
-    expiresAt: integer("expires_at").notNull(),
-  },
-  (table) => [index("quota_blobs_owner_idx").on(table.ownerId)],
-)

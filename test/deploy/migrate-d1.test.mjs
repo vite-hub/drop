@@ -66,16 +66,16 @@ test("Drizzle applies the migrations once, in journal order", async () => {
     journal.entries.map((entry) => `${entry.tag}.sql`),
     filenames,
   )
-  assert.deepEqual(
-    journal.entries.map((entry) => entry.idx),
-    journal.entries.map((_, index) => index),
-  )
-  for (let index = 1; index < journal.entries.length; index++)
+  // Main squashed 0001 and 0002 into 0000. Keep Comments' filename and timestamp so existing ledgers skip it.
+  for (const entry of journal.entries) assert.equal(entry.idx, Number.parseInt(entry.tag, 10))
+  for (let index = 1; index < journal.entries.length; index++) {
+    assert.ok(journal.entries[index].idx > journal.entries[index - 1].idx)
     assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
+  }
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  // Cover both a fresh database and main's schema through 0002_agent_metadata.
-  for (const alreadyApplied of [0, 3]) {
+  // Cover a fresh database, main's squashed schema, and a database that already has Comments.
+  for (const alreadyApplied of [0, 1, 2]) {
     const database = new DatabaseSync(":memory:")
     try {
       if (alreadyApplied) {
@@ -107,13 +107,10 @@ test("Drizzle applies the migrations once, in journal order", async () => {
           .some((column) => column.name === "plan"),
       )
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, migrations.length)
-      assert.equal(database.prepare("SELECT members FROM workspace_stats WHERE id = 1").get().members, 0)
       for (const table of [
         "drop_heads",
         "code_images",
-        "workspace_stats",
         "quota_reservations",
-        "quota_blobs",
         "abuse_reports",
         "vitehub_comment_threads",
         "vitehub_comments",

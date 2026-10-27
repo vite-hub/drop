@@ -267,7 +267,6 @@ export interface Viewer {
   mode: DropMode
   /** Days a public link stays open before it closes (null: until changed, 0: public links are off). */
   publicLinkDays: number | null
-  members: number
   /** How many skills are on: agents get them over MCP, and members see Skills only while one is. */
   skills: number
   /** On a personal Drop with `DROP_TEAMS`: the teams they're on. Absent when teams are off. */

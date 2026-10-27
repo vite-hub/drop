@@ -131,7 +131,6 @@ test("a signed-in admin's page bootstrap reads independent sidebar data in one r
     viewer = await meHandler(event("/api/me"))
   })
   assert.equal(viewer.id, who.userId)
-  assert.equal(viewer.members, 1)
   assert.ok(viewer.skills > 0)
   assert.equal(count, 1, `page bootstrap waited for ${count} sequential database round trips`)
 })
