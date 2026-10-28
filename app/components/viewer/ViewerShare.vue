@@ -40,10 +40,10 @@ async function pick(next: Share) {
 <template>
   <UPopover
     v-model:open="open"
-    :content="{ align: 'start', side: 'bottom' }"
+    :content="{ align: 'end', side: 'top' }"
     :ui="{
       content:
-        'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain',
+        'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px] border border-default surface-review bg-(--review-surface) ring-0',
     }"
   >
     <UButton
@@ -52,9 +52,7 @@ async function pick(next: Share) {
       color="neutral"
       :icon="SHARE_ICONS[drop.share]"
       label="Share"
-      :ui="{ label: 'hidden sm:inline', trailingIcon: 'hidden sm:block' }"
-      trailing-icon="i-mingcute-down-small-line"
-      size="sm"
+      size="xs"
       variant="ghost"
     />
     <template #content>
