@@ -5,10 +5,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { test } from "vite-plus/test"
+import ts from "typescript"
 
 const require = createRequire(import.meta.resolve("vite-hub"))
 const { hubRateLimit } = await import(pathToFileURL(require.resolve("@vite-hub/rate-limit/vite")))
 const { hubAuth } = await import(pathToFileURL(require.resolve("@vite-hub/auth/vite")))
+const { renderContentDevHandler } = await import(pathToFileURL(require.resolve("@vite-hub/content/vite")))
 
 async function fixture(run) {
   const root = await mkdtemp(join(tmpdir(), "drop-generated-roots-"))
@@ -51,4 +53,22 @@ test("Auth generates ambient types and Nitro handlers at the project root", () =
     await access(join(root, ".vitehub/auth/route.ts"))
     await access(join(root, ".vitehub/auth/access-middleware.ts"))
     await assert.rejects(access(join(root, "app/.vitehub")), { code: "ENOENT" })
+  }))
+
+test("Content's generated dev handler imports a definition TypeScript can resolve", () =>
+  fixture(async (root) => {
+    const definition = join(root, "server/content.ts")
+    await writeFile(definition, "export const content = {}\n")
+    const handler = join(root, ".vitehub/nitro/content/dev-handler.ts")
+    const source = renderContentDevHandler({ definition })
+    const imports = ts.preProcessFile(source).importedFiles
+    const specifier = imports.find((item) => item.fileName.includes("/server/content.ts"))?.fileName
+    assert.ok(specifier, source)
+    const resolved = ts.resolveModuleName(
+      specifier,
+      handler,
+      { moduleResolution: ts.ModuleResolutionKind.Bundler, allowImportingTsExtensions: true },
+      ts.sys,
+    ).resolvedModule
+    assert.equal(resolved?.resolvedFileName, definition, source)
   }))

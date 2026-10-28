@@ -1,0 +1,22 @@
+diff --git a/dist/vite.js b/dist/vite.js
+index 41463f0bea389b2c724090ebbfb1fa41d2e5d6ee..8f8b9d1b46610badd786bc518fe5e85f43161868 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
+ import { basename, dirname, join, parse, relative, resolve } from "node:path";
+ import { pathToFileURL } from "node:url";
+ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+-import { findContentEntry, inspectContentEntry, toRuntimeModuleSpecifier } from "@vite-hub/source/vite";
++import { findContentEntry, inspectContentEntry, toTypeModuleSpecifier } from "@vite-hub/source/vite";
+ import { parseAst } from "vite";
+ //#region ../internal/dist/build/vite.js
+ const projectRootDirectoryMarkers = [
+@@ -952,7 +952,7 @@ function renderContentDevHandler(options) {
+ 	return [
+ 		"import { defineEventHandler } from 'h3'",
+ 		`import { handleContentDevRequest } from ${JSON.stringify(`${options.importBase ?? contentPackageName}/runtime/dev`)}`,
+-		`import * as definition from ${JSON.stringify(toRuntimeModuleSpecifier(options.definition))}`,
++		`import * as definition from ${JSON.stringify(toTypeModuleSpecifier(options.definition))}`,
+ 		"",
+ 		"export default defineEventHandler(event => handleContentDevRequest(event.req, definition.content))",
+ 		""
