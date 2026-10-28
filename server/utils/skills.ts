@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { createTarGzip } from "nanotar"
 import comarkUiSkill from "comark-ui/skills/comark-ui/SKILL.md?raw"
+import bundledComarkSkills from "#comark-ui-skills"
 import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
@@ -24,7 +25,7 @@ const slidevFiles = import.meta.glob<string>("../../skills/slidev/**/*.md", {
 })
 
 /**
- * Drop's built-in Agent Skills, defined once (the files under skills/) and served three ways. `slidev` is Slidev's own,
+ * Drop's local and bundled upstream Agent Skills, served three ways. `slidev` is Slidev's own,
  * copied as it is, so vitehub-drop can send deck work there:
  * - MCP: the Skills extension (SEP-2640), as `skill://` resources (server/mcp, server/utils/mcp-skills.ts)
  * - Agent Skills Discovery v0.2.0 at /.well-known/agent-skills/ (index with digests, archive for multi-file skills)
@@ -41,6 +42,7 @@ export interface SkillFile {
 export interface Skill {
   name: string
   description: string
+  source: string
   frontmatter: Record<string, unknown>
   files: SkillFile[]
 }
@@ -50,7 +52,7 @@ const file = (path: string, text: string): SkillFile => ({
   path,
   text,
   bytes: encoder.encode(text),
-  mimeType: path.endsWith(".js") ? "text/javascript" : "text/markdown",
+  mimeType: /\.ya?ml$/.test(path) ? "application/yaml" : path.endsWith(".js") ? "text/javascript" : "text/markdown",
 })
 
 function frontmatterOf(markdown: string): Record<string, unknown> {
@@ -58,9 +60,15 @@ function frontmatterOf(markdown: string): Record<string, unknown> {
   return block ? (parseYAML<Record<string, unknown>>(block) ?? {}) : {}
 }
 
-function skill(files: SkillFile[]): Skill {
+function skill(files: SkillFile[], source?: string): Skill {
   const frontmatter = frontmatterOf(files.find((item) => item.path === "SKILL.md")!.text)
-  return { name: String(frontmatter.name), description: String(frontmatter.description), frontmatter, files }
+  return {
+    name: String(frontmatter.name),
+    description: String(frontmatter.description),
+    source: source ?? `https://github.com/vite-hub/drop/blob/main/skills/${String(frontmatter.name)}/SKILL.md`,
+    frontmatter,
+    files,
+  }
 }
 
 // Bundle the renderer package's skill and references, keeping their relative links intact.
@@ -78,7 +86,7 @@ const prEvidenceAnnotations = comarkUiSkill
   .replaceAll("](references/", "](comark-ui/references/")
 
 /** Every built-in skill, enabled or not. Only the admin UI should see the disabled ones. */
-export const SKILLS: Skill[] = [
+const LOCAL_SKILLS: Skill[] = [
   skill([
     file("SKILL.md", dropMd),
     file("references/documents.md", documentsGuide),
@@ -106,6 +114,18 @@ export const SKILLS: Skill[] = [
       .map(([path, text]) => file(path.replace("../../skills/slidev/", ""), text))
       .sort((a, b) => Number(b.path === "SKILL.md") - Number(a.path === "SKILL.md") || a.path.localeCompare(b.path)),
   ),
+]
+
+export const SKILLS: Skill[] = [
+  ...LOCAL_SKILLS,
+  ...bundledComarkSkills
+    .filter((entry) => !LOCAL_SKILLS.some((local) => local.name === entry.name))
+    .map((entry) =>
+      skill(
+        entry.files.map((item) => file(item.path, item.text)),
+        entry.source,
+      ),
+    ),
 ]
 
 export const findSkill = (name: string) => SKILLS.find((item) => item.name === name)
