@@ -1,0 +1,51 @@
+diff --git a/dist/vite.js b/dist/vite.js
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -4,10 +4,10 @@
+ import { t as registerViteHubNitroDevEndpoint } from "./dev-endpoint-DMmu9QC4.js";
+ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+ import { tmpdir } from "node:os";
+-import { basename, dirname, join, parse, relative, resolve } from "node:path";
++import { basename, dirname, join, parse, posix, relative, resolve, win32 } from "node:path";
+ import { pathToFileURL } from "node:url";
+ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+-import { findContentEntry, inspectContentEntry, toRuntimeModuleSpecifier } from "@vite-hub/source/vite";
++import { findContentEntry, inspectContentEntry, toRuntimeModuleSpecifier, toTypeModuleSpecifier } from "@vite-hub/source/vite";
+ import { parseAst } from "vite";
+ //#region ../internal/dist/build/vite.js
+ const projectRootDirectoryMarkers = [
+@@ -715,6 +715,7 @@
+ 				await mkdir(dirname(handler), { recursive: true });
+ 				await writeFile(handler, renderContentDevHandler({
+ 					definition,
++					handler,
+ 					importBase: options.importBase
+ 				}), "utf8");
+ 				const kit = createNitroServerKit(Reflect.get(config, "nitro"));
+@@ -949,10 +950,13 @@
+ const contentDevRuntimeUnavailableMessage = "This Vite Development Server does not run Nitro in process, so it cannot reach the Content runtime. `vitehub content` commands need a Vite + Nitro host. Nuxt and plain Vite are not supported.";
+ /** Renders the dev-only Nitro handler that passes `vitehub content` requests to the app's Content runtime. */
+ function renderContentDevHandler(options) {
++	const paths = process.platform === "win32" || /^[A-Z]:[\\/]/i.test(options.definition) ? win32 : posix;
++	const definition = options.handler ? paths.relative(paths.dirname(options.handler), options.definition) : void 0;
++	const specifier = definition && !paths.isAbsolute(definition) ? `./${toTypeModuleSpecifier(definition)}` : toRuntimeModuleSpecifier(options.definition);
+ 	return [
+ 		"import { defineEventHandler } from 'h3'",
+ 		`import { handleContentDevRequest } from ${JSON.stringify(`${options.importBase ?? contentPackageName}/runtime/dev`)}`,
+-		`import * as definition from ${JSON.stringify(toRuntimeModuleSpecifier(options.definition))}`,
++		`import * as definition from ${JSON.stringify(specifier)}`,
+ 		"",
+ 		"export default defineEventHandler(event => handleContentDevRequest(event.req, definition.content))",
+ 		""
+diff --git a/dist/vite.d.ts b/dist/vite.d.ts
+--- a/dist/vite.d.ts
++++ b/dist/vite.d.ts
+@@ -222,6 +222,8 @@
+ /** Renders the dev-only Nitro handler that passes `vitehub content` requests to the app's Content runtime. */
+ export declare function renderContentDevHandler(options: {
+   definition: string;
++  /** Generated handler location, used to emit a relative definition import. */
++  handler?: string;
+   importBase?: string;
+ }): string;
+ //#endregion
