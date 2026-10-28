@@ -9,6 +9,10 @@ What you publish reaches the user's team on a team Drop, or only the user on a p
 
 You work through Drop's MCP server at `https://drop.vitehub.dev/mcp`. There is no key to ask for: the user approved your MCP client once in the browser, and its tools act as them. If the Drop tools (`publish`, `read_drop`, …) aren't available, ask the user to add the server, for example `claude mcp add --transport http --scope user drop https://drop.vitehub.dev/mcp`, and sign in when the client asks.
 
+## Comark UI skills
+
+Drop bundles Comark UI's upstream skills during its build: `comark-ui` for block syntax, `before-after-evidence` for screenshot comparisons, `review-document` for review findings, `visual-explanation` for explaining a system, and `concept-lesson` for teaching a concept. Read the matching skill through this server's discovery, or `/.well-known/skills/<name>/SKILL.md`, and follow its relative reference links there. Use Drop's publishing and access instructions below.
+
 ## Publish
 
 Before publishing something new, call `list_folders` and pick its folder (see [Folders](#folders)).
