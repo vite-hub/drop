@@ -76,6 +76,7 @@ const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (i
 const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
+  shareOpen.value = false
   tool.value = "browse"
   commentsOpen.value = true
   if (!wide.value) panel.close()
