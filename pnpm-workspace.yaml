@@ -36,7 +36,7 @@ patchedDependencies:
   nitro@3.0.260903-beta: patches/nitro@3.0.260903-beta.patch
   # A zoomed screenshot's Copy action belongs in the zoom header, clear of its image and marks.
   comark-annotate@0.5.0: patches/comark-annotate@0.5.0.patch
-  # Generated dev handlers use a filesystem import so TypeScript resolves the app's Content definition.
+  # Generated dev handlers import Content relative to the handler so TypeScript and Vite resolve it on Windows too.
   "@vite-hub/content@0.0.4": patches/@vite-hub__content@0.0.4.patch
 
 # Only workerd (local Workers runtime) needs its install script.

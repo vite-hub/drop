@@ -66,5 +66,6 @@
     "unstorage",
     "@vite-hub/rate-limit",
     "@vite-hub/auth",
+    "@vite-hub/content",
   ],
 }
