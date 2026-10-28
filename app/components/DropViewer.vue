@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The header shares the drop, the bottom dock owns editing and comments, and the right sidebar holds Details and
+// The header locates the drop, the bottom dock owns editing, comments, and sharing, and the right sidebar holds Details and
 // History. Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import { expiryLabel } from "#shared/expiry"
@@ -76,6 +76,7 @@ const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (i
 const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
+  shareOpen.value = false
   tool.value = "browse"
   commentsOpen.value = true
   if (!wide.value) panel.close()
@@ -139,8 +140,7 @@ watch(framed, (value) => !value && (tool.value = "browse"))
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
 /** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. */
 const dockClearance = computed(
-  () =>
-    hasComments.value && !editing.value && !trashed.value && ["board", "site", "app", "file"].includes(drop.value.kind),
+  () => !editing.value && !trashed.value && ["board", "site", "app", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null
@@ -151,6 +151,9 @@ const popoverRef = useTemplateRef<{
   sent: () => Promise<void>
 }>("popoverRef")
 const shareOpen = ref(false)
+watch(shareOpen, (open) => {
+  if (open && commentsOpen.value) closeComments()
+})
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
 // they're commenting, selecting, or sharing. Editors are left out: the live editor tells them itself (useLiveEditor).
@@ -704,7 +707,6 @@ watch(
         </template>
         <template #trailing>
           <ViewerResources v-if="drop.resources?.length" :resources="drop.resources" />
-          <ViewerShare v-model:open="shareOpen" :drop="drop" />
         </template>
         <template #right>
           <UTooltip text="Details and history" :kbds="['I']">
@@ -860,10 +862,9 @@ watch(
           />
         </div>
         <ViewerReviewDock
-          v-if="(hasComments || editing) && !trashed"
           ref="reviewDock"
           :class="{ invisible: siteRef?.capturing }"
-          :open="commentsOpen && !editing"
+          :open="commentsOpen && !editing && !trashed"
           :overlay="Boolean(lightbox)"
           @close="closeComments"
         >
@@ -938,6 +939,7 @@ watch(
               <UButton size="xs" color="neutral" label="Close" variant="ghost" @click="live.close" />
               <UButton
                 size="xs"
+                data-review-primary
                 color="neutral"
                 :disabled="!live.synced.value"
                 label="Publish"
@@ -945,7 +947,7 @@ watch(
                 @click="live.publish()"
               />
             </template>
-            <template v-else>
+            <template v-else-if="hasComments && !trashed">
               <ViewerToolbar
                 v-if="
                   !lightbox &&
@@ -997,9 +999,19 @@ watch(
                 @click="toggleComments"
               >
                 Comments
-                <span v-if="openCount && !commentsOpen" class="font-mono text-xs tabular-nums">{{ openCount }}</span>
+                <span
+                  v-if="openCount && !commentsOpen"
+                  class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums"
+                  >{{ openCount }}</span
+                >
               </UButton>
             </template>
+            <span
+              v-if="editing || (hasComments && !trashed)"
+              aria-hidden="true"
+              class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)"
+            />
+            <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
         </ViewerReviewDock>
       </div>
