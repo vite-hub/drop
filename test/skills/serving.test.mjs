@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { test } from "vite-plus/test"
+import { test, vi } from "vite-plus/test"
+import bundledComarkSkills from "../../.nuxt/comark-ui-skills.ts"
 import { H3Event, toResponse } from "h3"
 import { parseTarGzip } from "nanotar"
 import { createMcpHandler } from "nitro-mcp-toolkit"
@@ -118,4 +119,63 @@ test("pr-evidence serves bundled comark-ui references through discovery and MCP"
   assert.equal(await (await get(`/.well-known/skills/pr-evidence/${path}`)).text(), expected)
   const response = await mcp("resources/read", { uri: `skill://pr-evidence/${path}` })
   assert.equal(response.result.contents[0].text, expected)
+})
+
+test("bundled Comark UI skills serve every file and archive through discovery and MCP without upstream requests", async () => {
+  const fetch = vi.fn(() => {
+    throw new Error("Serving bundled skills must not fetch upstream")
+  })
+  vi.stubGlobal("fetch", fetch)
+  try {
+    const v1 = await (await get("/.well-known/skills/index.json")).json()
+    const v2 = await (await get("/.well-known/agent-skills/index.json")).json()
+    const listed = await mcp("skills/list")
+    assert.equal(listed.error, undefined, listed.error?.message)
+    for (const skill of bundledComarkSkills) {
+      const entry = v1.skills.find((item) => item.name === skill.name)
+      assert.deepEqual(
+        entry.files,
+        skill.files.map((file) => file.path),
+      )
+      const archiveEntry = v2.skills.find((item) => item.name === skill.name)
+      const archive = new Uint8Array(await (await get(archiveEntry.url)).arrayBuffer())
+      assert.equal(archiveEntry.digest, await sha256(archive))
+      const files = await parseTarGzip(archive)
+      for (const file of skill.files) {
+        assert.equal(await (await get(`/.well-known/skills/${skill.name}/${file.path}`)).text(), file.text)
+        assert.equal(files.find((item) => item.name === file.path).text, file.text)
+        const resource = await mcp("resources/read", { uri: `skill://${skill.name}/${file.path}` })
+        assert.equal(resource.result.contents[0].text, file.text)
+        if (file.path.endsWith(".yaml")) assert.equal(resource.result.contents[0].mimeType, "application/yaml")
+      }
+      assert.ok(listed.result.skills.some((item) => item.frontmatter.name === skill.name))
+    }
+    assert.equal(fetch.mock.calls.length, 0)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("admins can toggle bundled skills while their source links point upstream", async () => {
+  const { setSkillEnabled } = await import("../../server/utils/skills.ts")
+  const { default: catalog } = await import("../../server/api/skills/index.get.ts")
+  const who = globalThis.dropTest.who
+  globalThis.dropTest.who = { role: "admin" }
+  const event = () => new H3Event(new Request("https://drop.example/api/skills"))
+  try {
+    for (const skill of bundledComarkSkills) {
+      const entry = (await catalog(event())).find((item) => item.name === skill.name)
+      assert.equal(entry.source, skill.source)
+      await setSkillEnabled(skill.name, false, "admin")
+      assert.ok(
+        !(await (await get("/.well-known/skills/index.json")).json()).skills.some((item) => item.name === skill.name),
+      )
+      assert.equal((await mcp("skills/get", { uri: `skill://${skill.name}/SKILL.md` })).error.code, -32602)
+      await assert.rejects(get(`/.well-known/skills/${skill.name}/SKILL.md`))
+      assert.equal((await catalog(event())).find((item) => item.name === skill.name).enabled, false)
+      await setSkillEnabled(skill.name, true, "admin")
+    }
+  } finally {
+    globalThis.dropTest.who = who
+  }
 })

@@ -1,5 +1,6 @@
 import { expiryLabel } from "#shared/expiry"
-import type { DropComment, DropResource, DropSummary, ViewerKind } from "#shared/types"
+import type { DropComment, DropResource, DropSummary, QuizAnswer, ViewerKind } from "#shared/types"
+import type { QuizTally, StoredAnswer } from "../utils/answers"
 import { dropPageUrl, type DropRow } from "../utils/drops"
 
 /** How every tool describes the share input: one state, the same names the pages use. */
@@ -103,3 +104,59 @@ export const replyItems = (comment: Pick<DropComment, "replies">, origin: string
     at: new Date(reply.createdAt).toISOString(),
     images: imageUrls(reply, origin),
   }))
+
+/**
+ * A doc's questions, polls, and recall cards for the user's agents, in the doc's order (`order`, the ids it shows) and
+ * then the ones only earlier versions had: how everyone answered each question and poll, and the user's own first and
+ * latest answer. Never anyone else's.
+ */
+export function mcpAnswers(results: Map<string, QuizTally>, mine: StoredAnswer[], order: Iterable<string>) {
+  const own = new Map(mine.map((answer) => [answer.id, answer]))
+  const ids = new Set([...order].filter((id) => results.has(id) || own.has(id)))
+  for (const id of [...results.keys(), ...own.keys()].sort()) ids.add(id)
+  return Array.from(ids, (id) => {
+    const result = results.get(id)
+    const user = own.get(id)
+    return {
+      id,
+      kind: user?.kind ?? result?.kind ?? "question",
+      ...(result ? { people: result.total, counts: result.counts } : {}),
+      ...(user
+        ? {
+            userAnswer: {
+              first: user.first,
+              latest: user.latest,
+              attempts: user.attempts,
+              at: new Date(user.answeredAt).toISOString(),
+            },
+          }
+        : {}),
+    }
+  })
+}
+
+type McpAnswer = ReturnType<typeof mcpAnswers>[number]
+
+const picked = ({ choice, correct }: QuizAnswer) =>
+  `${choice.join(" + ") || "nothing"}${correct === null ? "" : correct ? " (right)" : " (wrong)"}`
+
+/** The blocks for agents that read text: one line each, the most picked option first. */
+export const answersLines = (answers: McpAnswer[]) =>
+  `## Answers\nPeople signed in, each counted once: a question by their first try, a poll by their current vote. Option keys are the doc's own. "The user" is the one you act for.\n${answers
+    .map(({ id, kind, people, counts, userAnswer }) => {
+      const tally = counts
+        ? `: ${
+            Object.entries(counts)
+              .sort(([, a], [, b]) => b - a)
+              .map(([key, n]) => `${key} ${n}`)
+              .join(", ") || "no votes"
+          }`
+        : ""
+      const user = !userAnswer
+        ? ""
+        : userAnswer.attempts > 1 && kind === "question"
+          ? `. The user: ${picked(userAnswer.first)} first, ${picked(userAnswer.latest)} last, ${userAnswer.attempts} tries`
+          : `. The user: ${picked(userAnswer.latest)}`
+      return `- ${id} (${kind}${people === undefined ? "" : `, ${people} ${people === 1 ? "person" : "people"}`})${tally}${user}`
+    })
+    .join("\n")}`

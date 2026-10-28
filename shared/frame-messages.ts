@@ -1,4 +1,5 @@
 import * as v from "valibot"
+import { MAX_QUIZ_BLOCKS, QuizAnswerInput, QuizId } from "./quiz"
 
 // What a drop's frame posts up to the viewer: the comment layer (shared/plan-runtime.ts), an app's page runtime
 // (shared/project-bundle.ts), and the content origin's frame host (server/utils/content-origin.ts). Frames run the
@@ -72,6 +73,10 @@ export const FrameMessage = v.variant("type", [
     message: v.string(),
     source: v.optional(v.string()),
   }),
+  // A Markdown doc's questions, polls, and recall cards (QUIZ_BRIDGE in ./plan-runtime): the blocks on the page once
+  // comark-quiz's script starts, and each answer a reader gives.
+  v.object({ type: v.literal("quiz-ready"), ids: v.pipe(v.array(QuizId), v.maxLength(MAX_QUIZ_BLOCKS)) }),
+  v.object({ type: v.literal("quiz-answer"), answer: QuizAnswerInput }),
 ])
 
 export type FrameMessage = v.InferOutput<typeof FrameMessage>

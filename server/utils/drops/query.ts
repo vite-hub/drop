@@ -28,6 +28,7 @@ import {
 import { modeFor, shareNow, sharePolicy } from "../share"
 import { searchDrops, searchWords } from "../search"
 import { resourcesOf } from "../resources"
+import { answerable, quizOf } from "../answers"
 import { viewsOf } from "../views"
 import { dropExcerpt } from "../og"
 import { dropFiles, drops, dropVersions, dropVisits, user } from "../../databases/config"
@@ -506,11 +507,12 @@ export async function dropDetail(
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
-  const [versions, body, attachments, views] = await Promise.all([
+  const [versions, body, attachments, views, quiz] = await Promise.all([
     versionsOf(row),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
+    who && answerable(row, who) ? quizOf(row, who.userId) : undefined,
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
@@ -532,6 +534,7 @@ export async function dropDetail(
   if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
   if (views) detail.views = views
   if (resources.length) detail.resources = resources
+  if (quiz) detail.quiz = quiz
   return detail
 }
 
