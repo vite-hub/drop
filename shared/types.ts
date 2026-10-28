@@ -146,6 +146,38 @@ export interface DropDetail extends DropSummary {
   views?: Record<ViewerKind, number>
   /** Links it points to, like its pull request and that PR's preview, in the order they were added. */
   resources?: DropResource[]
+  /**
+   * Markdown docs, when the reader's answers count (a person signed in, and the doc out of the Trash): what they answered
+   * to its questions, polls, and recall cards, and how everyone answered the questions and polls they did.
+   */
+  quiz?: DropQuiz
+}
+
+/** A reader's latest answer to a block of a Markdown doc (#shared/quiz): the option keys they picked. */
+export interface QuizAnswer {
+  choice: string[]
+  correct: boolean | null
+}
+
+/**
+ * How everyone signed in answered a question or a poll: people per option key, by their first try at a question and
+ * their current vote in a poll. `total` counts people, so where people pick several options the counts add up to more.
+ */
+export interface QuizResult {
+  counts: Record<string, number>
+  total: number
+}
+
+export interface DropQuiz {
+  answers: Record<string, QuizAnswer>
+  /** Never a block the reader hasn't answered: results show once they have. */
+  results: Record<string, QuizResult>
+}
+
+/** What saving an answer returns: the answer as kept, and the block's results unless it's a recall card. */
+export interface QuizSaved {
+  answer: QuizAnswer
+  results?: QuizResult
 }
 
 export interface DropComment {
