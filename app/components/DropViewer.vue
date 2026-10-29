@@ -242,18 +242,21 @@ function nextWidth() {
 }
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath } = useViewerFrame({
-  drop,
-  frame,
-  app,
-  pinned,
-  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
-  inset: ref(0),
-  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
-  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
-  width: docWidth,
-  annotations,
-})
+const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker } = useViewerFrame(
+  {
+    drop,
+    frame,
+    app,
+    pinned,
+    // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+    inset: ref(0),
+    // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+    bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
+    width: docWidth,
+    annotations,
+    variantBar: true,
+  },
+)
 
 const outdated = computed(
   () =>
@@ -915,6 +918,10 @@ watch(
             />
           </template>
           <template #toolbar>
+            <template v-if="variants && !editing && !lightbox && !shownVersion">
+              <ViewerVariants :state="variants" @command="picker" />
+              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+            </template>
             <template v-if="editing">
               <AvatarStack
                 v-if="live.people.value.length"
@@ -1005,6 +1012,7 @@ watch(
               v-if="editing || (hasComments && !trashed)"
               aria-hidden="true"
               class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)"
+              data-divider
             />
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
