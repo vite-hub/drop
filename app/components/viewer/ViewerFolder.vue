@@ -254,12 +254,14 @@ async function newSite() {
 <template>
   <!-- A row's icon and its kind and time, the same whether it links or its name is being edited. -->
   <DefineRowParts v-slot="{ child, part }">
-    <!-- An image shows itself, with a hairline so a white one keeps its edge; the rest get their kind's icon. -->
+    <!-- An image shows its top, the header of a screenshot, with a hairline so a white one keeps its edge; the rest get
+         their kind's icon. The image's own size, not the grid's auto row, sets its box: a tall screenshot would
+         stretch that row past the 28px and over the rows below. -->
     <span v-if="part === 'icon'" class="grid size-7 shrink-0 place-items-center">
       <img
         v-if="child.thumbnail"
         alt=""
-        class="size-full rounded-md object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+        class="size-7 rounded-md object-cover object-top outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
         loading="lazy"
         :src="child.thumbnail"
       />
