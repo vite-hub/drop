@@ -10,6 +10,7 @@ Drop renders only the syntax on this page and the [blocks](blocks.md) it links. 
 | Code | [a fenced block with its language](#code) |
 | Progress on a list of steps | a task list: `- [x] done`, `- [ ] next` |
 | A screenshot with marks, or a before and after | [an annotated screenshot](#annotated-screenshots) |
+| A review of copy or a doc, each change or question with its reason | `:suggestion` and `:comment` from [comark-comments](https://comark-ui.onmax.me/comments/). Read [their syntax](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/comark-ui/references/comments.md) first |
 | Steps, tabs, cards, a diff, metrics, a data table, a chart, test results, and more | [a block](blocks.md) |
 
 Headings, lists, tables, links, `~~strikethrough~~`, and `![alt](https://…)` images work as in GitHub. A bare `https://` URL becomes a link, and every web link shows as a chip with its site's icon ([links](blocks.md#links)).
