@@ -152,14 +152,20 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   // A compare, or a Mermaid diagram wider than the text, spreads past the text into the room beside it, where the
   // outline goes. So in a doc with one, the outline keeps a 200px column 4rem right of them, and the text moves left
   // only as far as that needs (like for the viewer's panel). It only shows while they keep at least the text's width.
-  // A doc with threads keeps them in the column, since comark-comments' cards take that room (document-shell.css).
+  // A doc with threads keeps them in the column, since comark-comments' cards take that room (document-shell.css), and
+  // so does any doc while review comments sit in the margin (data-drop-rail, ANNOTATOR_SCRIPT).
   const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .drop-mermaid")].filter((block) => !block.closest(".cr"));
   const column = 264;
   const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
     const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
     const text = main.getBoundingClientRect().width - 48;
-    const wide = blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--mermaid-width")) > text);
+    const railed = document.documentElement.getAttribute("data-drop-rail") === "open";
+    const wide = railed ? [] : blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--mermaid-width")) > text);
+    if (blocks.length && !wide.length) {
+      document.body.style.removeProperty("--drop-outline");
+      document.body.style.removeProperty("--drop-shift");
+    }
     if (wide.length) {
       const body = document.body.style;
       const keep = (on) => {
@@ -209,7 +215,8 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   addEventListener("resize", place);
   addEventListener("scroll", mark, { passive: true });
   // The viewer's panel opening or closing sets --drop-inset, and the column slides over .2s (body's padding).
-  new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+  // Review comments opening the margin (data-drop-rail) widen the column.
+  new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-drop-rail"] });
   document.body.addEventListener("transitionend", place);
 })()`
 
