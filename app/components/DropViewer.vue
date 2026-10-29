@@ -478,8 +478,7 @@ onMounted(async () => {
       .toBe(true, { timeout: 10000 })
       .catch(() => {})
   const comment = comments.value.find((item) => item.n === n)
-  if (!comment)
-    return notify.say(`Comment #${n} isn't on this version`, { icon: "i-mingcute-chat-1-line" })
+  if (!comment) return notify.say(`Comment #${n} isn't on this version`, { icon: "i-mingcute-chat-1-line" })
   void focusComment(comment)
 })
 

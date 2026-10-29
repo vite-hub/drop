@@ -25,7 +25,7 @@ export function useNotify() {
     void refreshNuxtData(keys.usage)
   }
   const alert = (title: string, description?: string) =>
-    toast.add({ title, description, color: "error", icon: "i-mingcute-warning-line" })
+    toast.add({ title, description, color: "error", icon: "i-mingcute-warning-line", duration: 0 })
   const say = (title: string, options: Omit<StatusNote, "title" | "at"> = {}) =>
     (note.value = { title, ...options, at: Date.now() })
   return {

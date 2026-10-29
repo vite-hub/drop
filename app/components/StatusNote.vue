@@ -1,13 +1,16 @@
 <script setup lang="ts">
 // What went right says so in a small pill at the bottom that leaves on its own: no close button, no countdown bar.
-// One with an action (Undo, Open) stays longer, and holds while the pointer is on it. Failures stay toasts.
+// One with an action (Undo, Open) stays longer, and holds while hovered or focused. Failures stay toasts.
 const note = useStatusNote()
+const pill = useTemplateRef<HTMLElement>("pill")
+let hovered: EventTarget | null = null
 let timer: ReturnType<typeof setTimeout> | undefined
 function hold() {
   clearTimeout(timer)
-  if (note.value) timer = setTimeout(() => (note.value = null), note.value.action ? 6000 : 1800)
+  if (note.value && pill.value !== hovered && !pill.value?.matches(":focus-within"))
+    timer = setTimeout(() => (note.value = null), note.value.action ? 6000 : 1800)
 }
-watch(note, hold)
+watch(note, hold, { flush: "post" })
 const pause = () => clearTimeout(timer)
 onBeforeUnmount(pause)
 function act() {
@@ -27,11 +30,20 @@ function act() {
     >
       <div
         v-if="note"
+        ref="pill"
         :key="note.at"
         class="pointer-events-auto flex max-w-full items-center gap-1.5 rounded-full bg-inverted py-1.5 pl-3 text-sm font-medium text-inverted shadow-lg"
         :class="note.action ? 'pr-1.5' : 'pr-3'"
-        @pointerenter="pause"
-        @pointerleave="hold"
+        @pointerenter="
+          hovered = $event.currentTarget
+          pause()
+        "
+        @pointerleave="
+          hovered = null
+          hold()
+        "
+        @focusin="pause"
+        @focusout="hold"
       >
         <UIcon :name="note.icon ?? 'i-mingcute-check-line'" class="size-4 shrink-0" />
         <span class="truncate">{{ note.title }}</span>
