@@ -47,18 +47,9 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
           const key = `${published.id}@${published.version}`
           if (key === announced) continue
           announced = key
-          notify.info({
-            title: `${published.name} published v${published.version}`,
-            description: "Keep editing the new version.",
+          notify.say(`${published.name} published v${published.version}`, {
             icon: "i-mingcute-arrow-right-up-line",
-            actions: [
-              {
-                label: "Open",
-                color: "neutral",
-                variant: "outline",
-                onClick: () => void openLatest(published.id, true),
-              },
-            ],
+            action: { label: "Open", onClick: () => void openLatest(published.id, true) },
           })
         }
       }
@@ -101,7 +92,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         body: { version: drop.value.version, force },
       })
       if (next.unchanged) {
-        notify.done("Nothing to publish", "The draft matches the published version.")
+        notify.done("Nothing to publish: the draft matches")
         return
       }
       const awareness = realtime.value?.provider.value?.awareness
@@ -111,7 +102,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         version: next.version,
         name: me?.name ?? "Someone",
       } satisfies Published)
-      notify.done(`Published v${next.version}`, "The previous version stays in history.")
+      notify.done(`Published v${next.version}`)
       // A new version adds bytes and a write, so the plan usage moves too.
       await refreshNuxtData([keys.drops, keys.usage])
       // Let the announcement reach the room before this client leaves it.
@@ -133,21 +124,15 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       })
       // Awaited, or this call's `finally` would release the lock while the forced publish still runs.
       if (replace) return await publish(true)
-      notify.info({
-        title: `v${head.version} is the latest version`,
-        description: "Your draft stays here until you publish it.",
+      notify.say(`v${head.version} is the latest version. Your draft stays here`, {
         icon: "i-mingcute-history-line",
-        actions: [
-          {
-            label: `Open v${head.version}`,
-            color: "neutral",
-            variant: "outline",
-            onClick: () => {
-              close()
-              void openLatest(head.id)
-            },
+        action: {
+          label: `Open v${head.version}`,
+          onClick: () => {
+            close()
+            void openLatest(head.id)
           },
-        ],
+        },
       })
     } finally {
       publishing.value = false

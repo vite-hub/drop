@@ -63,6 +63,17 @@ test("expired memory/filesystem entries refetch and rerender rather than serving
   assert.equal(calls.writes.length, 2)
 })
 
+test("renders cached before the comments preset are refreshed on the next read", async () => {
+  state.entries.set(KEY, {
+    integrity: "13",
+    mtime: Date.now(),
+    value: { title: "Old document", html: "Unsupported component: comment", source: "source" },
+  })
+  const next = await cachedMarkdown("doc.md", async () => "source", render)
+  assert.equal(next.html, "<p>source</p>")
+  assert.equal(calls.writes.length, 1)
+})
+
 test("cache hits do not read source or render again, and deletion removes the render", async () => {
   await cachedMarkdown("doc.md", async () => "source", render)
   const never = () => {

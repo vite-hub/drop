@@ -99,6 +99,33 @@
   }
 }
 
+/* The HTML prototype picker's dark surface, including overlays portaled out of the review dock. */
+@utility surface-review {
+  color-scheme: dark;
+  --review-surface: rgb(17 17 17 / 92%);
+  --ui-bg: #171717;
+  --ui-bg-muted: #242424;
+  --ui-bg-elevated: #262626;
+  --ui-bg-accented: #404040;
+  --ui-bg-inverted: #fafafa;
+  --ui-text: #fafafa;
+  --ui-text-highlighted: #fafafa;
+  --ui-text-muted: #a3a3a3;
+  --ui-text-dimmed: #737373;
+  --ui-text-toned: #d4d4d4;
+  --ui-text-inverted: #0a0a0a;
+  --ui-border: rgb(255 255 255 / 12%);
+  --ui-border-muted: rgb(255 255 255 / 6%);
+  --ui-border-accented: rgb(255 255 255 / 18%);
+  --ui-border-inverted: #fafafa;
+  --ui-primary: #fafafa;
+  color: var(--ui-text);
+  background-color: var(--review-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
 body {
   background-image: var(--surface-grain);
   background-size: var(--surface-grain-size);

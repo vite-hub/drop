@@ -67,14 +67,16 @@ export const bearerFrom = (headers: Headers) => headers.get("authorization")?.ma
 /** Who is calling. Resolved once per request (middleware and route share it). */
 export function identify(event: H3Event): Promise<Identity | null> {
   return (event.context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
-    if (who && !(await isMember(who.userId))) return null
-    if (who) who.teams = await teamsOf(who.userId, event)
+    if (!who) return null
+    // Both are a round trip to the database, so they start together.
+    const [member, teams] = await Promise.all([isMember(who.userId), teamsOf(who.userId, event)])
+    if (!member) return null
+    who.teams = teams
     // Every request's wide event says who made it, never the credential itself.
-    if (who)
-      useLogger(event).set({
-        user: { id: who.userId, role: who.role },
-        actor: { kind: who.actorKind, name: who.actorName },
-      })
+    useLogger(event).set({
+      user: { id: who.userId, role: who.role },
+      actor: { kind: who.actorKind, name: who.actorName },
+    })
     return who
   }))
 }

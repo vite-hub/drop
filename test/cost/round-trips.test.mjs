@@ -90,6 +90,17 @@ test("a shared doc's page and the APIs it calls wait for few round trips, one af
   assert.deepEqual({ ...counts, page }, { link: 1, detail: 2, comments: 2, image: 1, page: 3 })
 })
 
+test("an image in a folder brings the folder's images without another round trip", async () => {
+  insertDrop("folder", { kind: "folder", blob_key: null, share: "public" })
+  for (const id of ["shot1", "shot2"])
+    insertDrop(id, { kind: "image", filename: `${id}.png`, blob_key: `${id}.png`, parent_id: "folder" })
+  insertDrop("alone", { kind: "image", filename: "alone.png", blob_key: "alone.png", share: "public" })
+  let detail
+  const inFolder = await roundTrips(async () => (detail = await get(detailHandler, "shot1")))
+  assert.equal(detail.gallery.length, 2)
+  assert.equal(inFolder, await roundTrips(() => get(detailHandler, "alone")))
+})
+
 test("a link's key finds the drop and the folders above it in one indexed query", async () => {
   publicDoc()
   for (let i = 0; i < 2000; i++) insertDrop(`other${i}`)

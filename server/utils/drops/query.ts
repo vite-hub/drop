@@ -5,7 +5,15 @@ import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { renderMarkdownCached } from "../markdown-document"
 import { renderSpreadsheetCached, SPREADSHEET_EXTENSIONS, spreadsheetExtension } from "../spreadsheet"
-import type { DropAttachment, DropCrumb, DropDetail, DropKind, DropSummary, DropVersion } from "#shared/types"
+import type {
+  DropAttachment,
+  DropCrumb,
+  DropDetail,
+  DropGalleryItem,
+  DropKind,
+  DropSummary,
+  DropVersion,
+} from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
 import { hasEditorlessSyntax } from "#shared/frontmatter"
@@ -77,21 +85,23 @@ async function summarize(
   days: number,
   options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {},
 ) {
-  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
-  const files =
+  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query. Both reads start together: each is a
+  // round trip to D1.
+  const [files, counts] = await Promise.all([
     options.ownerId && rows.some((row) => row.kind === "app")
-      ? await db
+      ? db
           .select({ dropId: dropFiles.dropId, path: dropFiles.path })
           .from(dropFiles)
           .innerJoin(drops, eq(drops.id, dropFiles.dropId))
           .where(eq(drops.ownerId, options.ownerId))
-      : []
+      : [],
+    itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : []))),
+  ])
   const pathsOf = (id: string) =>
     files
       .filter((file) => file.dropId === id)
       .map((file) => file.path)
       .sort()
-  const counts = await itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : [])))
   const pathOf = (row: DropRow) => {
     const above = row.ancestors ?? []
     const stop = options.below ? above.findIndex((node) => node.id === options.below) : -1
@@ -241,6 +251,27 @@ export async function listFolder(
     const owner = owners.get(ownerOf.get(summary.id)!)
     return owner && !summary.teamFolder ? { ...summary, owner } : summary
   })
+}
+
+/**
+ * The images in an image's folder, in the folder's order, for moving between them in the viewer: the ones `listFolder`
+ * lists there, read on their own so the folder's other drops cost nothing. Only for a reader who may open the folder,
+ * and only when there's another image to move to.
+ */
+async function galleryOf(row: DropRow, who: Identity | null, days: number): Promise<DropGalleryItem[] | undefined> {
+  const [parent, ...above] = row.ancestors ?? []
+  if (row.kind !== "image" || parent?.kind !== "folder") return undefined
+  const folder = { ...resolveNode(parent, above, days), ownerBanned: row.ownerBanned }
+  if (!permissions(folder, who).view) return undefined
+  const owned = folder.teamFolder ? undefined : eq(drops.ownerId, folder.ownerId)
+  const images = (
+    await newest(and(owned, eq(drops.parentId, parent.id), eq(drops.kind, "image"), isNull(drops.trashedAt)), 500)
+  )
+    .map((image) => resolveNode(image, [parent, ...above], days))
+    .filter((image) => (folder.expired || !image.expired) && image.blobKey)
+  // An image in the Trash, which its owner may still open, isn't among them.
+  if (images.length < 2 || !images.some((image) => image.id === row.id)) return undefined
+  return images.map((image) => ({ ...toCrumb(image), thumbnail: `/f/${image.blobKey}` }))
 }
 
 /**
@@ -507,12 +538,13 @@ export async function dropDetail(
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
-  const [versions, body, attachments, views, quiz] = await Promise.all([
+  const [versions, body, attachments, views, quiz, gallery] = await Promise.all([
     versionsOf(row),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
     who && answerable(row, who) ? quizOf(row, who.userId) : undefined,
+    galleryOf(row, who, days),
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
@@ -535,6 +567,7 @@ export async function dropDetail(
   if (views) detail.views = views
   if (resources.length) detail.resources = resources
   if (quiz) detail.quiz = quiz
+  if (gallery) detail.gallery = gallery
   return detail
 }
 

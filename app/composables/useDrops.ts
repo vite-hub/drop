@@ -1,4 +1,4 @@
-import { type Lifetime, TRASH_DAYS } from "#shared/expiry"
+import type { Lifetime } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import type { Share } from "#shared/share"
 import type { DropSummary, Viewer } from "#shared/types"
@@ -12,6 +12,12 @@ export const useDrops = () => useApi("/api/drops", { key: keys.drops, default: (
 /** What others share with you: on a team Drop the team's folders and teammates' drops, on a personal one the public links you opened. */
 export const useSharedWithMe = () =>
   useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: "1" }, default: () => [] })
+
+/** Your Trash, top-most nodes only (listDrops). */
+export const useTrash = () => useApi("/api/drops", { key: keys.trash, query: { trash: "1" }, default: () => [] })
+
+/** Your plan's limits and how much of them you've used. */
+export const useUsage = () => useApi("/api/usage", { key: keys.usage })
 
 /** The drops directly in a folder, for an expanded row in the tree or the Drops page. Keyed `folder:<id>`. */
 export const useFolder = (id: MaybeRefOrGetter<string>) =>
@@ -38,6 +44,13 @@ export function useShareUrl(
  * through useNuxtData instead of starting another fetch.
  */
 const refresh = () => refreshNuxtData([keys.drops, keys.usage])
+
+/**
+ * The lists a new drop shows up in. Not awaited: the caller opens the new drop next, and its page loads by itself, so
+ * waiting on the lists only held the page back by a round trip.
+ */
+const refreshAfterCreate = (parent?: Pick<DropSummary, "id">) =>
+  void refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
 
 export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>(keys.drops)
@@ -69,7 +82,6 @@ export function useDropActions() {
           : me.value?.mode === "team"
             ? "Dropped for the team"
             : "Dropped privately",
-        file.name,
       )
       return result
     } catch (error) {
@@ -130,11 +142,9 @@ export function useDropActions() {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
       drops.value = drops.value.filter((item) => item.id !== drop.id)
       await refreshNuxtData([keys.usage, keys.trash, keys.drop(drop.id), ...folders()])
-      notify.info({
-        title: "Moved to the Trash",
-        description: `${drop.title} can be restored for ${TRASH_DAYS} days.`,
+      notify.say("Moved to the Trash", {
         icon: "i-mingcute-delete-2-line",
-        actions: [{ label: "Undo", color: "neutral", variant: "outline", onClick: () => void restore(drop) }],
+        action: { label: "Undo", onClick: () => void restore(drop) },
       })
       return true
     } catch (error) {
@@ -147,7 +157,6 @@ export function useDropActions() {
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "PATCH", body: { trashed: false } })
       await refreshNuxtData([keys.drops, keys.trash, keys.usage, keys.drop(drop.id), ...folders()])
-      notify.done("Restored", drop.title)
       return true
     } catch (error) {
       notify.fail("Couldn't restore", error)
@@ -171,7 +180,6 @@ export function useDropActions() {
       await $fetch(`/api/drops/${drop.id}?forever`, { method: "DELETE" })
       clearNuxtData([keys.drop(drop.id), keys.comments(drop.id)])
       await refreshNuxtData([keys.trash, keys.usage])
-      notify.done("Deleted", drop.title)
       return true
     } catch (error) {
       notify.fail("Couldn't delete", error)
@@ -192,7 +200,6 @@ export function useDropActions() {
     try {
       await $fetch("/api/trash", { method: "DELETE" })
       await refreshNuxtData([keys.trash, keys.usage])
-      notify.done("Trash emptied")
       return true
     } catch (error) {
       notify.fail("Couldn't empty the Trash", error)
@@ -216,7 +223,6 @@ export function useDropActions() {
         keys.sharedWithMe,
         ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : []),
       ])
-      notify.done("Folder created", folder.title)
       return folder
     } catch (error) {
       notify.fail("Couldn't create the folder", error)
@@ -230,8 +236,7 @@ export function useDropActions() {
         method: "POST",
         body: { ...input, ...(parent ? { folder: parent.id } : {}) },
       })
-      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
-      notify.done("Site review created", site.title)
+      refreshAfterCreate(parent)
       return site
     } catch (error) {
       notify.fail("Couldn't create the site review", error)
@@ -246,7 +251,7 @@ export function useDropActions() {
         body: { filename: "untitled.md", title: "Untitled doc", content: "" },
       })
       if (parent) await $fetch(`/api/drops/${doc.id}`, { method: "PATCH", body: { folder: parent.id } })
-      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+      refreshAfterCreate(parent)
       return doc
     } catch (error) {
       notify.fail("Couldn't create the doc", error)
@@ -262,7 +267,7 @@ export function useDropActions() {
         body: { filename: "board.excalidraw", title: "Untitled board", content: "" },
       })
       if (parent) await $fetch(`/api/drops/${board.id}`, { method: "PATCH", body: { folder: parent.id } })
-      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+      refreshAfterCreate(parent)
       return board
     } catch (error) {
       notify.fail("Couldn't create the board", error)
@@ -291,7 +296,7 @@ export function useDropActions() {
       await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { folder: folder?.id ?? null } })
       const around = [drop.parentId, folder?.id].flatMap((id) => (id == null ? [] : [keys.drop(id)]))
       await refreshNuxtData([keys.drops, keys.drop(drop.id), ...around, ...folders()])
-      notify.done(folder ? `Moved to ${folder.title}` : "Moved to the top", drop.title)
+      notify.done(folder ? `Moved to ${folder.title}` : "Moved to the top")
       return true
     } catch (error) {
       notify.fail("Couldn't move it", error)

@@ -159,6 +159,14 @@ async function trash(child: DropSummary) {
 
 // The preview's width, dragged from its left edge, kept for every folder.
 const preview = useResizeHandle(useFolderPreviewWidth(), { min: 18, max: 40, initial: 22 })
+const previewing = computed(() => Boolean(picked.value && !search.value.trim()))
+// The list stays centered on the whole page while the preview is open, so opening or resizing it doesn't move the
+// list's left edge: the preview takes its room from the list's right.
+const listStyle = computed(() =>
+  previewing.value
+    ? { marginLeft: `max(0px, (100% + ${preview.width.value}rem + 1px - var(--container-5xl)) / 2)` }
+    : undefined,
+)
 
 // Arrows walk the list with the preview following; Escape closes it; F2 renames the row in focus.
 function walk(event: KeyboardEvent) {
@@ -246,12 +254,14 @@ async function newSite() {
 <template>
   <!-- A row's icon and its kind and time, the same whether it links or its name is being edited. -->
   <DefineRowParts v-slot="{ child, part }">
-    <!-- An image shows itself, with a hairline so a white one keeps its edge; the rest get their kind's icon. -->
+    <!-- An image shows its top, the header of a screenshot, with a hairline so a white one keeps its edge; the rest get
+         their kind's icon. The image's own size, not the grid's auto row, sets its box: a tall screenshot would
+         stretch that row past the 28px and over the rows below. -->
     <span v-if="part === 'icon'" class="grid size-7 shrink-0 place-items-center">
       <img
         v-if="child.thumbnail"
         alt=""
-        class="size-full rounded-md object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+        class="size-7 rounded-md object-cover object-top outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
         loading="lazy"
         :src="child.thumbnail"
       />
@@ -269,7 +279,7 @@ async function newSite() {
   </DefineRowParts>
   <div ref="root" class="relative flex min-h-0 flex-1">
     <div class="min-w-0 flex-1 overflow-y-auto">
-      <div class="mx-auto w-full max-w-5xl px-4 py-3 sm:px-6 sm:py-4">
+      <div class="max-w-5xl px-4 py-3 sm:px-6 sm:py-4" :class="{ 'mx-auto': !previewing }" :style="listStyle">
         <!-- Search and the folder's actions share one bar; visitors, who can't search, see how much it holds instead.
              The search box is a button that opens ⌘K on this folder. -->
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -374,7 +384,7 @@ async function newSite() {
         </template>
       </div>
     </div>
-    <template v-if="picked && !search.trim()">
+    <template v-if="picked && previewing">
       <!-- The pane's left border is its handle: drag it, double-click it to reset, or focus it and use the arrows. -->
       <div
         aria-label="Resize the preview"

@@ -24,9 +24,9 @@ import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
  * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
  * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments, and
- * Mermaid stays Drop's, with its limits.
+ * Mermaid stays Drop's, with its limits, and Drop supplies the document's typography.
  */
-const preset = comarkUi({ chips: { download: false }, mermaid: false, zoom: { images: false } })
+const preset = comarkUi({ chips: { download: false }, mermaid: false, typeset: false, zoom: { images: false } })
 // Writes comark-zoom's script once per render, using the renderer's context to track it.
 const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
   preset.components["zoom-runtime"]!(["zoom-runtime", {}], state)
@@ -190,7 +190,13 @@ function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): str
   const title = textValue(document.frontmatter.title)?.trim()
   if (title) return title
 
-  const heading = document.nodes.find((node) => Array.isArray(node) && node[0] === "h1")
+  // The comments plugin wraps the whole document; headings inside other blocks still aren't document titles.
+  const nodes = document.nodes.flatMap((node) => {
+    if (!Array.isArray(node) || node[0] !== "comments") return [node]
+    const [, , ...children] = node
+    return children
+  })
+  const heading = nodes.find((node) => Array.isArray(node) && node[0] === "h1")
   return (heading && textContent(heading).trim()) || "Untitled document"
 }
 

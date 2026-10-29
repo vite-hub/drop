@@ -4,8 +4,9 @@ import { blob } from "vite-hub/blob"
 
 const DOCUMENT_PATH =
   /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html|htm))$/i
+// Fonts only as data URIs: the hand-drawn ones comark-annotate's notes and comark-comments' pen inline with their styles.
 const markdownContentSecurityPolicy = (scriptHashes: string[]) =>
-  `default-src 'none'; img-src https: data:; media-src https:; script-src 'self' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(" ")}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+  `default-src 'none'; img-src https: data:; media-src https:; script-src 'self' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(" ")}; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
 // Scripts run, but in a sandbox without allow-same-origin: the page gets an opaque origin, so it can't read
 // Drop's cookies or call its API with the viewer's session.
 const HTML_CONTENT_SECURITY_POLICY =

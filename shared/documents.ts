@@ -21,12 +21,12 @@ const DOCUMENT_EXTRA_CSS =
    --drop-shift itself, to keep a column of its own (OUTLINE_SCRIPT); a compare keeps clear of both (document-shell.css). */
 body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out;
   --drop-right: calc(var(--drop-inset, 0px) + var(--drop-outline, 0px));
-  --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
+  --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) + var(--drop-rail, 0px) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
   padding-right: var(--drop-shift); }
 /* The app's grain (shared/theme.css) on the doc too, so the frame doesn't read as a flat sheet inside the page. The
    root carries it where a short doc's body ends. */
 html, body { background-image: var(--surface-grain); background-size: var(--surface-grain-size); }
-main { width: min(100% - 2rem, var(--drop-column, 46rem)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 @media (max-width: 36rem) { main { width: min(100% - 1.25rem, var(--drop-column, 46rem)); } }
 .task-list-item { list-style: none; margin-left: -1.25rem; }
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
@@ -152,13 +152,20 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   // A compare, or a Mermaid diagram wider than the text, spreads past the text into the room beside it, where the
   // outline goes. So in a doc with one, the outline keeps a 200px column 4rem right of them, and the text moves left
   // only as far as that needs (like for the viewer's panel). It only shows while they keep at least the text's width.
-  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .drop-mermaid")];
+  // A doc with threads keeps them in the column, since comark-comments' cards take that room (document-shell.css), and
+  // so does any doc while review comments sit in the margin (data-drop-rail, ANNOTATOR_SCRIPT).
+  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .drop-mermaid")].filter((block) => !block.closest(".cr"));
   const column = 264;
   const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
     const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
     const text = main.getBoundingClientRect().width - 48;
-    const wide = blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--mermaid-width")) > text);
+    const railed = document.documentElement.getAttribute("data-drop-rail") === "open";
+    const wide = railed ? [] : blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--mermaid-width")) > text);
+    if (blocks.length && !wide.length) {
+      document.body.style.removeProperty("--drop-outline");
+      document.body.style.removeProperty("--drop-shift");
+    }
     if (wide.length) {
       const body = document.body.style;
       const keep = (on) => {
@@ -208,7 +215,8 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   addEventListener("resize", place);
   addEventListener("scroll", mark, { passive: true });
   // The viewer's panel opening or closing sets --drop-inset, and the column slides over .2s (body's padding).
-  new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+  // Review comments opening the margin (data-drop-rail) widen the column.
+  new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-drop-rail"] });
   document.body.addEventListener("transitionend", place);
 })()`
 
@@ -229,8 +237,10 @@ export function planDocument(
     const src = source.trim().startsWith("<svg")
       ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`
       : source
+    // A sideways swipe moves to the folder's next image (plan-runtime.ts). Overscroll stops at the page's edge, so the
+    // browser doesn't also take the swipe as Back.
     return injectRuntime(
-      `<!doctype html><html><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:var(--muted)"><img src="${escapeHtml(src)}" style="max-width:min(100%,960px);box-shadow:0 10px 40px rgb(0 0 0/.15);border-radius:10px" alt=""></body></html>`,
+      `<!doctype html><html style="overscroll-behavior-x:none"><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:var(--muted)"><img src="${escapeHtml(src)}" style="max-width:min(100%,960px);box-shadow:0 10px 40px rgb(0 0 0/.15);border-radius:10px" alt=""></body></html>`,
       dark,
     )
   }

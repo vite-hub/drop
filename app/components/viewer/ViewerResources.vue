@@ -66,8 +66,8 @@ const links = computed(() =>
               @click="close"
             >
               <ViewerResourceIcon class="mt-0.5" :url="link.url" />
-              <span class="line-clamp-2 min-w-0 wrap-anywhere">{{ link.label }}</span>
-              <span v-if="link.host" class="ml-auto min-w-0 shrink-[2] truncate pl-2 text-xs/5 text-muted">{{
+              <span class="min-w-0 flex-1 truncate">{{ link.label }}</span>
+              <span v-if="link.host" class="ml-auto min-w-0 max-w-2/5 truncate pl-2 text-xs/5 text-muted">{{
                 link.host
               }}</span>
               <UIcon

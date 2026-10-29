@@ -38,8 +38,21 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* comark-comments floats each thread's card into a 19.5rem margin beside its line, and opens that margin only once the
+   doc (its .cr root) is 50rem wide. A doc with threads widens by the margin, so its text keeps the column's width beside
+   the cards. On a narrow screen the margin stays shut and a bubble opens its card under the line. The viewer's review
+   comments take the same margin (data-drop-rail, set by ANNOTATOR_SCRIPT in plan-runtime.ts); once it's open, a doc
+   without threads of its own leaves it as padding. */
+:root:is(:has(.cr), [data-drop-rail]) {
+  --drop-rail: 19.5rem;
+}
+
+:root[data-drop-rail="open"] .typeset:not(:has(.cr)) {
+  padding-right: var(--drop-rail);
+}
+
 main {
-  width: min(100% - 2rem, 48rem);
+  width: min(100% - 2rem, 48rem + var(--drop-rail, 0rem));
   margin: 0 auto;
   padding: 2.5rem 0 1.25rem;
 }
@@ -68,7 +81,7 @@ main {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  width: min(100% - 2rem, 48rem);
+  width: min(100% - 2rem, 48rem + var(--drop-rail, 0rem));
   margin: 1.25rem auto 0;
   padding: 1rem 0 2rem;
   border-top: 1px solid var(--border);
@@ -151,6 +164,14 @@ main {
   );
   width: var(--ca-wide);
   margin-inline: calc((100% - var(--ca-wide)) / 2);
+}
+
+/* In a doc with threads, or review comments in the margin, the room beside the text is the cards', so a compare, its
+   heading, and a wide diagram stay in the column. */
+:is(.typeset .cr, [data-drop-rail="open"] .typeset)
+  :is(.ca-compare, .drop-mermaid, :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare)) {
+  width: auto;
+  margin-inline: 0;
 }
 
 /* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.

@@ -29,15 +29,15 @@ patchedDependencies:
   # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
   # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
   vite-doctor@0.0.12: patches/vite-doctor@0.0.12.patch
-  # A chip's HTML renderer rendered its label's children without their parent, so comark read `<code>` as a block and
-  # wrote a newline after it: [commit `abc`](…) showed a space before whatever followed the chip.
-  comark-chips@0.5.0: patches/comark-chips@0.5.0.patch
+  # A zoomed screenshot's Copy action belongs in the zoom header, clear of its image and marks.
+  comark-annotate@0.7.2: patches/comark-annotate@0.7.2.patch
   # Nuxt runs Vite without an HTTP server; virtual importers also need the plugin resolver.
   nitro@3.0.260903-beta: patches/nitro@3.0.260903-beta.patch
-  # A zoomed screenshot's Copy action belongs in the zoom header, clear of its image and marks.
-  comark-annotate@0.5.0: patches/comark-annotate@0.5.0.patch
   # Generated dev handlers import Content relative to the handler so TypeScript and Vite resolve it on Windows too.
   "@vite-hub/content@0.0.4": patches/@vite-hub__content@0.0.4.patch
+  # useServerEnv() reuses its result while the env names it reads hold the same values; every call copied the whole env
+  # and checked each declaration again, ~85 ms of CPU per Drops page render (sharePolicy runs once per listed row).
+  "@vite-hub/env@0.0.4": patches/@vite-hub__env@0.0.4.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:

@@ -41,6 +41,8 @@ A **folder** groups drops that belong together, like the screenshots of one chan
 
 A folder shares and lives like one drop. Sharing it shares everything inside, though a drop inside can still be shared wider. Everything in it goes to the Trash and comes back with it. Folders don't count toward your plan; the drops in them do.
 
+An image in a folder opens with the folder's other images around it. Move between them with the arrows at its sides, the thumbnails in the bar at the bottom, <kbd>←</kbd> and <kbd>→</kbd>, or a swipe on a phone. Anyone who can open the folder sees them, at its share link too.
+
 Each folder has a **description** in its Details, up to 2,000 characters, saying what goes in it and how to name and write it. Agents read descriptions with `list_folders` before they publish, and follow them. For example: "Notes from calls, one doc per meeting, named YYYY-MM-DD-topic. Start with who was there, then decisions, then action items."
 
 ### Team folders
