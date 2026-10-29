@@ -13,6 +13,14 @@ function hold() {
 watch(note, hold, { flush: "post" })
 const pause = () => clearTimeout(timer)
 onBeforeUnmount(pause)
+function enter(event: PointerEvent) {
+  hovered = event.currentTarget
+  pause()
+}
+function leave() {
+  hovered = null
+  hold()
+}
 function act() {
   const action = note.value?.action
   note.value = null
@@ -34,14 +42,8 @@ function act() {
         :key="note.at"
         class="pointer-events-auto flex max-w-full items-center gap-1.5 rounded-full bg-inverted py-1.5 pl-3 text-sm font-medium text-inverted shadow-lg"
         :class="note.action ? 'pr-1.5' : 'pr-3'"
-        @pointerenter="
-          hovered = $event.currentTarget
-          pause()
-        "
-        @pointerleave="
-          hovered = null
-          hold()
-        "
+        @pointerenter="enter"
+        @pointerleave="leave"
         @focusin="pause"
         @focusout="hold"
       >
