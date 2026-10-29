@@ -37,6 +37,8 @@ Split the change into boards, one per thing a reviewer should notice. Each board
 - a `::diff`, when the code is the point. See [Code changes](#code-changes).
 - inside each screenshot, after its annotations, one sentence on the state it shows, which becomes its caption.
 
+When the change is to copy or a doc, mark it in the text with `:suggestion` and `:comment`, each with its reason as a note, as [the comments reference](references/comark-ui/references/comments.md) shows.
+
 Leave `color` and `ink` off: the default violet reads on light and dark screenshots alike, and one ink is the point. Each annotation is a side note in the margin above or below the image, `side="top"` or `"bottom"`, whichever is nearer its point. Use `mark="none"` with `to` on the exact spot, so the arrow does the pointing and nothing covers the screen. Set the note off with `at`, a tenth of the image or more from its point, so its arrow sweeps in; a top or bottom note reads away from its point, so give it room on that side. Use `mark="bracket"` for a run of rows or a group, and `circle` or `underline` only when the area itself is the point. Left and right notes only work on a single screenshot; in a compare they fall back to the numbered list.
 
 Two or three notes per screenshot. Write the notes of a compare as a pair that makes the case: the before says what's wrong, in the words the screen shows ("The type gets the headline…", "…but the useful message is down here."), and the after says what the change does about it ("The message becomes the starting point."). A value the screenshot doesn't show stays out of the note. Mark the change at its own size; what stayed the same goes unmarked.
