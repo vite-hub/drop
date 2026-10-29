@@ -925,7 +925,7 @@ watch(
           <template #toolbar>
             <template v-if="variants && !editing && !lightbox && !shownVersion">
               <ViewerVariants :state="variants" @command="picker" />
-              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" />
+              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
             </template>
             <template v-if="editing">
               <AvatarStack
@@ -1017,6 +1017,7 @@ watch(
               v-if="editing || (hasComments && !trashed)"
               aria-hidden="true"
               class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)"
+              data-divider
             />
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>

@@ -5,6 +5,16 @@ const props = defineProps<{ open: boolean; overlay?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
+const toolbar = useTemplateRef<HTMLElement>("toolbar")
+// A bar that wraps onto more rows hides its dividers, which would hang at a row's end. They keep their room, so hiding
+// them never lets the bar fit one row again and flip back.
+const wrapped = ref(false)
+useResizeObserver(toolbar, () => {
+  const tops = [...(toolbar.value?.children ?? [])].flatMap((item) =>
+    item instanceof HTMLElement && item.offsetHeight ? [item.offsetTop] : [],
+  )
+  wrapped.value = new Set(tops).size > 1
+})
 function focusTrigger() {
   root.value?.querySelector<HTMLButtonElement>("[data-review-trigger]")?.focus({ preventScroll: true })
 }
@@ -51,8 +61,10 @@ watch(
         <div class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"><slot name="panel" /></div>
       </section>
       <div
+        ref="toolbar"
         role="group"
         aria-label="Document tools"
+        :data-wrapped="wrapped || undefined"
         class="review-toolbar pointer-events-auto flex max-w-full shrink-0 flex-wrap items-center justify-center gap-1 rounded-[12px] border border-default surface-review p-1"
       >
         <slot name="toolbar" />
@@ -67,6 +79,10 @@ watch(
     500 12px/1 ui-sans-serif,
     system-ui,
     sans-serif;
+}
+
+.review-toolbar[data-wrapped] :deep([data-divider]) {
+  visibility: hidden;
 }
 
 .review-toolbar :deep(button) {
