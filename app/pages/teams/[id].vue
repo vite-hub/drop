@@ -47,7 +47,7 @@ async function invite() {
   inviting.value = true
   try {
     const sent = await teams.invite(id.value, email.value.trim(), role.value)
-    await copy(sent.id, `Invited ${sent.email}`)
+    await copy(sent.id, `Invited ${sent.email}. Link copied`)
     email.value = ""
     await refresh()
   } catch (error) {
@@ -59,7 +59,7 @@ async function invite() {
 
 async function copy(invitationId: string, title = "Link copied") {
   await navigator.clipboard.writeText(inviteLink(invitationId)).catch(() => {})
-  notify.done(title, "Send them the link: they join when they open it, signed in with that email.")
+  notify.done(title)
 }
 
 async function act(action: () => Promise<unknown>, failure: string) {
@@ -146,7 +146,7 @@ async function pay(action: () => Promise<{ url?: string | null }>) {
 }
 
 if (import.meta.client && route.query.billing === "done") {
-  notify.done("You're on the Team plan", "Stripe may take a moment to confirm it.")
+  notify.done("You're on the Team plan")
   void refreshNuxtData(keys.me)
 }
 </script>

@@ -4,7 +4,7 @@ import type { EffectScope } from "vue"
 /**
  * Follows a doc's link to its newest version while someone reads it. The link's Realtime room (server/realtime/latest.ts)
  * holds the version number of the doc's head, and publishing re-seeds it, so a new version arrives as soon as it's out.
- * A reader who isn't busy moves to it at once; a busy one (commenting, selecting, a dialog open) gets a toast, and moves
+ * A reader who isn't busy moves to it at once; a busy one (commenting, selecting, a dialog open) gets a note, and moves
  * once done.
  */
 export function useLatestVersion(
@@ -59,11 +59,9 @@ export function useLatestVersion(
     if (!waiting) return void follow()
     if (told === version) return
     told = version
-    notify.info({
-      title: `v${version} was published`,
-      description: "It opens when you're done here.",
+    notify.say(`v${version} was published`, {
       icon: "i-mingcute-history-line",
-      actions: [{ label: `Open v${version}`, color: "neutral", variant: "outline", onClick: () => void follow() }],
+      action: { label: "Open", onClick: () => void follow() },
     })
   })
 }

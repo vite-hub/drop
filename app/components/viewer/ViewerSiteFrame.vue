@@ -91,11 +91,10 @@ async function up() {
   box.value = null
   try {
     if (!capture.supported()) {
-      notify.info({
-        title: "This browser can't capture the screen",
-        description: "Write a comment without an area, or use the bookmarklet on the site instead.",
-        color: "error",
-      })
+      notify.alert(
+        "This browser can't capture the screen",
+        "Write a comment without an area, or use the bookmarklet on the site instead.",
+      )
       return
     }
     if (!capture.active.value) await capture.start()
@@ -162,7 +161,7 @@ async function send() {
   if (!finish) return
   try {
     await sendSiteComment(props.drop.id, shot.origin, form)
-    notify.done("Comment sent", "It's on the site's page with its screenshot.")
+    notify.done("Comment sent")
     finish(true)
     if (pending.value === shot) discard()
     // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
