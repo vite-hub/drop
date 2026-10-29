@@ -125,6 +125,20 @@ test("open text comments on a wide doc sit beside their text as bubbles and marg
       if (index) assert.ok(card.top >= wide.cards[index - 1].bottom + 7)
     }
 
+    // Hiding the comments with the toolbar's eye and showing them again lays the cards out as before.
+    await page.evaluate(() => {
+      const frame = document.querySelector("iframe").contentWindow
+      frame.postMessage({ __drop: true, type: "view", pins: false }, "*")
+      frame.postMessage({ __drop: true, type: "view", pins: true }, "*")
+    })
+    await frame.waitForFunction(
+      () => document.querySelector("drop-comments").shadowRoot.querySelector(".marks").style.display === "",
+    )
+    assert.deepEqual(
+      (await drawn(frame)).cards.map((card) => card.top),
+      wide.cards.map((card) => card.top),
+    )
+
     // Hovering a card marks its text and its bubble; clicking it opens its thread, as a pin does.
     const card = frame.locator("drop-comments .rail .cr-card").nth(2)
     await card.hover()

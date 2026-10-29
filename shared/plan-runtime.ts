@@ -262,6 +262,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
   function render() {
     marks.innerHTML = "";
+    // Hidden comments (the toolbar's eye) keep their place. Shown before drawing, so the margin's cards measure their
+    // size when the eye turns them back on.
+    marks.style.display = view.pins ? "" : "none";
     const layer = zoom && zoomLayer(), zoomMarks = layer && layer.querySelector(".marks");
     const aside = zoomMarks && zoomAside(), asideMarks = aside && aside.querySelector(".marks");
     if (zoomMarks) zoomMarks.innerHTML = "";
@@ -349,8 +352,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     });
     // The viewer lists the comments it couldn't place; it only says so when that changes, since this runs on resize.
     if (unplaced.join() !== lastUnplaced) { lastUnplaced = unplaced.join(); post({ type: "unplaced", ids: unplaced }); }
-    // Hidden comments (the toolbar's eye) keep their place, so showing them again needs no new render.
-    marks.style.display = view.pins ? "" : "none";
     emphasise();
   }
 
