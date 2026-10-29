@@ -65,9 +65,10 @@ export const FrameMessage = v.variant("type", [
   }),
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
   // The toolbar's keys, pressed while the page had focus, with the tool it was under (apps keep their keys under Browse).
+  // An image's page sends ← and → too, for those keys or a sideways swipe: they move to the folder's other images.
   v.object({
     type: v.literal("key"),
-    key: v.picklist(["Escape", "v", "r", "s", "u", "x"]),
+    key: v.picklist(["Escape", "v", "r", "s", "u", "x", "ArrowLeft", "ArrowRight"]),
     tool: v.optional(v.picklist(["browse", "comment", "measure"])),
   }),
   v.object({

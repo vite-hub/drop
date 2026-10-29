@@ -925,7 +925,26 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const t = e.target;
     const typing = t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
     const key = e.key.toLowerCase();
-    if (/^[vrsux]$/.test(key) && !e.metaKey && !e.ctrlKey && !e.altKey && !typing && !e.defaultPrevented) post({ type: "key", key, tool });
+    if (e.metaKey || e.ctrlKey || e.altKey || typing || e.defaultPrevented) return;
+    if (/^[vrsux]$/.test(key)) post({ type: "key", key, tool });
+    // An image's page (the one Drop takes point comments on) has no use for ← and →: Drop moves to the folder's next image.
+    if (pointComments && (e.key === "ArrowLeft" || e.key === "ArrowRight")) post({ type: "key", key: e.key });
+  });
+  // A quick sideways swipe across an image's page moves the same way. Not while pinch-zoomed in, where a swipe pans,
+  // and not under a tool, where a drag draws or measures.
+  let swipe = null;
+  window.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    swipe = pointComments && tool === "browse" && e.touches.length === 1 && (visualViewport?.scale ?? 1) <= 1
+      ? { x: t.clientX, y: t.clientY, at: e.timeStamp } : null;
+  }, { passive: true });
+  window.addEventListener("touchcancel", () => { swipe = null; });
+  window.addEventListener("touchend", (e) => {
+    const t = e.changedTouches[0];
+    const dx = swipe && t ? t.clientX - swipe.x : 0, dy = swipe && t ? t.clientY - swipe.y : 0;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy) && e.timeStamp - swipe.at < 600)
+      post({ type: "key", key: dx < 0 ? "ArrowRight" : "ArrowLeft" });
+    swipe = null;
   });
   window.addEventListener("resize", () => { render(); redraw(); });
   // A web font that arrives late moves the words, and with them each comment's bubble and card.

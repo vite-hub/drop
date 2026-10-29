@@ -453,3 +453,43 @@ test("an upload goes into a folder, where it shares and lives with the folder", 
   elsewhere.append("folder", "nope")
   assert.equal((await upload(elsewhere)).status, 404)
 })
+
+test("an image in a folder carries the folder's images, in its order, for whoever may open the folder", async () => {
+  state.who = null
+  const image = (id, updated, extra = {}) =>
+    insertDrop(id, { kind: "image", filename: `${id}.png`, blob_key: `${id}.png`, updated_at: updated, ...extra })
+  insertDrop("box", { kind: "folder", blob_key: null, share: "public" })
+  image("newest", 3, { parent_id: "box" })
+  image("middle", 2, { parent_id: "box" })
+  image("oldest", 1, { parent_id: "box" })
+  image("trashed", 4, { parent_id: "box", trashed_at: 5 })
+  insertDrop("notes", { parent_id: "box", updated_at: 6 })
+  insertDrop("inner", { kind: "folder", blob_key: null, parent_id: "box" })
+  image("deeper", 7, { parent_id: "inner" })
+  const gallery = async (id) =>
+    (await detailHandler(request(`/api/drops/${id}`, { id }))).gallery?.map((item) => [item.id, item.thumbnail])
+  const all = [
+    ["newest", "/f/newest.png"],
+    ["middle", "/f/middle.png"],
+    ["oldest", "/f/oldest.png"],
+  ]
+  assert.deepEqual(await gallery("middle"), all, "newest first, as the folder lists them; trashed and deeper ones out")
+  assert.equal(await gallery("notes"), undefined, "only images get one")
+  assert.equal(await gallery("deeper"), undefined, "nothing to move to beside the only image")
+
+  // A visitor reading an image shared on its own from a private folder can't open the folder, so gets no strip.
+  sql.prepare("UPDATE drops SET share = 'private' WHERE id = 'box'").run()
+  sql.prepare("UPDATE drops SET share = 'public' WHERE id = 'middle'").run()
+  assert.equal(await gallery("middle"), undefined)
+  state.who = { ...who }
+  assert.deepEqual(await gallery("middle"), all, "its owner can")
+  sql.prepare("UPDATE drops SET trashed_at = 5 WHERE id = 'newest'").run()
+  assert.equal(await gallery("newest"), undefined, "an image in the Trash, which its owner still opens, has none")
+  sql.prepare("UPDATE drops SET trashed_at = NULL WHERE id = 'newest'").run()
+
+  // A doc's embedded image belongs to the doc, not a folder.
+  insertDrop("doc", { parent_id: "box" })
+  image("figure", 1, { parent_id: "doc" })
+  image("figure2", 2, { parent_id: "doc" })
+  assert.equal(await gallery("figure"), undefined)
+})

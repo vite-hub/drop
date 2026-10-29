@@ -241,6 +241,10 @@ function nextWidth() {
   docWidth.value = widths[(at + 1) % widths.length]!.value
 }
 
+// An image in a folder moves along the folder's other images (useGallery).
+const gallery = useGallery(drop, publicView)
+const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
+
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker } = useViewerFrame(
   {
@@ -255,6 +259,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
     width: docWidth,
     annotations,
     variantBar: true,
+    arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
   },
 )
 
@@ -284,6 +289,8 @@ const previousVersion = computed(() =>
       null)
     : null,
 )
+// The folder's images show over the image, not over its lightbox or a version's changes.
+const galleryShown = computed(() => galleryItems.value.length > 0 && !lightbox.value && !shownVersion.value)
 // Opening a diff from the document adds a history entry; moving between versions replaces it, so one Back always
 // lands on the document. Closing steps back over that entry rather than adding another one.
 let pushedChanges = false
@@ -849,6 +856,32 @@ watch(
             />
           </ViewerDevice>
 
+          <!-- The folder's images on either side, like a carousel's; the bar below has them too. -->
+          <template v-if="galleryShown">
+            <UTooltip v-if="prevImage" :kbds="['←']" :text="prevImage.title">
+              <UButton
+                aria-label="Previous image"
+                data-gallery
+                class="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full shadow-sm pointer-coarse:size-11 pointer-coarse:justify-center"
+                color="neutral"
+                icon="i-mingcute-left-line"
+                variant="outline"
+                @click="gallery.step(-1)"
+              />
+            </UTooltip>
+            <UTooltip v-if="nextImage" :kbds="['→']" :text="nextImage.title">
+              <UButton
+                aria-label="Next image"
+                data-gallery
+                class="absolute top-1/2 right-3 z-10 -translate-y-1/2 rounded-full shadow-sm pointer-coarse:size-11 pointer-coarse:justify-center"
+                color="neutral"
+                icon="i-mingcute-right-line"
+                variant="outline"
+                @click="gallery.step(1)"
+              />
+            </UTooltip>
+          </template>
+
           <ViewerDiff
             v-if="shownVersion && !editing"
             :key="shownVersion.version"
@@ -918,6 +951,16 @@ watch(
             />
           </template>
           <template #toolbar>
+            <template v-if="galleryShown">
+              <ViewerGallery
+                :at="galleryAt"
+                :items="galleryItems"
+                :to="gallery.to"
+                @show="gallery.show"
+                @step="gallery.step"
+              />
+              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+            </template>
             <template v-if="variants && !editing && !lightbox && !shownVersion">
               <ViewerVariants :state="variants" @command="picker" />
               <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />

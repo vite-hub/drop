@@ -39,6 +39,8 @@ export function useViewerFrame(options: {
   annotations: ReturnType<typeof useViewerAnnotations>
   /** Whether the viewer's bar shows a prototype's variants, in place of the bar the page draws itself. */
   variantBar?: boolean
+  /** ← or → on an image's page, while the page has focus: the viewer moves along the image's folder. */
+  arrow?: (key: "ArrowLeft" | "ArrowRight") => void
 }) {
   const {
     drop,
@@ -219,11 +221,13 @@ export function useViewerFrame(options: {
       case "variants":
         if (options.variantBar) variants.value = { ...message }
         return
+      case "key":
+        if (message.key === "ArrowLeft" || message.key === "ArrowRight") return options.arrow?.(message.key)
+        return annotations.receive(message, box)
       case "selection":
       case "image":
       case "area":
       case "marker":
-      case "key":
         annotations.receive(message, box)
     }
   })

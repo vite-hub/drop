@@ -237,8 +237,10 @@ export function planDocument(
     const src = source.trim().startsWith("<svg")
       ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`
       : source
+    // A sideways swipe moves to the folder's next image (plan-runtime.ts). Overscroll stops at the page's edge, so the
+    // browser doesn't also take the swipe as Back.
     return injectRuntime(
-      `<!doctype html><html><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:var(--muted)"><img src="${escapeHtml(src)}" style="max-width:min(100%,960px);box-shadow:0 10px 40px rgb(0 0 0/.15);border-radius:10px" alt=""></body></html>`,
+      `<!doctype html><html style="overscroll-behavior-x:none"><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:var(--muted)"><img src="${escapeHtml(src)}" style="max-width:min(100%,960px);box-shadow:0 10px 40px rgb(0 0 0/.15);border-radius:10px" alt=""></body></html>`,
       dark,
     )
   }
