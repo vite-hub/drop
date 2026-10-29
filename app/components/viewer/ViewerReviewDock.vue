@@ -92,7 +92,8 @@ watch(
   border-radius: 8px;
   padding: 0 10px;
   background: transparent;
-  color: var(--ui-text-muted);
+  /* Toned, not muted: muted at the disabled 75% opacity fell to 4.1:1 over light pages. */
+  color: var(--ui-text-toned);
   font: inherit;
 }
 
