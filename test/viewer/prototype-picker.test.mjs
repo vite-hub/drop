@@ -40,6 +40,31 @@ test("an authored page runs the current picker in place of the copy it was publi
   assert.equal(injectRuntime(page(PICKER), false, 0, true).split("// Drop prototype picker.").length, 2)
 })
 
+test("quoted picker source before the real script stays intact while the real picker is upgraded", () => {
+  const old = "// Drop prototype picker.\n(() => {\n  window.oldPicker = true;\n})();"
+  const sample = `<pre><code>${old}</code></pre>`
+  const html = injectRuntime(
+    page(old).replace("<body>", () => `<body>${sample}`),
+    false,
+    0,
+    true,
+  )
+  assert.ok(html.includes(sample), "the authored code sample is preserved")
+  assert.ok(html.includes(`<script>${PICKER.trimEnd()}</script>`), "the actual script is upgraded")
+  assert.ok(!html.includes(`<script>${old}</script>`))
+
+  const quotedScript = `<script>const source = \`${old}\`;</script>`
+  const quoted = injectRuntime(
+    page("").replace("<body>", () => `<body>${sample}${quotedScript}`),
+    false,
+    0,
+    true,
+  )
+  assert.ok(quoted.includes(sample))
+  assert.ok(quoted.includes(quotedScript), "another script quoting the source is preserved")
+  assert.ok(!quoted.includes(PICKER.trimEnd()), "quoted source alone does not introduce a picker")
+})
+
 /** The variant showing, the picker's own bar, and the hash, read from a page or a frame. */
 const look = (target) =>
   target.evaluate(() => ({

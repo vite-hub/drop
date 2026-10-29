@@ -898,11 +898,18 @@ const DROP_TOKEN =
 const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\s*:/.test(html)
 
 /**
- * A prototype (skills/prototype) carries its own copy of the skill's picker.js, which starts with this line and ends
- * with the IIFE's close at the start of a line. Drop runs the current picker in that copy's place, so a prototype
- * published before a picker change still works with Drop's bar.
+ * A prototype (skills/prototype) carries its own copy of the skill's picker.js in a script element. Match its whole
+ * source inside that element, so authored text and scripts quoting the picker stay intact. Drop runs the current
+ * picker in that copy's place, so a prototype published before a picker change still works with Drop's bar.
  */
-const EMBEDDED_PICKER = /\/\/ Drop prototype picker\.[\s\S]*?\n\}\)\(\);/
+const EMBEDDED_PICKER = /^\s*\/\/ Drop prototype picker\.[\s\S]*\n\}\)\(\);\s*$/
+function upgradePicker(html: string): string {
+  return html.replace(
+    /(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/gi,
+    (script, open: string, source: string, close: string) =>
+      EMBEDDED_PICKER.test(source) ? `${open}${PICKER.trimEnd()}${close}` : script,
+  )
+}
 
 /**
  * Tells a prototype's picker that the viewer's bottom bar shows its variants (ViewerVariants), so the page draws no bar
@@ -927,7 +934,7 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
   const tail = `<script>${ANNOTATOR_SCRIPT.replace("__AUTHORED__", String(authored))
     .replace("__THEMED__", String(Boolean(theme)))
     .replace("__DARK__", String(dark))}</script>`
-  let out = prependToHead(authored ? html.replace(EMBEDDED_PICKER, () => PICKER.trimEnd()) : html, head)
+  let out = prependToHead(authored ? upgradePicker(html) : html, head)
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail
   return out
 }

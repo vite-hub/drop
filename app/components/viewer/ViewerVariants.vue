@@ -44,8 +44,8 @@ useEventListener("hashchange", () => {
 
 useEventListener("keydown", (event: KeyboardEvent) => {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
-  const target = event.target as Node | null
-  if (target !== document.body && !(target && group.value?.contains(target))) return
+  const target = event.target
+  if (target !== document.body && !(target instanceof Node && group.value?.contains(target))) return
   const n = Number(event.key)
   if (event.key === "ArrowLeft") emit("command", "prev")
   else if (event.key === "ArrowRight") emit("command", "next")

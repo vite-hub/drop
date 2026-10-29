@@ -68,10 +68,10 @@ export function useViewerFrame(options: {
   watch(options.inset, (value) => (startInset = value), { immediate: true, flush: "sync" })
   let startWidth: DocWidth = "readable"
   watch(options.width, (value) => (startWidth = value), { immediate: true, flush: "sync" })
-  // Every document says so when the viewer's bar shows the variants; only a prototype's picker reads it.
+  // Only the viewer's direct document uses its bar; nested app frames keep their own picker controls.
   const variantBar = (html: string) => (options.variantBar && html ? withVariantBar(html) : html)
   const appDocument = (path: string) =>
-    variantBar(injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset, true))
+    injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset, true)
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
   // panel showing doesn't slide left once it loads.
@@ -187,7 +187,7 @@ export function useViewerFrame(options: {
         return
       case "host":
         asked = true
-        frameDocument = followFrame(message.path) ? srcdoc.value : fallbackDocument()
+        frameDocument = followFrame(message.path) ? srcdoc.value : variantBar(fallbackDocument())
         // The grant lets this app's origin serve it its other files (server/utils/app-files.ts).
         return send({ type: "document", html: frameDocument, grant: drop.value.contentGrant })
       case "frame-request": {
