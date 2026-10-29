@@ -442,7 +442,7 @@ async function reply(id: string, body: string, files: File[] = []) {
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
-// it works for whoever can open the drop. The menu that copied it closes, so a toast says it was copied.
+// it works for whoever can open the drop. The menu that copied it closes, so CopyNote says it was copied.
 function copyCommentLink(comment: DropComment) {
   const url = new URL(link.value)
   url.searchParams.set("comment", String(comment.n))
@@ -644,9 +644,9 @@ watch(
           <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
           <ViewerAction
             v-if="copiesMarkdown"
-            icon="i-mingcute-markdown-line"
-            label="Copy as Markdown"
-            @click="copyMarkdown('Markdown copied')"
+            :icon="copied('markdown') ? 'i-mingcute-check-line' : 'i-mingcute-markdown-line'"
+            :label="copied('markdown') ? 'Copied' : 'Copy as Markdown'"
+            @click="copyMarkdown()"
           />
           <ViewerAction
             v-if="presents && !slidev"

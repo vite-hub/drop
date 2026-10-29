@@ -41,7 +41,7 @@ const detail = computed(() => {
 // The row's share menu shows the new choice, so picking one doesn't toast.
 const pick = (next: Share) => next === drop.share || setShare(drop, next)
 
-/** The link button shows a check once it copied; from the menu, which closes, `announce` says it in a toast. */
+/** The link button shows a check once it copied; from the menu, which closes, `announce` says it in CopyNote. */
 async function copyLink(announce?: string) {
   // Copying never widens a share on its own: the toast says who each choice lets in, and the team comes first.
   if (!shared.value && changeable.value) {

@@ -94,12 +94,17 @@ export function useRelativeNow() {
   return now
 }
 
+/** What CopyNote says after a copy whose button went away with the click; `at` restarts it for the same words. */
+export const useCopyNote = () => useState<{ text: string; at: number } | null>("copy-note", () => null)
+
 /**
  * Copy without a toast: the button that copied shows a check while `copied(key)` holds, for a moment. A copy whose
- * button goes away with the click (a menu item) passes `announce`, and a toast says it instead. A failure toasts.
+ * button goes away with the click (a menu item, ⌘K, a shortcut) passes `announce`, and CopyNote says it in a small
+ * pill that leaves on its own. A failure toasts.
  */
 export function useCopy() {
   const toast = useToast()
+  const note = useCopyNote()
   const { copy: write } = useClipboard({ legacy: true })
   const last = ref<string>()
   const { start } = useTimeoutFn(() => (last.value = undefined), 1400, { immediate: false })
@@ -107,7 +112,7 @@ export function useCopy() {
   function done({ key = "", announce }: Options) {
     last.value = key
     start()
-    if (announce) toast.add({ title: announce, icon: "i-mingcute-check-line" })
+    if (announce) note.value = { text: announce, at: Date.now() }
   }
   function failed(error: unknown) {
     reportClientError("copy", error)
