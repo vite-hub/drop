@@ -207,3 +207,64 @@ test("on a narrow doc every comment keeps its pin, with no sideways scroll", asy
     await browser.close()
   }
 }, 30_000)
+
+test("leaving the frame clears quote hover while keeping the open thread raised", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    // Leave room in the parent for the pointer to exit the iframe without crossing other text inside it.
+    await page.locator("iframe").evaluate((el) => {
+      el.style.height = "850px"
+    })
+    const quote = await frame.evaluate(() => {
+      const node = document.querySelector("p").firstChild
+      const range = document.createRange()
+      const start = node.data.indexOf("one set of numbers")
+      range.setStart(node, start)
+      range.setEnd(node, start + "one set of numbers".length)
+      const rect = range.getClientRects()[0]
+      return { x: rect.left + 2, y: (rect.top + rect.bottom) / 2 }
+    })
+    const state = () =>
+      frame.evaluate(() => ({
+        checked: [...document.querySelector("drop-comments").shadowRoot.querySelectorAll(".cr-tg")].map(
+          (t) => t.checked,
+        ),
+        bubbles: [...document.querySelectorAll("drop-bubble[data-on]")].map((b) => b.dataset.id),
+        active: CSS.highlights.get("drop-active").size,
+      }))
+    const hover = async () => {
+      await page.mouse.move(quote.x, quote.y)
+      await frame.waitForFunction(() => document.querySelector('drop-bubble[data-id="c1"]').hasAttribute("data-on"))
+    }
+    await hover()
+    await page.mouse.move(10, 880)
+    await frame.evaluate(() => new Promise(requestAnimationFrame))
+    assert.deepEqual(await state(), { checked: [false, false, false, false, false], bubbles: [], active: 0 })
+
+    await page.evaluate(() =>
+      document.querySelector("iframe").contentWindow.postMessage({ __drop: true, type: "active", id: "c4" }, "*"),
+    )
+    await frame.waitForFunction(() => document.querySelector('drop-bubble[data-id="c4"]').hasAttribute("data-on"))
+    await hover()
+    await page.mouse.move(10, 880)
+    await frame.evaluate(() => new Promise(requestAnimationFrame))
+    assert.deepEqual(await state(), { checked: [false, false, false, true, false], bubbles: ["c4"], active: 1 })
+
+    // A queued quote hit must not restore hover after the document loses the pointer or the window loses focus.
+    for (const event of ["mouseleave", "blur"]) {
+      await frame.evaluate(
+        ({ quote, event }) => {
+          document.dispatchEvent(new MouseEvent("mousemove", { clientX: quote.x, clientY: quote.y }))
+          const target = event === "blur" ? window : document
+          target.dispatchEvent(new Event(event))
+          return new Promise(requestAnimationFrame)
+        },
+        { quote, event },
+      )
+      assert.deepEqual(await state(), { checked: [false, false, false, true, false], bubbles: ["c4"], active: 1 })
+    }
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

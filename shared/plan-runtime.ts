@@ -475,6 +475,16 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (id !== textPointed) { textPointed = id; emphasise(); }
     });
   }, { passive: true });
+  function clearPointed() {
+    // A queued hit from the last move must not restore hover after the pointer leaves the frame.
+    cancelAnimationFrame(pointerFrame);
+    pointerFrame = 0;
+    if (!pointed && !textPointed) return;
+    pointed = textPointed = null;
+    emphasise();
+  }
+  document.addEventListener("mouseleave", clearPointed);
+  window.addEventListener("blur", clearPointed);
 
   let lastQuote = "";
   function reportSelection() {
