@@ -48,7 +48,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
 
   // A rectangle anchors to the smallest element that holds it, never the script's own root (skip).
   function anchorFor(left, top, right, bottom, skip) {
-    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments");
+    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble");
     let best = null, bestArea = Infinity;
     for (const el of under) {
       const r = el.getBoundingClientRect(), area = r.width * r.height;
@@ -105,10 +105,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.gd{position:absolute;background:var(--gd)}.gd::before{content:"";position:absolute;inset:-3px}.gd.h{height:1px;left:0}.gd.h::before{cursor:row-resize}.gd.v{width:1px;top:0}.gd.v::before{cursor:col-resize}' +
     '</style>';
   const LAYERS = '<div class="marks"></div><div class="draft"></div>';
-  // comark-comments' own stylesheet for the bubbles and cards of comments in the margin (see render), then where they
-  // go: each part is placed by hand, so it drops the package's floats and margins.
-  const RAIL_STYLE = '<style>' + __COMMENTS_CSS__ +
-    '.rail{position:absolute;height:0}.rail .cr-bub:empty::before{content:"\\200b"}.rail .g>:is(.cr-bub,.cr-card){position:absolute;margin:0}.rail .cr-card{float:none;clear:none;cursor:pointer}' +
+  // comark-comments' own stylesheet for the cards of comments in the margin (see render), then where they go: each is
+  // placed by hand, so it drops the package's floats and margins. The bubble each card follows is in the page (BUBBLES).
+  const COMMENTS_CSS = __COMMENTS_CSS__;
+  const RAIL_STYLE = '<style>' + COMMENTS_CSS +
+    '.rail{position:absolute;height:0}.rail .g>.cr-bub{display:none}.rail .g>.cr-card{position:absolute;margin:0}.rail .cr-card{float:none;clear:none;cursor:pointer}' +
     '.rail .g:has(.cr-tg:checked)>*{z-index:1}.rail .cr-av{overflow:hidden}.rail .cr-av img{display:block;width:100%;height:100%;object-fit:cover}' +
     '.rail .cr-entry{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}' +
     '.rail .cr-card small{display:block;margin-top:.25rem;color:var(--_comark-muted);font-size:.75rem}' +
@@ -125,6 +126,16 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
   // Highlights draw on the page itself, so without Drop's theme they take a grey that shows on light and dark pages.
   if (!THEMED) pageStyle.textContent = pageStyle.textContent.replaceAll("var(--foreground)", "#808080");
+  // A margin comment's bubble is the package's, in the page's own text after its quote, so it takes its room in the
+  // line as a doc's thread does and covers nothing. It's a <drop-bubble> with no text of its own: quotes are found and
+  // elements named (findRange, pathOf) as if it weren't there, and render() takes it out again. A word joiner keeps it
+  // on its quote's line, and the count is generated. The quote takes the package's anchor look (.cr-cm), as a highlight.
+  const BUBBLES = document.createElement("style");
+  BUBBLES.textContent = COMMENTS_CSS +
+    'drop-bubble.cr-bub:empty::before,drop-bubble.cr-bub b::before{content:"\\2060"}drop-bubble.cr-bub b{font:inherit;color:inherit}' +
+    'drop-bubble.cr-bub b::before{content:"\\2060" attr(data-n)}drop-bubble.cr-bub[data-on]{color:var(--_comark-foreground);border-color:var(--_comark-ring)}' +
+    // The package's .cr-cm tint and underline, on its own comment color, which the bubble resolves (render).
+    "::highlight(drop-margin){background-color:color-mix(in srgb,var(--drop-anchor) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--drop-anchor) 80%,transparent);text-underline-offset:.25em}";
   // active: the comment a "focus" pulses for a moment; opened: the one whose thread Drop shows; pointed and textPointed:
   // the one under the pointer, over its bubble or card, or over its text.
   let markers = [], active = null, opened = null, pointed = null, textPointed = null;
@@ -251,6 +262,28 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const article = !AUTHORED && THEMED ? document.querySelector("main > article.typeset") : null;
   const inRail = (m) => Boolean(article) && m.kind === "text" && !m.resolved && !m.earlier;
   let textRanges = [], railHits = [];
+  const bubbles = new Map();
+  function clearBubbles() {
+    for (const bubble of bubbles.values()) {
+      const parent = bubble.parentNode;
+      bubble.remove();
+      // Its insertion split a text node in two; joined again, the page's DOM is as it was.
+      if (parent) parent.normalize();
+    }
+    bubbles.clear();
+  }
+  function insertBubble(m, range) {
+    const bubble = document.createElement("drop-bubble");
+    bubble.className = "cr-bub"; bubble.dataset.dropBubble = ""; bubble.dataset.id = m.id; bubble.tabIndex = 0; bubble.setAttribute("role", "button");
+    const replies = m.replies || 0;
+    bubble.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
+    // Like the package's: the count only once the thread has more than its first comment.
+    if (replies) { const count = document.createElement("b"); count.dataset.n = String(replies + 1); bubble.appendChild(count); }
+    const end = range.cloneRange();
+    end.collapse(false);
+    end.insertNode(bubble);
+    bubbles.set(m.id, bubble);
+  }
   function setRail(want) {
     const root = document.documentElement;
     if (!want) return root.removeAttribute("data-drop-rail"), false;
@@ -270,11 +303,19 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (zoomMarks) zoomMarks.innerHTML = "";
     if (asideMarks) asideMarks.innerHTML = "";
     const unplaced = [], railed = [];
+    clearBubbles();
     // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
     const ranges = new Map(markers.filter((m) => m.kind === "text" && m.quote).map((m) => [m.id, findRange(m.selector, m.quote)]));
     // Under a zoom the page's comments don't draw, so the column stays as it was.
     const wide = zoom ? document.documentElement.getAttribute("data-drop-rail") === "open" : setRail(markers.some((m) => inRail(m) && ranges.get(m.id)));
     textRanges = [];
+    if (wide && view.pins && !zoom) {
+      if (!BUBBLES.isConnected) document.head.appendChild(BUBBLES);
+      for (const m of markers) if (inRail(m) && ranges.get(m.id)) insertBubble(m, ranges.get(m.id));
+      const bubble = bubbles.values().next().value;
+      const anchor = bubble && getComputedStyle(bubble).getPropertyValue("--_cr-comment").trim();
+      if (anchor && document.documentElement.style.getPropertyValue("--drop-anchor") !== anchor) document.documentElement.style.setProperty("--drop-anchor", anchor);
+    }
     for (const m of markers) {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {
@@ -296,7 +337,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       } else {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
-        textRanges.push({ id: m.id, range, resolved: m.resolved });
+        const railedHere = bubbles.has(m.id);
+        textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere });
         if (zoom) continue;
         const rects = range.getClientRects(), last = rects[rects.length - 1];
         if (!last) continue;
@@ -309,8 +351,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
           if (line) { line.left = Math.min(line.left, r.left); line.right = Math.max(line.right, r.right); line.top = Math.min(line.top, r.top); line.bottom = Math.max(line.bottom, r.bottom); }
           else lines.push({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
         }
+        if (railedHere) { railed.push({ m, last, lines }); continue; }
         for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
-        if (wide && inRail(m)) { railed.push({ m, last, lines }); continue; }
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
       const dot = document.createElement("div");
@@ -356,9 +398,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
 
   /**
-   * The margin's cards and their bubbles, in comark-comments' markup: each comment is a hidden checkbox, its bubble, and
-   * its card, so the package's own rules link them on hover, and a checked box (emphasise) raises the card. A card is
-   * level with its line, below the card before it, and clear of the cards a doc's own threads float into the margin.
+   * The margin's cards, in comark-comments' markup: each is a hidden checkbox, a stand-in for its bubble (which is in the
+   * page), and its card, so a checked box (emphasise) raises the card by the package's own rule. A card is level with
+   * its line, below the card before it, and clear of the cards a doc's own threads float into the margin.
    */
   function drawRail(railed) {
     const box = article.getBoundingClientRect();
@@ -372,15 +414,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     let below = -Infinity;
     for (const { m, last } of railed.sort((a, b) => a.last.top - b.last.top || a.last.left - b.last.left)) {
       const group = document.createElement("div");
-      group.className = "g";
+      group.className = "g"; group.dataset.id = m.id;
       const toggle = document.createElement("input");
       toggle.type = "checkbox"; toggle.className = "cr-tg"; toggle.tabIndex = -1; toggle.setAttribute("aria-hidden", "true");
       const replies = m.replies || 0;
-      const bubble = document.createElement("span");
-      bubble.className = "cr-bub"; bubble.dataset.id = m.id; bubble.tabIndex = 0; bubble.setAttribute("role", "button");
-      bubble.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
-      // Like the package's: the count only once the thread has more than its first comment.
-      if (replies) bubble.textContent = String(replies + 1);
+      const stand = document.createElement("span"), bubble = bubbles.get(m.id);
+      stand.className = "cr-bub";
       const card = document.createElement("div");
       card.className = "cr-card";
       const entry = document.createElement("span"), avatar = document.createElement("span"), name = document.createElement("b"), body = document.createElement("span");
@@ -393,11 +432,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       entry.append(avatar, name, body);
       card.appendChild(entry);
       if (replies) { const more = document.createElement("small"); more.textContent = replies + (replies === 1 ? " reply" : " replies"); card.appendChild(more); }
-      group.append(toggle, bubble, card);
+      group.append(toggle, stand, card);
       rail.appendChild(group);
-      // The bubble sits after the quote's last character, raised like a pin so the words after it stay readable.
-      bubble.style.left = last.right - box.left + 2 + "px";
-      bubble.style.top = last.top - box.top - bubble.offsetHeight + 5 + "px";
       const height = card.offsetHeight;
       let top = Math.max(last.top - box.top, below + 8);
       for (let moved = true; moved; ) {
@@ -409,7 +445,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       const point = (on) => () => { if (on) pointed = m.id; else if (pointed === m.id) pointed = null; emphasise(); };
       for (const el of [bubble, card]) {
         el.onmouseenter = point(true); el.onmouseleave = point(false);
-        el.onclick = (e) => { e.stopPropagation(); const r = el.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
+        el.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const r = el.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
       }
       bubble.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bubble.click(); } };
     }
@@ -418,10 +454,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   /** The comment Drop shows, the one a "focus" picked, and the one under the pointer: their highlight and card stand out. */
   function emphasise() {
     const on = new Set([active, opened, pointed, textPointed].filter(Boolean));
-    marks.querySelectorAll(".rail .cr-bub").forEach((bubble) => { bubble.previousElementSibling.checked = on.has(bubble.dataset.id); });
+    marks.querySelectorAll(".rail .g").forEach((group) => { group.firstElementChild.checked = on.has(group.dataset.id); });
+    for (const [id, bubble] of bubbles) bubble.toggleAttribute("data-on", on.has(id));
     if (!highlights) return;
     const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
-    CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved));
+    CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail));
+    CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail));
     CSS.highlights.set("drop-done", show((t) => !on.has(t.id) && t.resolved));
     CSS.highlights.set("drop-active", show((t) => on.has(t.id)));
   }
@@ -512,7 +550,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // The element under a point, past Drop's own layer.
   function elementAt(x, y) {
-    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments") || document.body;
+    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble") || document.body;
   }
   const px = (n) => String(Math.round(n * 10) / 10);
   const num = (value) => parseFloat(value) || 0;
@@ -851,7 +889,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "focus") {
       active = m.id; render();
       // A pin, or a margin comment's bubble.
-      const pinOf = () => (typeof m.id === "string" && marks.querySelector('[data-id="' + CSS.escape(m.id) + '"]')) || null;
+      const pinOf = () => (typeof m.id === "string" && (marks.querySelector('.m[data-id="' + CSS.escape(m.id) + '"]') || bubbles.get(m.id))) || null;
       const dot = pinOf();
       if (dot) scrollTo({ top: Math.max(0, dot.getBoundingClientRect().top + scrollY - innerHeight / 3), behavior: "smooth" });
       // With open: once the scroll settles, report the pin like a click, so Drop opens its thread beside it. Marked

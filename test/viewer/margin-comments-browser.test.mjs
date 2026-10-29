@@ -73,6 +73,7 @@ async function open(browser, width) {
   await page.goto("https://drop.test/")
   const frame = page.frames()[1]
   await frame.waitForFunction(() => document.querySelector("drop-comments")?.shadowRoot.querySelector(".m"))
+  await frame.evaluate(() => document.fonts.ready)
   return { context, page, frame }
 }
 
@@ -86,19 +87,33 @@ const drawn = (frame) =>
       scroll: document.documentElement.scrollWidth - innerWidth,
       width: innerWidth,
       text: box(document.querySelector("main > article > p")).right,
-      cards: [...root.querySelectorAll(".rail .cr-card")].map((card) => {
-        const bubble = card.previousElementSibling
-        return {
-          id: bubble.dataset.id,
-          count: bubble.textContent,
-          ...box(card).toJSON(),
-          display: getComputedStyle(card).display,
-        }
-      }),
+      cards: [...root.querySelectorAll(".rail .g")].map((group) => ({
+        id: group.dataset.id,
+        ...box(group.querySelector(".cr-card")).toJSON(),
+        display: getComputedStyle(group.querySelector(".cr-card")).display,
+      })),
       pins: [...root.querySelectorAll(".m")].map((pin) => pin.dataset.id),
-      lines: Object.fromEntries(
-        [...root.querySelectorAll(".rail .cr-bub")].map((bubble) => [bubble.dataset.id, box(bubble).bottom]),
+      // Each bubble in the page's own text: its box, its count, and the box of the character after it.
+      bubbles: Object.fromEntries(
+        [...document.querySelectorAll("drop-bubble")].map((bubble) => {
+          const next = bubble.nextSibling
+          const after = document.createRange()
+          if (next?.nodeType === 3 && next.data.length) {
+            after.setStart(next, 0)
+            after.setEnd(next, 1)
+          }
+          return [
+            bubble.dataset.id,
+            {
+              ...box(bubble).toJSON(),
+              count: getComputedStyle(bubble.querySelector("b") ?? bubble, "::before").content,
+              after: next?.nodeType === 3 ? after.getBoundingClientRect().toJSON() : null,
+            },
+          ]
+        }),
       ),
+      outlines: root.querySelectorAll(".marks > .a.t").length,
+      margin: CSS.highlights.get("drop-margin")?.size ?? 0,
     }
   })
 
@@ -106,6 +121,12 @@ test("open text comments on a wide doc sit beside their text as bubbles and marg
   const browser = await chromium.launch()
   try {
     const { page, frame } = await open(browser, 1440)
+    // The doc as the frame parsed it, before any comment drew.
+    const original = await frame.evaluate((html) => {
+      const parsed = document.createElement("template")
+      parsed.innerHTML = html
+      return parsed.innerHTML
+    }, html)
     const wide = await drawn(frame)
     assert.equal(wide.rail, "open")
     assert.equal(wide.scroll, 0)
@@ -115,25 +136,34 @@ test("open text comments on a wide doc sit beside their text as bubbles and marg
     )
     // Resolved comments, comments from an earlier version, and areas keep their pins.
     assert.deepEqual(wide.pins.toSorted(), ["c6", "c7", "c8"])
-    assert.equal(wide.cards.find((card) => card.id === "c2").count, "3")
+    assert.match(wide.bubbles.c2.count, /3"$/)
+    // The quotes in the margin take the package's anchor look, so only the pinned comments keep their outlines.
+    assert.equal(wide.margin, 5)
+    assert.equal(wide.outlines, 2)
     for (const [index, card] of wide.cards.entries()) {
+      const bubble = wide.bubbles[card.id]
+      // The bubble takes its own room in the line: the text after it starts where it ends.
+      if (bubble.after && bubble.after.top < bubble.bottom) assert.ok(bubble.after.left >= bubble.right - 0.5, card.id)
       assert.equal(card.display, "block")
       assert.ok(card.left > wide.text, "the card sits right of the text")
       assert.ok(card.right <= wide.width, "the card stays on screen")
       // Level with its line, or below the card before it.
-      assert.ok(card.top >= wide.lines[card.id] - 12)
+      assert.ok(card.top >= bubble.top - 12)
       if (index) assert.ok(card.top >= wide.cards[index - 1].bottom + 7)
     }
 
-    // Hiding the comments with the toolbar's eye and showing them again lays the cards out as before.
-    await page.evaluate(() => {
-      const frame = document.querySelector("iframe").contentWindow
-      frame.postMessage({ __drop: true, type: "view", pins: false }, "*")
-      frame.postMessage({ __drop: true, type: "view", pins: true }, "*")
-    })
-    await frame.waitForFunction(
-      () => document.querySelector("drop-comments").shadowRoot.querySelector(".marks").style.display === "",
-    )
+    // Hiding the comments with the toolbar's eye takes the bubbles out and leaves the doc as it was; showing them again
+    // finds every quote and lays the cards out as before.
+    const view = (pins) =>
+      page.evaluate(
+        (pins) => document.querySelector("iframe").contentWindow.postMessage({ __drop: true, type: "view", pins }, "*"),
+        pins,
+      )
+    await view(false)
+    await frame.waitForFunction(() => !document.querySelector("drop-bubble"))
+    assert.equal(await frame.evaluate(() => document.querySelector("article").innerHTML), original)
+    await view(true)
+    await frame.waitForFunction(() => document.querySelectorAll("drop-bubble").length === 5)
     assert.deepEqual(
       (await drawn(frame)).cards.map((card) => card.top),
       wide.cards.map((card) => card.top),
@@ -144,9 +174,10 @@ test("open text comments on a wide doc sit beside their text as bubbles and marg
     await card.hover()
     const hovered = await frame.evaluate(() => ({
       checked: [...document.querySelector("drop-comments").shadowRoot.querySelectorAll(".cr-tg")].map((t) => t.checked),
+      bubble: document.querySelector('drop-bubble[data-id="c3"]').hasAttribute("data-on"),
       active: CSS.highlights.get("drop-active").size,
     }))
-    assert.deepEqual(hovered, { checked: [false, false, true, false, false], active: 1 })
+    assert.deepEqual(hovered, { checked: [false, false, true, false, false], bubble: true, active: 1 })
     await card.click()
     await page.waitForFunction(() => window.posts.some((m) => m.type === "marker" && m.id === "c3"))
 
