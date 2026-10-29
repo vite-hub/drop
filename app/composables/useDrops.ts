@@ -13,6 +13,12 @@ export const useDrops = () => useApi("/api/drops", { key: keys.drops, default: (
 export const useSharedWithMe = () =>
   useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: "1" }, default: () => [] })
 
+/** Your Trash, top-most nodes only (listDrops). */
+export const useTrash = () => useApi("/api/drops", { key: keys.trash, query: { trash: "1" }, default: () => [] })
+
+/** Your plan's limits and how much of them you've used. */
+export const useUsage = () => useApi("/api/usage", { key: keys.usage })
+
 /** The drops directly in a folder, for an expanded row in the tree or the Drops page. Keyed `folder:<id>`. */
 export const useFolder = (id: MaybeRefOrGetter<string>) =>
   useApi("/api/drops", {

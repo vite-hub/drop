@@ -3,6 +3,15 @@ import { TRASH_DAYS } from "#shared/expiry"
 import { MIB, usageNearLimit } from "#shared/quotas"
 import type { DropSummary } from "#shared/types"
 
+// The layout waits for your drops before this page's setup runs, which put the Trash and usage a round trip later.
+// Started here, before either renders, all four load together.
+definePageMeta({
+  middleware: () => {
+    useTrash()
+    useUsage()
+  },
+})
+
 useSeoMeta({ title: "Drops" })
 
 const { data: drops, status, error, refresh } = useDrops()
@@ -13,11 +22,11 @@ const siteDialog = useSiteDialog()
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const open = useRowsOpen()
-const { data: trash } = useApi("/api/drops", { key: keys.trash, query: { trash: "1" }, default: () => [] })
+const { data: trash } = useTrash()
 const { data: shared } = useSharedWithMe()
 // A personal Drop's teams list their folders under Teams, not here.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
-const { data: usage } = useApi("/api/usage", { key: keys.usage })
+const { data: usage } = useUsage()
 const limited = computed(
   () =>
     usage.value?.enabled &&
