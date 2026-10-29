@@ -215,7 +215,7 @@ const menu = computed(() => [
       />
     </div>
     <div v-else class="relative z-10 flex items-center gap-0.5">
-      <UDropdownMenu v-if="linkChoices" :items="linkChoices" :content="{ align: 'end' }">
+      <DeferredMenu v-if="linkChoices" :items="linkChoices" :content="{ align: 'end' }">
         <UButton
           aria-label="Copy link"
           class="hidden sm:inline-flex"
@@ -223,7 +223,7 @@ const menu = computed(() => [
           icon="i-mingcute-link-line"
           variant="ghost"
         />
-      </UDropdownMenu>
+      </DeferredMenu>
       <UButton
         v-else
         aria-label="Copy link"
@@ -233,14 +233,14 @@ const menu = computed(() => [
         variant="ghost"
         @click="copyLink()"
       />
-      <UDropdownMenu :items="menu" :content="{ align: 'end' }">
+      <DeferredMenu :items="menu" :content="{ align: 'end' }">
         <UButton
           :aria-label="`Actions for ${drop.title}`"
           color="neutral"
           icon="i-mingcute-more-1-fill"
           variant="ghost"
         />
-      </UDropdownMenu>
+      </DeferredMenu>
     </div>
   </li>
 </template>
