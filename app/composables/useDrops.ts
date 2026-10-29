@@ -39,6 +39,13 @@ export function useShareUrl(
  */
 const refresh = () => refreshNuxtData([keys.drops, keys.usage])
 
+/**
+ * The lists a new drop shows up in. Not awaited: the caller opens the new drop next, and its page loads by itself, so
+ * waiting on the lists only held the page back by a round trip.
+ */
+const refreshAfterCreate = (parent?: Pick<DropSummary, "id">) =>
+  void refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+
 export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>(keys.drops)
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
@@ -223,7 +230,7 @@ export function useDropActions() {
         method: "POST",
         body: { ...input, ...(parent ? { folder: parent.id } : {}) },
       })
-      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+      refreshAfterCreate(parent)
       return site
     } catch (error) {
       notify.fail("Couldn't create the site review", error)
@@ -238,7 +245,7 @@ export function useDropActions() {
         body: { filename: "untitled.md", title: "Untitled doc", content: "" },
       })
       if (parent) await $fetch(`/api/drops/${doc.id}`, { method: "PATCH", body: { folder: parent.id } })
-      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+      refreshAfterCreate(parent)
       return doc
     } catch (error) {
       notify.fail("Couldn't create the doc", error)
@@ -254,7 +261,7 @@ export function useDropActions() {
         body: { filename: "board.excalidraw", title: "Untitled board", content: "" },
       })
       if (parent) await $fetch(`/api/drops/${board.id}`, { method: "PATCH", body: { folder: parent.id } })
-      await refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+      refreshAfterCreate(parent)
       return board
     } catch (error) {
       notify.fail("Couldn't create the board", error)
