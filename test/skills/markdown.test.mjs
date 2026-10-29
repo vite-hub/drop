@@ -108,8 +108,18 @@ test("a doc written before comark-annotate 0.2 keeps its screenshot's url and la
   assert.match(html, /Wrapped/)
 })
 
+test("plain Markdown keeps Drop's typography without the preset's typeset stylesheet", async () => {
+  const markdown = "# Existing document\n\nA paragraph.\n\n| Name | Value |\n| --- | --- |\n| One | Two |"
+  const { title, html } = await renderMarkdownCached("plain.md", async () => markdown)
+  assert.equal(title, "Existing document")
+  assert.match(html, /<table>/)
+  assert.equal(html.includes("data-comark-typeset"), false, "Drop already supplies its own typography CSS")
+})
+
 test("a suggestion, a comment, and its reply render their marks, bubbles, and card through the allowlist", async () => {
   const markdown = [
+    "# Review **copy**",
+    "",
     'To :suggestion[sign in]{from="log in" by="Claude" note="The button says Sign in."}, enter your email.',
     "",
     'The link expires after :comment[15 minutes]{#ttl by="@onmax" note="Is 15 minutes enough when email is slow?"}.',
@@ -118,7 +128,8 @@ test("a suggestion, a comment, and its reply render their marks, bubbles, and ca
   ].join("\n")
   const document = await parseMarkdown(markdown)
   assert.deepEqual(document.meta.issues ?? [], [])
-  const { html } = await renderMarkdownCached("comments.md", async () => markdown)
+  const { title, html } = await renderMarkdownCached("comments.md", async () => markdown)
+  assert.equal(title, "Review copy")
   assert.doesNotMatch(html, /unsupported-component|render-error/)
   assert.match(html, /<style data-comark-comments>/)
   assert.match(html, /<div class="cr">/)
