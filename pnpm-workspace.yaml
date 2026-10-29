@@ -35,6 +35,9 @@ patchedDependencies:
   nitro@3.0.260903-beta: patches/nitro@3.0.260903-beta.patch
   # Generated dev handlers import Content relative to the handler so TypeScript and Vite resolve it on Windows too.
   "@vite-hub/content@0.0.4": patches/@vite-hub__content@0.0.4.patch
+  # useServerEnv() reuses its result while the env names it reads hold the same values; every call copied the whole env
+  # and checked each declaration again, ~85 ms of CPU per Drops page render (sharePolicy runs once per listed row).
+  "@vite-hub/env@0.0.4": patches/@vite-hub__env@0.0.4.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
