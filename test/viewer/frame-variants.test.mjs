@@ -41,7 +41,7 @@ test("content-origin app frames keep their own picker unless they are the viewer
         inset: ref(0),
         bottom: ref(0),
         width: ref("readable"),
-        annotations: { frameTool: ref("browse"), overlays: {}, draftingArea: ref(null) },
+        annotations: { frameTool: ref("browse"), overlays: {}, draftingArea: ref(null), popover: ref(null) },
         variantBar: true,
       }),
     )

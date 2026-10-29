@@ -1,5 +1,5 @@
 import { addTemplate, defineNuxtModule } from "nuxt/kit"
-import type { NodeHandler } from "@comark/html/render"
+import { renderHtmlFromDocument } from "@comark/html"
 import comarkUi from "comark-ui/html"
 
 /**
@@ -8,10 +8,7 @@ import comarkUi from "comark-ui/html"
  * doc in, so this renders an empty root once, at build time: the app doesn't bundle the renderer or its fonts.
  */
 async function loadCommentsCss() {
-  const root = comarkUi().components.comments!
-  // SAFETY: the root handler reads only `context`, to write its styles once, and `flow`, for the doc it wraps.
-  const state = { context: {}, flow: async () => "" } as unknown as Parameters<NodeHandler>[1]
-  const html = await root(["comments", {}], state)
+  const html = await renderHtmlFromDocument({ nodes: [["comments", {}]] }, { components: comarkUi().components })
   const css = html.match(/<style data-comark-comments>([\s\S]*?)<\/style>/)?.[1]
   if (!css) throw new Error("comark-comments wrote no stylesheet with its root")
   return css
