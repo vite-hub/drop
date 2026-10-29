@@ -85,21 +85,23 @@ async function summarize(
   days: number,
   options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {},
 ) {
-  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
-  const files =
+  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query. Both reads start together: each is a
+  // round trip to D1.
+  const [files, counts] = await Promise.all([
     options.ownerId && rows.some((row) => row.kind === "app")
-      ? await db
+      ? db
           .select({ dropId: dropFiles.dropId, path: dropFiles.path })
           .from(dropFiles)
           .innerJoin(drops, eq(drops.id, dropFiles.dropId))
           .where(eq(drops.ownerId, options.ownerId))
-      : []
+      : [],
+    itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : []))),
+  ])
   const pathsOf = (id: string) =>
     files
       .filter((file) => file.dropId === id)
       .map((file) => file.path)
       .sort()
-  const counts = await itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : [])))
   const pathOf = (row: DropRow) => {
     const above = row.ancestors ?? []
     const stop = options.below ? above.findIndex((node) => node.id === options.below) : -1

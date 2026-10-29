@@ -103,6 +103,16 @@ const visible = computed(() => {
     )
 })
 
+// Hundreds of rows took the server seconds to render and the browser as long to hydrate, so the list starts with the
+// newest ROWS and renders more as you reach its end. The counts and the search still cover every drop.
+const ROWS = 50
+const shown = ref(ROWS)
+watch([filter, search], () => (shown.value = ROWS))
+const more = useTemplateRef("more")
+useIntersectionObserver(more, ([entry]) => {
+  if (entry?.isIntersecting) shown.value += ROWS
+})
+
 /**
  * Today, Yesterday, This week, then month names. The Worker renders in UTC, so the server render and hydration
  * group in UTC and the browser regroups in the reader's own timezone once mounted.
@@ -120,7 +130,7 @@ const groups = computed(() => {
     return new Date(at).toLocaleDateString("en", { timeZone, month: "long", year: "numeric" })
   }
   const out: Array<{ label: string; drops: DropSummary[] }> = []
-  for (const drop of visible.value) {
+  for (const drop of visible.value.slice(0, shown.value)) {
     // The Trash groups by when things went there, which is also what sets when they're deleted.
     const name = label(filter.value === "trash" ? (drop.trashedAt ?? drop.updatedAt) : drop.updatedAt)
     const last = out.at(-1)
@@ -356,6 +366,14 @@ async function newSite() {
           </template>
         </ul>
       </template>
+    </div>
+    <div v-if="visible.length > shown" ref="more" class="mt-4 flex justify-center">
+      <UButton
+        color="neutral"
+        :label="`Show ${Math.min(ROWS, visible.length - shown)} more`"
+        variant="ghost"
+        @click="shown += ROWS"
+      />
     </div>
   </PageShell>
 </template>
