@@ -1,6 +1,7 @@
 // What Drop injects into every plan document.
 // The theme contract matches T3 Code's HTML renders (same shadcn token names, --chart-1…6, base stylesheet),
 // so a page an agent built for T3 renders the same way in Drop.
+import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { MAX_QUIZ_BLOCKS } from "./quiz"
 
@@ -897,7 +898,22 @@ const DROP_TOKEN =
 const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\s*:/.test(html)
 
 /**
- * Injects Drop's runtime into a full HTML document without touching the author's markup.
+ * A prototype (skills/prototype) carries its own copy of the skill's picker.js, which starts with this line and ends
+ * with the IIFE's close at the start of a line. Drop runs the current picker in that copy's place, so a prototype
+ * published before a picker change still works with Drop's bar.
+ */
+const EMBEDDED_PICKER = /\/\/ Drop prototype picker\.[\s\S]*?\n\}\)\(\);/
+
+/**
+ * Tells a prototype's picker that the viewer's bottom bar shows its variants (ViewerVariants), so the page draws no bar
+ * of its own. Only the viewer sets it: a drop open alone in a window (ViewerPresent) keeps the page's bar.
+ */
+export const withVariantBar = (document: string) =>
+  prependToHead(document, "<script>self.__dropVariantBar = true;</script>")
+
+/**
+ * Injects Drop's runtime into a full HTML document. The author's markup stays as it is, except a prototype's picker,
+ * which becomes the current one (EMBEDDED_PICKER).
  * `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it.
  * `authored`: a page someone else built (an HTML doc or an app page), which gets only what comments need: Drop's
  * theme only if it reads Drop's tokens, and a comment layer that leaves its clicks alone (ANNOTATOR_SCRIPT).
@@ -911,7 +927,7 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
   const tail = `<script>${ANNOTATOR_SCRIPT.replace("__AUTHORED__", String(authored))
     .replace("__THEMED__", String(Boolean(theme)))
     .replace("__DARK__", String(dark))}</script>`
-  let out = prependToHead(html, head)
+  let out = prependToHead(authored ? html.replace(EMBEDDED_PICKER, () => PICKER.trimEnd()) : html, head)
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail
   return out
 }

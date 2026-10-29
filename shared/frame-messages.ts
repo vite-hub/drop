@@ -8,6 +8,9 @@ import { MAX_QUIZ_BLOCKS, QuizAnswerInput, QuizId } from "./quiz"
 const Rect = v.object({ left: v.number(), top: v.number(), right: v.number(), bottom: v.number() })
 const path = { path: v.string() }
 
+/** The most variants a prototype's message lists (the prototype skill asks for 3 to 6). */
+const MAX_VARIANTS = 100
+
 const RuntimeErrorKind = v.picklist(["error", "rejection", "console", "load"])
 
 export const FrameMessage = v.variant("type", [
@@ -77,6 +80,27 @@ export const FrameMessage = v.variant("type", [
   // comark-quiz's script starts, and each answer a reader gives.
   v.object({ type: v.literal("quiz-ready"), ids: v.pipe(v.array(QuizId), v.maxLength(MAX_QUIZ_BLOCKS)) }),
   v.object({ type: v.literal("quiz-answer"), answer: QuizAnswerInput }),
+  // A prototype's variants and the one showing, from the prototype skill's picker.js, for Drop's bottom bar to show.
+  v.pipe(
+    v.object({
+      type: v.literal("variants"),
+      variants: v.pipe(
+        v.array(
+          v.object({
+            id: v.pipe(v.string(), v.maxLength(200)),
+            label: v.pipe(v.string(), v.maxLength(200)),
+            note: v.pipe(v.string(), v.maxLength(500)),
+          }),
+        ),
+        v.minLength(1),
+        v.maxLength(MAX_VARIANTS),
+      ),
+      current: v.pipe(v.number(), v.integer(), v.minValue(0)),
+      canvas: v.boolean(),
+      zoom: v.pipe(v.number(), v.minValue(0), v.maxValue(1000)),
+    }),
+    v.check((message) => message.current < message.variants.length),
+  ),
 ])
 
 export type FrameMessage = v.InferOutput<typeof FrameMessage>

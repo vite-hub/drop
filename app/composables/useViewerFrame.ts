@@ -1,6 +1,6 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
-import { injectRuntime } from "#shared/plan-runtime"
+import { injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 
@@ -11,11 +11,17 @@ type RuntimeReport = {
   page?: string
 }
 
+/** A prototype's variants and the one showing, as its picker reports them. */
+export type ViewerVariants = Omit<Extract<FrameMessage, { type: "variants" }>, "type">
+/** What the viewer's bar asks a prototype's picker to do (picker.js in skills/prototype). */
+export type PickerCommand = "show" | "prev" | "next" | "canvas" | "zoom-in" | "zoom-out" | "fit" | "reset"
+
 /**
  * The frame the drop renders in, and everything that goes over its postMessage bridge (useDropFrame): the document
  * it shows, the app page it navigated to, the comment pins, the toolbar's tool and overlays, the room the floating
  * panel takes, and the errors the page reports. What the reader points at goes on to the annotations, and what they
- * answer in a Markdown doc's questions and polls to the quiz (useViewerQuiz).
+ * answer in a Markdown doc's questions and polls to the quiz (useViewerQuiz). A prototype's variants come up for the
+ * viewer's bar to show (ViewerVariants), and the bar's commands go down.
  */
 export function useViewerFrame(options: {
   drop: Ref<DropDetail>
@@ -31,6 +37,8 @@ export function useViewerFrame(options: {
   /** How wide a Markdown doc's text runs. */
   width: Ref<DocWidth>
   annotations: ReturnType<typeof useViewerAnnotations>
+  /** Whether the viewer's bar shows a prototype's variants, in place of the bar the page draws itself. */
+  variantBar?: boolean
 }) {
   const {
     drop,
@@ -60,12 +68,15 @@ export function useViewerFrame(options: {
   watch(options.inset, (value) => (startInset = value), { immediate: true, flush: "sync" })
   let startWidth: DocWidth = "readable"
   watch(options.width, (value) => (startWidth = value), { immediate: true, flush: "sync" })
+  // Every document says so when the viewer's bar shows the variants; only a prototype's picker reads it.
+  const variantBar = (html: string) => (options.variantBar && html ? withVariantBar(html) : html)
   const appDocument = (path: string) =>
-    injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset, true)
+    variantBar(injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset, true))
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
   // panel showing doesn't slide left once it loads.
-  const srcdoc = computed(() => {
+  const srcdoc = computed(() => variantBar(frameContent()))
+  function frameContent() {
     const { kind } = drop.value
     // A site review shows the live site itself (ViewerSite), not a document.
     if (!mounted.value || kind === "folder" || kind === "site" || kind === "board") return ""
@@ -90,7 +101,7 @@ export function useViewerFrame(options: {
       startInset,
       startWidth,
     )
-  })
+  }
 
   // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
   // postMessage (see server/utils/content-origin.ts). Otherwise the document is the iframe's srcdoc, in an opaque origin.
@@ -136,6 +147,9 @@ export function useViewerFrame(options: {
     if (target) page.value = target
     return target !== null
   }
+
+  const variants = shallowRef<ViewerVariants | null>(null)
+  const picker = (command: PickerCommand, index?: number) => send({ type: "picker", do: command, index })
 
   // Open comments carry over from earlier versions; the frame says which of them it couldn't place on this one.
   const unplaced = ref(new Set<string>())
@@ -198,6 +212,12 @@ export function useViewerFrame(options: {
         unplaced.value = new Set(message.ids)
         return
       case "ready":
+        // Each page load starts without variants; a prototype's picker answers the sync with its own.
+        variants.value = null
+        if (options.variantBar) send({ type: "picker", do: "sync" })
+        return
+      case "variants":
+        if (options.variantBar) variants.value = { ...message }
         return
       case "selection":
       case "image":
@@ -212,6 +232,7 @@ export function useViewerFrame(options: {
     // A frame that hasn't asked yet gets the document as it is then, unless it's loading another page's address.
     if (contentOrigin.value && (asked ? value === frameDocument : frameSrc.value === hostUrl())) return
     ready.value = false
+    variants.value = null
     if (contentOrigin.value) reloadFrame()
   })
   watch([ready, options.pinned], () => {
@@ -256,5 +277,5 @@ export function useViewerFrame(options: {
   )
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
 
-  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath }
+  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker }
 }

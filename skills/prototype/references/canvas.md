@@ -1,6 +1,6 @@
 # Canvas
 
-The picker shows one variant at a time. The canvas shows every variant side by side, at its real size, on a plane people pan and zoom. Both come from the same page and the same [picker.js](../assets/picker.js); readers switch with the Canvas button or the C key.
+The picker shows one variant at a time. The canvas shows every variant side by side, at its real size, on a plane people pan and zoom. Both come from the same page and the same [picker.js](../assets/picker.js); readers switch with the Canvas button in the bar (Drop's bottom bar, or the page's own when it's opened alone) or the C key.
 
 ## When to open in the canvas
 

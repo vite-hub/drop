@@ -11,9 +11,12 @@
 // `variantchange` on document ({ detail: { id, label, visible } }) whenever the visible set or the current variant
 // changes: `visible` lists the ids on screen (one in the picker, all in the canvas), so a variant animates while
 // `visible.includes(its id)`.
+// Inside Drop the page draws no bar: Drop's own bottom bar shows the variants and the camera. The page posts its state
+// up and takes Drop's commands over postMessage; everything else (keys, hash, memory, the canvas) stays here.
 (() => {
   const variants = [...document.querySelectorAll("body > [data-variant]")];
   if (!variants.length) return;
+  const hosted = self.__dropVariantBar === true && parent !== self;
   const root = document.documentElement;
   const key = "drop-prototype:" + location.pathname;
   const canvasKey = "drop-prototype-canvas:" + location.pathname;
@@ -174,6 +177,7 @@
   const place = (it, x, y) => { it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT); schedule(); };
 
   let layout = "picker", current = -1, gesture = null, space = false, frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
+  let synced = false, reportedZoom = 0;
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
   const view = () => ({ w: Math.max(1, innerWidth - inset()), h: Math.max(1, innerHeight) });
@@ -188,7 +192,9 @@
       it.tag.style.transform = `translate(${sx}px, ${sy - 30}px)`;
       it.tag.style.maxWidth = Math.max(it.w * cam.z, 56) + "px";
     }
-    zoomText.textContent = Math.round(cam.z * 100) + "%";
+    const zoom = Math.round(cam.z * 100);
+    zoomText.textContent = zoom + "%";
+    if (zoom !== reportedZoom) report();
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
   const bound = () => { cam.z = clamp(cam.z, MIN_Z, MAX_Z); cam.x = clamp(cam.x, -LIMIT, LIMIT); cam.y = clamp(cam.y, -LIMIT, LIMIT); };
@@ -283,7 +289,32 @@
     const el = variants[current] || variants[0];
     const visible = layout === "canvas" ? variants.map((v) => v.id) : [el.id];
     document.dispatchEvent(new CustomEvent("variantchange", { detail: { id: el.id, label: nameOf(el), visible } }));
+    report();
   }
+
+  // Drop asks for the state once its bar is ready for this page (sync), then hears every change.
+  function report() {
+    if (!hosted || !synced) return;
+    reportedZoom = Math.round(cam.z * 100);
+    const list = variants.map((el) => ({ id: el.id, label: nameOf(el), note: el.dataset.note || "" }));
+    parent.postMessage({ __drop: true, type: "variants", variants: list, current: Math.max(current, 0), canvas: layout === "canvas", zoom: reportedZoom }, "*");
+  }
+  const commands = {
+    sync: () => { synced = true; report(); },
+    show: (m) => Number.isInteger(m.index) && m.index >= 0 && m.index < variants.length && show(m.index),
+    prev: () => show(current - 1),
+    next: () => show(current + 1),
+    canvas: () => toggle(),
+    "zoom-in": () => layout === "canvas" && zoomCenter(1.25),
+    "zoom-out": () => layout === "canvas" && zoomCenter(1 / 1.25),
+    fit: () => layout === "canvas" && fit(),
+    reset: () => layout === "canvas" && reset(),
+  };
+  if (hosted) window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (e.source !== parent || !m || m.__drop !== true || m.type !== "picker" || !Object.hasOwn(commands, m.do)) return;
+    commands[m.do](m);
+  });
 
   function show(i) {
     i = (i + variants.length) % variants.length;
@@ -428,6 +459,7 @@
   window.addEventListener("resize", schedule);
   window.addEventListener("pagehide", () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; save(); } });
 
+  if (hosted) bar.remove();
   document.body.append(host);
   const start = [location.hash.slice(1), remembered()].map(find).find((i) => i >= 0);
   show(start ?? 0);
