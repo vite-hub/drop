@@ -240,8 +240,26 @@ export function useViewerFrame(options: {
     if (ready.value)
       send({
         type: "markers",
+        // `body` and `replies`: a text comment's card in the doc's margin shows its words and how many replies it has.
         markers: options.pinned.value.map(
-          ({ id, n, kind, selector, ox, oy, ow, oh, quote, label, resolved, version, authorName, authorImage }) => ({
+          ({
+            id,
+            n,
+            kind,
+            selector,
+            ox,
+            oy,
+            ow,
+            oh,
+            quote,
+            label,
+            resolved,
+            version,
+            authorName,
+            authorImage,
+            body,
+            replies,
+          }) => ({
             id,
             n,
             kind,
@@ -256,10 +274,17 @@ export function useViewerFrame(options: {
             earlier: version < drop.value.version,
             author: authorName,
             image: authorImage,
+            body,
+            replies: replies.length,
           }),
         ),
       })
   })
+  // The thread open in the dock, whose card the doc raises.
+  const openThread = computed(() =>
+    annotations.popover.value?.type === "thread" ? annotations.popover.value.id : null,
+  )
+  watch([ready, openThread], () => ready.value && send({ type: "active", id: openThread.value }))
   watch(
     [ready, annotations.frameTool],
     () =>

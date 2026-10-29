@@ -40,9 +40,15 @@ body {
 
 /* comark-comments floats each thread's card into a 19.5rem margin beside its line, and opens that margin only once the
    doc (its .cr root) is 50rem wide. A doc with threads widens by the margin, so its text keeps the column's width beside
-   the cards. On a narrow screen the margin stays shut and a bubble opens its card under the line. */
-:root:has(.cr) {
+   the cards. On a narrow screen the margin stays shut and a bubble opens its card under the line. The viewer's review
+   comments take the same margin (data-drop-rail, set by ANNOTATOR_SCRIPT in plan-runtime.ts); once it's open, a doc
+   without threads of its own leaves it as padding. */
+:root:is(:has(.cr), [data-drop-rail]) {
   --drop-rail: 19.5rem;
+}
+
+:root[data-drop-rail="open"] .typeset:not(:has(.cr)) {
+  padding-right: var(--drop-rail);
 }
 
 main {
@@ -160,9 +166,10 @@ main {
   margin-inline: calc((100% - var(--ca-wide)) / 2);
 }
 
-/* In a doc with threads the room beside the text is the cards', so a compare, its heading, and a wide diagram stay in
-   the column. */
-.typeset .cr :is(.ca-compare, .drop-mermaid, :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare)) {
+/* In a doc with threads, or review comments in the margin, the room beside the text is the cards', so a compare, its
+   heading, and a wide diagram stay in the column. */
+:is(.typeset .cr, [data-drop-rail="open"] .typeset)
+  :is(.ca-compare, .drop-mermaid, :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare)) {
   width: auto;
   margin-inline: 0;
 }
