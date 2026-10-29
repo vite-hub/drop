@@ -7,7 +7,6 @@ import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView: boolean; reviewing: boolean }>()
 
-const notify = useNotify()
 const origin = useRequestURL().origin
 const snippet = reviewSnippet(origin)
 const bookmarklet = reviewBookmarklet(origin)
@@ -161,13 +160,15 @@ function openHere(event: SubmitEvent) {
               </p>
             </div>
             <!-- A bookmarklet: dragged to the bookmarks bar, never run here. -->
-            <a
-              class="inline-flex h-8 shrink-0 cursor-grab items-center gap-1.5 rounded-md border border-default bg-elevated px-3 text-sm font-medium text-highlighted transition-colors hover:bg-accented focus-visible:ring-2 focus-visible:ring-inverted focus-visible:outline-none active:cursor-grabbing"
-              :href="bookmarklet"
-              @click.prevent="notify.done(`Drag it to your ${bar}`, `Then click it on any page of ${host}.`)"
-            >
-              <UIcon name="i-mingcute-chat-1-line" class="size-4 text-muted" />Review with Drop
-            </a>
+            <UTooltip :text="`Drag it to your ${bar}, then click it on any page of ${host}`">
+              <a
+                class="inline-flex h-8 shrink-0 cursor-grab items-center gap-1.5 rounded-md border border-default bg-elevated px-3 text-sm font-medium text-highlighted transition-colors hover:bg-accented focus-visible:ring-2 focus-visible:ring-inverted focus-visible:outline-none active:cursor-grabbing"
+                :href="bookmarklet"
+                @click.prevent
+              >
+                <UIcon name="i-mingcute-chat-1-line" class="size-4 text-muted" />Review with Drop
+              </a>
+            </UTooltip>
           </li>
           <li v-if="drop.isOwner" class="space-y-3 pt-5">
             <div class="space-y-1">

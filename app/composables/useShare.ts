@@ -37,7 +37,7 @@ export function shareStatus(
   return SHARE_LABELS[drop.share]
 }
 
-/** What a toast says after someone picks a share. */
+/** What the note says after someone picks a share. */
 export const SHARED_TITLES: Record<Share, string> = {
   private: "Only you now",
   team: "Shared with the team",

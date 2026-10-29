@@ -442,7 +442,7 @@ async function reply(id: string, body: string, files: File[] = []) {
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
-// it works for whoever can open the drop. The menu that copied it closes, so CopyNote says it was copied.
+// it works for whoever can open the drop. The menu that copied it closes, so StatusNote says it was copied.
 function copyCommentLink(comment: DropComment) {
   const url = new URL(link.value)
   url.searchParams.set("comment", String(comment.n))
@@ -479,11 +479,7 @@ onMounted(async () => {
       .catch(() => {})
   const comment = comments.value.find((item) => item.n === n)
   if (!comment)
-    return notify.info({
-      title: `Comment #${n} isn't on this version`,
-      icon: "i-mingcute-chat-1-line",
-      color: "neutral",
-    })
+    return notify.say(`Comment #${n} isn't on this version`, { icon: "i-mingcute-chat-1-line" })
   void focusComment(comment)
 })
 

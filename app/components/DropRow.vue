@@ -17,7 +17,6 @@ const INDENT = ["pl-4", "pl-10", "pl-16", "pl-22", "pl-28", "pl-34", "pl-40", "p
 const trashed = computed(() => drop.trashedAt !== null)
 const now = useRelativeNow()
 const purgeDays = computed(() => (drop.trashedAt === null ? 0 : daysUntil(purgesAt(drop.trashedAt), now.value)))
-const notify = useNotify()
 const { copy, copied } = useCopy()
 const { setShare } = useDropActions()
 const moveTo = useMoveDialog()
@@ -38,52 +37,36 @@ const detail = computed(() => {
   return `${drop.kind === "app" && drop.paths ? `${drop.filename} · ${drop.paths.length} files` : drop.filename}${where}`
 })
 
-// The row's share menu shows the new choice, so picking one doesn't toast.
+// The row's share menu shows the new choice, so picking one doesn't get a note.
 const pick = (next: Share) => next === drop.share || setShare(drop, next)
 
-/** The link button shows a check once it copied; from the menu, which closes, `announce` says it in CopyNote. */
-async function copyLink(announce?: string) {
-  // Copying never widens a share on its own: the toast says who each choice lets in, and the team comes first.
-  if (!shared.value && changeable.value) {
-    const shareAndCopy = (next: Share) => async () => {
-      if (await pick(next)) await copy(link.value, { announce: `${SHARED_TITLES[next]}. Link copied` })
-    }
-    const team = choices.value.some((item) => item.value === "team" && !item.disabled)
-    const canPublic = choices.value.some((item) => item.value === "public" && !item.disabled)
-    notify.info({
-      title: "Only you can open this",
-      description: team
-        ? "Share it with the team, or turn on a public link anyone can open."
-        : canPublic
-          ? "Turn on a public link to copy it. Anyone with the link can open it."
-          : "Share it before you copy its link.",
-      actions: [
-        ...(team
-          ? [
-              {
-                label: "Share with team & copy",
-                color: "neutral" as const,
-                variant: "outline" as const,
-                onClick: shareAndCopy("team"),
-              },
-            ]
-          : []),
-        ...(canPublic
-          ? [
-              {
-                label: "Public link & copy",
-                color: "neutral" as const,
-                variant: team ? ("ghost" as const) : ("outline" as const),
-                onClick: shareAndCopy("public"),
-              },
-            ]
-          : []),
-      ],
-    })
-    return
-  }
-  await copy(link.value, { announce })
+/** The link button shows a check once it copied; from the menu, which closes, `announce` says it in StatusNote. */
+const copyLink = (announce?: string) => copy(link.value, { announce })
+
+// Copying never widens a share on its own. A private drop's link button and menu item open the choices instead,
+// each saying who it lets in, the team first. Empty when sharing isn't this person's to change.
+const shareAndCopy = (next: Share) => async () => {
+  if (await pick(next)) await copy(link.value, { announce: `${SHARED_TITLES[next]}. Link copied` })
 }
+const linkChoices = computed(() =>
+  shared.value || !changeable.value
+    ? undefined
+    : [
+        [{ type: "label" as const, label: "Only you can open this" }],
+        offers.value.length
+          ? offers.value
+          : [{ label: "Share it before you copy its link", icon: "i-mingcute-lock-line", disabled: true }],
+      ],
+)
+const offers = computed(() =>
+  choices.value
+    .filter((item) => !item.disabled && (item.value === "team" || item.value === "public"))
+    .map((item) => ({
+      label: item.value === "team" ? "Share with team & copy" : "Public link & copy",
+      icon: SHARE_ICONS[item.value],
+      onSelect: shareAndCopy(item.value),
+    })),
+)
 
 const menu = computed(() => [
   [
@@ -95,7 +78,9 @@ const menu = computed(() => [
       target: "_blank",
       disabled: !shared.value,
     },
-    { label: "Copy link", icon: "i-mingcute-link-line", onSelect: () => void copyLink("Link copied") },
+    linkChoices.value
+      ? { label: "Copy link", icon: "i-mingcute-link-line", children: linkChoices.value }
+      : { label: "Copy link", icon: "i-mingcute-link-line", onSelect: () => void copyLink("Link copied") },
   ],
   ...(changeable.value
     ? [
@@ -230,7 +215,17 @@ const menu = computed(() => [
       />
     </div>
     <div v-else class="relative z-10 flex items-center gap-0.5">
+      <UDropdownMenu v-if="linkChoices" :items="linkChoices" :content="{ align: 'end' }">
+        <UButton
+          aria-label="Copy link"
+          class="hidden sm:inline-flex"
+          color="neutral"
+          icon="i-mingcute-link-line"
+          variant="ghost"
+        />
+      </UDropdownMenu>
       <UButton
+        v-else
         aria-label="Copy link"
         class="hidden sm:inline-flex"
         color="neutral"

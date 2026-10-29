@@ -19,7 +19,6 @@ export function useAgents() {
       return
     try {
       await $fetch(`/api/agents/${agent.id}`, { method: "DELETE" })
-      notify.done(`${agent.name} disconnected`)
     } catch (error) {
       notify.fail(`Couldn't disconnect ${agent.name}`, error)
     }

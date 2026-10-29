@@ -31,7 +31,7 @@ useHead({ link: [{ rel: "preload", as: "font", type: "font/woff2", href: geist, 
 <template>
   <UApp :toaster="{ position: 'bottom-center', progress: false }">
     <QuotaNotice />
-    <CopyNote />
+    <StatusNote />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
