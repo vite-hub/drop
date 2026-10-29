@@ -159,6 +159,14 @@ async function trash(child: DropSummary) {
 
 // The preview's width, dragged from its left edge, kept for every folder.
 const preview = useResizeHandle(useFolderPreviewWidth(), { min: 18, max: 40, initial: 22 })
+const previewing = computed(() => Boolean(picked.value && !search.value.trim()))
+// The list stays centered on the whole page while the preview is open, so opening or resizing it doesn't move the
+// list's left edge: the preview takes its room from the list's right.
+const listStyle = computed(() =>
+  previewing.value
+    ? { marginLeft: `max(0px, (100% + ${preview.width.value}rem + 1px - var(--container-5xl)) / 2)` }
+    : undefined,
+)
 
 // Arrows walk the list with the preview following; Escape closes it; F2 renames the row in focus.
 function walk(event: KeyboardEvent) {
@@ -269,7 +277,7 @@ async function newSite() {
   </DefineRowParts>
   <div ref="root" class="relative flex min-h-0 flex-1">
     <div class="min-w-0 flex-1 overflow-y-auto">
-      <div class="mx-auto w-full max-w-5xl px-4 py-3 sm:px-6 sm:py-4">
+      <div class="max-w-5xl px-4 py-3 sm:px-6 sm:py-4" :class="{ 'mx-auto': !previewing }" :style="listStyle">
         <!-- Search and the folder's actions share one bar; visitors, who can't search, see how much it holds instead.
              The search box is a button that opens ⌘K on this folder. -->
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -374,7 +382,7 @@ async function newSite() {
         </template>
       </div>
     </div>
-    <template v-if="picked && !search.trim()">
+    <template v-if="picked && previewing">
       <!-- The pane's left border is its handle: drag it, double-click it to reset, or focus it and use the arrows. -->
       <div
         aria-label="Resize the preview"
