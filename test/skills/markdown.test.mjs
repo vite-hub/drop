@@ -44,9 +44,11 @@ test("every component Drop renders is in the Markdown reference agents read", ()
 test("every comark-ui package Drop renders has a section in the Markdown references", () => {
   const preset = createRequire(import.meta.url)("comark-ui/package.json")
   // include reads files, which Drop turns off, reading-time only measures, Drop draws Mermaid itself, not with pele, and
-  // the security plugin drops mathml's MathML, so markdown.md lists math under what Drop doesn't render.
+  // the security plugin drops mathml's MathML, so markdown.md lists math under what Drop doesn't render. magic-move's
+  // animation needs its script, which /f/ pages block, so blocks.md (a stopgap that doesn't grow) leaves it out.
   const packages = Object.keys(preset.dependencies).filter(
-    (name) => !["comark-include", "comark-mathml", "comark-pele", "comark-reading-time"].includes(name),
+    (name) =>
+      !["comark-include", "comark-magic-move", "comark-mathml", "comark-pele", "comark-reading-time"].includes(name),
   )
   const missing = packages.filter(
     (name) => !(reference + blocks).includes(`https://comark-ui.onmax.me/${name.replace(/^comark-/, "")}/`),
@@ -104,4 +106,54 @@ test("a doc written before comark-annotate 0.2 keeps its screenshot's url and la
   assert.doesNotMatch(html, /render-error/)
   assert.match(html, /href="https:\/\/pr12\.example\.com\/plan"/)
   assert.match(html, /Wrapped/)
+})
+
+test("plain Markdown keeps Drop's typography without the preset's typeset stylesheet", async () => {
+  const markdown = "# Existing document\n\nA paragraph.\n\n| Name | Value |\n| --- | --- |\n| One | Two |"
+  const { title, html } = await renderMarkdownCached("plain.md", async () => markdown)
+  assert.equal(title, "Existing document")
+  assert.match(html, /<table>/)
+  assert.equal(html.includes("data-comark-typeset"), false, "Drop already supplies its own typography CSS")
+})
+
+test("a suggestion, a comment, and its reply render their marks, bubbles, and card through the allowlist", async () => {
+  const markdown = [
+    "# Review **copy**",
+    "",
+    'To :suggestion[sign in]{from="log in" by="Claude" note="The button says Sign in."}, enter your email.',
+    "",
+    'The link expires after :comment[15 minutes]{#ttl by="@onmax" note="Is 15 minutes enough when email is slow?"}.',
+    "",
+    ':comment{reply="ttl" by="Claude" note="Keeping 15. The email has a resend button."}',
+  ].join("\n")
+  const document = await parseMarkdown(markdown)
+  assert.deepEqual(document.meta.issues ?? [], [])
+  const { title, html } = await renderMarkdownCached("comments.md", async () => markdown)
+  assert.equal(title, "Review copy")
+  assert.doesNotMatch(html, /unsupported-component|render-error/)
+  assert.match(html, /<style data-comark-comments>/)
+  assert.match(html, /<div class="cr">/)
+  assert.match(
+    html,
+    /<span class="cr-sg" data-mark="track" data-kind="replace"><del>log in<\/del><ins>sign in<\/ins><\/span>/,
+  )
+  assert.match(html, /<mark class="cr-cm" id="ttl">15 minutes<\/mark>/)
+  // Each thread is a hidden checkbox and the bubble that labels it, so a click opens the card without a script.
+  const toggles = [
+    ...html.matchAll(
+      /<input class="cr-tg" type="checkbox" id="([^"]+)" aria-label="[^"]+"><label class="cr-bub" for="\1">(\d*)<\/label><span class="cr-card" role="note">(.*?)<\/span><\/span>/g,
+    ),
+  ]
+  assert.equal(toggles.length, 2)
+  // The reply joins the comment's card, so the bubble counts two and the paragraph it sat in is gone.
+  assert.equal(toggles[1][2], "2")
+  assert.match(toggles[1][3], /onmax<\/b>Is 15 minutes enough.*Claude<\/b>Keeping 15/)
+  assert.doesNotMatch(html, /reply=/)
+})
+
+test("a doc's problems open in a foldable box that counts them and shows the Markdown they quote as code", async () => {
+  const { html } = await renderMarkdownCached("problems.md", async () => "# Quiz\n\n::question\nWhy?\n::\n")
+  assert.match(html, /<details class="render-error" open><summary>.*<span>This doc has 2 problems<\/span>/)
+  assert.match(html, /<li><code>::question<\/code> #1 has no options\./)
+  assert.doesNotMatch(html, /<li>[^<]*`/)
 })

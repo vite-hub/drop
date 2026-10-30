@@ -59,7 +59,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
         />
         <span class="truncate" :title="drop.title">{{ drop.title }}</span>
       </NuxtLink>
-      <UDropdownMenu v-if="changeable" :content="{ align: 'start', side: 'right' }" :items="menu">
+      <DeferredMenu v-if="changeable" :content="{ align: 'start', side: 'right' }" :items="menu">
         <button
           :aria-label="`Actions for ${drop.title}`"
           class="size-5 shrink-0 cursor-pointer place-items-center rounded-sm text-dimmed hover:bg-accented hover:text-highlighted"
@@ -68,7 +68,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
         >
           <UIcon name="i-mingcute-more-1-fill" class="size-3.5" />
         </button>
-      </UDropdownMenu>
+      </DeferredMenu>
       <button
         v-if="expandable"
         :aria-expanded="expanded"

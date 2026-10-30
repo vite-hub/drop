@@ -3,7 +3,7 @@
 // why, so picking never makes options appear or vanish; the line under the link always takes one line, so the popover
 // keeps its height too.
 import { daysUntil } from "#shared/expiry"
-import { isPublic, type Share, SHARE_HINTS, SHARE_ICONS, SHARE_LABELS } from "#shared/share"
+import { isPublic, type Share, SHARE_ICONS, SHARE_LABELS } from "#shared/share"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail }>()
@@ -29,21 +29,21 @@ const linkNote = computed(() => {
   return `Back to ${after} in ${left} ${left === 1 ? "day" : "days"}.${props.drop.isOwner ? " Pick it again to renew." : ""}`
 })
 
-// The list shows the new choice and what it means; only renewing, which may not change what it says, gets a toast.
+// The list shows the new choice and what it means; only renewing, which may not change what it says, gets a note.
 async function pick(next: Share) {
   const renew = next === own.value
   if ((renew && !isPublic(next)) || !(await setShare(props.drop, next))) return
-  if (renew) notify.done("Public link renewed", SHARE_HINTS[next])
+  if (renew) notify.done("Public link renewed")
 }
 </script>
 
 <template>
   <UPopover
     v-model:open="open"
-    :content="{ align: 'start', side: 'bottom' }"
+    :content="{ align: 'end', side: 'top' }"
     :ui="{
       content:
-        'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain',
+        'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px] border border-default surface-review bg-(--review-surface) ring-0',
     }"
   >
     <UButton
@@ -52,9 +52,7 @@ async function pick(next: Share) {
       color="neutral"
       :icon="SHARE_ICONS[drop.share]"
       label="Share"
-      :ui="{ label: 'hidden sm:inline', trailingIcon: 'hidden sm:block' }"
-      trailing-icon="i-mingcute-down-small-line"
-      size="sm"
+      size="xs"
       variant="ghost"
     />
     <template #content>

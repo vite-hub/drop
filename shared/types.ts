@@ -12,6 +12,15 @@ export type ActorKind = (typeof ACTOR_KINDS)[number]
 export const VIEWER_KINDS = ["person", "anonymous", "agent"] as const
 export type ViewerKind = (typeof VIEWER_KINDS)[number]
 
+/** How many of your newest drops the sidebar lists before its "more" (`/api/drops?tree`). */
+export const TREE_ROWS = 30
+
+/** The sidebar's drops: your newest TREE_ROWS at the top, and the open one wherever it sits, of `total`. */
+export interface DropTree {
+  drops: DropSummary[]
+  total: number
+}
+
 export interface DropSummary {
   /** This version. */
   id: string
@@ -70,6 +79,9 @@ export interface DropSummary {
   /** "Shared with me" and search: whose drop it is, when it isn't yours. */
   owner?: { name: string; image: string | null }
 }
+
+/** An image beside the open one in its folder, for moving to it. */
+export type DropGalleryItem = DropCrumb & { thumbnail: string }
 
 /** A node on the way to a drop, for breadcrumbs. */
 export interface DropCrumb {
@@ -140,6 +152,8 @@ export interface DropDetail extends DropSummary {
   ancestors: DropCrumb[]
   /** Folders: the drops directly inside, newest first. */
   children?: DropSummary[]
+  /** Images in a folder the reader may open: the folder's images, in its order, this one among them. Two or more. */
+  gallery?: DropGalleryItem[]
   /** Sites: the origin of the website under review. */
   siteUrl?: string
   /** Its owner and admins: views of every version, each viewer counted once a day. Their own visits don't count. */

@@ -1,0 +1,16 @@
+diff --git a/dist/vite.js b/dist/vite.js
+index f075c896a72e37fa9f1911a461b5d8a5d2f383f8..3d4e38d26ae90fbb542d5c2277613aa28c54d0dc 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -956,7 +956,10 @@ function mergeGeneratedSourceNitroConfig(value, generatedHandlers) {
+ 		}
+ 		if (handlers.some((candidate) => candidate.handler === handler.handler && candidate.route === handler.route && candidate.method?.toLowerCase() === handler.method?.toLowerCase())) continue;
+ 		if (handlers.some((candidate) => !candidate.middleware && candidate.route === handler.route && methodsOverlap(candidate.method, handler.method))) throw sourceErrorDiagnostics.SOURCE_B0002({ message: `[vitehub] Generated ${generatedRouteOwner(handler)} route ${JSON.stringify(handler.route)} conflicts with an existing ${generatedRouteDescription(handler)}. Remove the matching server route.` });
+-		kit.addHandler(handler);
++		kit.addHandler({
++			...handler,
++			lazy: true
++		});
+ 	}
+ 	const modules = Array.isArray(nitro.modules) ? [...nitro.modules] : [];
+ 	if (!modules.some((module) => Object(module) === module && Reflect.get(Object(module), "name") === "vite-hub/generated-route-guard")) modules.push(generatedRouteGuard(generatedHandlers));

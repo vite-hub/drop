@@ -10,7 +10,6 @@ import { blobCleanup, dropFiles, drops, dropVersions } from "../../databases/con
 import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
-import { renderMarkdownCached } from "../markdown-document"
 import { refreshLatest } from "#live-drafts"
 import { deleteMarkdownCache } from "../markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
@@ -248,7 +247,9 @@ export async function createDocDrop(
       let parsedTitle: string | undefined
       try {
         parsedTitle =
-          kind === "markdown" && text ? (await renderMarkdownCached(key, async () => text, event)).title : undefined
+          kind === "markdown" && text
+            ? (await (await import("../markdown-document")).renderMarkdownCached(key, async () => text, event)).title
+            : undefined
       } catch (error) {
         await deleteBlobKeys([key])
         throw error

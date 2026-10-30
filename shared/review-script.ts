@@ -134,27 +134,86 @@ const MARKUP = `<div class="ui">
  * Clones only reach the hook without their original, so originals carry a data attribute for the length of a capture.
  * `describe` names the element under a box, and says when it's on a sticky or fixed one, which doesn't scroll. Needs
  * ELEMENT_NAMING's labelOf.
+ *
+ * What kept a comment's box from showing for seconds, measured in Firefox on a dashboard (2026-10-29):
+ *
+ * - Cloning the page reads and copies every computed style of every element: about a second on a dashboard, four on a
+ *   long page. It ran before the browser painted the box, and froze the page while it ran. The capture now waits for
+ *   the next frame, and the clone hands the main thread back every SLICE_MS, so the box takes typing meanwhile. The
+ *   clone walks the page by next siblings, so a page that removes the element just cloned, or one it's inside, in one
+ *   of those pauses cuts it short, and that capture is taken again in one go.
+ * - modern-screenshot first waits for every image on the page, and lazy images below the fold never load, so it sat
+ *   out its whole timeout. The clone embeds each image from its URL anyway, so this wait gets LOAD_WAIT_MS.
+ * - In Firefox and Safari it draws the result once more per image and CSS image on the page, 100 ms apart and one
+ *   after another (its fixSvgXmlDecode), which an icon-heavy page pays in seconds. MAX_REDRAWS caps it.
  */
-const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024;
+const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_MS = 300, MAX_REDRAWS = 2, SLICE_MS = 30;
   let screenshotModule = null;
   // Loaded when someone presses Comment, so the box's screenshot can start the moment it's drawn.
   const loadScreenshot = () => (screenshotModule = screenshotModule || import(${JSON.stringify(SCREENSHOT_MODULE)}));
+  const painted = () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  // modern-screenshot reads default styles from an iframe it adds, which starts loading its srcdoc then, and a clone
+  // that pauses would see its document swap midway. This one has loaded first; null when it didn't within a second,
+  // and that clone doesn't pause.
+  function sandbox() {
+    const frame = document.createElement("iframe");
+    frame.width = "0"; frame.height = "0"; frame.style.visibility = "hidden"; frame.style.position = "fixed";
+    frame.srcdoc = '<!DOCTYPE html><meta charset="UTF-8"><title></title><body>';
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => { frame.remove(); resolve(null); }, 1000);
+      // Chrome fires a load for the frame's first, blank document as it's added; that one gets replaced.
+      frame.onload = () => {
+        if (frame.contentDocument && frame.contentDocument.URL === "about:srcdoc" && frame.contentDocument.body) { clearTimeout(timer); resolve(frame); }
+      };
+      document.body.appendChild(frame);
+    });
+  }
   async function captureViewport(skip) {
     const pins = pinsNow(skip);
     const drawn = [scrollX, scrollY];
     try {
-      const { domToBlob } = await loadScreenshot();
+      const { createContext, domToBlob } = await loadScreenshot();
+      await painted();
       // If the page scrolled since the box was drawn, the clone is taken where it was drawn, and the page goes back
-      // once it's cloned. Cloning takes no paint in between on most pages, so nobody sees the jump.
-      const take = (scale, type, quality) => {
+      // once it's cloned. That clone doesn't pause, so nobody sees the jump.
+      const take = async (scale, type, quality, sliced = true) => {
+        const frame = sliced ? await sandbox() : null;
+        sliced = Boolean(frame);
+        // The elements whose clones are still open, outermost first: the filter sees each one as its clone starts.
+        const open = [];
+        let cut = false, slice = performance.now();
+        const filter = (node) => {
+          if (node === skip) return false;
+          if (node.nodeType === 1) open.push(node);
+          return true;
+        };
+        const each = async (cloned) => {
+          pins.apply(cloned);
+          const done = open.pop();
+          if (!sliced || away || performance.now() - slice < SLICE_MS) return;
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          slice = performance.now();
+          if ((done && !done.isConnected) || open.some((node) => !node.isConnected)) cut = true;
+        };
+        const context = await createContext(document.documentElement, {
+          width: pins.width, height: pins.height, backgroundColor: pins.background, scale, type, quality, timeout: LOAD_WAIT_MS,
+          filter, features: { restoreScrollPosition: true }, onCloneEachNode: each, onCloneNode: back,
+          onCreateForeignObjectSvg: () => { context.drawImageCount = Math.min(context.drawImageCount, MAX_REDRAWS); },
+          autoDestruct: true,
+        });
+        context.timeout = 15000;
+        if (frame) context.sandbox = frame;
         const now = [scrollX, scrollY];
         let away = now[0] !== drawn[0] || now[1] !== drawn[1];
-        const back = () => { if (away) { away = false; scrollTo(now[0], now[1]); } };
+        function back() { if (away) { away = false; scrollTo(now[0], now[1]); } }
         if (away) scrollTo(drawn[0], drawn[1]);
-        return domToBlob(document.documentElement, {
-          width: pins.width, height: pins.height, backgroundColor: pins.background, scale, type, quality, timeout: 15000,
-          filter: (node) => node !== skip, features: { restoreScrollPosition: true }, onCloneEachNode: pins.apply, onCloneNode: back,
-        }).finally(back);
+        try {
+          const shot = await domToBlob(context);
+          return cut ? take(scale, type, quality, false) : shot;
+        } finally {
+          back();
+          if (frame) frame.remove();
+        }
       };
       let shot = await take(Math.min(window.devicePixelRatio || 1, 2), "image/webp", 0.85);
       if (shot.size > MAX_BYTES) shot = await take(1, "image/jpeg", 0.75);

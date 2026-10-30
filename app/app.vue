@@ -29,8 +29,9 @@ useHead({ link: [{ rel: "preload", as: "font", type: "font/woff2", href: geist, 
 </script>
 
 <template>
-  <UApp :toaster="{ position: 'bottom-center' }">
+  <UApp :toaster="{ position: 'bottom-center', progress: false }">
     <QuotaNotice />
+    <StatusNote />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>

@@ -1,8 +1,11 @@
 import type { ConnectedAgent } from "#shared/types"
 
+/** The agents this person approved over MCP. */
+export const useAgentList = () => useApi("/api/agents", { key: keys.agents, default: () => [] })
+
 /** The agents this person approved over MCP, and disconnecting one. */
 export function useAgents() {
-  const { data: agents, status, refresh } = useApi("/api/agents", { key: keys.agents, default: () => [] })
+  const { data: agents, status, refresh } = useAgentList()
   const notify = useNotify()
   const confirm = useConfirm()
 
@@ -19,7 +22,6 @@ export function useAgents() {
       return
     try {
       await $fetch(`/api/agents/${agent.id}`, { method: "DELETE" })
-      notify.done(`${agent.name} disconnected`)
     } catch (error) {
       notify.fail(`Couldn't disconnect ${agent.name}`, error)
     }

@@ -43,7 +43,7 @@ const teams = computed(() => me.value?.teams ?? null)
 // Rows end in a count like Executor v2's nav: muted totals for what you have, and a marked one for what waits on you.
 // Both are the keyed caches the trees and the Drops page read; only a personal Drop's Shared with me, which no tree
 // shows, costs a fetch of its own.
-const { data: drops } = useDrops()
+const { total: dropCount } = useSidebarDrops()
 const { data: shared } = useSharedWithMe()
 // A personal Drop's teams list their folders under Teams, not under Shared with me.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
@@ -176,7 +176,7 @@ function leaveDocs() {
               <SidebarItem
                 active-icon="i-mingcute-layers-fill"
                 :active="onDrops"
-                :count="drops.length"
+                :count="dropCount"
                 icon="i-mingcute-layers-line"
                 :label="team ? 'My drops' : 'Drops'"
                 to="/drops"

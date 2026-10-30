@@ -6,6 +6,8 @@ export const keys = {
   me: "me",
   signIn: "sign-in",
   drops: "drops",
+  /** The sidebar's drops (useDropTree). */
+  tree: "tree",
   sharedWithMe: "shared-with-me",
   trash: "trash",
   usage: "usage",

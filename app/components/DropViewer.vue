@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The header shares the drop, the bottom dock owns editing and comments, and the right sidebar holds Details and
+// The header locates the drop, the bottom dock owns editing, comments, and sharing, and the right sidebar holds Details and
 // History. Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import { expiryLabel } from "#shared/expiry"
@@ -76,6 +76,7 @@ const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (i
 const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
+  shareOpen.value = false
   tool.value = "browse"
   commentsOpen.value = true
   if (!wide.value) panel.close()
@@ -139,8 +140,7 @@ watch(framed, (value) => !value && (tool.value = "browse"))
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
 /** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. */
 const dockClearance = computed(
-  () =>
-    hasComments.value && !editing.value && !trashed.value && ["board", "site", "app", "file"].includes(drop.value.kind),
+  () => !editing.value && !trashed.value && ["board", "site", "app", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null
@@ -151,6 +151,9 @@ const popoverRef = useTemplateRef<{
   sent: () => Promise<void>
 }>("popoverRef")
 const shareOpen = ref(false)
+watch(shareOpen, (open) => {
+  if (open && commentsOpen.value) closeComments()
+})
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
 // they're commenting, selecting, or sharing. Editors are left out: the live editor tells them itself (useLiveEditor).
@@ -238,19 +241,27 @@ function nextWidth() {
   docWidth.value = widths[(at + 1) % widths.length]!.value
 }
 
+// An image in a folder moves along the folder's other images (useGallery).
+const gallery = useGallery(drop, publicView)
+const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
+
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath } = useViewerFrame({
-  drop,
-  frame,
-  app,
-  pinned,
-  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
-  inset: ref(0),
-  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
-  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
-  width: docWidth,
-  annotations,
-})
+const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker } = useViewerFrame(
+  {
+    drop,
+    frame,
+    app,
+    pinned,
+    // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+    inset: ref(0),
+    // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+    bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
+    width: docWidth,
+    annotations,
+    variantBar: true,
+    arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
+  },
+)
 
 const outdated = computed(
   () =>
@@ -278,6 +289,8 @@ const previousVersion = computed(() =>
       null)
     : null,
 )
+// The folder's images show over the image, not over its lightbox or a version's changes.
+const galleryShown = computed(() => galleryItems.value.length > 0 && !lightbox.value && !shownVersion.value)
 // Opening a diff from the document adds a history entry; moving between versions replaces it, so one Back always
 // lands on the document. Closing steps back over that entry rather than adding another one.
 let pushedChanges = false
@@ -320,7 +333,11 @@ function present() {
 
 defineShortcuts({
   c: showComments,
-  e: () => !editing.value && !shownVersion.value && drop.value.canEdit && startEdit(),
+  e: () => {
+    if (editing.value || !showEditTool.value) return
+    if (drop.value.canEdit) startEdit()
+    else editNoteOpen.value = true
+  },
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleCommentArea,
@@ -375,6 +392,8 @@ const canMarkArea = computed(
 const inspectable = computed(
   () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
 )
+// Open when someone reaches for Edit on a doc the editor can't take: the popover says why.
+const editNoteOpen = ref(false)
 const showEditTool = computed(
   () =>
     !lightbox.value &&
@@ -439,7 +458,7 @@ async function reply(id: string, body: string, files: File[] = []) {
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
-// it works for whoever can open the drop. The menu that copied it closes, so a toast says it was copied.
+// it works for whoever can open the drop. The menu that copied it closes, so StatusNote says it was copied.
 function copyCommentLink(comment: DropComment) {
   const url = new URL(link.value)
   url.searchParams.set("comment", String(comment.n))
@@ -475,12 +494,7 @@ onMounted(async () => {
       .toBe(true, { timeout: 10000 })
       .catch(() => {})
   const comment = comments.value.find((item) => item.n === n)
-  if (!comment)
-    return notify.info({
-      title: `Comment #${n} isn't on this version`,
-      icon: "i-mingcute-chat-1-line",
-      color: "neutral",
-    })
+  if (!comment) return notify.say(`Comment #${n} isn't on this version`, { icon: "i-mingcute-chat-1-line" })
   void focusComment(comment)
 })
 
@@ -641,9 +655,9 @@ watch(
           <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
           <ViewerAction
             v-if="copiesMarkdown"
-            icon="i-mingcute-markdown-line"
-            label="Copy as Markdown"
-            @click="copyMarkdown('Markdown copied')"
+            :icon="copied('markdown') ? 'i-mingcute-check-line' : 'i-mingcute-markdown-line'"
+            :label="copied('markdown') ? 'Copied' : 'Copy as Markdown'"
+            @click="copyMarkdown()"
           />
           <ViewerAction
             v-if="presents && !slidev"
@@ -704,7 +718,6 @@ watch(
         </template>
         <template #trailing>
           <ViewerResources v-if="drop.resources?.length" :resources="drop.resources" />
-          <ViewerShare v-model:open="shareOpen" :drop="drop" />
         </template>
         <template #right>
           <UTooltip text="Details and history" :kbds="['I']">
@@ -849,6 +862,32 @@ watch(
             />
           </ViewerDevice>
 
+          <!-- The folder's images on either side, like a carousel's; the bar below has them too. -->
+          <template v-if="galleryShown">
+            <UTooltip v-if="prevImage" :kbds="['←']" :text="prevImage.title">
+              <UButton
+                aria-label="Previous image"
+                data-gallery
+                class="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full shadow-sm pointer-coarse:size-11 pointer-coarse:justify-center"
+                color="neutral"
+                icon="i-mingcute-left-line"
+                variant="outline"
+                @click="gallery.step(-1)"
+              />
+            </UTooltip>
+            <UTooltip v-if="nextImage" :kbds="['→']" :text="nextImage.title">
+              <UButton
+                aria-label="Next image"
+                data-gallery
+                class="absolute top-1/2 right-3 z-10 -translate-y-1/2 rounded-full shadow-sm pointer-coarse:size-11 pointer-coarse:justify-center"
+                color="neutral"
+                icon="i-mingcute-right-line"
+                variant="outline"
+                @click="gallery.step(1)"
+              />
+            </UTooltip>
+          </template>
+
           <ViewerDiff
             v-if="shownVersion && !editing"
             :key="shownVersion.version"
@@ -860,10 +899,9 @@ watch(
           />
         </div>
         <ViewerReviewDock
-          v-if="(hasComments || editing) && !trashed"
           ref="reviewDock"
           :class="{ invisible: siteRef?.capturing }"
-          :open="commentsOpen && !editing"
+          :open="commentsOpen && !editing && !trashed"
           :overlay="Boolean(lightbox)"
           @close="closeComments"
         >
@@ -919,6 +957,20 @@ watch(
             />
           </template>
           <template #toolbar>
+            <template v-if="galleryShown">
+              <ViewerGallery
+                :at="galleryAt"
+                :items="galleryItems"
+                :to="gallery.to"
+                @show="gallery.show"
+                @step="gallery.step"
+              />
+              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+            </template>
+            <template v-if="variants && !editing && !lightbox && !shownVersion">
+              <ViewerVariants :state="variants" @command="picker" />
+              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+            </template>
             <template v-if="editing">
               <AvatarStack
                 v-if="live.people.value.length"
@@ -938,6 +990,7 @@ watch(
               <UButton size="xs" color="neutral" label="Close" variant="ghost" @click="live.close" />
               <UButton
                 size="xs"
+                data-review-primary
                 color="neutral"
                 :disabled="!live.synced.value"
                 label="Publish"
@@ -945,7 +998,7 @@ watch(
                 @click="live.publish()"
               />
             </template>
-            <template v-else>
+            <template v-else-if="hasComments && !trashed">
               <ViewerToolbar
                 v-if="
                   !lightbox &&
@@ -969,15 +1022,10 @@ watch(
                 variant="ghost"
                 @click="present"
               />
-              <UTooltip
-                v-if="showEditTool"
-                :kbds="drop.canEdit ? ['E'] : undefined"
-                :text="drop.editNote ?? 'Edit together'"
-              >
+              <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
                 <UButton
                   size="xs"
                   color="neutral"
-                  :disabled="!drop.canEdit"
                   icon="i-mingcute-pencil-line"
                   label="Edit"
                   :loading="live.opening.value"
@@ -985,6 +1033,13 @@ watch(
                   @click="startEdit"
                 />
               </UTooltip>
+              <ViewerEditNote
+                v-else-if="showEditTool && drop.editNote"
+                v-model:open="editNoteOpen"
+                :can-comment="drop.canComment"
+                :note="drop.editNote"
+                @copy="copyMarkdown('Markdown copied')"
+              />
               <UButton
                 size="xs"
                 data-review-trigger
@@ -997,9 +1052,20 @@ watch(
                 @click="toggleComments"
               >
                 Comments
-                <span v-if="openCount && !commentsOpen" class="font-mono text-xs tabular-nums">{{ openCount }}</span>
+                <span
+                  v-if="openCount && !commentsOpen"
+                  class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums"
+                  >{{ openCount }}</span
+                >
               </UButton>
             </template>
+            <span
+              v-if="editing || (hasComments && !trashed)"
+              aria-hidden="true"
+              class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)"
+              data-divider
+            />
+            <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
         </ViewerReviewDock>
       </div>

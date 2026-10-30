@@ -24,9 +24,9 @@ import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
  * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
  * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments, and
- * Mermaid stays Drop's, with its limits.
+ * Mermaid stays Drop's, with its limits, and Drop supplies the document's typography.
  */
-const preset = comarkUi({ chips: { download: false }, mermaid: false, zoom: { images: false } })
+const preset = comarkUi({ chips: { download: false }, mermaid: false, typeset: false, zoom: { images: false } })
 // Writes comark-zoom's script once per render, using the renderer's context to track it.
 const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
   preset.components["zoom-runtime"]!(["zoom-runtime", {}], state)
@@ -190,7 +190,13 @@ function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): str
   const title = textValue(document.frontmatter.title)?.trim()
   if (title) return title
 
-  const heading = document.nodes.find((node) => Array.isArray(node) && node[0] === "h1")
+  // The comments plugin wraps the whole document; headings inside other blocks still aren't document titles.
+  const nodes = document.nodes.flatMap((node) => {
+    if (!Array.isArray(node) || node[0] !== "comments") return [node]
+    const [, , ...children] = node
+    return children
+  })
+  const heading = nodes.find((node) => Array.isArray(node) && node[0] === "h1")
   return (heading && textContent(heading).trim()) || "Untitled document"
 }
 
@@ -239,6 +245,31 @@ function createMermaidRenderer(): NodeHandler {
   }
 }
 
+const PROBLEM_ICON =
+  '<svg aria-hidden="true" class="render-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
+const FOLD_ICON =
+  '<svg aria-hidden="true" class="render-error-fold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+
+/**
+ * The box above a doc that lists its problems, open so its author sees them, foldable so a reader can put it away.
+ * Plugins quote Markdown in backticks (`::question`), which reads as code here.
+ */
+function problemsHtml(issues: string[]) {
+  const title = issues.length === 1 ? "This doc has a problem" : `This doc has ${issues.length} problems`
+  // "`::question` 2 has no id" counts blocks of a kind; "#2" says it's an ordinal rather than part of the sentence.
+  const items = issues.map(
+    (issue) =>
+      `<li>${escapeHtml(issue)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/^(<code>::[\w-]+<\/code>) (\d+) /, "$1 #$2 ")}</li>`,
+  )
+  return (
+    `<details class="render-error" open><summary>${PROBLEM_ICON}<span>${title}</span>${FOLD_ICON}</summary>` +
+    `<p class="render-error-hint">Fix ${issues.length === 1 ? "it" : "them"} in the Markdown and publish again. Readers see this box until then.</p>` +
+    `<ul>${items.join("")}</ul></details>`
+  )
+}
+
 /** Problems a network failure caused, which the next render may not have: an icon or a Kroki server out of reach. */
 const RETRIED_RULE = /\/(?:download-failed|server-unreachable)$/
 
@@ -281,9 +312,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
       ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
       : ""
     const { all: issues, retry } = issuesOf(document.meta)
-    const problems = issues.length
-      ? `<aside class="render-error"><p>This document has ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
-      : ""
+    const problems = issues.length ? problemsHtml(issues) : ""
     const content = await renderHtmlFromDocument(document, {
       components: {
         ...preset.components,

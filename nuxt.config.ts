@@ -26,6 +26,9 @@ const liveEditing = host === "cloudflare" || host === "vps"
 // 304 without its bytes (the blob handler handles conditional requests). server/plugins/content-headers.ts agrees.
 const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-cache" } } }
 
+// drop.vitehub.dev's own D1, in Cloudflare's EEUR region, which runs it in Milan.
+const HOSTED_D1 = "d634358e-4605-45ca-970f-d390584795a5"
+
 // D1's HTTP driver works from every host. The account and API token are read at runtime.
 const d1 = (fallback: string) => ({
   driver: "d1" as const,
@@ -404,9 +407,12 @@ export default defineNuxtConfig({
       wrangler: {
         name: cloudflareTemplate.name,
         observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } },
-        // A page waits on D1 queries one after another, each a round trip from wherever the Worker runs. Smart
-        // Placement runs it near the database when that's faster; static assets are still served from the edge.
-        placement: { mode: "smart" },
+        // A page waits on D1 queries one after another, each a round trip from wherever the Worker runs, so it runs
+        // next to the database; static assets are still served from the edge. Smart Placement kept drop.vitehub.dev's
+        // Worker in the visitor's city, 40 ms from its D1 per query; in Milan, by it, a query takes 6 ms (measured
+        // 2026-10-29). Self-hosted Drops keep Smart Placement: their database can be anywhere.
+        placement:
+          process.env.CLOUDFLARE_D1_DATABASE_ID === HOSTED_D1 ? { region: "gcp:europe-west8" } : { mode: "smart" },
       },
     },
     // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.

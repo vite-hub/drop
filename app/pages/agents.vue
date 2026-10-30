@@ -2,6 +2,9 @@
 import type { TabsItem } from "@nuxt/ui"
 import { PLAN_TEMPLATE } from "#shared/plan-template"
 
+// Started before the layout renders, which waits for your drops first, so the agents load alongside them.
+definePageMeta({ middleware: () => void useAgentList() })
+
 useSeoMeta({ title: "Agents" })
 
 const origin = useRequestURL().origin

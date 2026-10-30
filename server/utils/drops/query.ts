@@ -3,12 +3,20 @@ import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
-import { renderMarkdownCached } from "../markdown-document"
-import { renderSpreadsheetCached, SPREADSHEET_EXTENSIONS, spreadsheetExtension } from "../spreadsheet"
-import type { DropAttachment, DropCrumb, DropDetail, DropKind, DropSummary, DropVersion } from "#shared/types"
+import type {
+  DropAttachment,
+  DropCrumb,
+  DropDetail,
+  DropGalleryItem,
+  DropKind,
+  DropSummary,
+  DropTree,
+  DropVersion,
+} from "#shared/types"
+import { TREE_ROWS } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
-import { hasEditorlessSyntax } from "#shared/frontmatter"
+import { editorlessSyntax } from "#shared/frontmatter"
 import { MAX_DEPTH } from "#shared/nodes"
 import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
@@ -77,21 +85,23 @@ async function summarize(
   days: number,
   options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {},
 ) {
-  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query.
-  const files =
+  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query. Both reads start together: each is a
+  // round trip to D1.
+  const [files, counts] = await Promise.all([
     options.ownerId && rows.some((row) => row.kind === "app")
-      ? await db
+      ? db
           .select({ dropId: dropFiles.dropId, path: dropFiles.path })
           .from(dropFiles)
           .innerJoin(drops, eq(drops.id, dropFiles.dropId))
           .where(eq(drops.ownerId, options.ownerId))
-      : []
+      : [],
+    itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : []))),
+  ])
   const pathsOf = (id: string) =>
     files
       .filter((file) => file.dropId === id)
       .map((file) => file.path)
       .sort()
-  const counts = await itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : [])))
   const pathOf = (row: DropRow) => {
     const above = row.ancestors ?? []
     const stop = options.below ? above.findIndex((node) => node.id === options.below) : -1
@@ -194,6 +204,21 @@ export async function listDrops(
 }
 
 /**
+ * The sidebar's share of `listDrops`: the newest TREE_ROWS at the top, and `open` wherever it sits, with how many there
+ * are in all. Only those get summarized and sent, instead of every drop on every page.
+ */
+export async function listTree(who: Identity, event?: H3Event, open?: string): Promise<DropTree> {
+  const { days } = expiryPolicy(event)
+  const found = await newest(
+    and(eq(drops.ownerId, who.userId), isNull(drops.parentId), eq(drops.teamFolder, false)),
+    500,
+  )
+  const rows = (await resolveRows(found, days)).filter((row) => !row.expired)
+  const listed = rows.filter((row, index) => index < TREE_ROWS || row.id === open)
+  return { drops: await summarize(listed, days, { ownerId: who.userId }), total: rows.length }
+}
+
+/**
  * A folder's drops, newest first: the ones directly inside, or with `query` or `kinds` the matches anywhere below it. Drops someone
  * moved to the Trash on their own list there instead. Anyone who may open the folder may open what it holds. A team
  * folder holds everyone's drops; any other folder only its owner's.
@@ -241,6 +266,27 @@ export async function listFolder(
     const owner = owners.get(ownerOf.get(summary.id)!)
     return owner && !summary.teamFolder ? { ...summary, owner } : summary
   })
+}
+
+/**
+ * The images in an image's folder, in the folder's order, for moving between them in the viewer: the ones `listFolder`
+ * lists there, read on their own so the folder's other drops cost nothing. Only for a reader who may open the folder,
+ * and only when there's another image to move to.
+ */
+async function galleryOf(row: DropRow, who: Identity | null, days: number): Promise<DropGalleryItem[] | undefined> {
+  const [parent, ...above] = row.ancestors ?? []
+  if (row.kind !== "image" || parent?.kind !== "folder") return undefined
+  const folder = { ...resolveNode(parent, above, days), ownerBanned: row.ownerBanned }
+  if (!permissions(folder, who).view) return undefined
+  const owned = folder.teamFolder ? undefined : eq(drops.ownerId, folder.ownerId)
+  const images = (
+    await newest(and(owned, eq(drops.parentId, parent.id), eq(drops.kind, "image"), isNull(drops.trashedAt)), 500)
+  )
+    .map((image) => resolveNode(image, [parent, ...above], days))
+    .filter((image) => (folder.expired || !image.expired) && image.blobKey)
+  // An image in the Trash, which its owner may still open, isn't among them.
+  if (images.length < 2 || !images.some((image) => image.id === row.id)) return undefined
+  return images.map((image) => ({ ...toCrumb(image), thumbnail: `/f/${image.blobKey}` }))
 }
 
 /**
@@ -507,12 +553,13 @@ export async function dropDetail(
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
-  const [versions, body, attachments, views, quiz] = await Promise.all([
+  const [versions, body, attachments, views, quiz, gallery] = await Promise.all([
     versionsOf(row),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
     who && answerable(row, who) ? quizOf(row, who.userId) : undefined,
+    galleryOf(row, who, days),
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
@@ -526,15 +573,17 @@ export async function dropDetail(
     ancestors: openableAncestors(row, who, days),
     ...body,
   }
-  if (detail.canEdit && row.kind === "markdown" && hasEditorlessSyntax(detail.content ?? "")) {
+  const blocking = detail.canEdit && row.kind === "markdown" ? editorlessSyntax(detail.content ?? "") : []
+  if (blocking.length) {
     detail.canEdit = false
-    detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
+    detail.editNote = `It uses ${editNoteList(blocking)}, which the live editor can't keep yet.`
   }
   if (attachments) detail.attachments = attachments
   if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
   if (views) detail.views = views
   if (resources.length) detail.resources = resources
   if (quiz) detail.quiz = quiz
+  if (gallery) detail.gallery = gallery
   return detail
 }
 
@@ -566,15 +615,21 @@ async function bodyOf(
     detail.paths = files.map((file) => file.path).sort()
     detail.sizes = Object.fromEntries(files.map((file) => [file.path, file.size]))
   } else if (row.blobKey) {
+    // The Markdown renderer (Comark, Shiki, charts) and the spreadsheet readers load with the first drop that needs
+    // them, not with every route that lists drops: on a fresh Worker that's most of the first request's code.
     if (row.kind === "markdown") {
+      const { renderMarkdownCached } = await import("../markdown-document")
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       detail.html = rendered.html
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
-    else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {
+    else if (row.kind === "file") {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
+      const sheets = await import("../spreadsheet")
+      const extension = sheets.spreadsheetExtension(row.filename)
       const key = row.blobKey
-      detail.html = await renderSpreadsheetCached(key, spreadsheetExtension(row.filename), () => readBytes(key), event)
+      if (sheets.SPREADSHEET_EXTENSIONS.has(extension))
+        detail.html = await sheets.renderSpreadsheetCached(key, extension, () => readBytes(key), event)
     }
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
@@ -586,6 +641,12 @@ async function bodyOf(
  * The nodes above a drop that the caller may open, top-most first. A share widens going down, so the ones the caller
  * can't open are always the top-most: someone sent one drop from a private folder sees no folder names.
  */
+/** `::question, ::poll and footnotes`: the first three by name, then how many more. */
+function editNoteList(syntax: string[]) {
+  const named = syntax.length > 3 ? [...syntax.slice(0, 3), `${syntax.length - 3} more`] : syntax
+  return new Intl.ListFormat("en", { type: "conjunction" }).format(named)
+}
+
 function openableAncestors(row: DropRow, who: Identity | null, days: number): DropCrumb[] {
   const above = row.ancestors ?? []
   return above

@@ -38,8 +38,21 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* comark-comments floats each thread's card into a 19.5rem margin beside its line, and opens that margin only once the
+   doc (its .cr root) is 50rem wide. A doc with threads widens by the margin, so its text keeps the column's width beside
+   the cards. On a narrow screen the margin stays shut and a bubble opens its card under the line. The viewer's review
+   comments take the same margin (data-drop-rail, set by ANNOTATOR_SCRIPT in plan-runtime.ts); once it's open, a doc
+   without threads of its own leaves it as padding. */
+:root:is(:has(.cr), [data-drop-rail]) {
+  --drop-rail: 19.5rem;
+}
+
+:root[data-drop-rail="open"] .typeset:not(:has(.cr)) {
+  padding-right: var(--drop-rail);
+}
+
 main {
-  width: min(100% - 2rem, 48rem);
+  width: min(100% - 2rem, 48rem + var(--drop-rail, 0rem));
   margin: 0 auto;
   padding: 2.5rem 0 1.25rem;
 }
@@ -49,8 +62,7 @@ main {
   font-style: italic;
 }
 
-.revision-note,
-.render-error {
+.revision-note {
   margin: 0 0 1rem;
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--border);
@@ -60,15 +72,107 @@ main {
   font-size: 0.75rem;
 }
 
+/* A doc's problems, in the doc's sans rather than mono: they're sentences, and the Markdown they quote is <code>.
+   Red is the only accent, on the icon and a faint tint; the title and the list keep the doc's own text colors. */
 .render-error {
-  border-color: oklch(0.637 0.237 25.331 / 0.35);
+  --problem: var(--destructive, oklch(0.577 0.245 27.325));
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in oklab, var(--problem) 28%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--problem) 5%, var(--background));
+  color: var(--foreground);
+  font-family: var(--font-sans, var(--font-body));
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.render-error summary {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: -0.25rem -0.375rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.render-error summary::-webkit-details-marker {
+  display: none;
+}
+
+.render-error summary:focus-visible {
+  outline: 2px solid var(--problem);
+  outline-offset: 1px;
+}
+
+.render-error-icon,
+.render-error-fold {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.render-error-icon {
+  color: var(--problem);
+}
+
+.render-error-fold {
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .render-error-fold {
+    transition: rotate 150ms ease-out;
+  }
+}
+
+.render-error:not([open]) .render-error-fold {
+  rotate: -90deg;
+}
+
+/* Muted alone measures 4.42:1 on the light tint; a fifth of the foreground lifts it past 4.5:1 in both themes. */
+.render-error p.render-error-hint {
+  margin: 0.25rem 0 0 1.5rem;
+  color: color-mix(in oklab, var(--muted-foreground) 80%, var(--foreground));
+  font-size: 0.8125rem;
+}
+
+.render-error ul {
+  margin: 0.625rem 0 0;
+  padding-left: 1.5rem;
+}
+
+.render-error li {
+  margin: 0.375rem 0 0;
+  padding-left: 0.125rem;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+/* The doc's code chip is --muted, which nearly vanishes on the tint. */
+.render-error code {
+  background: color-mix(in oklab, var(--foreground) 7%, transparent);
+}
+
+.render-error li::marker {
+  color: var(--muted-foreground);
+}
+
+/* The whole-document fallback (Drop couldn't render it at all) is one sentence, not a list. */
+p.render-error {
+  color: var(--muted-foreground);
 }
 
 .document-footer {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  width: min(100% - 2rem, 48rem);
+  width: min(100% - 2rem, 48rem + var(--drop-rail, 0rem));
   margin: 1.25rem auto 0;
   padding: 1rem 0 2rem;
   border-top: 1px solid var(--border);
@@ -151,6 +255,14 @@ main {
   );
   width: var(--ca-wide);
   margin-inline: calc((100% - var(--ca-wide)) / 2);
+}
+
+/* In a doc with threads, or review comments in the margin, the room beside the text is the cards', so a compare, its
+   heading, and a wide diagram stay in the column. */
+:is(.typeset .cr, [data-drop-rail="open"] .typeset)
+  :is(.ca-compare, .drop-mermaid, :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare)) {
+  width: auto;
+  margin-inline: 0;
 }
 
 /* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.

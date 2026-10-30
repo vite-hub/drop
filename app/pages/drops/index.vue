@@ -3,6 +3,16 @@ import { TRASH_DAYS } from "#shared/expiry"
 import { MIB, usageNearLimit } from "#shared/quotas"
 import type { DropSummary } from "#shared/types"
 
+// The layout waits for your drops before this page's setup runs, which put the Trash and usage a round trip later.
+// Started here, before either renders, they load alongside the sidebar's (started by the auth middleware).
+definePageMeta({
+  middleware: () => {
+    void useDrops()
+    useTrash()
+    useUsage()
+  },
+})
+
 useSeoMeta({ title: "Drops" })
 
 const { data: drops, status, error, refresh } = useDrops()
@@ -13,11 +23,11 @@ const siteDialog = useSiteDialog()
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const open = useRowsOpen()
-const { data: trash } = useApi("/api/drops", { key: keys.trash, query: { trash: "1" }, default: () => [] })
+const { data: trash } = useTrash()
 const { data: shared } = useSharedWithMe()
 // A personal Drop's teams list their folders under Teams, not here.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
-const { data: usage } = useApi("/api/usage", { key: keys.usage })
+const { data: usage } = useUsage()
 const limited = computed(
   () =>
     usage.value?.enabled &&
@@ -103,6 +113,17 @@ const visible = computed(() => {
     )
 })
 
+// Each row costs the server render milliseconds of CPU (its menus, share picker, buttons), so the list starts with the
+// newest ROWS, about two screens, and renders more as you reach its end. The counts and the search still cover every
+// drop.
+const ROWS = 25
+const shown = ref(ROWS)
+watch([filter, search], () => (shown.value = ROWS))
+const more = useTemplateRef("more")
+useIntersectionObserver(more, ([entry]) => {
+  if (entry?.isIntersecting) shown.value += ROWS
+})
+
 /**
  * Today, Yesterday, This week, then month names. The Worker renders in UTC, so the server render and hydration
  * group in UTC and the browser regroups in the reader's own timezone once mounted.
@@ -120,7 +141,7 @@ const groups = computed(() => {
     return new Date(at).toLocaleDateString("en", { timeZone, month: "long", year: "numeric" })
   }
   const out: Array<{ label: string; drops: DropSummary[] }> = []
-  for (const drop of visible.value) {
+  for (const drop of visible.value.slice(0, shown.value)) {
     // The Trash groups by when things went there, which is also what sets when they're deleted.
     const name = label(filter.value === "trash" ? (drop.trashedAt ?? drop.updatedAt) : drop.updatedAt)
     const last = out.at(-1)
@@ -356,6 +377,14 @@ async function newSite() {
           </template>
         </ul>
       </template>
+    </div>
+    <div v-if="visible.length > shown" ref="more" class="mt-4 flex justify-center">
+      <UButton
+        color="neutral"
+        :label="`Show ${Math.min(ROWS, visible.length - shown)} more`"
+        variant="ghost"
+        @click="shown += ROWS"
+      />
     </div>
   </PageShell>
 </template>

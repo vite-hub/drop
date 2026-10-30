@@ -212,6 +212,8 @@ export const DropsQuerySchema = v.object({
   folders: v.optional(v.string()),
 })
 
+export const DropTreeQuerySchema = v.object({ open: v.optional(v.pipe(v.string(), v.maxLength(100))) })
+
 export const SearchQuerySchema = v.object({ q: v.optional(v.string()), kind: v.optional(v.string()) })
 // The page forwards whatever `?v=` it was given; the route ignores what isn't a version number.
 export const LinkQuerySchema = v.object({ v: v.optional(v.string()) })

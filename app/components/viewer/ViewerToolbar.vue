@@ -78,10 +78,10 @@ const groups = computed(() =>
 </script>
 
 <template>
-  <div aria-label="Preview tools" class="flex items-stretch" role="group">
+  <div aria-label="Preview tools" class="flex items-center gap-1" role="group">
     <template v-for="(group, index) in groups" :key="group.label">
-      <div v-if="index" aria-hidden="true" class="w-px shrink-0 bg-(--ui-border)" />
-      <div :aria-label="group.label" class="flex items-center gap-1 p-1" role="group">
+      <div v-if="index" aria-hidden="true" class="h-[18px] w-px shrink-0 bg-(--ui-border)" />
+      <div :aria-label="group.label" class="flex items-center gap-1" role="group">
         <UTooltip v-for="item in group.items" :key="item.id" :content="{ side: 'top', sideOffset: 8 }">
           <button
             :aria-keyshortcuts="item.kbd"
@@ -101,8 +101,8 @@ const groups = computed(() =>
       </div>
     </template>
     <template v-if="sizable">
-      <div v-if="groups.length" aria-hidden="true" class="w-px shrink-0 bg-(--ui-border)" />
-      <div aria-label="Device" class="flex items-center p-1" role="group">
+      <div v-if="groups.length" aria-hidden="true" class="h-[18px] w-px shrink-0 bg-(--ui-border)" />
+      <div aria-label="Device" class="flex items-center" role="group">
         <ViewerDeviceButton />
       </div>
     </template>
