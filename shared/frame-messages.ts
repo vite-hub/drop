@@ -54,7 +54,13 @@ export const FrameMessage = v.variant("type", [
     ow: v.number(),
     oh: v.number(),
     rect: Rect,
+    // On something that shows only for a while: the number of the "area-shot" with its picture, which follows.
+    shot: v.optional(v.number()),
   }),
+  // null: the picture couldn't be taken.
+  v.object({ type: v.literal("area-shot"), shot: v.number(), image: v.nullable(v.blob()) }),
+  // The tool the comment layer is under, once it has it: under any but browse, the page is held (EVENT_HOLD).
+  v.object({ type: v.literal("tool"), tool: v.picklist(["browse", "comment", "measure"]) }),
   // A click on a pin, or (`focused`) the pin a "focus" with `open` scrolled to.
   v.object({
     type: v.literal("marker"),

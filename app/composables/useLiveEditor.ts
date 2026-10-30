@@ -6,6 +6,9 @@ import type { LiveRoom } from "~/composables/live-room"
 // What a publishing client leaves on its awareness state. Other clients set it, so it's parsed, not trusted.
 const PublishedSchema = v.object({ id: v.string(), version: v.number(), name: v.string() })
 type Published = v.InferOutput<typeof PublishedSchema>
+const LintFailureSchema = v.object({
+  problems: v.array(v.object({ severity: v.string(), line: v.number(), message: v.string() })),
+})
 
 /**
  * Live editing of a Markdown drop. Everyone who opens it joins one Realtime room on the drop's draft, sees the others,
@@ -110,6 +113,18 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       close()
       await openLatest(next.id)
     } catch (error) {
+      // The Markdown has Comark errors (requirePublishableMarkdown): the first few, by line, rather than the whole list.
+      const errors = errorData(error, LintFailureSchema)?.problems.filter((problem) => problem.severity === "error")
+      if (errors?.length) {
+        notify.alert(
+          errors.length === 1 ? "Couldn't publish: fix this line" : `Couldn't publish: fix ${errors.length} problems`,
+          errors
+            .slice(0, 3)
+            .map((problem) => `Line ${problem.line}: ${problem.message}`)
+            .join(" "),
+        )
+        return
+      }
       const head = errorData(error, v.object({ head: v.object({ id: v.string(), version: v.number() }) }))?.head
       if (!head) {
         notify.fail("Couldn't publish", error)

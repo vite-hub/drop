@@ -14,7 +14,7 @@ import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, pu
 import { updateDrop } from "./drop-update"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
-import { markdownIssues } from "./markdown-document"
+import { problemLine } from "./markdown-document"
 import { createSiteDrop } from "./review"
 import { unpackApp } from "./app-archive"
 import { perDropOrigins } from "./content-origin"
@@ -321,15 +321,6 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     } else {
       const source = (input.markdown ?? input.html)!
       if (!source.trim()) throw new HTTPError({ status: 400, message: "The doc is empty." })
-      // A broken annotated screenshot would render with marks in the wrong place; send the agent back to fix it. Other
-      // blocks show their problem in the doc, so they publish, and the agent hears about them.
-      const issues = input.markdown ? await markdownIssues(source) : { annotations: [], blocks: [] }
-      if (issues.annotations.length)
-        throw new HTTPError({
-          status: 400,
-          message: `Fix the annotated screenshots and publish again:\n${issues.annotations.map((issue) => `- ${issue}`).join("\n")}`,
-        })
-      warnings = issues.blocks
       // An HTML doc is one file, so anything it loads by relative path is missing.
       if (input.html)
         warnings = appLinkIssues({ "doc.html": input.html }, ["doc.html"]).filter(
@@ -354,6 +345,8 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       },
       event,
     )
+    // createDocDrop refused a Markdown doc with errors (requirePublishableMarkdown); these are what it published with.
+    if (row.warnings.length) warnings = row.warnings.map(problemLine)
     // The share and the slug apply to every version, like a change on the drop's page.
     if (previous && (input.share || input.slug))
       await updateDrop(
@@ -373,7 +366,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
   const lead = input.markdown
-    ? "These blocks have problems, which the doc shows to its readers."
+    ? "It published with these Comark lint warnings."
     : `These references point at nothing in the ${input.files ? "app" : "page"}.`
   const check = warnings.length
     ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`

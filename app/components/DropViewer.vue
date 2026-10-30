@@ -112,7 +112,22 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotationsEnabled = computed(() => !route.query.changes && !trashed.value)
-const annotations = useViewerAnnotations({ drop, editing, enabled: annotationsEnabled, reviewOpen: commentsOpen })
+/** The picture the frame took of the tooltip or menu the new comment is on, among the draft's images. */
+let autoShot: File | null = null
+const annotations = useViewerAnnotations({
+  drop,
+  editing,
+  enabled: annotationsEnabled,
+  reviewOpen: commentsOpen,
+  shot: (file) => {
+    const { images } = reviewDraft
+    const before = images.picks.value.find((pick) => pick.file === autoShot)
+    if (before) images.remove(before)
+    // A send under way clears the draft when it's done, but not one that changed meanwhile: the picture would stay.
+    autoShot = file && !reviewDraft.sending.value ? file : null
+    if (autoShot) images.add([autoShot])
+  },
+})
 const {
   selection,
   lightbox,
@@ -246,8 +261,8 @@ const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker } = useViewerFrame(
-  {
+const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker, whenHeld } =
+  useViewerFrame({
     drop,
     frame,
     app,
@@ -260,8 +275,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
     annotations,
     variantBar: true,
     arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
-  },
-)
+  })
 
 const outdated = computed(
   () =>
@@ -412,11 +426,25 @@ watch(shownVersion, (version) => {
 async function submit(body: string, files: File[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
+  // A comment sent the moment its area is drawn still takes the picture the frame is taking of it.
+  const before = reviewDraft.images.picks.value.length
+  reviewDraft.waiting.value = true
+  try {
+    await annotations.waitForShot()
+  } finally {
+    reviewDraft.waiting.value = false
+  }
+  if (popover.value !== open) return
+  const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
   const finish = reviewDraft.beginSend()
   if (!finish) return
   const composer = popoverRef.value
   try {
-    const sent = await state.addComment({ ...open.pending, ...(isApp.value ? { page: page.value } : {}) }, body, files)
+    const sent = await state.addComment(
+      { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
+      body,
+      attached,
+    )
     if (!("value" in sent)) {
       if (popoverRef.value === composer) composer?.fail(sent.error)
       return
@@ -902,6 +930,7 @@ watch(
           :class="{ invisible: siteRef?.capturing }"
           :open="commentsOpen && !editing && !trashed"
           :overlay="Boolean(lightbox)"
+          :settle="whenHeld"
           @close="closeComments"
         >
           <template #heading>

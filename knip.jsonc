@@ -31,6 +31,8 @@
     // Launched by ssr-fetch.test.mjs in a Node subprocess.
     "test/auth/ssr-fetch-runtime.mjs",
     "skills/**/*.js",
+    // `pnpm doctor` loads it with --config.
+    "doctor.config.ts",
   ],
   "project": [
     "app/**/*.{ts,vue,css}",

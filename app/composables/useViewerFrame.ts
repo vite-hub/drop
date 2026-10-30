@@ -3,6 +3,7 @@ import type { FrameMessage } from "#shared/frame-messages"
 import { injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
+import type { ViewerTool } from "~/composables/useViewerAnnotations"
 
 type RuntimeReport = {
   kind: Extract<FrameMessage, { type: "runtime-error" }>["kind"]
@@ -153,6 +154,29 @@ export function useViewerFrame(options: {
   const variants = shallowRef<ViewerVariants | null>(null)
   const picker = (command: PickerCommand, index?: number) => send({ type: "picker", do: command, index })
 
+  /**
+   * The tool the frame says it's under. Under any but browse it holds the page's events (EVENT_HOLD in
+   * #shared/plan-runtime), so Drop can take focus from it without the page closing what it has open.
+   */
+  const frameTool = ref<ViewerTool>("browse")
+  const held = () => !ready.value || annotations.frameTool.value === "browse" || frameTool.value !== "browse"
+  /**
+   * Resolves once the frame is under the tool the viewer gave it, at once when that's browse, or after a moment for a
+   * frame that never says (one without the comment layer).
+   */
+  function whenHeld() {
+    if (held()) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const stop = watch(frameTool, () => held() && done())
+      const timer = setTimeout(done, 400)
+      function done() {
+        stop()
+        clearTimeout(timer)
+        resolve()
+      }
+    })
+  }
+
   // Open comments carry over from earlier versions; the frame says which of them it couldn't place on this one.
   const unplaced = ref(new Set<string>())
 
@@ -213,9 +237,13 @@ export function useViewerFrame(options: {
       case "unplaced":
         unplaced.value = new Set(message.ids)
         return
+      case "tool":
+        frameTool.value = message.tool
+        return
       case "ready":
-        // Each page load starts without variants; a prototype's picker answers the sync with its own.
+        // Each page load starts without variants or a tool; a prototype's picker answers the sync with its own.
         variants.value = null
+        frameTool.value = "browse"
         if (options.variantBar) send({ type: "picker", do: "sync" })
         return
       case "variants":
@@ -227,6 +255,7 @@ export function useViewerFrame(options: {
       case "selection":
       case "image":
       case "area":
+      case "area-shot":
       case "marker":
         annotations.receive(message, box)
     }
@@ -306,5 +335,5 @@ export function useViewerFrame(options: {
   )
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
 
-  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker }
+  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker, whenHeld }
 }

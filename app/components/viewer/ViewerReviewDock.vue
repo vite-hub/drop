@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The list, thread, and composer sit above the same dark pill as the HTML prototype picker.
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ open: boolean; overlay?: boolean }>()
+// settle: what to wait for before the composer takes focus, which the drop's frame would otherwise hear it lose.
+const props = defineProps<{ open: boolean; overlay?: boolean; settle?: () => Promise<void> }>()
 const emit = defineEmits<{ close: [] }>()
 const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
@@ -19,11 +20,23 @@ function focusTrigger() {
   root.value?.querySelector<HTMLButtonElement>("[data-review-trigger]")?.focus({ preventScroll: true })
 }
 defineExpose({ focusTrigger })
+// A press on the bar leaves focus in the drop's frame. The page there would hear it go and close what it has open, such
+// as the tooltip someone is about to comment on. Keys and the composer still move focus.
+function keepFrameFocus(event: MouseEvent) {
+  if (
+    document.activeElement instanceof HTMLIFrameElement &&
+    event.target instanceof Element &&
+    event.target.closest("button")
+  )
+    event.preventDefault()
+}
 watch(
   () => props.open,
   async (open) => {
     if (!open) return
     await nextTick()
+    await props.settle?.()
+    if (!props.open) return
     const target = panel.value?.querySelector<HTMLElement>("[data-comment-editor] textarea") ?? panel.value
     target?.focus({ preventScroll: true })
   },
@@ -65,6 +78,7 @@ watch(
         role="group"
         aria-label="Document tools"
         :data-wrapped="wrapped || undefined"
+        @mousedown="keepFrameFocus"
         class="review-toolbar pointer-events-auto flex max-w-full shrink-0 flex-wrap items-center justify-center gap-1 rounded-[12px] border border-default surface-review p-1"
       >
         <slot name="toolbar" />
