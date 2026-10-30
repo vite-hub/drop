@@ -93,7 +93,9 @@ async function load(path, isApp = false) {
   let source = readFileSync(path, "utf8")
   if (isApp) {
     source = stripTypeScriptTypes(source).replaceAll("createUseFetch(", "createUseFetch.__nuxt_factory(")
-    source = 'import { createUseFetch, useRequestURL, useRequestHeaders, useRequestEvent, keys } from "#test/context";\n' + source
+    source =
+      'import { createUseFetch, useRequestURL, useRequestHeaders, useRequestEvent, keys } from "#test/context";\n' +
+      source
   }
   source = source
     .replaceAll("import.meta.server", "true")
