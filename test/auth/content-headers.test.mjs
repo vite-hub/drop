@@ -6,7 +6,7 @@ vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({ seoIndex: fa
 
 const { default: contentHeaders } = await import("../../server/plugins/content-headers.ts")
 let onResponse
-contentHeaders({ hooks: { hook: (_name, fn) => (onResponse = fn) } })
+await contentHeaders({ hooks: { hook: (_name, fn) => (onResponse = fn) } })
 
 const key = "00000000-0000-4000-8000-000000000001"
 function respond(path, init = {}) {
