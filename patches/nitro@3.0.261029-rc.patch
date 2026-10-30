@@ -1,0 +1,25 @@
+diff --git a/dist/_build/common.mjs b/dist/_build/common.mjs
+index 3e20579..5915eb1 100644
+--- a/dist/_build/common.mjs
++++ b/dist/_build/common.mjs
+@@ -8469,7 +8469,8 @@ function libChunkName(id) {
+ function libChunksGroup() {
+ 	const group = {
+ 		test: NODE_MODULES_RE$2,
+-		name: (id) => libChunkName(id)
++		name: (id) => libChunkName(id),
++		entriesAware: true
+ 	};
+ 	Object.defineProperty(group, "debugName", { value: "libs" });
+ 	return group;
+@@ -8481,6 +8482,10 @@ function pathToPkgName(path) {
+ }
+ function getChunkName(chunk, nitro) {
+ 	if (chunk.name === "rolldown-runtime") return "_runtime.mjs";
++	chunk = {
++		...chunk,
++		name: chunk.name.split("~")[0]
++	};
+ 	if (chunk.moduleIds.every((id) => NODE_MODULES_RE$2.test(id))) {
+ 		const chunkName = joinPkgNames(chunk.moduleIds);
+ 		if (chunkName.length > 30) return `${chunk.name}+[...].mjs`;
