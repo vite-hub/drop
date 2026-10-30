@@ -10,7 +10,7 @@ const emit = defineEmits<{ upload: []; site: [] }>()
 const hidden = useGetStartedHidden()
 // Your agents decide only the first step, so they're fetched only when no drop came from one yet: on a Drops page with
 // agents' drops the fetch only held up the render by another round trip.
-const agents = hidden.value || props.drops.some((drop) => drop.actorKind === "agent") ? ref([]) : useAgents().agents
+const agents = hidden.value || props.drops.some((drop) => drop.actorKind === "agent") ? ref([]) : useAgentList().data
 const origin = useRequestURL().origin
 const snippets = mcpSnippets(`${origin}/mcp`)
 const clients = MCP_CLIENT_IDS.map((value) => ({ label: MCP_CLIENTS[value], value }))
