@@ -20,7 +20,7 @@ const variables = {
 <template>
   <div class="grid min-h-0 flex-1 place-items-center bg-elevated p-6 sm:p-10">
     <media-controller
-      class="block max-h-full w-full max-w-5xl overflow-hidden rounded-lg border border-default shadow-lg"
+      class="@container block max-h-full w-full max-w-5xl overflow-hidden rounded-lg border border-default shadow-lg"
       :style="variables"
     >
       <video
@@ -32,14 +32,18 @@ const variables = {
       >
         <source :src="src" :type="type" />
       </video>
+      <!-- A narrow player can't fit the seek bar beside its buttons, so it gets a row of its own above them. -->
+      <media-control-bar class="w-full @2xl:hidden">
+        <media-time-range class="flex-1 px-2.5" />
+      </media-control-bar>
       <media-control-bar class="w-full">
         <media-play-button class="p-2.5" />
-        <media-seek-backward-button class="p-2.5" seekoffset="10" />
-        <media-seek-forward-button class="p-2.5" seekoffset="10" />
-        <media-time-range class="flex-1 p-2.5" />
-        <media-time-display class="p-2.5 font-mono tabular-nums" showduration />
+        <media-seek-backward-button class="hidden p-2.5 @md:inline-flex" seekoffset="10" />
+        <media-seek-forward-button class="hidden p-2.5 @md:inline-flex" seekoffset="10" />
+        <media-time-range class="hidden flex-1 p-2.5 @2xl:inline-flex" />
+        <media-time-display class="mr-auto p-2.5 font-mono tabular-nums @2xl:mr-0" showduration />
         <media-mute-button class="p-2.5" />
-        <media-volume-range class="p-2.5" />
+        <media-volume-range class="hidden p-2.5 @2xl:inline-flex" />
         <media-playback-rate-button class="p-2.5" />
         <media-fullscreen-button class="p-2.5" />
       </media-control-bar>
