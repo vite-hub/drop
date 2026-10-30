@@ -1,3 +1,4 @@
+import * as v from "valibot"
 import type { RouteLocationNormalizedLoaded } from "vue-router"
 import type { Lifetime } from "#shared/expiry"
 import { dropPath } from "#shared/links"
@@ -14,8 +15,11 @@ export const useDrops = () => useApi("/api/drops", { key: keys.drops, default: (
  * The sidebar's drops (listTree): your newest, and the one open on the page that loaded it, of how many in all. Every
  * dashboard page has the sidebar, and listing every drop on each of them cost every page's render and payload.
  */
+// A page's open drop is its route's single `id`; a route without one, or with a repeated one, has none.
+const OpenDrop = v.fallback(v.object({ id: v.optional(v.string()) }), {})
+
 export function useDropTree({ params }: Pick<RouteLocationNormalizedLoaded, "params"> = useRoute()) {
-  const open = "id" in params && typeof params.id === "string" ? params.id : undefined
+  const { id: open } = v.parse(OpenDrop, params)
   return useApi("/api/drops/tree", {
     key: keys.tree,
     query: open ? { open } : {},

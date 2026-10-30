@@ -14,6 +14,18 @@ import type { ActorKind } from "#shared/types"
 import { textValue } from "#shared/utils/text"
 import type auth from "../auth"
 
+// What Drop's middleware leaves on the event for later handlers. Declared here, beside the identity lookup that reads
+// it, because the app and shared/ typecheck this file through their imports, outside the server project.
+declare module "h3" {
+  interface H3EventContext {
+    /** The access gate's identity lookup, shared so error pages don't look the caller up again. */
+    dropIdentity?: Promise<Identity | null>
+    /** On a page render's own API call (useApi), the page's request: same visitor, same cookie, already identified. */
+    dropPage?: H3Event
+    dropAccessChecked?: boolean
+  }
+}
+
 /** Who is calling and how: a person in the browser, or an agent through an MCP client they approved. */
 export interface Identity {
   userId: string
