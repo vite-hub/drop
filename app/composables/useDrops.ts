@@ -1,13 +1,46 @@
+import type { RouteLocationNormalizedLoaded } from "vue-router"
 import type { Lifetime } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import type { Share } from "#shared/share"
-import type { DropSummary, Viewer } from "#shared/types"
+import type { DropSummary, DropTree, Viewer } from "#shared/types"
 
 /**
- * Your drops. The list is one keyed cache ("drops") shared by the sidebar tree and the Drops page; the actions
- * (useDropActions) patch it after the server agrees, or refresh it when the server computes fields.
+ * Your drops, every one: the Drops page's list, and the sidebar's once it's loaded. The actions (useDropActions) patch it
+ * after the server agrees, or refresh it when the server computes fields.
  */
 export const useDrops = () => useApi("/api/drops", { key: keys.drops, default: () => [] })
+
+/**
+ * The sidebar's drops (listTree): your newest, and the one open on the page that loaded it, of how many in all. Every
+ * dashboard page has the sidebar, and listing every drop on each of them cost every page's render and payload.
+ */
+export function useDropTree({ params }: Pick<RouteLocationNormalizedLoaded, "params"> = useRoute()) {
+  const open = "id" in params && typeof params.id === "string" ? params.id : undefined
+  return useApi("/api/drops/tree", {
+    key: keys.tree,
+    query: open ? { open } : {},
+    default: (): DropTree => ({ drops: [], total: 0 }),
+  })
+}
+
+/**
+ * The drops the sidebar shows, and how many you have: every one where the page loaded them all already (the Drops page),
+ * else the sidebar's list (useDropTree).
+ */
+export function useSidebarDrops() {
+  const { data: tree, status } = useDropTree()
+  const { data: all } = useNuxtData<DropSummary[]>(keys.drops)
+  return {
+    drops: computed(() => (all.value?.length ? all.value : tree.value.drops)),
+    total: computed(() => all.value?.length || tree.value.total),
+    /** Whether every drop is in `drops`. */
+    complete: computed(() => Boolean(all.value?.length)),
+    status,
+  }
+}
+
+/** Both lists of your drops: the whole one (useDrops) and the sidebar's (useDropTree). They refresh together. */
+const LISTS = [keys.drops, keys.tree]
 
 /** What others share with you: on a team Drop the team's folders and teammates' drops, on a personal one the public links you opened. */
 export const useSharedWithMe = () =>
@@ -43,28 +76,32 @@ export function useShareUrl(
  * What you can do to drops, for the page, rows, modals and the viewer: actions patch the shared "drops" cache
  * through useNuxtData instead of starting another fetch.
  */
-const refresh = () => refreshNuxtData([keys.drops, keys.usage])
+const refresh = () => refreshNuxtData([...LISTS, keys.usage])
 
 /**
  * The lists a new drop shows up in. Not awaited: the caller opens the new drop next, and its page loads by itself, so
  * waiting on the lists only held the page back by a round trip.
  */
 const refreshAfterCreate = (parent?: Pick<DropSummary, "id">) =>
-  void refreshNuxtData([keys.drops, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
+  void refreshNuxtData([...LISTS, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
 
 export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>(keys.drops)
+  const { data: tree } = useNuxtData<DropTree>(keys.tree)
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
-  const drops = computed({ get: () => cached.value ?? [], set: (value) => (cached.value = value) })
+  /** Changes both lists (LISTS) the same way. */
+  const edit = (change: (list: DropSummary[]) => DropSummary[]) => {
+    if (cached.value) cached.value = change(cached.value)
+    if (tree.value) tree.value = { ...tree.value, drops: change(tree.value.drops) }
+  }
   const notify = useNotify()
   const confirm = useConfirm()
   // Sharing, trashing or moving a folder changes what its open listings show, so they refetch too.
   const nuxtApp = useNuxtApp()
   const folders = () => Object.keys(nuxtApp.payload.data).filter((key) => key.startsWith(keys.folder("")))
 
-  const patch = (id: string, change: Partial<DropSummary>) => {
-    drops.value = drops.value.map((drop) => (drop.id === id ? { ...drop, ...change } : drop))
-  }
+  const patch = (id: string, change: Partial<DropSummary>) =>
+    edit((list) => list.map((drop) => (drop.id === id ? { ...drop, ...change } : drop)))
 
   /** Uploads one file as a drop with this Drop's default share, or into `folder`, where it shares and lives with the folder. */
   async function upload(file: File, folder?: Pick<DropSummary, "id" | "title">) {
@@ -73,9 +110,7 @@ export function useDropActions() {
     if (folder) form.append("folder", folder.id)
     try {
       const result = await $fetch<{ id: string }>("/api/files", { method: "POST", body: form })
-      await (folder
-        ? refreshNuxtData([keys.drops, keys.usage, keys.folder(folder.id), keys.drop(folder.id)])
-        : refresh())
+      await (folder ? refreshNuxtData([...LISTS, keys.usage, keys.folder(folder.id), keys.drop(folder.id)]) : refresh())
       notify.done(
         folder
           ? `Dropped into ${folder.title}`
@@ -92,7 +127,7 @@ export function useDropActions() {
 
   // Optimistic: sharing is one pick, so it changes at once and rolls back if the server says no.
   async function setShare(drop: Pick<DropSummary, "id">, share: Share) {
-    const before = drops.value
+    const before = [...(cached.value ?? []), ...(tree.value?.drops ?? [])].find((item) => item.id === drop.id)?.share
     patch(drop.id, { share })
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { share } })
@@ -100,7 +135,7 @@ export function useDropActions() {
       await refreshNuxtData([keys.drop(drop.id), keys.sharedWithMe, ...folders()])
       return true
     } catch (error) {
-      drops.value = before
+      if (before) patch(drop.id, { share: before })
       notify.fail("Couldn't change sharing", error)
       return false
     }
@@ -140,8 +175,8 @@ export function useDropActions() {
   async function remove(drop: Pick<DropSummary, "id" | "title">) {
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
-      drops.value = drops.value.filter((item) => item.id !== drop.id)
-      await refreshNuxtData([keys.usage, keys.trash, keys.drop(drop.id), ...folders()])
+      edit((list) => list.filter((item) => item.id !== drop.id))
+      await refreshNuxtData([keys.tree, keys.usage, keys.trash, keys.drop(drop.id), ...folders()])
       notify.say("Moved to the Trash", {
         icon: "i-mingcute-delete-2-line",
         action: { label: "Undo", onClick: () => void restore(drop) },
@@ -156,7 +191,7 @@ export function useDropActions() {
   async function restore(drop: Pick<DropSummary, "id" | "title">) {
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "PATCH", body: { trashed: false } })
-      await refreshNuxtData([keys.drops, keys.trash, keys.usage, keys.drop(drop.id), ...folders()])
+      await refreshNuxtData([...LISTS, keys.trash, keys.usage, keys.drop(drop.id), ...folders()])
       return true
     } catch (error) {
       notify.fail("Couldn't restore", error)
@@ -219,7 +254,7 @@ export function useDropActions() {
         body: { title, ...(parent ? { folder: parent.id } : {}), ...options },
       })
       await refreshNuxtData([
-        keys.drops,
+        ...LISTS,
         keys.sharedWithMe,
         ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : []),
       ])
@@ -295,7 +330,7 @@ export function useDropActions() {
     try {
       await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { folder: folder?.id ?? null } })
       const around = [drop.parentId, folder?.id].flatMap((id) => (id == null ? [] : [keys.drop(id)]))
-      await refreshNuxtData([keys.drops, keys.drop(drop.id), ...around, ...folders()])
+      await refreshNuxtData([...LISTS, keys.drop(drop.id), ...around, ...folders()])
       notify.done(folder ? `Moved to ${folder.title}` : "Moved to the top")
       return true
     } catch (error) {

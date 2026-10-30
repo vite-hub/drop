@@ -4,9 +4,10 @@ import { MIB, usageNearLimit } from "#shared/quotas"
 import type { DropSummary } from "#shared/types"
 
 // The layout waits for your drops before this page's setup runs, which put the Trash and usage a round trip later.
-// Started here, before either renders, they load alongside your drops (started by the auth middleware).
+// Started here, before either renders, they load alongside the sidebar's (started by the auth middleware).
 definePageMeta({
   middleware: () => {
+    void useDrops()
     useTrash()
     useUsage()
   },

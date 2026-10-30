@@ -17,7 +17,7 @@ const context = injectPaletteContext()
 const current = computed(() => context?.drop.value ?? null)
 const folder = computed(() => context?.folder.value ?? null)
 const scope = computed(() => context?.scope.value ?? null)
-const { data: recent } = useDrops()
+const { drops: recent } = useSidebarDrops()
 const term = usePaletteTerm()
 // Opened with a term (a folder's search), the caret goes after it: the field selects it all, and the first key typed
 // would replace the folder's `in:`.

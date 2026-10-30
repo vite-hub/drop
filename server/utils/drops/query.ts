@@ -12,8 +12,10 @@ import type {
   DropGalleryItem,
   DropKind,
   DropSummary,
+  DropTree,
   DropVersion,
 } from "#shared/types"
+import { TREE_ROWS } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
 import { hasEditorlessSyntax } from "#shared/frontmatter"
@@ -201,6 +203,21 @@ export async function listDrops(
   const rows = await resolveRows(found.rows, days)
   const listed = rows.filter((row) => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
   return summarize(listed, days, { ownerId: who.userId, path: deep, snippets: found.snippets })
+}
+
+/**
+ * The sidebar's share of `listDrops`: the newest TREE_ROWS at the top, and `open` wherever it sits, with how many there
+ * are in all. Only those get summarized and sent, instead of every drop on every page.
+ */
+export async function listTree(who: Identity, event?: H3Event, open?: string): Promise<DropTree> {
+  const { days } = expiryPolicy(event)
+  const found = await newest(
+    and(eq(drops.ownerId, who.userId), isNull(drops.parentId), eq(drops.teamFolder, false)),
+    500,
+  )
+  const rows = (await resolveRows(found, days)).filter((row) => !row.expired)
+  const listed = rows.filter((row, index) => index < TREE_ROWS || row.id === open)
+  return { drops: await summarize(listed, days, { ownerId: who.userId }), total: rows.length }
 }
 
 /**
