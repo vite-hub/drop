@@ -7,16 +7,16 @@ overrides:
   vue: 3.5.44
   # Keep older consumers on the patched v5 serializer without downgrading Nuxt's v6.
   devalue@5: ^5.9.4
-  # alpha.10 still overflows setTimeout for the 30-day Markdown cache TTL.
-  nitro>unstorage: 2.0.0-alpha.11
+  # One Nitro: ViteHub's build asks for exactly 3.0.260903-beta.
+  nitro: 3.0.261029-rc
   vite@*: "catalog:"
   # Nuxt UI's editor menus stay on @tiptap/core's 3.31.4; a 3.32 menu beside core 3.31.4 breaks them.
   "@tiptap/extension-bubble-menu": 3.31.4
   "@tiptap/extension-floating-menu": 3.31.4
   # One h3 v2 in the server bundle. Nitro and ViteHub asked for older release candidates; Nitro's rc.22 answered a
   # malformed escape such as /f/%E0%A4 with a 500 before any of Drop's middleware ran.
-  "h3@2.0.1-rc.22": 2.0.1
-  "h3@2.0.1-rc.33": 2.0.1
+  "h3@2.0.1-rc.22": 2.0.8
+  "h3@2.0.1-rc.33": 2.0.8
 
 patchedDependencies:
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
@@ -33,10 +33,10 @@ patchedDependencies:
   # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
   # padding, so keep this part after #7267 ships.
   "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
-  # Nuxt runs Vite without an HTTP server; virtual importers also need the plugin resolver. Library chunks are split by
-  # the entries that load them (Rolldown `entriesAware`): grouped by package only, one small import (mrmime, entities,
-  # the comark-ui skills) loaded a whole package chunk and what it imports, about half of a cold /drops request's code.
-  nitro@3.0.260903-beta: patches/nitro@3.0.260903-beta.patch
+  # Library chunks are split by the entries that load them (Rolldown `entriesAware`, nitrojs/nitro#4967): grouped by
+  # package only, one small import (mrmime, entities, the comark-ui skills) loaded a whole package chunk and what it
+  # imports, about half of a cold /drops request's code.
+  nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
   # Generated dev handlers import Content relative to the handler so TypeScript and Vite resolve it on Windows too.
   "@vite-hub/content@0.0.4": patches/@vite-hub__content@0.0.4.patch
   # useServerEnv() reuses its result while the env names it reads hold the same values; every call copied the whole env
@@ -77,12 +77,13 @@ minimumReleaseAgeExclude:
   - "@better-auth/stripe@1.7.10"
   - "@better-auth/telemetry@1.7.10"
   - better-auth@1.7.10
-  - "@nuxt/kit-nightly@5.0.0-2610270115-58d7824"
-  - "@nuxt/nitro-server-nightly@5.0.0-2610270115-58d7824"
-  - "@nuxt/schema-nightly@5.0.0-2610270115-58d7824"
-  - "@nuxt/vite-builder-nightly@5.0.0-2610270115-58d7824"
-  - "@nuxt/vite-server-nightly@5.0.0-2610270115-58d7824"
-  - nuxt-nightly@5.0.0-2610270115-58d7824
+  - "@nuxt/kit-nightly@5.0.0-2610292252-da55a91"
+  - "@nuxt/nitro-server-nightly@5.0.0-2610292252-da55a91"
+  - "@nuxt/schema-nightly@5.0.0-2610292252-da55a91"
+  - "@nuxt/vite-builder-nightly@5.0.0-2610292252-da55a91"
+  - "@nuxt/vite-server-nightly@5.0.0-2610292252-da55a91"
+  - nuxt-nightly@5.0.0-2610292252-da55a91
+  - nitro@3.0.261029-rc
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0
