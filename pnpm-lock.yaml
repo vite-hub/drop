@@ -21,6 +21,8 @@ overrides:
   h3@2.0.1-rc.22: 2.0.8
   h3@2.0.1-rc.33: 2.0.8
 
+pnpmfileChecksum: sha256-8nGb6beLH6d2nsxD8QO9rz+ZxKMtdjGwf9yIYJVcy0c=
+
 patchedDependencies:
   '@nuxt/ui@4.11.0': ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc
   '@vite-hub/content@0.0.4': 5acb6a00876c79e343a0d4eceb4ab90656379d2e602c128b728e35073f8b23de
@@ -130,6 +132,9 @@ importers:
       comark-content:
         specifier: 0.4.1
         version: 0.4.1(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0))(aws4fetch@1.0.20)(beautiful-mermaid@1.1.3)(db0@0.4.1)(katex@0.17.0)(shiki@4.5.0)
+      comark-linter:
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-linter@068bbd1b91e6575797fcb2395195f47a28410150
+        version: https://pkg.pr.new/onmax/comark-ui/comark-linter@068bbd1b91e6575797fcb2395195f47a28410150(efa868999b44258bc0ff43196b51c2b8)
       comark-ui:
         specifier: https://pkg.pr.new/onmax/comark-ui/comark-ui@068bbd1b91e6575797fcb2395195f47a28410150
         version: https://pkg.pr.new/onmax/comark-ui/comark-ui@068bbd1b91e6575797fcb2395195f47a28410150(@comark/html@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.32.0)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(katex@0.17.0)(markdown-it@15.0.3)(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
@@ -6527,6 +6532,21 @@ packages:
       svelte:
         optional: true
       vue:
+        optional: true
+
+  comark-linter@https://pkg.pr.new/onmax/comark-ui/comark-linter@068bbd1b91e6575797fcb2395195f47a28410150:
+    resolution: {integrity: sha512-aBf0PcJ1Z21dTNy/0PYoZPBrHH7xlDn7bIpEuVfZjtHTXbwqCCzPNyFLtcKUqeCVa/0XJroYNQtEOf2x9TTemQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-linter@068bbd1b91e6575797fcb2395195f47a28410150}
+    version: 0.7.2
+    engines: {node: '>=22.12.0'}
+    hasBin: true
+    peerDependencies:
+      comark: ^0.8.0
+      comark-ui: ^0.7.2
+      vite-doctor: ^0.1.0
+    peerDependenciesMeta:
+      comark-ui:
+        optional: true
+      vite-doctor:
         optional: true
 
   comark-magic-move@https://pkg.pr.new/onmax/comark-ui/comark-magic-move@068bbd1b91e6575797fcb2395195f47a28410150:
@@ -17832,6 +17852,13 @@ snapshots:
       '@comark/html': 0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
+
+  comark-linter@https://pkg.pr.new/onmax/comark-ui/comark-linter@068bbd1b91e6575797fcb2395195f47a28410150(efa868999b44258bc0ff43196b51c2b8):
+    dependencies:
+      comark: 0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
+    optionalDependencies:
+      comark-ui: https://pkg.pr.new/onmax/comark-ui/comark-ui@068bbd1b91e6575797fcb2395195f47a28410150(@comark/html@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.32.0(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.32.0)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(katex@0.17.0)(markdown-it@15.0.3)(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      vite-doctor: 0.1.1(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))(chokidar@5.0.0)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magicast@0.5.5)(nuxt-nightly@5.0.0-2610292252-da55a91)(supports-color@8.1.1)
 
   comark-magic-move@https://pkg.pr.new/onmax/comark-ui/comark-magic-move@068bbd1b91e6575797fcb2395195f47a28410150(@comark/html@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:

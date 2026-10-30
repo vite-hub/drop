@@ -17,6 +17,7 @@ const { default: commentsGet } = await import("../../server/api/drops/[id]/comme
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
 const { default: uploadFile } = await import("../../server/api/files.post.ts")
+const { default: publishDraft } = await import("../../server/api/drops/[id]/versions.post.ts")
 
 const MIB = 1024 * 1024
 
@@ -1045,4 +1046,95 @@ test("an agent publishes a board, reads its outline, and edits it", async () => 
   ).structuredContent
   assert.equal(next.version, 2)
   assert.equal(next.title, "Onboarding")
+})
+
+// An annotated screenshot whose first annotation starts past the image's right edge. The problem is the screenshot's, on
+// line 3.
+const OFF_IMAGE = `# Evidence
+
+::screenshot{src="https://example.com/toolbar.png" alt="The review toolbar" viewport="1440x900"}
+:::annotation{x=120 y=10 w=20 h=10}
+The Comment button.
+:::
+::
+`
+const ON_IMAGE = OFF_IMAGE.replace("x=120", "x=60")
+
+test("publish lints Markdown as Drop renders it: errors with their line stop it, warnings come back located", async () => {
+  const doc = await call(publish, { markdown: ON_IMAGE, note: "Evidence", lifetime: "review" })
+  assert.notEqual(doc.isError, true, doc.message)
+  assert.equal(doc.structuredContent.warnings, undefined)
+
+  const warned = await call(publish, {
+    markdown: "# Shot\n\n![](https://example.com/shot.png)\n",
+    note: "No alt",
+    lifetime: "review",
+  })
+  assert.match(warned.structuredContent.warnings[0], /^3:\d+ comark\/missing-alt /)
+  assert.match(warned.content[0].text, /published with these Comark lint warnings/)
+
+  const count = (table) => sql.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n
+  const before = { drops: count("drops"), reservations: count("quota_reservations"), files: objects.size }
+  const cases = [
+    [OFF_IMAGE, /- 3:\d+ comark\/annotate\/invalid-position screenshot .*, annotation 1: `x` must be/],
+    ["# Plan\n\n::compare\n", /- 3:1 comark\/unclosed-block `::compare` opened on line 3 is never closed\. Add a line/],
+    ["# Plan\n\n::timeline\nSoon.\n::\n", /- 3:1 comark\/unknown-component `::timeline`/],
+    ['# Plan\n\n::note{type="tip"\nText.\n::\n', /- 3:\d+ comark\/malformed-attributes/],
+  ]
+  for (const [markdown, problem] of cases) {
+    const refused = await call(publish, { markdown, note: "Broken", lifetime: "review" })
+    assert.equal(refused.isError, true, markdown)
+    assert.match(refused.message, /Drop didn't publish this doc/)
+    assert.match(refused.message, problem)
+  }
+  // Refused before storing anything: no drop, no file, no quota held.
+  assert.equal(count("drops"), before.drops)
+  assert.equal(count("quota_reservations"), before.reservations)
+  assert.equal(objects.size, before.files)
+
+  // A broken next version leaves the drop on its last good one.
+  const next = await call(publish, { previous: doc.structuredContent.id, markdown: OFF_IMAGE, note: "Moved the box" })
+  assert.equal(next.isError, true)
+  assert.equal((await call(readDrop, { id: doc.structuredContent.id })).structuredContent.version, 1)
+  assert.equal(count("drop_versions"), 0)
+  assert.equal(objects.size, before.files)
+})
+
+test("an uploaded .md file and a person's edited draft get the same check before a version is stored", async () => {
+  state.who = who
+  const upload = (text) => {
+    const form = new FormData()
+    form.set("file", new File([text], "evidence.md", { type: "text/markdown" }))
+    const event = new H3Event(new Request("https://drop.example/api/files", { method: "POST", body: form }))
+    event.context.log = { set() {}, error() {}, warn() {} }
+    return uploadFile(event)
+  }
+  const refused = await upload(OFF_IMAGE).catch((error) => error)
+  assert.equal(refused.status, 400)
+  assert.match(refused.statusText, /^Line 3: /)
+  assert.deepEqual(
+    refused.data.problems.map(({ rule, severity, line }) => [rule, severity, line]),
+    [["comark/annotate/invalid-position", "error", 3]],
+  )
+  assert.equal(objects.size, 0)
+
+  const doc = await upload(ON_IMAGE)
+  const save = () => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${doc.id}/versions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ version: 1 }),
+      }),
+    )
+    event.context.params = { id: doc.id }
+    event.context.log = { set() {}, error() {}, warn() {} }
+    return publishDraft(event)
+  }
+  state.draft = OFF_IMAGE
+  assert.equal((await save().catch((error) => error)).status, 400)
+  assert.equal(sql.prepare("SELECT version FROM drops WHERE id = ?").get(doc.id).version, 1)
+  assert.equal(objects.size, 1)
+  state.draft = ON_IMAGE.replace("The Comment button.", "The Comment button, moved.")
+  assert.equal((await save()).version, 2)
 })
