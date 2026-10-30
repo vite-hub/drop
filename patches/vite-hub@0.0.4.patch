@@ -1,0 +1,44 @@
+diff --git a/dist/nuxt.js b/dist/nuxt.js
+index 01467b29aeb428e96a13278a002fc46e711d0c7a..ca93d078cb796b13f00ecd70a1e42844c538eb26 100644
+--- a/dist/nuxt.js
++++ b/dist/nuxt.js
+@@ -201,6 +201,7 @@ async function installConsole(nuxt, projectRoot, discoveryRoot, workflowDiscover
+ 	const clientRoute = mountPath(nuxt.options.app?.baseURL, "/api/_vitehub/console/client.js");
+ 	if (!nitro.handlers?.some((handler) => handler.route === clientRoute)) (nitro.handlers ??= []).push({
+ 		handler: clientHandler,
++		lazy: true,
+ 		route: clientRoute
+ 	});
+ 	const plugins = (nitro.plugins ??= []).filter((candidate) => !generatedConsolePluginRegistration(candidate));
+diff --git a/dist/src-3o2lBWf-.js b/dist/src-3o2lBWf-.js
+index cd3bca2a08a2c2902b4e1c8329e63c8de49d4d48..7fd8c8b2c7a565e13cf157cf1aa85b79e00f9fed 100644
+--- a/dist/src-3o2lBWf-.js
++++ b/dist/src-3o2lBWf-.js
+@@ -5411,6 +5411,7 @@ function addConsolePageHandlers(nitro, consoleRuntimeRoot, base) {
+ 	const handlers = (nitro.handlers ??= []).filter((candidate) => candidate.handler !== page);
+ 	for (const suffix of ["/_vitehub", "/_vitehub/**"]) handlers.push({
+ 		handler: page,
++		lazy: true,
+ 		route: mountPath(base, suffix)
+ 	});
+ 	nitro.handlers = handlers;
+@@ -5466,6 +5467,7 @@ function addConsoleRpcHandler(nitro, consoleRuntimeRoot, base, sections = []) {
+ 			route
+ 		};
+ 		if (registration.suffix !== "/_vitehub/rpc/**") handler.method = "post";
++		handler.lazy = true;
+ 		kit.addHandler(handler);
+ 	}
+ 	nitro.handlers = kit.config.handlers;
+@@ -5609,7 +5611,10 @@ function configureConsoleNitroRoutes(nitro, baseURL, sections, consoleAuthHandle
+ 			handler: join(consoleRuntimeRoot, "server/page.get.js"),
+ 			route: consoleMountPath(baseURL, "/_vitehub/**")
+ 		}
+-	]) kit.addHandler(handler);
++	]) kit.addHandler({
++		...handler,
++		lazy: true
++	});
+ 	kit.addHandler({
+ 		handler: consoleAuthHandlers?.client ?? join(consoleRuntimeRoot, "server/client.get.js"),
+ 		route: consoleMountPath(baseURL, "/api/_vitehub/console/client.js"),

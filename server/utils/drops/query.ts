@@ -3,8 +3,6 @@ import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
-import { renderMarkdownCached } from "../markdown-document"
-import { renderSpreadsheetCached, SPREADSHEET_EXTENSIONS, spreadsheetExtension } from "../spreadsheet"
 import type {
   DropAttachment,
   DropCrumb,
@@ -617,15 +615,21 @@ async function bodyOf(
     detail.paths = files.map((file) => file.path).sort()
     detail.sizes = Object.fromEntries(files.map((file) => [file.path, file.size]))
   } else if (row.blobKey) {
+    // The Markdown renderer (Comark, Shiki, charts) and the spreadsheet readers load with the first drop that needs
+    // them, not with every route that lists drops: on a fresh Worker that's most of the first request's code.
     if (row.kind === "markdown") {
+      const { renderMarkdownCached } = await import("../markdown-document")
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       detail.html = rendered.html
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
-    else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {
+    else if (row.kind === "file") {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
+      const sheets = await import("../spreadsheet")
+      const extension = sheets.spreadsheetExtension(row.filename)
       const key = row.blobKey
-      detail.html = await renderSpreadsheetCached(key, spreadsheetExtension(row.filename), () => readBytes(key), event)
+      if (sheets.SPREADSHEET_EXTENSIONS.has(extension))
+        detail.html = await sheets.renderSpreadsheetCached(key, extension, () => readBytes(key), event)
     }
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }

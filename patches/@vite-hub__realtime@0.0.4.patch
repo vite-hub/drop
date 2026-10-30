@@ -1,0 +1,12 @@
+diff --git a/dist/vite.js b/dist/vite.js
+index bb9f2cf04c9b0b1ab7cab976ea1e05b4447d5878..40134ae258ce597598781f19068314fd83bfb52c 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -722,6 +722,7 @@ function hubRealtime(options = {}) {
+ 			const kit = createNitroServerKit(nitro);
+ 			kit.addHandler({
+ 				handler: handlerFile,
++				lazy: true,
+ 				route: "/api/_vitehub/realtime/**"
+ 			});
+ 			for (const plugin of contribution?.plugins ?? []) kit.addPlugin(plugin);
