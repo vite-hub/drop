@@ -26,9 +26,6 @@ patchedDependencies:
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
   # basic auth without sendError or a Node request, and request middlewares registered only for features in use.
   nuxt-security@2.6.0: patches/nuxt-security@2.6.0.patch
-  # Doctor false positives on h3 v2 apps: a parameter named `document` read as the browser global, and admin routes
-  # that call requireAdmin, or Better Auth's re-exported mount, read as unguarded (onmax/vite-doctor#279, #280).
-  vite-doctor@0.0.12: patches/vite-doctor@0.0.12.patch
   # A zoomed screenshot's Copy action belongs in the zoom header, clear of its image and marks.
   comark-annotate@0.7.2: patches/comark-annotate@0.7.2.patch
   # Nuxt runs Vite without an HTTP server; virtual importers also need the plugin resolver. Library chunks are split by

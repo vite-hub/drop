@@ -10,6 +10,7 @@ type Highlighter = Awaited<ReturnType<typeof loadHighlighter>>["shiki"]
 const key = new PluginKey<DecorationSet>("codeHighlight")
 const THEMES = { light: "github-light", dark: "github-dark" } as const
 
+// doctor-disable-next-line nuxt/ssr/no-module-scope-request-state -- the live editor's, in the browser only; Shiki's grammars, not a request's data
 let highlighter: Highlighter | undefined
 const loaded = new Set<CodeLanguage>()
 const loading = new Set<CodeLanguage>()

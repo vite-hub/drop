@@ -508,7 +508,7 @@ const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
   publicView ? dropPath(crumb) : `/drops/${crumb.id}`
 
 // ⌘K offers the same actions as the header, review dock, and Details.
-offerToPalette("drop", () => {
+usePaletteOffer("drop", () => {
   if (visitor.value) return null
   if (editing.value)
     return {
@@ -814,7 +814,6 @@ watch(
             v-else-if="drop.kind === 'site'"
             ref="siteRef"
             :drop="drop"
-            :public-view="publicView"
             :reviewing="commentsOpen && drop.canComment && annotationsEnabled && !editing"
           />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />

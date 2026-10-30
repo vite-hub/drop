@@ -246,6 +246,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     clearTimeout(imageTimer)
     imageTimer = setTimeout(() => void images(), 4000)
   }
+  // doctor-disable-next-line vue/lifecycle/require-cleanup -- the returned stop() clears it, from onBeforeUnmount
   const poll = setInterval(() => void pull(), 3000)
 
   // A new version for people who can draw, so it saves; a reader's copy stays at the server's version.
@@ -335,6 +336,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   if (canEdit) imageTimer = setTimeout(() => void images(), 1500)
 
   const flush = () => void save()
+  // doctor-disable-next-line vue/lifecycle/require-cleanup -- the returned stop() removes it, from onBeforeUnmount
   window.addEventListener("pagehide", flush)
   return {
     onChange,

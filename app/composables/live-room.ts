@@ -8,7 +8,7 @@ import { RealtimeCaret } from "vite-hub/realtime/vue"
  * only when someone opens the editor, so readers never download it. Run inside an effect scope: leaving the scope
  * leaves the room.
  */
-export function joinLiveRoom(documentId: Ref<string | undefined>) {
+export function useLiveRoom(documentId: Ref<string | undefined>) {
   // Carets come from RealtimeCaret below, with a lighter selection tint than its default.
   const realtime = useRealtimeTiptap("drops", documentId, { enabled: () => Boolean(documentId.value), carets: false })
   const editor = shallowRef<Editor>()
@@ -41,4 +41,4 @@ export function joinLiveRoom(documentId: Ref<string | undefined>) {
   return { realtime, editor }
 }
 
-export type LiveRoom = ReturnType<typeof joinLiveRoom>
+export type LiveRoom = ReturnType<typeof useLiveRoom>
