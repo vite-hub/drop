@@ -5,7 +5,7 @@
 import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; publicView: boolean; reviewing: boolean }>()
+const props = defineProps<{ drop: DropDetail; reviewing: boolean }>()
 
 const origin = useRequestURL().origin
 const snippet = reviewSnippet(origin)

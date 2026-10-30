@@ -12,7 +12,7 @@ const signOut = useSignOut()
 const { createDoc, createBoard, createFolder, createSite, upload } = useDropActions()
 const folderDialog = useFolderDialog()
 const siteDialog = useSiteDialog()
-// The drop and the folder open on the page (offerToPalette): its commands, and where new drops go.
+// The drop and the folder open on the page (usePaletteOffer): its commands, and where new drops go.
 const context = injectPaletteContext()
 const current = computed(() => context?.drop.value ?? null)
 const folder = computed(() => context?.folder.value ?? null)

@@ -34,7 +34,7 @@ export const injectPaletteContext = () => inject(KEY, null)
  * last one unmounts, so leaving clears the slot only when it still holds this component's value. Pages outside the
  * dashboard layout have no palette, and nothing happens.
  */
-export function offerToPalette<K extends keyof PaletteContext>(key: K, value: () => PaletteContext[K]["value"]) {
+export function usePaletteOffer<K extends keyof PaletteContext>(key: K, value: () => PaletteContext[K]["value"]) {
   // SAFETY: PaletteContext[K] is that slot's ShallowRef; TypeScript loses the link between K and its value type.
   const slot = injectPaletteContext()?.[key] as ShallowRef<PaletteContext[K]["value"]> | undefined
   if (!slot) return

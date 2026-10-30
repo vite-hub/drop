@@ -1,7 +1,7 @@
 import { promiseTimeout } from "@vueuse/core"
 import * as v from "valibot"
 import type { DropDetail, DropSummary } from "#shared/types"
-import type { LiveRoom } from "~/utils/live-room"
+import type { LiveRoom } from "~/composables/live-room"
 
 // What a publishing client leaves on its awareness state. Other clients set it, so it's parsed, not trusted.
 const PublishedSchema = v.object({ id: v.string(), version: v.number(), name: v.string() })
@@ -18,7 +18,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const documentId = ref<string>()
   const opening = ref(false)
   const publishing = ref(false)
-  // The room and its editor load the first time someone opens the editor (~/utils/live-room), so readers never
+  // The room and its editor load the first time someone opens the editor (~/composables/live-room), so readers never
   // download Yjs or Tiptap. They run in a scope of this component's: leaving the page leaves the room.
   const scope = effectScope()
   const room = shallowRef<LiveRoom>()
@@ -63,11 +63,11 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     if (editing.value || opening.value || !drop.value.canEdit) return
     opening.value = true
     try {
-      const [{ joinLiveRoom }, { documentId: id }] = await Promise.all([
-        import("~/utils/live-room"),
+      const [{ useLiveRoom }, { documentId: id }] = await Promise.all([
+        import("~/composables/live-room"),
         $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" }),
       ])
-      room.value ??= scope.run(() => joinLiveRoom(documentId))
+      room.value ??= scope.run(() => useLiveRoom(documentId))
       documentId.value = id
     } catch (error) {
       notify.fail("Couldn't open the editor", error)

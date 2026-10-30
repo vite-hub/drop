@@ -73,7 +73,7 @@
     "nanotar": "^0.3.0",
     "nitro-mcp-toolkit": "0.4.0",
     "nuxt": "npm:nuxt-nightly@5.0.0-2610270115-58d7824",
-    "nuxt-security": "2.6.0",
+    "nuxt-security": "2.7.0",
     "ocache": "0.3.1",
     "ofetch": "2.0.0-alpha.3",
     "pretty-bytes": "^7.2.0",
@@ -97,7 +97,7 @@
     "nitro": "3.0.260903-beta",
     "playwright": "1.64.1",
     "typescript": "^6.0.3",
-    "vite-doctor": "0.0.12",
+    "vite-doctor": "0.1.1",
     "vite-plus": "catalog:",
     "vue-tsc": "^3.3.9",
     "wrangler": "4.148.0"
