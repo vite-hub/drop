@@ -3,6 +3,8 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState(() =
   const body = ref("")
   const images = useImagePicks()
   const sending = ref(false)
+  // Waiting for the picture of the area being commented on before it sends (DropViewer's submit).
+  const waiting = ref(false)
   let revision = 0
   watch([body, images.picks], () => revision++, { flush: "sync" })
 
@@ -23,5 +25,5 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState(() =
     }
   }
 
-  return { body, images, sending, beginSend }
+  return { body, images, sending, waiting, beginSend }
 })

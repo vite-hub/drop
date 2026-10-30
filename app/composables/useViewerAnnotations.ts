@@ -26,7 +26,7 @@ export type ViewerTool = "browse" | "comment" | "measure"
 export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
 
 /** What the frame reports about the reader's pointer and keys, in frame coordinates. */
-type PointerMessage = Extract<FrameMessage, { type: "selection" | "image" | "area" | "marker" | "key" }>
+type PointerMessage = Extract<FrameMessage, { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" }>
 
 /**
  * What the reader points at in the viewer: a text selection with its Comment button, an image zoomed in the lightbox,
@@ -38,6 +38,11 @@ export function useViewerAnnotations(options: {
   editing: Ref<boolean>
   enabled?: Ref<boolean>
   reviewOpen?: Ref<boolean>
+  /**
+   * The frame's picture of the tooltip or menu the comment being written is on, for its images; null once that comment
+   * is on another area, sent, or put away, so its picture goes too.
+   */
+  shot?: (file: File | null) => void
 }) {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
@@ -54,6 +59,31 @@ export function useViewerAnnotations(options: {
     return ++focusGeneration
   }
   const isFocusCurrent = (generation: number) => generation === focusGeneration
+  /** The number of the picture the frame takes for the area being commented on, if it takes one. */
+  let awaitedShot: number | undefined
+  let shotTaken = false
+  let shotWaiters: (() => void)[] = []
+  function settleShot() {
+    awaitedShot = undefined
+    for (const resolve of shotWaiters.splice(0)) resolve()
+  }
+  /** Drops the picture of the area that was being commented on, and stops waiting for one. */
+  function dropShot() {
+    settleShot()
+    if (shotTaken) options.shot?.(null)
+    shotTaken = false
+  }
+  /** Resolves once the picture for the area being commented on is in, or failed, or after 10 s: a big page takes 5. */
+  function waitForShot() {
+    if (awaitedShot === undefined) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 10_000)
+      shotWaiters.push(() => {
+        clearTimeout(timer)
+        resolve()
+      })
+    })
+  }
   const awaitThread = (id: string | null, generation?: number) => {
     if (generation !== undefined && generation !== focusGeneration) return false
     awaited = id
@@ -96,6 +126,11 @@ export function useViewerAnnotations(options: {
     overlays[name] = !overlays[name]
   }
   watch(canDrawArea, (value) => !value && tool.value === "comment" && (tool.value = "browse"))
+  // A new comment that's sent, put away, or turned into a thread no longer wants the picture of its area.
+  watch(
+    () => popover.value?.type === "new",
+    (writing) => !writing && dropShot(),
+  )
   // The frame keeps the drawn rectangle while its comment is written, on the page or a zoomed screenshot; it drops it
   // once the review dock closes. The mounted composer keeps its unsent text and files.
   const draftingArea = computed(
@@ -149,6 +184,8 @@ export function useViewerAnnotations(options: {
       lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
     }
     if (message.type === "area") {
+      dropShot()
+      awaitedShot = commenting.value ? message.shot : undefined
       if (commenting.value) {
         const { kind = "area", selector, label, ox, oy, ow, oh } = message
         popover.value = {
@@ -158,6 +195,16 @@ export function useViewerAnnotations(options: {
           y: y(message.rect.bottom),
         }
       }
+    }
+    // Only for the comment it was taken for, while it's still being written.
+    if (message.type === "area-shot" && message.shot === awaitedShot && popover.value?.type === "new") {
+      const { image } = message
+      if (image) {
+        const type = image.type || "image/png"
+        options.shot?.(new File([image], `screenshot.${type.split("/")[1]}`, { type }))
+        shotTaken = true
+      }
+      settleShot()
     }
     if (message.type === "marker")
       popover.value = {
@@ -239,5 +286,6 @@ export function useViewerAnnotations(options: {
     receive,
     commentOnSelection,
     pickImage,
+    waitForShot,
   }
 }

@@ -61,6 +61,7 @@ export function useImagePicks() {
     picks,
     problem,
     files: computed(() => picks.value.map((pick) => pick.file)),
+    add,
     remove,
     clear,
     open: () => dialog.open(),

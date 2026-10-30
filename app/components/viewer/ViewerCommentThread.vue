@@ -32,7 +32,7 @@ const composerDraft = sharedDraft ?? { body: ref(""), images: useImagePicks() }
 const body = composerDraft.body
 if (props.draft && !body.value) body.value = props.draft
 const replying = ref(false)
-const busy = sharedDraft?.sending ?? replying
+const busy = computed(() => (sharedDraft ? sharedDraft.sending.value || sharedDraft.waiting.value : replying.value))
 const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = composerDraft.images
 // Why the last send failed, under the box that sent it; editing the text clears it.
 const error = ref<string | undefined>(props.draftError)

@@ -4,6 +4,7 @@
 import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { MAX_QUIZ_BLOCKS } from "./quiz"
+import { CAPTURE } from "./viewport-capture"
 import COMMENTS_CSS from "#comark-comments-css"
 
 const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
@@ -46,16 +47,22 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
     return text ? name + ' "' + (text.length > 40 ? text.slice(0, 40) + "…" : text) + '"' : name;
   }
 
-  // A rectangle anchors to the smallest element that holds it, never the script's own root (skip).
+  // A rectangle anchors to the smallest element that holds it, never the script's own root (skip). What shows on top
+  // counts first: the element on top and those it sits in. So a box drawn on an open tooltip or menu anchors to it, not
+  // to a smaller row it covers. When only the page holds the box among those, any element under it counts.
   function anchorFor(left, top, right, bottom, skip) {
     const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble");
-    let best = null, bestArea = Infinity;
-    for (const el of under) {
-      const r = el.getBoundingClientRect(), area = r.width * r.height;
-      if (r.width < 1 || r.height < 1 || r.left > left + 1 || r.top > top + 1 || r.right < right - 1 || r.bottom < bottom - 1) continue;
-      if (area < bestArea) { best = el; bestArea = area; }
-    }
-    return best || under[0] || document.body;
+    const smallest = (els) => {
+      let best = null, bestArea = Infinity;
+      for (const el of els) {
+        const r = el.getBoundingClientRect(), area = r.width * r.height;
+        if (r.width < 1 || r.height < 1 || r.left > left + 1 || r.top > top + 1 || r.right < right - 1 || r.bottom < bottom - 1) continue;
+        if (area < bestArea) { best = el; bestArea = area; }
+      }
+      return best;
+    };
+    const front = under[0];
+    return smallest(under.filter((el) => el !== document.body && front && el.contains(front))) || smallest(under) || front || document.body;
   }`
 
 /**
@@ -81,6 +88,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.m img{display:block;width:100%;height:100%;object-fit:cover}' +
     '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-11px 0 0 -11px;border-radius:11px}' +
     '.m.pulse{animation:p 900ms ease-out 2}@keyframes p{50%{transform:scale(1.4)}}' +
+    // On what opens a closed tooltip or menu (standIn), not on the thing itself.
+    '.m.away{outline:1.5px dashed var(--foreground);outline-offset:2px}' +
     '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
     '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
     '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
@@ -253,6 +262,36 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     return m.kind === "image" ? (el.getAttribute("alt") || "image") === m.label : labelOf(el) === m.label;
   }
 
+  /**
+   * Where a comment's pin goes while its element doesn't show: a tooltip, menu, or popover that closed, or a tab not
+   * picked. It's the element that opens it (named by aria-describedby, aria-controls, and the like, or a link to it),
+   * else the nearest element around it that shows. None for a prototype's variant that isn't on, or for something
+   * only the whole page holds: those draw nothing until they show again.
+   */
+  const OPENERS = ["aria-describedby", "aria-labelledby", "aria-controls", "aria-owns", "popovertarget", "for"];
+  // A tooltip that hides with visibility or opacity keeps its box, so its size alone doesn't tell.
+  const shows = (el) => {
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return false;
+    return typeof el.checkVisibility !== "function" || el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+  };
+  function standIn(el) {
+    const variant = el.closest("[data-variant]");
+    if (variant && !shows(variant)) return null;
+    for (let node = el; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+      if (shows(node)) return node;
+      // The pin goes back once the element shows. A resize observer never reports an inline element such as a <b>, so
+      // each hidden element around it is watched too: the one whose display changes is among them.
+      resized.observe(node);
+      if (!node.id) continue;
+      const id = CSS.escape(node.id);
+      const named = OPENERS.map((name) => "[" + name + '~="' + id + '"]').concat('a[href="#' + id + '"]').join(",");
+      const opener = Array.from(document.querySelectorAll(named)).find((other) => !host.contains(other) && shows(other));
+      if (opener) return opener;
+    }
+    return null;
+  }
+
   const initials = (name) => (name || "?").trim().split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "?";
   let lastUnplaced = null;
   // Open comments on a Markdown doc's text sit beside it, the way comark-comments draws a doc's own threads: a bubble
@@ -293,6 +332,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     root.setAttribute("data-drop-rail", wide ? "open" : "reserved");
     return wide;
   }
+  function placePin(m, x, y, into, away) {
+    const dot = document.createElement("div");
+    dot.className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "") + (away ? " away" : "");
+    // The author's picture, else their initials; the panel and the agent feedback keep the number.
+    if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.textContent = initials(m.author); }; dot.appendChild(img); }
+    else dot.textContent = initials(m.author);
+    dot.title = (m.author || "Comment") + " · #" + m.n + (away ? " · on something that opens here" : "");
+    dot.style.left = x + "px"; dot.style.top = y + "px"; dot.dataset.id = m.id;
+    dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
+    into.appendChild(dot);
+  }
+
   function render() {
     marks.innerHTML = "";
     // Hidden comments (the toolbar's eye) keep their place. Shown before drawing, so the margin's cards measure their
@@ -302,7 +353,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const aside = zoomMarks && zoomAside(), asideMarks = aside && aside.querySelector(".marks");
     if (zoomMarks) zoomMarks.innerHTML = "";
     if (asideMarks) asideMarks.innerHTML = "";
-    const unplaced = [], railed = [];
+    const unplaced = [], railed = [], standing = new Map();
     clearBubbles();
     // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
     const ranges = new Map(markers.filter((m) => m.kind === "text" && m.quote).map((m) => [m.id, findRange(m.selector, m.quote)]));
@@ -324,8 +375,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (!el || (m.earlier && !sameAnchor(el, m))) { unplaced.push(m.id); continue; }
         resized.observe(el);
         const r = el.getBoundingClientRect();
-        // A hidden anchor (a closed tab, a prototype variant not shown) draws nothing until it shows again.
-        if (!r.width && !r.height) continue;
+        // A hidden anchor keeps a pin, without its area, on what stands in for it until it shows again.
+        if (!shows(el)) {
+          const stand = !zoom && standIn(el);
+          if (!stand) continue;
+          resized.observe(stand);
+          const s = stand.getBoundingClientRect(), before = standing.get(stand) || 0;
+          // Side by side when several wait on the same element, so each can be clicked.
+          standing.set(stand, before + 1);
+          x = s.right + scrollX + before * 24; y = s.top + scrollY;
+          placePin(m, x, y, into, true);
+          continue;
+        }
         // While zoomed, only what the zoom shows draws, on its copy: the page's pins would float over the zoom.
         const copy = zoom && zoomMarks && copyOf(el);
         if (zoom && !copy) continue;
@@ -355,15 +416,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
-      const dot = document.createElement("div");
-      dot.className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "");
-      // The author's picture, else their initials; the panel and the agent feedback keep the number.
-      if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.textContent = initials(m.author); }; dot.appendChild(img); }
-      else dot.textContent = initials(m.author);
-      dot.title = (m.author || "Comment") + " · #" + m.n;
-      dot.style.left = x + "px"; dot.style.top = y + "px"; dot.dataset.id = m.id;
-      dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
-      into.appendChild(dot);
+      placePin(m, x, y, into, false);
     }
     railHits = railed.map(({ m, lines }) => ({ id: m.id, boxes: lines.map((l) => ({ left: l.left + scrollX, right: l.right + scrollX, top: l.top + scrollY, bottom: l.bottom + scrollY })) }));
     if (railed.length) drawRail(railed);
@@ -555,7 +608,46 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     else if (right > left) areaBox(draft, left + scrollX, top + scrollY, right - left, bottom - top);
     else { const dot = document.createElement("div"); dot.className = "dp"; dot.style.cssText = "left:" + (left + scrollX) + "px;top:" + (top + scrollY) + "px"; draft.appendChild(dot); }
     const ow = right > left ? thousandths(right, r.left, r.width) - ox : 0, oh = right > left ? thousandths(bottom, r.top, r.height) - oy : 0;
-    post({ type: "area", selector: pathOf(el), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom } });
+    const around = !zoom && under.closest(TRANSIENT);
+    const n = around ? ++shots : undefined;
+    post({ type: "area", selector: pathOf(el), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, shot: n });
+    if (around) shoot(n, around.getBoundingClientRect(), left, top, right, bottom);
+  }
+
+  ${CAPTURE}
+  /**
+   * A comment on something that shows only for a while (a tooltip, a menu, a popover, a dialog) keeps a picture of it,
+   * since the page won't show it once it closes: the viewport, cut to that element and the box with some room around,
+   * with the box drawn on. Drop adds it to the comment being written ("area-shot", by the area's number). A page that
+   * blocks the screenshot module gets no picture and the comment still goes.
+   */
+  const TRANSIENT = "[role=tooltip],[role=menu],[role=listbox],[role=dialog],[role=alertdialog],[popover],dialog,[data-state=open]";
+  let shots = 0;
+  async function shoot(n, around, left, top, right, bottom) {
+    const ROOM = 24;
+    const cut = {
+      left: Math.max(0, Math.min(left, around.left) - ROOM), top: Math.max(0, Math.min(top, around.top) - ROOM),
+      right: Math.min(innerWidth, Math.max(right, around.right) + ROOM), bottom: Math.min(innerHeight, Math.max(bottom, around.bottom) + ROOM),
+    };
+    // Drop waits for it before it sends the comment, so a picture that can't be taken says so.
+    let image = null;
+    try {
+      const viewport = await captureViewport(host);
+      if (!viewport || cut.right <= cut.left || cut.bottom <= cut.top) return;
+      const bitmap = await createImageBitmap(viewport), k = bitmap.width / innerWidth;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round((cut.right - cut.left) * k); canvas.height = Math.round((cut.bottom - cut.top) * k);
+      const g = canvas.getContext("2d");
+      g.drawImage(bitmap, cut.left * k, cut.top * k, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+      // Dark on a white edge, so the box shows on light and dark pages.
+      if (right > left) for (const [color, width] of [["#fff", 4], ["#171717", 2]]) {
+        g.strokeStyle = color; g.lineWidth = width * k;
+        g.strokeRect((left - cut.left) * k, (top - cut.top) * k, (right - left) * k, (bottom - top) * k);
+      }
+      image = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+    } catch {} finally {
+      post({ type: "area-shot", shot: n, image });
+    }
   }
 
   // The element under a point, past Drop's own layer.
@@ -711,11 +803,64 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
   const redraw = () => { if (!toolFrame) toolFrame = requestAnimationFrame(drawTools); };
 
+  // Under a tool, EVENT_HOLD stops the page's events at the window and hands them here. Each reaches the handlers of
+  // Drop's own elements it passed through, from the one under the pointer out to Drop's root, and a guide being dragged.
+  let dragging = null;
+  // What the pointer was over when the hold began, and where it is since: null while it hasn't moved, "out" once it
+  // left the page.
+  let heldHover = [], pointer = null;
+  function held(e) {
+    const path = e.composedPath(), root = path.findIndex((node) => node.localName === "drop-comments");
+    for (const node of path.slice(0, Math.max(0, root))) {
+      const handler = node["on" + e.type];
+      if (typeof handler === "function") handler.call(node, e);
+    }
+    if (dragging && /^pointer(move|up|cancel)$/.test(e.type)) dragging(e);
+    if (e.type === "pointermove") pointer = { x: e.clientX, y: e.clientY };
+    if (e.type === "pointerout" && !e.relatedTarget) pointer = "out";
+  }
+  /**
+   * The page missed the pointer leaving what it was over when the hold began. Once the hold ends, each element the
+   * pointer is no longer over hears it leave, so a tooltip that opened on hover closes as it would have.
+   */
+  function leaveHeld() {
+    const was = heldHover;
+    heldHover = [];
+    if (pointer === null) return;
+    const at = pointer === "out" ? null : elementAt(pointer.x, pointer.y), over = new Set();
+    for (let node = at; node; node = node.parentElement) over.add(node);
+    const left = was.filter((el) => el.isConnected && !over.has(el)).reverse();
+    const init = { clientX: pointer === "out" ? -1 : pointer.x, clientY: pointer === "out" ? -1 : pointer.y, relatedTarget: at, pointerId: 1, pointerType: "mouse", isPrimary: true };
+    if (left[0]) { left[0].dispatchEvent(new PointerEvent("pointerout", { ...init, bubbles: true })); left[0].dispatchEvent(new MouseEvent("mouseout", { ...init, bubbles: true })); }
+    for (const el of left) { el.dispatchEvent(new PointerEvent("pointerleave", init)); el.dispatchEvent(new MouseEvent("mouseleave", init)); }
+  }
+  // A modal dialog sits above the page, Drop's layer included, and makes the rest inert: under a tool, the layer goes in it.
+  function modalShadow() {
+    let modal = null;
+    try { modal = document.querySelector("dialog:modal"); } catch {}
+    if (!modal) return null;
+    const inner = document.createElement("drop-comments");
+    inner.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;";
+    inner.attachShadow({ mode: "open" }).innerHTML = STYLE;
+    modal.appendChild(inner);
+    return inner.shadowRoot;
+  }
+
   function setTool(next) {
     if (next === tool) return;
+    const wasHeld = tool !== "browse";
     tool = next;
+    self.__dropHold(tool === "browse" ? null : held);
+    if (!wasHeld && tool !== "browse") { heldHover = Array.from(document.querySelectorAll(":hover")); pointer = null; }
+    // The picture a comment on a tooltip or menu keeps (shoot) starts sooner with its module loaded.
+    if (tool === "comment" && document.querySelector(TRANSIENT)) loadScreenshot().catch(() => { screenshotModule = null; });
     hovered = picked = null;
-    if (layer) { layer.remove(); layer = null; }
+    if (layer) {
+      const root = layer.getRootNode();
+      layer.remove(); layer = null;
+      if (root !== shadow && root.host) root.host.remove();
+    }
+    if (wasHeld && tool === "browse") leaveHeld();
     if (tool !== "browse") {
       getSelection().removeAllRanges();
       if (lastQuote) post({ type: "selection", clear: true });
@@ -749,7 +894,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       };
       layer.onpointerleave = () => { if (!start) { hovered = null; redraw(); } };
       layer.onpointercancel = () => { start = null; layer.dragging = false; if (box) { box.remove(); box = null; } };
-      shadow.appendChild(layer);
+      (modalShadow() || shadow).appendChild(layer);
     }
     redraw();
   }
@@ -842,12 +987,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       tag((guide.axis === "h" ? "y " : "x ") + px(guide.at), ev.clientX + 12, ev.clientY + 12, "d");
     };
     const done = () => {
+      dragging = null;
       removeEventListener("pointermove", place, true);
       removeEventListener("pointerup", done, true);
       removeEventListener("pointercancel", done, true);
       if (guide.out) guides = guides.filter((g) => g !== guide);
       redraw();
     };
+    // Under a tool these window listeners hear nothing (held), so the drag goes through there too.
+    dragging = (ev) => (ev.type === "pointermove" ? place(ev) : done());
     addEventListener("pointermove", place, true);
     addEventListener("pointerup", done, true);
     addEventListener("pointercancel", done, true);
@@ -883,7 +1031,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; render(); }
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); }
-    if (m.type === "tool" && /^(browse|comment|measure)$/.test(m.tool)) { pointComments = m.pointComments === true; setTool(m.tool); }
+    // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
+    if (m.type === "tool" && /^(browse|comment|measure)$/.test(m.tool)) { pointComments = m.pointComments === true; setTool(m.tool); post({ type: "tool", tool }); }
     if (m.type === "view") setView(m);
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
@@ -958,9 +1107,38 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The page and every anchor: an area must follow its element even when the page keeps its size.
   const resized = new ResizeObserver(render);
   resized.observe(document.documentElement);
+  // An element that shows or hides without changing size, such as a tooltip that fades, changes a class, a style, or
+  // its hidden or open attribute, or ends a transition: pins on elements are placed again then. Drop's own changes
+  // (the root's custom properties, its hosts in the page) don't count.
+  let reshowTimer = 0;
+  const reshow = () => {
+    if (reshowTimer || !markers.some((m) => m.kind !== "text")) return;
+    reshowTimer = setTimeout(() => { reshowTimer = 0; render(); }, 100);
+  };
+  new MutationObserver((records) => {
+    if (records.some((r) => r.target !== document.documentElement && r.target.localName !== "drop-comments")) reshow();
+  }).observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["class", "style", "hidden", "open"] });
+  document.addEventListener("transitionend", reshow, true);
   document.documentElement.appendChild(host);
   document.head.appendChild(pageStyle);
   post({ type: "ready" });
+})();`
+
+/**
+ * While a tool is on (the comment layer's setTool), the page hears none of the pointer, mouse, touch, and focus events.
+ * A tooltip, menu, or popover it has open stays open as the reviewer opened it: it misses the pointer leaving it for the
+ * layer over the page, the click that ends a drawn box, and the blur when Drop's composer takes focus. It runs first in
+ * the head, so its listeners come before any the page adds, and the layer gets what it stopped through `__dropHold`.
+ */
+const EVENT_HOLD = String.raw`(() => {
+  let hold = null;
+  Object.defineProperty(self, "__dropHold", { value: (fn) => { hold = typeof fn === "function" ? fn : null; } });
+  const POINTER = ["pointerdown", "pointerup", "pointermove", "pointerover", "pointerout", "pointerenter", "pointerleave", "pointercancel", "gotpointercapture", "lostpointercapture",
+    "mousedown", "mouseup", "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave", "click", "dblclick", "auxclick", "contextmenu", "focus", "blur", "focusin", "focusout"];
+  const stop = (e) => { if (!hold) return; e.stopImmediatePropagation(); hold(e); };
+  for (const type of POINTER) addEventListener(type, stop, true);
+  // Passive, so scrolling never waits on them; Drop's layer takes pointer events, not these.
+  for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"]) addEventListener(type, stop, { capture: true, passive: true });
 })();`
 
 /**
@@ -1122,7 +1300,7 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
     authored && !usesDropTheme(html)
       ? ""
       : `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`
-  const head = `<script>${ERROR_REPORTER}</script><script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
+  const head = `<script>${ERROR_REPORTER}</script><script>${EVENT_HOLD}</script><script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
   const tail = `<script>${ANNOTATOR_SCRIPT.replace("__COMMENTS_CSS__", () => JSON.stringify(COMMENTS_CSS))
     .replace("__AUTHORED__", String(authored))
     .replace("__THEMED__", String(Boolean(theme)))
