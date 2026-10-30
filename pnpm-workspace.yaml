@@ -22,10 +22,10 @@ patchedDependencies:
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
-  # Runs nuxt-security 2.6.0 on Nuxt 5 / Nitro v3 / h3 v2: Nitro v3 imports, headers set in render:html (Nuxt 5 has no
+  # Runs nuxt-security 2.7.0 on Nuxt 5 / Nitro v3 / h3 v2: Nitro v3 imports, headers set in render:html (Nuxt 5 has no
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
-  # basic auth without sendError or a Node request, and request middlewares registered only for features in use.
-  nuxt-security@2.6.0: patches/nuxt-security@2.6.0.patch
+  # basic auth without a Node request, and request middlewares registered only for features in use.
+  nuxt-security@2.7.0: patches/nuxt-security@2.7.0.patch
   # A zoomed screenshot's Copy action belongs in the zoom header, clear of its image and marks.
   comark-annotate@0.7.2: patches/comark-annotate@0.7.2.patch
   # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the

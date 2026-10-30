@@ -73,7 +73,7 @@
     "nanotar": "^0.3.0",
     "nitro-mcp-toolkit": "0.4.0",
     "nuxt": "npm:nuxt-nightly@5.0.0-2610270115-58d7824",
-    "nuxt-security": "2.6.0",
+    "nuxt-security": "2.7.0",
     "ocache": "0.3.1",
     "ofetch": "2.0.0-alpha.3",
     "pretty-bytes": "^7.2.0",
