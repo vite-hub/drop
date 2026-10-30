@@ -28,6 +28,11 @@ patchedDependencies:
   nuxt-security@2.6.0: patches/nuxt-security@2.6.0.patch
   # A zoomed screenshot's Copy action belongs in the zoom header, clear of its image and marks.
   comark-annotate@0.7.2: patches/comark-annotate@0.7.2.patch
+  # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the
+  # overlay scrollbar of a comment past maxrows. Measures a hidden copy instead (nuxt/ui#7267). Also scrolls to the
+  # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
+  # padding, so keep this part after #7267 ships.
+  "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
   # Nuxt runs Vite without an HTTP server; virtual importers also need the plugin resolver. Library chunks are split by
   # the entries that load them (Rolldown `entriesAware`): grouped by package only, one small import (mrmime, entities,
   # the comark-ui skills) loaded a whole package chunk and what it imports, about half of a cold /drops request's code.
