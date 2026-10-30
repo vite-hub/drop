@@ -150,3 +150,10 @@ test("a suggestion, a comment, and its reply render their marks, bubbles, and ca
   assert.match(toggles[1][3], /onmax<\/b>Is 15 minutes enough.*Claude<\/b>Keeping 15/)
   assert.doesNotMatch(html, /reply=/)
 })
+
+test("a doc's problems open in a foldable box that counts them and shows the Markdown they quote as code", async () => {
+  const { html } = await renderMarkdownCached("problems.md", async () => "# Quiz\n\n::question\nWhy?\n::\n")
+  assert.match(html, /<details class="render-error" open><summary>.*<span>This doc has 2 problems<\/span>/)
+  assert.match(html, /<li><code>::question<\/code> #1 has no options\./)
+  assert.doesNotMatch(html, /<li>[^<]*`/)
+})

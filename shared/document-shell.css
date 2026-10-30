@@ -62,8 +62,7 @@ main {
   font-style: italic;
 }
 
-.revision-note,
-.render-error {
+.revision-note {
   margin: 0 0 1rem;
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--border);
@@ -73,8 +72,100 @@ main {
   font-size: 0.75rem;
 }
 
+/* A doc's problems, in the doc's sans rather than mono: they're sentences, and the Markdown they quote is <code>.
+   Red is the only accent, on the icon and a faint tint; the title and the list keep the doc's own text colors. */
 .render-error {
-  border-color: oklch(0.637 0.237 25.331 / 0.35);
+  --problem: var(--destructive, oklch(0.577 0.245 27.325));
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in oklab, var(--problem) 28%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--problem) 5%, var(--background));
+  color: var(--foreground);
+  font-family: var(--font-sans, var(--font-body));
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.render-error summary {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: -0.25rem -0.375rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.render-error summary::-webkit-details-marker {
+  display: none;
+}
+
+.render-error summary:focus-visible {
+  outline: 2px solid var(--problem);
+  outline-offset: 1px;
+}
+
+.render-error-icon,
+.render-error-fold {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.render-error-icon {
+  color: var(--problem);
+}
+
+.render-error-fold {
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .render-error-fold {
+    transition: rotate 150ms ease-out;
+  }
+}
+
+.render-error:not([open]) .render-error-fold {
+  rotate: -90deg;
+}
+
+/* Muted alone measures 4.42:1 on the light tint; a fifth of the foreground lifts it past 4.5:1 in both themes. */
+.render-error p.render-error-hint {
+  margin: 0.25rem 0 0 1.5rem;
+  color: color-mix(in oklab, var(--muted-foreground) 80%, var(--foreground));
+  font-size: 0.8125rem;
+}
+
+.render-error ul {
+  margin: 0.625rem 0 0;
+  padding-left: 1.5rem;
+}
+
+.render-error li {
+  margin: 0.375rem 0 0;
+  padding-left: 0.125rem;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+/* The doc's code chip is --muted, which nearly vanishes on the tint. */
+.render-error code {
+  background: color-mix(in oklab, var(--foreground) 7%, transparent);
+}
+
+.render-error li::marker {
+  color: var(--muted-foreground);
+}
+
+/* The whole-document fallback (Drop couldn't render it at all) is one sentence, not a list. */
+p.render-error {
+  color: var(--muted-foreground);
 }
 
 .document-footer {
