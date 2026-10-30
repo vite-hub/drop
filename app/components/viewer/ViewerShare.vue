@@ -29,11 +29,18 @@ const linkNote = computed(() => {
   return `Back to ${after} in ${left} ${left === 1 ? "day" : "days"}.${props.drop.isOwner ? " Pick it again to renew." : ""}`
 })
 
-// The list shows the new choice and what it means; only renewing, which may not change what it says, gets a note.
+// The list shows the new choice and what it means at once; only renewing, which may not change what it says, gets a
+// note. A pick that turns the link on copies it too, in the click itself, since a link is what Share was opened for.
+// Another pick waits for the server: a second click on the same choice would otherwise renew the link it just opened.
+const saving = ref(false)
 async function pick(next: Share) {
   const renew = next === own.value
-  if ((renew && !isPublic(next)) || !(await setShare(props.drop, next))) return
-  if (renew) notify.done("Public link renewed")
+  if (saving.value || (renew && !isPublic(next))) return
+  if (!shared.value && next !== "private") void copy(url.value)
+  saving.value = true
+  const done = await setShare(props.drop, next)
+  saving.value = false
+  if (done && renew) notify.done("Public link renewed")
 }
 </script>
 
@@ -88,6 +95,7 @@ async function pick(next: Share) {
         </div>
         <p v-if="!drop.isOwner" class="px-1 text-xs text-muted">Only its owner changes who can open it.</p>
         <URadioGroup
+          :aria-busy="saving"
           aria-label="Who can open it"
           color="neutral"
           :disabled="!drop.isOwner"
@@ -125,7 +133,9 @@ async function pick(next: Share) {
               @click="copy(url)"
             />
           </div>
-          <p aria-live="polite" class="mt-1.5 min-h-lh px-1 text-xs text-muted">{{ linkNote }}</p>
+          <p aria-live="polite" class="mt-1.5 min-h-lh px-1 text-xs text-muted">
+            {{ linkNote }}<span class="sr-only">{{ copied() ? " Link copied." : "" }}</span>
+          </p>
         </div>
       </div>
     </template>
