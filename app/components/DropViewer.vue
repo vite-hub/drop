@@ -333,7 +333,11 @@ function present() {
 
 defineShortcuts({
   c: showComments,
-  e: () => !editing.value && !shownVersion.value && drop.value.canEdit && startEdit(),
+  e: () => {
+    if (editing.value || !showEditTool.value) return
+    if (drop.value.canEdit) startEdit()
+    else editNoteOpen.value = true
+  },
   h: () => !editing.value && has("history") && panel.show("history"),
   i: () => !editing.value && has("details") && panel.show("details"),
   r: toggleCommentArea,
@@ -388,6 +392,8 @@ const canMarkArea = computed(
 const inspectable = computed(
   () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
 )
+// Open when someone reaches for Edit on a doc the editor can't take: the popover says why.
+const editNoteOpen = ref(false)
 const showEditTool = computed(
   () =>
     !lightbox.value &&
@@ -1016,15 +1022,10 @@ watch(
                 variant="ghost"
                 @click="present"
               />
-              <UTooltip
-                v-if="showEditTool"
-                :kbds="drop.canEdit ? ['E'] : undefined"
-                :text="drop.editNote ?? 'Edit together'"
-              >
+              <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
                 <UButton
                   size="xs"
                   color="neutral"
-                  :disabled="!drop.canEdit"
                   icon="i-mingcute-pencil-line"
                   label="Edit"
                   :loading="live.opening.value"
@@ -1032,6 +1033,13 @@ watch(
                   @click="startEdit"
                 />
               </UTooltip>
+              <ViewerEditNote
+                v-else-if="showEditTool && drop.editNote"
+                v-model:open="editNoteOpen"
+                :can-comment="drop.canComment"
+                :note="drop.editNote"
+                @copy="copyMarkdown('Markdown copied')"
+              />
               <UButton
                 size="xs"
                 data-review-trigger

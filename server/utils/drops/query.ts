@@ -18,7 +18,7 @@ import type {
 import { TREE_ROWS } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
-import { hasEditorlessSyntax } from "#shared/frontmatter"
+import { editorlessSyntax } from "#shared/frontmatter"
 import { MAX_DEPTH } from "#shared/nodes"
 import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
@@ -575,9 +575,10 @@ export async function dropDetail(
     ancestors: openableAncestors(row, who, days),
     ...body,
   }
-  if (detail.canEdit && row.kind === "markdown" && hasEditorlessSyntax(detail.content ?? "")) {
+  const blocking = detail.canEdit && row.kind === "markdown" ? editorlessSyntax(detail.content ?? "") : []
+  if (blocking.length) {
     detail.canEdit = false
-    detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
+    detail.editNote = `It uses ${editNoteList(blocking)}, which the live editor can't keep yet.`
   }
   if (attachments) detail.attachments = attachments
   if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
@@ -636,6 +637,12 @@ async function bodyOf(
  * The nodes above a drop that the caller may open, top-most first. A share widens going down, so the ones the caller
  * can't open are always the top-most: someone sent one drop from a private folder sees no folder names.
  */
+/** `::question, ::poll and footnotes`: the first three by name, then how many more. */
+function editNoteList(syntax: string[]) {
+  const named = syntax.length > 3 ? [...syntax.slice(0, 3), `${syntax.length - 3} more`] : syntax
+  return new Intl.ListFormat("en", { type: "conjunction" }).format(named)
+}
+
 function openableAncestors(row: DropRow, who: Identity | null, days: number): DropCrumb[] {
   const above = row.ancestors ?? []
   return above
