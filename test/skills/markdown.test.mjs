@@ -82,6 +82,15 @@ test("every rule comark-linter's catalog marks as an error stops a publish", asy
   )
 })
 
+test("comark-linter comes from the same comark-ui commit as the renderer", async () => {
+  // A linter from another commit checks a different plugin set, so it passes or refuses what Drop doesn't render.
+  const { dependencies } = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"))
+  const commit = (name) =>
+    dependencies[name].match(/^https:\/\/pkg\.pr\.new\/onmax\/comark-ui\/[\w-]+@([0-9a-f]{40})$/)?.[1]
+  assert.ok(commit("comark-ui"), dependencies["comark-ui"])
+  assert.equal(commit("comark-linter"), commit("comark-ui"))
+})
+
 test("all five GitHub alert kinds keep their label", async () => {
   const kinds = ["note", "tip", "important", "warning", "caution"]
   const markdown = kinds.map((kind) => `> [!${kind.toUpperCase()}]\n> Text.`).join("\n\n")
