@@ -18,14 +18,15 @@ const html = `<!doctype html><html><head><style>
 // The screenshot module, stubbed: a white viewport, so the test needs no network and the strokes are all that's drawn.
 const SCREENSHOT_STUB = `export async function createContext() { return {}; }
 export async function domToBlob() {
+  if (self.delayCaptures) await new Promise((resolve) => (self.pendingCaptures ||= []).push(resolve));
   const canvas = document.createElement("canvas");
   canvas.width = innerWidth; canvas.height = innerHeight;
   const g = canvas.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, canvas.width, canvas.height);
   return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 }`
 
-async function open(browser) {
-  const escaped = planDocument("html", html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+async function open(browser, source = html) {
+  const escaped = planDocument("html", source).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   const context = await browser.newContext({ viewport: { width: 900, height: 600 } })
   await context.route("**/*", (route) => {
     const url = new URL(route.request().url())
@@ -141,6 +142,169 @@ test("Escape under the Marker goes to Drop, and an undone stroke leaves nothing 
     await page.keyboard.press("Escape")
     await page.waitForFunction(() => window.posts.some((m) => m.type === "key" && m.key === "Escape"))
     assert.equal((await posted(page, "area")).length, 0)
+  } finally {
+    await browser.close()
+  }
+})
+
+for (const adopted of [false, true]) {
+  test(`the Marker freezes nested open shadow roots with ${adopted ? "adopted" : "inline"} hover styles`, async () => {
+    const browser = await chromium.launch()
+    try {
+      const { page, frame } = await open(
+        browser,
+        `<!doctype html><body><outer-widget></outer-widget><script>
+        const outer = document.querySelector("outer-widget").attachShadow({ mode: "open" });
+        outer.innerHTML = '<inner-widget></inner-widget>';
+        const root = outer.querySelector("inner-widget").attachShadow({ mode: "open" });
+        root.innerHTML = '<style>.tip { display: none } .metric { display: block; width: 200px; padding: 40px }</style><div class="wrap"><span class="metric">Hover me</span><span class="tip">Shadow tooltip</span></div>';
+        const css = '.wrap:hover .tip { display: block }';
+        if (${adopted}) {
+          const sheet = new CSSStyleSheet(); sheet.replaceSync(css); root.adoptedStyleSheets = [sheet];
+        } else {
+          const style = document.createElement("style"); style.textContent = css; root.appendChild(style);
+        }
+      </script></body>`,
+      )
+      await frame.locator(".metric").hover()
+      await frame.locator(".tip").waitFor({ state: "visible" })
+      const stylesBefore = await frame
+        .locator(".tip")
+        .evaluate((el) => el.getRootNode().querySelectorAll("style").length)
+      await page.evaluate(() => tell({ type: "tool", tool: "mark" }))
+      await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw.mark"))
+      await page.mouse.move(800, 500)
+      assert.equal(await frame.locator(".tip").isVisible(), true)
+      await page.evaluate(() => tell({ type: "tool", tool: "browse" }))
+      await frame.locator(".tip").waitFor({ state: "hidden" })
+      assert.deepEqual(
+        await frame.locator(".tip").evaluate((el) => ({
+          hovering: el.getRootNode().querySelectorAll("[data-drop-hover]").length,
+          styles: el.getRootNode().querySelectorAll("style").length,
+        })),
+        { hovering: 0, styles: stylesBefore },
+      )
+    } finally {
+      await browser.close()
+    }
+  })
+}
+
+test("a finished bowed arrow anchors and persists its complete rendered bounds", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(
+      browser,
+      `<!doctype html><style>
+      body { margin: 0 } #wide { position: absolute; left: 80px; top: 80px; width: 700px; height: 300px }
+      #tight { position: absolute; left: 120px; top: 120px; width: 380px; height: 8px }
+    </style><main id="wide"><div id="tight"></div></main>`,
+    )
+    await page.evaluate(() => tell({ type: "tool", tool: "mark", pen: { tool: "arrow", color: "#2563eb", width: 3 } }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw.mark"))
+    await page.mouse.move(210, 204)
+    await page.mouse.down()
+    await page.mouse.move(570, 204, { steps: 6 })
+    await page.mouse.up()
+    const visible = await frame.evaluate(() => {
+      const path = document.querySelector("drop-comments").shadowRoot.querySelector(".ink path")
+      const box = path.getBBox(),
+        radius = Number(path.getAttribute("stroke-width")) / 2
+      return {
+        left: box.x - radius,
+        right: box.x + box.width + radius,
+        top: box.y - radius,
+        bottom: box.y + box.height + radius,
+      }
+    })
+    await page.evaluate(() => tell({ type: "mark", do: "done" }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "area"))
+    const [area] = await posted(page, "area")
+    assert.equal(area.selector, "#wide")
+    const saved = await frame.locator(area.selector).evaluate((el, area) => {
+      const r = el.getBoundingClientRect()
+      return {
+        left: r.left + (r.width * area.ox) / 1000,
+        right: r.left + (r.width * (area.ox + area.ow)) / 1000,
+        top: r.top + (r.height * area.oy) / 1000,
+        bottom: r.top + (r.height * (area.oy + area.oh)) / 1000,
+      }
+    }, area)
+    for (const bounds of [area.rect, saved]) {
+      assert.ok(bounds.left <= visible.left && bounds.right >= visible.right, JSON.stringify({ bounds, visible }))
+      assert.ok(bounds.top <= visible.top && bounds.bottom >= visible.bottom, JSON.stringify({ bounds, visible }))
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
+test("keyboard scrolling stays locked under the Marker and resumes in Browse", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(
+      browser,
+      "<!doctype html><style>body { height: 3000px }</style><p>Scrollable page</p>",
+    )
+    await page.mouse.click(600, 400)
+    await frame.evaluate(() => scrollTo(0, 100))
+    await page.evaluate(() => tell({ type: "tool", tool: "mark" }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw.mark"))
+    for (const key of ["PageDown", "Space", "ArrowDown", "End", "PageUp", "ArrowUp", "Home"])
+      await page.keyboard.press(key)
+    await page.waitForTimeout(250)
+    assert.equal(await frame.evaluate(() => scrollY), 100)
+    await page.evaluate(() => tell({ type: "tool", tool: "browse" }))
+    await frame.waitForFunction(() => !document.querySelector("[data-drop-hover]"))
+    await page.keyboard.press("End")
+    await frame.waitForFunction(() => scrollY > 100)
+  } finally {
+    await browser.close()
+  }
+})
+
+test("a canceled capture cannot post over or unlock a new Marker session", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser)
+    await frame.evaluate(() => {
+      self.delayCaptures = true
+    })
+    const draw = async (y) => {
+      await page.mouse.move(200, y)
+      await page.mouse.down()
+      await page.mouse.move(400, y, { steps: 4 })
+      await page.mouse.up()
+    }
+    await page.evaluate(() => tell({ type: "tool", tool: "mark" }))
+    await frame.waitForFunction(() => self.pendingCaptures?.length === 1)
+    await draw(300)
+    await page.evaluate(() => tell({ type: "mark", do: "done" }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draft .inkp"))
+    await page.evaluate(() => {
+      tell({ type: "tool", tool: "browse" })
+      tell({ type: "clear-area" })
+      tell({ type: "tool", tool: "mark" })
+    })
+    await frame.waitForFunction(() => self.pendingCaptures?.length === 2)
+    await draw(400)
+    await page.evaluate(() => tell({ type: "mark", do: "done" }))
+    await frame.evaluate(() => self.pendingCaptures[0]())
+    await page.waitForTimeout(150)
+    assert.equal((await posted(page, "area")).length, 0)
+    // The old completion must leave the current preview and in-flight Done alone.
+    assert.equal(
+      await frame.evaluate(
+        () => document.querySelector("drop-comments").shadowRoot.querySelectorAll(".draft .inkp path").length,
+      ),
+      1,
+    )
+    await page.evaluate(() => tell({ type: "mark", do: "done" }))
+    await frame.evaluate(() => self.pendingCaptures[1]())
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "area-shot"))
+    const areas = await posted(page, "area")
+    assert.equal(areas.length, 1)
+    assert.ok(areas[0].rect.top > 380)
   } finally {
     await browser.close()
   }

@@ -36,11 +36,17 @@ function target(comment: DropComment) {
     : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
 }
 
+/** Attachments use absolute addresses so pasted feedback can be read outside Drop. */
+const images = (item: Pick<DropComment, "attachments">, url: string, indent = "   ") =>
+  item.attachments.length
+    ? `\n${indent}Images: ${item.attachments.map((file) => new URL(file.url, url).href).join(" ")}`
+    : ""
+
 /** Open comments as Markdown, ready to paste back to the agent. `version` is the one being viewed. */
 export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
   const open = comments.filter((comment) => !comment.resolved).sort((a, b) => a.n - b.n)
   const lines = open.map((comment) =>
-    `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${(comment.body || "(no words, only the image)").replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})${comment.replies.map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body.replace(/\n/g, "\n     ")}`).join("")}`.replace(
+    `${target(comment)}${comment.page ? ` (${comment.page})` : ""}\n   ${(comment.body || "(no words, only the image)").replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`.replace(
       /^/,
       `${comment.n}. `,
     ),

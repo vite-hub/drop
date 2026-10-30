@@ -923,6 +923,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    */
   const SVG = "http://www.w3.org/2000/svg";
   let pen = { tool: "marker", color: "#ec4899", width: 14 }, strokes = [], stroke = null, shot = null, frozen = null, ink = null;
+  let markSession = 0, finishing = false;
   function setPen(next) {
     if (/^(marker|pen|arrow)$/.test(next.tool)) pen.tool = next.tool;
     if (/^#[0-9a-f]{6}$/i.test(next.color)) pen.color = next.color;
@@ -963,24 +964,31 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
 
   function freeze() {
-    const hovering = Array.from(document.querySelectorAll(":hover"));
-    hovering.forEach((el) => el.setAttribute("data-drop-hover", ""));
-    // A stylesheet from another origin can't be read, so its hover looks go when the pointer moves.
-    const rules = [];
-    for (const sheet of Array.from(document.styleSheets)) {
-      let list = null;
-      try { list = sheet.cssRules; } catch (e) { continue; }
-      for (const rule of Array.from(list || [])) if (rule.cssText.includes(":hover")) rules.push(rule.cssText.replace(/:hover/g, "[data-drop-hover]"));
+    const roots = [document], hovering = [], styles = [];
+    for (const root of roots) {
+      // Selectors and stylesheets are scoped to each root, including nested web components.
+      for (const el of root.querySelectorAll("*")) if (el !== host && el.shadowRoot) roots.push(el.shadowRoot);
+      const over = Array.from(root.querySelectorAll(":hover"));
+      over.forEach((el) => el.setAttribute("data-drop-hover", ""));
+      hovering.push(...over);
+      // A stylesheet from another origin can't be read, so its hover looks go when the pointer moves.
+      const rules = [];
+      for (const sheet of new Set([...root.styleSheets, ...root.adoptedStyleSheets])) {
+        let list = null;
+        try { list = sheet.cssRules; } catch (e) { continue; }
+        for (const rule of Array.from(list || [])) if (rule.cssText.includes(":hover")) rules.push(rule.cssText.replace(/:hover/g, "[data-drop-hover]"));
+      }
+      const style = document.createElement("style");
+      style.textContent = rules.join("\n");
+      (root === document ? document.head : root).appendChild(style);
+      styles.push(style);
     }
-    const style = document.createElement("style");
-    style.textContent = rules.join("\n");
-    document.head.appendChild(style);
-    frozen = { hovering, style };
+    frozen = { hovering, styles };
   }
   function unfreeze() {
     if (!frozen) return;
     frozen.hovering.forEach((el) => el.removeAttribute("data-drop-hover"));
-    frozen.style.remove();
+    frozen.styles.forEach((style) => style.remove());
     frozen = null;
   }
   function markLayer() {
@@ -1026,6 +1034,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     return el;
   }
   function leaveMark() {
+    markSession++; finishing = false;
     unfreeze();
     strokes = []; stroke = null; shot = null; ink = null;
     post({ type: "marks", count: 0 });
@@ -1138,15 +1147,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
     return out && out.size <= MAX_BYTES ? out : null;
   }
-  let finishing = false;
   async function finishMark() {
     if (tool !== "mark" || !strokes.length || finishing) return;
     finishing = true;
-    const list = strokes.slice(), picture = shot;
+    const list = strokes.slice(), picture = shot, session = markSession;
     let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
-    for (const s of list) for (const [x, y] of s.points) {
-      const pad = s.width / 2 + 2;
-      left = Math.min(left, x - pad); top = Math.min(top, y - pad); right = Math.max(right, x + pad); bottom = Math.max(bottom, y + pad);
+    for (const s of list) {
+      // The rendered path includes an arrow's bow and head, beyond its pointer endpoints.
+      const b = s.el.getBBox(), pad = s.width / 2 + 2;
+      left = Math.min(left, b.x - pad); top = Math.min(top, b.y - pad); right = Math.max(right, b.x + b.width + pad); bottom = Math.max(bottom, b.y + b.height + pad);
     }
     [left, right] = [Math.max(0, left), Math.min(innerWidth, right)];
     [top, bottom] = [Math.max(0, top), Math.min(innerHeight, bottom)];
@@ -1166,9 +1175,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // Done waits for the picture, so it shows the page as frozen, before the hold and the hover look end.
     let marked = null;
     try { const taken = await picture; marked = taken ? await drawOn(taken, list, { left, top, right, bottom }) : null; } catch (e) { marked = null; }
+    // A canceled capture must not post or change a newer session's preview or in-flight Done.
+    if (session !== markSession || tool !== "mark") return;
     finishing = false;
-    // Cancelled while the picture was drawn.
-    if (tool !== "mark") return void (draft.innerHTML = "");
     const n = ++shots;
     post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, shot: n });
     post({ type: "area-shot", shot: n, image: marked });
@@ -1341,6 +1350,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // Escape under a tool unpicks the measured element, else goes to Drop, which closes what's open or puts the tool down.
   // Caught first, so Comark's zoom under the layer stays open.
   window.addEventListener("keydown", (e) => {
+    // The screenshot and ink use viewport coordinates, including when the page still has keyboard focus.
+    if (tool === "mark" && /^( |ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(e.key)) {
+      e.preventDefault(); e.stopPropagation(); return;
+    }
     if (e.key !== "Escape" || tool === "browse") return;
     e.stopPropagation();
     if (picked) { picked = null; return redraw(); }
