@@ -28,13 +28,13 @@ const openPalette = usePaletteOpener()
 const searchable = computed(() => Boolean(me.value) && children.value.length > 0)
 const search = ref("")
 const searchFolder = () => openPalette(`${inFolder(props.drop.title)} `)
-offerToPalette("scope", () => (me.value ? { id: props.drop.id, title: props.drop.title } : null))
+usePaletteOffer("scope", () => (me.value ? { id: props.drop.id, title: props.drop.title } : null))
 defineShortcuts({ "/": () => palette && searchable.value && searchFolder() })
 const live = computed(() => !props.drop.trashedAt)
 const adds = computed(() => live.value && Boolean(me.value) && (props.drop.isOwner || Boolean(props.drop.teamFolder)))
 const addsFolders = computed(() => props.drop.isOwner)
 // ⌘K's new drops go in here too, where the New menu would put them.
-offerToPalette("folder", () =>
+usePaletteOffer("folder", () =>
   adds.value ? { id: props.drop.id, title: props.drop.title, folders: addsFolders.value } : null,
 )
 

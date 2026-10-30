@@ -14,7 +14,7 @@ export function useLatestVersion(
   const notify = useNotify()
   const config = useRuntimeConfig()
   const enabled = () => config.public.realtime && toValue(options.enabled)
-  // The room loads once the page shows and following is on (~/utils/latest-room), in a scope of this component's.
+  // The room loads once the page shows and following is on (~/composables/latest-room), in a scope of this component's.
   const room = shallowRef<ComputedRef<number>>()
   let scope: EffectScope | undefined
   let generation = 0
@@ -32,13 +32,13 @@ export function useLatestVersion(
       if (room.value || scope) return
       const nextScope = effectScope()
       scope = nextScope
-      const { joinLatestRoom } = await import("~/utils/latest-room")
+      const { useLatestRoom } = await import("~/composables/latest-room")
       if (current !== generation || !enabled()) {
         nextScope.stop()
         if (scope === nextScope) scope = undefined
         return
       }
-      room.value = nextScope.run(() => joinLatestRoom(() => drop.value.link, enabled))
+      room.value = nextScope.run(() => useLatestRoom(() => drop.value.link, enabled))
     },
   )
   onScopeDispose(() => {

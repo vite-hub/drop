@@ -15,6 +15,8 @@ const items = [
 ]
 
 interface Block {
+  /** Stays with its code block while blocks are added or removed above it, so an open select stays on its block. */
+  id: number
   element: HTMLElement
   top: number
   right: number
@@ -24,6 +26,14 @@ interface Block {
 }
 
 const blocks = shallowRef<Block[]>([])
+// ProseMirror keeps a code block's DOM node across edits, so the node names the block.
+const ids = new WeakMap<HTMLElement, number>()
+let lastId = 0
+function idOf(element: HTMLElement) {
+  let id = ids.get(element)
+  if (id === undefined) ids.set(element, (id = ++lastId))
+  return id
+}
 // The selects are placed against this layer, which covers the same box as the editor's column.
 const layer = useTemplateRef("layer")
 
@@ -39,6 +49,7 @@ function measure() {
       const rect = element.getBoundingClientRect()
       const info = textValue(node.attrs.language)?.trim() ?? ""
       next.push({
+        id: idOf(element),
         element,
         top: rect.top - box.top,
         right: box.right - rect.right,
@@ -80,8 +91,8 @@ useResizeObserver(
 <template>
   <div ref="layer" class="pointer-events-none absolute inset-0 z-10">
     <USelectMenu
-      v-for="(block, index) in blocks"
-      :key="index"
+      v-for="block in blocks"
+      :key="block.id"
       :model-value="block.language ?? (block.written ? undefined : 'text')"
       :items="items"
       value-key="value"
