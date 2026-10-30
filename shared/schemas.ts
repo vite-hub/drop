@@ -91,7 +91,8 @@ export const CommentSchema = v.pipe(
     quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
     label: v.optional(v.pipe(v.string(), v.maxLength(200))),
     page: v.optional(v.pipe(v.string(), v.maxLength(300))),
-    body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
+    // Empty only with images, such as the Marker's snapshot: the endpoint checks once it has read them.
+    body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
   }),
   v.check(
     (input) => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000,

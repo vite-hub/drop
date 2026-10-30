@@ -15,6 +15,7 @@ import {
 import { createInjectionState, useFileDialog } from "@vueuse/core"
 import { useViewerAnnotations } from "../../app/composables/useViewerAnnotations.ts"
 import { useImagePicks } from "../../app/composables/useImagePicks.ts"
+import { MARK_COLORS, MARK_TIPS } from "../../app/utils/marker.ts"
 
 for (const [name, value] of Object.entries({
   computed,
@@ -26,6 +27,8 @@ for (const [name, value] of Object.entries({
   createInjectionState,
   useFileDialog,
   useImagePicks,
+  MARK_COLORS,
+  MARK_TIPS,
 }))
   vi.stubGlobal(name, value)
 const { provideReviewDraft, injectReviewDraft } = await import("../../app/composables/useReviewDraft.ts")
@@ -34,11 +37,14 @@ afterEach(() => scopes.splice(0).forEach((scope) => scope.stop()))
 function viewer(kind = "markdown") {
   const scope = effectScope()
   scopes.push(scope)
+  const shots = []
   const options = {
     drop: ref({ kind, canComment: true }),
     editing: ref(false),
     enabled: ref(true),
     reviewOpen: ref(false),
+    shot: (file) => shots.push(file),
+    shots,
   }
   return { ...options, ...scope.run(() => useViewerAnnotations(options)) }
 }
@@ -94,6 +100,43 @@ test("R still enables area selection; V gives the page its clicks back", () => {
   state.receive({ type: "key", key: "v", tool: "comment" }, frame)
   assert.equal(state.frameTool.value, "browse")
   assert.equal(state.reviewOpen.value, false)
+})
+
+test("the Marker: B takes it up, [ and ] size the tip, and its snapshot opens a new comment back under Browse", () => {
+  const state = viewer("html")
+  state.receive({ type: "key", key: "b", tool: "browse" }, frame)
+  assert.equal(state.frameTool.value, "mark")
+  assert.deepEqual(state.penStyle.value, { tool: "marker", color: "#ec4899", width: 14 })
+  state.receive({ type: "key", key: "a", tool: "mark" }, frame)
+  state.receive({ type: "key", key: "]", tool: "mark" }, frame)
+  state.receive({ type: "key", key: "]", tool: "mark" }, frame)
+  state.receive({ type: "key", key: "]", tool: "mark" }, frame)
+  assert.deepEqual(state.penStyle.value, { tool: "arrow", color: "#ec4899", width: 8 })
+  state.receive({ type: "marks", count: 2 }, frame)
+  assert.equal(state.marks.value, 2)
+  state.receive({ ...area, quote: "Not monthly demand.", shot: 1 }, frame)
+  assert.equal(state.frameTool.value, "browse")
+  assert.equal(state.popover.value.pending.quote, "Not monthly demand.")
+  const image = new Blob([new Uint8Array([1, 2, 3])], { type: "image/webp" })
+  state.receive({ type: "area-shot", shot: 1, image }, frame)
+  assert.equal(state.shots[0].type, "image/webp")
+  // The viewer opens Comments for the new comment, and the strokes stay drawn while it's written.
+  state.reviewOpen.value = true
+  assert.equal(state.draftingArea.value, true)
+})
+
+test("the Marker stays off where areas can't be drawn, and Escape puts it down", () => {
+  const state = viewer("board")
+  state.receive({ type: "key", key: "b", tool: "browse" }, frame)
+  assert.equal(state.frameTool.value, "browse")
+  const doc = viewer()
+  doc.mark("pen")
+  assert.equal(doc.frameTool.value, "mark")
+  doc.receive({ type: "key", key: "Escape", tool: "mark" }, frame)
+  assert.equal(doc.frameTool.value, "browse")
+  // A plain area from the Comment tool takes no quote, whatever the frame sent.
+  doc.receive({ ...area, quote: "stray" }, frame)
+  assert.equal(doc.popover.value.pending.quote, undefined)
 })
 
 test("reading a thread does not let a drag replace a reply", () => {

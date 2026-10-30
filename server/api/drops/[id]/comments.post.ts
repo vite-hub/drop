@@ -23,6 +23,7 @@ export default defineHandler(async (event) => {
   // Cloudflare Rate Limiting on Workers, ViteHub's in-memory limiter elsewhere (local dev included).
   await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
   const { input: body, images } = await readCommentBody(event, CommentSchema)
+  if (!body.body && !images.length) throw new HTTPError({ status: 400, statusText: "Write a comment." })
   const parent = images.length ? await imageParent(drop) : drop
   const authorName = who?.name ?? "Guest"
   const { row, attachments } = await withImages(

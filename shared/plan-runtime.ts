@@ -68,7 +68,8 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
 /**
  * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
  * Select text to comment on it; click an image to zoom and comment on a spot. The viewer's toolbar picks a tool: with
- * Comment (R), click an element to pin a comment to it or drag a rectangle; with Measure, inspect sizes and distances.
+ * Comment (R), click an element to pin a comment to it or drag a rectangle; with Measure, inspect sizes and distances;
+ * with the Marker, draw on a still of the page and send it as a comment.
  * On a page someone else built (an HTML doc or an app, AUTHORED), clicks stay the page's own: no image zoom, no copy
  * buttons on its code. Its images take comments through the Comment tool.
  * Comark's own zoom, such as an annotated screenshot's, shows the comments on what it zooms and takes areas drawn on it.
@@ -96,6 +97,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.a{position:absolute;box-sizing:border-box;border:calc(1.5px * var(--drop-z,1)) solid var(--foreground);border-radius:3px;background:color-mix(in oklab,var(--foreground) 6%,transparent);pointer-events:none;transition:background 120ms}' +
     '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}.a.t{background:none}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
+    // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
+    '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
+    '.ink path,.inkp path{fill:none;stroke-linecap:round;stroke-linejoin:round}.ink .mk,.inkp .mk{stroke-opacity:.4;stroke-linecap:butt}' +
     '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--hi);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
     // (4.7:1 under white) behind labels, its white card and rulers in light mode and their dark cut in dark, and the box
@@ -849,6 +853,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function setTool(next) {
     if (next === tool) return;
     const wasHeld = tool !== "browse";
+    if (tool === "mark") leaveMark();
     tool = next;
     self.__dropHold(tool === "browse" ? null : held);
     if (!wasHeld && tool !== "browse") { heldHover = Array.from(document.querySelectorAll(":hover")); pointer = null; }
@@ -861,7 +866,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (root !== shadow && root.host) root.host.remove();
     }
     if (wasHeld && tool === "browse") leaveHeld();
-    if (tool !== "browse") {
+    if (tool === "mark") {
+      getSelection().removeAllRanges();
+      if (lastQuote) post({ type: "selection", clear: true });
+      lastQuote = "";
+      layer = markLayer();
+      (modalShadow() || shadow).appendChild(layer);
+    } else if (tool !== "browse") {
       getSelection().removeAllRanges();
       if (lastQuote) post({ type: "selection", clear: true });
       lastQuote = "";
@@ -897,6 +908,279 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       (modalShadow() || shadow).appendChild(layer);
     }
     redraw();
+  }
+
+  /**
+   * The Marker: the reader marks up a still of the page and sends it as one comment. Picking it freezes the page as it
+   * is: the page hears no pointer while a tool is on (EVENT_HOLD), and what's under the pointer keeps its hover look
+   * too, since each :hover rule also matches [data-drop-hover], which those elements carry. So a tooltip, even one
+   * shown only by CSS, stays open. The viewport's screenshot starts then,
+   * and a layer over the page takes the strokes (marker, pen, or arrow, in viewport pixels) and holds the scroll still.
+   * Done anchors the comment to the smallest element under the strokes, reads the words under them, draws the strokes
+   * on the screenshot, and posts the area, then the picture as its "area-shot", which Drop adds to the comment. The
+   * strokes stay on the page while the comment is written; Drop clears them with the area. A page whose CSP blocks the
+   * screenshot sends the area with no picture.
+   */
+  const SVG = "http://www.w3.org/2000/svg";
+  let pen = { tool: "marker", color: "#ec4899", width: 14 }, strokes = [], stroke = null, shot = null, frozen = null, ink = null;
+  let markSession = 0, finishing = false;
+  function setPen(next) {
+    if (/^(marker|pen|arrow)$/.test(next.tool)) pen.tool = next.tool;
+    if (/^#[0-9a-f]{6}$/i.test(next.color)) pen.color = next.color;
+    if (typeof next.width === "number" && next.width >= 1 && next.width <= 64) pen.width = next.width;
+    if (layer && tool === "mark") layer.style.cursor = penCursor();
+  }
+  // The pointer is the tip: its size and colour, see-through for the marker. The arrow keeps the crosshair.
+  function penCursor() {
+    if (pen.tool === "arrow") return "";
+    const d = Math.max(8, Math.ceil(pen.width) + 4), r = d / 2;
+    const svg = '<svg xmlns="' + SVG + '" width="' + d + '" height="' + d + '"><circle cx="' + r + '" cy="' + r + '" r="' + Math.max(2, pen.width / 2) + '" fill="' + pen.color + '" fill-opacity="' + (pen.tool === "marker" ? 0.4 : 0.9) + '" stroke="#0a0a0a" stroke-opacity=".55"/></svg>';
+    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '") ' + r + " " + r + ", crosshair";
+  }
+  const pt = (p) => p[0].toFixed(1) + " " + p[1].toFixed(1);
+  function smoothPath(points) {
+    if (points.length === 1) return "M" + pt(points[0]) + "l0.1 0";
+    let d = "M" + pt(points[0]);
+    for (let i = 1; i < points.length - 1; i++) d += "Q" + pt(points[i]) + " " + pt([(points[i][0] + points[i + 1][0]) / 2, (points[i][1] + points[i + 1][1]) / 2]);
+    return d + "L" + pt(points[points.length - 1]);
+  }
+  // A hand-drawn arrow: the shaft bows a little unless Shift keeps it straight, and the head is two strokes along its end.
+  function arrowPath(a, b, straight, width) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, bow = straight ? 0 : Math.min(18, length * 0.08);
+    const c = [(a[0] + b[0]) / 2 - (dy / length) * bow, (a[1] + b[1]) / 2 + (dx / length) * bow];
+    const angle = Math.atan2(b[1] - c[1], b[0] - c[0]), head = Math.min(14, length * 0.4) + width;
+    const side = (turn) => [b[0] - head * Math.cos(angle + turn), b[1] - head * Math.sin(angle + turn)];
+    return "M" + pt(a) + "Q" + pt(c) + " " + pt(b) + "M" + pt(side(-0.5)) + "L" + pt(b) + "L" + pt(side(0.5));
+  }
+  const strokePath = (s) => (s.tool === "arrow" ? arrowPath(s.points[0], s.points[s.points.length - 1], s.straight, s.width) : smoothPath(s.points));
+  function drawStroke(s, into) {
+    const path = document.createElementNS(SVG, "path");
+    path.setAttribute("d", strokePath(s));
+    path.setAttribute("stroke", s.color);
+    path.setAttribute("stroke-width", String(s.width));
+    if (s.tool === "marker") path.setAttribute("class", "mk");
+    into.appendChild(path);
+    return path;
+  }
+
+  function freeze() {
+    const roots = [document], hovering = [], styles = [];
+    for (const root of roots) {
+      // Selectors and stylesheets are scoped to each root, including nested web components.
+      for (const el of root.querySelectorAll("*")) if (el !== host && el.shadowRoot) roots.push(el.shadowRoot);
+      const over = Array.from(root.querySelectorAll(":hover"));
+      over.forEach((el) => el.setAttribute("data-drop-hover", ""));
+      hovering.push(...over);
+      // A stylesheet from another origin can't be read, so its hover looks go when the pointer moves.
+      const rules = [];
+      for (const sheet of new Set([...root.styleSheets, ...root.adoptedStyleSheets])) {
+        let list = null;
+        try { list = sheet.cssRules; } catch (e) { continue; }
+        for (const rule of Array.from(list || [])) if (rule.cssText.includes(":hover")) rules.push(rule.cssText.replace(/:hover/g, "[data-drop-hover]"));
+      }
+      const style = document.createElement("style");
+      style.textContent = rules.join("\n");
+      (root === document ? document.head : root).appendChild(style);
+      styles.push(style);
+    }
+    frozen = { hovering, styles };
+  }
+  function unfreeze() {
+    if (!frozen) return;
+    frozen.hovering.forEach((el) => el.removeAttribute("data-drop-hover"));
+    frozen.styles.forEach((style) => style.remove());
+    frozen = null;
+  }
+  function markLayer() {
+    freeze();
+    shot = captureViewport(host).catch(() => null);
+    strokes = [];
+    const el = document.createElement("div");
+    el.className = "draw mark";
+    el.style.cursor = penCursor();
+    ink = document.createElementNS(SVG, "svg");
+    ink.setAttribute("class", "ink");
+    el.appendChild(ink);
+    el.onpointerdown = (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      stroke = { tool: pen.tool, color: pen.color, width: pen.width, points: [[e.clientX, e.clientY]], straight: false };
+      stroke.el = drawStroke(stroke, ink);
+    };
+    el.onpointermove = (e) => {
+      if (!stroke) return;
+      const p = [e.clientX, e.clientY], first = stroke.points[0];
+      // Shift draws straight: a marker stays on its line, a pen and an arrow go point to point.
+      if (stroke.tool === "arrow" || e.shiftKey) {
+        stroke.straight = e.shiftKey;
+        stroke.points = [first, stroke.tool === "marker" && e.shiftKey ? [p[0], first[1]] : p];
+      } else {
+        const last = stroke.points[stroke.points.length - 1];
+        if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 2) stroke.points.push(p);
+      }
+      stroke.el.setAttribute("d", strokePath(stroke));
+    };
+    el.onpointerup = el.onpointercancel = () => {
+      if (!stroke) return;
+      const s = stroke, a = s.points[0], b = s.points[s.points.length - 1];
+      stroke = null;
+      if (s.tool === "arrow" && Math.hypot(b[0] - a[0], b[1] - a[1]) < 10) return s.el.remove();
+      strokes.push(s);
+      post({ type: "marks", count: strokes.length });
+    };
+    // The snapshot is of the viewport, so the page stays where it is under it.
+    el.onwheel = el.ontouchmove = (e) => e.preventDefault();
+    return el;
+  }
+  function leaveMark() {
+    markSession++; finishing = false;
+    unfreeze();
+    strokes = []; stroke = null; shot = null; ink = null;
+    post({ type: "marks", count: 0 });
+  }
+  function undoMark() {
+    const s = strokes.pop();
+    if (s) s.el.remove();
+    post({ type: "marks", count: strokes.length });
+  }
+
+  // The words under the strokes, one phrase per block, in reading order: the marker's whole width, a pen's line, the
+  // inside of a loop drawn with the pen, and the word an arrow points at.
+  function caretAt(x, y) {
+    if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); return p && { node: p.offsetNode, offset: p.offset }; }
+    const r = document.caretRangeFromPoint && document.caretRangeFromPoint(x, y);
+    return r && { node: r.startContainer, offset: r.startOffset };
+  }
+  function wordAt(x, y, slack) {
+    const c = caretAt(x, y);
+    if (!c || !c.node || c.node.nodeType !== 3 || host.contains(c.node)) return null;
+    const t = c.node.data;
+    let start = Math.min(c.offset, t.length), end = start;
+    while (start > 0 && /\S/.test(t[start - 1])) start--;
+    while (end < t.length && /\S/.test(t[end])) end++;
+    if (start === end) return null;
+    const range = document.createRange();
+    range.setStart(c.node, start); range.setEnd(c.node, end);
+    const b = range.getBoundingClientRect();
+    if (x < b.left - slack || x > b.right + slack || y < b.top - slack || y > b.bottom + slack) return null;
+    return { node: c.node, start, end };
+  }
+  function along(points) {
+    const out = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      const [x0, y0] = points[i - 1], [x1, y1] = points[i], n = Math.max(1, Math.floor(Math.hypot(x1 - x0, y1 - y0) / 5));
+      for (let k = 1; k <= n; k++) out.push([x0 + ((x1 - x0) * k) / n, y0 + ((y1 - y0) * k) / n]);
+    }
+    return out;
+  }
+  function inside(points) {
+    const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const gap = Math.hypot(points[0][0] - points[points.length - 1][0], points[0][1] - points[points.length - 1][1]);
+    if (points.length < 10 || x1 - x0 < 16 || y1 - y0 < 12 || gap > Math.max(28, 0.3 * Math.hypot(x1 - x0, y1 - y0))) return [];
+    const out = [];
+    for (let x = x0; x <= x1; x += 7) for (let y = y0; y <= y1; y += 7) {
+      let hit = false;
+      for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const [xi, yi] = points[i], [xj, yj] = points[j];
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit;
+      }
+      if (hit) out.push([x, y]);
+    }
+    return out;
+  }
+  function markedText(list) {
+    const words = new Map(), ids = new Map();
+    const keyOf = (w) => { if (!ids.has(w.node)) ids.set(w.node, ids.size); return ids.get(w.node) + ":" + w.start; };
+    const take = (x, y, slack) => { const w = wordAt(x, y, slack); if (w) words.set(keyOf(w), w); };
+    for (const s of list) {
+      if (s.tool === "arrow") { const [x, y] = s.points[s.points.length - 1]; take(x, y, 10); continue; }
+      const third = s.width / 3;
+      for (const [x, y] of along(s.points)) {
+        take(x, y, s.tool === "marker" ? s.width / 2 : 4);
+        if (s.tool === "marker") { take(x, y - third, s.width / 2); take(x, y + third, s.width / 2); }
+      }
+      if (s.tool === "pen") for (const [x, y] of inside(s.points)) take(x, y, 2);
+    }
+    const sorted = Array.from(words.values()).sort((a, b) =>
+      a.node === b.node ? a.start - b.start : a.node.compareDocumentPosition(b.node) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+    const groups = [];
+    for (const w of sorted) {
+      const block = blockOf(w.node), last = groups[groups.length - 1];
+      if (last && last.block === block) last.to = w; else groups.push({ block, from: w, to: w });
+    }
+    return groups.map(({ from, to }) => {
+      const range = document.createRange();
+      range.setStart(from.node, from.start); range.setEnd(to.node, to.end);
+      return range.toString().replace(/\s+/g, " ").trim();
+    }).filter(Boolean).join(" … ").slice(0, 2000);
+  }
+  // The screenshot with the strokes on it, as the reader saw them, cut to the strokes and some of what's around them
+  // (at least 640 by 360). The marker multiplies, so the words under it stay dark.
+  async function drawOn(picture, list, box) {
+    const image = await createImageBitmap(picture), k = image.width / innerWidth;
+    const grow = (from, to, min, max) => {
+      let a = from - 120, b = to + 120;
+      if (b - a < min) { a -= (min - (b - a)) / 2; b = a + min; }
+      if (a < 0) { b -= a; a = 0; }
+      if (b > max) { a -= b - max; b = max; }
+      return [Math.max(0, a), Math.min(max, b)];
+    };
+    const [x0, x1] = grow(box.left, box.right, 640, innerWidth), [y0, y1] = grow(box.top, box.bottom, 360, innerHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round((x1 - x0) * k); canvas.height = Math.round((y1 - y0) * k);
+    const g = canvas.getContext("2d");
+    g.drawImage(image, -x0 * k, -y0 * k);
+    g.scale(k, k);
+    g.translate(-x0, -y0);
+    for (const s of list) {
+      g.save();
+      g.globalAlpha = s.tool === "marker" ? 0.4 : 1;
+      g.globalCompositeOperation = s.tool === "marker" ? "multiply" : "source-over";
+      g.strokeStyle = s.color; g.lineWidth = s.width; g.lineCap = s.tool === "marker" ? "butt" : "round"; g.lineJoin = "round";
+      g.stroke(new Path2D(strokePath(s)));
+      g.restore();
+    }
+    const blob = (type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+    let out = await blob("image/webp", 0.9);
+    if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
+    return out && out.size <= MAX_BYTES ? out : null;
+  }
+  async function finishMark() {
+    if (tool !== "mark" || !strokes.length || finishing) return;
+    finishing = true;
+    const list = strokes.slice(), picture = shot, session = markSession;
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    for (const s of list) {
+      // The rendered path includes an arrow's bow and head, beyond its pointer endpoints.
+      const b = s.el.getBBox(), pad = s.width / 2 + 2;
+      left = Math.min(left, b.x - pad); top = Math.min(top, b.y - pad); right = Math.max(right, b.x + b.width + pad); bottom = Math.max(bottom, b.y + b.height + pad);
+    }
+    [left, right] = [Math.max(0, left), Math.min(innerWidth, right)];
+    [top, bottom] = [Math.max(0, top), Math.min(innerHeight, bottom)];
+    // The layer steps aside, so the hit tests reach the page under it.
+    layer.style.pointerEvents = "none";
+    const under = anchorFor(left, top, right, bottom, host), quote = markedText(list);
+    layer.style.pointerEvents = "";
+    const r = under.getBoundingClientRect();
+    const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
+    const ow = Math.max(1, Math.min(1000 - ox, thousandths(right, r.left, r.width) - ox));
+    const oh = Math.max(1, Math.min(1000 - oy, thousandths(bottom, r.top, r.height) - oy));
+    draft.innerHTML = "";
+    const kept = document.createElementNS(SVG, "svg");
+    kept.setAttribute("class", "inkp");
+    for (const s of list) drawStroke(Object.assign({}, s, { points: s.points.map(([x, y]) => [x + scrollX, y + scrollY]) }), kept);
+    draft.appendChild(kept);
+    // Done waits for the picture, so it shows the page as frozen, before the hold and the hover look end.
+    let marked = null;
+    try { const taken = await picture; marked = taken ? await drawOn(taken, list, { left, top, right, bottom }) : null; } catch (e) { marked = null; }
+    // A canceled capture must not post or change a newer session's preview or in-flight Done.
+    if (session !== markSession || tool !== "mark") return;
+    finishing = false;
+    const n = ++shots;
+    post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, shot: n });
+    post({ type: "area-shot", shot: n, image: marked });
   }
 
   /**
@@ -1032,7 +1316,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "markers") { markers = m.markers; render(); }
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
-    if (m.type === "tool" && /^(browse|comment|measure)$/.test(m.tool)) { pointComments = m.pointComments === true; setTool(m.tool); post({ type: "tool", tool }); }
+    if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
+    if (m.type === "pen") setPen(m);
+    if (m.type === "mark" && m.do === "undo") undoMark();
+    if (m.type === "mark" && m.do === "done") finishMark();
     if (m.type === "view") setView(m);
     if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
@@ -1063,6 +1350,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // Escape under a tool unpicks the measured element, else goes to Drop, which closes what's open or puts the tool down.
   // Caught first, so Comark's zoom under the layer stays open.
   window.addEventListener("keydown", (e) => {
+    // The screenshot and ink use viewport coordinates, including when the page still has keyboard focus.
+    if (tool === "mark" && /^( |ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(e.key)) {
+      e.preventDefault(); e.stopPropagation(); return;
+    }
     if (e.key !== "Escape" || tool === "browse") return;
     e.stopPropagation();
     if (picked) { picked = null; return redraw(); }
@@ -1074,8 +1365,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const t = e.target;
     const typing = t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
     const key = e.key.toLowerCase();
+    // The Marker's own keys: Enter sends the snapshot, ⌘Z or Ctrl+Z takes back the last stroke.
+    if (tool === "mark" && !typing && !e.altKey && !e.defaultPrevented) {
+      if (key === "enter") { e.preventDefault(); return finishMark(); }
+      if ((e.metaKey || e.ctrlKey) && key === "z") { e.preventDefault(); return undoMark(); }
+    }
     if (e.metaKey || e.ctrlKey || e.altKey || typing || e.defaultPrevented) return;
-    if (/^[vrsux]$/.test(key)) post({ type: "key", key, tool });
+    if (/^[vrsuxbpa]$/.test(key) || (tool === "mark" && (key === "[" || key === "]"))) post({ type: "key", key, tool });
     // An image's page (the one Drop takes point comments on) has no use for ← and →: Drop moves to the folder's next image.
     if (pointComments && (e.key === "ArrowLeft" || e.key === "ArrowRight")) post({ type: "key", key: e.key });
   });

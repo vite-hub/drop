@@ -141,6 +141,7 @@ const {
   toggleOverlay,
   commentOnSelection,
   pickImage,
+  pen,
 } = annotations
 /** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
 const framed = computed(
@@ -357,6 +358,10 @@ defineShortcuts({
   r: toggleCommentArea,
   v: () => (tool.value = "browse"),
   s: () => framed.value && setTool("measure"),
+  b: () => canMark.value && annotations.mark("marker"),
+  p: () => canMark.value && annotations.mark("pen"),
+  a: () => canMark.value && annotations.mark("arrow"),
+  meta_z: () => undoMark(),
   u: () => framed.value && toggleOverlay("rulers"),
   x: () => framed.value && toggleOverlay("xray"),
   l: () => !editing.value && copyLink("Link copied"),
@@ -364,6 +369,20 @@ defineShortcuts({
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   w: () => widens.value && nextWidth(),
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
+})
+// The Marker's size and Done, while it's on and nothing is being typed.
+const typing = (event: KeyboardEvent) =>
+  event.target instanceof HTMLElement &&
+  (event.target.isContentEditable || /^(input|textarea|select)$/i.test(event.target.tagName))
+onKeyStroke(["[", "]", "Enter"], (event) => {
+  if (!marking.value || event.defaultPrevented || typing(event) || event.metaKey || event.ctrlKey || event.altKey)
+    return
+  if (event.key === "Enter") {
+    if (event.target instanceof HTMLButtonElement) return
+    event.preventDefault()
+    return finishMark()
+  }
+  annotations.resize(event.key === "[" ? -1 : 1)
 })
 // Dialogs and menus consume Escape first. Only handle it here when it reaches the document unhandled.
 onKeyStroke("Escape", (event) => {
@@ -406,6 +425,19 @@ const canMarkArea = computed(
 const inspectable = computed(
   () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
 )
+/** Whether the Marker can draw on a snapshot of the page: docs, images, HTML, and apps in the frame. */
+const canMark = computed(() => framed.value && canDrawArea.value && !shownVersion.value)
+const marking = computed(() => tool.value === "mark")
+const markTools = computed(() => [
+  ...(inspectable.value ? (["browse", "measure"] as const) : []),
+  ...(canMark.value ? (["mark"] as const) : []),
+])
+function finishMark() {
+  if (!marking.value || !annotations.marks.value || annotations.finishing.value) return
+  annotations.finishing.value = true
+  send({ type: "mark", do: "done" })
+}
+const undoMark = () => marking.value && send({ type: "mark", do: "undo" })
 // Open when someone reaches for Edit on a doc the editor can't take: the popover says why.
 const editNoteOpen = ref(false)
 const showEditTool = computed(
@@ -1026,14 +1058,27 @@ watch(
                 @click="live.publish()"
               />
             </template>
+            <template v-else-if="hasComments && !trashed && marking">
+              <ViewerMarkTools
+                :finishing="annotations.finishing.value"
+                :marks="annotations.marks.value"
+                :pen="pen"
+                @cancel="setTool('browse')"
+                @color="pen.color = $event"
+                @done="finishMark"
+                @size="pen.sizes[pen.tip] = $event"
+                @tip="annotations.mark($event)"
+                @undo="undoMark"
+              />
+            </template>
             <template v-else-if="hasComments && !trashed">
               <ViewerToolbar
                 v-if="
                   !lightbox &&
                   !shownVersion &&
-                  (inspectable || sizable || (framed && pinned.length) || siteRef?.canDraw)
+                  (inspectable || canMark || sizable || (framed && pinned.length) || siteRef?.canDraw)
                 "
-                :tools="inspectable ? ['browse', 'measure'] : []"
+                :tools="markTools"
                 :views="inspectable ? ['rulers', 'xray', 'pins'] : pinned.length ? ['pins'] : []"
                 :overlays="overlays"
                 :sizable="sizable || Boolean(siteRef?.canDraw)"
