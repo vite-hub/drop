@@ -257,6 +257,7 @@ export function useViewerFrame(options: {
       case "area":
       case "area-shot":
       case "marker":
+      case "marks":
         annotations.receive(message, box)
     }
   })
@@ -322,8 +323,14 @@ export function useViewerFrame(options: {
     [ready, annotations.frameTool],
     () =>
       ready.value &&
-      send({ type: "tool", tool: annotations.frameTool.value, pointComments: drop.value.kind === "image" }),
+      send({
+        type: "tool",
+        tool: annotations.frameTool.value,
+        pointComments: drop.value.kind === "image",
+        pen: annotations.penStyle.value,
+      }),
   )
+  watch(annotations.penStyle, (pen) => ready.value && send({ type: "pen", ...pen }))
   watch(
     [ready, () => ({ ...annotations.overlays })],
     () => ready.value && send({ type: "view", ...annotations.overlays }),

@@ -50,8 +50,10 @@ function escape(event: KeyboardEvent) {
   if (event.target instanceof HTMLElement) event.target.blur()
 }
 
+// A new comment may be only images, such as the Marker's snapshot; a reply still needs words.
+const sendable = computed(() => Boolean(body.value.trim() || (props.pending && picks.value.length)))
 function send() {
-  if (!body.value.trim() || busy.value) return
+  if (!sendable.value || busy.value) return
   if (props.comment) replying.value = true
   if (props.comment) emit("reply", props.comment.id, body.value, files.value)
   else emit("submit", body.value, files.value)
@@ -109,7 +111,13 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     <template v-if="pending">
       <div class="mb-3 flex items-center justify-between gap-2">
         <span class="text-sm text-muted">{{
-          pending.quote ? "Selected text" : pending.kind === "image" ? "Selected image area" : "Selected area"
+          pending.quote
+            ? pending.kind === "area"
+              ? "Marked"
+              : "Selected text"
+            : pending.kind === "image"
+              ? "Selected image area"
+              : "Selected area"
         }}</span>
         <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
       </div>
@@ -125,7 +133,13 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           class="flex-1"
           :maxrows="6"
           :placeholder="
-            pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'
+            picks.length
+              ? 'Add a note (optional)'
+              : pending.quote
+                ? 'Comment on the selection'
+                : pending.ow
+                  ? 'Comment on this area'
+                  : 'Comment on this spot'
           "
           :rows="1"
           :ui="{ base: 'px-1 py-1.5 text-base leading-relaxed sm:text-sm' }"
@@ -148,7 +162,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           aria-label="Send comment"
           class="size-8 justify-center rounded-full"
           color="neutral"
-          :disabled="!body.trim()"
+          :disabled="!sendable"
           icon="i-mingcute-arrow-up-line"
           :loading="busy"
           @click="send"

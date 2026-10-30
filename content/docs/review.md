@@ -62,6 +62,7 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | Text | Select it. |
 | An image | In a Markdown doc or an image drop, click it to zoom, then click a spot or drag an area. In an HTML doc or an app, clicks stay the page's own, so use the Comment tool. |
 | An element or part of a page | Pick **Comment** in the toolbar under the page, or press :kbd[R]. Click an element to pin a comment to it, or drag a rectangle. The tool stays on for the next one. |
+| Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
 | The whole page | Write in the box at the bottom of the Comments panel. |
 
 A comment shows the moment you send it. If it doesn't go through, it comes back to its box with the reason.
@@ -80,12 +81,27 @@ Docs and apps show a toolbar under the page. Each tool has a key, which also wor
 | --- | --- | --- |
 | Browse | :kbd[V] | The page takes its own clicks. |
 | Comment | :kbd[R] | Highlights the element under the pointer. Click to pin a comment, drag for an area. |
+| Marker | :kbd[B] | Freezes the page and lets you draw on it. See [Marker](#marker). |
 | Measure | :kbd[S] | Shows an element's size, padding, and margin, with its font, colors, gap, and corners. Click one to pick it, then point at another to see the distance between them. |
 | Rulers and guides | :kbd[U] | Pixel rulers along the top and left. Drag a guide out of a ruler. Drag it back, or double-click it, to remove it. |
 | X-ray | :kbd[X] | Outlines every element without moving anything. |
 | Hide comments | | Hides the pins and highlights while you look at the page. |
 
 :kbd[Esc] unpicks the measured element, closes an open comment box, then returns to Browse.
+
+### Marker {#marker}
+
+The Marker draws on a snapshot of the page and sends it as one comment. Press :kbd[B] while you point at what you want to mark: the page freezes as it is, an open tooltip or menu included, and the toolbar turns into the Marker's tools.
+
+| Tool | Key | What it does |
+| --- | --- | --- |
+| Marker | :kbd[B] | A see-through highlighter stroke. Hold :kbd[Shift] to keep it on its line. |
+| Pen | :kbd[P] | A thin line, to circle, underline, or cross out. Hold :kbd[Shift] for a straight one. |
+| Arrow | :kbd[A] | Drag from where it starts to what it points at. |
+| Size | :kbd[[] :kbd[]] | Four sizes for each tool. |
+| Undo | :kbd[⌘Z] | Takes back the last stroke. |
+
+**Done** (:kbd[Enter]) opens the comment with the snapshot and your strokes attached, and the words under them quoted. The note is optional. The comment points at the part of the page you marked, and agents read the marked words and the image with `read_drop`. :kbd[Esc] or **Cancel** throws the snapshot away.
 
 ## Sharing {#sharing}
 

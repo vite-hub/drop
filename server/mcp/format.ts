@@ -76,12 +76,14 @@ export function commentTarget(
     comment.ow || comment.oh
       ? `the area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
       : `the spot ${pct(comment.ox)} across, ${pct(comment.oy)} down`
-  return `[${where} of ${comment.label ?? (comment.kind === "image" ? "an image" : "an element")}]${within}`
+  // The Marker's comments carry the words under their strokes.
+  const marked = comment.quote ? ` marking > ${comment.quote}` : ""
+  return `[${where} of ${comment.label ?? (comment.kind === "image" ? "an image" : "an element")}]${marked}${within}`
 }
 
 /** `version` is the one being read: a comment written on an earlier version says which. */
 export const commentLine = (comment: DropComment, version: number, origin: string) =>
-  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
+  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body || "(no words, only the image)"} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
 
 /** The images sent with a comment or a reply, as full addresses an agent can fetch. */
 export const imageUrls = (item: Pick<DropComment, "attachments">, origin: string) =>

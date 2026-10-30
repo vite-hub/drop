@@ -111,7 +111,8 @@ watch(
   font: inherit;
 }
 
-.review-toolbar :deep([aria-label="Preview tools"] button) {
+.review-toolbar :deep([aria-label="Preview tools"] button),
+.review-toolbar :deep([data-marker] button[data-icon]) {
   width: 28px;
   padding: 0;
 }
