@@ -3,8 +3,6 @@ import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
-import { renderMarkdownCached } from "../markdown-document"
-import { renderSpreadsheetCached, SPREADSHEET_EXTENSIONS, spreadsheetExtension } from "../spreadsheet"
 import type {
   DropAttachment,
   DropCrumb,
@@ -12,11 +10,13 @@ import type {
   DropGalleryItem,
   DropKind,
   DropSummary,
+  DropTree,
   DropVersion,
 } from "#shared/types"
+import { TREE_ROWS } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
-import { hasEditorlessSyntax } from "#shared/frontmatter"
+import { editorlessSyntax } from "#shared/frontmatter"
 import { MAX_DEPTH } from "#shared/nodes"
 import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
@@ -201,6 +201,21 @@ export async function listDrops(
   const rows = await resolveRows(found.rows, days)
   const listed = rows.filter((row) => (options.trash ? row.expired && !parentNode(row, days)?.expired : !row.expired))
   return summarize(listed, days, { ownerId: who.userId, path: deep, snippets: found.snippets })
+}
+
+/**
+ * The sidebar's share of `listDrops`: the newest TREE_ROWS at the top, and `open` wherever it sits, with how many there
+ * are in all. Only those get summarized and sent, instead of every drop on every page.
+ */
+export async function listTree(who: Identity, event?: H3Event, open?: string): Promise<DropTree> {
+  const { days } = expiryPolicy(event)
+  const found = await newest(
+    and(eq(drops.ownerId, who.userId), isNull(drops.parentId), eq(drops.teamFolder, false)),
+    500,
+  )
+  const rows = (await resolveRows(found, days)).filter((row) => !row.expired)
+  const listed = rows.filter((row, index) => index < TREE_ROWS || row.id === open)
+  return { drops: await summarize(listed, days, { ownerId: who.userId }), total: rows.length }
 }
 
 /**
@@ -558,9 +573,10 @@ export async function dropDetail(
     ancestors: openableAncestors(row, who, days),
     ...body,
   }
-  if (detail.canEdit && row.kind === "markdown" && hasEditorlessSyntax(detail.content ?? "")) {
+  const blocking = detail.canEdit && row.kind === "markdown" ? editorlessSyntax(detail.content ?? "") : []
+  if (blocking.length) {
     detail.canEdit = false
-    detail.editNote = "This doc uses Comark components or footnotes, which the editor can't keep yet."
+    detail.editNote = `It uses ${editNoteList(blocking)}, which the live editor can't keep yet.`
   }
   if (attachments) detail.attachments = attachments
   if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
@@ -599,15 +615,21 @@ async function bodyOf(
     detail.paths = files.map((file) => file.path).sort()
     detail.sizes = Object.fromEntries(files.map((file) => [file.path, file.size]))
   } else if (row.blobKey) {
+    // The Markdown renderer (Comark, Shiki, charts) and the spreadsheet readers load with the first drop that needs
+    // them, not with every route that lists drops: on a fresh Worker that's most of the first request's code.
     if (row.kind === "markdown") {
+      const { renderMarkdownCached } = await import("../markdown-document")
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       detail.html = rendered.html
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
-    else if (row.kind === "file" && SPREADSHEET_EXTENSIONS.has(spreadsheetExtension(row.filename))) {
+    else if (row.kind === "file") {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
+      const sheets = await import("../spreadsheet")
+      const extension = sheets.spreadsheetExtension(row.filename)
       const key = row.blobKey
-      detail.html = await renderSpreadsheetCached(key, spreadsheetExtension(row.filename), () => readBytes(key), event)
+      if (sheets.SPREADSHEET_EXTENSIONS.has(extension))
+        detail.html = await sheets.renderSpreadsheetCached(key, extension, () => readBytes(key), event)
     }
     detail.url = new URL(`/f/${row.blobKey}?raw`, origin).href
   }
@@ -619,6 +641,12 @@ async function bodyOf(
  * The nodes above a drop that the caller may open, top-most first. A share widens going down, so the ones the caller
  * can't open are always the top-most: someone sent one drop from a private folder sees no folder names.
  */
+/** `::question, ::poll and footnotes`: the first three by name, then how many more. */
+function editNoteList(syntax: string[]) {
+  const named = syntax.length > 3 ? [...syntax.slice(0, 3), `${syntax.length - 3} more`] : syntax
+  return new Intl.ListFormat("en", { type: "conjunction" }).format(named)
+}
+
 function openableAncestors(row: DropRow, who: Identity | null, days: number): DropCrumb[] {
   const above = row.ancestors ?? []
   return above

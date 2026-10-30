@@ -245,6 +245,31 @@ function createMermaidRenderer(): NodeHandler {
   }
 }
 
+const PROBLEM_ICON =
+  '<svg aria-hidden="true" class="render-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
+const FOLD_ICON =
+  '<svg aria-hidden="true" class="render-error-fold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+
+/**
+ * The box above a doc that lists its problems, open so its author sees them, foldable so a reader can put it away.
+ * Plugins quote Markdown in backticks (`::question`), which reads as code here.
+ */
+function problemsHtml(issues: string[]) {
+  const title = issues.length === 1 ? "This doc has a problem" : `This doc has ${issues.length} problems`
+  // "`::question` 2 has no id" counts blocks of a kind; "#2" says it's an ordinal rather than part of the sentence.
+  const items = issues.map(
+    (issue) =>
+      `<li>${escapeHtml(issue)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/^(<code>::[\w-]+<\/code>) (\d+) /, "$1 #$2 ")}</li>`,
+  )
+  return (
+    `<details class="render-error" open><summary>${PROBLEM_ICON}<span>${title}</span>${FOLD_ICON}</summary>` +
+    `<p class="render-error-hint">Fix ${issues.length === 1 ? "it" : "them"} in the Markdown and publish again. Readers see this box until then.</p>` +
+    `<ul>${items.join("")}</ul></details>`
+  )
+}
+
 /** Problems a network failure caused, which the next render may not have: an icon or a Kroki server out of reach. */
 const RETRIED_RULE = /\/(?:download-failed|server-unreachable)$/
 
@@ -287,9 +312,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
       ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
       : ""
     const { all: issues, retry } = issuesOf(document.meta)
-    const problems = issues.length
-      ? `<aside class="render-error"><p>This document has ${issues.length === 1 ? "a problem" : `${issues.length} problems`}:</p><ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul></aside>`
-      : ""
+    const problems = issues.length ? problemsHtml(issues) : ""
     const content = await renderHtmlFromDocument(document, {
       components: {
         ...preset.components,

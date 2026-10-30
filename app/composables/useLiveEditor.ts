@@ -104,7 +104,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       } satisfies Published)
       notify.done(`Published v${next.version}`)
       // A new version adds bytes and a write, so the plan usage moves too.
-      await refreshNuxtData([keys.drops, keys.usage])
+      await refreshNuxtData([keys.drops, keys.tree, keys.usage])
       // Let the announcement reach the room before this client leaves it.
       await promiseTimeout(300)
       close()

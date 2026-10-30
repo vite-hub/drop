@@ -4,11 +4,11 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   const { data: cached } = useNuxtData(keys.me)
   if (cached.value) return
-  // Every page behind sign-in has the dashboard layout, which lists your drops and what's shared with you. Started with
+  // Every page behind sign-in has the dashboard layout, which lists your newest drops and what's shared with you. Started with
   // /api/me instead of after it, the server render waits for one round trip less. Only with a session cookie (Better
   // Auth's, whatever its prefix), so a signed-out visit's redirect doesn't log two refused lists first.
   if (import.meta.server && useRequestHeaders(["cookie"]).cookie?.includes(".session_token=")) {
-    void useDrops()
+    void useDropTree(to)
     void useSharedWithMe()
   }
   const { data: me } = await useMe()

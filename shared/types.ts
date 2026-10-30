@@ -12,6 +12,15 @@ export type ActorKind = (typeof ACTOR_KINDS)[number]
 export const VIEWER_KINDS = ["person", "anonymous", "agent"] as const
 export type ViewerKind = (typeof VIEWER_KINDS)[number]
 
+/** How many of your newest drops the sidebar lists before its "more" (`/api/drops?tree`). */
+export const TREE_ROWS = 30
+
+/** The sidebar's drops: your newest TREE_ROWS at the top, and the open one wherever it sits, of `total`. */
+export interface DropTree {
+  drops: DropSummary[]
+  total: number
+}
+
 export interface DropSummary {
   /** This version. */
   id: string
