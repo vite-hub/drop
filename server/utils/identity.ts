@@ -64,21 +64,32 @@ export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefine
 
 export const bearerFrom = (headers: Headers) => headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? null
 
-/** Who is calling. Resolved once per request (middleware and route share it). */
+/**
+ * Who is calling. Resolved once per request (middleware and route share it), and once per page render: the API calls a
+ * page makes while it renders on the server (useApi) take the page's.
+ */
 export function identify(event: H3Event): Promise<Identity | null> {
-  return (event.context.dropIdentity ??= resolveIdentity(event).then(async (who) => {
-    if (!who) return null
-    // Both are a round trip to the database, so they start together.
-    const [member, teams] = await Promise.all([isMember(who.userId), teamsOf(who.userId, event)])
-    if (!member) return null
-    who.teams = teams
+  return (event.context.dropIdentity ??= (
+    event.context.dropPage ? identify(event.context.dropPage) : verify(event)
+  ).then((who) => {
     // Every request's wide event says who made it, never the credential itself.
-    useLogger(event).set({
-      user: { id: who.userId, role: who.role },
-      actor: { kind: who.actorKind, name: who.actorName },
-    })
+    if (who)
+      useLogger(event).set({
+        user: { id: who.userId, role: who.role },
+        actor: { kind: who.actorKind, name: who.actorName },
+      })
     return who
   }))
+}
+
+async function verify(event: H3Event): Promise<Identity | null> {
+  const who = await resolveIdentity(event)
+  if (!who) return null
+  // Both are a round trip to the database, so they start together.
+  const [member, teams] = await Promise.all([isMember(who.userId), teamsOf(who.userId, event)])
+  if (!member) return null
+  who.teams = teams
+  return who
 }
 
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {

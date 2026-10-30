@@ -15,6 +15,7 @@ const nuxt = dirname(fileURLToPath(import.meta.resolve("nuxt/package.json")))
 const nuxtRequire = createRequire(import.meta.resolve("nuxt/package.json"))
 let app
 let calls
+const pageEvent = { context: {} }
 let answer
 const reset = (value) => {
   app = {
@@ -76,9 +77,11 @@ const stubs = {
   "../../app/diagnostics/core.js": { appDiagnostics: {} },
   "./lazy-hydration.js": { neverHydratedSymbol: Symbol() },
   nitro: {
-    serverFetch: async (request, options) => {
+    serverFetch: async (request, options, context) => {
       assert.equal(new URL(request).origin, "https://drop.example")
       assert.equal(new Headers(options.headers).get("cookie"), "fixture-session")
+      // The page's request goes along, so the API call takes its identity (server/utils/identity.ts).
+      assert.equal(context?.dropPage, pageEvent)
       calls++
       await new Promise(setImmediate)
       return Response.json(answer)
@@ -90,7 +93,7 @@ async function load(path, isApp = false) {
   let source = readFileSync(path, "utf8")
   if (isApp) {
     source = stripTypeScriptTypes(source).replaceAll("createUseFetch(", "createUseFetch.__nuxt_factory(")
-    source = 'import { createUseFetch, useRequestURL, useRequestHeaders, keys } from "#test/context";\n' + source
+    source = 'import { createUseFetch, useRequestURL, useRequestHeaders, useRequestEvent, keys } from "#test/context";\n' + source
   }
   source = source
     .replaceAll("import.meta.server", "true")
@@ -121,6 +124,7 @@ stubs["#test/context"] = {
   createUseFetch: fetchModule.namespace.createUseFetch,
   useRequestURL: () => new URL("https://drop.example/d/fixture"),
   useRequestHeaders: () => ({ cookie: "fixture-session" }),
+  useRequestEvent: () => pageEvent,
   keys: { me: "me" },
 }
 const source = process.env.DROP_SSR_SOURCE || resolve(root, "app/composables/useApi.ts")

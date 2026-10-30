@@ -4,7 +4,7 @@ import { MIB, usageNearLimit } from "#shared/quotas"
 import type { DropSummary } from "#shared/types"
 
 // The layout waits for your drops before this page's setup runs, which put the Trash and usage a round trip later.
-// Started here, before either renders, all four load together.
+// Started here, before either renders, they load alongside your drops (started by the auth middleware).
 definePageMeta({
   middleware: () => {
     useTrash()
@@ -112,9 +112,10 @@ const visible = computed(() => {
     )
 })
 
-// Hundreds of rows took the server seconds to render and the browser as long to hydrate, so the list starts with the
-// newest ROWS and renders more as you reach its end. The counts and the search still cover every drop.
-const ROWS = 50
+// Each row costs the server render milliseconds of CPU (its menus, share picker, buttons), so the list starts with the
+// newest ROWS, about two screens, and renders more as you reach its end. The counts and the search still cover every
+// drop.
+const ROWS = 25
 const shown = ref(ROWS)
 watch([filter, search], () => (shown.value = ROWS))
 const more = useTemplateRef("more")

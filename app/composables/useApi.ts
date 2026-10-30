@@ -11,6 +11,7 @@ import { QuotaFailureSchema, type QuotaFailure } from "#shared/quotas"
 export const useApi = createUseFetch((defaults) => {
   if (import.meta.client) return {}
   const origin = useRequestURL().origin
+  const page = useRequestEvent()
   return {
     // Middleware, layouts, and their children ask for the same keys during SSR. Nuxt's default only reuses payload
     // data while hydrating in the browser; on the server each subscriber otherwise starts another request.
@@ -24,7 +25,10 @@ export const useApi = createUseFetch((defaults) => {
     $fetch: createFetch({
       fetch: async (request, options) => {
         const { serverFetch } = await import("nitro")
-        return serverFetch(new URL(request instanceof Request ? request.url : request, origin).href, options)
+        // The page's request goes along, so each call takes the identity it resolved instead of reading the session again.
+        return serverFetch(new URL(request instanceof Request ? request.url : request, origin).href, options, {
+          dropPage: page,
+        })
       },
     }) as typeof $fetch,
   }
