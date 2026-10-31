@@ -408,8 +408,10 @@ function present() {
 }
 
 defineShortcuts({
-  c: showComments,
+  // With text selected in the page, C and E work on it, as the bar over it says.
+  c: () => (selection.value ? commentOnSelection() : showComments()),
   e: () => {
+    if (selection.value) return commentOnSelection(true)
     if (editing.value || !showEditTool.value) return
     if (drop.value.canEdit) startEdit()
     else editNoteOpen.value = true
@@ -560,9 +562,21 @@ const addPageComment = (body: string, files: File[] = []) =>
     files,
   )
 
+/**
+ * A thread or row that goes away with its comment (resolved, accepted, deleted) drops the focus it held. Hand it to the
+ * comments' composer when they're open, else to the review button; focus the reader moved elsewhere stays put.
+ */
+async function keepFocus() {
+  await nextTick()
+  if (document.activeElement && document.activeElement !== document.body) return
+  if (commentsOpen.value) commentsRef.value?.focusComposer()
+  else reviewDock.value?.focusTrigger()
+}
+
 async function resolve(id: string, resolved: boolean) {
   popover.value = null
   await state.resolveComment(id, resolved)
+  await keepFocus()
 }
 
 // A suggestion goes into the doc from its latest version, by someone who could edit it by hand.
@@ -576,11 +590,13 @@ async function accept(id: string) {
   } finally {
     accepting.value = null
   }
+  await keepFocus()
 }
 
 async function removeComment(id: string) {
   popover.value = null
   await state.removeComment(id)
+  await keepFocus()
 }
 
 async function reply(id: string, body: string, files: File[] = []) {
@@ -1296,6 +1312,10 @@ watch(
     >
       <ViewerSelectionBar @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
+    <!-- Focus stays in the page while text is selected there, so a screen reader hears the keys instead of the bar. -->
+    <p aria-live="polite" class="sr-only">
+      {{ selection ? "Text selected. Press C to comment on it, or E to suggest new words." : "" }}
+    </p>
 
     <ViewerLightbox
       v-if="lightbox"

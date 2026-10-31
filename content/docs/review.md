@@ -60,7 +60,7 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | To comment on | Do this |
 | --- | --- |
 | Text | Select it and pick **Comment**. |
-| Text you'd word differently | Select it and pick **Suggest**, then write the words that replace it, or clear them to suggest deleting it. The doc shows the old words struck through and the new ones after them. People who can edit the doc **Accept** it, which publishes the next version with the change and resolves it. |
+| Text you'd word differently | Select it and pick **Suggest**, then write the words that replace it, or clear them to suggest deleting it. The doc shows the old words struck through and the new ones after them. People who can edit the doc **Accept** it, which publishes the next version with the change and resolves it. **Undo** in the note that follows publishes the text from before and opens the suggestion again. |
 | An image | In a Markdown doc or an image drop, click it to zoom, then click a spot or drag an area. In an HTML doc or an app, clicks stay the page's own, so use the Comment tool. |
 | An element or part of a page | Pick **Comment** in the toolbar under the page, or press :kbd[R]. Click an element to pin a comment to it, or drag a rectangle. The tool stays on for the next one. |
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
@@ -70,7 +70,7 @@ A comment shows the moment you send it. If it doesn't go through, it comes back 
 
 Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread.
 
-Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
+Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, accept a suggestion as written with `accept_suggestion`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
 
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
 

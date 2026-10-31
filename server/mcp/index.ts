@@ -4,6 +4,7 @@ import { MCP_INSTRUCTIONS, MCP_SERVER_INFO } from "#shared/mcp"
 import { identify } from "../utils/identity"
 import { mcpSkills, skillResources } from "../utils/mcp-skills"
 import addressFeedback from "./prompts/address_feedback"
+import acceptSuggestion from "./tools/accept_suggestion"
 import createCodeImage from "./tools/create_code_image"
 import createFolder from "./tools/create_folder"
 import editBoard from "./tools/edit_board"
@@ -59,6 +60,7 @@ export function mcpFor(origin: string) {
         readDrop,
         readFile,
         reply,
+        acceptSuggestion,
         listDrops,
         listFolders,
         updateDrop,

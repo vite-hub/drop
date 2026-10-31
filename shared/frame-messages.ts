@@ -82,10 +82,11 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
   // The toolbar's keys, pressed while the page had focus, with the tool it was under (apps keep their keys under Browse).
   // B, P, and A pick the Marker's tips, [ and ] its size.
+  // C and E comment on or suggest an edit to the text selected in the page.
   // An image's page sends ← and → too, for those keys or a sideways swipe: they move to the folder's other images.
   v.object({
     type: v.literal("key"),
-    key: v.picklist(["Escape", "v", "r", "s", "u", "x", "b", "p", "a", "[", "]", "ArrowLeft", "ArrowRight"]),
+    key: v.picklist(["Escape", "c", "e", "v", "r", "s", "u", "x", "b", "p", "a", "[", "]", "ArrowLeft", "ArrowRight"]),
     tool: v.optional(v.picklist(["browse", "comment", "measure", "mark"])),
   }),
   v.object({
