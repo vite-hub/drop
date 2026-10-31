@@ -21,6 +21,12 @@ export function useSidePanel() {
 export const useFolderPreviewWidth = () =>
   useCookie<number>("drop-folder-preview-width", { default: () => 22, maxAge: year, sameSite: "lax" })
 
+/** How the Drops page lists your drops: newest first (Recent) or folders first (Folders). */
+export const useDropsView = () =>
+  useCookie<"recent" | "folders">("drop-drops-view", { default: () => "recent", maxAge: year, sameSite: "lax" })
+/** Whether the Drops page shows cards with previews or a list. */
+export const useDropsLayout = () =>
+  useCookie<"grid" | "list">("drop-drops-layout", { default: () => "grid", maxAge: year, sameSite: "lax" })
 /** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
@@ -71,9 +77,6 @@ export function useSidebarHidden() {
 
 /** Which folders and apps are expanded in the sidebar tree. Shared state, so it survives navigation. */
 export const useTreeOpen = () => useState<Record<string, boolean>>("drop-tree-open", () => ({}))
-
-/** Which folders are expanded on the Drops page, at every level. */
-export const useRowsOpen = () => useState<Record<string, boolean>>("drop-rows-open", () => ({}))
 
 // One timer for every relative time on the page, alive while any of them is mounted. It catches up first, since
 // `now` may have sat still while nothing showed a time.
