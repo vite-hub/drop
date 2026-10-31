@@ -177,6 +177,7 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
         "vitehub_comments",
         "vitehub_auth_events",
         "comment_cleanup",
+        "suggestion_acceptances",
       ])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
       assert.deepEqual(

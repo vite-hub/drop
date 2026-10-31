@@ -6,7 +6,7 @@ import * as v from "valibot"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, drops, dropVersions } from "../../databases/config"
+import { blobCleanup, dropFiles, drops, dropVersions, suggestionAcceptances } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
@@ -152,6 +152,8 @@ export async function createDocDrop(
     slug?: string
     nameFromSlug?: boolean
     supersedes?: string
+    /** Internal acceptance receipt, committed atomically with the new version. */
+    acceptedSuggestionId?: string
     share?: Share
     folder?: DropRow
   },
@@ -335,7 +337,18 @@ export async function createDocDrop(
             ]
           : [db.insert(drops).values(row)]
         await quota.commit(
-          [...write, ...textStatements(row, text), ...(folder ? [touchFolder(folder.id, now)] : [])],
+          [
+            ...write,
+            ...textStatements(row, text),
+            ...(folder ? [touchFolder(folder.id, now)] : []),
+            ...(input.acceptedSuggestionId
+              ? [
+                  db
+                    .insert(suggestionAcceptances)
+                    .values({ threadId: input.acceptedSuggestionId, dropId: row.id, version: row.version }),
+                ]
+              : []),
+          ],
           own
             ? exists(
                 db

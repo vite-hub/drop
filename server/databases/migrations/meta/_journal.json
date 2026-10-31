@@ -43,6 +43,13 @@
       "when": 1793445000003,
       "tag": "0005_comment_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793450753903,
+      "tag": "0006_suggestion_acceptances",
+      "breakpoints": true
     }
   ]
 }

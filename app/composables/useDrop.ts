@@ -113,6 +113,12 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       notify.done(`Published v${next.version}`)
       return true
     } catch (error) {
+      // The version may already be published while its comment still needs resolution on retry.
+      await Promise.allSettled([
+        drop.refresh(),
+        comments.refresh(),
+        refreshNuxtData([keys.drops, keys.tree, keys.usage]),
+      ])
       notify.fail("Couldn't accept the suggestion", error)
       return false
     }

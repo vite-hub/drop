@@ -221,6 +221,19 @@ export const commentCleanup = sqliteTable("comment_cleanup", {
   createdAt: integer("created_at").notNull(),
 })
 
+/** A receipt committed with the accepted edit, so a Comments outage never makes a retry publish it twice. */
+export const suggestionAcceptances = sqliteTable(
+  "suggestion_acceptances",
+  {
+    threadId: text("thread_id").primaryKey(),
+    dropId: text("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+  },
+  (table) => [index("suggestion_acceptances_drop").on(table.dropId)],
+)
+
 /**
  * Temporary public images. They still belong to an account, follow its ban, and count toward its storage until the
  * hourly cleanup has deleted the blob and then the row.

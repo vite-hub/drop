@@ -19,6 +19,7 @@ import {
   dropViews,
   dropVersions,
   dropVisits,
+  suggestionAcceptances,
 } from "./drops"
 import {
   jwks,
@@ -140,6 +141,7 @@ export {
   dropViews,
   dropVersions,
   dropVisits,
+  suggestionAcceptances,
   jwks,
   oauthAccessToken,
   oauthClient,
@@ -168,6 +170,7 @@ export default defineDatabase({
     dropViews,
     dropVersions,
     dropVisits,
+    suggestionAcceptances,
     invitation,
     jwks,
     member,

@@ -1,7 +1,10 @@
+import { and, eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
+import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { joinFrontmatter, splitFrontmatter } from "#shared/frontmatter"
 import { applySuggestion } from "#shared/suggestion"
+import { suggestionAcceptances } from "../../../databases/config"
 import { findThread, setResolved } from "../../../utils/comments"
 import { createDocDrop, findDrop, permissions, readText, toSummary } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
@@ -30,6 +33,17 @@ export default defineHandler(async (event) => {
   if (thread.status === "resolved")
     throw new HTTPError({ status: 409, statusText: "This suggestion is already resolved." })
   await requireRateLimit(event, "drop-version", { key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
+  const [accepted] = await db
+    .select({ version: suggestionAcceptances.version })
+    .from(suggestionAcceptances)
+    .where(and(eq(suggestionAcceptances.threadId, thread.id), eq(suggestionAcceptances.dropId, drop.id)))
+    .limit(1)
+  // Publishing and Comments are separate writes. A receipt survives either a resolution failure or a restart,
+  // even if someone publishes another version before retrying acceptance.
+  if (accepted) {
+    await setResolved(thread, true, who)
+    return toSummary(drop)
+  }
   const source = await readText(drop.blobKey)
   const { frontmatter, body } = splitFrontmatter(source)
   const applied = applySuggestion(body, thread.meta.quote, thread.meta.suggestion, thread.meta.label)
@@ -40,6 +54,7 @@ export default defineHandler(async (event) => {
       filename: drop.filename,
       bytes: new TextEncoder().encode(joinFrontmatter(frontmatter, applied.body)),
       supersedes: drop.id,
+      acceptedSuggestionId: thread.id,
       note: `Accepted suggestion #${thread.number}`,
     },
     event,
