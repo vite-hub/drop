@@ -28,8 +28,8 @@ const review = (id: string, action: "approve" | "reject") => run(id, action)
         size="sm"
         variant="ghost"
     /></template>
-    <p v-if="error" role="alert">Only admins can review shares.</p>
-    <p v-else-if="!data?.length" role="status" class="text-muted">No shares waiting for review.</p>
+    <p v-if="error" role="alert" class="text-sm">Only admins can review shares.</p>
+    <p v-else-if="!data?.length" role="status" class="text-sm text-muted">No shares waiting for review.</p>
     <div v-for="member in data" :key="member.id" class="mb-4 space-y-3 rounded-lg border border-default p-4">
       <h2 class="font-medium">
         {{ member.name }} <span class="text-muted">{{ member.email }}</span>

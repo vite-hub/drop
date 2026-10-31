@@ -2,7 +2,8 @@
 // New comments: a one-line composer (Enter sends, Shift+Enter breaks). The selection stays highlighted
 // in the document, so the composer doesn't repeat it. Existing comments: the thread, Figma's way. A bar with the
 // number, Resolve, and a menu (Copy link, Delete); the comment and its replies; a reply box at the bottom. Both boxes
-// take images: from the image button, a paste, or a drop.
+// take images: from the image button, a paste, or a drop. Suggest on a selection adds the words that replace it above the
+// note, filled in with the selected ones.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { CommentInput } from "#shared/schemas"
 import type { DropComment, SiteReviewItem } from "#shared/types"
@@ -26,32 +27,50 @@ const emit = defineEmits<{
   reply: [id: string, body: string, files: File[]]
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
+  /** The suggested words were edited; the viewer keeps them on the pending comment, which sends them. */
+  suggest: [text: string]
 }>()
 const sharedDraft = props.pending ? injectReviewDraft()! : undefined
 const composerDraft = sharedDraft ?? { body: ref(""), images: useImagePicks() }
 const body = composerDraft.body
 if (props.draft && !body.value) body.value = props.draft
 const replying = ref(false)
-const busy = sharedDraft?.sending ?? replying
+const busy = computed(() => (sharedDraft ? sharedDraft.sending.value || sharedDraft.waiting.value : replying.value))
 const { picks, problem, files, remove, clear, open: pickImages, paste, drop } = composerDraft.images
 // Why the last send failed, under the box that sent it; editing the text clears it.
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
 const card = useTemplateRef<HTMLElement>("card")
 const motion = usePreferredReducedMotion()
-onMounted(() =>
-  (card.value?.querySelector<HTMLElement>("textarea") ?? card.value?.querySelector<HTMLElement>("button"))?.focus({
-    preventScroll: true,
-  }),
-)
+onMounted(() => {
+  const field = card.value?.querySelector<HTMLElement>("textarea") ?? card.value?.querySelector<HTMLElement>("button")
+  field?.focus({ preventScroll: true })
+  // A suggestion starts as the selected words, selected, so typing replaces them.
+  if (suggesting.value && field instanceof HTMLTextAreaElement) field.select()
+})
 
 function escape(event: KeyboardEvent) {
-  if (!body.value.trim()) return emit("cancel")
+  if (!body.value.trim() && (!suggesting.value || suggestion.value === props.pending?.quote)) return emit("cancel")
   if (event.target instanceof HTMLElement) event.target.blur()
 }
 
+// A suggested edit on the selection: the words that replace it, empty to delete it.
+const suggesting = computed(() => props.pending?.suggestion !== undefined)
+const suggestion = computed({
+  get: () => props.pending?.suggestion ?? "",
+  set: (text: string) => emit("suggest", text),
+})
+// A new comment may be only images, such as the Marker's snapshot, or only a suggestion that changes the words; a reply
+// still needs words.
+const sendable = computed(() =>
+  Boolean(
+    body.value.trim() ||
+    (props.pending && picks.value.length) ||
+    (suggesting.value && suggestion.value !== props.pending?.quote),
+  ),
+)
 function send() {
-  if (!body.value.trim() || busy.value) return
+  if (!sendable.value || busy.value) return
   if (props.comment) replying.value = true
   if (props.comment) emit("reply", props.comment.id, body.value, files.value)
   else emit("submit", body.value, files.value)
@@ -104,28 +123,67 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     ref="card"
     data-comment-editor
     class="flex min-h-0 flex-1 flex-col overflow-hidden bg-default text-default"
-    :class="pending && 'p-3'"
+    :class="pending && 'p-2 in-[#drop-comments]:p-3'"
   >
     <template v-if="pending">
-      <div class="mb-3 flex items-center justify-between gap-2">
+      <!-- Only in the dock: the card floating over the page sits beside what it's on, which stays marked there. -->
+      <div class="mb-3 hidden items-center justify-between gap-2 in-[#drop-comments]:flex">
         <span class="text-sm text-muted">{{
-          pending.quote ? "Selected text" : pending.kind === "image" ? "Selected image area" : "Selected area"
+          pending.quote
+            ? pending.kind === "area"
+              ? "Marked"
+              : "Selected text"
+            : pending.kind === "image"
+              ? "Selected image area"
+              : "Selected area"
         }}</span>
         <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
       </div>
-      <p v-if="pending.quote" class="mb-3 line-clamp-3 border-l-2 border-default pl-3 text-sm text-muted">
+      <p
+        v-if="pending.quote && !suggesting"
+        class="mb-3 line-clamp-3 hidden border-l-2 border-default pl-3 text-sm text-muted in-[#drop-comments]:[display:-webkit-box]"
+      >
         {{ pending.quote }}
       </p>
+      <div v-if="suggesting" class="mb-1.5 space-y-1 px-1 pt-0.5">
+        <p class="line-clamp-3 text-sm leading-relaxed">
+          <del class="rounded-sm bg-error/10 px-0.5 text-error decoration-error/70 box-decoration-clone">{{
+            pending.quote
+          }}</del>
+        </p>
+        <UTextarea
+          v-model="suggestion"
+          aria-label="Suggested text"
+          autofocus
+          autoresize
+          class="w-full"
+          :maxrows="6"
+          placeholder="Leave empty to delete it"
+          :rows="1"
+          :ui="{
+            base: 'rounded-sm bg-success/10 px-1.5 py-1 text-base leading-relaxed text-success placeholder:text-success/60 sm:text-sm',
+          }"
+          variant="none"
+          @keydown.enter.exact.prevent="send"
+          @keydown.esc.stop="escape"
+        />
+      </div>
       <div class="flex items-end gap-1" @dragover.prevent @drop="drop">
         <UTextarea
           v-model="body"
           aria-label="Comment"
-          autofocus
+          :autofocus="!suggesting"
           autoresize
           class="flex-1"
           :maxrows="6"
           :placeholder="
-            pending.quote ? 'Comment on the selection' : pending.ow ? 'Comment on this area' : 'Comment on this spot'
+            picks.length || suggesting
+              ? 'Add a note (optional)'
+              : pending.quote
+                ? 'Add a comment'
+                : pending.ow
+                  ? 'Comment on this area'
+                  : 'Comment on this spot'
           "
           :rows="1"
           :ui="{ base: 'px-1 py-1.5 text-base leading-relaxed sm:text-sm' }"
@@ -145,10 +203,10 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           />
         </UTooltip>
         <UButton
-          aria-label="Send comment"
+          :aria-label="suggesting ? 'Send suggestion' : 'Send comment'"
           class="size-8 justify-center rounded-full"
           color="neutral"
-          :disabled="!body.trim()"
+          :disabled="!sendable"
           icon="i-mingcute-arrow-up-line"
           :loading="busy"
           @click="send"
@@ -189,10 +247,15 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         <div class="space-y-2 px-3 py-3">
           <ViewerReviewScreenshot v-if="screenshot" :comment="comment" :screenshot="screenshot" />
           <ViewerCommentHeader :comment="comment" :numbered="false" />
-          <p v-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
+          <ViewerSuggestion
+            v-if="comment.quote && comment.suggestion !== null"
+            :quote="comment.quote"
+            :suggestion="comment.suggestion"
+          />
+          <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
           </p>
-          <p class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
+          <p v-if="comment.body" class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
           <ViewerCommentImages :attachments="comment.attachments" />
         </div>
         <div v-for="reply in comment.replies" :key="reply.id" class="group space-y-1.5 px-3 py-3">
@@ -203,7 +266,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             <UButton
               v-if="canManage || reply.mine"
               aria-label="Delete reply"
-              class="ml-auto opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              class="ml-auto motion-safe:transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-visible:opacity-100"
               color="neutral"
               icon="i-mingcute-delete-2-line"
               size="xs"

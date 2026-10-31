@@ -6,11 +6,15 @@ import type { LiveRoom } from "~/composables/live-room"
 // What a publishing client leaves on its awareness state. Other clients set it, so it's parsed, not trusted.
 const PublishedSchema = v.object({ id: v.string(), version: v.number(), name: v.string() })
 type Published = v.InferOutput<typeof PublishedSchema>
+const LintFailureSchema = v.object({
+  problems: v.array(v.object({ severity: v.string(), line: v.number(), message: v.string() })),
+})
 
 /**
  * Live editing of a Markdown drop. Everyone who opens it joins one Realtime room on the drop's draft, sees the others,
  * and types into the same text. The room saves the draft on its own; publish saves it once more and makes it the next
  * version, and the others follow. Closing keeps the draft, so the next person who opens it continues where the room left off.
+ * Since closing loses nothing, Close says so instead of asking; it asks only when edits may not have reached the room.
  */
 export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: boolean }) {
   const notify = useNotify()
@@ -68,6 +72,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" }),
       ])
       room.value ??= scope.run(() => useLiveRoom(documentId))
+      if (room.value) room.value.edited.value = false
       documentId.value = id
     } catch (error) {
       notify.fail("Couldn't open the editor", error)
@@ -80,6 +85,26 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     room.value?.editor.value?.destroy()
     if (room.value) room.value.editor.value = undefined
     documentId.value = undefined
+  }
+
+  // Typing while disconnected stays in this tab until the room is back (`synced` is false until then).
+  async function leave() {
+    const edited = room.value?.edited.value
+    if (edited && !realtime.value?.synced.value) {
+      const discard = await confirm({
+        title: "Your last edits haven't saved",
+        description: "You're offline, so they're still only in this tab. Closing the editor now loses them.",
+        confirmLabel: "Close and lose them",
+        destructive: true,
+      })
+      if (!discard) return
+    }
+    close()
+    if (edited)
+      notify.say("Draft kept, not published yet", {
+        icon: "i-mingcute-edit-2-line",
+        action: { label: "Keep editing", onClick: () => void open() },
+      })
   }
 
   async function publish(force = false): Promise<void> {
@@ -110,6 +135,18 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       close()
       await openLatest(next.id)
     } catch (error) {
+      // The Markdown has Comark errors (requirePublishableMarkdown): the first few, by line, rather than the whole list.
+      const errors = errorData(error, LintFailureSchema)?.problems.filter((problem) => problem.severity === "error")
+      if (errors?.length) {
+        notify.alert(
+          errors.length === 1 ? "Couldn't publish: fix this line" : `Couldn't publish: fix ${errors.length} problems`,
+          errors
+            .slice(0, 3)
+            .map((problem) => `Line ${problem.line}: ${problem.message}`)
+            .join(" "),
+        )
+        return
+      }
       const head = errorData(error, v.object({ head: v.object({ id: v.string(), version: v.number() }) }))?.head
       if (!head) {
         notify.fail("Couldn't publish", error)
@@ -151,6 +188,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     synced: computed(() => realtime.value?.synced.value ?? false),
     open,
     close,
+    leave,
     publish,
   }
 }

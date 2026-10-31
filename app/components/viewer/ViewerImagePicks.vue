@@ -16,7 +16,7 @@ const emit = defineEmits<{ remove: [pick: ImagePick] }>()
       <img :alt="pick.file.name" class="size-full object-cover" :src="pick.url" />
       <button
         :aria-label="`Remove ${pick.file.name || 'image'}`"
-        class="absolute top-0.5 right-0.5 grid size-4 cursor-pointer place-items-center rounded-full bg-black/60 text-white"
+        class="absolute top-0.5 right-0.5 grid size-4 cursor-pointer place-items-center rounded-full bg-black/60 text-white before:absolute before:-inset-2"
         type="button"
         @click="emit('remove', pick)"
       >

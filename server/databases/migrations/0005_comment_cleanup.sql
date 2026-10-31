@@ -1,4 +1,4 @@
-CREATE TABLE `comment_cleanup` (
+CREATE TABLE IF NOT EXISTS `comment_cleanup` (
 	`drop_id` text PRIMARY KEY NOT NULL,
 	`scope` text NOT NULL,
 	`shot` integer NOT NULL,

@@ -3,6 +3,7 @@
 -- stay: they keep the images of the old comments out of their drops' embedded files, and the images go with their drop.
 -- The rebuild comes first: dropping `comments` while the old comment_attachments exists would cascade into it. It needs
 -- no `PRAGMA foreign_keys=OFF`: no table references comment_attachments.
+-- Earlier child previews already removed the old tables. Replaying after the parent migrations preserves attachments.
 CREATE TABLE `__new_comment_attachments` (
 	`drop_id` text PRIMARY KEY NOT NULL,
 	`comment_id` text NOT NULL,
@@ -15,5 +16,5 @@ INSERT INTO `__new_comment_attachments`("drop_id", "comment_id", "reply_id", "cr
 DROP TABLE `comment_attachments`;--> statement-breakpoint
 ALTER TABLE `__new_comment_attachments` RENAME TO `comment_attachments`;--> statement-breakpoint
 CREATE INDEX `comment_attachments_comment_idx` ON `comment_attachments` (`comment_id`,`created_at`);--> statement-breakpoint
-DROP TABLE `comment_replies`;--> statement-breakpoint
-DROP TABLE `comments`;
+DROP TABLE IF EXISTS `comment_replies`;--> statement-breakpoint
+DROP TABLE IF EXISTS `comments`;

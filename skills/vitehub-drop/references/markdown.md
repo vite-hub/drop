@@ -10,6 +10,7 @@ Drop renders only the syntax on this page and the [blocks](blocks.md) it links. 
 | Code | [a fenced block with its language](#code) |
 | Progress on a list of steps | a task list: `- [x] done`, `- [ ] next` |
 | A screenshot with marks, or a before and after | [an annotated screenshot](#annotated-screenshots) |
+| Something interactive: a demo, an animated figure, a small widget | [another drop shown in the doc](#interactive-drops) |
 | A review of copy or a doc, each change or question with its reason | `:suggestion` and `:comment` from [comark-comments](https://comark-ui.onmax.me/comments/). Read [their syntax](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/comark-ui/references/comments.md) first |
 | Steps, tabs, cards, a diff, metrics, a data table, a chart, test results, and more | [a block](blocks.md) |
 
@@ -95,6 +96,19 @@ Save sits below the fold on a laptop screen.
 
 `::screenshot` marks areas of an image, and `::compare` puts two screenshots side by side as before and after. `src` takes an `https://` URL or the `fileUrl` of an image published with `file`. Before you write marks or a comparison, read the full syntax in [the annotation reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/annotations.md). When the syntax is wrong, `publish` fails and lists every problem. [comark-annotate](https://comark-ui.onmax.me/annotate/)
 
+## Interactive drops
+
+A doc runs no scripts. To show something that does, publish it as its own `html` drop first, then put that drop's link in the doc:
+
+```md
+::drop{link=k7f2q9m4x8wd height=420 title="How a rebuild uses the snapshots"}
+::
+```
+
+`link` is the drop's link key or its whole `/d/` address. `height` is the box's height in pixels, 120 to 1600 (default 480): set it to what the drop needs, since the box doesn't grow with it. `title` names the frame for screen readers and is the link text where the drop can't show.
+
+The drop runs in its own sandbox inside the doc, so it can't reach Drop, the reader's session, or the doc around it. Make it one self-contained HTML file: with no origin of its own, it can't load another drop's files or Drop's private images. Only HTML drops show; an app, a doc, or an image shows a note instead. Each reader sees the drop only if they may open it themselves, so share it at least as widely as the doc. On the doc's plain `/f/` page, which runs no scripts, the box is a link to the drop.
+
 ## Front matter
 
 ```md
@@ -113,6 +127,6 @@ Set `title` when the first heading isn't the doc's title. Add `supersedes`, the 
 | `$x^2$` math | its TeX source, in monospace | a code span or a `text` block |
 | `:rocket:` | an "Unsupported component" box | the emoji itself, when it carries meaning |
 | `#123` | plain text | `owner/repo#123`, or a full link: `[#123](https://github.com/owner/repo/pull/123)` |
-| `<script>`, `<style>`, `<iframe>`, or a tag GitHub doesn't allow | nothing | Markdown, a [block](blocks.md), or publish `html` |
+| `<script>`, `<style>`, `<iframe>`, or a tag GitHub doesn't allow | nothing | Markdown, a [block](blocks.md), an [interactive drop](#interactive-drops), or publish `html` |
 
 A word that starts with a colon, such as `:name`, also renders as an "Unsupported component" box. In prose, attach the colon to the word before it: `Note: text`, `key:value`, and `10:30` stay plain.

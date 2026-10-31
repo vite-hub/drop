@@ -7,7 +7,7 @@ overrides:
   vue: 3.5.44
   # Keep older consumers on the patched v5 serializer without downgrading Nuxt's v6.
   devalue@5: ^5.9.4
-  # One Nitro: ViteHub's build asks for exactly 3.0.260903-beta.
+  # ViteHub's build asks for exactly 3.0.260903-beta. This keeps one Nitro.
   nitro: 3.0.261029-rc
   vite@*: "catalog:"
   # Nuxt UI's editor menus stay on @tiptap/core's 3.31.4; a 3.32 menu beside core 3.31.4 breaks them.
@@ -26,16 +26,14 @@ patchedDependencies:
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
   # basic auth without a Node request, and request middlewares registered only for features in use.
   nuxt-security@2.7.0: patches/nuxt-security@2.7.0.patch
-  # A zoomed screenshot's Copy action belongs in the zoom header, clear of its image and marks.
-  comark-annotate@0.7.2: patches/comark-annotate@0.7.2.patch
   # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the
   # overlay scrollbar of a comment past maxrows. Measures a hidden copy instead (nuxt/ui#7267). Also scrolls to the
   # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
   # padding, so keep this part after #7267 ships.
   "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
-  # Library chunks are split by the entries that load them (Rolldown `entriesAware`, nitrojs/nitro#4967): grouped by
-  # package only, one small import (mrmime, entities, the comark-ui skills) loaded a whole package chunk and what it
-  # imports, about half of a cold /drops request's code.
+  # Rolldown's `entriesAware` splits library chunks by the entries that load them, upstream in nitrojs/nitro#4967. When
+  # Nitro grouped them only by package, one small import such as mrmime, entities or the comark-ui skills loaded a whole
+  # package chunk and everything it imports. That was about half the code of a cold /drops request.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
   # Generated dev handlers import Content relative to the handler so TypeScript and Vite resolve it on Windows too.
   "@vite-hub/content@0.0.4": patches/@vite-hub__content@0.0.4.patch

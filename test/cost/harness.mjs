@@ -143,6 +143,7 @@ export function reset() {
   state.failDelete = false
   state.failCacheDelete = false
   state.who = null
+  state.draft = null
   objects.clear()
   entries.clear()
   queries.length = 0

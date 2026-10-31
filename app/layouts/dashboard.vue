@@ -129,7 +129,9 @@ function leaveDocs() {
         <NuxtLink class="flex items-center gap-2" to="/drops" @click="close">
           <DropMark class="h-4 w-6" />
           <span class="text-sm font-semibold tracking-tight">Drop</span>
-          <span class="rounded-sm border border-default px-1 font-mono text-[11px] leading-4 text-muted">v0.1</span>
+          <span class="label-mono rounded-sm border border-default px-1 leading-4 tracking-normal normal-case"
+            >v0.1</span
+          >
         </NuxtLink>
         <UTooltip :kbds="['meta', 'b']" text="Hide sidebar">
           <UDashboardSidebarCollapse class="-mr-2 ml-auto" size="sm" />
@@ -155,16 +157,17 @@ function leaveDocs() {
                   to="/drops?tab=with-me"
                   @navigate="close"
                 >
+                  <!-- The carets' hit areas (before:) reach the row's full 32px, past their 24px square. -->
                   <button
                     :aria-expanded="teamOpen"
                     :aria-label="teamOpen ? 'Collapse team folders' : 'Expand team folders'"
-                    class="grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed hover:bg-accented hover:text-highlighted"
+                    class="relative grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed before:absolute before:-inset-1 hover:bg-accented hover:text-highlighted"
                     type="button"
                     @click="teamOpen = !teamOpen"
                   >
                     <UIcon
                       name="i-mingcute-right-line"
-                      class="size-3.5 transition-transform duration-150"
+                      class="size-3.5 motion-safe:transition-transform duration-150"
                       :class="teamOpen && 'rotate-90'"
                     />
                   </button>
@@ -185,13 +188,13 @@ function leaveDocs() {
                 <button
                   :aria-expanded="dropsOpen"
                   :aria-label="dropsOpen ? 'Collapse drops' : 'Expand drops'"
-                  class="grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed hover:bg-accented hover:text-highlighted"
+                  class="relative grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed before:absolute before:-inset-1 hover:bg-accented hover:text-highlighted"
                   type="button"
                   @click="dropsOpen = !dropsOpen"
                 >
                   <UIcon
                     name="i-mingcute-right-line"
-                    class="size-3.5 transition-transform duration-150"
+                    class="size-3.5 motion-safe:transition-transform duration-150"
                     :class="dropsOpen && 'rotate-90'"
                   />
                 </button>

@@ -108,13 +108,13 @@ const menu = computed(() => [
       type="button"
       @click="emit('toggle')"
     >
-      <UIcon :name="open ? 'i-mingcute-folder-open-line' : 'i-mingcute-folder-line'" class="size-[18px]" />
+      <UIcon :name="open ? 'i-mingcute-folder-open-line' : 'i-mingcute-folder-line'" class="size-4.5" />
     </button>
     <span
       v-else
       class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-inset ring-default"
     >
-      <UIcon :name="KIND_ICONS[drop.kind]" class="size-[18px]" />
+      <UIcon :name="KIND_ICONS[drop.kind]" class="size-4.5" />
     </span>
     <div class="min-w-0">
       <NuxtLink class="flex min-w-0 items-center gap-2 after:absolute after:inset-0" :to="`/drops/${drop.id}`">
@@ -230,6 +230,7 @@ const menu = computed(() => [
         class="hidden sm:inline-flex"
         color="neutral"
         :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
+        :ui="{ leadingIcon: copied() ? 'animate-icon-in' : undefined }"
         variant="ghost"
         @click="copyLink()"
       />

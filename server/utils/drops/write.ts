@@ -231,6 +231,12 @@ export async function createDocDrop(
         ? { share: own.share, publicUntil: own.publicUntil }
         : { share: defaultShare(mode), publicUntil: null }
 
+  // Before anything is stored, so a doc Comark can't render right leaves no file and no version behind.
+  const warnings =
+    kind === "markdown" && text !== undefined
+      ? await (await import("../markdown-document")).requirePublishableMarkdown(text)
+      : []
+
   return withDropQuota(
     ownerId,
     { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id },
@@ -357,7 +363,7 @@ export async function createDocDrop(
       // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
       // internal-only on vite-hub/vitehub's feat/forge-primitive branch today, and on a token that may write to the
       // owner's repo (a GitHub App install, or a wider scope on GitHub sign-in).
-      return row
+      return Object.assign(row, { warnings })
     },
   )
 }

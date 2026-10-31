@@ -1,4 +1,4 @@
-import type { H3Event } from "h3"
+import { type H3Event, HTTPError } from "h3"
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
 import { log } from "evlog"
@@ -10,6 +10,7 @@ import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { visitAsync } from "@comark/html/utils"
+import { lint } from "comark-linter"
 import comarkUi from "comark-ui/html"
 import { escapeUTF8 as escapeHtml } from "entities"
 import * as v from "valibot"
@@ -44,11 +45,11 @@ export const RENDERER_SCRIPTS = [
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
- * kinds), Mermaid, and comark-annotate's screenshot, compare, and annotation for PR evidence. Its blocks.md documents
- * every other plugin.
+ * kinds), `::drop` (another drop shown in the doc), Mermaid, and comark-annotate's screenshot, compare, and annotation
+ * for PR evidence. Its blocks.md documents every other plugin.
  */
 export const COMPONENT_TAGS =
-  "alert annotation callout caution compare important info mermaid note screenshot tip warning".split(" ")
+  "alert annotation callout caution compare drop important info mermaid note screenshot tip warning".split(" ")
 const ALLOWED_TAGS = [
   // Markdown's own, and the raw HTML comark-github lets through: GitHub's allowlist.
   ..."a abbr b bdo blockquote br caption cite code dd del details dfn div dl dt em figcaption figure h1 h2 h3 h4 h5 h6 hr i img input ins kbd li mark ol p picture pre q rp rt ruby s samp section small source span strike strong sub summary sup table tbody td tfoot th thead time tr tt ul var wbr".split(
@@ -245,6 +246,30 @@ function createMermaidRenderer(): NodeHandler {
   }
 }
 
+/** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
+const EMBED_LINK = /^(?:(?:https?:\/\/[^/]+)?\/d\/)?([0-9a-hjkmnp-tv-z]{12})(?:[/?#].*)?$/
+const EMBED_HEIGHT = { min: 120, max: 1600, default: 480 }
+
+/**
+ * `::drop{link=…}`: another drop, shown inside the doc. The render is cached for every reader, so it only holds the
+ * link: the viewer fetches the drop as the reader, and only an HTML drop they may open fills the box (EMBEDS_SCRIPT in
+ * #shared/documents), in a sandbox of its own. On the /f/ page, which runs no scripts, the box stays a link.
+ */
+const renderDropEmbed: NodeHandler = ([, attrs]) => {
+  const link = textValue(attrs.link)?.trim().match(EMBED_LINK)?.[1]
+  if (!link)
+    return `<aside class="callout" data-kind="warning"><p><code>::drop</code> needs the link of the drop to show: <code>::drop{link=k7f2q9m4x8wd}</code>.</p></aside>`
+  const height = Math.round(Number(attrs.height ?? Number.NaN))
+  const clamped = Number.isFinite(height)
+    ? Math.min(EMBED_HEIGHT.max, Math.max(EMBED_HEIGHT.min, height))
+    : EMBED_HEIGHT.default
+  const title = textValue(attrs.title)?.trim() || "Embedded drop"
+  return (
+    `<figure class="drop-embed" data-drop-embed="${link}" data-title="${escapeHtml(title)}" style="--drop-embed-height: ${clamped}px">` +
+    `<a class="drop-embed-link" href="/d/${link}">${escapeHtml(title)}</a></figure>`
+  )
+}
+
 const PROBLEM_ICON =
   '<svg aria-hidden="true" class="render-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
 const FOLD_ICON =
@@ -278,26 +303,86 @@ type DocumentMeta = Awaited<ReturnType<typeof parseMarkdown>>["meta"]
 const Issues = v.fallback(v.array(v.string()), [])
 const IssueRules = v.fallback(v.record(v.string(), v.string()), {})
 
-/** Each plugin names its problems (`comark/<plugin>/<rule>`); one without a name counts as a block's. */
+/** The problems the plugins report, each named by its rule (`comark/<plugin>/<rule>`), for the box above the doc. */
 function issuesOf(meta: DocumentMeta) {
   const all = v.parse(Issues, meta.issues)
   const rules = v.parse(IssueRules, meta.issueRules)
-  const annotated = (issue: string) => rules[issue]?.startsWith("comark/annotate/") === true
-  return {
-    all,
-    annotations: all.filter(annotated),
-    blocks: all.filter((issue) => !annotated(issue)),
-    retry: all.some((issue) => RETRIED_RULE.test(rules[issue] ?? "")),
-  }
+  return { all, retry: all.some((issue) => RETRIED_RULE.test(rules[issue] ?? "")) }
+}
+
+export interface MarkdownProblem {
+  rule: string
+  /** An error stops the doc from publishing; a warning publishes with it. */
+  severity: "error" | "warning"
+  /** 1-based, counting the front matter. */
+  line: number
+  column?: number
+  message: string
+  fix: string
 }
 
 /**
- * A doc's problems, one readable sentence each: its annotated screenshots', which `publish` refuses, and every other
- * block's, which the doc shows. Empty when it has none.
+ * What a doc can't publish with: a block that never closes, broken `{…}` attributes, a component Drop doesn't render,
+ * every problem of an annotated screenshot, whose marks would land in the wrong place, and the rules comark-linter's
+ * catalog marks as errors (invalid front matter, script URLs, a quiz without an answer). Its index doesn't export
+ * severities, so they're listed here.
  */
-export async function markdownIssues(markdown: string): Promise<{ annotations: string[]; blocks: string[] }> {
-  const { annotations, blocks } = issuesOf((await parseMarkdown(markdown)).meta)
-  return { annotations, blocks }
+const ERROR_RULE =
+  /^comark\/(?:unclosed-block|malformed-attributes|unknown-component|invalid-frontmatter|unsafe-url|annotate\/.+|cards\/unsafe-link|[a-z]+\/path-outside-root|quiz\/(?:no-options|no-correct-option|correct-in-poll|missing-answer|duplicate-id|swallowed-slot)|comments\/(?:duplicate-id|unknown-reply))$/
+
+export const blocksPublishing = (rule: string) => ERROR_RULE.test(rule)
+
+/**
+ * The components a doc may write: the allowlist, and the blocks comark-ui's plugins turn into other components before
+ * the allowlist sees them (comark-linter's own list for comark-ui, which it uses when it loads the preset itself).
+ */
+const LINT_COMPONENTS = [
+  ...ALLOWED_TAGS,
+  ..."accordion-item code-group collapsible details ref stats table tabs-item".split(" "),
+]
+
+/**
+ * comark-linter over the parse Drop renders with: the same plugins, the components the allowlist keeps, and the
+ * legacy props read as their new names. Every problem has its line and how to fix it. Links to other files and
+ * external URLs aren't checked: a published doc has no folder around it. The checks read the source, so they can say
+ * an annotation's box is outside its image, not that it points at the button it means.
+ */
+export async function lintMarkdown(markdown: string): Promise<MarkdownProblem[]> {
+  const found = await lint(renameLegacyProps(markdown), { plugins, components: LINT_COMPONENTS })
+  return found.flatMap(({ rule, line, column, message, fix, cause }) => {
+    // A rule that threw is comark-linter's bug, not the doc's, and its message says so; Comark failing to parse the doc
+    // is the doc's.
+    if (cause !== undefined && !(rule === "comark/invalid-frontmatter" || message.startsWith("Comark could not"))) {
+      log.error({ action: "markdown_lint", rule, error: message })
+      return []
+    }
+    const error = cause !== undefined || blocksPublishing(rule)
+    return [{ rule, severity: error ? "error" : "warning", line, ...(column && { column }), message, fix }]
+  })
+}
+
+/** A problem as lint-comark prints it: `line:column rule message fix`. */
+export const problemLine = ({ line, column, rule, message, fix }: MarkdownProblem) =>
+  `${line}${column ? `:${column}` : ""} ${rule} ${message}${fix ? ` ${fix}` : ""}`
+
+/**
+ * Lints a Markdown doc before it's stored: one with an error is refused with all its problems, as `message`, and as
+ * `data.problems` for clients. Returns the warnings it publishes with.
+ */
+export async function requirePublishableMarkdown(markdown: string): Promise<MarkdownProblem[]> {
+  const problems = await lintMarkdown(markdown)
+  const errors = problems.filter((problem) => problem.severity === "error")
+  if (!errors.length) return problems
+  const [first] = errors
+  throw new HTTPError({
+    status: 400,
+    statusText:
+      errors.length === 1
+        ? `Line ${first!.line}: ${first!.message}`
+        : `This doc has ${errors.length} errors. Line ${first!.line}: ${first!.message}`,
+    message: `Drop didn't publish this doc. Fix ${errors.length === 1 ? "this error" : "these errors"} and publish again:\n${errors.map((error) => `- ${problemLine(error)}`).join("\n")}`,
+    data: { problems },
+  })
 }
 
 /**
@@ -319,6 +404,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
         alert: renderCallout,
         callout: renderCallout,
         caution: renderCallout,
+        drop: renderDropEmbed,
         important: renderCallout,
         info: renderCallout,
         mermaid: createMermaidRenderer(),

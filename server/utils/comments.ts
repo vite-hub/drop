@@ -85,6 +85,8 @@ const CommentMeta = v.object({
   ow: v.number(),
   oh: v.number(),
   quote: v.nullable(v.string()),
+  suggestion: v.optional(v.nullable(v.string()), null),
+  emptyBody: v.optional(v.boolean(), false),
   label: v.nullable(v.string()),
   page: v.nullable(v.string()),
   elementX: v.nullable(v.number()),
@@ -156,9 +158,10 @@ export function toComment(thread: DropThread, who: Identity | null, attachments:
     ow: meta.ow,
     oh: meta.oh,
     quote: meta.quote,
+    suggestion: meta.suggestion,
     label: meta.label,
     page: meta.page,
-    body: first?.body ?? "",
+    body: meta.emptyBody ? "" : (first?.body ?? ""),
     authorName: thread.createdBy.name,
     authorImage: thread.createdBy.image ?? null,
     resolved: thread.status === "resolved",
@@ -215,15 +218,27 @@ export async function listComments(row: Commented, who: Identity | null) {
 /** Starts a thread on `row`'s list. `page` is where the Comments API files it; it defaults to the drop's link. */
 export async function addThread(
   row: Commented,
-  input: { fields: Omit<CommentMeta, "dropId" | "version">; body: string; author: CommentAuthor; page?: string },
+  input: {
+    fields: Omit<v.InferInput<typeof CommentMeta>, "dropId" | "version">
+    body: string
+    author: CommentAuthor
+    page?: string
+  },
   list?: CommentList,
 ): Promise<DropThread> {
-  const meta: CommentMeta = { dropId: row.id, version: row.version, ...input.fields }
+  const meta: CommentMeta = {
+    suggestion: null,
+    dropId: row.id,
+    version: row.version,
+    ...input.fields,
+    emptyBody: !input.body,
+  }
   const [error, thread] = await comments.create({
     scope: (list ?? (await commentList(row))).scope,
     page: input.page ?? commentPage(row),
     metadata: meta,
-    body: input.body,
+    // The primitive requires words. Metadata preserves Drop's empty note for suggestions and image-only comments.
+    body: input.body || (meta.suggestion === null ? "Image attachment" : "Suggested edit"),
     author: input.author,
   })
   if (error) throw commentsFailure(error)

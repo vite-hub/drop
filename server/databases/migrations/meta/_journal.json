@@ -17,23 +17,30 @@
       "breakpoints": true
     },
     {
+      "idx": 2,
+      "version": "6",
+      "when": 1793445000000,
+      "tag": "0004_comment_suggestions",
+      "breakpoints": true
+    },
+    {
       "idx": 3,
       "version": "6",
-      "when": 1793095000001,
+      "when": 1793445000001,
       "tag": "0003_vitehub_comments",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "6",
-      "when": 1793095000002,
+      "when": 1793445000002,
       "tag": "0004_drop_comments_on_vitehub",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "6",
-      "when": 1793129177718,
+      "when": 1793445000003,
       "tag": "0005_comment_cleanup",
       "breakpoints": true
     }

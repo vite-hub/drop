@@ -915,6 +915,51 @@ test("comments and replies in Drop take images, which belong to the drop and go 
   for (const { blob_key } of keys) assert.equal(objects.has(blob_key), false)
 })
 
+test("suggestions without a comment body survive thread storage, including deleting the quote", async () => {
+  insertDrop("doc")
+  state.who = who
+  const write = (input) =>
+    request("/api/drops/doc/comments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "text", selector: "p", ox: 0, oy: 0, quote: "Old words", ...input }),
+      id: "doc",
+    })
+  for (const suggestion of ["New words", ""]) {
+    const posted = await dropCommentsPost(write({ suggestion }))
+    assert.equal(posted.suggestion, suggestion)
+    assert.equal(posted.body, "")
+    assert.equal(threads().find((thread) => thread.id === posted.id).metadata.suggestion, suggestion)
+    const listed = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
+    assert.equal(listed.find((comment) => comment.id === posted.id).suggestion, suggestion)
+  }
+  const form = new FormData()
+  form.append("data", JSON.stringify({ kind: "page", selector: "", ox: 0, oy: 0 }))
+  form.append("image", new Blob([PNG]), "marker.png")
+  const image = await dropCommentsPost(request("/api/drops/doc/comments", { method: "POST", body: form, id: "doc" }))
+  assert.equal(image.body, "")
+  assert.equal(image.attachments.length, 1)
+  assert.equal(
+    (await dropComments(request("/api/drops/doc/comments", { id: "doc" }))).find((comment) => comment.id === image.id)
+      .body,
+    "",
+  )
+  const plain = await dropCommentsPost(write({ body: "A plain comment" }))
+  assert.equal(plain.suggestion, null)
+  // Threads from before suggestions were introduced have no suggestion key in their metadata.
+  sql
+    .prepare(
+      "UPDATE vitehub_comment_threads SET metadata = json_remove(metadata, '$.suggestion', '$.emptyBody') WHERE id = ?",
+    )
+    .run(plain.id)
+  assert.equal(
+    (await dropComments(request("/api/drops/doc/comments", { id: "doc" }))).find((comment) => comment.id === plain.id)
+      .suggestion,
+    null,
+  )
+  assert.equal((await answer(dropCommentsPost, write({}))).status, 400)
+})
+
 test("deleting a screenshot takes its own comments, and deleting the site takes them all", async () => {
   site()
   const { body } = await token(SITE, { name: "Ole" })

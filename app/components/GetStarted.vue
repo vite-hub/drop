@@ -164,7 +164,7 @@ const tabsUi = {
             <UButton
               color="neutral"
               icon="i-mingcute-globe-line"
-              label="New Site Review"
+              label="New site review"
               size="xs"
               variant="outline"
               @click="emit('site')"

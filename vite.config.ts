@@ -52,7 +52,7 @@ export default defineConfig({
       // `__drop` (frame messages) and `_meta` (MCP) are protocol fields.
       "no-underscore-dangle": "off",
       "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],
-      // Doctor's typescript/strict/require-safety-comment-for-type-assertion owns casts (doctor.config.json).
+      // Doctor's typescript/strict/require-safety-comment-for-type-assertion owns casts (doctor.config.ts).
       "typescript/no-unsafe-type-assertion": "off",
       // tsgolint doesn't read Nuxt's generated tsconfigs (the root one only references them): it misses
       // noUncheckedIndexedAccess and the packages Nuxt maps through paths (h3, hookable). So `!` on an index and casts on
