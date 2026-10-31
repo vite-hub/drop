@@ -8,13 +8,20 @@ const props = defineProps<{
   comments: DropComment[]
   canComment: boolean
   canManage: boolean
+  /** Whether this reader may put a suggestion's words into the doc (an editor, on its latest version). */
+  canAccept?: boolean
+  accepting?: string | null
   version: number
   versions: DropVersion[]
   screenshots?: Map<string, SiteReviewItem["screenshot"]>
   outdated: Set<string>
   addPageComment: (body: string, files: File[]) => Promise<Sent<DropComment>>
 }>()
-const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
+const emit = defineEmits<{
+  focus: [comment: DropComment]
+  resolve: [id: string, resolved: boolean]
+  accept: [id: string]
+}>()
 const root = useTemplateRef<HTMLElement>("root")
 defineExpose({
   focusComposer: () => root.value?.querySelector("textarea")?.focus(),
@@ -120,10 +127,15 @@ async function sendPageComment() {
           <p v-if="comment.kind === 'page'" class="flex items-center gap-1.5 text-xs text-muted">
             <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />General feedback
           </p>
+          <ViewerSuggestion
+            v-else-if="comment.quote && comment.suggestion !== null"
+            :quote="comment.quote"
+            :suggestion="comment.suggestion"
+          />
           <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
           </p>
-          <p class="text-sm">{{ comment.body }}</p>
+          <p v-if="comment.body" class="text-sm">{{ comment.body }}</p>
           <ViewerCommentImages :attachments="comment.attachments" />
           <span v-if="comment.replies.length" class="flex items-center gap-1.5 text-xs text-muted">
             <UAvatarGroup :max="3" size="2xs">
@@ -137,14 +149,25 @@ async function sendPageComment() {
             {{ comment.replies.length === 1 ? "1 reply" : `${comment.replies.length} replies` }}
           </span>
         </button>
-        <button
-          v-if="canManage || comment.mine"
-          class="min-h-6 cursor-pointer text-xs text-muted hover:text-highlighted pointer-coarse:min-h-11"
-          type="button"
-          @click="emit('resolve', comment.id, !comment.resolved)"
-        >
-          {{ comment.resolved ? "Reopen" : "Resolve" }}
-        </button>
+        <div class="flex items-center gap-3">
+          <button
+            v-if="canAccept && comment.suggestion !== null && !comment.resolved"
+            class="min-h-6 cursor-pointer text-xs font-medium text-highlighted hover:underline disabled:cursor-wait disabled:opacity-60 pointer-coarse:min-h-11"
+            :disabled="accepting === comment.id"
+            type="button"
+            @click="emit('accept', comment.id)"
+          >
+            {{ accepting === comment.id ? "Accepting…" : "Accept" }}
+          </button>
+          <button
+            v-if="canManage || comment.mine"
+            class="min-h-6 cursor-pointer text-xs text-muted hover:text-highlighted pointer-coarse:min-h-11"
+            type="button"
+            @click="emit('resolve', comment.id, !comment.resolved)"
+          >
+            {{ comment.resolved ? "Reopen" : "Resolve" }}
+          </button>
+        </div>
       </li>
       <li v-if="earlier.length" key="earlier" class="bg-elevated/50 px-4 py-2">
         <p class="label-mono">From earlier versions</p>

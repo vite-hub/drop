@@ -1,5 +1,5 @@
 import { dropPath } from "#shared/links"
-import type { CommentReply, DropComment, DropDetail, DropVersion } from "#shared/types"
+import type { CommentReply, DropComment, DropDetail, DropSummary, DropVersion } from "#shared/types"
 import type { CommentInput } from "#shared/schemas"
 import * as v from "valibot"
 
@@ -101,7 +101,34 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     }
   }
 
-  return { drop, comments, findComment, addComment, resolveComment, removeComment, addReply, removeReply }
+  /**
+   * Puts a suggestion's words into the doc as its next version and resolves it. The drop keeps its id, so the page
+   * reloads its data and shows the new version. Resolves to whether it went through; a failure says why in a toast.
+   */
+  async function acceptSuggestion(commentId: string) {
+    try {
+      const next = await $fetch<DropSummary>(`/api/comments/${commentId}/accept`, { method: "POST" })
+      // A new version adds bytes and a write, so the lists and the plan usage move too.
+      await Promise.all([drop.refresh(), comments.refresh(), refreshNuxtData([keys.drops, keys.tree, keys.usage])])
+      notify.done(`Published v${next.version}`)
+      return true
+    } catch (error) {
+      notify.fail("Couldn't accept the suggestion", error)
+      return false
+    }
+  }
+
+  return {
+    drop,
+    comments,
+    findComment,
+    addComment,
+    resolveComment,
+    removeComment,
+    addReply,
+    removeReply,
+    acceptSuggestion,
+  }
 }
 
 /** The drop page provides its drop; the viewer and its panels inject it instead of threading props. */

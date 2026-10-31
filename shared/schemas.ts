@@ -91,6 +91,8 @@ export const CommentSchema = v.pipe(
     quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
     label: v.optional(v.pipe(v.string(), v.maxLength(200))),
     page: v.optional(v.pipe(v.string(), v.maxLength(300))),
+    /** A suggested edit: the words that replace the quote. Empty suggests deleting it. */
+    suggestion: v.optional(v.pipe(v.string(), v.maxLength(2000))),
     // Empty only with images, such as the Marker's snapshot: the endpoint checks once it has read them.
     body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
   }),
@@ -107,6 +109,10 @@ export const CommentSchema = v.pipe(
     (input) =>
       input.kind !== "page" || (!input.selector && !input.ox && !input.oy && !input.ow && !input.oh && !input.quote),
     "A comment on the whole page points at nothing in it.",
+  ),
+  v.check(
+    (input) => input.suggestion === undefined || (input.kind === "text" && Boolean(input.quote)),
+    "A suggestion replaces selected text.",
   ),
 )
 

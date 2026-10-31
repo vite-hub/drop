@@ -40,3 +40,28 @@ test("copied image-only feedback includes fetchable comment and reply images", (
   assert.match(output, /↳ Bob: This arrow\n     Images: https:\/\/cdn\.test\/reply\.webp/)
   assert.doesNotMatch(output, /images\/resolved/)
 })
+
+test("copied feedback says what a suggestion replaces the quote with, or that it deletes it", () => {
+  const comment = (n, suggestion, body = "") => ({
+    n,
+    kind: "text",
+    selector: "p",
+    quote: "twelve",
+    suggestion,
+    body,
+    authorName: "Ada",
+    version: 1,
+    resolved: false,
+    attachments: [],
+    replies: [],
+  })
+  const output = feedbackMarkdown(
+    "Plan",
+    "https://drop.test/d/plan",
+    [comment(1, "fifteen", "The count changed."), comment(2, ""), comment(3, null, "Plain")],
+    1,
+  )
+  assert.match(output, /1\. > twelve\n {3}Suggests replacing it with: fifteen\n {3}The count changed\. \(Ada\)/)
+  assert.match(output, /2\. > twelve\n {3}Suggests deleting it\.\n {3}\(no note\) \(Ada\)/)
+  assert.match(output, /3\. > twelve\n {3}Plain \(Ada\)/)
+})

@@ -23,6 +23,8 @@ export const FrameMessage = v.variant("type", [
   // The /f/ paths of a Markdown doc's images, videos, and audio that came near the screen (DEFERRED_FILES_SCRIPT in
   // ./documents).
   v.object({ type: v.literal("files"), paths: v.pipe(v.array(v.string()), v.maxLength(100)) }),
+  // The links of a Markdown doc's `::drop` boxes that came near the screen (EMBEDS_SCRIPT in ./documents).
+  v.object({ type: v.literal("embeds"), links: v.pipe(v.array(v.string()), v.maxLength(20)) }),
   // A cleared selection carries nothing else.
   v.variant("clear", [
     v.object({ type: v.literal("selection"), clear: v.literal(true) }),
@@ -35,6 +37,9 @@ export const FrameMessage = v.variant("type", [
       rect: Rect,
     }),
   ]),
+  // Where the composer for a held selection goes, in the frame's viewport: its card's place in the margin (`rail`), or
+  // the quote's box.
+  v.object({ type: v.literal("draft-place"), rail: v.boolean(), rect: Rect }),
   v.object({
     type: v.literal("image"),
     src: v.string(),

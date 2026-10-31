@@ -59,7 +59,8 @@ To find a drop in any folder, use [Search](/docs/features#search).
 
 | To comment on | Do this |
 | --- | --- |
-| Text | Select it. |
+| Text | Select it and pick **Comment**. |
+| Text you'd word differently | Select it and pick **Suggest**, then write the words that replace it, or clear them to suggest deleting it. The doc shows the old words struck through and the new ones after them. People who can edit the doc **Accept** it, which publishes the next version with the change and resolves it. |
 | An image | In a Markdown doc or an image drop, click it to zoom, then click a spot or drag an area. In an HTML doc or an app, clicks stay the page's own, so use the Comment tool. |
 | An element or part of a page | Pick **Comment** in the toolbar under the page, or press :kbd[R]. Click an element to pin a comment to it, or drag a rectangle. The tool stays on for the next one. |
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |

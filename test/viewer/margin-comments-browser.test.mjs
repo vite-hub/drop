@@ -269,3 +269,55 @@ test("leaving the frame clears quote hover while keeping the open thread raised"
     await browser.close()
   }
 }, 30_000)
+
+test("a comment being written on a selection keeps its card's place in the margin, where the card lands once sent", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    const toFrame = (message) =>
+      page.evaluate(
+        (message) => document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, "*"),
+        message,
+      )
+    await frame.evaluate(() => {
+      const p = document.querySelectorAll("main > article > p")[2]
+      const node = p.firstChild
+      const at = node.data.indexOf("for a week")
+      const range = document.createRange()
+      range.setStart(node, at)
+      range.setEnd(node, at + "for a week".length)
+      getSelection().removeAllRanges()
+      getSelection().addRange(range)
+      document.dispatchEvent(new MouseEvent("mouseup"))
+    })
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "selection" && m.quote === "for a week"))
+    await toFrame({ type: "hold-selection" })
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "draft-place"))
+    const place = await page.evaluate(() => window.posts.findLast((m) => m.type === "draft-place"))
+    const line = await frame.evaluate(() => {
+      const r = CSS.highlights.get("drop-draft").values().next().value.getClientRects()
+      return r[r.length - 1].toJSON()
+    })
+    const cards = (await drawn(frame)).cards
+    assert.equal(place.rail, true)
+    // In the margin with the other cards, level with the quote's line.
+    assert.equal(Math.round(place.rect.right), Math.round(cards[0].right))
+    assert.ok(place.rect.top >= line.top - 1)
+
+    // Sent: the comment's card takes the place the composer was over, and the place goes.
+    await toFrame({ type: "markers", markers: [...markers, text("c9", "for a week")] })
+    await toFrame({ type: "clear-selection" })
+    await frame.waitForFunction(() =>
+      document.querySelector("drop-comments").shadowRoot.querySelector('.rail .g[data-id="c9"]'),
+    )
+    const sent = (await drawn(frame)).cards.find((card) => card.id === "c9")
+    assert.equal(Math.round(sent.left), Math.round(place.rect.left))
+    assert.equal(Math.round(sent.top), Math.round(place.rect.top))
+    assert.equal(
+      await frame.evaluate(() => document.querySelector("drop-comments").shadowRoot.querySelector(".slot")),
+      null,
+    )
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

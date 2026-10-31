@@ -34,7 +34,7 @@ const { copy, copyLoading, copied } = useCopy()
 const { remove, restore } = useDropActions()
 const [DefineSide, ReuseSide] = createReusableTemplate()
 const [DefineComposer, ReuseComposer] = createReusableTemplate()
-const { width: windowWidth } = useWindowSize()
+const { width: windowWidth, height: windowHeight } = useWindowSize()
 
 const isApp = computed(() => drop.value.kind === "app")
 const video = computed(() => (drop.value.kind === "file" ? videoType(drop.value.filename) : undefined))
@@ -133,6 +133,7 @@ const {
   selection,
   lightbox,
   popover,
+  draftPlace,
   tool,
   overlays,
   areaMode,
@@ -207,8 +208,13 @@ const pageComments = computed(() =>
 // TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
+// A resolved comment leaves the page and stays in the panel's Resolved list; it shows again while its thread is open.
+const onPage = (comment: DropComment) =>
+  !comment.resolved || (popover.value?.type === "thread" && popover.value.id === comment.id)
 // Comments on the whole page have nothing in it to pin to; they live in the panel.
-const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
+const pinned = computed(() =>
+  pageComments.value.filter((comment) => onPage(comment) && !replaced(comment) && comment.kind !== "page"),
+)
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
 // The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
@@ -244,34 +250,51 @@ watch(
   () => siteRef.value?.pending,
   (pending) => pending && startComment(),
 )
-// On wide screens a new comment on a selection, an element, or an area is written in the column beside the page, where
-// what it points at stays in view. Page-wide comments, threads, and the lightbox's keep the dock.
-const commentAside = computed(
+// On wide screens a new comment on a selection, an element, or an area is written in a card floating over the page,
+// where its card lands once sent: in the margin beside a doc's text (the frame keeps that place, draft-place), else
+// under what it points at. Page-wide comments, threads, sites, and the lightbox's keep the dock.
+const floating = computed(
   () =>
     wide.value &&
     commentsOpen.value &&
     !editing.value &&
     !trashed.value &&
     !lightbox.value &&
-    Boolean(siteRef.value?.pending || popover.value?.type === "new"),
+    !siteRef.value?.pending &&
+    popover.value?.type === "new",
 )
-watch(commentAside, async (open, was) => {
-  if (open) {
-    await nextTick()
-    await whenHeld()
-    if (commentAside.value) asideRef.value?.querySelector<HTMLElement>("[data-comment-editor] textarea")?.focus()
-  } else if (was && commentsOpen.value && !popover.value && !listBefore) closeComments()
+// A selection's card waits for its place, which the frame reports once the margin has made room for it.
+const floatShown = computed(
+  () =>
+    floating.value && (popover.value?.type !== "new" || popover.value.pending.kind !== "text" || !!draftPlace.value),
+)
+const FLOAT_WIDTH = 288
+const floatStyle = computed(() => {
+  const place = draftPlace.value
+  const width = place?.rail ? place.rect.right - place.rect.left : FLOAT_WIDTH
+  const left = place ? place.rect.left : (popover.value?.x ?? 0)
+  const top = place ? (place.rail ? place.rect.top : place.rect.bottom + 8) : (popover.value?.y ?? 0) + 8
+  return {
+    width: `${width}px`,
+    left: `${Math.min(Math.max(8, left), windowWidth.value - width - 8)}px`,
+    top: `${Math.min(Math.max(56, top), windowHeight.value - 160)}px`,
+  }
 })
-const asideRef = useTemplateRef<HTMLElement>("asideRef")
+const floatRef = useTemplateRef<HTMLElement>("floatRef")
+watch(floatShown, async (open) => {
+  if (!open) return
+  await nextTick()
+  await whenHeld()
+  if (floatShown.value) floatRef.value?.querySelector<HTMLElement>("[data-comment-editor] textarea")?.focus()
+})
+watch(floating, (open, was) => {
+  if (!open && was && commentsOpen.value && !popover.value && !listBefore) closeComments()
+})
 // The page loses its selection once the composer takes focus; it keeps the quote marked while the comment is written.
 watch(
   () => popover.value?.type === "new" && popover.value.pending.kind === "text",
   (text) => send({ type: text ? "hold-selection" : "clear-selection" }),
 )
-function cancelAside() {
-  if (popover.value) void backToComments()
-  else closeComments()
-}
 function toggleCommentArea() {
   if (canMarkArea.value) showComments()
 }
@@ -542,6 +565,19 @@ async function resolve(id: string, resolved: boolean) {
   await state.resolveComment(id, resolved)
 }
 
+// A suggestion goes into the doc from its latest version, by someone who could edit it by hand.
+const canAccept = computed(() => drop.value.kind === "markdown" && drop.value.canEdit && !shownVersion.value)
+const accepting = ref<string | null>(null)
+async function accept(id: string) {
+  if (accepting.value) return
+  accepting.value = id
+  try {
+    if (await state.acceptSuggestion(id)) popover.value = null
+  } finally {
+    accepting.value = null
+  }
+}
+
 async function removeComment(id: string) {
   popover.value = null
   await state.removeComment(id)
@@ -580,7 +616,10 @@ async function focusComment(comment: DropComment) {
       .toBe(true, { timeout: 5000 })
       .catch(() => {})
   }
-  if (comment.kind !== "page") send({ type: "focus", id: comment.id, open: false })
+  if (comment.kind === "page") return
+  // A resolved comment joins the pins once its thread opens: the frame takes the new pins first.
+  await nextTick()
+  send({ type: "focus", id: comment.id, open: false })
 }
 
 // `?comment=<n>` from a copied link: once the frame has placed the pins, open that thread with the comments showing.
@@ -785,7 +824,7 @@ watch(
     </div>
   </DefineSide>
   <!-- A new comment's composer, or the open thread: in the dock, or beside the page for a new comment on what's selected
-       (commentAside). -->
+       (floating). -->
   <DefineComposer>
     <div id="drop-site-composer" v-show="siteRef?.pending" class="flex min-h-0 flex-1 flex-col" />
     <ViewerCommentThread
@@ -799,6 +838,9 @@ watch(
       :draft="popover.type === 'new' ? popover.body : undefined"
       :draft-error="popover.type === 'new' ? popover.error : undefined"
       :can-reply="drop.canComment"
+      :can-accept="canAccept"
+      :accepting="Boolean(accepting) && accepting === threadComment?.id"
+      @accept="accept"
       @cancel="backToComments"
       @copy-link="copyCommentLink"
       @delete="removeComment"
@@ -806,6 +848,7 @@ watch(
       @reply="reply"
       @resolve="resolve"
       @submit="submit"
+      @suggest="(text) => popover?.type === 'new' && (popover.pending.suggestion = text)"
     />
   </DefineComposer>
 
@@ -1023,7 +1066,7 @@ watch(
         <ViewerReviewDock
           ref="reviewDock"
           :class="{ invisible: siteRef?.capturing }"
-          :open="commentsOpen && !editing && !trashed && !commentAside"
+          :open="commentsOpen && !editing && !trashed && !floating"
           :overlay="Boolean(lightbox)"
           :settle="whenHeld"
           @close="closeComments"
@@ -1045,12 +1088,14 @@ watch(
             </UTooltip>
           </template>
           <template #panel>
-            <ReuseComposer v-if="!commentAside" />
+            <ReuseComposer v-if="!floating" />
             <ViewerComments
               v-if="!popover && !siteRef?.pending"
               ref="commentsRef"
               :can-comment="drop.canComment && !shownVersion && !lightbox"
               :can-manage="drop.isOwner"
+              :can-accept="canAccept"
+              :accepting="accepting"
               :comments="lightbox ? imageComments : comments"
               :screenshots="screenshots"
               :add-page-comment="addPageComment"
@@ -1059,6 +1104,7 @@ watch(
               :versions="drop.versions"
               @focus="focusComment"
               @resolve="resolve"
+              @accept="accept"
             />
           </template>
           <template #toolbar>
@@ -1194,7 +1240,7 @@ watch(
   </UDashboardPanel>
   <!-- Beside the page, full height, like T3 Code's right panel: it pushes the content instead of covering it. The page's
        right border divides them, and the handle on it resizes the panel; double-click resets it. -->
-  <template v-if="docked || commentAside">
+  <template v-if="docked">
     <UDashboardResizeHandle
       tabindex="0"
       aria-label="Resize details sidebar"
@@ -1216,26 +1262,7 @@ watch(
       :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
     >
       <template #body>
-        <section
-          v-if="commentAside"
-          ref="asideRef"
-          aria-label="New comment"
-          class="flex min-h-0 flex-1 flex-col motion-safe:[animation:aside-in_180ms_var(--ease-out)]"
-        >
-          <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default pr-2 pl-4">
-            <span class="text-sm font-medium">New comment</span>
-            <UButton
-              aria-label="Discard comment"
-              color="neutral"
-              icon="i-mingcute-close-line"
-              size="sm"
-              variant="ghost"
-              @click="cancelAside"
-            />
-          </div>
-          <div class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"><ReuseComposer /></div>
-        </section>
-        <div v-else id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
+        <div id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
       </template>
     </UDashboardPanel>
   </template>
@@ -1250,6 +1277,15 @@ watch(
   <!-- On <body>: as the dashboard's last child they'd put the panel's lg:not-last:border-e on it, and the doc would
        shift a pixel whenever text is selected. -->
   <Teleport to="body">
+    <section
+      v-if="floatShown"
+      ref="floatRef"
+      aria-label="New comment"
+      class="fixed z-40 flex max-h-[min(24rem,60dvh)] origin-top-left flex-col overflow-y-auto overscroll-contain rounded-lg border border-default bg-default shadow-lg motion-safe:[animation:pop-in_150ms_var(--ease-out)]"
+      :style="floatStyle"
+    >
+      <ReuseComposer />
+    </section>
     <div
       v-if="selection && (!commentsOpen || !popover)"
       class="fixed z-30 -translate-x-1/2 -translate-y-full"
@@ -1258,26 +1294,14 @@ watch(
         top: `${Math.max(56, selection.rect.top - 8)}px`,
       }"
     >
-      <div
-        class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]"
-      >
-        <UButton
-          color="neutral"
-          icon="i-mingcute-chat-1-line"
-          label="Comment"
-          size="sm"
-          variant="ghost"
-          @click="commentOnSelection"
-          @mousedown.prevent
-        />
-      </div>
+      <ViewerSelectionBar @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
 
     <ViewerLightbox
       v-if="lightbox"
       :alt="lightbox.alt"
       :can-comment="drop.canComment"
-      :comments="imageComments"
+      :comments="imageComments.filter(onPage)"
       :draft="imageDraft"
       :from="lightbox.from"
       :src="lightbox.src"

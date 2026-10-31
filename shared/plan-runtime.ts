@@ -51,7 +51,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
   // counts first: the element on top and those it sits in. So a box drawn on an open tooltip or menu anchors to it, not
   // to a smaller row it covers. When only the page holds the box among those, any element under it counts.
   function anchorFor(left, top, right, bottom, skip) {
-    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble");
+    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble" && el.localName !== "drop-ins");
     const smallest = (els) => {
       let best = null, bestArea = Infinity;
       for (const el of els) {
@@ -139,6 +139,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
   // Highlights draw on the page itself, so without Drop's theme they take a grey that shows on light and dark pages.
   if (!THEMED) pageStyle.textContent = pageStyle.textContent.replaceAll("var(--foreground)", "#808080");
+  // comark-comments' speech bubble, in a given color.
+  const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   // A margin comment's bubble is the package's, in the page's own text after its quote, so it takes its room in the
   // line as a doc's thread does and covers nothing. It's a <drop-bubble> with no text of its own: quotes are found and
   // elements named (findRange, pathOf) as if it weren't there, and render() takes it out again. A word joiner keeps it
@@ -146,9 +148,19 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const BUBBLES = document.createElement("style");
   BUBBLES.textContent = COMMENTS_CSS +
     'drop-bubble.cr-bub:empty::before,drop-bubble.cr-bub b::before{content:"\\2060"}drop-bubble.cr-bub b{font:inherit;color:inherit}' +
-    'drop-bubble.cr-bub b::before{content:"\\2060" attr(data-n)}drop-bubble.cr-bub[data-on]{color:var(--_comark-foreground);border-color:var(--_comark-ring)}' +
+    'drop-bubble.cr-bub b::before{content:"\\2060" attr(data-n)}' +
+    // Drop's bubble stands out from the page, as its selection bar does: dark on a light theme, white on a dark one.
+    // The package's icon is a grey image, so each theme gets one in the page's own background color.
+    "drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#fafafa") + ";border-color:var(--foreground);background-color:var(--foreground);color:var(--background);transition:box-shadow .12s}" +
+    ":root.dark drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#0a0a0a") + "}" +
+    "drop-bubble.cr-bub:hover,drop-bubble.cr-bub[data-on]{border-color:var(--foreground);color:var(--background);box-shadow:0 0 0 3px color-mix(in oklab,var(--foreground) 18%,transparent)}" +
     // The package's .cr-cm tint and underline, on its own comment color, which the bubble resolves (render).
-    "::highlight(drop-margin){background-color:color-mix(in srgb,var(--drop-anchor) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--drop-anchor) 80%,transparent);text-underline-offset:.25em}";
+    "::highlight(drop-margin){background-color:color-mix(in srgb,var(--drop-anchor) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--drop-anchor) 80%,transparent);text-underline-offset:.25em}" +
+    // A suggested edit, in the package's redline (.cr-sg del and ins): the quote struck through in red, as a highlight,
+    // and the new words after it in green. They're generated from data-text, so the page gains no text of its own.
+    "::highlight(drop-del){color:color-mix(in oklab,var(--destructive) 70%,var(--foreground));background-color:color-mix(in srgb,var(--destructive) 11%,transparent);text-decoration:line-through 1.5px color-mix(in srgb,var(--destructive) 75%,transparent)}" +
+    "drop-ins.cr-sg{margin-left:.125rem;padding:.0625rem .1875rem;color:color-mix(in oklab,var(--_cr-ins) 60%,var(--_comark-foreground));background:color-mix(in srgb,var(--_cr-ins) 13%,transparent);-webkit-box-decoration-break:clone;box-decoration-break:clone;cursor:pointer}" +
+    "drop-ins.cr-sg::after{content:attr(data-text)}";
   // active: the comment a "focus" pulses for a moment; opened: the one whose thread Drop shows; pointed and textPointed:
   // the one under the pointer, over its bubble or card, or over its text.
   let markers = [], active = null, opened = null, pointed = null, textPointed = null;
@@ -305,7 +317,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const article = !AUTHORED && THEMED ? document.querySelector("main > article.typeset") : null;
   const inRail = (m) => Boolean(article) && m.kind === "text" && !m.resolved && !m.earlier;
   let textRanges = [], railHits = [];
+  // The selection a comment is being written on ("hold-selection"): its quote stays marked (drop-draft), and in the
+  // margin it keeps a card's place, so the composer Drop floats over that place is where the card lands once it's sent.
+  let drafted = null;
+  const drafting = () => Boolean(drafted && article && article.contains(drafted.commonAncestorContainer));
   const bubbles = new Map();
+  let inserts = [];
+  // A suggestion on open text in a Markdown doc shows as a redline, with or without the margin, and on later versions
+  // too while its words are still there: accepting one publishes a version, and the others mustn't lose theirs.
+  const suggests = (m) => Boolean(article) && m.kind === "text" && !m.resolved && m.suggestion != null;
   function clearBubbles() {
     for (const bubble of bubbles.values()) {
       const parent = bubble.parentNode;
@@ -314,12 +334,27 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (parent) parent.normalize();
     }
     bubbles.clear();
+    for (const ins of inserts) { const parent = ins.parentNode; ins.remove(); if (parent) parent.normalize(); }
+    inserts = [];
+  }
+  /** A suggestion's new words, after its quote and before its bubble. A deletion has none. */
+  function insertSuggestion(m, range) {
+    if (!m.suggestion) return;
+    const ins = document.createElement("drop-ins");
+    ins.className = "cr-sg"; ins.dataset.id = m.id; ins.dataset.text = m.suggestion; ins.title = "Suggested: " + m.suggestion;
+    ins.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const r = ins.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
+    const end = range.cloneRange();
+    end.collapse(false);
+    end.insertNode(ins);
+    inserts.push(ins);
   }
   function insertBubble(m, range) {
     const bubble = document.createElement("drop-bubble");
     bubble.className = "cr-bub"; bubble.dataset.dropBubble = ""; bubble.dataset.id = m.id; bubble.tabIndex = 0; bubble.setAttribute("role", "button");
     const replies = m.replies || 0;
-    bubble.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
+    // The redline is a highlight and generated text, which screen readers skip, so the bubble says what it suggests.
+    const change = m.suggestion == null ? "" : m.suggestion ? ": replace \u201c" + m.quote + "\u201d with \u201c" + m.suggestion + "\u201d" : ": delete \u201c" + m.quote + "\u201d";
+    bubble.setAttribute("aria-label", (m.suggestion == null ? "Comment" : "Suggestion") + " by " + (m.author || "someone") + change + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
     // Like the package's: the count only once the thread has more than its first comment.
     if (replies) { const count = document.createElement("b"); count.dataset.n = String(replies + 1); bubble.appendChild(count); }
     const end = range.cloneRange();
@@ -362,7 +397,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
     const ranges = new Map(markers.filter((m) => m.kind === "text" && m.quote).map((m) => [m.id, findRange(m.selector, m.quote)]));
     // Under a zoom the page's comments don't draw, so the column stays as it was.
-    const wide = zoom ? document.documentElement.getAttribute("data-drop-rail") === "open" : setRail(view.pins && markers.some((m) => inRail(m) && ranges.get(m.id)));
+    const wide = zoom ? document.documentElement.getAttribute("data-drop-rail") === "open" : setRail(view.pins && (drafting() || markers.some((m) => inRail(m) && ranges.get(m.id))));
     textRanges = [];
     if (wide && view.pins && !zoom) {
       if (!BUBBLES.isConnected) document.head.appendChild(BUBBLES);
@@ -371,6 +406,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       const anchor = bubble && getComputedStyle(bubble).getPropertyValue("--_cr-comment").trim();
       if (anchor && document.documentElement.style.getPropertyValue("--drop-anchor") !== anchor) document.documentElement.style.setProperty("--drop-anchor", anchor);
     }
+    // After the bubbles: each is inserted at its quote's end, so the new words land between the quote and its bubble.
+    const redlined = view.pins && !zoom ? markers.filter((m) => suggests(m) && ranges.get(m.id)) : [];
+    for (const m of redlined) insertSuggestion(m, ranges.get(m.id));
+    // The strike's style is in BUBBLES too: a deletion with no margin open still needs it.
+    if (redlined.length && !BUBBLES.isConnected) document.head.appendChild(BUBBLES);
     for (const m of markers) {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {
@@ -403,7 +443,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
         const railedHere = bubbles.has(m.id);
-        textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere });
+        textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere, suggest: suggests(m) });
         if (zoom) continue;
         const rects = range.getClientRects(), last = rects[rects.length - 1];
         if (!last) continue;
@@ -423,6 +463,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       placePin(m, x, y, into, false);
     }
     railHits = railed.map(({ m, lines }) => ({ id: m.id, boxes: lines.map((l) => ({ left: l.left + scrollX, right: l.right + scrollX, top: l.top + scrollY, bottom: l.bottom + scrollY })) }));
+    const draftLines = wide && view.pins && !zoom && drafting() ? drafted.getClientRects() : [];
+    if (draftLines.length) railed.push({ m: null, last: draftLines[draftLines.length - 1], lines: [] });
     if (railed.length) drawRail(railed);
     // A copy button on each code block, shown while the pointer is over it: the block scrolls sideways under it, so an
     // always-on label would sit on top of the code. The sandbox has no clipboard access, so Drop copies.
@@ -452,6 +494,14 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The viewer lists the comments it couldn't place; it only says so when that changes, since this runs on resize.
     if (unplaced.join() !== lastUnplaced) { lastUnplaced = unplaced.join(); post({ type: "unplaced", ids: unplaced }); }
     emphasise();
+    placeDraft();
+  }
+
+  /** Where the composer for the held selection goes: its place in the margin, else the quote, for Drop to float it under. */
+  function placeDraft() {
+    if (!drafted) return;
+    const slot = marks.querySelector(".rail .slot > .cr-card"), r = (slot || drafted).getBoundingClientRect();
+    post({ type: "draft-place", rail: Boolean(slot), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }
 
   /**
@@ -470,6 +520,22 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       .map((r) => ({ top: r.top - box.top, bottom: r.bottom - box.top }));
     let below = -Infinity;
     for (const { m, last } of railed.sort((a, b) => a.last.top - b.last.top || a.last.left - b.last.left)) {
+      if (!m) {
+        // The held selection's place: a card's width and a one-line composer's height, empty, under Drop's composer.
+        const group = document.createElement("div"), slot = document.createElement("div");
+        group.className = "g slot"; slot.className = "cr-card";
+        slot.style.cssText = "visibility:hidden;height:3.5rem;right:0";
+        group.appendChild(slot);
+        rail.appendChild(group);
+        let top = Math.max(last.top - box.top, below + 8);
+        for (let moved = true; moved; ) {
+          moved = false;
+          for (const t of taken) if (top < t.bottom + 8 && top + slot.offsetHeight > t.top - 8) { top = t.bottom + 8; moved = true; }
+        }
+        slot.style.top = top + "px";
+        below = top + slot.offsetHeight;
+        continue;
+      }
       const group = document.createElement("div");
       group.className = "g"; group.dataset.id = m.id;
       const toggle = document.createElement("input");
@@ -485,7 +551,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); avatar.textContent = initials(m.author).slice(0, 1); }; avatar.appendChild(img); }
       else avatar.textContent = initials(m.author).slice(0, 1);
       name.textContent = m.author || "Comment";
-      body.textContent = m.body || "";
+      // A suggestion sent without a note says what it suggests; the redline in the text shows the words.
+      body.textContent = m.body || (m.suggestion == null ? "" : m.suggestion ? "Suggested an edit" : "Suggested deleting this");
       entry.append(avatar, name, body);
       card.appendChild(entry);
       if (replies) { const more = document.createElement("small"); more.textContent = replies + (replies === 1 ? " reply" : " replies"); card.appendChild(more); }
@@ -511,12 +578,16 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   /** The comment Drop shows, the one a "focus" picked, and the one under the pointer: their highlight and card stand out. */
   function emphasise() {
     const on = new Set([active, opened, pointed, textPointed].filter(Boolean));
-    marks.querySelectorAll(".rail .g").forEach((group) => { group.firstElementChild.checked = on.has(group.dataset.id); });
+    marks.querySelectorAll(".rail .g:not(.slot)").forEach((group) => { group.firstElementChild.checked = on.has(group.dataset.id); });
     for (const [id, bubble] of bubbles) bubble.toggleAttribute("data-on", on.has(id));
     if (!highlights) return;
     const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
-    CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail));
-    CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail));
+    CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail && !t.suggest));
+    CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail && !t.suggest));
+    // Under the others, so a picked suggestion takes their tint and keeps its strike.
+    const struck = show((t) => t.suggest);
+    struck.priority = -1;
+    CSS.highlights.set("drop-del", struck);
     CSS.highlights.set("drop-done", show((t) => !on.has(t.id) && t.resolved));
     CSS.highlights.set("drop-active", show((t) => on.has(t.id)));
   }
@@ -559,7 +630,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   document.addEventListener("mouseup", () => setTimeout(reportSelection, 0));
   document.addEventListener("selectionchange", () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(reportSelection, 250); });
   document.addEventListener("keyup", (e) => { if (e.shiftKey || e.key === "Shift") reportSelection(); });
-  document.addEventListener("scroll", () => { if (lastQuote) reportSelection(); }, { passive: true });
+  document.addEventListener("scroll", () => { if (lastQuote) reportSelection(); placeDraft(); }, { passive: true });
 
   document.addEventListener("click", (e) => {
     const target = e.target && e.target.closest ? e.target : null;
@@ -659,7 +730,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // The element under a point, past Drop's own layer.
   function elementAt(x, y) {
-    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble") || document.body;
+    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble" && el.localName !== "drop-ins") || document.body;
   }
   const px = (n) => String(Math.round(n * 10) / 10);
   const num = (value) => parseFloat(value) || 0;
@@ -1317,8 +1388,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); }
-    if (m.type === "hold-selection" && lastRange && highlights) CSS.highlights.set("drop-draft", new Highlight(lastRange));
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; render(); } }
+    if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("drop-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
     if (m.type === "pen") setPen(m);
@@ -1587,6 +1658,19 @@ function upgradePicker(html: string): string {
  */
 export const withVariantBar = (document: string) =>
   prependToHead(document, "<script>self.__dropVariantBar = true;</script>")
+
+/**
+ * An HTML drop as a Markdown doc's `::drop` box shows it (EMBEDS_SCRIPT in ./documents): no comment layer or error
+ * reporter, since the doc around it is what readers review, but storage that works in its opaque origin, Drop's theme
+ * when it reads Drop's tokens, and the reader's color mode as a `dark` class on its root either way.
+ */
+export function embedDocument(html: string, dark: boolean): string {
+  const theme = usesDropTheme(html) ? `<style data-drop-theme>${THEME_CSS}</style>` : ""
+  return prependToHead(
+    html,
+    `<script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.classList.toggle("dark", ${dark});</script>`,
+  )
+}
 
 /**
  * Injects Drop's runtime into a full HTML document. The author's markup stays as it is, except a prototype's picker,
