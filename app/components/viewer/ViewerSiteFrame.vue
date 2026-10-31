@@ -260,7 +260,8 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
         </div>
       </ViewerDevice>
 
-      <Teleport v-if="pending" to="#drop-site-composer">
+      <!-- Deferred: its box mounts in the same update, in the dock or beside the page (DropViewer). -->
+      <Teleport v-if="pending" defer to="#drop-site-composer">
         <form
           class="space-y-3 overflow-y-auto overscroll-contain p-3"
           @dragover.prevent
@@ -281,6 +282,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           </div>
           <UTextarea
             v-model="note"
+            aria-label="Comment"
             autofocus
             autoresize
             class="w-full"

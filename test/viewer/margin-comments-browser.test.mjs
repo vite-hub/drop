@@ -152,8 +152,8 @@ test("open text comments on a wide doc sit beside their text as bubbles and marg
       if (index) assert.ok(card.top >= wide.cards[index - 1].bottom + 7)
     }
 
-    // Hiding the comments with the toolbar's eye takes the bubbles out and leaves the doc as it was; showing them again
-    // finds every quote and lays the cards out as before.
+    // Hiding the comments with the toolbar's eye takes the bubbles out and the margin away, so the doc is as it was and
+    // centered again; showing them again finds every quote and lays the cards out as before.
     const view = (pins) =>
       page.evaluate(
         (pins) => document.querySelector("iframe").contentWindow.postMessage({ __drop: true, type: "view", pins }, "*"),
@@ -162,6 +162,7 @@ test("open text comments on a wide doc sit beside their text as bubbles and marg
     await view(false)
     await frame.waitForFunction(() => !document.querySelector("drop-bubble"))
     assert.equal(await frame.evaluate(() => document.querySelector("article").innerHTML), original)
+    assert.equal(await frame.evaluate(() => document.documentElement.getAttribute("data-drop-rail")), null)
     await view(true)
     await frame.waitForFunction(() => document.querySelectorAll("drop-bubble").length === 5)
     assert.deepEqual(

@@ -33,6 +33,7 @@ const notify = useNotify()
 const { copy, copyLoading, copied } = useCopy()
 const { remove, restore } = useDropActions()
 const [DefineSide, ReuseSide] = createReusableTemplate()
+const [DefineComposer, ReuseComposer] = createReusableTemplate()
 const { width: windowWidth } = useWindowSize()
 
 const isApp = computed(() => drop.value.kind === "app")
@@ -228,12 +229,49 @@ function toggleDetails() {
   }
 }
 watch(mobileSide, (open) => open && closeComments())
-watch(popover, (value) => value && showComments())
+// Whether the Comments list was open when a new comment started: it comes back once that comment is sent or dropped.
+let listBefore = false
+function startComment() {
+  listBefore = commentsOpen.value
+  showComments()
+}
+watch(popover, (value, before) => {
+  if (value?.type === "new" && !before) startComment()
+  else if (value) showComments()
+})
 watch(areaMode, (active) => active && showComments())
 watch(
   () => siteRef.value?.pending,
-  (pending) => pending && showComments(),
+  (pending) => pending && startComment(),
 )
+// On wide screens a new comment on a selection, an element, or an area is written in the column beside the page, where
+// what it points at stays in view. Page-wide comments, threads, and the lightbox's keep the dock.
+const commentAside = computed(
+  () =>
+    wide.value &&
+    commentsOpen.value &&
+    !editing.value &&
+    !trashed.value &&
+    !lightbox.value &&
+    Boolean(siteRef.value?.pending || popover.value?.type === "new"),
+)
+watch(commentAside, async (open, was) => {
+  if (open) {
+    await nextTick()
+    await whenHeld()
+    if (commentAside.value) asideRef.value?.querySelector<HTMLElement>("[data-comment-editor] textarea")?.focus()
+  } else if (was && commentsOpen.value && !popover.value && !listBefore) closeComments()
+})
+const asideRef = useTemplateRef<HTMLElement>("asideRef")
+// The page loses its selection once the composer takes focus; it keeps the quote marked while the comment is written.
+watch(
+  () => popover.value?.type === "new" && popover.value.pending.kind === "text",
+  (text) => send({ type: text ? "hold-selection" : "clear-selection" }),
+)
+function cancelAside() {
+  if (popover.value) void backToComments()
+  else closeComments()
+}
 function toggleCommentArea() {
   if (canMarkArea.value) showComments()
 }
@@ -716,6 +754,7 @@ watch(
           <ViewerAction
             v-if="copiesMarkdown"
             :icon="copied('markdown') ? 'i-mingcute-check-line' : 'i-mingcute-markdown-line'"
+            :icon-class="copied('markdown') ? 'animate-icon-in' : undefined"
             :label="copied('markdown') ? 'Copied' : 'Copy as Markdown'"
             @click="copyMarkdown()"
           />
@@ -745,6 +784,30 @@ watch(
       </ViewerOverview>
     </div>
   </DefineSide>
+  <!-- A new comment's composer, or the open thread: in the dock, or beside the page for a new comment on what's selected
+       (commentAside). -->
+  <DefineComposer>
+    <div id="drop-site-composer" v-show="siteRef?.pending" class="flex min-h-0 flex-1 flex-col" />
+    <ViewerCommentThread
+      v-if="popover && !siteRef?.pending"
+      :key="popover.type === 'thread' ? popover.id : 'new'"
+      ref="popoverRef"
+      :can-manage="drop.isOwner"
+      :comment="threadComment"
+      :screenshot="threadComment ? screenshots.get(threadComment.id) : undefined"
+      :pending="popover.type === 'new' ? popover.pending : undefined"
+      :draft="popover.type === 'new' ? popover.body : undefined"
+      :draft-error="popover.type === 'new' ? popover.error : undefined"
+      :can-reply="drop.canComment"
+      @cancel="backToComments"
+      @copy-link="copyCommentLink"
+      @delete="removeComment"
+      @delete-reply="(id, replyId) => state.removeReply(id, replyId)"
+      @reply="reply"
+      @resolve="resolve"
+      @submit="submit"
+    />
+  </DefineComposer>
 
   <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }">
     <template #header>
@@ -960,7 +1023,7 @@ watch(
         <ViewerReviewDock
           ref="reviewDock"
           :class="{ invisible: siteRef?.capturing }"
-          :open="commentsOpen && !editing && !trashed"
+          :open="commentsOpen && !editing && !trashed && !commentAside"
           :overlay="Boolean(lightbox)"
           :settle="whenHeld"
           @close="closeComments"
@@ -974,6 +1037,7 @@ watch(
                 aria-label="Copy feedback for your agent"
                 color="neutral"
                 :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+                :ui="{ leadingIcon: copied('feedback') ? 'animate-icon-in' : undefined }"
                 size="sm"
                 variant="ghost"
                 @click="copyFeedback"
@@ -981,28 +1045,9 @@ watch(
             </UTooltip>
           </template>
           <template #panel>
-            <div id="drop-site-composer" v-show="siteRef?.pending" class="flex min-h-0 flex-1 flex-col" />
-            <ViewerCommentThread
-              v-if="popover && !siteRef?.pending"
-              :key="popover.type === 'thread' ? popover.id : 'new'"
-              ref="popoverRef"
-              :can-manage="drop.isOwner"
-              :comment="threadComment"
-              :screenshot="threadComment ? screenshots.get(threadComment.id) : undefined"
-              :pending="popover.type === 'new' ? popover.pending : undefined"
-              :draft="popover.type === 'new' ? popover.body : undefined"
-              :draft-error="popover.type === 'new' ? popover.error : undefined"
-              :can-reply="drop.canComment"
-              @cancel="backToComments"
-              @copy-link="copyCommentLink"
-              @delete="removeComment"
-              @delete-reply="(id, replyId) => state.removeReply(id, replyId)"
-              @reply="reply"
-              @resolve="resolve"
-              @submit="submit"
-            />
+            <ReuseComposer v-if="!commentAside" />
             <ViewerComments
-              v-else-if="!siteRef?.pending"
+              v-if="!popover && !siteRef?.pending"
               ref="commentsRef"
               :can-comment="drop.canComment && !shownVersion && !lightbox"
               :can-manage="drop.isOwner"
@@ -1149,7 +1194,7 @@ watch(
   </UDashboardPanel>
   <!-- Beside the page, full height, like T3 Code's right panel: it pushes the content instead of covering it. The page's
        right border divides them, and the handle on it resizes the panel; double-click resets it. -->
-  <template v-if="docked">
+  <template v-if="docked || commentAside">
     <UDashboardResizeHandle
       tabindex="0"
       aria-label="Resize details sidebar"
@@ -1171,7 +1216,26 @@ watch(
       :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
     >
       <template #body>
-        <div id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
+        <section
+          v-if="commentAside"
+          ref="asideRef"
+          aria-label="New comment"
+          class="flex min-h-0 flex-1 flex-col motion-safe:[animation:aside-in_180ms_var(--ease-out)]"
+        >
+          <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default pr-2 pl-4">
+            <span class="text-sm font-medium">New comment</span>
+            <UButton
+              aria-label="Discard comment"
+              color="neutral"
+              icon="i-mingcute-close-line"
+              size="sm"
+              variant="ghost"
+              @click="cancelAside"
+            />
+          </div>
+          <div class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"><ReuseComposer /></div>
+        </section>
+        <div v-else id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
       </template>
     </UDashboardPanel>
   </template>
