@@ -228,6 +228,32 @@ const create = computed<CommandPaletteItem[]>(() => {
   ]
 })
 
+// Every match at once, on the Drops page as cards, in the view (Recent or Folders) the reader keeps there. A folder
+// search stays in the palette: the folder's own page lists it.
+const showAll = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => {
+  const { words, kinds: picked } = parsed.value
+  if (named.value || !(words || picked.length)) return []
+  const query = { q: words || undefined, kind: picked.length ? picked.join(",") : undefined }
+  const label = words
+    ? `Show every drop matching “${words}”`
+    : `Show every ${picked.map((kind) => KIND_LABELS[kind]).join(", ")}`
+  return [
+    {
+      id: "show-all",
+      ignoreFilter: true,
+      items: [
+        {
+          id: "show-all",
+          label,
+          icon: "i-mingcute-search-line",
+          suffix: "on the Drops page",
+          to: { path: "/drops", query },
+        },
+      ],
+    },
+  ]
+})
+
 // Until the debounced words reach the server, the last results would answer the new words: show none instead. A folder
 // no one has is nothing to search.
 const settled = computed(() => JSON.stringify(asked.value) === JSON.stringify(request.value))
@@ -235,6 +261,7 @@ const unknownFolder = computed(() => Boolean(named.value) && !searched.value)
 // The open drop's commands lead: they're about what's on screen. With words, matching pages and new drops follow: there
 // are few, and most searches match none. Theme commands stay ahead of delayed results so Enter keeps its target.
 const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
+  ...showAll.value,
   // With a filter on, only drops can match it.
   ...(filtered.value
     ? [
