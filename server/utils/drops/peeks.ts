@@ -38,9 +38,9 @@ export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks
     .where(and(eq(drops.ownerId, ownerId), inArray(drops.id, wanted), isNull(drops.quarantinedAt)))
   const ancestors = await ancestorsOf(requested)
   const rows = requested.filter((row) => !ancestors.get(row.id)?.some((parent) => parent.quarantinedAt))
-  const folders = rows.filter((row) => row.kind === "folder").map((row) => row.id)
+  const folders = rows.flatMap((row) => (row.kind === "folder" ? [row.id] : []))
   const inside = folders.length ? await newestInside(ownerId, folders) : []
-  const texted = [...rows, ...inside].filter((row) => hasText(row.kind)).map((row) => row.id)
+  const texted = [...rows, ...inside].flatMap((row) => (hasText(row.kind) ? [row.id] : []))
   const texts = new Map<string, string>()
   for (let offset = 0; offset < texted.length; offset += MAX_PEEKS)
     for (const row of await db
@@ -48,9 +48,9 @@ export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks
       .from(dropTexts)
       .where(inArray(dropTexts.dropId, texted.slice(offset, offset + MAX_PEEKS))))
       if (row.text) texts.set(row.id, row.text.replace(CALLOUT, " ").replace(/\s+/g, " ").trim())
-  const peek = (row: { id: string; kind: string; title: string; blobKey: string | null }): DropPeek => ({
+  const peek = (row: { id: string; kind: DropPeek["kind"]; title: string; blobKey: string | null }): DropPeek => ({
     id: row.id,
-    kind: row.kind as DropPeek["kind"],
+    kind: row.kind,
     title: row.title,
     ...(row.kind === "image" && row.blobKey ? { thumbnail: `/f/${row.blobKey}` } : {}),
     ...(texts.has(row.id) ? { text: texts.get(row.id) } : {}),

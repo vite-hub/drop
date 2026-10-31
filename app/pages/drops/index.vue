@@ -10,6 +10,7 @@
 //
 // The sidebar's Shared with me (Team, on a team Drop) is `?tab=with-me`: the same cards, for what others share.
 import { breakpointsTailwind } from "@vueuse/core"
+import * as v from "valibot"
 import { TRASH_DAYS } from "#shared/expiry"
 import type { DropSummary } from "#shared/types"
 
@@ -53,8 +54,10 @@ function show(value: (typeof VIEWS)[number]["value"]) {
 }
 
 // A search from ⌘K's "Show every drop matching": your drops at any depth, by name and by a doc's words.
-const query = computed(() => (typeof route.query.q === "string" ? route.query.q.trim() : ""))
-const kind = computed(() => (typeof route.query.kind === "string" ? route.query.kind : ""))
+const SearchQuery = v.object({ q: v.fallback(v.string(), ""), kind: v.fallback(v.string(), "") })
+const searchQuery = computed(() => v.parse(SearchQuery, route.query))
+const query = computed(() => searchQuery.value.q.trim())
+const kind = computed(() => searchQuery.value.kind)
 const searching = computed(() => Boolean(query.value || kind.value) && !place.value)
 const {
   data: found,

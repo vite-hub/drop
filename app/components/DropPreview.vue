@@ -20,7 +20,10 @@ const words = computed(() => peek?.text ?? "")
 // A board's words, a few to a note.
 const notes = computed(() => {
   const parts = words.value.split(/\s+/).filter(Boolean)
-  return [0, 1, 2].map((at) => parts.slice(at * 5, at * 5 + 5).join(" ")).filter(Boolean)
+  return [0, 1, 2].flatMap((at) => {
+    const note = parts.slice(at * 5, at * 5 + 5).join(" ")
+    return note ? [note] : []
+  })
 })
 const inside = computed(() => peek?.inside ?? [])
 const NOTE_PLACES = [
