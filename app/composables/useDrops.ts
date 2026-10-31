@@ -3,7 +3,7 @@ import type { RouteLocationNormalizedLoaded } from "vue-router"
 import type { Lifetime } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import type { Share } from "#shared/share"
-import type { DropSummary, DropTree, Viewer } from "#shared/types"
+import type { DropDetail, DropSummary, DropTree, Viewer } from "#shared/types"
 
 /**
  * Your drops, every one: the Drops page's list, and the sidebar's once it's loaded. The actions (useDropActions) patch it
@@ -106,6 +106,16 @@ export function useDropActions() {
 
   const patch = (id: string, change: Partial<DropSummary>) =>
     edit((list) => list.map((drop) => (drop.id === id ? { ...drop, ...change } : drop)))
+  /** Changes the drop's own page too (useDrop), when one has it loaded. */
+  function editDetail(id: string, change: (detail: DropDetail) => DropDetail) {
+    if (!(keys.drop(id) in nuxtApp.payload.data)) return
+    const scope = effectScope(true)
+    const data = scope.run(() => useNuxtData<DropDetail>(keys.drop(id)).data)!
+    const before = data.value
+    if (before) data.value = change(before)
+    scope.stop()
+    return before
+  }
 
   /** Uploads one file as a drop with this Drop's default share, or into `folder`, where it shares and lives with the folder. */
   async function upload(file: File, folder?: Pick<DropSummary, "id" | "title">) {
@@ -129,17 +139,28 @@ export function useDropActions() {
     }
   }
 
-  // Optimistic: sharing is one pick, so it changes at once and rolls back if the server says no.
+  // Optimistic: sharing is one pick, so it changes at once, in the lists and on the drop's page, and rolls back if the
+  // server says no. The PATCH answers with everything the share decides (its review, a public link's window, the share
+  // a folder above leaves it), so the page takes that instead of loading the whole drop again; only the lists the drop
+  // may join or leave refetch, without holding the pick up.
   async function setShare(drop: Pick<DropSummary, "id">, share: Share) {
     const before = [...(cached.value ?? []), ...(tree.value?.drops ?? [])].find((item) => item.id === drop.id)?.share
     patch(drop.id, { share })
+    // In a folder that shares it wider, the pick is its own share; what it ends up with waits for the server.
+    const shown = editDetail(drop.id, (detail) => ({
+      ...detail,
+      ...(detail.sharedFrom ? { ownShare: share } : { share }),
+    }))
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { share } })
       patch(drop.id, result)
-      await refreshNuxtData([keys.drop(drop.id), keys.sharedWithMe, ...folders()])
+      editDetail(drop.id, (detail) => ({ ...detail, sharedFrom: undefined, ownShare: undefined, ...result }))
+      // A folder's page lists its drops, whose shares follow it.
+      void refreshNuxtData([keys.sharedWithMe, ...folders(), ...(result.kind === "folder" ? [keys.drop(drop.id)] : [])])
       return true
     } catch (error) {
       if (before) patch(drop.id, { share: before })
+      if (shown) editDetail(drop.id, () => shown)
       notify.fail("Couldn't change sharing", error)
       return false
     }

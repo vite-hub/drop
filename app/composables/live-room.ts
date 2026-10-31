@@ -1,6 +1,7 @@
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { Link } from "@tiptap/extension-link"
 import { Editor } from "@tiptap/vue-3"
+import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { RealtimeCaret } from "vite-hub/realtime/vue"
 
 /**
@@ -12,6 +13,9 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
   // Carets come from RealtimeCaret below, with a lighter selection tint than its default.
   const realtime = useRealtimeTiptap("drops", documentId, { enabled: () => Boolean(documentId.value), carets: false })
   const editor = shallowRef<Editor>()
+  // Whether this person typed since the editor opened. The room's own changes (loading the draft, others typing) come
+  // in as y-sync transactions and don't count.
+  const edited = ref(false)
 
   // The room's extensions exist once its Y.Doc and provider do. Rebuild the editor only for a new room: the extensions
   // list is recomputed on reconnects too, and a rebuild would drop focus mid-sentence.
@@ -36,9 +40,12 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
       ],
       autofocus: "end",
     })
+    editor.value.on("update", ({ transaction }) => {
+      if (!transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) edited.value = true
+    })
   })
 
-  return { realtime, editor }
+  return { realtime, editor, edited }
 }
 
 export type LiveRoom = ReturnType<typeof useLiveRoom>

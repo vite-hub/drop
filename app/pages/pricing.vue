@@ -23,7 +23,7 @@ const rows = computed(() => [
       <table>
         <thead>
           <tr>
-            <th />
+            <th><span class="sr-only">Limit</span></th>
             <th>Free</th>
             <th>Team, $10 per member a month</th>
           </tr>

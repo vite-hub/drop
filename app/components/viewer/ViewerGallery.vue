@@ -57,7 +57,7 @@ function pick(event: MouseEvent, index: number) {
         <NuxtLink
           :aria-current="index === at ? 'page' : undefined"
           :aria-label="item.title"
-          class="relative h-7 w-10 shrink-0 overflow-hidden rounded-[6px] opacity-50 outline-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-white/10 after:ring-inset hover:opacity-100 focus-visible:opacity-100 focus-visible:after:ring-2 focus-visible:after:ring-(--ui-bg-inverted) aria-[current=page]:opacity-100 aria-[current=page]:after:ring-2 aria-[current=page]:after:ring-(--ui-bg-inverted)"
+          class="relative h-7 w-10 shrink-0 overflow-hidden rounded-[6px] opacity-50 outline-none motion-safe:transition-opacity motion-safe:duration-150 after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-white/10 after:ring-inset hover:opacity-100 focus-visible:opacity-100 focus-visible:after:ring-2 focus-visible:after:ring-(--ui-bg-inverted) aria-[current=page]:opacity-100 aria-[current=page]:after:ring-2 aria-[current=page]:after:ring-(--ui-bg-inverted)"
           draggable="false"
           :to="to(item)"
           @click="pick($event, index)"

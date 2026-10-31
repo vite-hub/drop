@@ -14,6 +14,7 @@ const LintFailureSchema = v.object({
  * Live editing of a Markdown drop. Everyone who opens it joins one Realtime room on the drop's draft, sees the others,
  * and types into the same text. The room saves the draft on its own; publish saves it once more and makes it the next
  * version, and the others follow. Closing keeps the draft, so the next person who opens it continues where the room left off.
+ * Since closing loses nothing, Close says so instead of asking; it asks only when edits may not have reached the room.
  */
 export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: boolean }) {
   const notify = useNotify()
@@ -71,6 +72,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" }),
       ])
       room.value ??= scope.run(() => useLiveRoom(documentId))
+      if (room.value) room.value.edited.value = false
       documentId.value = id
     } catch (error) {
       notify.fail("Couldn't open the editor", error)
@@ -83,6 +85,26 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     room.value?.editor.value?.destroy()
     if (room.value) room.value.editor.value = undefined
     documentId.value = undefined
+  }
+
+  // Typing while disconnected stays in this tab until the room is back (`synced` is false until then).
+  async function leave() {
+    const edited = room.value?.edited.value
+    if (edited && !realtime.value?.synced.value) {
+      const discard = await confirm({
+        title: "Your last edits haven't saved",
+        description: "You're offline, so they're still only in this tab. Closing the editor now loses them.",
+        confirmLabel: "Close and lose them",
+        destructive: true,
+      })
+      if (!discard) return
+    }
+    close()
+    if (edited)
+      notify.say("Draft kept, not published yet", {
+        icon: "i-mingcute-edit-2-line",
+        action: { label: "Keep editing", onClick: () => void open() },
+      })
   }
 
   async function publish(force = false): Promise<void> {
@@ -166,6 +188,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     synced: computed(() => realtime.value?.synced.value ?? false),
     open,
     close,
+    leave,
     publish,
   }
 }

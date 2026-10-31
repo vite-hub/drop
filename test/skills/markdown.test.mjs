@@ -82,6 +82,15 @@ test("every rule comark-linter's catalog marks as an error stops a publish", asy
   )
 })
 
+test("comark-linter comes from the same comark-ui commit as the renderer", async () => {
+  // A linter from another commit checks a different plugin set, so it passes or refuses what Drop doesn't render.
+  const { dependencies } = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"))
+  const commit = (name) =>
+    dependencies[name].match(/^https:\/\/pkg\.pr\.new\/onmax\/comark-ui\/[\w-]+@([0-9a-f]{40})$/)?.[1]
+  assert.ok(commit("comark-ui"), dependencies["comark-ui"])
+  assert.equal(commit("comark-linter"), commit("comark-ui"))
+})
+
 test("all five GitHub alert kinds keep their label", async () => {
   const kinds = ["note", "tip", "important", "warning", "caution"]
   const markdown = kinds.map((kind) => `> [!${kind.toUpperCase()}]\n> Text.`).join("\n\n")
@@ -172,4 +181,18 @@ test("a doc's problems open in a foldable box that counts them and shows the Mar
   assert.match(html, /<details class="render-error" open><summary>.*<span>This doc has 2 problems<\/span>/)
   assert.match(html, /<li><code>::question<\/code> #1 has no options\./)
   assert.doesNotMatch(html, /<li>[^<]*`/)
+})
+
+test("::drop leaves a box with only the link, which the viewer fills for readers who may open it", async () => {
+  const { html } = await renderMarkdownCached(
+    "embed.md",
+    async () =>
+      '::drop{link=https://drop.vitehub.dev/d/k7f2q9m4x8wd/steps height=9999 title="Steps <b>"}\n::\n\n::drop{link=nope}\n::',
+  )
+  assert.match(
+    html,
+    /<figure class="drop-embed" data-drop-embed="k7f2q9m4x8wd" data-title="Steps &lt;b&gt;" style="--drop-embed-height: 1600px"><a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Steps &lt;b&gt;<\/a><\/figure>/,
+  )
+  assert.match(html, /<code>::drop<\/code> needs the link/)
+  assert.doesNotMatch(html, /<iframe|unsupported-component/)
 })

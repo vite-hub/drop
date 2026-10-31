@@ -40,7 +40,14 @@ async function submit() {
     </p>
     <template v-else>
       <form class="mb-6 flex max-w-md gap-2" @submit.prevent="submit">
-        <UInput v-model="name" aria-label="Team name" class="flex-1" :maxlength="80" placeholder="Team name" />
+        <UInput
+          v-model="name"
+          aria-label="Team name"
+          autocomplete="off"
+          class="flex-1"
+          :maxlength="80"
+          placeholder="Team name"
+        />
         <UButton color="neutral" :disabled="!name.trim()" label="New team" :loading="creating" type="submit" />
       </form>
       <ul v-if="teams.length" class="divide-y divide-default overflow-hidden rounded-lg border border-default">

@@ -83,6 +83,7 @@ const counts = computed(() => ({
           class="shrink-0"
           color="neutral"
           :icon="copied ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
+          :ui="{ leadingIcon: copied ? 'animate-icon-in' : undefined }"
           size="xs"
           variant="ghost"
           @click="emit('copyLink')"

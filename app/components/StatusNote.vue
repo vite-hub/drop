@@ -29,12 +29,17 @@ function act() {
 </script>
 
 <template>
-  <div aria-live="polite" class="pointer-events-none fixed inset-x-0 bottom-6 z-[100] flex justify-center px-4">
+  <!-- A grid of one cell: a note replacing another enters over it while it leaves, instead of beside it. Leaving runs
+       faster than entering, with a nudge back down where it came from. -->
+  <div
+    aria-live="polite"
+    class="pointer-events-none fixed inset-x-0 bottom-6 z-[100] grid justify-items-center px-4 *:col-start-1 *:row-start-1"
+  >
     <Transition
-      enter-active-class="transition duration-150 ease-out"
-      enter-from-class="translate-y-1 opacity-0"
-      leave-active-class="transition duration-200 ease-in"
-      leave-to-class="opacity-0"
+      enter-active-class="transition-[opacity,translate] duration-200 ease-out"
+      enter-from-class="opacity-0 motion-safe:translate-y-2"
+      leave-active-class="transition-[opacity,translate] duration-150 ease-out"
+      leave-to-class="opacity-0 motion-safe:translate-y-1"
     >
       <div
         v-if="note"

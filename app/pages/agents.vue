@@ -41,6 +41,7 @@ const { copy, copied } = useCopy()
             aria-label="Copy server URL"
             color="neutral"
             :icon="copied('server') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+            :ui="{ leadingIcon: copied('server') ? 'animate-icon-in' : undefined }"
             size="xs"
             variant="ghost"
             @click="copy(server, { key: 'server' })"
@@ -61,15 +62,16 @@ const { copy, copied } = useCopy()
 
       <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
         <span
-          >{{ MCP_HINTS[client] }} The <NuxtLink to="/skills" class="underline">skills</NuxtLink> come with the
-          server.</span
+          >{{ MCP_HINTS[client] }} The
+          <NuxtLink to="/skills" class="underline underline-offset-4">skills</NuxtLink> come with the server.</span
         >
         <!-- A bare "Template" said nothing about what it copies. -->
         <UTooltip text="A starter HTML plan your agent can fill in and drop">
           <UButton
             color="neutral"
             :icon="copied('template') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-            :label="copied('template') ? 'Copied' : 'Copy Plan Template'"
+            :ui="{ leadingIcon: copied('template') ? 'animate-icon-in' : undefined }"
+            :label="copied('template') ? 'Copied' : 'Copy plan template'"
             size="sm"
             variant="ghost"
             @click="copy(PLAN_TEMPLATE, { key: 'template' })"

@@ -17,9 +17,16 @@
       "breakpoints": true
     },
     {
+      "idx": 2,
+      "version": "6",
+      "when": 1793445000000,
+      "tag": "0004_comment_suggestions",
+      "breakpoints": true
+    },
+    {
       "idx": 3,
       "version": "6",
-      "when": 1793095000001,
+      "when": 1793445000001,
       "tag": "0003_vitehub_comments",
       "breakpoints": true
     }

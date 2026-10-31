@@ -39,6 +39,7 @@ export const toComment = (row: CommentRow, who: Identity | null, extras?: Commen
   ow: row.ow,
   oh: row.oh,
   quote: row.quote,
+  suggestion: row.suggestion,
   label: row.label,
   page: row.page,
   body: row.body,

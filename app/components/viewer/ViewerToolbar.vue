@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Contextual preview controls inside the shared review dock. HTML/apps expose inspection tools;
-// documents and images only expose pin visibility and supported device sizing.
+// Contextual preview controls inside the shared review dock. HTML/apps expose inspection tools; docs, images, HTML,
+// and apps take the Marker; documents and images otherwise only expose pin visibility and supported device sizing.
 import type { ViewerOverlays, ViewerTool } from "~/composables/useViewerAnnotations"
 
 const {
@@ -24,6 +24,7 @@ const toolItems = computed<Item[]>(() =>
   [
     { value: "browse" as const, label: "Browse", icon: "i-mingcute-cursor-3-line", kbd: "V" },
     { value: "measure" as const, label: "Measure", icon: "i-mingcute-aiming-2-line", kbd: "S" },
+    { value: "mark" as const, label: "Marker", icon: "i-mingcute-mark-pen-line", kbd: "B" },
   ].flatMap((item) =>
     tools.includes(item.value)
       ? [

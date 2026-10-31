@@ -31,10 +31,19 @@ async function submit() {
     @submit.prevent="submit"
   >
     <p class="label-mono">Dev sign-in</p>
-    <UInput v-if="creating" v-model="form.name" autocomplete="name" placeholder="Name" size="sm" />
-    <UInput v-model="form.email" autocomplete="email" placeholder="Email" size="sm" type="email" required />
+    <UInput v-if="creating" v-model="form.name" aria-label="Name" autocomplete="name" placeholder="Name" size="sm" />
+    <UInput
+      v-model="form.email"
+      aria-label="Email"
+      autocomplete="email"
+      placeholder="Email"
+      size="sm"
+      type="email"
+      required
+    />
     <UInput
       v-model="form.password"
+      aria-label="Password"
       :autocomplete="creating ? 'new-password' : 'current-password'"
       minlength="8"
       placeholder="Password"

@@ -20,13 +20,16 @@ type Popover = { x: number; y: number } & (
   | { type: "new"; pending: PendingComment; body?: string; error?: string }
   | { type: "thread"; id: string }
 )
-/** The toolbar's tools (ViewerToolbar): the page as it is, the Comment tool, or the Measure tool. */
-export type ViewerTool = "browse" | "comment" | "measure"
+/** The toolbar's tools (ViewerToolbar): the page as it is, the Comment tool, the Measure tool, or the Marker. */
+export type ViewerTool = "browse" | "comment" | "measure" | "mark"
 /** What the toolbar shows over the page under any tool. */
 export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
 
 /** What the frame reports about the reader's pointer and keys, in frame coordinates. */
-type PointerMessage = Extract<FrameMessage, { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" }>
+type PointerMessage = Extract<
+  FrameMessage,
+  { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" | "marks" | "draft-place" }
+>
 
 /**
  * What the reader points at in the viewer: a text selection with its Comment button, an image zoomed in the lightbox,
@@ -48,6 +51,12 @@ export function useViewerAnnotations(options: {
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
   const popover = ref<Popover | null>(null)
+  /** Where the frame keeps the place of the comment being written on a selection, in page coordinates (draft-place). */
+  const draftPlace = ref<{ rail: boolean; rect: Rect } | null>(null)
+  watch(
+    () => popover.value?.type === "new" && popover.value.pending.kind === "text",
+    (text) => !text && (draftPlace.value = null),
+  )
   /**
    * The comment whose thread the frame will open once it has scrolled to the pin (`awaitThread`). Escape, a tool, or
    * another comment in the meantime clears it, so the late report doesn't open a thread the reader moved on from.
@@ -111,7 +120,7 @@ export function useViewerAnnotations(options: {
   /** Picks a tool, or puts the one on back to Browse. */
   function setTool(next: ViewerTool) {
     if (!(options.enabled?.value ?? true) && next !== "browse") return
-    if (next === "comment" && !canDrawArea.value) return
+    if ((next === "comment" || next === "mark") && !canDrawArea.value) return
     if (next === "measure" && !["html", "app"].includes(drop.value.kind)) return
     if (options.reviewOpen && next !== "comment") options.reviewOpen.value = false
     awaited = null
@@ -125,12 +134,36 @@ export function useViewerAnnotations(options: {
     if (name !== "pins" && !["html", "app"].includes(drop.value.kind)) return
     overlays[name] = !overlays[name]
   }
-  watch(canDrawArea, (value) => !value && tool.value === "comment" && (tool.value = "browse"))
+  watch(canDrawArea, (value) => !value && ["comment", "mark"].includes(tool.value) && (tool.value = "browse"))
   // A new comment that's sent, put away, or turned into a thread no longer wants the picture of its area.
   watch(
     () => popover.value?.type === "new",
     (writing) => !writing && dropShot(),
   )
+
+  /**
+   * The Marker freezes the page in the frame and takes strokes on it until Done sends them as one area comment with the
+   * snapshot (shared/plan-runtime.ts). `marks` counts the strokes so far; `finishing` holds while the frame draws them
+   * onto the snapshot.
+   */
+  const pen = reactive<MarkPen>({ tip: "marker", color: "pink", sizes: { marker: 1, pen: 1, arrow: 1 } })
+  const penStyle = computed(() => ({
+    tool: pen.tip,
+    color: MARK_COLORS[pen.color],
+    width: MARK_TIPS[pen.tip].sizes[pen.sizes[pen.tip]]!,
+  }))
+  const marks = ref(0)
+  const finishing = ref(false)
+  watch(tool, (value) => value !== "mark" && (finishing.value = false))
+  /** Takes up the Marker with `tip`, or switches to it while marking. */
+  function mark(tip: MarkTip = pen.tip) {
+    pen.tip = tip
+    if (tool.value !== "mark") setTool("mark")
+  }
+  function resize(step: number) {
+    const sizes = MARK_TIPS[pen.tip].sizes
+    pen.sizes[pen.tip] = Math.min(sizes.length - 1, Math.max(0, pen.sizes[pen.tip] + step))
+  }
   // The frame keeps the drawn rectangle while its comment is written, on the page or a zoomed screenshot; it drops it
   // once the review dock closes. The mounted composer keeps its unsent text and files.
   const draftingArea = computed(
@@ -183,14 +216,28 @@ export function useViewerAnnotations(options: {
       }
       lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
     }
+    if (message.type === "marks") marks.value = message.count
+    if (message.type === "draft-place" && popover.value?.type === "new")
+      draftPlace.value = {
+        rail: message.rail,
+        rect: {
+          left: x(message.rect.left),
+          top: y(message.rect.top),
+          right: x(message.rect.right),
+          bottom: y(message.rect.bottom),
+        },
+      }
     if (message.type === "area") {
       dropShot()
       awaitedShot = commenting.value ? message.shot : undefined
+      // A Marker snapshot is one comment: the page unfreezes, and the strokes stay on it while it's written.
+      const marked = tool.value === "mark"
+      if (marked) tool.value = "browse"
       if (commenting.value) {
-        const { kind = "area", selector, label, ox, oy, ow, oh } = message
+        const { kind = "area", selector, label, ox, oy, ow, oh, quote } = message
         popover.value = {
           type: "new",
-          pending: { kind, selector, label, ox, oy, ow, oh },
+          pending: { kind, selector, label, ox, oy, ow, oh, ...(marked && quote ? { quote } : {}) },
           x: x(message.rect.left),
           y: y(message.rect.bottom),
         }
@@ -232,14 +279,30 @@ export function useViewerAnnotations(options: {
     if (key === "s") setTool("measure")
     if (key === "u") toggleOverlay("rulers")
     if (key === "x") toggleOverlay("xray")
+    if (key === "b") mark("marker")
+    if (key === "p") mark("pen")
+    if (key === "a") mark("arrow")
+    if (key === "[" && tool.value === "mark") resize(-1)
+    if (key === "]" && tool.value === "mark") resize(1)
   }
 
-  function commentOnSelection() {
+  /** `suggest`: the composer starts a suggested edit, its new words filled in with the selected ones. */
+  function commentOnSelection(suggest = false) {
     if (!selection.value) return
     const { selector, quote, label, rect } = selection.value
     popover.value = {
       type: "new",
-      pending: { kind: "text", selector, ox: 0, oy: 0, ow: 0, oh: 0, quote, label },
+      pending: {
+        kind: "text",
+        selector,
+        ox: 0,
+        oy: 0,
+        ow: 0,
+        oh: 0,
+        quote,
+        label,
+        ...(suggest ? { suggestion: quote } : {}),
+      },
       x: rect.left,
       y: rect.bottom,
     }
@@ -269,6 +332,7 @@ export function useViewerAnnotations(options: {
     selection,
     lightbox,
     popover,
+    draftPlace,
     tool,
     frameTool,
     overlays,
@@ -279,6 +343,12 @@ export function useViewerAnnotations(options: {
     toggleArea,
     setTool,
     toggleOverlay,
+    pen,
+    penStyle,
+    marks,
+    finishing,
+    mark,
+    resize,
     dismiss,
     awaitThread,
     beginFocus,

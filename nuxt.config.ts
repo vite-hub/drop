@@ -287,6 +287,9 @@ export default defineNuxtConfig({
     },
   },
 
+  // Switching themes swaps every color at once instead of fading each element's own transition.
+  colorMode: { disableTransition: true },
+
   ui: {
     colorMode: true,
     // Geist is self-hosted from Fontsource (see `css`).
@@ -314,6 +317,10 @@ export default defineNuxtConfig({
         "mingcute:pad-line",
         "mingcute:laptop-line",
         "mingcute:monitor-line",
+        // The Marker's tips (MARK_TIPS in app/utils/marker.ts).
+        "mingcute:mark-pen-line",
+        "mingcute:pen-2-line",
+        "mingcute:arrow-right-up-line",
         "simple-icons:claude",
         "simple-icons:openai",
         "simple-icons:cursor",

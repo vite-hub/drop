@@ -229,18 +229,23 @@ async function newSite() {
           v-model="filter"
           :content="false"
           :items="[
-            { label: `All ${counts.all}`, value: 'all' },
-            { label: `Only me ${counts.private}`, value: 'private', icon: 'i-mingcute-lock-line' },
-            { label: `Shared ${counts.shared}`, value: 'shared', icon: 'i-mingcute-share-2-line' },
+            { label: 'All', count: counts.all, value: 'all' },
+            { label: 'Only me', count: counts.private, value: 'private', icon: 'i-mingcute-lock-line' },
+            { label: 'Shared', count: counts.shared, value: 'shared', icon: 'i-mingcute-share-2-line' },
             team
-              ? { label: `Team ${counts.withMe}`, value: 'with-me', icon: 'i-mingcute-group-2-line' }
-              : { label: `Shared with me ${counts.withMe}`, value: 'with-me', icon: 'i-mingcute-inbox-line' },
-            { label: `Trash ${counts.trash}`, value: 'trash', icon: 'i-mingcute-delete-2-line' },
+              ? { label: 'Team', count: counts.withMe, value: 'with-me', icon: 'i-mingcute-group-2-line' }
+              : { label: 'Shared with me', count: counts.withMe, value: 'with-me', icon: 'i-mingcute-inbox-line' },
+            { label: 'Trash', count: counts.trash, value: 'trash', icon: 'i-mingcute-delete-2-line' },
           ]"
           size="sm"
           color="neutral"
           :ui="{ root: 'w-max' }"
-        />
+        >
+          <!-- Counts in mono, as PageShell's and the sidebar's: fixed-width digits, muted beside the label. -->
+          <template #trailing="{ item }">
+            <span class="font-mono text-xs text-muted tabular-nums">{{ item.count }}</span>
+          </template>
+        </UTabs>
       </div>
       <div class="flex w-full items-center gap-2 sm:w-auto">
         <!-- The page description already says how long the Trash keeps things. -->
@@ -265,8 +270,20 @@ async function newSite() {
       </div>
     </div>
 
-    <div v-if="status === 'pending' && !drops.length" class="space-y-2">
-      <USkeleton v-for="index in 4" :key="index" class="h-16 w-full" />
+    <!-- The list's own box and row heights, so the drops land without moving anything. -->
+    <div
+      v-if="status === 'pending' && !drops.length"
+      aria-hidden="true"
+      class="divide-y divide-default overflow-hidden rounded-lg border border-default"
+    >
+      <div class="bg-muted px-4 py-2"><USkeleton class="h-4 w-16" /></div>
+      <div v-for="index in 4" :key="index" class="flex items-center gap-4 px-4 py-3">
+        <USkeleton class="size-9 shrink-0 rounded-lg" />
+        <div class="min-w-0 flex-1 space-y-1.5">
+          <USkeleton class="h-4 w-48 max-w-full" />
+          <USkeleton class="h-3 w-32 max-w-full" />
+        </div>
+      </div>
     </div>
 
     <div v-else-if="error" class="rounded-lg border border-dashed border-default px-6 py-16 text-center" role="alert">
@@ -332,7 +349,7 @@ async function newSite() {
         Connect an agent and it drops plans, specs, and small apps here. You can upload a file yourself too.
       </p>
       <div class="mt-5 flex justify-center gap-2">
-        <UButton color="neutral" label="Connect an Agent" to="/agents" />
+        <UButton color="neutral" label="Connect an agent" to="/agents" />
         <UButton
           color="neutral"
           icon="i-mingcute-upload-2-line"

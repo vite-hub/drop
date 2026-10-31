@@ -45,11 +45,11 @@ export const RENDERER_SCRIPTS = [
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
- * kinds), Mermaid, and comark-annotate's screenshot, compare, and annotation for PR evidence. Its blocks.md documents
- * every other plugin.
+ * kinds), `::drop` (another drop shown in the doc), Mermaid, and comark-annotate's screenshot, compare, and annotation
+ * for PR evidence. Its blocks.md documents every other plugin.
  */
 export const COMPONENT_TAGS =
-  "alert annotation callout caution compare important info mermaid note screenshot tip warning".split(" ")
+  "alert annotation callout caution compare drop important info mermaid note screenshot tip warning".split(" ")
 const ALLOWED_TAGS = [
   // Markdown's own, and the raw HTML comark-github lets through: GitHub's allowlist.
   ..."a abbr b bdo blockquote br caption cite code dd del details dfn div dl dt em figcaption figure h1 h2 h3 h4 h5 h6 hr i img input ins kbd li mark ol p picture pre q rp rt ruby s samp section small source span strike strong sub summary sup table tbody td tfoot th thead time tr tt ul var wbr".split(
@@ -246,6 +246,30 @@ function createMermaidRenderer(): NodeHandler {
   }
 }
 
+/** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
+const EMBED_LINK = /^(?:(?:https?:\/\/[^/]+)?\/d\/)?([0-9a-hjkmnp-tv-z]{12})(?:[/?#].*)?$/
+const EMBED_HEIGHT = { min: 120, max: 1600, default: 480 }
+
+/**
+ * `::drop{link=…}`: another drop, shown inside the doc. The render is cached for every reader, so it only holds the
+ * link: the viewer fetches the drop as the reader, and only an HTML drop they may open fills the box (EMBEDS_SCRIPT in
+ * #shared/documents), in a sandbox of its own. On the /f/ page, which runs no scripts, the box stays a link.
+ */
+const renderDropEmbed: NodeHandler = ([, attrs]) => {
+  const link = textValue(attrs.link)?.trim().match(EMBED_LINK)?.[1]
+  if (!link)
+    return `<aside class="callout" data-kind="warning"><p><code>::drop</code> needs the link of the drop to show: <code>::drop{link=k7f2q9m4x8wd}</code>.</p></aside>`
+  const height = Math.round(Number(attrs.height ?? Number.NaN))
+  const clamped = Number.isFinite(height)
+    ? Math.min(EMBED_HEIGHT.max, Math.max(EMBED_HEIGHT.min, height))
+    : EMBED_HEIGHT.default
+  const title = textValue(attrs.title)?.trim() || "Embedded drop"
+  return (
+    `<figure class="drop-embed" data-drop-embed="${link}" data-title="${escapeHtml(title)}" style="--drop-embed-height: ${clamped}px">` +
+    `<a class="drop-embed-link" href="/d/${link}">${escapeHtml(title)}</a></figure>`
+  )
+}
+
 const PROBLEM_ICON =
   '<svg aria-hidden="true" class="render-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
 const FOLD_ICON =
@@ -380,6 +404,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
         alert: renderCallout,
         callout: renderCallout,
         caution: renderCallout,
+        drop: renderDropEmbed,
         important: renderCallout,
         info: renderCallout,
         mermaid: createMermaidRenderer(),

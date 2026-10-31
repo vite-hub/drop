@@ -1,6 +1,6 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
-import { injectRuntime, withVariantBar } from "#shared/plan-runtime"
+import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
@@ -193,6 +193,38 @@ export function useViewerFrame(options: {
       }).catch(() => {})
   }, 2000)
 
+  /**
+   * The drop a Markdown doc's `::drop` box names, fetched as the reader, so it shows only to someone who may open it.
+   * Only an HTML drop fills the box: an app needs its files and origin, and a doc in a doc would only nest frames.
+   */
+  const embedLinks = computed(() => {
+    if (drop.value.kind !== "markdown") return new Set<string>()
+    // Read only the server-rendered boxes, in an inert template: frame messages cannot grant access to other links.
+    const template = globalThis.document?.createElement("template")
+    if (!template) return new Set<string>()
+    template.innerHTML = drop.value.html ?? ""
+    return new Set(
+      Array.from(template.content.querySelectorAll("figure.drop-embed[data-drop-embed]"), (box) =>
+        box.getAttribute("data-drop-embed"),
+      ),
+    )
+  })
+  const embeds = new Map<string, Promise<{ html: string } | { error: string }>>()
+  function embedded(link: string) {
+    let embed = embeds.get(link)
+    if (!embed) {
+      embed = $fetch<DropDetail>(`/api/drops/${encodeURIComponent(link)}`).then(
+        (found) =>
+          found.kind === "html" && found.content
+            ? { html: found.content }
+            : { error: `“${found.title}” isn't an HTML drop, so it can't show inside a doc. Only HTML drops can.` },
+        () => ({ error: "This drop is private, expired, or deleted, so it can't show here." }),
+      )
+      embeds.set(link, embed)
+    }
+    return embed
+  }
+
   const quiz = useViewerQuiz(drop, (message) => send(message))
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
@@ -234,6 +266,22 @@ export function useViewerFrame(options: {
         for (const path of message.paths)
           void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
         return
+      case "embeds": {
+        if (drop.value.kind !== "markdown") return
+        const requestedId = drop.value.id
+        for (const link of message.links) {
+          if (!embedLinks.value.has(link)) continue
+          void embedded(link).then((embed) => {
+            if (drop.value.id !== requestedId || !embedLinks.value.has(link)) return
+            return send({
+              type: "embed-data",
+              link,
+              ...("html" in embed ? { html: embedDocument(embed.html, dark.value) } : embed),
+            })
+          })
+        }
+        return
+      }
       case "unplaced":
         unplaced.value = new Set(message.ids)
         return
@@ -257,6 +305,8 @@ export function useViewerFrame(options: {
       case "area":
       case "area-shot":
       case "marker":
+      case "marks":
+      case "draft-place":
         annotations.receive(message, box)
     }
   })
@@ -273,7 +323,8 @@ export function useViewerFrame(options: {
     if (ready.value)
       send({
         type: "markers",
-        // `body` and `replies`: a text comment's card in the doc's margin shows its words and how many replies it has.
+        // `suggestion`: the doc strikes the quote and shows the new words after it. `body` and `replies`: a text
+        // comment's card in the doc's margin shows its words and how many replies it has.
         markers: options.pinned.value.map(
           ({
             id,
@@ -285,6 +336,7 @@ export function useViewerFrame(options: {
             ow,
             oh,
             quote,
+            suggestion,
             label,
             resolved,
             version,
@@ -302,6 +354,7 @@ export function useViewerFrame(options: {
             ow,
             oh,
             quote,
+            suggestion,
             label,
             resolved,
             earlier: version < drop.value.version,
@@ -322,8 +375,14 @@ export function useViewerFrame(options: {
     [ready, annotations.frameTool],
     () =>
       ready.value &&
-      send({ type: "tool", tool: annotations.frameTool.value, pointComments: drop.value.kind === "image" }),
+      send({
+        type: "tool",
+        tool: annotations.frameTool.value,
+        pointComments: drop.value.kind === "image",
+        pen: annotations.penStyle.value,
+      }),
   )
+  watch(annotations.penStyle, (pen) => ready.value && send({ type: "pen", ...pen }))
   watch(
     [ready, () => ({ ...annotations.overlays })],
     () => ready.value && send({ type: "view", ...annotations.overlays }),

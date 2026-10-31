@@ -206,6 +206,8 @@ export const comments = sqliteTable(
     ow: integer("ow").notNull().default(0),
     oh: integer("oh").notNull().default(0),
     quote: text("quote"),
+    /** A suggested edit on the quote: the words that replace it, empty to delete it. */
+    suggestion: text("suggestion"),
     label: text("label"),
     page: text("page"),
     body: text("body").notNull(),

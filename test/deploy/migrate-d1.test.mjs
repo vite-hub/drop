@@ -62,10 +62,7 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
   const filenames = readdirSync(directory)
     .filter((name) => name.endsWith(".sql"))
     .sort()
-  assert.deepEqual(
-    journal.entries.map((entry) => `${entry.tag}.sql`),
-    filenames,
-  )
+  assert.deepEqual(journal.entries.map((entry) => `${entry.tag}.sql`).sort(), filenames)
   // Keep existing filenames for Wrangler's ledger; journal indexes can have gaps after main's squash.
   for (let index = 1; index < journal.entries.length; index++) {
     assert.ok(journal.entries[index].idx > journal.entries[index - 1].idx)
@@ -73,37 +70,43 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
   }
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  const [baseline, authEvents, comments] = migrations
-  // Comments must follow main's auth migration. Earlier previews can already contain comments at either old timestamp.
+  const [baseline, authEvents, suggestions, comments] = migrations
+  // Comments must follow main's latest migration. Earlier previews can already contain comments at older timestamps.
   for (const {
     appliedMigrations,
     appliedTimestamps = appliedMigrations.map((migration) => migration.folderMillis),
-    expectedMigrations,
+    expectedMigrations = migrations.length,
   } of [
-    { appliedMigrations: [], expectedMigrations: 3 },
-    { appliedMigrations: [baseline], expectedMigrations: 3 },
+    { appliedMigrations: [] },
+    { appliedMigrations: [baseline] },
     {
       appliedMigrations: [baseline],
       appliedTimestamps: [baseline.folderMillis, 1792593042706, 1793089140860],
-      expectedMigrations: 5,
+      expectedMigrations: migrations.length + 2,
     },
-    { appliedMigrations: [baseline, authEvents], expectedMigrations: 3 },
+    { appliedMigrations: [baseline, authEvents] },
     {
       appliedMigrations: [baseline, comments],
       appliedTimestamps: [baseline.folderMillis, 1793091156010],
-      expectedMigrations: 4,
+      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, comments],
       appliedTimestamps: [baseline.folderMillis, 1793094947398],
-      expectedMigrations: 4,
+      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, authEvents, comments],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793094947398],
-      expectedMigrations: 4,
+      expectedMigrations: migrations.length + 1,
     },
-    { appliedMigrations: [baseline, authEvents, comments], expectedMigrations: 3 },
+    {
+      appliedMigrations: [baseline, authEvents, comments],
+      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001],
+      expectedMigrations: migrations.length + 1,
+    },
+    { appliedMigrations: [baseline, authEvents, suggestions] },
+    { appliedMigrations: migrations },
   ]) {
     const database = new DatabaseSync(":memory:")
     try {
@@ -181,6 +184,12 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
       const threadColumns = database.prepare("PRAGMA table_info(vitehub_comment_threads)").all()
       for (const name of ["scope", "number", "metadata"])
         assert.ok(threadColumns.some((column) => column.name === name))
+      assert.ok(
+        database
+          .prepare("PRAGMA table_info(comments)")
+          .all()
+          .some((column) => column.name === "suggestion"),
+      )
       if (appliedMigrations.includes(comments)) {
         assert.equal(
           database.prepare("SELECT body FROM vitehub_comments WHERE id = 'existing-comment'").get().body,

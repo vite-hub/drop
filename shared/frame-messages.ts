@@ -23,6 +23,8 @@ export const FrameMessage = v.variant("type", [
   // The /f/ paths of a Markdown doc's images, videos, and audio that came near the screen (DEFERRED_FILES_SCRIPT in
   // ./documents).
   v.object({ type: v.literal("files"), paths: v.pipe(v.array(v.string()), v.maxLength(100)) }),
+  // The links of a Markdown doc's `::drop` boxes that came near the screen (EMBEDS_SCRIPT in ./documents).
+  v.object({ type: v.literal("embeds"), links: v.pipe(v.array(v.string()), v.maxLength(20)) }),
   // A cleared selection carries nothing else.
   v.variant("clear", [
     v.object({ type: v.literal("selection"), clear: v.literal(true) }),
@@ -35,6 +37,9 @@ export const FrameMessage = v.variant("type", [
       rect: Rect,
     }),
   ]),
+  // Where the composer for a held selection goes, in the frame's viewport: its card's place in the margin (`rail`), or
+  // the quote's box.
+  v.object({ type: v.literal("draft-place"), rail: v.boolean(), rect: Rect }),
   v.object({
     type: v.literal("image"),
     src: v.string(),
@@ -54,13 +59,18 @@ export const FrameMessage = v.variant("type", [
     ow: v.number(),
     oh: v.number(),
     rect: Rect,
-    // On something that shows only for a while: the number of the "area-shot" with its picture, which follows.
+    // On something that shows only for a while, or from the Marker: the number of the "area-shot" with its picture,
+    // which follows.
     shot: v.optional(v.number()),
+    // From the Marker: the words under its strokes.
+    quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
   }),
   // null: the picture couldn't be taken.
   v.object({ type: v.literal("area-shot"), shot: v.number(), image: v.nullable(v.blob()) }),
   // The tool the comment layer is under, once it has it: under any but browse, the page is held (EVENT_HOLD).
-  v.object({ type: v.literal("tool"), tool: v.picklist(["browse", "comment", "measure"]) }),
+  v.object({ type: v.literal("tool"), tool: v.picklist(["browse", "comment", "measure", "mark"]) }),
+  // How many strokes the Marker's snapshot holds, after each one and each undo.
+  v.object({ type: v.literal("marks"), count: v.pipe(v.number(), v.integer(), v.minValue(0)) }),
   // A click on a pin, or (`focused`) the pin a "focus" with `open` scrolled to.
   v.object({
     type: v.literal("marker"),
@@ -71,11 +81,12 @@ export const FrameMessage = v.variant("type", [
   }),
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
   // The toolbar's keys, pressed while the page had focus, with the tool it was under (apps keep their keys under Browse).
+  // B, P, and A pick the Marker's tips, [ and ] its size.
   // An image's page sends ← and → too, for those keys or a sideways swipe: they move to the folder's other images.
   v.object({
     type: v.literal("key"),
-    key: v.picklist(["Escape", "v", "r", "s", "u", "x", "ArrowLeft", "ArrowRight"]),
-    tool: v.optional(v.picklist(["browse", "comment", "measure"])),
+    key: v.picklist(["Escape", "v", "r", "s", "u", "x", "b", "p", "a", "[", "]", "ArrowLeft", "ArrowRight"]),
+    tool: v.optional(v.picklist(["browse", "comment", "measure", "mark"])),
   }),
   v.object({
     type: v.literal("runtime-error"),

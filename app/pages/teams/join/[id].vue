@@ -6,7 +6,11 @@ const route = useRoute()
 const id = String(route.params.id)
 const teams = useTeams()
 const notify = useNotify()
-const { data: invitation, error } = useAsyncData(`invitation:${id}`, () => teams.invitation(id), {
+const {
+  data: invitation,
+  error,
+  status,
+} = useAsyncData(`invitation:${id}`, () => teams.invitation(id), {
   default: () => null,
   server: false,
 })
@@ -27,7 +31,12 @@ async function join() {
 <template>
   <PageShell id="team-join" title="Join a team">
     <div class="max-w-md space-y-3 text-sm">
-      <template v-if="invitation">
+      <template v-if="status === 'pending' && !invitation">
+        <USkeleton class="h-4 w-full" />
+        <USkeleton class="h-4 w-2/3" />
+        <USkeleton class="h-9 w-32" />
+      </template>
+      <template v-else-if="invitation">
         <p>
           <span class="font-medium text-highlighted">{{ invitation.inviterEmail }}</span> invited you to
           <span class="font-medium text-highlighted">{{ invitation.organizationName }}</span

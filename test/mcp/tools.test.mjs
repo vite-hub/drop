@@ -413,6 +413,42 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
   )
 })
 
+test("a suggestion is a comment with the words that replace its quote, and read_drop gives agents both", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${id}/comments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init),
+      }),
+    )
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  const doc = (await call(publish, { markdown: "# Plan\n\nCount twelve pigeons.", note: "Draft", lifetime: "review" }))
+    .structuredContent
+  const anchor = { kind: "text", selector: "p", ox: 0, oy: 0, quote: "twelve" }
+  const replaced = await commentsPost(route(doc.id, { ...anchor, suggestion: "fifteen" }))
+  assert.equal(replaced.suggestion, "fifteen", "a suggestion needs no note")
+  assert.equal(replaced.body, "")
+  const deleted = await commentsPost(route(doc.id, { ...anchor, suggestion: "", body: "Any number works." }))
+  assert.equal(deleted.suggestion, "")
+  const plain = await commentsPost(route(doc.id, { ...anchor, body: "Why twelve?" }))
+  assert.equal(plain.suggestion, null)
+  await assert.rejects(commentsPost(route(doc.id, { kind: "page", selector: "", ox: 0, oy: 0, suggestion: "x" })), {
+    statusText: "A suggestion replaces selected text.",
+  })
+
+  const read = await call(readDrop, { id: doc.id })
+  assert.deepEqual(
+    read.structuredContent.comments.map((comment) => comment.suggestion),
+    ["fifteen", "", undefined],
+  )
+  assert.match(read.content[0].text, /> twelve\n {3}Suggests replacing it with: fifteen\n {3}\(no note\) \(Owner\)/)
+  assert.match(read.content[0].text, /Suggests deleting it\.\n {3}Any number works\./)
+})
+
 test("open comments follow a doc to its next versions, numbered across them, and resolve from any later version", async () => {
   const route = (id, init, version) => {
     const event = new H3Event(
