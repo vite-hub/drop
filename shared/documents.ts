@@ -32,6 +32,10 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)
 .mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
 .mermaid svg { max-width: 100%; height: auto; }
 .typeset :is(h2, h3) { scroll-margin-top: 1.5rem; }
+/* \`::drop\` (EMBEDS_SCRIPT): another drop's box, a link until the viewer fills it with the drop in a frame. */
+.drop-embed { display: grid; place-items: center; height: var(--drop-embed-height, 480px); margin: 1.5rem 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted); overflow: hidden; }
+.drop-embed iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--background); }
+.drop-embed-note { margin: 0; padding: 1rem; color: var(--muted-foreground); font-size: .875rem; text-align: center; }
 /* An image on its way (DEFERRED_FILES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
 .typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }
 `
@@ -74,6 +78,50 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
       if (image.dataset.dropImage !== m.path) continue;
       image.src = m.data;
       image.removeAttribute("data-drop-image");
+    }
+  });
+})()`
+
+/**
+ * Fills each `::drop` box (server/utils/markdown-document.ts) as it comes within a screen and a half of view: it asks
+ * the viewer for the drop, which fetches it as the reader, and shows what comes back in a frame of its own. That frame
+ * gets only allow-scripts, an opaque origin inside this one: the drop runs, but can't reach Drop, its storage, or this
+ * doc. A drop the reader can't open, or one that isn't an HTML drop, leaves the viewer's reason in the box.
+ */
+const EMBEDS_SCRIPT = String.raw`(() => {
+  const boxes = document.querySelectorAll("[data-drop-embed]");
+  if (!boxes.length) return;
+  const asked = new Set();
+  const near = new IntersectionObserver((entries) => {
+    const links = [];
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      near.unobserve(entry.target);
+      const link = entry.target.dataset.dropEmbed;
+      if (link && !asked.has(link)) { asked.add(link); links.push(link); }
+    }
+    if (links.length) parent.postMessage({ __drop: true, type: "embeds", links }, "*");
+  }, { root: document, rootMargin: "150% 0px" });
+  boxes.forEach((box) => near.observe(box));
+  addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || !m.__drop || e.source !== parent || m.type !== "embed-data") return;
+    for (const box of document.querySelectorAll("[data-drop-embed]")) {
+      if (box.dataset.dropEmbed !== m.link) continue;
+      box.removeAttribute("data-drop-embed");
+      if (typeof m.html !== "string") {
+        const note = document.createElement("p");
+        note.className = "drop-embed-note";
+        note.textContent = String(m.error || "This drop can't show here.");
+        box.replaceChildren(note);
+        continue;
+      }
+      const frame = document.createElement("iframe");
+      frame.setAttribute("sandbox", "allow-scripts");
+      frame.setAttribute("referrerpolicy", "no-referrer");
+      frame.title = box.dataset.title || "Embedded drop";
+      frame.srcdoc = m.html;
+      box.replaceChildren(frame);
     }
   });
 })()`
@@ -259,7 +307,7 @@ export function planDocument(
   }
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><script>${QUIZ_BRIDGE}</script><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en" style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><script>${QUIZ_BRIDGE}</script><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )

@@ -182,3 +182,17 @@ test("a doc's problems open in a foldable box that counts them and shows the Mar
   assert.match(html, /<li><code>::question<\/code> #1 has no options\./)
   assert.doesNotMatch(html, /<li>[^<]*`/)
 })
+
+test("::drop leaves a box with only the link, which the viewer fills for readers who may open it", async () => {
+  const { html } = await renderMarkdownCached(
+    "embed.md",
+    async () =>
+      '::drop{link=https://drop.vitehub.dev/d/k7f2q9m4x8wd/steps height=9999 title="Steps <b>"}\n::\n\n::drop{link=nope}\n::',
+  )
+  assert.match(
+    html,
+    /<figure class="drop-embed" data-drop-embed="k7f2q9m4x8wd" data-title="Steps &lt;b&gt;" style="--drop-embed-height: 1600px"><a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Steps &lt;b&gt;<\/a><\/figure>/,
+  )
+  assert.match(html, /<code>::drop<\/code> needs the link/)
+  assert.doesNotMatch(html, /<iframe|unsupported-component/)
+})

@@ -1,6 +1,6 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
-import { injectRuntime, withVariantBar } from "#shared/plan-runtime"
+import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
@@ -193,6 +193,26 @@ export function useViewerFrame(options: {
       }).catch(() => {})
   }, 2000)
 
+  /**
+   * The drop a Markdown doc's `::drop` box names, fetched as the reader, so it shows only to someone who may open it.
+   * Only an HTML drop fills the box: an app needs its files and origin, and a doc in a doc would only nest frames.
+   */
+  const embeds = new Map<string, Promise<{ html: string } | { error: string }>>()
+  function embedded(link: string) {
+    let embed = embeds.get(link)
+    if (!embed) {
+      embed = $fetch<DropDetail>(`/api/drops/${encodeURIComponent(link)}`).then(
+        (found) =>
+          found.kind === "html" && found.content
+            ? { html: found.content }
+            : { error: `“${found.title}” isn't an HTML drop, so it can't show inside a doc. Only HTML drops can.` },
+        () => ({ error: "This drop is private, expired, or deleted, so it can't show here." }),
+      )
+      embeds.set(link, embed)
+    }
+    return embed
+  }
+
   const quiz = useViewerQuiz(drop, (message) => send(message))
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
@@ -233,6 +253,16 @@ export function useViewerFrame(options: {
         // Each as soon as it's read, so the first one on screen doesn't wait for the rest.
         for (const path of message.paths)
           void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
+        return
+      case "embeds":
+        for (const link of message.links)
+          void embedded(link).then((embed) =>
+            send({
+              type: "embed-data",
+              link,
+              ...("html" in embed ? { html: embedDocument(embed.html, dark.value) } : embed),
+            }),
+          )
         return
       case "unplaced":
         unplaced.value = new Set(message.ids)

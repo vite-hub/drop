@@ -1585,6 +1585,19 @@ export const withVariantBar = (document: string) =>
   prependToHead(document, "<script>self.__dropVariantBar = true;</script>")
 
 /**
+ * An HTML drop as a Markdown doc's `::drop` box shows it (EMBEDS_SCRIPT in ./documents): no comment layer or error
+ * reporter, since the doc around it is what readers review, but storage that works in its opaque origin, Drop's theme
+ * when it reads Drop's tokens, and the reader's color mode as a `dark` class on its root either way.
+ */
+export function embedDocument(html: string, dark: boolean): string {
+  const theme = usesDropTheme(html) ? `<style data-drop-theme>${THEME_CSS}</style>` : ""
+  return prependToHead(
+    html,
+    `<script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.classList.toggle("dark", ${dark});</script>`,
+  )
+}
+
+/**
  * Injects Drop's runtime into a full HTML document. The author's markup stays as it is, except a prototype's picker,
  * which becomes the current one (EMBEDDED_PICKER).
  * `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it.
