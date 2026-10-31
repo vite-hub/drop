@@ -1,12 +1,12 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, eq, exists, inArray, isNull, ne, sql } from "drizzle-orm"
+import { and, eq, exists, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, drops, dropVersions } from "../../databases/config"
+import { blobCleanup, dropFiles, drops, dropVersions, suggestionAcceptances } from "../../databases/config"
 import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
@@ -152,6 +152,10 @@ export async function createDocDrop(
     slug?: string
     nameFromSlug?: boolean
     supersedes?: string
+    /** Internal acceptance receipt, committed atomically with the new version. */
+    acceptedSuggestionId?: string
+    /** Internal undo receipt, committed atomically with the reversal. */
+    undoneSuggestionId?: string
     share?: Share
     folder?: DropRow
   },
@@ -335,15 +339,70 @@ export async function createDocDrop(
             ]
           : [db.insert(drops).values(row)]
         await quota.commit(
-          [...write, ...textStatements(row, text), ...(folder ? [touchFolder(folder.id, now)] : [])],
-          own
-            ? exists(
-                db
-                  .select({ id: drops.id })
-                  .from(drops)
-                  .where(and(eq(drops.id, row.id), eq(drops.blobKey, key))),
-              )
-            : sql`1`,
+          [
+            ...write,
+            ...textStatements(row, text),
+            ...(folder ? [touchFolder(folder.id, now)] : []),
+            ...(input.acceptedSuggestionId
+              ? [
+                  // An undone suggestion can be accepted again; an active receipt still rejects duplicate accepts.
+                  db
+                    .delete(suggestionAcceptances)
+                    .where(
+                      and(
+                        eq(suggestionAcceptances.threadId, input.acceptedSuggestionId),
+                        isNotNull(suggestionAcceptances.undoneVersion),
+                      ),
+                    ),
+                  db
+                    .insert(suggestionAcceptances)
+                    .values({ threadId: input.acceptedSuggestionId, dropId: row.id, version: row.version }),
+                ]
+              : []),
+            ...(input.undoneSuggestionId
+              ? [
+                  db
+                    .insert(suggestionAcceptances)
+                    .values({
+                      threadId: input.undoneSuggestionId,
+                      dropId: row.id,
+                      version: row.version - 1,
+                      undoneVersion: row.version,
+                    })
+                    .onConflictDoUpdate({
+                      target: suggestionAcceptances.threadId,
+                      set: { undoneVersion: row.version },
+                      setWhere: and(
+                        isNull(suggestionAcceptances.undoneVersion),
+                        eq(suggestionAcceptances.version, row.version - 1),
+                      ),
+                    }),
+                ]
+              : []),
+          ],
+          and(
+            own
+              ? exists(
+                  db
+                    .select({ id: drops.id })
+                    .from(drops)
+                    .where(and(eq(drops.id, row.id), eq(drops.blobKey, key))),
+                )
+              : sql`1`,
+            input.undoneSuggestionId
+              ? exists(
+                  db
+                    .select({ id: suggestionAcceptances.threadId })
+                    .from(suggestionAcceptances)
+                    .where(
+                      and(
+                        eq(suggestionAcceptances.threadId, input.undoneSuggestionId),
+                        eq(suggestionAcceptances.undoneVersion, row.version),
+                      ),
+                    ),
+                )
+              : undefined,
+          ),
         )
       } catch (error) {
         await deleteBlobKeys([key])

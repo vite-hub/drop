@@ -1,11 +1,8 @@
-import { eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
-import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentSchema } from "#shared/schemas"
-import { comments } from "../../../databases/config"
 import { attachImages, imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
-import { authorImages, nextCommentNumber, toComment } from "../../../utils/comments"
+import { addThread, authorOf, toComment, undoThread } from "../../../utils/comments"
 import { findDropAt, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -22,41 +19,31 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 404, statusText: "You can't comment on this drop." })
   // Cloudflare Rate Limiting on Workers, ViteHub's in-memory limiter elsewhere (local dev included).
   await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
-  const { input: body, images } = await readCommentBody(event, CommentSchema)
-  if (!body.body && !images.length && body.suggestion === undefined)
+  const { input, images } = await readCommentBody(event, CommentSchema)
+  if (!input.body && !images.length && input.suggestion === undefined)
     throw new HTTPError({ status: 400, statusText: "Write a comment." })
   const parent = images.length ? await imageParent(drop) : drop
-  const authorName = who?.name ?? "Guest"
+  const author = authorOf(who, who?.name ?? "Guest")
+  const { body, quote, label, page, ...anchor } = input
+  // Comments numbers the thread in the same statement that adds it, so two comments can't take the same number.
   const { row, attachments } = await withImages(
     images,
-    async () => {
-      // The next number comes from the same statement as the insert, so two comments can't take the same one.
-      const [inserted] = await db
-        .insert(comments)
-        .values({
-          id: crypto.randomUUID(),
-          dropId: drop.id,
-          version: drop.version,
-          n: nextCommentNumber(drop),
-          ...body,
-          quote: body.quote ?? null,
-          suggestion: body.suggestion ?? null,
-          label: body.label ?? null,
-          page: body.page ?? null,
-          authorId: who?.userId ?? null,
-          authorName,
-          resolved: false,
-          createdAt: Date.now(),
-        })
-        .returning()
-      return inserted!
-    },
-    (added) => attachImages(parent, images, { commentId: added.id, replyId: null, n: added.n }, authorName),
-    (added) => db.delete(comments).where(eq(comments.id, added.id)),
+    () =>
+      addThread(drop, {
+        fields: {
+          ...anchor,
+          quote: quote ?? null,
+          label: label ?? null,
+          page: page ?? null,
+          elementX: null,
+          elementY: null,
+        },
+        body,
+        author,
+      }),
+    (added) =>
+      attachImages(parent, images, { commentId: added.comments[0]!.id, replyId: null, n: added.number }, author.name),
+    undoThread,
   )
-  return toComment(row, who, {
-    images: await authorImages([row]),
-    replies: new Map(),
-    attachments: new Map([[row.id, attachments]]),
-  })
+  return toComment(row, who, new Map([[row.comments[0]!.id, attachments]]))
 })

@@ -29,6 +29,34 @@
       "when": 1793445000001,
       "tag": "0003_vitehub_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793445000002,
+      "tag": "0004_drop_comments_on_vitehub",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793445000003,
+      "tag": "0005_comment_cleanup",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793450753903,
+      "tag": "0006_suggestion_acceptances",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793455248455,
+      "tag": "0007_suggestion_undos",
+      "breakpoints": true
     }
   ]
 }

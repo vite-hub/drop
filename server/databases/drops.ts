@@ -186,67 +186,11 @@ export const dropFiles = sqliteTable(
   (table) => [uniqueIndex("drop_files_path_idx").on(table.dropId, table.path)],
 )
 
-export const comments = sqliteTable(
-  "comments",
-  {
-    id: text("id").primaryKey(),
-    dropId: text("drop_id")
-      .notNull()
-      .references(() => drops.id, { onDelete: "cascade" }),
-    /** The version it was written on. A comment carries over to later versions until someone resolves it. */
-    version: integer("version").notNull().default(1),
-    /** Its number on the drop, counted across versions: #3 names one comment whichever version shows it. */
-    n: integer("n").notNull(),
-    /** `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of an HTML page. */
-    kind: text("kind", { enum: ["text", "image", "area", "page"] }).notNull(),
-    selector: text("selector").notNull(),
-    ox: integer("ox").notNull().default(0),
-    oy: integer("oy").notNull().default(0),
-    /** An area's size, in thousandths of the anchor's box like `ox`/`oy`. Zero for a point. */
-    ow: integer("ow").notNull().default(0),
-    oh: integer("oh").notNull().default(0),
-    quote: text("quote"),
-    /** A suggested edit on the quote: the words that replace it, empty to delete it. */
-    suggestion: text("suggestion"),
-    label: text("label"),
-    page: text("page"),
-    body: text("body").notNull(),
-    authorId: text("author_id"),
-    authorName: text("author_name").notNull(),
-    resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at").notNull(),
-    /**
-     * Site review: where the pin sits on the element `label` names, in thousandths of that element's box, so the
-     * review script can put it back on the live page. Null for comments with no element.
-     */
-    elementX: integer("element_x"),
-    elementY: integer("element_y"),
-  },
-  (table) => [uniqueIndex("comments_drop_n_unique").on(table.dropId, table.n)],
-)
-
-/**
- * Replies in a comment's thread. The comment holds the anchor, the number, and the resolved state; a reply is only
- * words, so it has its own table and leaves the anchoring code alone. Deleting the comment deletes its thread.
- */
-export const commentReplies = sqliteTable(
-  "comment_replies",
-  {
-    id: text("id").primaryKey(),
-    commentId: text("comment_id")
-      .notNull()
-      .references(() => comments.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
-    authorId: text("author_id"),
-    authorName: text("author_name").notNull(),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [index("comment_replies_comment_idx").on(table.commentId, table.createdAt)],
-)
-
 /**
  * Images in a comment or in one of its replies. Each image is a drop of its own under the commented drop (see
  * server/utils/comment-images.ts), so it shares that drop's sharing, lifetime, and Trash; this row says whose it is.
+ * The comments themselves are ViteHub Comments threads (server/utils/comments.ts): `commentId` is a thread's first
+ * comment, and `replyId` the reply, when the image is a reply's.
  */
 export const commentAttachments = sqliteTable(
   "comment_attachments",
@@ -254,11 +198,9 @@ export const commentAttachments = sqliteTable(
     dropId: text("drop_id")
       .primaryKey()
       .references(() => drops.id, { onDelete: "cascade" }),
-    commentId: text("comment_id")
-      .notNull()
-      .references(() => comments.id, { onDelete: "cascade" }),
-    /** Null when the image is on the comment itself. */
-    replyId: text("reply_id").references(() => commentReplies.id, { onDelete: "cascade" }),
+    commentId: text("comment_id").notNull(),
+    /** Null when the image is on the thread's first comment. */
+    replyId: text("reply_id"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [index("comment_attachments_comment_idx").on(table.commentId, table.createdAt)],
@@ -270,6 +212,28 @@ export const blobCleanup = sqliteTable("blob_cleanup", {
   blobKey: text("blob_key").notNull().unique(),
   createdAt: integer("created_at").notNull(),
 })
+
+/** Comment cleanup committed with Drop deletion, without a foreign key to the deleted row. */
+export const commentCleanup = sqliteTable("comment_cleanup", {
+  dropId: text("drop_id").primaryKey(),
+  scope: text("scope").notNull(),
+  shot: integer("shot", { mode: "boolean" }).notNull(),
+  createdAt: integer("created_at").notNull(),
+})
+
+/** A receipt committed with the accepted edit, so a Comments outage never makes a retry publish it twice. */
+export const suggestionAcceptances = sqliteTable(
+  "suggestion_acceptances",
+  {
+    threadId: text("thread_id").primaryKey(),
+    dropId: text("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    undoneVersion: integer("undone_version"),
+  },
+  (table) => [index("suggestion_acceptances_drop").on(table.dropId)],
+)
 
 /**
  * Temporary public images. They still belong to an account, follow its ban, and count toward its storage until the

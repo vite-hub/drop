@@ -18,7 +18,7 @@ export default reviewApi(async (event) => {
 
   const comment = await addReviewComment(site, { who, name: claims.n }, input, shot, claims.o, images)
   useLogger(event).set({
-    review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), images: images.length },
+    review: { site: site.id, comment: comment.number, screenshot: Boolean(shot), images: images.length },
   })
-  return { n: comment.n }
+  return { n: comment.number }
 })
