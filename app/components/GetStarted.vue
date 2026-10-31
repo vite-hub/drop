@@ -11,11 +11,6 @@ const hidden = useGetStartedHidden()
 // Your agents decide only the first step, so they're fetched only when no drop came from one yet: on a Drops page with
 // agents' drops the fetch only held up the render by another round trip.
 const agents = hidden.value || props.drops.some((drop) => drop.actorKind === "agent") ? ref([]) : useAgentList().data
-const origin = useRequestURL().origin
-const snippets = mcpSnippets(`${origin}/mcp`)
-const clients = MCP_CLIENT_IDS.map((value) => ({ label: MCP_CLIENTS[value], value }))
-const client = ref<McpClient>("claude")
-const PROMPT = "Write a one-page plan for what we're building next and drop it for review."
 // On a team Drop a drop is the team's from the start, so sharing is done once there's one.
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
@@ -26,43 +21,109 @@ const steps = computed(() => [
   {
     id: "agent",
     title: "Connect an agent",
+    hint: "Claude, Codex, Cursor, and more",
     done: agents.value.length > 0 || props.drops.some((drop) => drop.actorKind === "agent"),
   },
-  { id: "drop", title: "Drop your first doc", done: docs.value.length > 0 },
+  { id: "drop", title: "Drop your first doc", hint: "Ask your agent, or upload a file", done: docs.value.length > 0 },
   {
     id: "share",
     title: team.value ? "Show it to the team" : "Share it",
+    hint: team.value ? "Choose who sees each drop" : "Turn on a public link",
     done: props.drops.some((drop) => drop.share !== "private"),
   },
-  { id: "site", title: "Review a live site", done: props.drops.some((drop) => drop.kind === "site"), optional: true },
+  {
+    id: "site",
+    title: "Review a live site",
+    hint: "Comment on any website",
+    done: props.drops.some((drop) => drop.kind === "site"),
+    optional: true,
+  },
 ])
 const required = computed(() => steps.value.filter((step) => !step.optional))
 const finished = computed(() => required.value.filter((step) => step.done).length)
 const visible = computed(() => !hidden.value && finished.value < required.value.length)
 
-// On an empty page the first open step starts expanded. Once there are drops the list starts folded, a few short
-// rows above your drops, and a step opens on click. A step that gets done closes.
+// The first run is the whole page: the steps run down a column and the first open one starts expanded. Once there are
+// drops the steps fold into a row of small cards above them, and each opens its instructions in a popover.
 const picked = ref<string>()
 const active = computed(() => {
   const step = steps.value.find((item) => item.id === picked.value)
   if (step) return step.done ? undefined : step.id
-  return picked.value === undefined && !props.drops.length ? steps.value.find((item) => !item.done)?.id : undefined
+  return picked.value === undefined ? steps.value.find((item) => !item.done)?.id : undefined
 })
 const toggle = (id: string) => (picked.value = active.value === id ? "" : id)
 const firstDoc = computed(() => docs.value[0])
-
-const tabsUi = {
-  list: "w-auto",
-  indicator: "bg-default shadow-xs ring ring-default",
-  trigger: "text-xs data-[state=active]:text-highlighted",
-}
+const CARD_RING =
+  "shadow-[0_0_0_1px_rgb(0_0_0/.07),0_1px_2px_rgb(0_0_0/.05)] dark:shadow-[0_0_0_1px_rgb(255_255_255/.09)]"
 </script>
 
 <template>
-  <section v-if="visible" aria-labelledby="get-started" class="mb-6 rounded-lg border border-default">
-    <header class="flex items-center gap-3 border-b border-default py-2 pr-2 pl-4">
-      <h2 id="get-started" class="text-sm font-medium text-highlighted">Get started</h2>
-      <span class="text-xs text-muted tabular-nums">{{ finished }} of {{ required.length }} done</span>
+  <section v-if="visible && !drops.length" aria-labelledby="get-started" class="mx-auto max-w-2xl pt-4 pb-12 sm:pt-12">
+    <header class="flex items-center gap-3">
+      <h2 id="get-started" class="text-lg font-semibold text-highlighted">Get started</h2>
+      <span class="text-sm text-muted tabular-nums">{{ finished }} of {{ required.length }} done</span>
+      <UButton class="ml-auto" color="neutral" label="Hide" size="xs" variant="ghost" @click="hidden = true" />
+    </header>
+    <p class="mt-1 text-sm text-pretty text-muted">
+      Your agents drop plans, specs, and small apps here, and you comment on them.
+    </p>
+
+    <ol class="mt-8">
+      <li v-for="(step, index) in steps" :key="step.id" class="relative flex gap-4 pb-7 last:pb-0">
+        <span
+          v-if="index < steps.length - 1"
+          aria-hidden="true"
+          class="absolute top-8 bottom-2 left-3 w-px -translate-x-1/2 bg-(--ui-border)"
+        />
+        <span
+          class="grid size-6 shrink-0 place-items-center rounded-full text-xs font-medium tabular-nums"
+          :class="
+            step.done
+              ? 'bg-inverted text-inverted'
+              : active === step.id
+                ? 'text-highlighted ring-1 ring-(--ui-border-inverted)'
+                : 'text-muted ring-1 ring-(--ui-border-accented)'
+          "
+        >
+          <UIcon v-if="step.done" name="i-mingcute-check-line" class="size-3.5" />
+          <template v-else>{{ index + 1 }}</template>
+        </span>
+        <div class="min-w-0 flex-1">
+          <button
+            :aria-expanded="active === step.id"
+            class="flex h-6 items-center gap-2 text-left text-sm enabled:cursor-pointer"
+            :class="
+              step.done
+                ? 'text-muted'
+                : active === step.id
+                  ? 'font-medium text-highlighted'
+                  : 'font-medium text-default hover:text-highlighted'
+            "
+            :disabled="step.done"
+            type="button"
+            @click="toggle(step.id)"
+          >
+            {{ step.title }}
+            <span v-if="step.optional" class="text-xs font-normal text-muted">Optional</span>
+          </button>
+          <GetStartedStep
+            v-if="active === step.id"
+            class="mt-2"
+            :first-doc="firstDoc"
+            :step="step.id"
+            :team="team"
+            @site="emit('site')"
+            @upload="emit('upload')"
+          />
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section v-else-if="visible" aria-labelledby="get-started" class="mb-8">
+    <div class="mb-3 flex h-4 items-center gap-3">
+      <h2 id="get-started" class="label-mono">Get started</h2>
+      <span class="text-xs text-muted tabular-nums">{{ finished }} of {{ required.length }}</span>
       <UButton
         aria-label="Hide get started"
         class="ml-auto"
@@ -72,106 +133,41 @@ const tabsUi = {
         variant="ghost"
         @click="hidden = true"
       />
-    </header>
-
-    <ol class="divide-y divide-default">
+    </div>
+    <ul class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <li v-for="step in steps" :key="step.id">
-        <button
-          :aria-expanded="active === step.id"
-          class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-muted"
-          :disabled="step.done"
-          type="button"
-          @click="toggle(step.id)"
-        >
-          <UIcon v-if="step.done" name="i-mingcute-check-circle-fill" class="size-5 shrink-0 text-highlighted" />
-          <UIcon v-else name="i-mingcute-round-line" class="size-5 shrink-0 text-dimmed" />
-          <span class="text-sm" :class="step.done ? 'text-muted line-through' : 'font-medium text-highlighted'">{{
-            step.title
-          }}</span>
-          <span v-if="step.optional" class="text-xs text-muted">Optional</span>
-          <UIcon
-            v-if="!step.done"
-            name="i-mingcute-down-line"
-            class="ml-auto size-4 text-dimmed transition-transform"
-            :class="active === step.id && 'rotate-180'"
-          />
-        </button>
-
-        <div v-if="active === step.id" class="space-y-3 pr-4 pb-4 pl-12 text-sm text-muted">
-          <template v-if="step.id === 'agent'">
-            <p>Add Drop's server to your agent. It signs in through your browser once; there are no keys to paste.</p>
-            <div class="-mx-1 overflow-x-auto px-1">
-              <UTabs
-                v-model="client"
-                :content="false"
-                color="neutral"
-                :items="clients"
-                size="xs"
-                :ui="{ ...tabsUi, root: 'w-max' }"
+        <UPopover :content="{ align: 'start', sideOffset: 8 }">
+          <button
+            class="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-shadow duration-150 enabled:cursor-pointer enabled:hover:shadow-[0_0_0_1px_rgb(0_0_0/.12),0_2px_4px_rgb(0_0_0/.06)] dark:enabled:hover:shadow-[0_0_0_1px_rgb(255_255_255/.16)]"
+            :class="CARD_RING"
+            :disabled="step.done"
+            type="button"
+          >
+            <UIcon v-if="step.done" name="i-mingcute-check-circle-fill" class="size-5 shrink-0 text-highlighted" />
+            <UIcon v-else name="i-mingcute-round-line" class="size-5 shrink-0 text-dimmed" />
+            <span class="min-w-0">
+              <span class="block truncate text-sm" :class="step.done ? 'text-muted' : 'font-medium text-highlighted'">
+                {{ step.title }}
+              </span>
+              <span class="block truncate text-xs text-muted">
+                {{ step.done ? "Done" : step.optional ? `${step.hint} · Optional` : step.hint }}
+              </span>
+            </span>
+          </button>
+          <template #content>
+            <div class="w-[min(34rem,calc(100vw-2rem))] p-4">
+              <p class="mb-2 text-sm font-medium text-highlighted">{{ step.title }}</p>
+              <GetStartedStep
+                :first-doc="firstDoc"
+                :step="step.id"
+                :team="team"
+                @site="emit('site')"
+                @upload="emit('upload')"
               />
             </div>
-            <AgentsCodeBlock :code="snippets[client]" />
-            <p>
-              {{ MCP_HINTS[client] }} It shows up under
-              <NuxtLink class="text-highlighted underline" to="/agents">Agents</NuxtLink> once you allow it.
-            </p>
           </template>
-
-          <template v-else-if="step.id === 'drop'">
-            <p>
-              Ask your agent for something to review. It answers with the link, and the drop lands here, private to you.
-            </p>
-            <AgentsCodeBlock :code="PROMPT" />
-            <p class="flex flex-wrap items-center gap-2">
-              Or drop a Markdown, HTML, or image file yourself.
-              <UButton
-                color="neutral"
-                icon="i-mingcute-upload-2-line"
-                label="Upload a file"
-                size="xs"
-                variant="outline"
-                @click="emit('upload')"
-              />
-            </p>
-          </template>
-
-          <template v-else-if="step.id === 'share'">
-            <p v-if="team">
-              Your team sees what you drop, and comments on it. Press Share to keep one to yourself, let the team edit
-              it, or open a public link for people outside.
-            </p>
-            <p v-else>
-              Everything starts private. Open a drop and press Share to turn on a public link, and choose whether people
-              with it can comment.
-            </p>
-            <UButton
-              v-if="firstDoc"
-              color="neutral"
-              :label="`Open ${firstDoc.title}`"
-              size="xs"
-              :to="`/drops/${firstDoc.id}`"
-              trailing-icon="i-mingcute-arrow-right-line"
-              variant="outline"
-            />
-            <p v-else>Drop something first.</p>
-          </template>
-
-          <template v-else>
-            <p>
-              Comment on any live website, such as a preview build, with a bookmarklet. Each note arrives with a
-              screenshot your agent can read.
-            </p>
-            <UButton
-              color="neutral"
-              icon="i-mingcute-globe-line"
-              label="New site review"
-              size="xs"
-              variant="outline"
-              @click="emit('site')"
-            />
-          </template>
-        </div>
+        </UPopover>
       </li>
-    </ol>
+    </ul>
   </section>
 </template>

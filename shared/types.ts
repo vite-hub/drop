@@ -80,6 +80,19 @@ export interface DropSummary {
   owner?: { name: string; image: string | null }
 }
 
+/** What a card on the Drops page shows of a drop: an image's file, a doc's or board's first words, a folder's newest drops. */
+export interface DropPeek {
+  id: string
+  kind: DropKind
+  title: string
+  thumbnail?: string
+  text?: string
+  inside?: DropPeek[]
+}
+
+/** `GET /api/drops/peeks`: a peek for each of the ids asked for that the caller owns. */
+export type DropPeeks = Record<string, DropPeek>
+
 /** An image beside the open one in its folder, for moving to it. */
 export type DropGalleryItem = DropCrumb & { thumbnail: string }
 
