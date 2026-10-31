@@ -51,7 +51,7 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
   // counts first: the element on top and those it sits in. So a box drawn on an open tooltip or menu anchors to it, not
   // to a smaller row it covers. When only the page holds the box among those, any element under it counts.
   function anchorFor(left, top, right, bottom, skip) {
-    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble");
+    const under = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2).filter((el) => el !== skip && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble" && el.localName !== "drop-ins");
     const smallest = (els) => {
       let best = null, bestArea = Infinity;
       for (const el of els) {
@@ -139,12 +139,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
   // Highlights draw on the page itself, so without Drop's theme they take a grey that shows on light and dark pages.
   if (!THEMED) pageStyle.textContent = pageStyle.textContent.replaceAll("var(--foreground)", "#808080");
+  // comark-comments' speech bubble, in a given color.
+  const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   // A margin comment's bubble is the package's, in the page's own text after its quote, so it takes its room in the
   // line as a doc's thread does and covers nothing. It's a <drop-bubble> with no text of its own: quotes are found and
   // elements named (findRange, pathOf) as if it weren't there, and render() takes it out again. A word joiner keeps it
   // on its quote's line, and the count is generated. The quote takes the package's anchor look (.cr-cm), as a highlight.
-  // comark-comments' speech bubble, in a given color.
-  const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   const BUBBLES = document.createElement("style");
   BUBBLES.textContent = COMMENTS_CSS +
     'drop-bubble.cr-bub:empty::before,drop-bubble.cr-bub b::before{content:"\\2060"}drop-bubble.cr-bub b{font:inherit;color:inherit}' +
@@ -155,7 +155,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     ":root.dark drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#0a0a0a") + "}" +
     "drop-bubble.cr-bub:hover,drop-bubble.cr-bub[data-on]{border-color:var(--foreground);color:var(--background);box-shadow:0 0 0 3px color-mix(in oklab,var(--foreground) 18%,transparent)}" +
     // The package's .cr-cm tint and underline, on its own comment color, which the bubble resolves (render).
-    "::highlight(drop-margin){background-color:color-mix(in srgb,var(--drop-anchor) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--drop-anchor) 80%,transparent);text-underline-offset:.25em}";
+    "::highlight(drop-margin){background-color:color-mix(in srgb,var(--drop-anchor) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--drop-anchor) 80%,transparent);text-underline-offset:.25em}" +
+    // A suggested edit, in the package's redline (.cr-sg del and ins): the quote struck through in red, as a highlight,
+    // and the new words after it in green. They're generated from data-text, so the page gains no text of its own.
+    "::highlight(drop-del){color:color-mix(in oklab,var(--destructive) 70%,var(--foreground));background-color:color-mix(in srgb,var(--destructive) 11%,transparent);text-decoration:line-through 1.5px color-mix(in srgb,var(--destructive) 75%,transparent)}" +
+    "drop-ins.cr-sg{margin-left:.125rem;padding:.0625rem .1875rem;color:color-mix(in oklab,var(--_cr-ins) 60%,var(--_comark-foreground));background:color-mix(in srgb,var(--_cr-ins) 13%,transparent);-webkit-box-decoration-break:clone;box-decoration-break:clone;cursor:pointer}" +
+    "drop-ins.cr-sg::after{content:attr(data-text)}";
   // active: the comment a "focus" pulses for a moment; opened: the one whose thread Drop shows; pointed and textPointed:
   // the one under the pointer, over its bubble or card, or over its text.
   let markers = [], active = null, opened = null, pointed = null, textPointed = null;
@@ -317,6 +322,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   let drafted = null;
   const drafting = () => Boolean(drafted && article && article.contains(drafted.commonAncestorContainer));
   const bubbles = new Map();
+  let inserts = [];
+  // A suggestion on open text in a Markdown doc shows as a redline, with or without the margin.
+  const suggests = (m) => inRail(m) && m.suggestion != null;
   function clearBubbles() {
     for (const bubble of bubbles.values()) {
       const parent = bubble.parentNode;
@@ -325,6 +333,19 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (parent) parent.normalize();
     }
     bubbles.clear();
+    for (const ins of inserts) { const parent = ins.parentNode; ins.remove(); if (parent) parent.normalize(); }
+    inserts = [];
+  }
+  /** A suggestion's new words, after its quote and before its bubble. A deletion has none. */
+  function insertSuggestion(m, range) {
+    if (!m.suggestion) return;
+    const ins = document.createElement("drop-ins");
+    ins.className = "cr-sg"; ins.dataset.id = m.id; ins.dataset.text = m.suggestion; ins.title = "Suggested: " + m.suggestion;
+    ins.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const r = ins.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
+    const end = range.cloneRange();
+    end.collapse(false);
+    end.insertNode(ins);
+    inserts.push(ins);
   }
   function insertBubble(m, range) {
     const bubble = document.createElement("drop-bubble");
@@ -382,6 +403,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       const anchor = bubble && getComputedStyle(bubble).getPropertyValue("--_cr-comment").trim();
       if (anchor && document.documentElement.style.getPropertyValue("--drop-anchor") !== anchor) document.documentElement.style.setProperty("--drop-anchor", anchor);
     }
+    // After the bubbles: each is inserted at its quote's end, so the new words land between the quote and its bubble.
+    if (view.pins && !zoom) for (const m of markers) if (suggests(m) && ranges.get(m.id)) insertSuggestion(m, ranges.get(m.id));
+    if (inserts.length && !BUBBLES.isConnected) document.head.appendChild(BUBBLES);
     for (const m of markers) {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {
@@ -414,7 +438,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
         const railedHere = bubbles.has(m.id);
-        textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere });
+        textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere, suggest: suggests(m) });
         if (zoom) continue;
         const rects = range.getClientRects(), last = rects[rects.length - 1];
         if (!last) continue;
@@ -522,7 +546,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); avatar.textContent = initials(m.author).slice(0, 1); }; avatar.appendChild(img); }
       else avatar.textContent = initials(m.author).slice(0, 1);
       name.textContent = m.author || "Comment";
-      body.textContent = m.body || "";
+      // A suggestion sent without a note says what it suggests; the redline in the text shows the words.
+      body.textContent = m.body || (m.suggestion == null ? "" : m.suggestion ? "Suggested an edit" : "Suggested deleting this");
       entry.append(avatar, name, body);
       card.appendChild(entry);
       if (replies) { const more = document.createElement("small"); more.textContent = replies + (replies === 1 ? " reply" : " replies"); card.appendChild(more); }
@@ -552,8 +577,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     for (const [id, bubble] of bubbles) bubble.toggleAttribute("data-on", on.has(id));
     if (!highlights) return;
     const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
-    CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail));
-    CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail));
+    CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail && !t.suggest));
+    CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail && !t.suggest));
+    // Under the others, so a picked suggestion takes their tint and keeps its strike.
+    const struck = show((t) => t.suggest);
+    struck.priority = -1;
+    CSS.highlights.set("drop-del", struck);
     CSS.highlights.set("drop-done", show((t) => !on.has(t.id) && t.resolved));
     CSS.highlights.set("drop-active", show((t) => on.has(t.id)));
   }
@@ -696,7 +725,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // The element under a point, past Drop's own layer.
   function elementAt(x, y) {
-    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble") || document.body;
+    return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble" && el.localName !== "drop-ins") || document.body;
   }
   const px = (n) => String(Math.round(n * 10) / 10);
   const num = (value) => parseFloat(value) || 0;

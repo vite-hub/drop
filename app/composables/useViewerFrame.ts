@@ -323,7 +323,8 @@ export function useViewerFrame(options: {
     if (ready.value)
       send({
         type: "markers",
-        // `body` and `replies`: a text comment's card in the doc's margin shows its words and how many replies it has.
+        // `suggestion`: the doc strikes the quote and shows the new words after it. `body` and `replies`: a text
+        // comment's card in the doc's margin shows its words and how many replies it has.
         markers: options.pinned.value.map(
           ({
             id,
@@ -335,6 +336,7 @@ export function useViewerFrame(options: {
             ow,
             oh,
             quote,
+            suggestion,
             label,
             resolved,
             version,
@@ -352,6 +354,7 @@ export function useViewerFrame(options: {
             ow,
             oh,
             quote,
+            suggestion,
             label,
             resolved,
             earlier: version < drop.value.version,

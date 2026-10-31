@@ -206,6 +206,8 @@ export interface DropComment {
   ow: number
   oh: number
   quote: string | null
+  /** A suggested edit: the words that replace the quote, empty to delete it. Null on a plain comment. */
+  suggestion: string | null
   label: string | null
   page: string | null
   body: string

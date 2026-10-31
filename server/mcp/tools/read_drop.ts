@@ -153,6 +153,8 @@ export default defineMcpTool({
           n: comment.n,
           kind: comment.kind,
           target: commentTarget(comment),
+          // The words that would replace the quote; empty suggests deleting it.
+          ...(comment.suggestion === null ? {} : { suggestion: comment.suggestion }),
           body: comment.body,
           author: comment.authorName,
           page: comment.page,

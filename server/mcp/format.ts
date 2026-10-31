@@ -1,4 +1,5 @@
 import { expiryLabel } from "#shared/expiry"
+import { suggestionLine } from "#shared/suggestion"
 import type { DropComment, DropResource, DropSummary, QuizAnswer, ViewerKind } from "#shared/types"
 import type { QuizTally, StoredAnswer } from "../utils/answers"
 import { dropPageUrl, type DropRow } from "../utils/drops"
@@ -83,7 +84,7 @@ export function commentTarget(
 
 /** `version` is the one being read: a comment written on an earlier version says which. */
 export const commentLine = (comment: DropComment, version: number, origin: string) =>
-  `${comment.n}. ${commentTarget(comment)}\n   ${comment.body || "(no words, only the image)"} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
+  `${comment.n}. ${commentTarget(comment)}${suggestionLine(comment.suggestion)}\n   ${comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
 
 /** The images sent with a comment or a reply, as full addresses an agent can fetch. */
 export const imageUrls = (item: Pick<DropComment, "attachments">, origin: string) =>

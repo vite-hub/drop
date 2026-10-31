@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The bar over a text selection, in the review dock's shape and type (ViewerReviewDock). It stands out from the page:
 // the dock's dark surface on a light theme, and its light twin on a dark one.
-const emit = defineEmits<{ comment: [] }>()
+const emit = defineEmits<{ comment: []; suggest: [] }>()
 </script>
 
 <template>
@@ -15,6 +15,10 @@ const emit = defineEmits<{ comment: [] }>()
     <button type="button" @click="emit('comment')">
       <UIcon name="i-mingcute-chat-1-line" />
       Comment
+    </button>
+    <button type="button" @click="emit('suggest')">
+      <UIcon name="i-mingcute-edit-2-line" />
+      Suggest
     </button>
   </div>
 </template>

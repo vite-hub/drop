@@ -286,12 +286,23 @@ export function useViewerAnnotations(options: {
     if (key === "]" && tool.value === "mark") resize(1)
   }
 
-  function commentOnSelection() {
+  /** `suggest`: the composer starts a suggested edit, its new words filled in with the selected ones. */
+  function commentOnSelection(suggest = false) {
     if (!selection.value) return
     const { selector, quote, label, rect } = selection.value
     popover.value = {
       type: "new",
-      pending: { kind: "text", selector, ox: 0, oy: 0, ow: 0, oh: 0, quote, label },
+      pending: {
+        kind: "text",
+        selector,
+        ox: 0,
+        oy: 0,
+        ow: 0,
+        oh: 0,
+        quote,
+        label,
+        ...(suggest ? { suggestion: quote } : {}),
+      },
       x: rect.left,
       y: rect.bottom,
     }

@@ -120,10 +120,15 @@ async function sendPageComment() {
           <p v-if="comment.kind === 'page'" class="flex items-center gap-1.5 text-xs text-muted">
             <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />General feedback
           </p>
+          <ViewerSuggestion
+            v-else-if="comment.quote && comment.suggestion !== null"
+            :quote="comment.quote"
+            :suggestion="comment.suggestion"
+          />
           <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
           </p>
-          <p class="text-sm">{{ comment.body }}</p>
+          <p v-if="comment.body" class="text-sm">{{ comment.body }}</p>
           <ViewerCommentImages :attachments="comment.attachments" />
           <span v-if="comment.replies.length" class="flex items-center gap-1.5 text-xs text-muted">
             <UAvatarGroup :max="3" size="2xs">

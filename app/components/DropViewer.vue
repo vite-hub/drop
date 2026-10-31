@@ -832,6 +832,7 @@ watch(
       @reply="reply"
       @resolve="resolve"
       @submit="submit"
+      @suggest="(text) => popover?.type === 'new' && (popover.pending.suggestion = text)"
     />
   </DefineComposer>
 
@@ -1274,7 +1275,7 @@ watch(
         top: `${Math.max(56, selection.rect.top - 8)}px`,
       }"
     >
-      <ViewerSelectionBar @comment="commentOnSelection" />
+      <ViewerSelectionBar @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
 
     <ViewerLightbox
