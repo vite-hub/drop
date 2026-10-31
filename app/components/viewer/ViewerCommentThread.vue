@@ -119,7 +119,15 @@ const menu = computed<DropdownMenuItem[][]>(() => [
               ? "Selected image area"
               : "Selected area"
         }}</span>
-        <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
+        <!-- Only in the dock: beside the page, the column's own close button above already discards it. -->
+        <UButton
+          class="hidden in-[#drop-comments]:inline-flex"
+          color="neutral"
+          label="Remove selection"
+          size="sm"
+          variant="ghost"
+          @click="emit('cancel')"
+        />
       </div>
       <p v-if="pending.quote" class="mb-3 line-clamp-3 border-l-2 border-default pl-3 text-sm text-muted">
         {{ pending.quote }}
@@ -217,7 +225,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             <UButton
               v-if="canManage || reply.mine"
               aria-label="Delete reply"
-              class="ml-auto opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              class="ml-auto motion-safe:transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-visible:opacity-100"
               color="neutral"
               icon="i-mingcute-delete-2-line"
               size="xs"

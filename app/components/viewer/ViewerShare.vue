@@ -128,6 +128,7 @@ async function pick(next: Share) {
               color="neutral"
               :disabled="drop.isOwner && !shared"
               :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+              :ui="{ leadingIcon: copied() ? 'animate-icon-in' : undefined }"
               size="sm"
               variant="ghost"
               @click="copy(url)"

@@ -79,7 +79,7 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
       >
         <UIcon
           name="i-mingcute-right-line"
-          class="size-3.5 transition-transform duration-150"
+          class="size-3.5 motion-safe:transition-transform duration-150"
           :class="expanded && 'rotate-90'"
         />
       </button>

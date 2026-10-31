@@ -33,7 +33,7 @@ async function connect() {
     if (result.error) throw new Error(result.error.message ?? "Couldn't start GitHub sign-in.")
   } catch (cause) {
     error.value = errorText(cause)
-  } finally {
+    // Only a failure frees the button: on success the page is leaving, and a second press would start a second login.
     pending.value = false
   }
 }

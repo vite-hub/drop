@@ -60,7 +60,12 @@ export default defineAppConfig({
       upload: "i-mingcute-upload-2-line",
       warning: "i-mingcute-alert-line",
     },
+    // Press feedback: a pressed button settles to 96% and springs back on release, a transition so letting go mid-press
+    // glides instead of snapping. Colors keep their own transition beside it.
     button: {
+      slots: {
+        base: "transition-[color,background-color,border-color,box-shadow,scale] duration-150 ease-out motion-safe:active:not-disabled:not-aria-disabled:scale-[0.96]",
+      },
       variants: {
         size: {
           xs: { base: "h-7 px-2 text-xs gap-1", leadingIcon: "size-3.5", trailingIcon: "size-3.5" },
@@ -77,18 +82,19 @@ export default defineAppConfig({
         { color: "neutral", variant: "outline", class: "ring-default shadow-xs dark:bg-elevated/40" },
       ],
     },
+    // 16px text on phones, as shadcn's: iOS Safari zooms the page into any field set smaller, the ⌘K palette's too.
     input: {
       variants: {
         size: {
-          sm: { base: "h-8 px-3 text-sm" },
-          md: { base: "h-9 px-3 text-sm" },
-          lg: { base: "h-10 px-3 text-sm" },
+          sm: { base: "h-8 px-3 text-base md:text-sm" },
+          md: { base: "h-9 px-3 text-base md:text-sm" },
+          lg: { base: "h-10 px-3 text-base md:text-sm" },
         },
       },
       compoundVariants: [{ color: "neutral", variant: "outline", class: "shadow-xs" }],
     },
     textarea: {
-      compoundVariants: [{ color: "neutral", variant: "outline", class: "shadow-xs text-sm" }],
+      compoundVariants: [{ color: "neutral", variant: "outline", class: "shadow-xs text-base md:text-sm" }],
     },
     select: {
       variants: { size: { sm: { base: "h-8 px-3 text-sm" }, md: { base: "h-9 px-3 text-sm" } } },
@@ -97,7 +103,9 @@ export default defineAppConfig({
     card: {
       slots: { root: "rounded-xl", header: "p-6 pb-0", body: "p-6", footer: "p-6 pt-0" },
     },
+    // Tab counts (Open 3, Resolved 1) change in place as comments resolve: equal-width digits keep the tabs still.
     tabs: {
+      slots: { trailingBadge: "tabular-nums" },
       compoundVariants: [
         {
           color: "neutral",
@@ -119,7 +127,31 @@ export default defineAppConfig({
     tooltip: {
       slots: { content: "bg-inverted text-inverted ring-0 shadow-none rounded-md h-auto px-3 py-1.5 text-xs" },
     },
-    modal: { slots: { content: "ring-default" } },
+    // Nuxt UI closes a modal as slowly as it opens it. Leaving runs faster: the decision to leave is already made.
+    modal: {
+      slots: { content: "ring-default" },
+      variants: {
+        transition: {
+          true: {
+            overlay: "data-[state=closed]:animate-[fade-out_150ms_var(--ease-out)]",
+            content: "data-[state=closed]:animate-[scale-out_150ms_var(--ease-out)]",
+          },
+        },
+      },
+    },
+    // The mobile panel (DropViewer) leaves faster than it arrives, its overlay in step with it.
+    slideover: {
+      variants: {
+        transition: { true: { overlay: "data-[state=closed]:animate-[fade-out_150ms_var(--ease-out)]" } },
+      },
+      compoundVariants: [
+        {
+          transition: true,
+          side: "right",
+          class: { content: "data-[state=closed]:animate-[slide-out-to-right_150ms_var(--ease-out)]" },
+        },
+      ],
+    },
     editorToolbar: {
       slots: { base: "gap-1", separator: "my-1 bg-(--ui-border)" },
       variants: { layout: { bubble: { base: `${surface} p-0.5` } } },

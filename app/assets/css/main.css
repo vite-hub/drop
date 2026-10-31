@@ -17,6 +17,8 @@
   --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* A copy button's check (`animate-icon-in`), one timing for every one of them. */
+  --animate-icon-in: icon-in 300ms var(--ease-out);
 }
 
 /*
@@ -126,7 +128,12 @@
   backdrop-filter: blur(8px);
 }
 
+/* macOS paints text heavier than its weight without this. The drops themselves set it too (shared/plan-runtime.ts).
+   Taps show their own pressed states, so the browser's gray flash goes. */
 body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
   background-image: var(--surface-grain);
   background-size: var(--surface-grain-size);
 }
@@ -258,6 +265,14 @@ body {
     transform: translateY(4px) scale(0.97);
   }
 }
+/* An icon that swaps for its done state (copy to check): it grows out of a blur, so the swap reads as a change. */
+@keyframes icon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+    filter: blur(3px);
+  }
+}
 @keyframes blink {
   50% {
     opacity: 0;
@@ -319,6 +334,12 @@ body {
     transform: translateY(-16px);
   }
 }
+@keyframes aside-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
 @keyframes flash {
   from {
     background-color: var(--ui-bg-accented);
@@ -333,6 +354,11 @@ body {
     }
   }
   @keyframes pop-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes icon-in {
     from {
       opacity: 0;
     }

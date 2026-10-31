@@ -155,16 +155,17 @@ function leaveDocs() {
                   to="/drops?tab=with-me"
                   @navigate="close"
                 >
+                  <!-- The carets' hit areas (before:) reach the row's full 32px, past their 24px square. -->
                   <button
                     :aria-expanded="teamOpen"
                     :aria-label="teamOpen ? 'Collapse team folders' : 'Expand team folders'"
-                    class="grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed hover:bg-accented hover:text-highlighted"
+                    class="relative grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed before:absolute before:-inset-1 hover:bg-accented hover:text-highlighted"
                     type="button"
                     @click="teamOpen = !teamOpen"
                   >
                     <UIcon
                       name="i-mingcute-right-line"
-                      class="size-3.5 transition-transform duration-150"
+                      class="size-3.5 motion-safe:transition-transform duration-150"
                       :class="teamOpen && 'rotate-90'"
                     />
                   </button>
@@ -185,13 +186,13 @@ function leaveDocs() {
                 <button
                   :aria-expanded="dropsOpen"
                   :aria-label="dropsOpen ? 'Collapse drops' : 'Expand drops'"
-                  class="grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed hover:bg-accented hover:text-highlighted"
+                  class="relative grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed before:absolute before:-inset-1 hover:bg-accented hover:text-highlighted"
                   type="button"
                   @click="dropsOpen = !dropsOpen"
                 >
                   <UIcon
                     name="i-mingcute-right-line"
-                    class="size-3.5 transition-transform duration-150"
+                    class="size-3.5 motion-safe:transition-transform duration-150"
                     :class="dropsOpen && 'rotate-90'"
                   />
                 </button>

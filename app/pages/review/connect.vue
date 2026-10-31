@@ -99,6 +99,7 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
           <UFormField class="mt-6" label="Your name" hint="Optional">
             <UInput
               v-model="name"
+              autocomplete="name"
               class="w-full"
               :maxlength="60"
               placeholder="Guest"

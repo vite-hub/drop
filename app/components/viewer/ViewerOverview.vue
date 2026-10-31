@@ -71,6 +71,7 @@ function startEditing() {
   editing.value = true
 }
 async function save() {
+  if (saving.value) return
   saving.value = true
   if (await describe(props.drop, draft.value)) editing.value = false
   saving.value = false
@@ -139,6 +140,9 @@ async function save() {
           :maxrows="16"
           placeholder="What belongs here, and how to name and write it."
           :rows="4"
+          @keydown.meta.enter.prevent="save"
+          @keydown.ctrl.enter.prevent="save"
+          @keydown.esc.stop="editing = false"
         />
         <div class="flex justify-end gap-2">
           <UButton color="neutral" label="Cancel" size="sm" variant="ghost" @click="editing = false" />

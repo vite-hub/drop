@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ icon: string; label: string; destructive?: boolean }>()
+defineProps<{ icon: string; label: string; destructive?: boolean; iconClass?: string }>()
 defineEmits<{ click: [] }>()
 </script>
 
@@ -10,7 +10,7 @@ defineEmits<{ click: [] }>()
     type="button"
     @click="$emit('click')"
   >
-    <UIcon :name="icon" class="size-4" :class="destructive ? '' : 'text-muted'" />
+    <UIcon :name="icon" class="size-4" :class="[destructive ? '' : 'text-muted', iconClass]" />
     <span class="flex-1">{{ label }}</span>
   </button>
 </template>
