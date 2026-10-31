@@ -197,6 +197,17 @@ export function useViewerFrame(options: {
    * The drop a Markdown doc's `::drop` box names, fetched as the reader, so it shows only to someone who may open it.
    * Only an HTML drop fills the box: an app needs its files and origin, and a doc in a doc would only nest frames.
    */
+  const embedLinks = computed(() => {
+    if (drop.value.kind !== "markdown") return new Set<string>()
+    // Read only the server-rendered boxes, in an inert template: frame messages cannot grant access to other links.
+    const template = document.createElement("template")
+    template.innerHTML = drop.value.html ?? ""
+    return new Set(
+      Array.from(template.content.querySelectorAll("figure.drop-embed[data-drop-embed]"), (box) =>
+        box.getAttribute("data-drop-embed"),
+      ),
+    )
+  })
   const embeds = new Map<string, Promise<{ html: string } | { error: string }>>()
   function embedded(link: string) {
     let embed = embeds.get(link)
@@ -254,16 +265,22 @@ export function useViewerFrame(options: {
         for (const path of message.paths)
           void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
         return
-      case "embeds":
-        for (const link of message.links)
-          void embedded(link).then((embed) =>
-            send({
+      case "embeds": {
+        if (drop.value.kind !== "markdown") return
+        const requestedId = drop.value.id
+        for (const link of message.links) {
+          if (!embedLinks.value.has(link)) continue
+          void embedded(link).then((embed) => {
+            if (drop.value.id !== requestedId || !embedLinks.value.has(link)) return
+            return send({
               type: "embed-data",
               link,
               ...("html" in embed ? { html: embedDocument(embed.html, dark.value) } : embed),
-            }),
-          )
+            })
+          })
+        }
         return
+      }
       case "unplaced":
         unplaced.value = new Set(message.ids)
         return
