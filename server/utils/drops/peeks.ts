@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import type { DropPeek, DropPeeks } from "#shared/types"
 import { dropTexts, drops } from "../../databases/config"
+import { ancestorsOf } from "../nodes"
 import { SEARCH_KINDS } from "../search"
 
 /** About a card's worth of a doc: the Drops page shows its first lines, not the whole text. */
@@ -9,7 +10,7 @@ export const PEEK_TEXT = 360
 /** How many of a folder's drops its card fans out. */
 export const PEEK_INSIDE = 3
 /** At most this many drops per request: D1 binds at most 100 parameters per query. */
-export const MAX_PEEKS = 90
+const MAX_PEEKS = 90
 
 // Search text keeps a callout's marker (`[!NOTE]`), which a preview reads as noise.
 const CALLOUT = /\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/gi
@@ -23,12 +24,22 @@ const hasText = (kind: string) => SEARCH_KINDS.some((searched) => searched === k
 export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks> {
   const wanted = [...new Set(ids)].slice(0, MAX_PEEKS)
   if (!wanted.length) return {}
-  const rows = await db
-    .select({ id: drops.id, kind: drops.kind, title: drops.title, blobKey: drops.blobKey })
+  const requested = await db
+    .select({
+      id: drops.id,
+      parentId: drops.parentId,
+      ownerId: drops.ownerId,
+      teamFolder: drops.teamFolder,
+      kind: drops.kind,
+      title: drops.title,
+      blobKey: drops.blobKey,
+    })
     .from(drops)
-    .where(and(eq(drops.ownerId, ownerId), inArray(drops.id, wanted)))
+    .where(and(eq(drops.ownerId, ownerId), inArray(drops.id, wanted), isNull(drops.quarantinedAt)))
+  const ancestors = await ancestorsOf(requested)
+  const rows = requested.filter((row) => !ancestors.get(row.id)?.some((parent) => parent.quarantinedAt))
   const folders = rows.filter((row) => row.kind === "folder").map((row) => row.id)
-  const inside = folders.length ? await newestInside(folders) : []
+  const inside = folders.length ? await newestInside(ownerId, folders) : []
   const texted = [...rows, ...inside].filter((row) => hasText(row.kind)).map((row) => row.id)
   const texts = new Map<string, string>()
   for (let offset = 0; offset < texted.length; offset += MAX_PEEKS)
@@ -55,8 +66,8 @@ export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks
   )
 }
 
-/** Each folder's newest PEEK_INSIDE drops, ranked inside the query so a folder of hundreds sends three. */
-function newestInside(folders: string[]) {
+/** Each visible folder's newest owned, non-quarantined drops, ranked in the query so a folder of hundreds sends three. */
+function newestInside(ownerId: string, folders: string[]) {
   const ranked = db
     .select({
       id: drops.id,
@@ -67,7 +78,15 @@ function newestInside(folders: string[]) {
       rank: sql<number>`row_number() over (partition by ${drops.parentId} order by ${drops.updatedAt} desc)`.as("rank"),
     })
     .from(drops)
-    .where(and(inArray(drops.parentId, folders), isNull(drops.trashedAt)))
+    // Their ancestors are the visible folder's path, already checked above.
+    .where(
+      and(
+        eq(drops.ownerId, ownerId),
+        inArray(drops.parentId, folders),
+        isNull(drops.trashedAt),
+        isNull(drops.quarantinedAt),
+      ),
+    )
     .as("ranked")
   return db
     .select()

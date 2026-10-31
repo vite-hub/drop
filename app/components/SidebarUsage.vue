@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// How much of the plan the drops use, at the foot of the sidebar: storage as a bar, file writes under it. Shown only
-// where a plan sets limits. Near a limit the bar darkens to a warning and offers your own Drop, which has none.
+// How much of the plan the drops use, at the foot of the sidebar: storage, drops, and file writes. Shown only
+// where a plan sets limits. Near or at a limit the bar darkens to a warning and offers your own Drop, which has none.
 import { MIB, usageNearLimit } from "#shared/quotas"
 
 const { data: usage } = useUsage()
@@ -10,6 +10,13 @@ const limited = computed(
     [usage.value.drops, usage.value.bytes, usage.value.writes].some((quota) => quota.limit !== null),
 )
 const near = computed(() => Boolean(usage.value && usageNearLimit(usage.value)))
+const reached = computed(() => {
+  const value = usage.value
+  return Boolean(
+    value &&
+    [value.drops, value.bytes, value.writes].some((quota) => quota.limit !== null && quota.used >= quota.limit),
+  )
+})
 const of = (quota: { used: number; limit: number | null }) => `${quota.used} of ${quota.limit ?? "∞"}`
 const mib = (bytes: number) => Math.ceil((bytes / MIB) * 10) / 10
 const storage = computed(() => {
@@ -50,12 +57,16 @@ const title = computed(() => {
     >
       <div class="h-full rounded-full" :class="near ? 'bg-warning' : 'bg-inverted'" :style="{ width: `${share}%` }" />
     </div>
+    <div v-if="usage.drops.limit !== null" class="flex items-center justify-between gap-2 text-muted">
+      <span>Drops</span>
+      <span class="tabular-nums">{{ usage.drops.used }} / {{ usage.drops.limit }}</span>
+    </div>
     <div class="flex items-center justify-between gap-2 text-muted">
       <span>Writes this month</span>
       <span class="tabular-nums">{{ usage.writes.used }} / {{ usage.writes.limit ?? "∞" }}</span>
     </div>
-    <ULink v-if="near" class="text-highlighted underline underline-offset-2" :to="usage.selfHostUrl" external
-      >Near your plan's limit. Deploy your own</ULink
-    >
+    <ULink v-if="near" class="text-highlighted underline underline-offset-2" :to="usage.selfHostUrl" external>
+      {{ reached ? "Plan limit reached." : "Near your plan's limit." }} Deploy your own
+    </ULink>
   </div>
 </template>
