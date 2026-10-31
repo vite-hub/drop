@@ -81,15 +81,12 @@ const AROUND = [
   { icon: "i-mingcute-book-5-line", text: "Skills for review, PR evidence, and handoffs" },
 ]
 
-const HOSTED = [
-  "Sign in with GitHub",
-  "Free for you and small teams",
-  "Drops nobody opens expire, unless you keep them",
-]
+const HOSTED = ["Sign in with GitHub", "Free for one or two people", "Drops nobody opens expire, unless you keep them"]
 const SELF_HOSTED = [
   "Team mode: open to the team, closed to the internet",
   "Cloudflare, Vercel, Netlify, Deno Deploy, or your own server",
   "Any sign-in Better Auth supports",
+  "Free for one or two people, $9 per member a month from 3",
 ]
 
 const FAQ = [
@@ -115,7 +112,7 @@ const FAQ = [
   },
   {
     q: "Can I run it myself?",
-    a: "Yes. Drop is open source under Apache-2.0. Deploy it to Cloudflare, Vercel, Netlify, Deno Deploy, or a server, and everything stays in your account.",
+    a: "Yes. Deploy it to Cloudflare, Vercel, Netlify, Deno Deploy, or a server, and everything stays in your account. It's free for one or two people; a team of 3 or more pays $9 per member a month.",
   },
 ]
 </script>
@@ -280,11 +277,18 @@ const FAQ = [
                 <UIcon name="i-mingcute-check-line" class="mt-0.5 size-4 shrink-0 text-muted" />{{ item }}
               </li>
             </ul>
-            <NuxtLink
-              to="/docs/self-host"
-              class="mt-4 inline-block text-sm text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)"
-              >Self-hosting guide</NuxtLink
-            >
+            <p class="mt-4 flex gap-5 text-sm">
+              <NuxtLink
+                to="/docs/self-host"
+                class="text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)"
+                >Self-hosting guide</NuxtLink
+              >
+              <NuxtLink
+                to="/pricing"
+                class="text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 hover:decoration-(--ui-text-highlighted)"
+                >Pricing</NuxtLink
+              >
+            </p>
           </div>
         </div>
       </section>
