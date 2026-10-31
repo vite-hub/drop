@@ -62,35 +62,64 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
   const filenames = readdirSync(directory)
     .filter((name) => name.endsWith(".sql"))
     .sort()
-  assert.deepEqual(
-    journal.entries.map((entry) => `${entry.tag}.sql`),
-    filenames,
-  )
-  assert.deepEqual(
-    journal.entries.map((entry) => entry.idx),
-    journal.entries.map((_, index) => index),
-  )
-  for (let index = 1; index < journal.entries.length; index++)
+  assert.deepEqual(journal.entries.map((entry) => `${entry.tag}.sql`).sort(), filenames)
+  // Keep existing filenames for Wrangler's ledger; journal indexes can have gaps after main's squash.
+  for (let index = 1; index < journal.entries.length; index++) {
+    assert.ok(journal.entries[index].idx > journal.entries[index - 1].idx)
     assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
+  }
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  // Existing databases can retain the ledger timestamps of migrations consolidated into 0000 on main.
-  for (const appliedTimestamps of [
-    [],
-    [migrations[0].folderMillis],
-    [migrations[0].folderMillis, 1792593042706, 1793089140860],
+  const [baseline, authEvents, suggestions, comments] = migrations
+  // Comments must follow main's latest migration. Earlier previews can already contain comments at older timestamps.
+  for (const {
+    appliedMigrations,
+    appliedTimestamps = appliedMigrations.map((migration) => migration.folderMillis),
+  } of [
+    { appliedMigrations: [] },
+    { appliedMigrations: [baseline] },
+    {
+      appliedMigrations: [baseline],
+      appliedTimestamps: [baseline.folderMillis, 1792593042706, 1793089140860],
+    },
+    { appliedMigrations: [baseline, authEvents] },
+    {
+      appliedMigrations: [baseline, comments],
+      appliedTimestamps: [baseline.folderMillis, 1793091156010],
+    },
+    {
+      appliedMigrations: [baseline, comments],
+      appliedTimestamps: [baseline.folderMillis, 1793094947398],
+    },
+    {
+      appliedMigrations: [baseline, authEvents, comments],
+      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793094947398],
+    },
+    {
+      appliedMigrations: [baseline, authEvents, comments],
+      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001],
+    },
+    { appliedMigrations: [baseline, authEvents, suggestions] },
+    { appliedMigrations: migrations },
   ]) {
     const database = new DatabaseSync(":memory:")
     try {
-      // Model a database already migrated on main: Drizzle only runs entries newer than its latest timestamp.
       database.exec(
         "CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)",
       )
-      if (appliedTimestamps.length) database.exec(migrations[0].sql.join(";\n"))
+      for (const migration of appliedMigrations) database.exec(migration.sql.join(";\n"))
       for (const timestamp of appliedTimestamps) {
         database
           .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
           .run(`applied-${timestamp}`, timestamp)
+      }
+      if (appliedMigrations.includes(comments)) {
+        database.exec(`
+          INSERT INTO vitehub_comment_threads (id, page, anchor, status, created_by, created_at, updated_at)
+            VALUES ('existing-thread', '/', '{}', 'open', 'admin', 1, 1);
+          INSERT INTO vitehub_comments (id, thread_id, body, mentions, author, created_at)
+            VALUES ('existing-comment', 'existing-thread', 'Keep this comment', '[]', 'admin', 1);
+        `)
       }
       // Drizzle runs every migration newer than the ledger's latest timestamp, each adding a row.
       const latest = Math.max(0, ...appliedTimestamps)
@@ -125,6 +154,8 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
         "code_images",
         "quota_reservations",
         "abuse_reports",
+        "vitehub_comment_threads",
+        "vitehub_comments",
         "vitehub_auth_events",
       ])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
@@ -154,6 +185,25 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
           .all()
           .some((column) => column.name === "agent"),
       )
+      const threadColumns = database.prepare("PRAGMA table_info(vitehub_comment_threads)").all()
+      for (const name of ["scope", "number", "metadata"])
+        assert.ok(threadColumns.some((column) => column.name === name))
+      assert.ok(
+        database
+          .prepare("PRAGMA table_info(comments)")
+          .all()
+          .some((column) => column.name === "suggestion"),
+      )
+      if (appliedMigrations.includes(comments)) {
+        assert.equal(
+          database.prepare("SELECT body FROM vitehub_comments WHERE id = 'existing-comment'").get().body,
+          "Keep this comment",
+        )
+        assert.equal(
+          database.prepare("SELECT page FROM vitehub_comment_threads WHERE id = 'existing-thread'").get().page,
+          "/",
+        )
+      }
       await migrate(db, apply, config)
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
     } finally {

@@ -22,5 +22,6 @@ export default defineConsoleAuthorize(async ({ request, user }) => {
   // Refresh all accounts once per deployment policy, and always repair the current operator.
   await syncConsoleRoles()
   await syncRole(parsed.output.id)
+  // Grant all sections, including Comments for the page toolbar, Console triage, and ViteHub MCP tools.
   return true
 })
