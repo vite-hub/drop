@@ -27,7 +27,6 @@ export function applySuggestion(
 ): { body: string } | { error: string } {
   const pattern = new RegExp(quote.trim().split(/\s+/).map(escape).join("\\s+"), "g")
   let matches = [...body.matchAll(pattern)]
-  if (!matches.length) return { error: "These words aren't in the Markdown as written. Edit the doc instead." }
   if (matches.length > 1) {
     const start = label?.match(/^[a-z0-9]+ "(.*?)…?"$/)?.[1]
     const blockAt = (index: number) => {
@@ -39,7 +38,8 @@ export function applySuggestion(
     if (matches.length !== 1)
       return { error: "These words are in the doc more than once. Edit the doc to change the one you meant." }
   }
-  const [match] = matches as [RegExpExecArray]
+  const [match] = matches
+  if (!match) return { error: "These words aren't in the Markdown as written. Edit the doc instead." }
   let before = body.slice(0, match.index)
   const after = body.slice(match.index + match[0].length)
   // A deleted word takes one of the spaces around it along, so "more than twelve pigeons" reads "more than pigeons".
