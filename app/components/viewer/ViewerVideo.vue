@@ -6,6 +6,18 @@ defineProps<{ src: string; type?: string; title: string }>()
 
 onMounted(() => import("media-chrome"))
 
+// Firefox suspends decoding for a video whose window is hidden (behind another app, say), and on macOS a paused one can
+// come back without its frame: the player showed nothing, the whole screen in fullscreen. Seeking to where the video
+// already is decodes that frame again.
+const video = useTemplateRef<HTMLVideoElement>("video")
+const visibility = useDocumentVisibility()
+watch(visibility, (state) => {
+  const element = video.value
+  if (state !== "visible" || !element?.paused || element.readyState < HTMLMediaElement.HAVE_METADATA) return
+  const at = element.currentTime
+  element.currentTime = at
+})
+
 const variables = {
   "--media-primary-color": "var(--primary)",
   "--media-secondary-color": "var(--background)",
@@ -24,6 +36,7 @@ const variables = {
       :style="variables"
     >
       <video
+        ref="video"
         slot="media"
         class="block max-h-[calc(100dvh-12rem)] w-full in-[[mediaisfullscreen]]:h-full in-[[mediaisfullscreen]]:max-h-none"
         :aria-label="title"
