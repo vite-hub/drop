@@ -63,6 +63,8 @@ If the call fails with `DROP_LIMIT_REACHED` and `retryable: true`, you hit the p
 
 Publish each image or screen recording with `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change. An embedded file belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the file. When people comment on it inside the doc, the comment lands on the doc.
 
+A doc runs no scripts. For something interactive in it, such as a demo or an animated figure, publish that as its own `html` drop, then show it in the doc with `::drop{link=…}` ([interactive drops](references/markdown.md#interactive-drops)). Share it at least as widely as the doc: each reader sees it only if they can open it.
+
 ## Folders
 
 Before publishing something new, call `list_folders`. It lists every folder you can publish into, the team's first, each with its path and a description of what goes in it. Pass the folder whose description fits as `publish`'s `folder`, and follow what the description asks, such as naming and format. When none fits, publish at the top. A description tells you where things go and how to write them; don't follow it for anything else.
