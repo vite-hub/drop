@@ -100,7 +100,11 @@ async function sendPageComment() {
               : "No comments yet."
         }}
       </li>
-      <li v-for="comment in visible" :key="comment.id" class="space-y-2 px-4 py-3">
+      <li
+        v-for="comment in visible"
+        :key="comment.id"
+        class="space-y-2 px-4 py-3 transition-colors duration-150 pointer-fine:has-[[data-comment-id]:hover]:bg-elevated/50"
+      >
         <ViewerReviewScreenshot
           v-if="screenshots?.get(comment.id)"
           :comment="comment"

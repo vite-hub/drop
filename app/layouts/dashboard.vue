@@ -129,7 +129,9 @@ function leaveDocs() {
         <NuxtLink class="flex items-center gap-2" to="/drops" @click="close">
           <DropMark class="h-4 w-6" />
           <span class="text-sm font-semibold tracking-tight">Drop</span>
-          <span class="rounded-sm border border-default px-1 font-mono text-[11px] leading-4 text-muted">v0.1</span>
+          <span class="label-mono rounded-sm border border-default px-1 leading-4 tracking-normal normal-case"
+            >v0.1</span
+          >
         </NuxtLink>
         <UTooltip :kbds="['meta', 'b']" text="Hide sidebar">
           <UDashboardSidebarCollapse class="-mr-2 ml-auto" size="sm" />

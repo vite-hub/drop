@@ -306,7 +306,14 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
                 @click="pickImages"
               />
             </UTooltip>
-            <UButton color="neutral" label="Remove area" variant="ghost" @click="discard" />
+            <!-- Beside the page the column's X does this; in the dock it reads as Cancel next to Send. -->
+            <UButton
+              class="hidden in-[#drop-comments]:inline-flex"
+              color="neutral"
+              label="Remove area"
+              variant="ghost"
+              @click="discard"
+            />
             <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
           </div>
         </form>
