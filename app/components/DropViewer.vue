@@ -990,7 +990,13 @@ watch(
            Interactive viewers need clearance so their bottom controls stay clickable. -->
       <div class="relative flex min-h-0 flex-1 flex-col" :class="dockClearance ? 'pb-28 sm:pb-20' : ''">
         <div class="relative flex min-h-0 flex-1 flex-col">
-          <LazyViewerEditor v-if="editing" :editor="live.editor.value" :synced="live.synced.value" :width="docWidth" />
+          <!-- A draft the room turned away never syncs again, but its text stays readable. -->
+          <LazyViewerEditor
+            v-if="editing"
+            :editor="live.editor.value"
+            :synced="live.synced.value || live.refused.value !== undefined"
+            :width="docWidth"
+          />
           <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
           <ViewerSite
             v-else-if="drop.kind === 'site'"
@@ -1149,7 +1155,12 @@ watch(
                 :style="{ '--vh-avatar-size': '1.25rem' }"
                 variant="outline"
               />
+              <!-- A draft the room turned away has nothing to reconnect to (useLiveEditor). -->
+              <span v-if="live.refused.value !== undefined" class="px-2 text-xs text-muted">{{
+                live.refused.value ? "Out of date" : "Can't edit"
+              }}</span>
               <ConnectionStatus
+                v-else
                 class="px-2 text-xs text-muted data-[status=reconnecting]:text-error"
                 :status="live.status.value"
               >
@@ -1159,6 +1170,15 @@ watch(
               </ConnectionStatus>
               <UButton size="xs" color="neutral" label="Close" variant="ghost" @click="live.leave" />
               <UButton
+                v-if="live.refused.value"
+                size="xs"
+                data-review-primary
+                color="neutral"
+                :label="`Open v${live.refused.value}`"
+                @click="live.openRefused()"
+              />
+              <UButton
+                v-else
                 size="xs"
                 data-review-primary
                 color="neutral"

@@ -1,5 +1,6 @@
 import { promiseTimeout } from "@vueuse/core"
 import * as v from "valibot"
+import { draftOf } from "#shared/draft-paths"
 import type { DropDetail, DropSummary } from "#shared/types"
 import type { LiveRoom } from "~/composables/live-room"
 
@@ -9,6 +10,8 @@ type Published = v.InferOutput<typeof PublishedSchema>
 const LintFailureSchema = v.object({
   problems: v.array(v.object({ severity: v.string(), line: v.number(), message: v.string() })),
 })
+// A drop this person can no longer open answers 404.
+const GoneSchema = v.object({ statusCode: v.literal(404) })
 
 /**
  * Live editing of a Markdown drop. Everyone who opens it joins one Realtime room on the drop's draft, sees the others,
@@ -30,6 +33,54 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const editor = computed(() => room.value?.editor.value)
   const editing = computed(() => Boolean(documentId.value))
   const people = computed(() => realtime.value?.people.value ?? [])
+
+  // The room admits only people who may edit, and only on the latest version's draft (server/realtime/drops.ts). A
+  // version published from elsewhere (an agent, Accept on a suggestion) leaves this editor on an older draft, and once
+  // its socket drops, y-websocket knocks on the refused room every couple of seconds for as long as the tab stays open:
+  // browsers never say why a WebSocket failed. So when the room stays out of reach, ask the server whether this draft
+  // still qualifies, and if it doesn't, stop knocking. `refused` holds the newer version, or 0 when editing is over.
+  const refused = ref<number>()
+  let recheck: ReturnType<typeof setTimeout> | undefined
+  watch(
+    () => realtime.value?.status.value,
+    (status) => {
+      if (status !== "connected" && editing.value && refused.value === undefined)
+        recheck ??= setTimeout(() => void checkDraft(), 5_000)
+      else {
+        clearTimeout(recheck)
+        recheck = undefined
+      }
+    },
+  )
+  async function checkDraft() {
+    recheck = undefined
+    const id = documentId.value
+    const draft = id ? draftOf(id) : null
+    if (!draft) return
+    // `undefined` when there's no answer, so the connection itself is down, and `null` when the drop is gone.
+    const head = await $fetch<DropDetail>(`/api/drops/${draft.id}`).catch((error: unknown) =>
+      v.is(GoneSchema, error) ? null : undefined,
+    )
+    if (documentId.value !== id || realtime.value?.status.value === "connected") return
+    if (head === undefined || (head && head.version === draft.version && head.canEdit)) {
+      recheck = setTimeout(() => void checkDraft(), 30_000)
+      return
+    }
+    realtime.value?.provider.value?.disconnect()
+    // The text stays on screen, read-only, so whatever didn't reach the room can still be copied. No update event: it
+    // would count as typing.
+    editor.value?.setEditable(false, false)
+    if (head && head.version > draft.version) {
+      refused.value = head.version
+      notify.say(`v${head.version} was published while you were editing`, {
+        icon: "i-mingcute-history-line",
+        action: { label: `Open v${head.version}`, onClick: () => void openRefused() },
+      })
+    } else {
+      refused.value = 0
+      notify.say("You can't edit this drop anymore", { icon: "i-mingcute-lock-line" })
+    }
+  }
 
   // A new version keeps the drop's id, so the page reloads the drop's data rather than finding a new address.
   async function openLatest(id: string, edit = false) {
@@ -72,7 +123,11 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" }),
       ])
       room.value ??= scope.run(() => useLiveRoom(documentId))
-      if (room.value) room.value.edited.value = false
+      if (room.value) {
+        room.value.edited.value = false
+        room.value.unsaved.value = false
+      }
+      refused.value = undefined
       documentId.value = id
     } catch (error) {
       notify.fail("Couldn't open the editor", error)
@@ -82,29 +137,44 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   }
 
   function close() {
+    clearTimeout(recheck)
+    recheck = undefined
     room.value?.editor.value?.destroy()
     if (room.value) room.value.editor.value = undefined
     documentId.value = undefined
   }
 
-  // Typing while disconnected stays in this tab until the room is back (`synced` is false until then).
+  // Typing while disconnected stays in this tab until the room is back (`unsaved` until then). A refused draft never
+  // gets back, and it isn't kept for later either: the editor opens on the latest version next time.
+  async function mayClose() {
+    if (!room.value?.unsaved.value) return true
+    return await confirm({
+      title: "Your last edits haven't saved",
+      description:
+        refused.value === undefined
+          ? "You're offline, so they're still only in this tab. Closing the editor now loses them."
+          : "This draft can't save anymore, so they're only in this tab. Closing the editor now loses them.",
+      confirmLabel: "Close and lose them",
+      destructive: true,
+    })
+  }
+
   async function leave() {
-    const edited = room.value?.edited.value
-    if (edited && !realtime.value?.synced.value) {
-      const discard = await confirm({
-        title: "Your last edits haven't saved",
-        description: "You're offline, so they're still only in this tab. Closing the editor now loses them.",
-        confirmLabel: "Close and lose them",
-        destructive: true,
-      })
-      if (!discard) return
-    }
+    const kept = room.value?.edited.value && refused.value === undefined
+    if (!(await mayClose())) return
     close()
-    if (edited)
+    if (kept)
       notify.say("Draft kept, not published yet", {
         icon: "i-mingcute-edit-2-line",
         action: { label: "Keep editing", onClick: () => void open() },
       })
+  }
+
+  /** Leaves a refused draft for the drop's latest version. */
+  async function openRefused() {
+    if (!(await mayClose())) return
+    close()
+    await openLatest(drop.value.id)
   }
 
   async function publish(force = false): Promise<void> {
@@ -186,9 +256,11 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     people,
     status: computed(() => realtime.value?.status.value ?? "disconnected"),
     synced: computed(() => realtime.value?.synced.value ?? false),
+    refused: readonly(refused),
     open,
     close,
     leave,
+    openRefused,
     publish,
   }
 }
