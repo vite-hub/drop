@@ -35,6 +35,9 @@ export const FrameMessage = v.variant("type", [
       rect: Rect,
     }),
   ]),
+  // Where the composer for a held selection goes, in the frame's viewport: its card's place in the margin (`rail`), or
+  // the quote's box.
+  v.object({ type: v.literal("draft-place"), rail: v.boolean(), rect: Rect }),
   v.object({
     type: v.literal("image"),
     src: v.string(),

@@ -106,10 +106,11 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     ref="card"
     data-comment-editor
     class="flex min-h-0 flex-1 flex-col overflow-hidden bg-default text-default"
-    :class="pending && 'p-3'"
+    :class="pending && 'p-2 in-[#drop-comments]:p-3'"
   >
     <template v-if="pending">
-      <div class="mb-3 flex items-center justify-between gap-2">
+      <!-- Only in the dock: the card floating over the page sits beside what it's on, which stays marked there. -->
+      <div class="mb-3 hidden items-center justify-between gap-2 in-[#drop-comments]:flex">
         <span class="text-sm text-muted">{{
           pending.quote
             ? pending.kind === "area"
@@ -119,17 +120,12 @@ const menu = computed<DropdownMenuItem[][]>(() => [
               ? "Selected image area"
               : "Selected area"
         }}</span>
-        <!-- Only in the dock: beside the page, the column's own close button above already discards it. -->
-        <UButton
-          class="hidden in-[#drop-comments]:inline-flex"
-          color="neutral"
-          label="Remove selection"
-          size="sm"
-          variant="ghost"
-          @click="emit('cancel')"
-        />
+        <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
       </div>
-      <p v-if="pending.quote" class="mb-3 line-clamp-3 border-l-2 border-default pl-3 text-sm text-muted">
+      <p
+        v-if="pending.quote"
+        class="mb-3 line-clamp-3 hidden border-l-2 border-default pl-3 text-sm text-muted in-[#drop-comments]:[display:-webkit-box]"
+      >
         {{ pending.quote }}
       </p>
       <div class="flex items-end gap-1" @dragover.prevent @drop="drop">
@@ -144,7 +140,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             picks.length
               ? 'Add a note (optional)'
               : pending.quote
-                ? 'Comment on the selection'
+                ? 'Add a comment'
                 : pending.ow
                   ? 'Comment on this area'
                   : 'Comment on this spot'

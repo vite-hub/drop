@@ -334,12 +334,6 @@ body {
     transform: translateY(-16px);
   }
 }
-@keyframes aside-in {
-  from {
-    opacity: 0;
-    transform: translateX(8px);
-  }
-}
 @keyframes flash {
   from {
     background-color: var(--ui-bg-accented);
