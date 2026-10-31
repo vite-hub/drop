@@ -1032,8 +1032,11 @@ watch(
               <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
             </template>
             <template v-if="editing">
+              <!-- One presence ring instead of the outline's two: its inner ring is page-colored, not the glass behind it,
+              and the pair reached past the pill's padding. -->
               <AvatarStack
                 v-if="live.people.value.length"
+                class="ml-1 [&_[data-slot=avatar-stack-item]]:shadow-[0_0_0_2px_var(--vh-avatar-color,var(--ui-border))]"
                 :max="3"
                 :people="live.people.value"
                 :style="{ '--vh-avatar-size': '1.25rem' }"
