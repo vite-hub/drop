@@ -121,6 +121,7 @@ const about = computed(() =>
             aria-label="Copy link"
             color="neutral"
             :icon="copied('link') ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
+            :ui="{ leadingIcon: copied('link') ? 'animate-icon-in' : undefined }"
             size="sm"
             variant="outline"
             @click="copy(link, { key: 'link' })"

@@ -28,7 +28,7 @@ export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
 /** What the frame reports about the reader's pointer and keys, in frame coordinates. */
 type PointerMessage = Extract<
   FrameMessage,
-  { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" | "marks" }
+  { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" | "marks" | "draft-place" }
 >
 
 /**
@@ -51,6 +51,12 @@ export function useViewerAnnotations(options: {
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
   const popover = ref<Popover | null>(null)
+  /** Where the frame keeps the place of the comment being written on a selection, in page coordinates (draft-place). */
+  const draftPlace = ref<{ rail: boolean; rect: Rect } | null>(null)
+  watch(
+    () => popover.value?.type === "new" && popover.value.pending.kind === "text",
+    (text) => !text && (draftPlace.value = null),
+  )
   /**
    * The comment whose thread the frame will open once it has scrolled to the pin (`awaitThread`). Escape, a tool, or
    * another comment in the meantime clears it, so the late report doesn't open a thread the reader moved on from.
@@ -211,6 +217,16 @@ export function useViewerAnnotations(options: {
       lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
     }
     if (message.type === "marks") marks.value = message.count
+    if (message.type === "draft-place" && popover.value?.type === "new")
+      draftPlace.value = {
+        rail: message.rail,
+        rect: {
+          left: x(message.rect.left),
+          top: y(message.rect.top),
+          right: x(message.rect.right),
+          bottom: y(message.rect.bottom),
+        },
+      }
     if (message.type === "area") {
       dropShot()
       awaitedShot = commenting.value ? message.shot : undefined
@@ -305,6 +321,7 @@ export function useViewerAnnotations(options: {
     selection,
     lightbox,
     popover,
+    draftPlace,
     tool,
     frameTool,
     overlays,

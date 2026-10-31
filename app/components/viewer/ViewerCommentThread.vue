@@ -106,10 +106,11 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     ref="card"
     data-comment-editor
     class="flex min-h-0 flex-1 flex-col overflow-hidden bg-default text-default"
-    :class="pending && 'p-3'"
+    :class="pending && 'p-2 in-[#drop-comments]:p-3'"
   >
     <template v-if="pending">
-      <div class="mb-3 flex items-center justify-between gap-2">
+      <!-- Only in the dock: the card floating over the page sits beside what it's on, which stays marked there. -->
+      <div class="mb-3 hidden items-center justify-between gap-2 in-[#drop-comments]:flex">
         <span class="text-sm text-muted">{{
           pending.quote
             ? pending.kind === "area"
@@ -121,7 +122,10 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         }}</span>
         <UButton color="neutral" label="Remove selection" size="sm" variant="ghost" @click="emit('cancel')" />
       </div>
-      <p v-if="pending.quote" class="mb-3 line-clamp-3 border-l-2 border-default pl-3 text-sm text-muted">
+      <p
+        v-if="pending.quote"
+        class="mb-3 line-clamp-3 hidden border-l-2 border-default pl-3 text-sm text-muted in-[#drop-comments]:[display:-webkit-box]"
+      >
         {{ pending.quote }}
       </p>
       <div class="flex items-end gap-1" @dragover.prevent @drop="drop">
@@ -136,7 +140,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             picks.length
               ? 'Add a note (optional)'
               : pending.quote
-                ? 'Comment on the selection'
+                ? 'Add a comment'
                 : pending.ow
                   ? 'Comment on this area'
                   : 'Comment on this spot'
@@ -217,7 +221,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
             <UButton
               v-if="canManage || reply.mine"
               aria-label="Delete reply"
-              class="ml-auto opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              class="ml-auto motion-safe:transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-visible:opacity-100"
               color="neutral"
               icon="i-mingcute-delete-2-line"
               size="xs"

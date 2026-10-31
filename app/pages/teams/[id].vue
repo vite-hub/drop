@@ -15,7 +15,11 @@ const newFolder = useFolderDialog()
 const team = computed(() => me.value?.teams?.find((item) => item.id === id.value))
 const runs = computed(() => team.value?.role === "owner" || team.value?.role === "admin")
 // Better Auth's client calls go from the browser, with its session cookie.
-const { data: detail, refresh } = useAsyncData(keys.team(id.value), () => teams.full(id.value), {
+const {
+  data: detail,
+  status,
+  refresh,
+} = useAsyncData(keys.team(id.value), () => teams.full(id.value), {
   default: () => null,
   server: false,
 })
@@ -57,9 +61,23 @@ async function invite() {
   }
 }
 
+// A blocked clipboard says so and shows the link to copy by hand, instead of a "copied" note over an empty clipboard.
 async function copy(invitationId: string, title = "Link copied") {
-  await navigator.clipboard.writeText(inviteLink(invitationId)).catch(() => {})
-  notify.done(title)
+  const link = inviteLink(invitationId)
+  const written = await navigator.clipboard.writeText(link).then(
+    () => true,
+    () => false,
+  )
+  if (written) notify.done(title)
+  else notify.alert("Couldn't copy the link", link)
+}
+
+// One row's Cancel at a time, so a double press doesn't send it twice.
+const cancelling = ref<string | null>(null)
+async function cancelInvite(invitationId: string) {
+  cancelling.value = invitationId
+  await act(() => teams.cancelInvite(invitationId), "Couldn't cancel the invitation")
+  cancelling.value = null
 }
 
 async function act(action: () => Promise<unknown>, failure: string) {
@@ -133,15 +151,16 @@ async function makeFolder() {
   }
 }
 
-const paying = ref(false)
-async function pay(action: () => Promise<{ url?: string | null }>) {
-  paying.value = true
+// Which billing button was pressed: it spins, the others wait.
+const paying = ref<"manage" | "monthly" | "yearly" | null>(null)
+async function pay(button: NonNullable<typeof paying.value>, action: () => Promise<{ url?: string | null }>) {
+  paying.value = button
   try {
     const { url } = await action()
     if (url) window.location.href = url
   } catch (error) {
     notify.fail("Couldn't open billing", error)
-    paying.value = false
+    paying.value = null
   }
 }
 
@@ -195,9 +214,11 @@ if (import.meta.client && route.query.billing === "done") {
           <UInput
             v-model="email"
             aria-label="Email to invite"
+            autocomplete="off"
             class="min-w-56 flex-1"
             :disabled="full"
             placeholder="name@example.com"
+            spellcheck="false"
             type="email"
           />
           <USelect v-model="role" aria-label="Role" class="w-28" :disabled="full" :items="roleItems" />
@@ -205,6 +226,13 @@ if (import.meta.client && route.query.billing === "done") {
         </form>
         <div class="overflow-hidden rounded-lg border border-default">
           <ul class="divide-y divide-default text-sm">
+            <li v-if="status === 'pending' && !detail" class="flex items-center gap-3 px-4 py-2.5">
+              <USkeleton class="size-8 rounded-full" />
+              <div class="flex-1 space-y-1.5">
+                <USkeleton class="h-4 w-32" />
+                <USkeleton class="h-3 w-44" />
+              </div>
+            </li>
             <li v-for="person in members" :key="person.id" class="flex items-center gap-3 px-4 py-2.5">
               <UAvatar :alt="person.user.name" :src="person.user.image ?? undefined" size="sm" />
               <div class="min-w-0 flex-1">
@@ -234,13 +262,22 @@ if (import.meta.client && route.query.billing === "done") {
               <span class="min-w-0 flex-1 truncate font-mono text-xs">{{ item.email }}</span>
               <span class="text-xs">Invited</span>
               <template v-if="runs">
-                <UButton color="neutral" label="Copy link" size="sm" variant="ghost" @click="copy(item.id)" />
                 <UButton
+                  :aria-label="`Copy the invitation link for ${item.email}`"
                   color="neutral"
-                  label="Cancel"
+                  label="Copy link"
                   size="sm"
                   variant="ghost"
-                  @click="act(() => teams.cancelInvite(item.id), 'Couldn\'t cancel the invitation')"
+                  @click="copy(item.id)"
+                />
+                <UButton
+                  :aria-label="`Cancel the invitation for ${item.email}`"
+                  color="neutral"
+                  label="Cancel"
+                  :loading="cancelling === item.id"
+                  size="sm"
+                  variant="ghost"
+                  @click="cancelInvite(item.id)"
                 />
               </template>
             </li>
@@ -269,33 +306,36 @@ if (import.meta.client && route.query.billing === "done") {
               v-if="team.paid"
               color="neutral"
               label="Manage billing"
-              :loading="paying"
+              :loading="paying === 'manage'"
               size="sm"
               variant="outline"
-              @click="pay(() => teams.manageBilling(id))"
+              @click="pay('manage', () => teams.manageBilling(id))"
             />
             <template v-else>
               <UButton
                 v-if="billing.annual"
                 color="neutral"
                 label="Pay yearly"
-                :loading="paying"
+                :disabled="paying !== null"
+                :loading="paying === 'yearly'"
                 size="sm"
                 variant="ghost"
-                @click="pay(() => teams.upgrade(id, true))"
+                @click="pay('yearly', () => teams.upgrade(id, true))"
               />
               <UButton
                 color="neutral"
                 label="Start the Team plan"
-                :loading="paying"
+                :disabled="paying !== null"
+                :loading="paying === 'monthly'"
                 size="sm"
-                @click="pay(() => teams.upgrade(id))"
+                @click="pay('monthly', () => teams.upgrade(id))"
               />
             </template>
           </template>
         </div>
         <p class="mt-2 text-xs text-muted">
-          Boards aren't part of the Team plan. <NuxtLink class="underline" to="/pricing">Plans and prices</NuxtLink>
+          Boards aren't part of the Team plan.
+          <NuxtLink class="underline underline-offset-4" to="/pricing">Plans and prices</NuxtLink>
         </p>
       </section>
     </div>

@@ -69,9 +69,10 @@ function talk(version: DropVersion) {
       <UTooltip :text="`Copy link to v${version.version}`">
         <UButton
           :aria-label="`Copy link to v${version.version}`"
-          class="absolute top-1.5 right-1.5 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-visible:opacity-100"
+          class="absolute top-1.5 right-1.5 motion-safe:transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/row:opacity-100 pointer-fine:focus-visible:opacity-100"
           color="neutral"
           :icon="copied(`v${version.version}`) ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
+          :ui="{ leadingIcon: copied(`v${version.version}`) ? 'animate-icon-in' : undefined }"
           size="xs"
           variant="ghost"
           @click="copyLink(version)"

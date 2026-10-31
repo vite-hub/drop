@@ -76,9 +76,9 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
       <span aria-hidden="true" class="block size-3.5 rounded-full ring-1 ring-black/10" :style="{ background: hex }" />
     </button>
     <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
-    <UTooltip :content="{ side: 'top', sideOffset: 8 }">
+    <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['meta', 'z']" text="Undo">
       <button
-        aria-keyshortcuts="Meta+Z"
+        aria-keyshortcuts="Meta+Z Control+Z"
         aria-label="Undo"
         class="grid place-items-center"
         data-icon
@@ -88,7 +88,6 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
       >
         <UIcon aria-hidden="true" name="i-mingcute-back-2-line" />
       </button>
-      <template #content>Undo<span class="ml-1.5 opacity-60">⌘Z</span></template>
     </UTooltip>
     <UButton color="neutral" label="Cancel" size="xs" variant="ghost" @click="emit('cancel')" />
     <UButton

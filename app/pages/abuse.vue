@@ -17,7 +17,7 @@ const { data: contact } = await useApi("/api/abuse-contact", { key: keys.abuseCo
         <a :href="`mailto:${contact.email}`">{{ contact.email }}</a
         >.
       </p>
-      <p v-else>No contact email is configured. Please use the report form.</p>
+      <p v-else>This Drop lists no contact email. Use the report form.</p>
       <h2>Copyright / DMCA notices</h2>
       <p>
         Identify the copyrighted work, the exact content link, your name and contact details. Include a statement that

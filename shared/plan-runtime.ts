@@ -133,7 +133,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
   const pageStyle = document.createElement("style");
-  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent)}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
+  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent)}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active),::highlight(drop-draft){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
     // Drop's review dock floats over the frame's bottom edge (--drop-bottom), out of reach of the page's own layers, so
     // Comark's zoom ends above it and its thumbnails stay clickable. Its backdrop still runs under the dock.
     ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
@@ -305,6 +305,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const article = !AUTHORED && THEMED ? document.querySelector("main > article.typeset") : null;
   const inRail = (m) => Boolean(article) && m.kind === "text" && !m.resolved && !m.earlier;
   let textRanges = [], railHits = [];
+  // The selection a comment is being written on ("hold-selection"): its quote stays marked (drop-draft), and in the
+  // margin it keeps a card's place, so the composer Drop floats over that place is where the card lands once it's sent.
+  let drafted = null;
+  const drafting = () => Boolean(drafted && article && article.contains(drafted.commonAncestorContainer));
   const bubbles = new Map();
   function clearBubbles() {
     for (const bubble of bubbles.values()) {
@@ -350,8 +354,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   function render() {
     marks.innerHTML = "";
-    // Hidden comments (the toolbar's eye) keep their place. Shown before drawing, so the margin's cards measure their
-    // size when the eye turns them back on.
+    // Hidden comments (the toolbar's eye) give the doc its margin back, so the column centers again. Shown before
+    // drawing, so the margin's cards measure their size when the eye turns them back on.
     marks.style.display = view.pins ? "" : "none";
     const layer = zoom && zoomLayer(), zoomMarks = layer && layer.querySelector(".marks");
     const aside = zoomMarks && zoomAside(), asideMarks = aside && aside.querySelector(".marks");
@@ -362,7 +366,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
     const ranges = new Map(markers.filter((m) => m.kind === "text" && m.quote).map((m) => [m.id, findRange(m.selector, m.quote)]));
     // Under a zoom the page's comments don't draw, so the column stays as it was.
-    const wide = zoom ? document.documentElement.getAttribute("data-drop-rail") === "open" : setRail(markers.some((m) => inRail(m) && ranges.get(m.id)));
+    const wide = zoom ? document.documentElement.getAttribute("data-drop-rail") === "open" : setRail(view.pins && (drafting() || markers.some((m) => inRail(m) && ranges.get(m.id))));
     textRanges = [];
     if (wide && view.pins && !zoom) {
       if (!BUBBLES.isConnected) document.head.appendChild(BUBBLES);
@@ -423,6 +427,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       placePin(m, x, y, into, false);
     }
     railHits = railed.map(({ m, lines }) => ({ id: m.id, boxes: lines.map((l) => ({ left: l.left + scrollX, right: l.right + scrollX, top: l.top + scrollY, bottom: l.bottom + scrollY })) }));
+    const draftLines = wide && view.pins && !zoom && drafting() ? drafted.getClientRects() : [];
+    if (draftLines.length) railed.push({ m: null, last: draftLines[draftLines.length - 1], lines: [] });
     if (railed.length) drawRail(railed);
     // A copy button on each code block, shown while the pointer is over it: the block scrolls sideways under it, so an
     // always-on label would sit on top of the code. The sandbox has no clipboard access, so Drop copies.
@@ -452,6 +458,14 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The viewer lists the comments it couldn't place; it only says so when that changes, since this runs on resize.
     if (unplaced.join() !== lastUnplaced) { lastUnplaced = unplaced.join(); post({ type: "unplaced", ids: unplaced }); }
     emphasise();
+    placeDraft();
+  }
+
+  /** Where the composer for the held selection goes: its place in the margin, else the quote, for Drop to float it under. */
+  function placeDraft() {
+    if (!drafted) return;
+    const slot = marks.querySelector(".rail .slot > .cr-card"), r = (slot || drafted).getBoundingClientRect();
+    post({ type: "draft-place", rail: Boolean(slot), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }
 
   /**
@@ -470,6 +484,22 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       .map((r) => ({ top: r.top - box.top, bottom: r.bottom - box.top }));
     let below = -Infinity;
     for (const { m, last } of railed.sort((a, b) => a.last.top - b.last.top || a.last.left - b.last.left)) {
+      if (!m) {
+        // The held selection's place: a card's width and a one-line composer's height, empty, under Drop's composer.
+        const group = document.createElement("div"), slot = document.createElement("div");
+        group.className = "g slot"; slot.className = "cr-card";
+        slot.style.cssText = "visibility:hidden;height:3.5rem;right:0";
+        group.appendChild(slot);
+        rail.appendChild(group);
+        let top = Math.max(last.top - box.top, below + 8);
+        for (let moved = true; moved; ) {
+          moved = false;
+          for (const t of taken) if (top < t.bottom + 8 && top + slot.offsetHeight > t.top - 8) { top = t.bottom + 8; moved = true; }
+        }
+        slot.style.top = top + "px";
+        below = top + slot.offsetHeight;
+        continue;
+      }
       const group = document.createElement("div");
       group.className = "g"; group.dataset.id = m.id;
       const toggle = document.createElement("input");
@@ -511,7 +541,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   /** The comment Drop shows, the one a "focus" picked, and the one under the pointer: their highlight and card stand out. */
   function emphasise() {
     const on = new Set([active, opened, pointed, textPointed].filter(Boolean));
-    marks.querySelectorAll(".rail .g").forEach((group) => { group.firstElementChild.checked = on.has(group.dataset.id); });
+    marks.querySelectorAll(".rail .g:not(.slot)").forEach((group) => { group.firstElementChild.checked = on.has(group.dataset.id); });
     for (const [id, bubble] of bubbles) bubble.toggleAttribute("data-on", on.has(id));
     if (!highlights) return;
     const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
@@ -543,20 +573,23 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   document.addEventListener("mouseleave", clearPointed);
   window.addEventListener("blur", clearPointed);
 
-  let lastQuote = "";
+  // The selection's range too: the page loses the selection once focus moves to Drop's composer, and "hold-selection"
+  // keeps its text marked (drop-draft) until the comment is sent or dropped.
+  let lastQuote = "", lastRange = null;
   function reportSelection() {
     const sel = getSelection();
     const text = sel && sel.rangeCount ? sel.toString().trim().replace(/\s+/g, " ") : "";
     if (!text || host.contains(sel.anchorNode)) { if (lastQuote) post({ type: "selection", clear: true }); lastQuote = ""; return; }
     const range = sel.getRangeAt(0), r = range.getBoundingClientRect(), block = blockOf(range.commonAncestorContainer);
     lastQuote = text.slice(0, 500);
+    lastRange = range.cloneRange();
     post({ type: "selection", quote: lastQuote, selector: pathOf(block), label: labelOf(block), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }
   let selectionTimer = 0;
   document.addEventListener("mouseup", () => setTimeout(reportSelection, 0));
   document.addEventListener("selectionchange", () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(reportSelection, 250); });
   document.addEventListener("keyup", (e) => { if (e.shiftKey || e.key === "Shift") reportSelection(); });
-  document.addEventListener("scroll", () => { if (lastQuote) reportSelection(); }, { passive: true });
+  document.addEventListener("scroll", () => { if (lastQuote) reportSelection(); placeDraft(); }, { passive: true });
 
   document.addEventListener("click", (e) => {
     const target = e.target && e.target.closest ? e.target : null;
@@ -1314,7 +1347,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); }
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; render(); } }
+    if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("drop-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
     if (m.type === "pen") setPen(m);

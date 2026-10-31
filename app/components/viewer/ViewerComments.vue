@@ -81,10 +81,17 @@ async function sendPageComment() {
       size="sm"
       variant="link"
     />
-    <ul
+    <!-- A comment that arrives (yours, sent from the box below, or someone else's live) rises in; the list as it
+         loads, or as a tab or version swaps it (the key), is just there. Leaving is instant: a resolved comment is
+         done with, and a fading row would hold the rows below it in place. -->
+    <TransitionGroup
+      :key="`${filter}:${version}`"
       class="min-h-0 flex-1 divide-y divide-default overflow-y-auto overscroll-contain border-t border-default wrap-anywhere"
+      enter-active-class="transition-[opacity,translate] duration-200 ease-out"
+      enter-from-class="opacity-0 motion-safe:translate-y-1"
+      tag="ul"
     >
-      <li v-if="!visible.length && !earlier.length" class="px-4 py-10 text-center text-sm text-muted">
+      <li v-if="!visible.length && !earlier.length" key="empty" class="px-4 py-10 text-center text-sm text-muted">
         {{
           filter === "resolved"
             ? "Nothing resolved yet."
@@ -93,7 +100,11 @@ async function sendPageComment() {
               : "No comments yet."
         }}
       </li>
-      <li v-for="comment in visible" :key="comment.id" class="space-y-2 px-4 py-3">
+      <li
+        v-for="comment in visible"
+        :key="comment.id"
+        class="space-y-2 px-4 py-3 transition-colors duration-150 pointer-fine:has-[[data-comment-id]:hover]:bg-elevated/50"
+      >
         <ViewerReviewScreenshot
           v-if="screenshots?.get(comment.id)"
           :comment="comment"
@@ -128,14 +139,14 @@ async function sendPageComment() {
         </button>
         <button
           v-if="canManage || comment.mine"
-          class="min-h-6 cursor-pointer text-xs text-muted hover:text-highlighted"
+          class="min-h-6 cursor-pointer text-xs text-muted hover:text-highlighted pointer-coarse:min-h-11"
           type="button"
           @click="emit('resolve', comment.id, !comment.resolved)"
         >
           {{ comment.resolved ? "Reopen" : "Resolve" }}
         </button>
       </li>
-      <li v-if="earlier.length" class="bg-elevated/50 px-4 py-2">
+      <li v-if="earlier.length" key="earlier" class="bg-elevated/50 px-4 py-2">
         <p class="label-mono">From earlier versions</p>
         <p class="mt-0.5 text-xs text-muted">What these point at changed or is gone in v{{ version }}.</p>
       </li>
@@ -157,7 +168,7 @@ async function sendPageComment() {
           >
           <button
             v-if="canManage || comment.mine"
-            class="min-h-6 cursor-pointer text-muted hover:text-highlighted"
+            class="min-h-6 cursor-pointer text-muted hover:text-highlighted pointer-coarse:min-h-11"
             type="button"
             @click="emit('resolve', comment.id, true)"
           >
@@ -165,7 +176,7 @@ async function sendPageComment() {
           </button>
         </div>
       </li>
-    </ul>
+    </TransitionGroup>
     <!-- A comment on the page as a whole: no text, image, or area to point at. Enter sends, Shift+Enter breaks. -->
     <ViewerImagePicks v-if="canComment" class="border-t border-default px-2.5 pt-1.5" :picks="picks" @remove="remove" />
     <div

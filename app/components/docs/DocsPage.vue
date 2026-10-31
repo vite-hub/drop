@@ -22,8 +22,8 @@ useSeoMeta({
 <template>
   <article class="max-w-3xl">
     <header class="mb-10">
-      <h1 class="text-3xl font-semibold tracking-tight text-highlighted">{{ title }}</h1>
-      <p class="mt-3 text-base leading-relaxed text-muted">{{ lead }}</p>
+      <h1 class="text-3xl font-semibold tracking-tight text-balance text-highlighted">{{ title }}</h1>
+      <p class="mt-3 max-w-prose text-base leading-relaxed text-pretty text-muted">{{ lead }}</p>
     </header>
 
     <div class="space-y-10">

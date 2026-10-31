@@ -287,6 +287,9 @@ export default defineNuxtConfig({
     },
   },
 
+  // Switching themes swaps every color at once instead of fading each element's own transition.
+  colorMode: { disableTransition: true },
+
   ui: {
     colorMode: true,
     // Geist is self-hosted from Fontsource (see `css`).

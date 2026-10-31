@@ -109,6 +109,18 @@
   overflow-wrap: anywhere;
   text-align: center;
   text-decoration: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    opacity 150ms,
+    background-color 150ms,
+    transform 100ms ease-out;
+}
+
+/* Press feedback lands with the finger, on touch too, where the hover rules below never run. */
+.content-unavailable-action:active {
+  transform: scale(0.97);
 }
 
 .content-unavailable-action svg {
@@ -149,7 +161,7 @@
   outline-offset: 4px;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .content-unavailable-action:hover {
     opacity: 0.85;
   }
@@ -161,6 +173,12 @@
 
   .content-unavailable-report:hover {
     color: var(--foreground);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-unavailable-action:active {
+    transform: none;
   }
 }
 

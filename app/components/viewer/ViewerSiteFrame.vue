@@ -260,7 +260,8 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
         </div>
       </ViewerDevice>
 
-      <Teleport v-if="pending" to="#drop-site-composer">
+      <!-- Deferred: its box mounts in the same update, in the dock or beside the page (DropViewer). -->
+      <Teleport v-if="pending" defer to="#drop-site-composer">
         <form
           class="space-y-3 overflow-y-auto overscroll-contain p-3"
           @dragover.prevent
@@ -281,6 +282,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           </div>
           <UTextarea
             v-model="note"
+            aria-label="Comment"
             autofocus
             autoresize
             class="w-full"
@@ -304,7 +306,14 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
                 @click="pickImages"
               />
             </UTooltip>
-            <UButton color="neutral" label="Remove area" variant="ghost" @click="discard" />
+            <!-- Beside the page the column's X does this; in the dock it reads as Cancel next to Send. -->
+            <UButton
+              class="hidden in-[#drop-comments]:inline-flex"
+              color="neutral"
+              label="Remove area"
+              variant="ghost"
+              @click="discard"
+            />
             <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
           </div>
         </form>

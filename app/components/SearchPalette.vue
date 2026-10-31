@@ -277,6 +277,7 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
 </script>
 
 <template>
+  <!-- No open or close animation: a palette summoned many times a day should be there the moment ⌘K lands. -->
   <UDashboardSearch
     v-model:open="open"
     v-model:search-term="term"
@@ -285,6 +286,7 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
     :color-mode="false"
     preserve-group-order
     :search-delay="0"
+    :transition="false"
     :loading="pending && !unknownFolder"
     placeholder="Search drops, docs and pages, or make one"
     title="Search"
