@@ -208,8 +208,13 @@ const pageComments = computed(() =>
 // TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
 // outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
+// A resolved comment leaves the page and stays in the panel's Resolved list; it shows again while its thread is open.
+const onPage = (comment: DropComment) =>
+  !comment.resolved || (popover.value?.type === "thread" && popover.value.id === comment.id)
 // Comments on the whole page have nothing in it to pin to; they live in the panel.
-const pinned = computed(() => pageComments.value.filter((comment) => !replaced(comment) && comment.kind !== "page"))
+const pinned = computed(() =>
+  pageComments.value.filter((comment) => onPage(comment) && !replaced(comment) && comment.kind !== "page"),
+)
 
 const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
 // The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
@@ -598,7 +603,10 @@ async function focusComment(comment: DropComment) {
       .toBe(true, { timeout: 5000 })
       .catch(() => {})
   }
-  if (comment.kind !== "page") send({ type: "focus", id: comment.id, open: false })
+  if (comment.kind === "page") return
+  // A resolved comment joins the pins once its thread opens: the frame takes the new pins first.
+  await nextTick()
+  send({ type: "focus", id: comment.id, open: false })
 }
 
 // `?comment=<n>` from a copied link: once the frame has placed the pins, open that thread with the comments showing.
@@ -1273,7 +1281,7 @@ watch(
       v-if="lightbox"
       :alt="lightbox.alt"
       :can-comment="drop.canComment"
-      :comments="imageComments"
+      :comments="imageComments.filter(onPage)"
       :draft="imageDraft"
       :from="lightbox.from"
       :src="lightbox.src"
