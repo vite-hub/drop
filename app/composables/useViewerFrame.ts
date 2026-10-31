@@ -200,7 +200,8 @@ export function useViewerFrame(options: {
   const embedLinks = computed(() => {
     if (drop.value.kind !== "markdown") return new Set<string>()
     // Read only the server-rendered boxes, in an inert template: frame messages cannot grant access to other links.
-    const template = document.createElement("template")
+    const template = globalThis.document?.createElement("template")
+    if (!template) return new Set<string>()
     template.innerHTML = drop.value.html ?? ""
     return new Set(
       Array.from(template.content.querySelectorAll("figure.drop-embed[data-drop-embed]"), (box) =>
