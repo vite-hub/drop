@@ -17,7 +17,7 @@
   <a href="https://github.com/vite-hub/drop">Source</a>
 </p>
 
-[![license](https://comark-ui.onmax.me/badge.svg?label=license&value=Apache-2.0)](https://github.com/vite-hub/drop/blob/main/LICENSE)
+[![license](https://comark-ui.onmax.me/badge.svg?label=license&value=BUSL-1.1)](https://github.com/vite-hub/drop/blob/main/LICENSE)
 [![docs](https://comark-ui.onmax.me/badge.svg?label=docs&value=drop.vitehub.dev)](https://drop.vitehub.dev)
 
 ## How it works
@@ -59,4 +59,6 @@ The hand mark is [Twemoji](https://github.com/twitter/twemoji) via [Iconify](htt
 
 ## License
 
-[Apache-2.0](LICENSE), like [ViteHub](https://github.com/vite-hub/vitehub).
+Drop's code is public under the [Business Source License 1.1](LICENSE). Running it is free for one or two people, and trying it out is free at any size. A team of 3 or more needs a license, $9 per member a month: see [Pricing](https://drop.vitehub.dev/pricing) or write to hello@onmax.me. Each version becomes Apache-2.0 four years after it's published.
+
+Drop was Apache-2.0 up to commit `832a57a`, and that code stays Apache-2.0. Files that carry their own license, such as the ported Brainless components and the `slidev` skill, keep it.

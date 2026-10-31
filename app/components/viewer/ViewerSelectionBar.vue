@@ -2,6 +2,16 @@
 // The bar over a text selection, in the review dock's shape and type (ViewerReviewDock). It stands out from the page:
 // the dock's dark surface on a light theme, and its light twin on a dark one.
 const emit = defineEmits<{ comment: []; suggest: [] }>()
+const actions = [
+  { label: "Comment", hint: "Comment on it", kbd: "C", icon: "i-mingcute-chat-1-line", press: () => emit("comment") },
+  {
+    label: "Suggest",
+    hint: "Suggest new words",
+    kbd: "E",
+    icon: "i-mingcute-edit-2-line",
+    press: () => emit("suggest"),
+  },
+]
 </script>
 
 <template>
@@ -12,14 +22,16 @@ const emit = defineEmits<{ comment: []; suggest: [] }>()
     class="selection-bar flex origin-bottom items-center gap-1 rounded-[12px] border p-1 [animation:pop-in_140ms_var(--ease-out)]"
     @mousedown.prevent
   >
-    <button type="button" @click="emit('comment')">
-      <UIcon name="i-mingcute-chat-1-line" />
-      Comment
-    </button>
-    <button type="button" @click="emit('suggest')">
-      <UIcon name="i-mingcute-edit-2-line" />
-      Suggest
-    </button>
+    <!-- The keys work from the page too (C, E), where focus stays while text is selected. -->
+    <UTooltip v-for="action in actions" :key="action.kbd" :content="{ side: 'top', sideOffset: 8 }">
+      <button :aria-keyshortcuts="action.kbd" type="button" @click="action.press">
+        <UIcon aria-hidden="true" :name="action.icon" />
+        {{ action.label }}
+      </button>
+      <template #content>
+        {{ action.hint }}<span class="ml-1.5 opacity-60">{{ action.kbd }}</span>
+      </template>
+    </UTooltip>
   </div>
 </template>
 

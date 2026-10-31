@@ -334,7 +334,6 @@ if (import.meta.client && route.query.billing === "done") {
           </template>
         </div>
         <p class="mt-2 text-xs text-muted">
-          Boards aren't part of the Team plan.
           <NuxtLink class="underline underline-offset-4" to="/pricing">Plans and prices</NuxtLink>
         </p>
       </section>

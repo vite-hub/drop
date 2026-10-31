@@ -101,6 +101,10 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     }
   }
 
+  // A new version adds bytes and a write, so the lists and the plan usage move too.
+  const reloadVersion = () =>
+    Promise.all([drop.refresh(), comments.refresh(), refreshNuxtData([keys.drops, keys.tree, keys.usage])])
+
   /**
    * Puts a suggestion's words into the doc as its next version and resolves it. The drop keeps its id, so the page
    * reloads its data and shows the new version. Resolves to whether it went through; a failure says why in a toast.
@@ -108,13 +112,22 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   async function acceptSuggestion(commentId: string) {
     try {
       const next = await $fetch<DropSummary>(`/api/comments/${commentId}/accept`, { method: "POST" })
-      // A new version adds bytes and a write, so the lists and the plan usage move too.
-      await Promise.all([drop.refresh(), comments.refresh(), refreshNuxtData([keys.drops, keys.tree, keys.usage])])
-      notify.done(`Published v${next.version}`)
+      await reloadVersion()
+      notify.say(`Published v${next.version}`, { action: { label: "Undo", onClick: () => void undo(commentId) } })
       return true
     } catch (error) {
       notify.fail("Couldn't accept the suggestion", error)
       return false
+    }
+  }
+  /** Takes an accepted suggestion back: the text from before is published again, and the suggestion opens again. */
+  async function undo(commentId: string) {
+    try {
+      const next = await $fetch<DropSummary>(`/api/comments/${commentId}/accept`, { method: "DELETE" })
+      await reloadVersion()
+      notify.done(`Published v${next.version} without it`)
+    } catch (error) {
+      notify.fail("Couldn't undo the suggestion", error)
     }
   }
 

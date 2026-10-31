@@ -11,6 +11,7 @@ const { default: readFile } = await import("../../server/mcp/tools/read_file.ts"
 const { default: listDrops } = await import("../../server/mcp/tools/list_drops.ts")
 const { default: updateDrop } = await import("../../server/mcp/tools/update_drop.ts")
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
+const { default: acceptTool } = await import("../../server/mcp/tools/accept_suggestion.ts")
 const { default: editBoard } = await import("../../server/mcp/tools/edit_board.ts")
 const { default: viewBoard } = await import("../../server/mcp/tools/view_board.ts")
 const { siteCommentTools } = await import("../../server/mcp/site-comments.ts")
@@ -20,6 +21,7 @@ const { default: uploadPut } = await import("../../server/api/uploads/[ticket].p
 const { default: uploadFile } = await import("../../server/api/files.post.ts")
 const { default: publishDraft } = await import("../../server/api/drops/[id]/versions.post.ts")
 const { default: acceptSuggestion } = await import("../../server/api/comments/[id]/accept.post.ts")
+const { default: undoSuggestion } = await import("../../server/api/comments/[id]/accept.delete.ts")
 
 const MIB = 1024 * 1024
 
@@ -34,7 +36,18 @@ const server = createMcpHandler({
   name: "drop-test",
   version: "1",
   origin: false,
-  tools: [publish, readDrop, readFile, reply, listDrops, updateDrop, editBoard, viewBoard, ...siteCommentTools],
+  tools: [
+    publish,
+    readDrop,
+    readFile,
+    reply,
+    acceptTool,
+    listDrops,
+    updateDrop,
+    editBoard,
+    viewBoard,
+    ...siteCommentTools,
+  ],
 })
 async function call(tool, input, protocolVersion = "2025-06-18") {
   const request = new H3Event(
@@ -450,7 +463,7 @@ test("a suggestion is a comment with the words that replace its quote, and read_
   assert.match(read.content[0].text, /Suggests deleting it\.\n {3}Any number works\./)
 })
 
-test("accepting a suggestion publishes the doc with its words as the next version and resolves it", async () => {
+test("accepting a suggestion, from the page or an agent, publishes its words as the next version and resolves it; undo takes it back", async () => {
   const post = (id, init) => {
     const event = new H3Event(
       new Request(`https://drop.example/api/drops/${id}/comments`, {
@@ -463,12 +476,14 @@ test("accepting a suggestion publishes the doc with its words as the next versio
     event.context.params = { id }
     return commentsPost(event)
   }
-  const accept = (id) => {
-    const event = new H3Event(new Request(`https://drop.example/api/comments/${id}/accept`, { method: "POST" }))
+  const route = (handler, method) => (id) => {
+    const event = new H3Event(new Request(`https://drop.example/api/comments/${id}/accept`, { method }))
     event.context.log = { set() {}, error() {}, warn() {} }
     event.context.params = { id }
-    return acceptSuggestion(event)
+    return handler(event)
   }
+  const accept = route(acceptSuggestion, "POST")
+  const undo = route(undoSuggestion, "DELETE")
   const doc = (
     await call(publish, {
       markdown: "---\ntitle: Pigeons\n---\n\n# Plan\n\nCount twelve pigeons\non the roof.\n\nThe roof holds twelve.",
@@ -494,14 +509,21 @@ test("accepting a suggestion publishes the doc with its words as the next versio
   })
   const plain = await post(doc.id, { ...at, selector: "p", quote: "roof", body: "Which roof?" })
 
-  await assert.rejects(accept(swap.id), { status: 404 }, "agents publish instead")
+  // An agent accepts by number; a comment without a suggestion has nothing to accept.
+  assert.match((await call(acceptTool, { id: doc.id, comment: 3 })).message, /can't accept/)
+  const byAgent = await call(acceptTool, { id: doc.id, comment: 1 })
+  assert.equal(byAgent.structuredContent.version, 2)
+  assert.match(byAgent.content[0].text, /^Accepted suggestion #1 as v2:/)
   state.who = { ...who, actorKind: "browser" }
   await assert.rejects(accept(plain.id), { status: 404 }, "only suggestions")
-  const next = await accept(swap.id)
-  assert.equal(next.version, 2)
-  const second = await accept(twice.id)
-  assert.equal(second.version, 3)
-  await assert.rejects(accept(twice.id), { status: 409 }, "a resolved suggestion stays resolved")
+  await assert.rejects(accept(swap.id), { status: 409 }, "a resolved suggestion stays resolved")
+  assert.equal((await accept(twice.id)).version, 3)
+
+  // Undo publishes the text from before and opens the suggestion again, only while its version is the latest.
+  await assert.rejects(undo(swap.id), { status: 409 }, "a later version came after it")
+  assert.equal((await undo(twice.id)).version, 4)
+  await assert.rejects(undo(twice.id), { status: 409 }, "already undone")
+  assert.equal((await accept(twice.id)).version, 5)
 
   const read = await call(readDrop, { id: doc.id })
   assert.equal(
@@ -510,7 +532,7 @@ test("accepting a suggestion publishes the doc with its words as the next versio
   )
   assert.deepEqual(
     read.structuredContent.versions.map((version) => version.note),
-    ["Accepted suggestion #2", "Accepted suggestion #1", "Draft"],
+    ["Accepted suggestion #2", "Undid suggestion #2", "Accepted suggestion #2", "Accepted suggestion #1", "Draft"],
   )
   assert.deepEqual(
     sql

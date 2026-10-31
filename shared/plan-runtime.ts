@@ -1446,6 +1446,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if ((e.metaKey || e.ctrlKey) && key === "z") { e.preventDefault(); return undoMark(); }
     }
     if (e.metaKey || e.ctrlKey || e.altKey || typing || e.defaultPrevented) return;
+    // With text selected, C comments on it and E suggests an edit to it: the bar over it is outside the page's focus.
+    if (lastQuote && (key === "c" || key === "e")) { e.preventDefault(); return post({ type: "key", key }); }
     if (/^[vrsuxbpa]$/.test(key) || (tool === "mark" && (key === "[" || key === "]"))) post({ type: "key", key, tool });
     // An image's page (the one Drop takes point comments on) has no use for ← and →: Drop moves to the folder's next image.
     if (pointComments && (e.key === "ArrowLeft" || e.key === "ArrowRight")) post({ type: "key", key: e.key });

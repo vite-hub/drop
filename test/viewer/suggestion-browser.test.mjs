@@ -50,6 +50,7 @@ test("a suggestion strikes its quote and shows the new words after it, and the p
             body: `<style>body{margin:0}iframe{border:0;width:100vw;height:100vh}</style>
               <iframe sandbox="${PREVIEW_SANDBOX}" srcdoc="${escaped}"></iframe>
               <script>addEventListener("message", (e) => {
+                if (e.data?.__drop && e.data.type === "key") (window.keys ??= []).push(e.data.key);
                 if (e.data?.__drop && e.data.type === "ready") window.send = (markers) => e.source.postMessage({ __drop: true, type: "markers", markers }, "*");
               });</script>`,
           })
@@ -106,6 +107,16 @@ test("a suggestion strikes its quote and shows the new words after it, and the p
     assert.equal(drawn.struck, 2, "both suggestions strike their quotes")
     assert.equal(drawn.margin, 1, "the plain comment keeps its anchor highlight")
     assert.equal(drawn.text, before, "the new words are generated, so quotes are still found in the page's own text")
+
+    // With text selected, C and E go to Drop, which comments on it or suggests an edit; without a selection they don't.
+    await frame.click("h1")
+    await page.keyboard.press("c")
+    await frame.evaluate(() => getSelection().selectAllChildren(document.querySelector("h1")))
+    await frame.waitForTimeout(300)
+    await page.keyboard.press("e")
+    await page.keyboard.press("c")
+    await page.waitForFunction(() => window.keys?.length >= 2)
+    assert.deepEqual(await page.evaluate(() => window.keys), ["e", "c"])
 
     await send([])
     assert.equal(
