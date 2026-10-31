@@ -1050,7 +1050,7 @@ watch(
                   liveLabel(connection)
                 }}</ConnectionStatusLabel>
               </ConnectionStatus>
-              <UButton size="xs" color="neutral" label="Close" variant="ghost" @click="live.close" />
+              <UButton size="xs" color="neutral" label="Close" variant="ghost" @click="live.leave" />
               <UButton
                 size="xs"
                 data-review-primary
