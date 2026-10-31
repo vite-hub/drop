@@ -10,7 +10,6 @@ const variables = {
   "--media-primary-color": "var(--primary)",
   "--media-secondary-color": "var(--background)",
   "--media-text-color": "var(--foreground)",
-  "--media-background-color": "var(--background)",
   "--media-control-hover-background": "var(--accent)",
   "--media-font-family": "var(--font-sans)",
   "--media-range-track-background": "var(--border)",
@@ -19,13 +18,14 @@ const variables = {
 
 <template>
   <div class="grid min-h-0 flex-1 place-items-center bg-elevated p-6 sm:p-10">
+    <!-- The page caps the video's height and fills the letterbox with the page; fullscreen fills the screen, letterboxed in black. -->
     <media-controller
-      class="@container block max-h-full w-full max-w-5xl overflow-hidden rounded-lg border border-default shadow-lg"
+      class="@container block max-h-full w-full max-w-5xl overflow-hidden rounded-lg border border-default shadow-lg [--media-background-color:var(--background)] [&[mediaisfullscreen]]:rounded-none [&[mediaisfullscreen]]:border-0 [&[mediaisfullscreen]]:[--media-background-color:#000]"
       :style="variables"
     >
       <video
         slot="media"
-        class="block max-h-[calc(100dvh-12rem)] w-full"
+        class="block max-h-[calc(100dvh-12rem)] w-full in-[[mediaisfullscreen]]:h-full in-[[mediaisfullscreen]]:max-h-none"
         :aria-label="title"
         playsinline
         preload="metadata"
