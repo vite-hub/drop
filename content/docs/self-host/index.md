@@ -8,6 +8,10 @@ description: Run your own Drop on Cloudflare, Vercel, Netlify, Deno Deploy, or a
 
 Start with the button for your host. You still supply GitHub sign-in and your admin email; the sections below cover those and the database. Each host page lists where its settings go.
 
+## License {#license}
+
+**Running Drop is free for one or two people**, and trying it out is free at any size. A team of 3 or more needs a license, $9 per member a month; [Pricing](/pricing) says who counts and how to buy one. Running Drop as a hosted service for others needs a license at any size. The [Business Source License](https://github.com/vite-hub/drop/blob/main/LICENSE) has the terms.
+
 ## Sign-in and admins {#github}
 
 Drop signs in with **GitHub**. [Create a GitHub OAuth app](https://github.com/settings/applications/new) with:
@@ -54,12 +58,12 @@ DROP_PUBLIC_LINK_DAYS=7
 | Variable | What it does |
 | --- | --- |
 | [DROP_TEAMS]{.font-mono .text-xs} | Set true to turn teams on. Ignored on a team Drop, which is one team already. |
-| [DROP_FREE_TEAM_MEMBERS]{.font-mono .text-xs} | Members a team has before it needs a subscription, invitations included. Defaults to 3. Applies only with billing on. |
+| [DROP_FREE_TEAM_MEMBERS]{.font-mono .text-xs} | Members a team has before it needs a subscription, invitations included. Defaults to 2. Applies only with billing on. |
 | [DROP_FREE_KEPT]{.font-mono .text-xs} | Drops the Free plan keeps forever at once. Defaults to 10. Applies only with `DROP_QUOTAS=true`. |
 
 ### Bill teams through Stripe {#billing}
 
-With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` shows the plans; without billing it's a 404.
+With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` then shows the Team plan below the license prices.
 
 | Variable | What it does |
 | --- | --- |

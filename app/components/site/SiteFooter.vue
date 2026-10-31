@@ -20,6 +20,7 @@ const { wide = false } = defineProps<{ wide?: boolean }>()
       </span>
       <span class="flex flex-wrap gap-5">
         <NuxtLink class="hover:text-highlighted" to="/docs">Docs</NuxtLink>
+        <NuxtLink class="hover:text-highlighted" to="/pricing">Pricing</NuxtLink>
         <NuxtLink class="hover:text-highlighted" to="/terms">Terms</NuxtLink>
         <NuxtLink class="hover:text-highlighted" to="/acceptable-use">Acceptable use</NuxtLink>
         <NuxtLink class="hover:text-highlighted" to="/abuse">Copyright and abuse</NuxtLink>

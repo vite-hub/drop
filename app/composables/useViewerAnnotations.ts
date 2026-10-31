@@ -273,6 +273,8 @@ export function useViewerAnnotations(options: {
       beginFocus()
       return
     }
+    // Selected text in an app too: nothing typed reaches here, so the app wasn't using the key.
+    if (key === "c" || key === "e") return commentOnSelection(key === "e")
     if (drop.value.kind === "app" && (under ?? "browse") === "browse") return
     if (key === "v") setTool("browse")
     if (key === "r") setTool("comment")

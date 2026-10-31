@@ -52,4 +52,4 @@ Everyone who signs in joins as a Member. The people whose verified emails the op
 
 ## Use ours or run your own {#your-own}
 
-[drop.vitehub.dev](https://drop.vitehub.dev) is one Drop anyone can use. Drop is open source and built on [ViteHub](https://vitehub.dev), so you can run your own on Cloudflare, Vercel, Netlify, Deno Deploy, or a server of yours. [Host it yourself](/docs/self-host) compares them.
+[drop.vitehub.dev](https://drop.vitehub.dev) is one Drop anyone can use. Drop is built on [ViteHub](https://vitehub.dev) and its code is public, so you can run your own on Cloudflare, Vercel, Netlify, Deno Deploy, or a server of yours. [Host it yourself](/docs/self-host) compares them. Running your own is free for one or two people; [Pricing](/pricing) covers teams of 3 or more.

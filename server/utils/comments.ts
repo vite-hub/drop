@@ -93,7 +93,7 @@ const CommentMeta = v.object({
   elementY: v.nullable(v.number()),
 })
 type CommentMeta = v.InferOutput<typeof CommentMeta>
-type DropThread = CommentThread & { meta: CommentMeta }
+export type DropThread = CommentThread & { meta: CommentMeta }
 
 /** A thread of Drop's, or null for one of another scope, such as the comments on Drop's own pages. */
 function dropThread(thread: CommentThread): DropThread | null {

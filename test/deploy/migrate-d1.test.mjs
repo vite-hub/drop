@@ -70,7 +70,7 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
   }
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
-  const [baseline, authEvents, suggestions, comments, dropComments, cleanup] = migrations
+  const [baseline, authEvents, suggestions, comments, dropComments, cleanup, acceptances] = migrations
   // Comments must follow main's latest migration. Earlier previews can already contain comments at older timestamps.
   for (const {
     appliedMigrations,
@@ -109,6 +109,7 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
       appliedMigrations: [baseline, authEvents, comments, dropComments, cleanup],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001, 1793095000002, 1793129177718],
     },
+    { appliedMigrations: migrations.slice(0, -1) },
     { appliedMigrations: migrations },
   ]) {
     const database = new DatabaseSync(":memory:")
@@ -146,6 +147,10 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
       }
       if (appliedMigrations.includes(cleanup))
         database.exec("INSERT INTO comment_cleanup VALUES ('deleted-drop', 'drop:deleted-drop', 0, 1)")
+      if (appliedMigrations.includes(acceptances))
+        database.exec(
+          "INSERT INTO suggestion_acceptances (thread_id, drop_id, version) VALUES ('accepted-thread', 'legacy-image', 2)",
+        )
       // Drizzle runs every migration newer than the ledger's latest timestamp, each adding a row.
       const latest = Math.max(0, ...appliedTimestamps)
       const expectedMigrations =
@@ -180,6 +185,17 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
         "suggestion_acceptances",
       ])
         assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
+      assert.ok(
+        database
+          .prepare("PRAGMA table_info(suggestion_acceptances)")
+          .all()
+          .some((column) => column.name === "undone_version"),
+      )
+      if (appliedMigrations.includes(acceptances))
+        assert.deepEqual(
+          { ...database.prepare("SELECT version, undone_version FROM suggestion_acceptances").get() },
+          { version: 2, undone_version: null },
+        )
       assert.deepEqual(
         database
           .prepare("PRAGMA index_list(vitehub_auth_events)")

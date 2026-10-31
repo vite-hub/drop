@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// The public pages' header (landing and docs): marks on the left; Docs, theme, GitHub, and sign-in on the right.
-// Signed in, Open Drop and the account menu (theme, Sign out) take the place of the theme button and Sign in.
+// The public pages' header (landing and docs): marks on the left; Docs, Pricing, theme, GitHub, and sign-in on the
+// right. Signed in, Open Drop and the account menu (theme, Sign out) take the place of the theme button and Sign in.
+// Phones have no room for Pricing; the footer links it.
 const { wide = false } = defineProps<{ wide?: boolean }>()
 
 const route = useRoute()
@@ -35,6 +36,14 @@ const dev = import.meta.dev
           label="Docs"
           to="/docs"
           :class="route.path.startsWith('/docs') ? 'text-highlighted' : 'text-muted'"
+        />
+        <UButton
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          label="Pricing"
+          to="/pricing"
+          :class="[route.path === '/pricing' ? 'text-highlighted' : 'text-muted', 'hidden sm:inline-flex']"
         />
         <!-- Signed in, the theme switch moves into the account menu, next to Sign out. -->
         <ClientOnly v-if="!signedIn">

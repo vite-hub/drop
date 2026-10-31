@@ -7,6 +7,7 @@ import { migrate, reset, sql, state, threads, who } from "../cost/harness.mjs"
 const { comments } = await import("../../server/comments.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: acceptSuggestion } = await import("../../server/api/comments/[id]/accept.post.ts")
+const { default: undoSuggestion } = await import("../../server/api/comments/[id]/accept.delete.ts")
 const { createDocDrop, deleteDrop, findDrop, readText } = await import("../../server/utils/drops.ts")
 
 migrate()
@@ -29,6 +30,7 @@ function post(path, id, body) {
 }
 
 const accept = (id) => acceptSuggestion(post(`comments/${id}/accept`, id))
+const undo = (id) => undoSuggestion(post(`comments/${id}/accept`, id))
 
 async function suggestion(body = "Count twelve pigeons.", replacement = "fifteen") {
   const doc = await createDocDrop(state.who, {
@@ -124,4 +126,68 @@ test("concurrent acceptance requests cannot publish the same suggestion twice", 
   assert.equal((await findDrop(doc.id)).version, 2)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM suggestion_acceptances").get().n, 1)
   assert.equal(threads()[0].status, "resolved")
+})
+
+test("undo retries only reopening after publication and a Comments outage, then allows acceptance again", async () => {
+  const { doc, comment } = await suggestion()
+  await accept(comment.id)
+  sql.exec(`CREATE TRIGGER fail_suggestion_reopening BEFORE UPDATE ON vitehub_comment_threads
+    WHEN NEW.status = 'open' BEGIN SELECT RAISE(ABORT, 'Comments unavailable'); END`)
+  try {
+    await assert.rejects(undo(comment.id), (error) => error.cause?.message === "Comments unavailable")
+    assert.equal((await findDrop(doc.id)).version, 3)
+    assert.equal(await readText((await findDrop(doc.id)).blobKey), "Count twelve pigeons.")
+    assert.equal(threads()[0].status, "resolved")
+    assert.equal(
+      sql.prepare("SELECT undone_version FROM suggestion_acceptances WHERE thread_id = ?").get(comment.id)
+        .undone_version,
+      3,
+    )
+  } finally {
+    sql.exec("DROP TRIGGER fail_suggestion_reopening")
+  }
+  installComments(comments, { database: state.db })
+  await createDocDrop(state.who, {
+    filename: doc.filename,
+    bytes: new TextEncoder().encode("Count twelve pigeons.\n\nA later edit."),
+    supersedes: doc.id,
+  })
+  state.who = { ...who, userId: "someone-else", actorKind: "browser" }
+  await assert.rejects(undo(comment.id), { status: 404 })
+  state.who = { ...who, actorKind: "browser" }
+  assert.equal((await undo(comment.id)).version, 4, "retry must not publish the reversal twice")
+  assert.equal(threads()[0].status, "open")
+  assert.equal(await readText((await findDrop(doc.id)).blobKey), "Count twelve pigeons.\n\nA later edit.")
+  assert.equal((await accept(comment.id)).version, 5)
+  assert.equal(await readText((await findDrop(doc.id)).blobKey), "Count fifteen pigeons.\n\nA later edit.")
+  assert.equal(threads()[0].status, "resolved")
+  assert.equal(sql.prepare("SELECT undone_version FROM suggestion_acceptances").get().undone_version, null)
+})
+
+test("failure to record undo rolls back its version and allows a clean retry", async () => {
+  const { doc, comment } = await suggestion()
+  await accept(comment.id)
+  sql.exec(`CREATE TRIGGER fail_undo_receipt BEFORE UPDATE ON suggestion_acceptances
+    BEGIN SELECT RAISE(ABORT, 'Receipt unavailable'); END`)
+  try {
+    await assert.rejects(undo(comment.id))
+    assert.equal((await findDrop(doc.id)).version, 2)
+    assert.equal(await readText((await findDrop(doc.id)).blobKey), "Count fifteen pigeons.")
+    assert.equal(sql.prepare("SELECT undone_version FROM suggestion_acceptances").get().undone_version, null)
+    assert.equal(threads()[0].status, "resolved")
+  } finally {
+    sql.exec("DROP TRIGGER fail_undo_receipt")
+  }
+  assert.equal((await undo(comment.id)).version, 3)
+  assert.equal(threads()[0].status, "open")
+})
+
+test("concurrent undo requests cannot publish the reversal twice", async () => {
+  const { doc, comment } = await suggestion()
+  await accept(comment.id)
+  const attempts = await Promise.allSettled([undo(comment.id), undo(comment.id)])
+  assert.ok(attempts.some((attempt) => attempt.status === "fulfilled"))
+  assert.equal((await findDrop(doc.id)).version, 3)
+  assert.equal(sql.prepare("SELECT undone_version FROM suggestion_acceptances").get().undone_version, 3)
+  assert.equal(threads()[0].status, "open")
 })

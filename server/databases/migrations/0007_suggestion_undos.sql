@@ -1,0 +1,1 @@
+ALTER TABLE `suggestion_acceptances` ADD `undone_version` integer;

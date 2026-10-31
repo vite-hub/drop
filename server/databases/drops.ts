@@ -230,6 +230,7 @@ export const suggestionAcceptances = sqliteTable(
       .notNull()
       .references(() => drops.id, { onDelete: "cascade" }),
     version: integer("version").notNull(),
+    undoneVersion: integer("undone_version"),
   },
   (table) => [index("suggestion_acceptances_drop").on(table.dropId)],
 )
