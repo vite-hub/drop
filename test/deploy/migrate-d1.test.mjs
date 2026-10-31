@@ -75,35 +75,29 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
   for (const {
     appliedMigrations,
     appliedTimestamps = appliedMigrations.map((migration) => migration.folderMillis),
-    expectedMigrations = migrations.length,
   } of [
     { appliedMigrations: [] },
     { appliedMigrations: [baseline] },
     {
       appliedMigrations: [baseline],
       appliedTimestamps: [baseline.folderMillis, 1792593042706, 1793089140860],
-      expectedMigrations: migrations.length + 2,
     },
     { appliedMigrations: [baseline, authEvents] },
     {
       appliedMigrations: [baseline, comments],
       appliedTimestamps: [baseline.folderMillis, 1793091156010],
-      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, comments],
       appliedTimestamps: [baseline.folderMillis, 1793094947398],
-      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, authEvents, comments],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793094947398],
-      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, authEvents, comments],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001],
-      expectedMigrations: migrations.length + 1,
     },
     { appliedMigrations: [baseline, authEvents, suggestions] },
     { appliedMigrations: migrations },
@@ -127,6 +121,10 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
             VALUES ('existing-comment', 'existing-thread', 'Keep this comment', '[]', 'admin', 1);
         `)
       }
+      // Drizzle runs every migration newer than the ledger's latest timestamp, each adding a row.
+      const latest = Math.max(0, ...appliedTimestamps)
+      const expectedMigrations =
+        appliedTimestamps.length + migrations.filter((migration) => migration.folderMillis > latest).length
       const db = drizzle(async (query, params, method) => {
         const statement = database.prepare(query)
         if (method === "run") {
@@ -145,6 +143,12 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
           .some((column) => column.name === "plan"),
       )
       assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
+      assert.ok(
+        database
+          .prepare("PRAGMA table_info(comments)")
+          .all()
+          .some((column) => column.name === "suggestion"),
+      )
       for (const table of [
         "drop_versions",
         "code_images",

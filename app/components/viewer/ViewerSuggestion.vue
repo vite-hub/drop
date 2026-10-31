@@ -1,16 +1,17 @@
 <script setup lang="ts">
 // A suggested edit as the doc draws it (comark-comments' redline): the quote struck through in red, then the words
-// that replace it in green. An empty suggestion deletes the quote.
+// that replace it in green. An empty suggestion deletes the quote. <del> and <ins> are silent in most screen readers,
+// so hidden words say what the change is.
 defineProps<{ quote: string; suggestion: string }>()
 </script>
 
 <template>
   <p class="line-clamp-4 text-sm leading-relaxed">
-    <del class="rounded-sm bg-error/10 px-0.5 text-error decoration-error/70 box-decoration-clone">{{ quote }}</del>
-    <ins
-      v-if="suggestion"
-      class="ml-0.5 rounded-sm bg-success/10 px-0.5 text-success no-underline box-decoration-clone"
-      >{{ suggestion }}</ins
-    >
+    <span class="sr-only">{{ suggestion ? "Replace" : "Delete" }} </span>
+    <del class="redline-del px-0.5">{{ quote }}</del>
+    <template v-if="suggestion">
+      <span class="sr-only"> with</span>
+      <ins class="ml-0.5 redline-ins px-0.5">{{ suggestion }}</ins>
+    </template>
   </p>
 </template>
