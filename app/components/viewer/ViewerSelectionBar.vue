@@ -7,8 +7,8 @@ const emit = defineEmits<{ comment: []; suggest: [] }>()
 <template>
   <!-- mousedown.prevent: a press here must not take the selection away from the page. -->
   <div
-    role="toolbar"
-    aria-label="Selection"
+    role="group"
+    aria-label="Selected text"
     class="selection-bar flex origin-bottom items-center gap-1 rounded-[12px] border p-1 [animation:pop-in_140ms_var(--ease-out)]"
     @mousedown.prevent
   >
@@ -53,6 +53,7 @@ const emit = defineEmits<{ comment: []; suggest: [] }>()
 }
 
 button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   height: 28px;
@@ -65,6 +66,13 @@ button {
   transition-property: background-color, color, scale;
   transition-duration: 150ms;
   transition-timing-function: var(--ease-out);
+}
+
+/* 28px to match the dock, with a taller hit area for fingers; the 4px gap keeps neighbours from overlapping. */
+button::before {
+  content: "";
+  position: absolute;
+  inset: -8px -2px;
 }
 
 button > .iconify {

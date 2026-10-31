@@ -323,8 +323,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const drafting = () => Boolean(drafted && article && article.contains(drafted.commonAncestorContainer));
   const bubbles = new Map();
   let inserts = [];
-  // A suggestion on open text in a Markdown doc shows as a redline, with or without the margin.
-  const suggests = (m) => inRail(m) && m.suggestion != null;
+  // A suggestion on open text in a Markdown doc shows as a redline, with or without the margin, and on later versions
+  // too while its words are still there: accepting one publishes a version, and the others mustn't lose theirs.
+  const suggests = (m) => Boolean(article) && m.kind === "text" && !m.resolved && m.suggestion != null;
   function clearBubbles() {
     for (const bubble of bubbles.values()) {
       const parent = bubble.parentNode;
@@ -351,7 +352,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const bubble = document.createElement("drop-bubble");
     bubble.className = "cr-bub"; bubble.dataset.dropBubble = ""; bubble.dataset.id = m.id; bubble.tabIndex = 0; bubble.setAttribute("role", "button");
     const replies = m.replies || 0;
-    bubble.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
+    // The redline is a highlight and generated text, which screen readers skip, so the bubble says what it suggests.
+    const change = m.suggestion == null ? "" : m.suggestion ? ": replace \u201c" + m.quote + "\u201d with \u201c" + m.suggestion + "\u201d" : ": delete \u201c" + m.quote + "\u201d";
+    bubble.setAttribute("aria-label", (m.suggestion == null ? "Comment" : "Suggestion") + " by " + (m.author || "someone") + change + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
     // Like the package's: the count only once the thread has more than its first comment.
     if (replies) { const count = document.createElement("b"); count.dataset.n = String(replies + 1); bubble.appendChild(count); }
     const end = range.cloneRange();
@@ -404,8 +407,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (anchor && document.documentElement.style.getPropertyValue("--drop-anchor") !== anchor) document.documentElement.style.setProperty("--drop-anchor", anchor);
     }
     // After the bubbles: each is inserted at its quote's end, so the new words land between the quote and its bubble.
-    if (view.pins && !zoom) for (const m of markers) if (suggests(m) && ranges.get(m.id)) insertSuggestion(m, ranges.get(m.id));
-    if (inserts.length && !BUBBLES.isConnected) document.head.appendChild(BUBBLES);
+    const redlined = view.pins && !zoom ? markers.filter((m) => suggests(m) && ranges.get(m.id)) : [];
+    for (const m of redlined) insertSuggestion(m, ranges.get(m.id));
+    // The strike's style is in BUBBLES too: a deletion with no margin open still needs it.
+    if (redlined.length && !BUBBLES.isConnected) document.head.appendChild(BUBBLES);
     for (const m of markers) {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {

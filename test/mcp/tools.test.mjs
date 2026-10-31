@@ -18,6 +18,7 @@ const { default: commentsPost } = await import("../../server/api/drops/[id]/comm
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
 const { default: uploadFile } = await import("../../server/api/files.post.ts")
 const { default: publishDraft } = await import("../../server/api/drops/[id]/versions.post.ts")
+const { default: acceptSuggestion } = await import("../../server/api/comments/[id]/accept.post.ts")
 
 const MIB = 1024 * 1024
 
@@ -446,6 +447,81 @@ test("a suggestion is a comment with the words that replace its quote, and read_
   )
   assert.match(read.content[0].text, /> twelve\n {3}Suggests replacing it with: fifteen\n {3}\(no note\) \(Owner\)/)
   assert.match(read.content[0].text, /Suggests deleting it\.\n {3}Any number works\./)
+})
+
+test("accepting a suggestion publishes the doc with its words as the next version and resolves it", async () => {
+  const post = (id, init) => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${id}/comments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init),
+      }),
+    )
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return commentsPost(event)
+  }
+  const accept = (id) => {
+    const event = new H3Event(new Request(`https://drop.example/api/comments/${id}/accept`, { method: "POST" }))
+    event.context.log = { set() {}, error() {}, warn() {} }
+    event.context.params = { id }
+    return acceptSuggestion(event)
+  }
+  const doc = (
+    await call(publish, {
+      markdown: "---\ntitle: Pigeons\n---\n\n# Plan\n\nCount twelve pigeons\non the roof.\n\nThe roof holds twelve.",
+      note: "Draft",
+      lifetime: "review",
+    })
+  ).structuredContent
+  const at = { kind: "text", ox: 0, oy: 0 }
+  // Selected across the source's line break, and in the first of two paragraphs that both say "twelve".
+  const swap = await post(doc.id, {
+    ...at,
+    selector: "p",
+    quote: "twelve pigeons on",
+    label: 'p "Count twelve pigeons on the roof."',
+    suggestion: "fifteen pigeons on",
+  })
+  const twice = await post(doc.id, {
+    ...at,
+    selector: "p",
+    quote: "twelve",
+    label: 'p "The roof holds twelve."',
+    suggestion: "",
+  })
+  const plain = await post(doc.id, { ...at, selector: "p", quote: "roof", body: "Which roof?" })
+
+  await assert.rejects(accept(swap.id), { status: 404 }, "agents publish instead")
+  state.who = { ...who, actorKind: "browser" }
+  await assert.rejects(accept(plain.id), { status: 404 }, "only suggestions")
+  const next = await accept(swap.id)
+  assert.equal(next.version, 2)
+  const second = await accept(twice.id)
+  assert.equal(second.version, 3)
+  await assert.rejects(accept(twice.id), { status: 409 }, "a resolved suggestion stays resolved")
+
+  const read = await call(readDrop, { id: doc.id })
+  assert.equal(
+    read.structuredContent.content,
+    "---\ntitle: Pigeons\n---\n\n# Plan\n\nCount fifteen pigeons on the roof.\n\nThe roof holds.",
+  )
+  assert.deepEqual(
+    read.structuredContent.versions.map((version) => version.note),
+    ["Accepted suggestion #2", "Accepted suggestion #1", "Draft"],
+  )
+  assert.deepEqual(
+    sql
+      .prepare("SELECT n, resolved FROM comments ORDER BY n")
+      .all()
+      .map((row) => [row.n, Boolean(row.resolved)]),
+    [
+      [1, true],
+      [2, true],
+      [3, false],
+    ],
+  )
 })
 
 test("open comments follow a doc to its next versions, numbered across them, and resolve from any later version", async () => {

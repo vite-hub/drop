@@ -68,6 +68,19 @@ test("a suggestion strikes its quote and shows the new words after it, and the p
       )
     }
 
+    // On a later version, with no margin comment left to open the margin, a deletion still strikes its words.
+    await send([text("c2", "after the stand-up", { suggestion: "", earlier: true })])
+    assert.equal(
+      await frame.evaluate(
+        () =>
+          CSS.highlights.get("drop-del")?.size &&
+          [...document.styleSheets].some((sheet) =>
+            [...sheet.cssRules].some((rule) => rule.cssText.includes("drop-del")),
+          ),
+      ),
+      true,
+    )
+
     // Sent twice, as every new comment does: the redline is drawn once.
     await send(markers)
     await send(markers)
