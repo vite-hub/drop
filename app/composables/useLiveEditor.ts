@@ -40,20 +40,25 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   // browsers never say why a WebSocket failed. So when the room stays out of reach, ask the server whether this draft
   // still qualifies, and if it doesn't, stop knocking. `refused` holds the newer version, or 0 when editing is over.
   const refused = ref<number>()
-  let recheck: ReturnType<typeof setTimeout> | undefined
-  watch(
-    () => realtime.value?.status.value,
-    (status) => {
-      if (status !== "connected" && editing.value && refused.value === undefined)
-        recheck ??= setTimeout(() => void checkDraft(), 5_000)
-      else {
-        clearTimeout(recheck)
-        recheck = undefined
-      }
-    },
+  // Connecting and disconnected take turns while it knocks, so this stays true until the room answers or gives up.
+  const outOfReach = computed(
+    () => editing.value && refused.value === undefined && realtime.value?.status.value !== "connected",
   )
+  // A first look 5 s after the room goes out of reach, then one every 30 s while it stays there.
+  watch(outOfReach, (away, _, onCleanup) => {
+    if (!away) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let stopped = false
+    const look = (delay: number) => {
+      timer = setTimeout(() => void checkDraft().then(() => !stopped && look(30_000)), delay)
+    }
+    look(5_000)
+    onCleanup(() => {
+      stopped = true
+      clearTimeout(timer)
+    })
+  })
   async function checkDraft() {
-    recheck = undefined
     const id = documentId.value
     const draft = id ? draftOf(id) : null
     if (!draft) return
@@ -61,11 +66,8 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     const head = await $fetch<DropDetail>(`/api/drops/${draft.id}`).catch((error: unknown) =>
       v.is(GoneSchema, error) ? null : undefined,
     )
-    if (documentId.value !== id || realtime.value?.status.value === "connected") return
-    if (head === undefined || (head && head.version === draft.version && head.canEdit)) {
-      recheck = setTimeout(() => void checkDraft(), 30_000)
-      return
-    }
+    if (documentId.value !== id || !outOfReach.value) return
+    if (head === undefined || (head && head.version === draft.version && head.canEdit)) return
     realtime.value?.provider.value?.disconnect()
     // The text stays on screen, read-only, so whatever didn't reach the room can still be copied. No update event: it
     // would count as typing.
@@ -137,8 +139,6 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   }
 
   function close() {
-    clearTimeout(recheck)
-    recheck = undefined
     room.value?.editor.value?.destroy()
     if (room.value) room.value.editor.value = undefined
     documentId.value = undefined
