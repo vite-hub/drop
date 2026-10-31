@@ -1266,19 +1266,7 @@ watch(
         top: `${Math.max(56, selection.rect.top - 8)}px`,
       }"
     >
-      <div
-        class="flex origin-bottom items-center rounded-md border border-default bg-default p-0.5 shadow-sm [animation:pop-in_140ms_var(--ease-out)]"
-      >
-        <UButton
-          color="neutral"
-          icon="i-mingcute-chat-1-line"
-          label="Comment"
-          size="sm"
-          variant="ghost"
-          @click="commentOnSelection"
-          @mousedown.prevent
-        />
-      </div>
+      <ViewerSelectionBar @comment="commentOnSelection" />
     </div>
 
     <ViewerLightbox

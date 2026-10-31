@@ -143,10 +143,17 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // line as a doc's thread does and covers nothing. It's a <drop-bubble> with no text of its own: quotes are found and
   // elements named (findRange, pathOf) as if it weren't there, and render() takes it out again. A word joiner keeps it
   // on its quote's line, and the count is generated. The quote takes the package's anchor look (.cr-cm), as a highlight.
+  // comark-comments' speech bubble, in a given color.
+  const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   const BUBBLES = document.createElement("style");
   BUBBLES.textContent = COMMENTS_CSS +
     'drop-bubble.cr-bub:empty::before,drop-bubble.cr-bub b::before{content:"\\2060"}drop-bubble.cr-bub b{font:inherit;color:inherit}' +
-    'drop-bubble.cr-bub b::before{content:"\\2060" attr(data-n)}drop-bubble.cr-bub[data-on]{color:var(--_comark-foreground);border-color:var(--_comark-ring)}' +
+    'drop-bubble.cr-bub b::before{content:"\\2060" attr(data-n)}' +
+    // Drop's bubble stands out from the page, as its selection bar does: dark on a light theme, white on a dark one.
+    // The package's icon is a grey image, so each theme gets one in the page's own background color.
+    "drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#fafafa") + ";border-color:var(--foreground);background-color:var(--foreground);color:var(--background);transition:box-shadow .12s}" +
+    ":root.dark drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#0a0a0a") + "}" +
+    "drop-bubble.cr-bub:hover,drop-bubble.cr-bub[data-on]{border-color:var(--foreground);color:var(--background);box-shadow:0 0 0 3px color-mix(in oklab,var(--foreground) 18%,transparent)}" +
     // The package's .cr-cm tint and underline, on its own comment color, which the bubble resolves (render).
     "::highlight(drop-margin){background-color:color-mix(in srgb,var(--drop-anchor) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--drop-anchor) 80%,transparent);text-underline-offset:.25em}";
   // active: the comment a "focus" pulses for a moment; opened: the one whose thread Drop shows; pointed and textPointed:
