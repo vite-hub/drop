@@ -75,47 +75,39 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
   for (const {
     appliedMigrations,
     appliedTimestamps = appliedMigrations.map((migration) => migration.folderMillis),
-    expectedMigrations = migrations.length,
   } of [
     { appliedMigrations: [] },
     { appliedMigrations: [baseline] },
     {
       appliedMigrations: [baseline],
       appliedTimestamps: [baseline.folderMillis, 1792593042706, 1793089140860],
-      expectedMigrations: migrations.length + 2,
     },
     { appliedMigrations: [baseline, authEvents] },
     {
       appliedMigrations: [baseline, comments],
       appliedTimestamps: [baseline.folderMillis, 1793091156010],
-      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, comments],
       appliedTimestamps: [baseline.folderMillis, 1793094947398],
-      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, authEvents, comments],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793094947398],
-      expectedMigrations: migrations.length + 1,
     },
     {
       appliedMigrations: [baseline, authEvents, comments],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001],
-      expectedMigrations: migrations.length + 1,
     },
     { appliedMigrations: [baseline, authEvents, suggestions] },
     { appliedMigrations: [baseline, authEvents, suggestions, comments] },
     {
       appliedMigrations: [baseline, authEvents, comments, dropComments],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001, 1793095000002],
-      expectedMigrations: migrations.length + 2,
     },
     {
       appliedMigrations: [baseline, authEvents, comments, dropComments, cleanup],
       appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001, 1793095000002, 1793129177718],
-      expectedMigrations: migrations.length + 3,
     },
     { appliedMigrations: migrations },
   ]) {
@@ -154,6 +146,10 @@ test("Drizzle applies the migrations once, in journal order, on fresh and existi
       }
       if (appliedMigrations.includes(cleanup))
         database.exec("INSERT INTO comment_cleanup VALUES ('deleted-drop', 'drop:deleted-drop', 0, 1)")
+      // Drizzle runs every migration newer than the ledger's latest timestamp, each adding a row.
+      const latest = Math.max(0, ...appliedTimestamps)
+      const expectedMigrations =
+        appliedTimestamps.length + migrations.filter((migration) => migration.folderMillis > latest).length
       const db = drizzle(async (query, params, method) => {
         const statement = database.prepare(query)
         if (method === "run") {

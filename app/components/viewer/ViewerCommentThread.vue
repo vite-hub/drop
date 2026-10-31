@@ -16,6 +16,9 @@ const props = defineProps<{
   comment?: DropComment
   canManage: boolean
   canReply: boolean
+  /** Whether this reader may put a suggestion's words into the doc (an editor, on its latest version). */
+  canAccept?: boolean
+  accepting?: boolean
   draft?: string
   draftError?: string
 }>()
@@ -29,6 +32,7 @@ const emit = defineEmits<{
   copyLink: [comment: DropComment]
   /** The suggested words were edited; the viewer keeps them on the pending comment, which sends them. */
   suggest: [text: string]
+  accept: [id: string]
 }>()
 const sharedDraft = props.pending ? injectReviewDraft()! : undefined
 const composerDraft = sharedDraft ?? { body: ref(""), images: useImagePicks() }
@@ -145,11 +149,10 @@ const menu = computed<DropdownMenuItem[][]>(() => [
       >
         {{ pending.quote }}
       </p>
-      <div v-if="suggesting" class="mb-1.5 space-y-1 px-1 pt-0.5">
+      <!-- Left edges line up with the note's text: the struck quote, the field, and the note all start 4px in. -->
+      <div v-if="suggesting" class="mb-1.5 space-y-1 pt-0.5">
         <p class="line-clamp-3 text-sm leading-relaxed">
-          <del class="rounded-sm bg-error/10 px-0.5 text-error decoration-error/70 box-decoration-clone">{{
-            pending.quote
-          }}</del>
+          <span class="sr-only">Replace </span><del class="redline-del px-1">{{ pending.quote }}</del>
         </p>
         <UTextarea
           v-model="suggestion"
@@ -161,7 +164,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           placeholder="Leave empty to delete it"
           :rows="1"
           :ui="{
-            base: 'rounded-sm bg-success/10 px-1.5 py-1 text-base leading-relaxed text-success placeholder:text-success/60 sm:text-sm',
+            base: 'redline-ins rounded-sm px-1 py-1 text-base leading-relaxed placeholder:text-muted sm:text-sm',
           }"
           variant="none"
           @keydown.enter.exact.prevent="send"
@@ -228,6 +231,20 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         <span class="label-mono">Comment #{{ comment.n }}</span>
         <span v-if="comment.resolved" class="ml-1.5 text-xs text-muted">Resolved</span>
         <span class="flex-1" />
+        <UTooltip
+          v-if="canAccept && comment.suggestion !== null && !comment.resolved"
+          text="Publish a new version with this change"
+        >
+          <UButton
+            color="neutral"
+            icon="i-mingcute-check-line"
+            label="Accept"
+            :loading="accepting"
+            size="sm"
+            variant="soft"
+            @click="emit('accept', comment.id)"
+          />
+        </UTooltip>
         <UTooltip v-if="canManage || comment.mine" :text="comment.resolved ? 'Reopen' : 'Resolve'">
           <UButton
             :aria-label="comment.resolved ? 'Reopen' : 'Resolve'"

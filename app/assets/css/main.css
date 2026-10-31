@@ -138,6 +138,24 @@ body {
   background-size: var(--surface-grain-size);
 }
 
+/* A suggested edit's redline, as comark-comments draws it in the doc: the old words struck through in red, the new ones
+   in green. The text mixes toward the foreground so it keeps 4.5:1 on its tint in both themes. */
+@utility redline-del {
+  border-radius: 0.25rem;
+  background-color: color-mix(in srgb, var(--ui-error) 11%, transparent);
+  color: color-mix(in oklab, var(--ui-error) 65%, var(--ui-text-highlighted));
+  text-decoration: line-through 1.5px color-mix(in srgb, var(--ui-error) 75%, transparent);
+  box-decoration-break: clone;
+}
+
+@utility redline-ins {
+  border-radius: 0.25rem;
+  background-color: color-mix(in srgb, var(--ui-success) 13%, transparent);
+  color: color-mix(in oklab, var(--ui-success) 55%, var(--ui-text-highlighted));
+  text-decoration: none;
+  box-decoration-break: clone;
+}
+
 /* Mono uppercase section labels, Executor's signature. */
 @utility label-mono {
   font-family: var(--font-mono);

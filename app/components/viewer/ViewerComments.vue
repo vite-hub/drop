@@ -8,13 +8,20 @@ const props = defineProps<{
   comments: DropComment[]
   canComment: boolean
   canManage: boolean
+  /** Whether this reader may put a suggestion's words into the doc (an editor, on its latest version). */
+  canAccept?: boolean
+  accepting?: string | null
   version: number
   versions: DropVersion[]
   screenshots?: Map<string, SiteReviewItem["screenshot"]>
   outdated: Set<string>
   addPageComment: (body: string, files: File[]) => Promise<Sent<DropComment>>
 }>()
-const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
+const emit = defineEmits<{
+  focus: [comment: DropComment]
+  resolve: [id: string, resolved: boolean]
+  accept: [id: string]
+}>()
 const root = useTemplateRef<HTMLElement>("root")
 defineExpose({
   focusComposer: () => root.value?.querySelector("textarea")?.focus(),
@@ -142,14 +149,25 @@ async function sendPageComment() {
             {{ comment.replies.length === 1 ? "1 reply" : `${comment.replies.length} replies` }}
           </span>
         </button>
-        <button
-          v-if="canManage || comment.mine"
-          class="min-h-6 cursor-pointer text-xs text-muted hover:text-highlighted pointer-coarse:min-h-11"
-          type="button"
-          @click="emit('resolve', comment.id, !comment.resolved)"
-        >
-          {{ comment.resolved ? "Reopen" : "Resolve" }}
-        </button>
+        <div class="flex items-center gap-3">
+          <button
+            v-if="canAccept && comment.suggestion !== null && !comment.resolved"
+            class="min-h-6 cursor-pointer text-xs font-medium text-highlighted hover:underline disabled:cursor-wait disabled:opacity-60 pointer-coarse:min-h-11"
+            :disabled="accepting === comment.id"
+            type="button"
+            @click="emit('accept', comment.id)"
+          >
+            {{ accepting === comment.id ? "Accepting…" : "Accept" }}
+          </button>
+          <button
+            v-if="canManage || comment.mine"
+            class="min-h-6 cursor-pointer text-xs text-muted hover:text-highlighted pointer-coarse:min-h-11"
+            type="button"
+            @click="emit('resolve', comment.id, !comment.resolved)"
+          >
+            {{ comment.resolved ? "Reopen" : "Resolve" }}
+          </button>
+        </div>
       </li>
       <li v-if="earlier.length" key="earlier" class="bg-elevated/50 px-4 py-2">
         <p class="label-mono">From earlier versions</p>

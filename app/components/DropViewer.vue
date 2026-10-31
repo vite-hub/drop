@@ -565,6 +565,19 @@ async function resolve(id: string, resolved: boolean) {
   await state.resolveComment(id, resolved)
 }
 
+// A suggestion goes into the doc from its latest version, by someone who could edit it by hand.
+const canAccept = computed(() => drop.value.kind === "markdown" && drop.value.canEdit && !shownVersion.value)
+const accepting = ref<string | null>(null)
+async function accept(id: string) {
+  if (accepting.value) return
+  accepting.value = id
+  try {
+    if (await state.acceptSuggestion(id)) popover.value = null
+  } finally {
+    accepting.value = null
+  }
+}
+
 async function removeComment(id: string) {
   popover.value = null
   await state.removeComment(id)
@@ -825,6 +838,9 @@ watch(
       :draft="popover.type === 'new' ? popover.body : undefined"
       :draft-error="popover.type === 'new' ? popover.error : undefined"
       :can-reply="drop.canComment"
+      :can-accept="canAccept"
+      :accepting="Boolean(accepting) && accepting === threadComment?.id"
+      @accept="accept"
       @cancel="backToComments"
       @copy-link="copyCommentLink"
       @delete="removeComment"
@@ -1078,6 +1094,8 @@ watch(
               ref="commentsRef"
               :can-comment="drop.canComment && !shownVersion && !lightbox"
               :can-manage="drop.isOwner"
+              :can-accept="canAccept"
+              :accepting="accepting"
               :comments="lightbox ? imageComments : comments"
               :screenshots="screenshots"
               :add-page-comment="addPageComment"
@@ -1086,6 +1104,7 @@ watch(
               :versions="drop.versions"
               @focus="focusComment"
               @resolve="resolve"
+              @accept="accept"
             />
           </template>
           <template #toolbar>
