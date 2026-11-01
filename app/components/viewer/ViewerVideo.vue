@@ -31,7 +31,7 @@ const variables = {
 <template>
   <!-- The stage runs under the review dock and keeps the dock's height clear at its bottom, so the controls stay clickable. -->
   <div class="flex min-h-0 flex-1 flex-col bg-elevated px-4 pt-4 pb-28 sm:px-8 sm:pt-8 sm:pb-20">
-    <!-- A size container: the video's height cap below is this box's height less the control bars (one row from @2xl). -->
+    <!-- A size container: cap the video at this box's height; Media Chrome overlays the control bars on the video. -->
     <div class="grid min-h-0 flex-1 place-items-center [container-type:size]">
       <!-- The stage caps the video's height and fills the letterbox with the page; fullscreen fills the screen, letterboxed in black. -->
       <media-controller
@@ -41,7 +41,7 @@ const variables = {
         <video
           ref="video"
           slot="media"
-          class="block max-h-[calc(100cqh-5.5rem)] w-full @2xl:max-h-[calc(100cqh-2.75rem)] in-[[mediaisfullscreen]]:h-full in-[[mediaisfullscreen]]:max-h-none!"
+          class="block max-h-[100cqh] w-full in-[[mediaisfullscreen]]:h-full in-[[mediaisfullscreen]]:max-h-none!"
           :aria-label="title"
           playsinline
           preload="metadata"
