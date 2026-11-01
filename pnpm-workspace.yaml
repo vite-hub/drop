@@ -82,6 +82,52 @@ minimumReleaseAgeExclude:
   - "@nuxt/vite-server-nightly@5.0.0-2610292252-da55a91"
   - nuxt-nightly@5.0.0-2610292252-da55a91
   - nitro@3.0.261029-rc
+  - comark-annotate@0.8.0
+  - comark-badge@0.8.0
+  - comark-cards@0.8.0
+  - comark-carousel@0.8.0
+  - comark-cast@0.8.0
+  - comark-charts@0.8.0
+  - comark-chips@0.8.0
+  - comark-cjk@0.8.0
+  - comark-code-notes@0.8.0
+  - comark-code@0.8.0
+  - comark-colors@0.8.0
+  - comark-comments@0.8.0
+  - comark-critic@0.8.0
+  - comark-deflist@0.8.0
+  - comark-details@0.8.0
+  - comark-diagrams@0.8.0
+  - comark-diff@0.8.0
+  - comark-embed@0.8.0
+  - comark-fields@0.8.0
+  - comark-figure@0.8.0
+  - comark-file-tree@0.8.0
+  - comark-footnotes@0.8.0
+  - comark-github@0.8.0
+  - comark-icon@0.8.0
+  - comark-include@0.8.0
+  - comark-keys@0.8.0
+  - comark-links@0.8.0
+  - comark-linter@0.8.0
+  - comark-magic-move@0.8.0
+  - comark-mark@0.8.0
+  - comark-mathml@0.8.0
+  - comark-media@0.8.0
+  - comark-metrics@0.8.0
+  - comark-outline@0.8.0
+  - comark-properties@0.8.0
+  - comark-qr@0.8.0
+  - comark-quiz@0.8.0
+  - comark-reading-time@0.8.0
+  - comark-sources@0.8.0
+  - comark-steps@0.8.0
+  - comark-table@0.8.0
+  - comark-tabs@0.8.0
+  - comark-tests@0.8.0
+  - comark-ui@0.8.0
+  - comark-xref@0.8.0
+  - comark-zoom@0.8.0
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0

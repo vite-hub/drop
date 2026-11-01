@@ -41,6 +41,21 @@ export const RENDERER_SCRIPTS = [
   (await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })).match(
     /<script>([\s\S]*)<\/script>/,
   )![1]!,
+  // comark-properties rewrites a frontmatter date in the reader's locale.
+  (
+    await renderHtmlFromDocument(
+      {
+        nodes: [
+          [
+            "properties",
+            {},
+            ["div", {}, ["dt", {}, "Date"], ["dd", {}, ["time", { datetime: "2026-10-23" }, "Oct 23, 2026"]]],
+          ],
+        ],
+      },
+      { components: preset.components },
+    )
+  ).match(/<script>([\s\S]*)<\/script>/)![1]!,
 ]
 
 /**
