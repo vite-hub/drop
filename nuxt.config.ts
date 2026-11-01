@@ -6,7 +6,7 @@ import { env } from "vite-hub/env"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
-import { cloudflareTemplate, syncCloudflareTemplate } from "./scripts/cloudflare-template.ts"
+import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
 
 declare module "nuxt/schema" {
@@ -29,19 +29,19 @@ const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-c
 // drop.vitehub.dev's own D1, in Cloudflare's EEUR region, which runs it in Milan.
 const HOSTED_D1 = "d634358e-4605-45ca-970f-d390584795a5"
 
-// D1's HTTP driver works from every host. The account and API token are read at runtime.
+// D1's HTTP driver works from every host. The account, API token, and database id are read at runtime.
 const d1 = (fallback: string) => ({
   driver: "d1" as const,
   databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || fallback,
-  // ViteHub needs the id while it generates the runtime database registry.
-  databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || "00000000-0000-4000-8000-000000000000",
+  databaseId: env({ source: env.source("CLOUDFLARE_D1_DATABASE_ID") }),
   cloudflare: { http: true },
 })
 
 /**
  * ViteHub per host. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
  * for Nitro's cache. Elsewhere code images are SVG only, rate limits count per server instance (ViteHub's
- * in-memory limiter), and Nitro's cache stays in memory.
+ * in-memory limiter), and Nitro's cache stays in memory. The host comes from DROP_HOST or the build env
+ * (scripts/deployment.ts).
  */
 const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   cloudflare: {
@@ -62,17 +62,20 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
       readReplication: true,
     },
     kv: true,
+    // Cached functions and handlers share the Worker's KV, under the nitro-cache: prefix.
+    cache: { driver: "kv" },
     rateLimit: true,
     schedule: true,
     // Live editing: rooms in a SQLite Durable Object, drafts in BLOB (server/live-drafts/realtime.ts).
     realtime: { authority: "cloudflare" },
   },
-  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job. The deploy build sets it to daily for Hobby.
+  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job.
   vercel: {
     preset: "vercel",
     blob: { ...files, driver: "vercel-blob", access: "private" },
     database: d1("vitehub-drop-vercel"),
-    schedule: true,
+    // Vercel Hobby runs cron jobs at most once a day; other hosts keep the hourly cron.
+    schedule: { cron: { cleanup: "0 0 * * *" } },
   },
   // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
   netlify: {
@@ -398,11 +401,7 @@ export default defineNuxtConfig({
     devServer: { runner: "node-worker" },
     // Drizzle applies the existing migration journal before a local Node instance serves requests.
     plugins: database === "sqlite" ? [fileURLToPath(new URL("./server/database-migrate.ts", import.meta.url))] : [],
-    // Cached handlers (defineCachedHandler) share the Worker's KV; `base` keeps their keys apart from ViteHub's.
-    // Other hosts keep Nitro's default in-memory cache.
-    ...(host === "cloudflare"
-      ? { storage: { cache: { driver: "cloudflare-kv-binding", binding: "KV", base: "nitro-cache" } } }
-      : {}),
+    // `nuxt dev` keeps Nitro's cache in memory instead of the dev KV store.
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
@@ -443,10 +442,6 @@ export default defineNuxtConfig({
   ],
 
   hooks: {
-    "nitro:init": function (nitro) {
-      if (host === "cloudflare")
-        nitro.hooks.hook("compiled", () => syncCloudflareTemplate(nitro.options.output.serverDir))
-    },
     "nitro:config": function (config) {
       // Raw files and share pages get their own error page (server/handlers/content-error.ts); everything else keeps
       // Nuxt's, which renders app/error.vue. Nuxt only adds its handler when nitro.errorHandler is unset, so ours goes

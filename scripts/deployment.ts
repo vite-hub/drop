@@ -1,38 +1,21 @@
+import { detectPreset } from "vite-hub/deployment"
+
 export const HOSTS = ["cloudflare", "vercel", "netlify", "deno", "vps"] as const
 export type HostId = (typeof HOSTS)[number]
 export type Host = HostId
 
 const isHost = (value: string): value is Host => HOSTS.some((host) => host === value)
 
-/** Build-time choices. Credentials and the SQLite path remain runtime settings. */
+/**
+ * Build-time choices. Credentials and the SQLite path remain runtime settings. DROP_HOST wins; otherwise ViteHub reads
+ * the host from the build env (NITRO_PRESET, VERCEL, NETLIFY, ...), and ViteHub's build rejects a preset that
+ * conflicts with it. Drop calls ViteHub's node preset `vps`.
+ */
 export function deployment(env: Record<string, string | undefined> = process.env) {
-  const presets = new Map<string, Host>([
-    ["cloudflare", "cloudflare"],
-    ["cloudflare_module", "cloudflare"],
-    ["vercel", "vercel"],
-    ["netlify", "netlify"],
-    ["deno", "deno"],
-    ["deno_server", "deno"],
-    ["node", "vps"],
-    ["node_server", "vps"],
-  ])
-  const preset = env.NITRO_PRESET || env.SERVER_PRESET
-  const presetHost = preset ? presets.get(preset.replaceAll("-", "_")) : undefined
+  const detected = detectPreset(env)
   const host =
-    env.DROP_HOST ||
-    presetHost ||
-    (env.VERCEL === "1"
-      ? "vercel"
-      : env.NETLIFY === "true"
-        ? "netlify"
-        : env.DENO_DEPLOYMENT_ID
-          ? "deno"
-          : undefined) ||
-    (env.DROP_DATABASE_URL ? "vps" : "cloudflare")
+    env.DROP_HOST || (detected === "node" ? "vps" : detected) || (env.DROP_DATABASE_URL ? "vps" : "cloudflare")
   if (!isHost(host)) throw new Error(`DROP_HOST must be one of ${HOSTS.join(", ")}; got "${host}".`)
-  if (preset && !presetHost)
-    throw new Error(`Unsupported Drop preset "${preset}". Set DROP_HOST and use its matching Nitro preset.`)
-  if (preset && presetHost !== host) throw new Error(`DROP_HOST=${host} conflicts with ${preset}.`)
 
   // Preserve existing VPS deployments with an explicit D1 database. Never switch a configured D1 to SQLite.
   const database =

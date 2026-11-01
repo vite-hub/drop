@@ -2,6 +2,7 @@ import type { H3Event } from "h3"
 import { defineCachedFunction } from "nitro/cache"
 import { useStorage } from "nitro/storage"
 import { resolveCacheKeys } from "ocache"
+import { version as comarkUiVersion } from "comark-ui/package.json"
 
 export const MARKDOWN_CACHE_TTL = 60 * 60 * 24 * 30
 
@@ -34,8 +35,9 @@ const cached = defineCachedFunction(
     name: "markdown",
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
-    // Bump when the renderer changes so existing documents pick up the current preset on their next read.
-    integrity: "18",
+    // A comark-ui upgrade changes it by itself. Bump the Drop revision after it when Drop's own render changes, so
+    // existing documents pick up the current preset on their next read.
+    integrity: `${comarkUiVersion}+drop.18`,
     validate: (entry: { value?: MarkdownRender }) => entry.value !== undefined && !entry.value.retry,
     getKey: (_event: H3Event | undefined, key: string) => key,
   },

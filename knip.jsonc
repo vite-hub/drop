@@ -69,5 +69,7 @@
     "@vite-hub/rate-limit",
     "@vite-hub/auth",
     "@vite-hub/content",
+    "@vite-hub/database",
+    "@vite-hub/schedule",
   ],
 }

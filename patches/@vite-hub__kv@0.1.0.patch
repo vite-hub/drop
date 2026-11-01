@@ -1,0 +1,48 @@
+diff --git a/dist/runtime/nitro-cache.js b/dist/runtime/nitro-cache.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a24a51f3d3769ecd8d89122f12e4ad0f33ca17ec
+--- /dev/null
++++ b/dist/runtime/nitro-cache.js
+@@ -0,0 +1,27 @@
++import { a as normalizeKey } from "../utils2-Dsb9P4_2.js";
++import { kv } from "@vite-hub/kv";
++//#region src/runtime/nitro-cache.ts
++async function unwrap(pending) {
++	const [error, value] = await pending;
++	if (error) throw error;
++	return value;
++}
++/** Unstorage driver over the app's default KV store, for Nitro's `cache` mount. */
++function createKVCacheDriver(options = {}) {
++	const prefix = `${normalizeKey(options.base ?? "nitro-cache")}:`;
++	const key = (name) => prefix + normalizeKey(name);
++	return {
++		name: "vitehub-kv",
++		options,
++		hasItem: (name) => unwrap(kv.has(key(name))),
++		getItem: (name) => unwrap(kv.get(key(name))),
++		setItem: (name, value, opts) => unwrap(kv.set(key(name), value, opts)),
++		removeItem: (name) => unwrap(kv.del(key(name))),
++		async getKeys(base) {
++			return (await unwrap(kv.keys(key(base)))).map((name) => name.slice(prefix.length));
++		},
++		clear: (base) => unwrap(kv.clear(key(base)))
++	};
++}
++//#endregion
++export { createKVCacheDriver as default };
+diff --git a/package.json b/package.json
+index 8a2f319e577be338952f9dadc3b94d63b7d18fd2..7d81a04b636d60fe39c13d634c5b004e6d657ea8 100644
+--- a/package.json
++++ b/package.json
+@@ -55,6 +55,10 @@
+       "import": "./dist/runtime/cloudflare-kv.js",
+       "default": "./dist/runtime/cloudflare-kv.js"
+     },
++    "./runtime/nitro-cache": {
++      "import": "./dist/runtime/nitro-cache.js",
++      "default": "./dist/runtime/nitro-cache.js"
++    },
+     "./runtime/upstash-driver": {
+       "types": "./dist/runtime/upstash-driver.d.ts",
+       "import": "./dist/runtime/upstash-driver.js",

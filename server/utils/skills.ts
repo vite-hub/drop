@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { createTarGzip } from "nanotar"
 import comarkUiSkill from "comark-ui/skills/comark-ui/SKILL.md?raw"
-import bundledComarkSkills from "#comark-ui-skills"
+import { skills as comarkSkills } from "comark-ui/skills"
 import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
@@ -116,14 +116,18 @@ const LOCAL_SKILLS: Skill[] = [
   ),
 ]
 
+// comark-ui's own skills, from the installed release, so they describe the renderer Drop runs. Their source links
+// point at comark-ui's skill index, which serves the same files.
+const COMARK_SKILLS = "https://comark-ui.onmax.me/.well-known/skills/"
+
 export const SKILLS: Skill[] = [
   ...LOCAL_SKILLS,
-  ...bundledComarkSkills
+  ...comarkSkills
     .filter((entry) => !LOCAL_SKILLS.some((local) => local.name === entry.name))
     .map((entry) =>
       skill(
         entry.files.map((item) => file(item.path, item.text)),
-        entry.source,
+        `${COMARK_SKILLS}${entry.name}/SKILL.md`,
       ),
     ),
 ]

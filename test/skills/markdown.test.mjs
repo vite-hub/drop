@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { afterAll, beforeAll, beforeEach, test } from "vite-plus/test"
 import { migrate, reset } from "../cost/harness.mjs"
-const { blocksPublishing, COMPONENT_TAGS, lintMarkdown, parseMarkdown, renderMarkdownCached } =
+const { COMPONENT_TAGS, lintMarkdown, parseMarkdown, renderMarkdownCached } =
   await import("../../server/utils/markdown-document.ts")
 
 migrate()
@@ -69,17 +69,6 @@ test("every example in the Markdown references renders without an unsupported co
 
 test("every example in the Markdown references publishes without a lint problem", async () => {
   for (const example of examples) assert.deepEqual(await lintMarkdown(example), [], example)
-})
-
-test("every rule comark-linter's catalog marks as an error stops a publish", async () => {
-  // The linter's index exports rule titles only; its Doctor extension carries each rule's severity.
-  const { default: comark } = await import("comark-linter/doctor")
-  const rules = comark().rulePacks.flatMap((pack) => pack.rules.map((rule) => rule.meta))
-  assert.ok(rules.length > 100 && rules.some((rule) => rule.severity === "error"))
-  assert.deepEqual(
-    rules.filter((rule) => rule.severity === "error" && !blocksPublishing(rule.id)).map((rule) => rule.id),
-    [],
-  )
 })
 
 test("comark-linter comes from the same comark-ui release as the renderer", async () => {

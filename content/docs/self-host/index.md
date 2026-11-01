@@ -127,11 +127,13 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 | Host | Applies migrations with |
 | --- | --- |
 | Cloudflare | `pnpm run deploy`, which the button runs. Workers Builds that run `npx wrangler deploy` need `pnpm db:migrate:remote` after schema changes. |
-| Vercel, Netlify | `pnpm db:migrate:d1` after the build, before publishing. |
+| Vercel, Netlify | `pnpm db:migrate --allow-data-loss` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
 | Deno Deploy | `pnpm db:migrate:d1` as a pre-deploy command. |
 | Docker Compose | Drizzle for SQLite, or `pnpm db:migrate:d1` for an explicit D1 build, before Drop starts. |
 
-`pnpm db:migrate:d1` needs `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_D1_DATABASE_ID`. It records migrations in `d1_migrations` and skips those already applied.
+Both commands need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_D1_DATABASE_ID`. They record migrations in `d1_migrations`, as Wrangler does, and skip those already applied.
+
+The Vercel and Netlify builds explicitly allow Drop's intentional destructive migrations, including removal of the legacy comment tables after moving to ViteHub Comments. Review new migrations before deploying, as with the D1 migration script used by Deno and Docker.
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 

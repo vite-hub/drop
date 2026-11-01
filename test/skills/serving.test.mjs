@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import { test, vi } from "vite-plus/test"
-import bundledComarkSkills from "../../.nuxt/comark-ui-skills.ts"
+import { skills as bundledComarkSkills } from "comark-ui/skills"
 import { H3Event, toResponse } from "h3"
 import { parseTarGzip } from "nanotar"
 import { createMcpHandler } from "nitro-mcp-toolkit"
@@ -165,7 +165,7 @@ test("admins can toggle bundled skills while their source links point upstream",
   try {
     for (const skill of bundledComarkSkills) {
       const entry = (await catalog(event())).find((item) => item.name === skill.name)
-      assert.equal(entry.source, skill.source)
+      assert.equal(entry.source, `https://comark-ui.onmax.me/.well-known/skills/${skill.name}/SKILL.md`)
       await setSkillEnabled(skill.name, false, "admin")
       assert.ok(
         !(await (await get("/.well-known/skills/index.json")).json()).skills.some((item) => item.name === skill.name),

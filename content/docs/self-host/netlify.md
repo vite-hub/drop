@@ -30,7 +30,7 @@ extra:
 
 ## Database {#database}
 
-Cloudflare D1 over HTTPS. `pnpm db:migrate:d1` skips migrations already applied. The configured Netlify build runs it after building. Disable deploy previews or give them a separate D1 database.
+Cloudflare D1 over HTTPS. `pnpm db:migrate --allow-data-loss` skips migrations already applied and permits Drop's intentional schema removals. The configured Netlify build runs it after building. Disable deploy previews or give them a separate D1 database.
 
 ## On Netlify {#different}
 
