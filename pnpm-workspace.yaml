@@ -44,6 +44,8 @@ patchedDependencies:
   #   arrays with the generated ones, and a real id replaces a placeholder (vite-hub/vitehub#3175).
   # - `cache: { driver: "kv" }` mounts Nitro's cache on the app's KV (vite-hub/vitehub#3178).
   # - `detectPreset()` from vite-hub/deployment reads the host from the build env (vite-hub/vitehub#3179).
+  # - The Console's page-tool routes drop the doubled slash in `//_vitehub/page/...`, which Nitro's Vercel preset wrote
+  #   as the absolute path /_vitehub and failed the build (vite-hub/vitehub#3191).
   vite-hub@0.1.0: patches/vite-hub@0.1.0.patch
   # - `vitehub db migrate` on D1 over HTTP keeps Wrangler's d1_migrations ledger, so Vercel and Netlify builds migrate
   #   without Drizzle Kit or Drop's script (vite-hub/vitehub#3174).

@@ -100,7 +100,7 @@ index 5e6561bff3190caeb6359a6bb53e79c702e14b4f..b35f4b6519fb034fd996a165bb2f100f
  	const envConfig = configuredEnv && typeof configuredEnv === "object" ? {
  		define: configuredEnv.define,
 diff --git a/dist/src-CaqWiza-.js b/dist/src-CaqWiza-.js
-index 7398d09ed393d3c3237b60a67dd49ca061fe6ffd..d77e400a14fdfa2dec3b8d1b472b5dde2bf4647e 100644
+index 7398d09ed393d3c3237b60a67dd49ca061fe6ffd..e3858940dcfd1c8390d3cfd2c354c4acae4ec1a7 100644
 --- a/dist/src-CaqWiza-.js
 +++ b/dist/src-CaqWiza-.js
 @@ -1,4 +1,5 @@
@@ -250,6 +250,15 @@ index 7398d09ed393d3c3237b60a67dd49ca061fe6ffd..d77e400a14fdfa2dec3b8d1b472b5dde
  }
  //#endregion
  //#region ../internal/src/build/runtime-package-resolution.ts
+@@ -5678,7 +5702,7 @@ function addConsolePageHandlers(nitro, consoleRuntimeRoot, base, signInPage) {
+ 		},
+ 		...(nitro.publicAssets ?? []).filter((asset) => asset.dir !== assets && asset.dir !== skills)
+ 	];
+-	addConsolePageToolRoutes(nitro, consoleRuntimeRoot, base);
++	addConsolePageToolRoutes(nitro, consoleRuntimeRoot, viteHubBasePath(base));
+ }
+ /**
+ * Serves the page tools session `GET <mount>/_vitehub/page/session` and the loader at `<mount>/_vitehub/page/assets`, so
 @@ -7223,6 +7247,89 @@ function configureCloudflarePrerender(config) {
  function shellQuote(value) {
  	return `'${value.replaceAll("'", `'\\''`)}'`;
