@@ -32,7 +32,7 @@ extra:
 
 ## Database {#database}
 
-Cloudflare D1 over HTTPS. `pnpm db:migrate:d1` skips migrations already applied. The configured Vercel build runs it after building. Disable previews or give them a separate D1 database.
+Cloudflare D1 over HTTPS. `pnpm db:migrate` skips migrations already applied. The configured Vercel build runs it after building. Disable previews or give them a separate D1 database.
 
 ## On Vercel {#different}
 

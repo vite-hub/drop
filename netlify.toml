@@ -1,20 +1,11 @@
 # Netlify builds Drop for its own host. Secrets go in the site's environment variables (docs/self-host/netlify).
 [build]
-command = "pnpm build && pnpm db:migrate:d1"
+command = "pnpm build && pnpm db:migrate"
 publish = "dist"
 
 [build.environment]
 DROP_HOST = "netlify"
 NODE_VERSION = "24"
-
-[functions]
-directory = "netlify/functions"
-node_bundler = "none"
-
-[[redirects]]
-from = "/*"
-to = "/.netlify/functions/server"
-status = 200
 
 # The deploy button prompts for these values before its first build.
 [template.environment]
