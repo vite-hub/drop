@@ -17,5 +17,17 @@ export default defineDoctorConfig({
       reason:
         "ViteHub wraps this dependency handler in withConsoleAccess with section auth and user required. Doctor cannot follow that wrapper. test/auth/console-runtime.mjs verifies signed-out and non-admin requests are denied by the built Worker.",
     },
+    {
+      ruleId: "nuxt/middleware/no-route-middleware-api-security",
+      file: "node_modules/*/vite-hub/dist/console/runtime/server/page-session.js",
+      reason:
+        "Public page-tool discovery filters every tool through its allowed callback: Console uses consoleAllowsRequest, and Comments checks Console access and read permission. Denied or failed checks expose no tool. Doctor cannot follow the bundled dispatcher.",
+    },
+    {
+      ruleId: "nuxt/middleware/no-route-middleware-api-security",
+      file: ".vitehub/nitro/comments/page-session.mjs",
+      reason:
+        "Generated re-export of the same public page-tool discovery handler. Comments checks Console section access and read permission in its allowed callback; denied or failed checks expose no tool. Doctor cannot follow the re-export and callback.",
+    },
   ],
 })
