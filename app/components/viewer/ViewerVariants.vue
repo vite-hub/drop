@@ -63,7 +63,7 @@ const camera: { command: PickerCommand; label: string; icon?: string; kbd: strin
 </script>
 
 <template>
-  <div ref="group" aria-label="Prototype variants" class="flex max-w-full min-w-0 items-center gap-1" role="group">
+  <div ref="group" aria-label="Prototype variants" class="flex max-w-full min-w-0 items-center gap-0.5" role="group">
     <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['←']" text="Previous variant">
       <button
         aria-label="Previous variant"
