@@ -156,9 +156,14 @@ const framed = computed(
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
-/** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. */
+/** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. A
+ * video clears the dock inside its own stage, so the stage's color runs under the dock. */
 const dockClearance = computed(
-  () => !editing.value && !trashed.value && ["board", "site", "app", "file", "folder"].includes(drop.value.kind),
+  () =>
+    !editing.value &&
+    !trashed.value &&
+    !video.value &&
+    ["board", "site", "app", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null
