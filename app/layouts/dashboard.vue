@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // shadcn's sidebar (sidebar-07) on Executor's flat console: one step lighter or darker than the page (bg-muted, at
-// shadcn's --sidebar lightness), a hairline between sidebar and page, your search above the drops, Drops folding open
-// into their tree like Google Drive's My Drive (apps are folders), the workspace pages and Docs at the bottom, and the
-// account menu (NavUser) opening upward.
+// shadcn's --sidebar lightness), a hairline between sidebar and page, your search above the drops, Drops with a + to
+// make one (the Drops page lists them, so the sidebar doesn't), the workspace pages and Docs at the bottom, how much of
+// the plan you use, and the account menu (NavUser) opening upward.
 //
 // Docs is a pane of its own: picking it slides everything under Search out to the left and the docs nav in from the
 // right, with Back at its top; Back slides the other way and stays on the page. The logo, Search and the account menu
@@ -32,9 +32,7 @@ providePaletteContext()
 
 const onDrops = computed(() => route.path === "/drops" && route.query.tab !== "with-me")
 const onShared = computed(() => route.path === "/drops" && route.query.tab === "with-me")
-// Drops start open on their tree; the caret folds it away. A team Drop leads with the team's folders, and its Team page
-// takes the place of Shared with me.
-const dropsOpen = ref(true)
+// A team Drop leads with the team's folders, and its Team page takes the place of Shared with me.
 const teamOpen = ref(true)
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
@@ -176,6 +174,7 @@ function leaveDocs() {
                   <TeamTree @navigate="close" />
                 </div>
               </template>
+              <!-- Drops lists them on its page; the + beside it makes one from anywhere. -->
               <SidebarItem
                 active-icon="i-mingcute-layers-fill"
                 :active="onDrops"
@@ -185,23 +184,8 @@ function leaveDocs() {
                 to="/drops"
                 @navigate="close"
               >
-                <button
-                  :aria-expanded="dropsOpen"
-                  :aria-label="dropsOpen ? 'Collapse drops' : 'Expand drops'"
-                  class="relative grid size-6 cursor-pointer place-items-center rounded-sm text-dimmed before:absolute before:-inset-1 hover:bg-accented hover:text-highlighted"
-                  type="button"
-                  @click="dropsOpen = !dropsOpen"
-                >
-                  <UIcon
-                    name="i-mingcute-right-line"
-                    class="size-3.5 motion-safe:transition-transform duration-150"
-                    :class="dropsOpen && 'rotate-90'"
-                  />
-                </button>
+                <SidebarNew />
               </SidebarItem>
-              <div v-if="dropsOpen" class="ml-3.5 border-l border-default pl-2">
-                <DropTree @navigate="close" />
-              </div>
               <SidebarItem
                 v-if="!team"
                 active-icon="i-mingcute-inbox-fill"
@@ -268,6 +252,7 @@ function leaveDocs() {
       </div>
 
       <template #footer>
+        <ClientOnly><SidebarUsage /></ClientOnly>
         <UpdateReady />
         <UserMenu />
       </template>

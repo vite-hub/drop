@@ -210,6 +210,9 @@ export const ReportActionSchema = v.object({ action: v.picklist(["dismiss", "qua
  * Query strings stay strings here. Routes convert and cut them after h3 has validated the shape: a search box or a
  * reviewed page's URL can run long, and those requests should still answer, with the first part.
  */
+/** The Drops page's previews: up to 90 ids, comma-separated. */
+export const PeeksQuerySchema = v.object({ ids: v.pipe(v.string(), v.maxLength(90 * 24)) })
+
 export const DropsQuerySchema = v.object({
   q: v.optional(v.string()),
   kind: v.optional(v.string()),

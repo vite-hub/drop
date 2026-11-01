@@ -16,6 +16,10 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
   // Whether this person typed since the editor opened. The room's own changes (loading the draft, others typing) come
   // in as y-sync transactions and don't count.
   const edited = ref(false)
+  // Whether they typed something the room hasn't had yet: set by their edits while out of sync, cleared each time the
+  // room catches up.
+  const unsaved = ref(false)
+  watch(realtime.synced, (synced) => synced && (unsaved.value = false))
 
   // The room's extensions exist once its Y.Doc and provider do. Rebuild the editor only for a new room: the extensions
   // list is recomputed on reconnects too, and a rebuild would drop focus mid-sentence.
@@ -41,11 +45,13 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
       autofocus: "end",
     })
     editor.value.on("update", ({ transaction }) => {
-      if (!transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) edited.value = true
+      if (transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) return
+      edited.value = true
+      if (!realtime.synced.value) unsaved.value = true
     })
   })
 
-  return { realtime, editor, edited }
+  return { realtime, editor, edited, unsaved }
 }
 
 export type LiveRoom = ReturnType<typeof useLiveRoom>

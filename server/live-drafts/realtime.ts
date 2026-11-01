@@ -2,7 +2,7 @@ import { log } from "evlog"
 import { blob } from "vite-hub/blob"
 import { RealtimeDocumentConflict, type RealtimeDocumentAdapter } from "vite-hub/realtime"
 import { refreshRealtimeDocument } from "vite-hub/realtime/server"
-import { draftPath } from "../utils/draft-paths"
+import { draftPath } from "#shared/draft-paths"
 
 /**
  * Live drafts: the text people edit together, one Blob file per drop version (`drafts/<id>/v<n>.md`) holding the body

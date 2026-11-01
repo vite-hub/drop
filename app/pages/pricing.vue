@@ -69,9 +69,11 @@ const rows = computed(() => [
     <div class="docs-prose">
       <h2 id="who-counts">Who counts</h2>
       <p>
-        <strong>Everyone who signs in counts</strong>, across every Drop you run: you, your teammates, and contractors.
-        People outside your team who only open or comment on what you share with them don't. Agents act for the person
-        who connected them, so they don't count on their own.
+        <strong>Everyone who has an account on, or signs in to, any Drop run by you or for you counts</strong>, added up
+        across all those Drops. Your organization includes you, your employees and contractors, and every entity that
+        controls, is controlled by, or is under common control with you. People outside your organization who only view
+        or comment on content shared with them don't count. Agents act for the person who connected them, so they don't
+        count on their own.
       </p>
       <h2 id="buy">Buying a license</h2>
       <p>

@@ -6,26 +6,39 @@ defineProps<{ src: string; type?: string; title: string }>()
 
 onMounted(() => import("media-chrome"))
 
+// Firefox suspends decoding for a video whose window is hidden (behind another app, say), and on macOS a paused one can
+// come back without its frame: the player showed nothing, the whole screen in fullscreen. Seeking to where the video
+// already is decodes that frame again.
+const video = useTemplateRef<HTMLVideoElement>("video")
+const visibility = useDocumentVisibility()
+watch(visibility, (state) => {
+  const element = video.value
+  if (state !== "visible" || !element?.paused || element.readyState < HTMLMediaElement.HAVE_METADATA) return
+  const at = element.currentTime
+  element.currentTime = at
+})
+
 const variables = {
   "--media-primary-color": "var(--primary)",
   "--media-secondary-color": "var(--background)",
   "--media-text-color": "var(--foreground)",
-  "--media-background-color": "var(--background)",
   "--media-control-hover-background": "var(--accent)",
   "--media-font-family": "var(--font-sans)",
-  "--media-range-track-background": "var(--border)",
+  "--media-range-track-background": "color-mix(in srgb, var(--foreground) 25%, transparent)",
 }
 </script>
 
 <template>
   <div class="grid min-h-0 flex-1 place-items-center bg-elevated p-6 sm:p-10">
+    <!-- The page caps the video's height and fills the letterbox with the page; fullscreen fills the screen, letterboxed in black. -->
     <media-controller
-      class="@container block max-h-full w-full max-w-5xl overflow-hidden rounded-lg border border-default shadow-lg"
+      class="@container block max-h-full w-full max-w-5xl overflow-hidden rounded-lg border border-default shadow-lg [--media-background-color:var(--background)] [&[mediaisfullscreen]]:rounded-none [&[mediaisfullscreen]]:border-0 [&[mediaisfullscreen]]:[--media-background-color:#000]"
       :style="variables"
     >
       <video
+        ref="video"
         slot="media"
-        class="block max-h-[calc(100dvh-12rem)] w-full"
+        class="block max-h-[calc(100dvh-12rem)] w-full in-[[mediaisfullscreen]]:h-full in-[[mediaisfullscreen]]:max-h-none"
         :aria-label="title"
         playsinline
         preload="metadata"
