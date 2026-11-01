@@ -57,6 +57,20 @@
       "when": 1793455248455,
       "tag": "0007_suggestion_undos",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793529936150,
+      "tag": "0005_vitehub_comments_release",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793529936151,
+      "tag": "0009_drop_comments_release_upgrade",
+      "breakpoints": true
     }
   ]
 }
