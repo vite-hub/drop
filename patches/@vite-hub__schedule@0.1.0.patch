@@ -1,0 +1,73 @@
+diff --git a/dist/vite-BAVyZ8hZ.d.ts b/dist/vite-BAVyZ8hZ.d.ts
+index 30f8fb8cb1f052fdf9037d7c464ed63d4dc6df17..7a236d894ff337751fbeeceddbcd626300fda3d6 100644
+--- a/dist/vite-BAVyZ8hZ.d.ts
++++ b/dist/vite-BAVyZ8hZ.d.ts
+@@ -427,6 +427,7 @@ interface ScheduleProcessRuntimeOptions {
+   prefix?: string;
+ }
+ interface ScheduleVitePluginOptions {
++  cron?: Readonly<Record<string, string>>;
+   providerOutput?: "auto" | "standalone" | "nitro" | false;
+   projectRoot?: string;
+   runtime?: ScheduleProcessRuntimeOptions;
+diff --git a/dist/vite-BJwZkMrn.js b/dist/vite-BJwZkMrn.js
+index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..a493c0d9282cdd8ae7da476a409e6e7f09c11042 100644
+--- a/dist/vite-BJwZkMrn.js
++++ b/dist/vite-BJwZkMrn.js
+@@ -3996,8 +3996,9 @@ async function writeProviderEntries(rootDir, source, providedDefinitions) {
+ 		vercelServerFile
+ 	};
+ }
+-async function readDefinitionCrons(definitions) {
++async function readDefinitionCrons(definitions, overrides) {
+ 	const crons = await readRuntimeDefinitionCrons(definitions);
++	for (const [name, cron] of Object.entries(overrides ?? {})) if (crons.has(name)) crons.set(name, cron);
+ 	for (const [name, cron] of crons) validateProviderCron(cron, name);
+ 	for (const definition of definitions) assertProviderTimeZone(definition.handler, definition.name);
+ 	return crons;
+@@ -4538,8 +4539,8 @@ function inspectTimeZone(file) {
+ 	const timeZone = readStaticScheduleTimeZone(file);
+ 	return timeZone === null ? "Not a static string" : timeZone ?? "UTC";
+ }
+-function summarizeScheduleDefinition(projectRoot, definition, crons) {
+-	const cron = crons.get(definition.name);
++function summarizeScheduleDefinition(projectRoot, definition, crons, overrides = {}) {
++	const cron = Object.hasOwn(overrides, definition.name) ? overrides[definition.name] : crons.get(definition.name);
+ 	const fields = [{
+ 		label: "Kind",
+ 		value: "Static schedule"
+@@ -4589,7 +4590,7 @@ async function inspectScheduleDefinitions(options) {
+ 	for (const definition of definitions) try {
+ 		for (const [name, cron] of await readRuntimeDefinitionCrons([definition])) crons.set(name, cron);
+ 	} catch {}
+-	return definitions.map((definition) => summarizeScheduleDefinition(options.projectRoot, definition, crons));
++	return definitions.map((definition) => summarizeScheduleDefinition(options.projectRoot, definition, crons, options.cron));
+ }
+ function definitionRecord(summary) {
+ 	const field = (label) => summary.fields.find((entry) => entry.label === label)?.value;
+@@ -4957,7 +4958,7 @@ async function createScheduleNitroConfig(options = {}) {
+ 	const vercelDefinitions = options.command === "build" && nitroPreset.startsWith("vercel") && (options.runtime === void 0 || options.providerOutput === "standalone") && shouldEmitStandaloneProviderOutput(definitions, options) ? definitions.filter((definition) => standaloneProviderSource === void 0 || definition.source === standaloneProviderSource) : [];
+ 	if (!installNitroPlugin && !vercelDefinitions.length) return null;
+ 	let nitro = options.nitro;
+-	if (vercelDefinitions.length) nitro = mergeNitroVercelCrons(nitro, vercelDefinitions, await readDefinitionCrons(vercelDefinitions));
++	if (vercelDefinitions.length) nitro = mergeNitroVercelCrons(nitro, vercelDefinitions, await readDefinitionCrons(vercelDefinitions, options.cron));
+ 	if (!installNitroPlugin) return nitro;
+ 	const nitroDefinitions = processRuntime && options.providerOutput !== "nitro" ? [] : selectNitroScheduleDefinitions(definitions, options);
+ 	const crons = options.command === "build" ? [...new Set((await readDefinitionCrons(nitroDefinitions)).values())] : [];
+@@ -5091,7 +5092,7 @@ function hubSchedule(options = {}) {
+ 			let artifactDir;
+ 			try {
+ 				const definitions = emitStandaloneProviderOutput ? discoverRegistrySchedules() : [];
+-				const crons = await readDefinitionCrons(definitions);
++				const crons = await readDefinitionCrons(definitions, options.cron);
+ 				const prepareWorkflow = definitions.length ? (config.plugins ?? []).find((candidate) => candidate.vitehub?.workflow?.prepareScheduleRuntime)?.vitehub?.workflow?.prepareScheduleRuntime : void 0;
+ 				artifactDir = resolve(rootDir, ".vitehub/schedule-generations", randomUUID());
+ 				const contributionArtifactDir = artifactDir;
+@@ -5178,6 +5179,7 @@ function hubSchedule(options = {}) {
+ 			list: () => {
+ 				const roots = resolveSchedulePluginRoots(viteRoot ?? process.cwd(), options);
+ 				return inspectScheduleDefinitions({
++					cron: options.cron,
+ 					plugins: resolved?.plugins,
+ 					projectRoot: roots.projectRoot,
+ 					rootDir: roots.viteRoot,

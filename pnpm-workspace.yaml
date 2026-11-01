@@ -37,6 +37,23 @@ patchedDependencies:
   # package chunk and everything it imports. That was about half the code of a cold /drops request.
   # Preserve registered virtual handler ids: resolving ViteHub's MCP discovery middleware as a file breaks the build.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
+  # Four open ViteHub PRs in one patch, since pnpm takes one per version:
+  # - Netlify builds on the Nitro RC: ViteHub looked for the beta's functions-internal/ entry and failed the build. It
+  #   now finds .netlify/v1/functions/server/server.mjs and writes no wrapper (vite-hub/vitehub#3173).
+  # - One Wrangler entry per binding name, flag, and required secret: Nitro concatenates the project's wrangler.jsonc
+  #   arrays with the generated ones, and a real id replaces a placeholder (vite-hub/vitehub#3175).
+  # - `cache: { driver: "kv" }` mounts Nitro's cache on the app's KV (vite-hub/vitehub#3178).
+  # - `detectPreset()` from vite-hub/deployment reads the host from the build env (vite-hub/vitehub#3179).
+  vite-hub@0.1.0: patches/vite-hub@0.1.0.patch
+  # - `vitehub db migrate` on D1 over HTTP keeps Wrangler's d1_migrations ledger, so Vercel and Netlify builds migrate
+  #   without Drizzle Kit or Drop's script (vite-hub/vitehub#3174).
+  # - A real D1 id replaces the template's all-zero one instead of conflicting with it (vite-hub/vitehub#3175).
+  "@vite-hub/database@0.1.0": patches/@vite-hub__database@0.1.0.patch
+  # `schedule: { cron }` sets a Schedule's cron for one host's build, so Vercel Hobby runs the cleanup daily
+  # (vite-hub/vitehub#3177, the Vercel part only).
+  "@vite-hub/schedule@0.1.0": patches/@vite-hub__schedule@0.1.0.patch
+  # The Nitro cache driver behind `cache: { driver: "kv" }` (vite-hub/vitehub#3178).
+  "@vite-hub/kv@0.1.0": patches/@vite-hub__kv@0.1.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
