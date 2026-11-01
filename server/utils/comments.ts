@@ -279,7 +279,8 @@ export async function resolveComments(row: Commented, numbers: number[], who: Id
   const threads = await Promise.all([...new Set(numbers)].map((n) => findCommentByNumber(row, n, list)))
   const open = threads.flatMap((thread) => (thread?.status === "open" ? [thread] : []))
   const by = authorOf(who, who.name)
-  await Promise.all(open.map((thread) => done(comments.resolve(thread.id, { by }))))
+  // Each resolution owns a write batch; don't overlap transactions on the same SQLite connection.
+  for (const thread of open) await done(comments.resolve(thread.id, { by }))
   return open.map((thread) => thread.number).sort((a, b) => a - b)
 }
 

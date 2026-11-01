@@ -45,6 +45,8 @@ async function pick(next: Share) {
 </script>
 
 <template>
+  <!-- The popover's surface is see-through: over a light page it lightens to Nuxt UI's elevated gray, which hid the
+       hovers in it, so they tint with the inverted color instead, as the review toolbar's do. -->
   <UPopover
     v-model:open="open"
     :content="{ align: 'end', side: 'top' }"
@@ -68,6 +70,7 @@ async function pick(next: Share) {
           <h2 class="text-sm font-medium text-highlighted">Share drop</h2>
           <UButton
             aria-label="Close sharing"
+            class="hover:bg-inverted/8 active:bg-inverted/12"
             color="neutral"
             icon="i-mingcute-close-line"
             size="xs"
@@ -94,6 +97,9 @@ async function pick(next: Share) {
           </div>
         </div>
         <p v-if="!drop.isOwner" class="px-1 text-xs text-muted">Only its owner changes who can open it.</p>
+        <!-- A click anywhere on a row picks it: the label's ::after covers the row, description and padding too, and
+             takes the row's cursor, since browsers give a label the default one. The row carries the focus ring, not
+             the dot. -->
         <URadioGroup
           :aria-busy="saving"
           aria-label="Who can open it"
@@ -104,9 +110,10 @@ async function pick(next: Share) {
           size="sm"
           :ui="{
             fieldset: 'gap-0',
-            item: 'rounded-md px-1 py-1.5 has-[button:enabled]:hover:bg-elevated/60 motion-safe:transition-colors motion-safe:duration-150',
+            item: 'relative -mx-1 rounded-md px-2 py-1.5 outline-inverted/25 has-focus-visible:outline-3 has-[button:enabled]:cursor-pointer has-[button:disabled]:cursor-not-allowed has-[button:enabled]:hover:bg-inverted/8 has-[button:enabled]:active:bg-inverted/12 motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-(--ease-out)',
+            base: 'focus-visible:outline-0',
             wrapper: 'min-w-0',
-            label: 'flex items-center gap-1.5 font-medium',
+            label: 'flex items-center gap-1.5 font-medium cursor-[inherit] after:absolute after:inset-0',
             description: 'text-xs',
           }"
           variant="list"
@@ -125,6 +132,7 @@ async function pick(next: Share) {
             >
             <UButton
               :aria-label="copied() ? 'Link copied' : 'Copy link'"
+              class="hover:bg-inverted/8 active:bg-inverted/12"
               color="neutral"
               :disabled="drop.isOwner && !shared"
               :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"

@@ -18,11 +18,7 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
 </script>
 
 <template>
-  <div aria-label="Marker" class="flex items-center gap-1" data-marker role="group">
-    <span class="flex items-center gap-1.5 pr-1 pl-2 text-muted">
-      <UIcon aria-hidden="true" class="size-3.5" name="i-mingcute-camera-line" />Snapshot
-    </span>
-    <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+  <div aria-label="Marker" class="flex items-center gap-0.5" data-marker role="group">
     <UTooltip v-for="(tip, id) in MARK_TIPS" :key="id" :content="{ side: 'top', sideOffset: 8 }">
       <button
         :aria-keyshortcuts="tip.key"
@@ -39,7 +35,7 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
         {{ tip.label }}<span class="ml-1.5 opacity-60">{{ tip.key }}</span>
       </template>
     </UTooltip>
-    <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+    <span aria-hidden="true" class="w-1 shrink-0" />
     <UTooltip v-for="size in sizes" :key="size.index" :content="{ side: 'top', sideOffset: 8 }">
       <button
         :aria-label="`Size ${size.index + 1} of ${sizes.length}, ${size.px} pixels`"
@@ -62,7 +58,7 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
       </button>
       <template #content> {{ size.px }}px<span class="ml-1.5 opacity-60">[ ]</span> </template>
     </UTooltip>
-    <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+    <span aria-hidden="true" class="w-1 shrink-0" />
     <button
       v-for="(hex, name) in MARK_COLORS"
       :key="name"
@@ -75,7 +71,7 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
     >
       <span aria-hidden="true" class="block size-3.5 rounded-full ring-1 ring-black/10" :style="{ background: hex }" />
     </button>
-    <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+    <span aria-hidden="true" class="w-1 shrink-0" />
     <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['meta', 'z']" text="Undo">
       <button
         aria-keyshortcuts="Meta+Z Control+Z"

@@ -1,8 +1,15 @@
 diff --git a/dist/_build/common.mjs b/dist/_build/common.mjs
-index 3e20579..5915eb1 100644
 --- a/dist/_build/common.mjs
 +++ b/dist/_build/common.mjs
-@@ -8469,7 +8469,8 @@ function libChunkName(id) {
+@@ -3862,6 +3862,7 @@
+ }
+ function resolveNitroPath(path, nitroOptions, base) {
+ 	if (typeof path !== "string") throw new TypeError("Invalid path: " + path);
++	if (nitroOptions.virtual && path in nitroOptions.virtual) return path;
+ 	path = _compilePathTemplate(path)(nitroOptions);
+ 	for (const base in nitroOptions.alias) if (path.startsWith(base)) path = nitroOptions.alias[base] + path.slice(base.length);
+ 	if (/^[#\u0000]/.test(path)) return path;
+@@ -8469,7 +8470,8 @@
  function libChunksGroup() {
  	const group = {
  		test: NODE_MODULES_RE$2,
@@ -12,7 +19,7 @@ index 3e20579..5915eb1 100644
  	};
  	Object.defineProperty(group, "debugName", { value: "libs" });
  	return group;
-@@ -8481,6 +8482,10 @@ function pathToPkgName(path) {
+@@ -8481,6 +8483,10 @@
  }
  function getChunkName(chunk, nitro) {
  	if (chunk.name === "rolldown-runtime") return "_runtime.mjs";
