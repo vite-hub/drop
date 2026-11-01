@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install --global pnpm@11.18.0 && pnpm install --frozen-lockfile",
-  "buildCommand": "DROP_HOST=vercel pnpm build && pnpm db:migrate",
+  "buildCommand": "DROP_HOST=vercel pnpm build && pnpm db:migrate --allow-data-loss",
   "env": {
     "DROP_HOST": "vercel"
   }

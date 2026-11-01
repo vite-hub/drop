@@ -51,6 +51,7 @@ patchedDependencies:
   "@vite-hub/database@0.1.0": patches/@vite-hub__database@0.1.0.patch
   # `schedule: { cron }` sets a Schedule's cron for one host's build, so Vercel Hobby runs the cleanup daily
   # (vite-hub/vitehub#3177, the Vercel part only).
+  # Nuxt's Netlify builds emit scheduled functions through Nitro so they include its generated service bindings.
   "@vite-hub/schedule@0.1.0": patches/@vite-hub__schedule@0.1.0.patch
   # The Nitro cache driver behind `cache: { driver: "kv" }` (vite-hub/vitehub#3178).
   "@vite-hub/kv@0.1.0": patches/@vite-hub__kv@0.1.0.patch

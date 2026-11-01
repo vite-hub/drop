@@ -1,6 +1,6 @@
 # Netlify builds Drop for its own host. Secrets go in the site's environment variables (docs/self-host/netlify).
 [build]
-command = "pnpm build && pnpm db:migrate"
+command = "pnpm build && pnpm db:migrate --allow-data-loss"
 publish = "dist"
 
 [build.environment]

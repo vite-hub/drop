@@ -1,3 +1,66 @@
+diff --git a/dist/nitro-netlify.js b/dist/nitro-netlify.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ffae3b08ffda173d2bf77b27095f5f747a7f568
+--- /dev/null
++++ b/dist/nitro-netlify.js
+@@ -0,0 +1,57 @@
++import { cp, mkdir, rm, writeFile } from "node:fs/promises";
++import { join } from "node:path";
++
++// Nuxt replays the Vite config hooks but does not run the standalone output hooks. Bundle schedules through Nitro
++// so they retain its aliases, auto-imports, and generated service bindings, then give each Netlify function a copy
++// of that server bundle. No HTTP route is needed to invoke a schedule.
++function createNetlifyScheduleNitroModule({ projectRoot, definitions, crons, registry, runtimeImport }) {
++	const names = new Set();
++	const functions = definitions.map((definition) => {
++		const name = `vitehub-schedule-${definition.name.toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "schedule"}`;
++		if (names.has(name)) throw new Error(`Netlify schedule function name conflict: ${name}`);
++		names.add(name);
++		return { name, scheduleName: definition.name, cron: crons.get(definition.name) };
++	});
++	return {
++		name: "vitehub/schedule-netlify",
++		async setup(nitro) {
++			const directory = join(projectRoot, ".vitehub/nitro/schedule");
++			const entry = join(directory, "netlify-entry.mjs");
++			await mkdir(directory, { recursive: true });
++			await writeFile(join(directory, "netlify-registry.js"), registry);
++			await writeFile(entry, [
++				`export { default } from ${JSON.stringify(nitro.options.entry)}`,
++				`import registry from './netlify-registry.js'`,
++				`import { executeStaticSchedule, unwrapScheduleDefinition } from ${JSON.stringify(runtimeImport)}`,
++				`const crons = ${JSON.stringify(Object.fromEntries(crons))}`,
++				`export async function runViteHubNetlifySchedule(name) {`,
++				`  const definition = unwrapScheduleDefinition(await registry[name]())`,
++				`  await executeStaticSchedule({ definition, name, cron: crons[name], scheduledAt: new Date() })`,
++				`}`,
++				""
++			].join("\n"));
++			nitro.options.entry = entry;
++			nitro.hooks.hook("compiled", async () => {
++				for (const func of functions) {
++					const directory = join(nitro.options.output.dir, func.name);
++					await rm(directory, { recursive: true, force: true });
++					await cp(nitro.options.output.serverDir, directory, {
++						recursive: true,
++						filter: (source) => source !== join(nitro.options.output.serverDir, "server.mjs")
++					});
++					await writeFile(join(directory, `${func.name}.mjs`), [
++						`import { runViteHubNetlifySchedule } from './main.mjs'`,
++						`export default async function handler() {`,
++						`  await runViteHubNetlifySchedule(${JSON.stringify(func.scheduleName)})`,
++						`  return new Response(null, { status: 204 })`,
++						`}`,
++						`export const config = ${JSON.stringify({ schedule: func.cron, nodeBundler: "none", includedFiles: ["**"] })}`,
++						""
++					].join("\n"));
++				}
++			});
++		}
++	};
++}
++
++export { createNetlifyScheduleNitroModule };
 diff --git a/dist/vite-BAVyZ8hZ.d.ts b/dist/vite-BAVyZ8hZ.d.ts
 index 30f8fb8cb1f052fdf9037d7c464ed63d4dc6df17..7a236d894ff337751fbeeceddbcd626300fda3d6 100644
 --- a/dist/vite-BAVyZ8hZ.d.ts
@@ -11,10 +74,18 @@ index 30f8fb8cb1f052fdf9037d7c464ed63d4dc6df17..7a236d894ff337751fbeeceddbcd6263
    projectRoot?: string;
    runtime?: ScheduleProcessRuntimeOptions;
 diff --git a/dist/vite-BJwZkMrn.js b/dist/vite-BJwZkMrn.js
-index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..a493c0d9282cdd8ae7da476a409e6e7f09c11042 100644
+index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..23abf30d242b5797d64c3c5ade55086d02fef0f2 100644
 --- a/dist/vite-BJwZkMrn.js
 +++ b/dist/vite-BJwZkMrn.js
-@@ -3996,8 +3996,9 @@ async function writeProviderEntries(rootDir, source, providedDefinitions) {
+@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { build } from "esbuild";
+ import { parseSync } from "vite";
+ import { isDeepStrictEqual } from "node:util";
++import { createNetlifyScheduleNitroModule } from "./nitro-netlify.js";
+ //#region ../internal/src/build/client-output.ts
+ function hasStaticIndex(clientDir) {
+ 	return existsSync(resolve$1(clientDir, "index.html"));
+@@ -3996,8 +3997,9 @@ async function writeProviderEntries(rootDir, source, providedDefinitions) {
  		vercelServerFile
  	};
  }
@@ -25,7 +96,7 @@ index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..a493c0d9282cdd8ae7da476a409e6e7f
  	for (const [name, cron] of crons) validateProviderCron(cron, name);
  	for (const definition of definitions) assertProviderTimeZone(definition.handler, definition.name);
  	return crons;
-@@ -4538,8 +4539,8 @@ function inspectTimeZone(file) {
+@@ -4538,8 +4540,8 @@ function inspectTimeZone(file) {
  	const timeZone = readStaticScheduleTimeZone(file);
  	return timeZone === null ? "Not a static string" : timeZone ?? "UTC";
  }
@@ -36,7 +107,7 @@ index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..a493c0d9282cdd8ae7da476a409e6e7f
  	const fields = [{
  		label: "Kind",
  		value: "Static schedule"
-@@ -4589,7 +4590,7 @@ async function inspectScheduleDefinitions(options) {
+@@ -4589,7 +4591,7 @@ async function inspectScheduleDefinitions(options) {
  	for (const definition of definitions) try {
  		for (const [name, cron] of await readRuntimeDefinitionCrons([definition])) crons.set(name, cron);
  	} catch {}
@@ -45,7 +116,24 @@ index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..a493c0d9282cdd8ae7da476a409e6e7f
  }
  function definitionRecord(summary) {
  	const field = (label) => summary.fields.find((entry) => entry.label === label)?.value;
-@@ -4957,7 +4958,7 @@ async function createScheduleNitroConfig(options = {}) {
+@@ -4953,11 +4955,24 @@ async function createScheduleNitroConfig(options = {}) {
+ 	});
+ 	const installNitroPlugin = shouldInstallNitroSchedulePlugin(definitions, options);
+ 	const nitroPreset = isRecord(options.nitro) && typeof options.nitro.preset === "string" ? options.nitro.preset : process.env.NITRO_PRESET || process.env.SERVER_PRESET || process.env.VITEHUB_HOSTING || "";
++	if (options.command === "build" && nitroPreset === "netlify" && options.nitroOwnsPaths && options.providerOutput === "standalone" && definitions.length) {
++		const module = createNetlifyScheduleNitroModule({
++			projectRoot: roots.projectRoot,
++			definitions,
++			crons: await readDefinitionCrons(definitions, options.cron),
++			registry: createRuntimeRegistryContents(resolve(roots.projectRoot, ".vitehub/nitro/schedule/netlify-registry.js"), definitions),
++			runtimeImport: options.runtimeImport ?? scheduleRuntimeEntry
++		});
++		return {
++			...options.nitro,
++			modules: [...(options.nitro?.modules ?? []).filter((entry) => entry?.name !== module.name), module]
++		};
++	}
+ 	const standaloneProviderSource = selectStandaloneProviderSource(definitions, options);
  	const vercelDefinitions = options.command === "build" && nitroPreset.startsWith("vercel") && (options.runtime === void 0 || options.providerOutput === "standalone") && shouldEmitStandaloneProviderOutput(definitions, options) ? definitions.filter((definition) => standaloneProviderSource === void 0 || definition.source === standaloneProviderSource) : [];
  	if (!installNitroPlugin && !vercelDefinitions.length) return null;
  	let nitro = options.nitro;
@@ -54,7 +142,7 @@ index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..a493c0d9282cdd8ae7da476a409e6e7f
  	if (!installNitroPlugin) return nitro;
  	const nitroDefinitions = processRuntime && options.providerOutput !== "nitro" ? [] : selectNitroScheduleDefinitions(definitions, options);
  	const crons = options.command === "build" ? [...new Set((await readDefinitionCrons(nitroDefinitions)).values())] : [];
-@@ -5091,7 +5092,7 @@ function hubSchedule(options = {}) {
+@@ -5091,7 +5106,7 @@ function hubSchedule(options = {}) {
  			let artifactDir;
  			try {
  				const definitions = emitStandaloneProviderOutput ? discoverRegistrySchedules() : [];
@@ -63,7 +151,7 @@ index c3d00bf48a7e300b7b06c4df7491c3f3ff54c7af..a493c0d9282cdd8ae7da476a409e6e7f
  				const prepareWorkflow = definitions.length ? (config.plugins ?? []).find((candidate) => candidate.vitehub?.workflow?.prepareScheduleRuntime)?.vitehub?.workflow?.prepareScheduleRuntime : void 0;
  				artifactDir = resolve(rootDir, ".vitehub/schedule-generations", randomUUID());
  				const contributionArtifactDir = artifactDir;
-@@ -5178,6 +5179,7 @@ function hubSchedule(options = {}) {
+@@ -5178,6 +5193,7 @@ function hubSchedule(options = {}) {
  			list: () => {
  				const roots = resolveSchedulePluginRoots(viteRoot ?? process.cwd(), options);
  				return inspectScheduleDefinitions({
