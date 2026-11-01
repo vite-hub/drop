@@ -3,6 +3,7 @@ blockExoticSubdeps: false
 overrides:
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.10
+  "@better-auth/oauth-provider": 1.7.10
   # Nuxt and Nuxt UI must share one Vue instance. 3.5.42+ fixes an SSR attribute-name XSS (@vue/server-renderer).
   vue: 3.5.44
   # Keep older consumers on the patched v5 serializer without downgrading Nuxt's v6.
