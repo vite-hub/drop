@@ -57,7 +57,7 @@ for (const replacement of ["fifteen", ""]) {
     sql.exec(`CREATE TRIGGER fail_suggestion_resolution BEFORE UPDATE ON vitehub_comment_threads
       WHEN NEW.status = 'resolved' BEGIN SELECT RAISE(ABORT, 'Comments unavailable'); END`)
     try {
-      await assert.rejects(accept(comment.id), (error) => error.cause?.message === "Comments unavailable")
+      await assert.rejects(accept(comment.id), { message: "Comments unavailable" })
       assert.equal((await findDrop(doc.id)).version, 2, "publication committed before resolution failed")
       assert.equal(threads()[0].status, "open")
       assert.equal(
@@ -134,7 +134,7 @@ test("undo retries only reopening after publication and a Comments outage, then 
   sql.exec(`CREATE TRIGGER fail_suggestion_reopening BEFORE UPDATE ON vitehub_comment_threads
     WHEN NEW.status = 'open' BEGIN SELECT RAISE(ABORT, 'Comments unavailable'); END`)
   try {
-    await assert.rejects(undo(comment.id), (error) => error.cause?.message === "Comments unavailable")
+    await assert.rejects(undo(comment.id), { message: "Comments unavailable" })
     assert.equal((await findDrop(doc.id)).version, 3)
     assert.equal(await readText((await findDrop(doc.id)).blobKey), "Count twelve pigeons.")
     assert.equal(threads()[0].status, "resolved")

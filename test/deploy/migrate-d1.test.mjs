@@ -152,8 +152,7 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
         database.exec(
           "INSERT INTO suggestion_acceptances (thread_id, drop_id, version) VALUES ('accepted-thread', 'legacy-image', 2)",
         )
-      if (appliedMigrations.includes(undos))
-        database.exec("UPDATE suggestion_acceptances SET undone_version = 3")
+      if (appliedMigrations.includes(undos)) database.exec("UPDATE suggestion_acceptances SET undone_version = 3")
       // Drizzle runs every migration newer than the ledger's latest timestamp, each adding a row.
       const latest = Math.max(0, ...appliedTimestamps)
       const expectedMigrations =
