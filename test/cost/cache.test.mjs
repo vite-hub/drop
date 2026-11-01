@@ -74,6 +74,17 @@ test("renders cached before the comments preset are refreshed on the next read",
   assert.equal(calls.writes.length, 1)
 })
 
+test("renders from an older comark-ui release are refreshed on the next read", async () => {
+  state.entries.set(KEY, {
+    integrity: "0.7.6+drop.18",
+    mtime: Date.now(),
+    value: { title: "Old document", html: "<p>old</p>", source: "source" },
+  })
+  const next = await cachedMarkdown("doc.md", async () => "source", render)
+  assert.equal(next.html, "<p>source</p>")
+  assert.equal(calls.writes.length, 1)
+})
+
 test("cache hits do not read source or render again, and deletion removes the render", async () => {
   await cachedMarkdown("doc.md", async () => "source", render)
   const never = () => {

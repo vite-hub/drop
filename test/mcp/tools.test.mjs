@@ -1313,6 +1313,8 @@ test("publish lints Markdown as Drop renders it: errors with their line stop it,
     ["# Plan\n\n::compare\n", /- 3:1 comark\/unclosed-block `::compare` opened on line 3 is never closed\. Add a line/],
     ["# Plan\n\n::timeline\nSoon.\n::\n", /- 3:1 comark\/unknown-component `::timeline`/],
     ['# Plan\n\n::note{type="tip"\nText.\n::\n', /- 3:\d+ comark\/malformed-attributes/],
+    // An error in comark-linter's own catalog.
+    ["# Plan\n\n::question\nWhat?\n::\n", /- 3:\d+ comark\/quiz\/no-options/],
   ]
   for (const [markdown, problem] of cases) {
     const refused = await call(publish, { markdown, note: "Broken", lifetime: "review" })

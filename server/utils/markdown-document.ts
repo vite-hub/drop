@@ -337,15 +337,12 @@ export interface MarkdownProblem {
 }
 
 /**
- * What a doc can't publish with: a block that never closes, broken `{…}` attributes, a component Drop doesn't render,
- * every problem of an annotated screenshot, whose marks would land in the wrong place, and the rules comark-linter's
- * catalog marks as errors (invalid front matter, script URLs, a quiz without an answer). Its index doesn't export
- * severities, so they're listed here.
+ * What a doc can't publish with: every rule comark-linter marks as an error (invalid front matter, script URLs, a quiz
+ * without an answer), and Drop's stricter extras, which the linter only warns about: a block that never closes, broken
+ * `{…}` attributes, a component Drop doesn't render, and every problem of an annotated screenshot, whose marks would
+ * land in the wrong place.
  */
-const ERROR_RULE =
-  /^comark\/(?:unclosed-block|malformed-attributes|unknown-component|invalid-frontmatter|unsafe-url|annotate\/.+|cards\/unsafe-link|[a-z]+\/path-outside-root|quiz\/(?:no-options|no-correct-option|correct-in-poll|missing-answer|duplicate-id|swallowed-slot)|comments\/(?:duplicate-id|unknown-reply))$/
-
-export const blocksPublishing = (rule: string) => ERROR_RULE.test(rule)
+const DROP_ERROR_RULE = /^comark\/(?:unclosed-block|malformed-attributes|unknown-component|annotate\/.+)$/
 
 /**
  * The components a doc may write: the allowlist, and the blocks comark-ui's plugins turn into other components before
@@ -364,14 +361,14 @@ const LINT_COMPONENTS = [
  */
 export async function lintMarkdown(markdown: string): Promise<MarkdownProblem[]> {
   const found = await lint(renameLegacyProps(markdown), { plugins, components: LINT_COMPONENTS })
-  return found.flatMap(({ rule, line, column, message, fix, cause }) => {
+  return found.flatMap(({ rule, severity, line, column, message, fix, cause }) => {
     // A rule that threw is comark-linter's bug, not the doc's, and its message says so; Comark failing to parse the doc
     // is the doc's.
     if (cause !== undefined && !(rule === "comark/invalid-frontmatter" || message.startsWith("Comark could not"))) {
       log.error({ action: "markdown_lint", rule, error: message })
       return []
     }
-    const error = cause !== undefined || blocksPublishing(rule)
+    const error = cause !== undefined || severity === "error" || DROP_ERROR_RULE.test(rule)
     return [{ rule, severity: error ? "error" : "warning", line, ...(column && { column }), message, fix }]
   })
 }

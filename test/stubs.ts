@@ -47,7 +47,6 @@ export function dropTestStubs(): Plugin {
     apply: () => Boolean(process.env.VITEST),
     resolveId(id, importer) {
       if (!importer || importer.startsWith(`${root}test/`)) return
-      if (id === "#comark-ui-skills") return `${root}.nuxt/comark-ui-skills.ts`
       if (id === "#comark-comments-css") return `${root}.nuxt/comark-comments-css.ts`
       if (id in stubs || id.endsWith("/utils/identity") || id === "./identity")
         return PREFIX + (id in stubs ? id : "identity")
