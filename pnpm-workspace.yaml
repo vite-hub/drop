@@ -35,16 +35,6 @@ patchedDependencies:
   # Nitro grouped them only by package, one small import such as mrmime, entities or the comark-ui skills loaded a whole
   # package chunk and everything it imports. That was about half the code of a cold /drops request.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
-  # Generated dev handlers import Content relative to the handler so TypeScript and Vite resolve it on Windows too.
-  "@vite-hub/content@0.0.4": patches/@vite-hub__content@0.0.4.patch
-  # useServerEnv() reuses its result while the env names it reads hold the same values; every call copied the whole env
-  # and checked each declaration again, ~85 ms of CPU per Drops page render (sharePolicy runs once per listed row).
-  "@vite-hub/env@0.0.4": patches/@vite-hub__env@0.0.4.patch
-  # The Console, Realtime, and Content routes load on their first request instead of with every cold Worker: eager, they
-  # put Agents, Workspaces, Sources, Comark, Tiptap, and Yjs in the startup graph (vite-hub/vitehub#3050).
-  vite-hub@0.0.4: patches/vite-hub@0.0.4.patch
-  "@vite-hub/realtime@0.0.4": patches/@vite-hub__realtime@0.0.4.patch
-  "@vite-hub/source@0.0.4": patches/@vite-hub__source@0.0.4.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
@@ -82,6 +72,35 @@ minimumReleaseAgeExclude:
   - "@nuxt/vite-server-nightly@5.0.0-2610292252-da55a91"
   - nuxt-nightly@5.0.0-2610292252-da55a91
   - nitro@3.0.261029-rc
+  - "@vite-hub/agent@0.1.0"
+  - "@vite-hub/auth@0.1.0"
+  - "@vite-hub/blob@0.1.0"
+  - "@vite-hub/browser@0.1.0"
+  - "@vite-hub/channels@0.1.0"
+  - "@vite-hub/cli@0.1.0"
+  - "@vite-hub/comments@0.1.0"
+  - "@vite-hub/connections@0.1.0"
+  - "@vite-hub/content@0.1.0"
+  - "@vite-hub/database@0.1.0"
+  - "@vite-hub/email@0.1.0"
+  - "@vite-hub/env@0.1.0"
+  - "@vite-hub/forge@0.1.0"
+  - "@vite-hub/gateways@0.1.0"
+  - "@vite-hub/kv@0.1.0"
+  - "@vite-hub/markdown-template@0.1.0"
+  - "@vite-hub/presets@0.1.0"
+  - "@vite-hub/queue@0.1.0"
+  - "@vite-hub/rate-limit@0.1.0"
+  - "@vite-hub/realtime@0.1.0"
+  - "@vite-hub/runtime@0.1.0"
+  - "@vite-hub/sandbox@0.1.0"
+  - "@vite-hub/schedule@0.1.0"
+  - "@vite-hub/shell@0.1.0"
+  - "@vite-hub/source@0.1.0"
+  - "@vite-hub/ui@0.1.0"
+  - "@vite-hub/workflow@0.1.0"
+  - "@vite-hub/workspace@0.1.0"
+  - vite-hub@0.1.0
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0

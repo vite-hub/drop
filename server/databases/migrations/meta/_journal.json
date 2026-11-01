@@ -29,6 +29,13 @@
       "when": 1793445000001,
       "tag": "0003_vitehub_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793529936150,
+      "tag": "0005_vitehub_comments_release",
+      "breakpoints": true
     }
   ]
 }
