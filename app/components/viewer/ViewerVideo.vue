@@ -24,7 +24,7 @@ const variables = {
   "--media-text-color": "var(--foreground)",
   "--media-control-hover-background": "var(--accent)",
   "--media-font-family": "var(--font-sans)",
-  "--media-range-track-background": "var(--border)",
+  "--media-range-track-background": "color-mix(in srgb, var(--foreground) 25%, transparent)",
 }
 </script>
 
