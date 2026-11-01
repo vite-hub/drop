@@ -53,7 +53,10 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
       driver: "d1",
       databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || cloudflareTemplate.d1_databases[0]!.database_name,
       // Local dev and `nuxt prepare` run against a local D1; deploys read the real id from the environment.
-      databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || cloudflareTemplate.d1_databases[0]!.database_id,
+      databaseId:
+        process.env.CLOUDFLARE_D1_DATABASE_ID ||
+        cloudflareTemplate.d1_databases[0]!.database_id ||
+        "00000000-0000-4000-8000-000000000000",
       // Reads go to the D1 replica nearest the Worker once replication is on for the database (Cloudflare API,
       // read_replication.mode "auto"); a request that writes sets a bookmark cookie, so its reader sees the write next.
       readReplication: true,
