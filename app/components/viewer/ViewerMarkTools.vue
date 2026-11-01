@@ -19,10 +19,6 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
 
 <template>
   <div aria-label="Marker" class="flex items-center gap-1" data-marker role="group">
-    <span class="flex items-center gap-1.5 pr-1 pl-2 text-muted">
-      <UIcon aria-hidden="true" class="size-3.5" name="i-mingcute-camera-line" />Snapshot
-    </span>
-    <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
     <UTooltip v-for="(tip, id) in MARK_TIPS" :key="id" :content="{ side: 'top', sideOffset: 8 }">
       <button
         :aria-keyshortcuts="tip.key"
