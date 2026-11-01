@@ -1,10 +1,14 @@
 import { eq, like, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, drops, dropVersions } from "../databases/config"
+import { blobCleanup, commentCleanup, dropFiles, drops, dropVersions } from "../databases/config"
 import type { DropRow } from "./drops"
 
 /** Removes the drop and every version of it at the batch's snapshot, including a version committed meanwhile. */
-export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string[]) => Promise<void>) {
+export async function deleteRetainedDrop(
+  row: DropRow,
+  deleteKeys: (keys: string[]) => Promise<void>,
+  comments: Pick<typeof commentCleanup.$inferInsert, "scope" | "shot">,
+) {
   const token = crypto.randomUUID()
   // Queue every key before its metadata disappears.
   const keys = sql`(
@@ -26,11 +30,15 @@ export async function deleteRetainedDrop(row: DropRow, deleteKeys: (keys: string
     )
     .onConflictDoNothing()
   const remove = db.delete(drops).where(eq(drops.id, row.id))
+  const queueComments = db
+    .insert(commentCleanup)
+    .values({ dropId: row.id, ...comments, createdAt: Date.now() })
+    .onConflictDoNothing()
   const pending = db
     .select({ key: blobCleanup.blobKey })
     .from(blobCleanup)
     .where(like(blobCleanup.id, `${token}:%`))
-  const [, , rows] = await db.batch([queue, remove, pending])
+  const [, , , rows] = await db.batch([queue, queueComments, remove, pending])
   // Cleanup's retry INSERT binds three values per key, below D1's 100-value ceiling.
   for (let offset = 0; offset < rows.length; offset += 25)
     await deleteKeys(rows.slice(offset, offset + 25).map((item) => item.key))

@@ -116,6 +116,12 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       notify.say(`Published v${next.version}`, { action: { label: "Undo", onClick: () => void undo(commentId) } })
       return true
     } catch (error) {
+      // The version may already be published while its comment still needs resolution on retry.
+      await Promise.allSettled([
+        drop.refresh(),
+        comments.refresh(),
+        refreshNuxtData([keys.drops, keys.tree, keys.usage]),
+      ])
       notify.fail("Couldn't accept the suggestion", error)
       return false
     }
@@ -127,6 +133,11 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       await reloadVersion()
       notify.done(`Published v${next.version} without it`)
     } catch (error) {
+      await Promise.allSettled([
+        drop.refresh(),
+        comments.refresh(),
+        refreshNuxtData([keys.drops, keys.tree, keys.usage]),
+      ])
       notify.fail("Couldn't undo the suggestion", error)
     }
   }

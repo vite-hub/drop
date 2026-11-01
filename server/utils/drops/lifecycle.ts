@@ -8,6 +8,7 @@ import { DAY_MS, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
 import { LIVE_EDITING } from "#live-drafts"
 import { draftPath } from "#shared/draft-paths"
 import { deleteRetainedDrop } from "../quota-deletion"
+import { commentCleanupFor, drainCommentCleanup } from "../comments"
 import { expiryPolicy } from "../expiry"
 import type { Identity } from "../identity"
 import type { DropRow } from "./types"
@@ -39,7 +40,9 @@ export async function deleteDrop(row: DropRow, gone = new Set<string>()) {
     db.select({ version: dropVersions.version }).from(dropVersions).where(eq(dropVersions.dropId, row.id)),
   ])
   for (const child of children) if (!gone.has(child.id)) await deleteDrop(child, gone)
-  await deleteRetainedDrop(row, deleteBlobKeys)
+  // Queue Comments cleanup in the deletion batch, before its scope can no longer be found from the Drop rows.
+  await deleteRetainedDrop(row, deleteBlobKeys, await commentCleanupFor(row))
+  await drainCommentCleanup()
   // Live drafts are Blob files too (#live-drafts), one per version anyone opened in the editor.
   if (row.kind === "markdown" && LIVE_EDITING)
     await deleteBlobKeys([row.version, ...versions.map((item) => item.version)].map((n) => draftPath(row.id, n)))
@@ -92,6 +95,7 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
     .where(and(isNotNull(drops.parentId), sql`NOT EXISTS (SELECT 1 FROM drops p WHERE p.id = ${drops.parentId})`))
     .limit(limit)
   await drainBlobCleanup()
+  await drainCommentCleanup()
   for (const row of due) {
     await deleteDrop(row)
     log.info({ action: "drop-purged", drop: row.id, owner: row.ownerId, reason: row.trashReason })

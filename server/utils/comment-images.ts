@@ -15,8 +15,8 @@ import { withDropQuota } from "./quotas"
 /**
  * Images in comments. Each one is an image drop under the drop the comment is on, owned by that drop's owner, like a
  * doc's attachment: it shares the drop's sharing, lifetime, and Trash, stays out of lists and search, and takes no
- * plan slot (its bytes count). `comment_attachments` says which comment or reply it belongs to. Deleting the comment
- * or the reply deletes its images.
+ * plan slot (its bytes count). `comment_attachments` says which thread (by its first comment) or reply it belongs to.
+ * Deleting the thread or the reply deletes its images.
  */
 
 type ImageType = (typeof COMMENT_IMAGE_TYPES)[number]
@@ -154,8 +154,9 @@ export async function imageParent(drop: DropRow) {
 }
 
 /**
- * Stores `images` under `parent` for comment `commentId` (and reply `replyId`, when they're a reply's). The parent's
- * owner pays for the bytes, as for a site's screenshots. When anything fails, the blobs go and nothing points at them.
+ * Stores `images` under `parent` for the thread whose first comment is `commentId` (and reply `replyId`, when they're a
+ * reply's). The parent's owner pays for the bytes, as for a site's screenshots. When anything fails, the blobs go and
+ * nothing points at them.
  */
 export async function attachImages(
   parent: DropRow,
@@ -240,8 +241,12 @@ export async function withImages<T extends { id: string }>(
   }
 }
 
-/** The images of the comments `commented` selects (a subquery of comment ids), oldest first. */
-export const attachmentsOf = (commented: SQL) =>
+/**
+ * The comment images stored under the drops `parents` selects (a subquery, or one id), oldest first. A comment's images
+ * live under the drop it's on, or under the site a screenshot came from (imageParent), so this reads a list's images
+ * without its comment ids, beside its threads.
+ */
+export const attachmentsUnder = (parents: SQL) =>
   db
     .select({
       commentId: commentAttachments.commentId,
@@ -254,10 +259,10 @@ export const attachmentsOf = (commented: SQL) =>
     })
     .from(commentAttachments)
     .innerJoin(drops, eq(drops.id, commentAttachments.dropId))
-    .where(sql`${commentAttachments.commentId} IN (${commented})`)
+    .where(sql`${drops.parentId} IN (${parents})`)
     .orderBy(asc(commentAttachments.createdAt))
 
-/** Deletes the images of a comment (with its replies') or of one reply, before the row itself goes. */
+/** Deletes the images of a thread (its first comment's and its replies') or of one reply, before the comment goes. */
 export async function deleteImagesOf(target: { commentId: string } | { replyId: string }) {
   const rows = await db
     .select({ id: commentAttachments.dropId })

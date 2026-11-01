@@ -26,9 +26,9 @@ export default defineMcpTool({
     const drop = await findDropByRef(id, event)
     if (!drop || !permissions(drop, who).comment)
       throw new HTTPError({ status: 404, message: `No drop with id ${id} you can comment on.` })
-    const comment = await findCommentByNumber(drop, n)
-    if (!comment) throw new HTTPError({ status: 404, message: `No comment #${n} on this drop.` })
-    const reply = await addReply(comment, who, text)
+    const thread = await findCommentByNumber(drop, n)
+    if (!thread) throw new HTTPError({ status: 404, message: `No comment #${n} on this drop.` })
+    const reply = await addReply(thread, who, text)
     return { content: [{ type: "text" as const, text: `Replied to #${n}.` }], structuredContent: { comment: n, reply } }
   },
 })

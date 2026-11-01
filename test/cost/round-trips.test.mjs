@@ -53,16 +53,24 @@ function publicDoc() {
   insertDrop(LINK, { title: "Doc", version: 2, parent_id: "folder", share: "public" })
   insertVersion(LINK, 1)
   insertDrop("image", { kind: "image", blob_key: IMAGE, parent_id: LINK, share: "public" })
+  // A ViteHub Comments thread on the doc's list (server/utils/comments.ts), with a guest's reply.
+  const metadata = { dropId: LINK, version: 2, kind: "text", selector: "p", ox: 0, oy: 0, ow: 0, oh: 0 }
+  const owner = JSON.stringify({ id: "owner", name: "Owner" })
   sql
     .prepare(
-      `INSERT INTO comments (id, drop_id, version, n, kind, selector, body, author_id, author_name, created_at) VALUES ('c1', '${LINK}', 2, 1, 'text', 'p', 'Hi', 'owner', 'Owner', 1)`,
+      "INSERT INTO vitehub_comment_threads (id, scope, number, page, anchor, metadata, status, created_by, created_at, updated_at) VALUES ('c1', ?, 1, ?, 'null', ?, 'open', ?, 1, 2)",
     )
-    .run()
+    .run(
+      `drop:${LINK}`,
+      `/d/${LINK}`,
+      JSON.stringify({ ...metadata, quote: null, label: null, page: null, elementX: null, elementY: null }),
+      owner,
+    )
   sql
     .prepare(
-      "INSERT INTO comment_replies (id, comment_id, body, author_id, author_name, created_at) VALUES ('r1', 'c1', 'Yes', NULL, 'Guest', 2)",
+      "INSERT INTO vitehub_comments (id, thread_id, body, mentions, author, created_at) VALUES ('c1-1', 'c1', 'Hi', '[]', ?, 1), ('r1', 'c1', 'Yes', '[]', ?, 2)",
     )
-    .run()
+    .run(owner, JSON.stringify({ id: "guest:1", name: "Guest", guest: true }))
 }
 
 async function roundTrips(run) {
@@ -85,9 +93,10 @@ test("a shared doc's page and the APIs it calls wait for few round trips, one af
     comments: await roundTrips(() => get(commentsHandler, LINK)),
     image: await roundTrips(() => requireBlobAccess(event(`/f/${IMAGE}`), IMAGE)),
   }
-  // The page reads the link, then the doc and its comments side by side (pages/d/[id]/[[slug]].vue).
+  // The page reads the link, then the doc and its comments side by side (pages/d/[id]/[[slug]].vue). Comments reads a
+  // list's threads, then their comments: the doc, then the threads with the images beside them, then the comments.
   const page = counts.link + Math.max(counts.detail, counts.comments)
-  assert.deepEqual({ ...counts, page }, { link: 1, detail: 2, comments: 2, image: 1, page: 3 })
+  assert.deepEqual({ ...counts, page }, { link: 1, detail: 2, comments: 3, image: 1, page: 4 })
 })
 
 test("an image in a folder brings the folder's images without another round trip", async () => {

@@ -29,6 +29,8 @@ export default defineHandler(async (event) => {
   const { input, shot, images } = await readReviewComment(event)
 
   const comment = await addReviewComment(site, { who, name: who?.name ?? "Guest" }, input, shot, origin, images)
-  useLogger(event).set({ review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), embedded: true } })
-  return { n: comment.n }
+  useLogger(event).set({
+    review: { site: site.id, comment: comment.number, screenshot: Boolean(shot), embedded: true },
+  })
+  return { n: comment.number }
 })

@@ -1,5 +1,5 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { textValue } from "#shared/utils/text"
@@ -20,9 +20,9 @@ import {
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
-import { comments, drops, user } from "../databases/config"
+import { drops, user } from "../databases/config"
 import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
-import { commentExtras, nextCommentNumber, siteFamily, toComment } from "./comments"
+import { addThread, authorOf, siteCommentList, threadsFor, toComment, undoThread } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import {
   deleteDrop,
@@ -418,12 +418,13 @@ export async function addReviewComment(
   const { row } = await withImages(
     images,
     () => insertReviewComment(site, author, input, shot, origin),
-    (added) => attachImages(site, images, { commentId: added.id, replyId: null, n: added.n }, author.name),
+    (added) =>
+      attachImages(site, images, { commentId: added.comments[0]!.id, replyId: null, n: added.number }, author.name),
     async (added) => {
       // With a screenshot, the comment is on the screenshot's drop: deleting that takes the comment with it.
-      const shotDrop = added.dropId === site.id ? null : await findDrop(added.dropId)
+      const shotDrop = added.meta.dropId === site.id ? null : await findDrop(added.meta.dropId)
       if (shotDrop) await deleteDrop(shotDrop)
-      else await db.delete(comments).where(eq(comments.id, added.id))
+      else await undoThread(added)
     },
   )
   return row
@@ -437,40 +438,32 @@ async function insertReviewComment(
   origin: string,
 ) {
   const now = Date.now()
-  const fields = {
-    id: crypto.randomUUID(),
-    body: input.body,
-    page: reviewPage(site, origin, input.page),
+  const element = {
     ox: input.ox,
     oy: input.oy,
     ow: input.ow,
     oh: input.oh,
+    page: reviewPage(site, origin, input.page),
     label: input.selector || null,
     quote: input.label || null,
     elementX: input.selector && input.spot ? input.spot.x : null,
     elementY: input.selector && input.spot ? input.spot.y : null,
-    authorId: author.who?.userId ?? null,
-    authorName: author.name,
-    resolved: false,
-    createdAt: now,
   }
-  if (!shot) {
-    const [row] = await db
-      .insert(comments)
-      .values({
-        ...fields,
-        dropId: site.id,
-        version: 1,
-        n: nextCommentNumber(site),
-        kind: "area",
-        selector: input.selector || "body",
-      })
-      .returning()
-    return row!
+  const thread = {
+    body: input.body,
+    author: authorOf(author.who, author.name),
+    // Comments files the thread under the page's path, without its query and hash.
+    page: input.page.replace(/[?#].*$/, "") || "/",
   }
+  if (!shot)
+    return addThread(
+      site,
+      { ...thread, fields: { ...element, kind: "area", selector: input.selector || "body" } },
+      siteCommentList(site),
+    )
   // The site's owner pays for the bytes, as for anything else in their drops. No publish burst: the route's own rate
   // limit is per reviewer, and reviewers shouldn't use up the owner's agents' publishes.
-  return withDropQuota(
+  const image = await withDropQuota(
     site.ownerId,
     { drops: 0, bytes: shot.bytes.byteLength, writes: 1 },
     undefined,
@@ -478,9 +471,8 @@ async function insertReviewComment(
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
       const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
       if (storageError) throw storageFailure(storageError)
-      const path = input.page.replace(/[?#].*$/, "") || "/"
-      const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
-      const image = imageDrop(
+      const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + thread.page : thread.page
+      const row = imageDrop(
         site,
         {
           key,
@@ -493,69 +485,65 @@ async function insertReviewComment(
         author.name,
         now,
       )
-
       try {
-        await quota.commit([
-          db.insert(drops).values(image),
-          db.insert(comments).values({
-            ...fields,
-            dropId: image.id,
-            version: 1,
-            n: nextCommentNumber(image),
-            kind: "image",
-            selector: "body > img",
-          }),
-        ])
+        await quota.commit([db.insert(drops).values(row)])
       } catch (error) {
         await blob.del([key])
         throw error
       }
-      const [row] = await db.select().from(comments).where(eq(comments.id, fields.id)).limit(1)
-      return row!
+      return row
     },
   )
+  try {
+    return await addThread(
+      image,
+      { ...thread, fields: { ...element, kind: "image", selector: "body > img" } },
+      siteCommentList(site, true),
+    )
+  } catch (error) {
+    // Without its comment, nothing would show the screenshot, so it goes too.
+    await deleteDrop(image)
+    throw error
+  }
 }
 
-/** The site's review list, newest first, each comment with the screenshot it came with. `page` is as `reviewPage` keeps it. */
+/**
+ * The site's review list, newest first, each comment with the screenshot it came with. `page` is as `reviewPage` keeps
+ * it. Comments reads at most 500 threads at once, so a site with more lists its 500 most active.
+ */
 export async function siteItems(
-  site: Pick<DropRow, "id">,
+  site: Pick<DropRow, "id" | "kind" | "parentId" | "version">,
   who: Identity | null,
   origin: string,
   page?: string,
 ): Promise<SiteReviewItem[]> {
-  const [rows, extras] = await Promise.all([
+  const [{ threads, attachments }, shots] = await Promise.all([
+    threadsFor(site),
     db
-      .select({
-        comment: comments,
-        shot: { id: drops.id, kind: drops.kind, slug: drops.slug, blobKey: drops.blobKey },
-      })
-      .from(comments)
-      .innerJoin(drops, eq(drops.id, comments.dropId))
-      .where(
-        and(
-          sql`${comments.dropId} IN (${siteFamily(site.id)})`,
-          page
-            ? sql`(${comments.page} = ${page} OR ${comments.page} LIKE ${`${page.replace(/[\\%_]/g, "\\$&")}#%`} ESCAPE '\\')`
-            : undefined,
-        ),
-      )
-      .orderBy(asc(comments.createdAt))
-      .limit(500),
-    commentExtras(siteFamily(site.id)),
+      .select({ id: drops.id, slug: drops.slug, blobKey: drops.blobKey })
+      .from(drops)
+      .where(and(eq(drops.parentId, site.id), eq(drops.kind, "image"))),
   ])
-  return rows.reverse().map(({ comment, shot }) => ({
-    ...toComment(comment, who, extras),
-    spot: comment.elementX !== null && comment.elementY !== null ? { x: comment.elementX, y: comment.elementY } : null,
-    screenshot:
-      shot.kind === "image" && shot.blobKey
-        ? {
-            id: shot.id,
-            link: shot.id,
-            slug: shot.slug ?? "screenshot",
-            url: new URL(`/f/${shot.blobKey}`, origin).href,
-          }
-        : null,
-  }))
+  const byId = new Map(shots.map((shot) => [shot.id, shot]))
+  return threads
+    .filter(({ meta }) => !page || meta.page === page || Boolean(meta.page?.startsWith(`${page}#`)))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.number - a.number)
+    .map((thread) => {
+      const { meta } = thread
+      const shot = byId.get(meta.dropId)
+      return {
+        ...toComment(thread, who, attachments),
+        spot: meta.elementX !== null && meta.elementY !== null ? { x: meta.elementX, y: meta.elementY } : null,
+        screenshot: shot?.blobKey
+          ? {
+              id: shot.id,
+              link: shot.id,
+              slug: shot.slug ?? "screenshot",
+              url: new URL(`/f/${shot.blobKey}`, origin).href,
+            }
+          : null,
+      }
+    })
 }
 
 const reviewImages = (files: SiteReviewItem["attachments"]) => files.map(({ id, filename }) => ({ id, filename }))

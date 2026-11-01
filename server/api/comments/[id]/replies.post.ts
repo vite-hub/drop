@@ -1,25 +1,18 @@
-import { eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
-import { db } from "vite-hub/database/drizzle"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
-import { commentReplies, comments } from "../../../databases/config"
 import { attachImages, imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
-import { insertReply, replyOf } from "../../../utils/comments"
+import { authorOf, findThread, replyTo, toReply, undoReply } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 
 /** Reply in a comment's thread: anyone who may comment on the drop, like a new comment. Images as for a comment. */
 export default defineHandler(async (event) => {
-  const [comment] = await db
-    .select()
-    .from(comments)
-    .where(eq(comments.id, await routeId(event)))
-    .limit(1)
-  const drop = comment ? await findDrop(comment.dropId, event) : null
+  const thread = await findThread(await routeId(event))
+  const drop = thread ? await findDrop(thread.meta.dropId, event) : null
   const who = await identify(event)
-  if (!comment || !drop || !permissions(drop, who).comment)
+  if (!thread || !drop || !permissions(drop, who).comment)
     throw new HTTPError({ status: 404, statusText: "You can't reply to this comment." })
   // Replies share the comment limit: a thread is no way around it.
   await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
@@ -28,10 +21,15 @@ export default defineHandler(async (event) => {
   const parent = images.length ? await imageParent(drop) : drop
   const { row, attachments } = await withImages(
     images,
-    () => insertReply(comment, who, input.body),
+    () => replyTo(thread, authorOf(who, who?.name ?? "Guest"), input.body),
     (added) =>
-      attachImages(parent, images, { commentId: comment.id, replyId: added.id, n: comment.n }, added.authorName),
-    (added) => db.delete(commentReplies).where(eq(commentReplies.id, added.id)),
+      attachImages(
+        parent,
+        images,
+        { commentId: thread.comments[0]!.id, replyId: added.id, n: thread.number },
+        added.author.name,
+      ),
+    undoReply,
   )
-  return replyOf(row, who, attachments)
+  return toReply(row, who, new Map([[row.id, attachments]]))
 })

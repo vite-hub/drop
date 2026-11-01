@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { H3Event } from "h3"
+import { installComments } from "vite-hub/comments"
 
 const root = new URL("../../", import.meta.url)
 
@@ -91,13 +92,30 @@ export const state = (globalThis.dropTest = {
     },
   },
 })
+const { comments } = await import("../../server/comments.ts")
+/** Applies the migrations, and gives Drop's Comments (server/comments.ts) the database, as ViteHub does at start. */
 export function migrate() {
   const directory = new URL("server/databases/migrations/", root)
   for (const name of readdirSync(directory)
     .filter((name) => name.endsWith(".sql"))
     .sort())
     sql.exec(readFileSync(new URL(name, directory), "utf8"))
+  installComments(comments, { database: state.db })
 }
+/** Every comment thread, by scope and number, with its JSON fields read. */
+export const threads = () =>
+  sql
+    .prepare("SELECT * FROM vitehub_comment_threads ORDER BY scope, number")
+    .all()
+    .map((row) => ({
+      ...row,
+      metadata: JSON.parse(row.metadata),
+      createdBy: JSON.parse(row.created_by),
+      comments: sql
+        .prepare("SELECT * FROM vitehub_comments WHERE thread_id = ? ORDER BY created_at")
+        .all(row.id)
+        .map((comment) => ({ ...comment, author: JSON.parse(comment.author) })),
+    }))
 export function event(path, method = "GET") {
   const request = new H3Event(new Request(`https://drop.example${path}`, { method }))
   request.context.log = { set() {}, error() {} }
@@ -105,7 +123,7 @@ export function event(path, method = "GET") {
 }
 export function reset() {
   sql.exec(
-    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM comments; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
+    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comments; DELETE FROM vitehub_comment_threads; DELETE FROM vitehub_comment_scope_counters; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM comment_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
   )
   state.bursts.length = 0
   state.failBurst = false
