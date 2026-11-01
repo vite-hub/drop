@@ -1138,11 +1138,11 @@ watch(
                 @show="gallery.show"
                 @step="gallery.step"
               />
-              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+              <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
             <template v-if="variants && !editing && !lightbox && !shownVersion">
               <ViewerVariants :state="variants" @command="picker" />
-              <span aria-hidden="true" class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)" data-divider />
+              <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
             <template v-if="editing">
               <!-- One presence ring instead of the outline's two: its inner ring is page-colored, not the glass behind it,
@@ -1262,12 +1262,7 @@ watch(
                 >
               </UButton>
             </template>
-            <span
-              v-if="editing || (hasComments && !trashed)"
-              aria-hidden="true"
-              class="mx-0.5 h-[18px] w-px shrink-0 bg-(--ui-border)"
-              data-divider
-            />
+            <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
         </ViewerReviewDock>
