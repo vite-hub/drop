@@ -1,4 +1,3 @@
-import type { H3Event } from "h3"
 import { defineRealtime } from "vite-hub/realtime"
 
 /**
@@ -11,11 +10,9 @@ import { defineRealtime } from "vite-hub/realtime"
  * also opens (`documentId` null) carries nothing here; Drop ignores it.
  */
 export default defineRealtime({
-  async authorize({ event: hostEvent, documentId, mode }) {
+  async authorize({ event, documentId, mode }) {
     if (mode === "write") return false
     if (documentId === null) return true
-    // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which findDrop and identify read.
-    const event = hostEvent as H3Event
     const [{ expiredLink, findDrop, permissions, waitingForReview }, { identify }] = await Promise.all([
       import("../utils/drops"),
       import("../utils/identity"),

@@ -1,4 +1,3 @@
-import type { H3Event } from "h3"
 import { defineRealtime } from "vite-hub/realtime"
 import { draftOf } from "#shared/draft-paths"
 import { draftDocument } from "../live-drafts/realtime"
@@ -12,10 +11,8 @@ import { draftDocument } from "../live-drafts/realtime"
  */
 export default defineRealtime({
   auth: true,
-  async authorize({ event: hostEvent, documentId }) {
+  async authorize({ event, documentId }) {
     if (documentId === null) return true
-    // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which findDrop and identify read.
-    const event = hostEvent as H3Event
     const [{ findDrop, liveEditable }, { identify }] = await Promise.all([
       import("../utils/drops"),
       import("../utils/identity"),

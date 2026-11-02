@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
-import type { Auth } from "better-auth"
 import { verifyJwsAccessToken } from "better-auth/oauth2"
 import { useLogger } from "evlog/nitro/v3"
 import { getAuthForRequest } from "vite-hub/auth/server"
@@ -12,7 +11,6 @@ import { useServerEnv } from "#vitehub/env/server"
 import { type Role, roleFor } from "#shared/roles"
 import type { ActorKind } from "#shared/types"
 import { textValue } from "#shared/utils/text"
-import type auth from "../auth"
 
 // What Drop's middleware leaves on the event for later handlers. Declared here, beside the identity lookup that reads
 // it, because the app and shared/ typecheck this file through their imports, outside the server project.
@@ -39,8 +37,6 @@ export interface Identity {
   /** The teams they're on and their role on each, on a personal Drop with teams (./teams.ts). */
   teams?: Record<string, TeamRole>
 }
-
-type DropAuth = Auth<ReturnType<typeof auth.options>>
 
 /**
  * Someone's role, from `DROP_ADMINS`: an admin when their email is in it and a sign-in method verified it, whichever one
@@ -69,10 +65,7 @@ export async function syncRole(userId: string) {
       .where(eq(users.id, userId))
 }
 
-// SAFETY: ViteHub builds this instance from server/auth.ts's definition, the one DropAuth is the type of. Its own type is
-// the plain Better Auth instance, without the plugins' endpoints and fields, which no single assertion bridges.
-// doctor-disable-next-line typescript/evidence/no-chained-type-assertions -- getAuthForRequest's type isn't generic over the definition
-export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event) as unknown as DropAuth
+export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event)
 
 export const bearerFrom = (headers: Headers) => headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? null
 
