@@ -9,9 +9,8 @@ import { DROP_KINDS, type DropSummary } from "#shared/types"
 const { data: me } = useMe()
 const shortcutsOpen = useShortcutsOpen()
 const signOut = useSignOut()
-const { createDoc, createBoard, createFolder, createSite, upload } = useDropActions()
+const { createDoc, createBoard, createFolder, newSite, upload } = useDropActions()
 const folderDialog = useFolderDialog()
-const siteDialog = useSiteDialog()
 // The drop and the folder open on the page (usePaletteOffer): its commands, and where new drops go.
 const context = injectPaletteContext()
 const current = computed(() => context?.drop.value ?? null)
@@ -211,11 +210,7 @@ const create = computed<CommandPaletteItem[]>(() => {
       suffix,
       description: "Comments on a live URL",
       icon: KIND_ICONS.site,
-      onSelect: async () => {
-        const input = await siteDialog()
-        const site = input && (await createSite(input, inside))
-        if (site) await navigateTo(`/drops/${site.id}`)
-      },
+      onSelect: () => newSite(inside),
     },
     {
       label: "Upload a file",

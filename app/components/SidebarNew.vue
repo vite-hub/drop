@@ -2,9 +2,8 @@
 // The + on the Drops row in the sidebar: what you make yourself, from any page. A folder, a doc, a board or a site
 // review open once made; a file uploads and opens. On a team Drop admins choose whether a new folder is the team's.
 // Agents make most drops, so this stays one quiet button rather than a bar of them.
-const { upload, createFolder, createSite, createDoc, createBoard } = useDropActions()
+const { upload, createFolder, newSite, createDoc, createBoard } = useDropActions()
 const folderDialog = useFolderDialog()
-const siteDialog = useSiteDialog()
 const { data: me } = useMe()
 const route = useRoute()
 const picker = useFileDialog({ multiple: false, reset: true })
@@ -19,11 +18,6 @@ async function newFolder() {
   const folder =
     input && (await createFolder(input.title, undefined, { description: input.description, team: input.team }))
   if (folder) await navigateTo(`/drops/${folder.id}`)
-}
-async function newSite() {
-  const input = await siteDialog()
-  const site = input && (await createSite(input))
-  if (site) await navigateTo(`/drops/${site.id}`)
 }
 const items = [
   [
