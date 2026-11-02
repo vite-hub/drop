@@ -50,6 +50,7 @@ test("R2 failures remain errors and existing heads retain their served URL", asy
 
 test("serve answers a byte range with 206 so videos can seek", async () => {
   const bytes = new Uint8Array(1000).map((_, index) => index % 256)
+  const ranges = []
   const object = {
     key: "clip.mp4",
     size: bytes.byteLength,
@@ -64,7 +65,13 @@ test("serve answers a byte range with 206 so videos can seek", async () => {
   setActiveCloudflareEnv({
     BLOB: {
       head: async () => object,
-      get: async () => ({ ...object, arrayBuffer: async () => bytes.buffer.slice(0) }),
+      get: async (key, { onlyIf, range } = {}) => {
+        assert.equal(key, object.key)
+        assert.deepEqual(onlyIf, { etagMatches: "v1" })
+        ranges.push(range)
+        const part = range ? bytes.slice(range.offset, range.offset + range.length) : bytes
+        return { ...object, body: new Blob([part]).stream() }
+      },
     },
   })
   const serve = async (range) => {
@@ -79,7 +86,7 @@ test("serve answers a byte range with 206 so videos can seek", async () => {
   const whole = await serve()
   assert.equal(whole.status, 200)
   assert.equal(whole.headers.get("accept-ranges"), "bytes")
-  assert.equal((await whole.arrayBuffer()).byteLength, 1000)
+  assert.deepEqual(new Uint8Array(await whole.arrayBuffer()), bytes)
 
   const part = await serve("bytes=100-199")
   assert.equal(part.status, 206)
@@ -88,9 +95,12 @@ test("serve answers a byte range with 206 so videos can seek", async () => {
   assert.deepEqual(new Uint8Array(await part.arrayBuffer()), bytes.slice(100, 200))
 
   const tail = await serve("bytes=-10")
+  assert.equal(tail.status, 206)
   assert.equal(tail.headers.get("content-range"), "bytes 990-999/1000")
+  assert.deepEqual(new Uint8Array(await tail.arrayBuffer()), bytes.slice(990))
 
   const beyond = await serve("bytes=5000-")
   assert.equal(beyond.status, 416)
   assert.equal(beyond.headers.get("content-range"), "bytes */1000")
+  assert.deepEqual(ranges, [undefined, { offset: 100, length: 100 }, { offset: 990, length: 10 }])
 })
