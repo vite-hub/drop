@@ -150,7 +150,7 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
     if (event.source !== parent || !message || message.__drop !== true) return;
     if (message.type === "hello") return ask();
     if (message.type !== "document" || typeof message.html !== "string") return;
-    if (typeof message.grant === "string" && /^[\\w.-]+$/.test(message.grant))
+    if (typeof message.grant === "string" && /^[\\w.:-]+$/.test(message.grant))
       document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (isSecureContext ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
     // A written document paints before its stylesheets load, unlike one the browser navigates to, so an app would show
     // unstyled first. Keep it hidden until they load or fail, with a 3-second cap for a stylesheet that never answers.

@@ -20,7 +20,7 @@ import { seal, unseal } from "./review"
 
 const UPLOAD_MINUTES = 15
 // A ticket carries a whole publish call (a note, a keep reason, a title), so it's longer than a review token.
-const MAX_TICKET = 8192
+const MAX_TICKET = 12_288
 
 // Lazy: publish.ts imports this file, so its schema isn't there yet when this module loads.
 const UploadTicket = v.object({

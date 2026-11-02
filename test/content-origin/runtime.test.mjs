@@ -202,7 +202,7 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     assert.match(detail.contentOrigin, /^https:\/\/[a-z2-7]{26}-drop\.example$/)
     assert.deepEqual(Object.keys(detail.files).sort(), ["docs/index.html", "index.html"], "only its pages")
     assert.equal(detail.sizes["_nuxt/inter.woff2"], font.byteLength)
-    assert.match(detail.contentGrant, /^v2\.[\w-]+$/)
+    assert.match(detail.contentGrant, /^[\da-f]{24}:[\da-f]+$/)
 
     const origin = detail.contentOrigin
     const load = (path, { grant = detail.contentGrant, dest = "script", headers = {} } = {}) =>
@@ -329,10 +329,10 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
     onMessage({ source: parent, data: { __drop: true, type: "document", html: "<p>", grant } })
     return { cookies, written }
   }
-  const { cookies, written } = run("v2.abc-DEF_123")
-  assert.deepEqual(cookies, ["drop_grant=v2.abc-DEF_123; Path=/; Max-Age=43200; Secure; SameSite=None; Partitioned"])
+  const { cookies, written } = run("0a1b2c:3d4e5f")
+  assert.deepEqual(cookies, ["drop_grant=0a1b2c:3d4e5f; Path=/; Max-Age=43200; Secure; SameSite=None; Partitioned"])
   assert.deepEqual(written, ["open after 1 cookies"])
-  assert.deepEqual(run("v2.x; Domain=vitehub.dev").cookies, [], "nothing that could add cookie attributes")
+  assert.deepEqual(run("0a:1b; Domain=vitehub.dev").cookies, [], "nothing that could add cookie attributes")
   assert.deepEqual(run(undefined).cookies, [])
 })
 

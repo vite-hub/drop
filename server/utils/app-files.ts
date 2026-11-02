@@ -95,7 +95,7 @@ export function isHashedAsset(path: string): boolean {
 /** The file this request on a content origin asks for, or null when it carries no valid grant for this origin's app. */
 export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Response | null> {
   const sealed = getCookie(event, "drop_grant")
-  const grant = sealed ? await unseal(event, "app-files", Grant, sealed, 512) : null
+  const grant = sealed ? await unseal(event, "app-files", Grant, sealed, 768) : null
   if (!grant || grant.e <= now) return null
   if (!(await onOwnOrigin(event, grant.l))) return null
 

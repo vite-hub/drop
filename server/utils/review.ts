@@ -7,6 +7,7 @@ import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
+import { importSealKey, seal as sealValue, unseal as unsealValue } from "vite-hub/env/seal"
 import { newLink, slugify } from "#shared/links"
 import {
   isSitePattern,
@@ -63,23 +64,18 @@ const Choice = v.object({ c: v.string(), o: v.string(), u: v.nullable(v.string()
 type Choice = v.InferOutput<typeof Choice>
 
 const encoder = new TextEncoder()
-const base64url = (bytes: Uint8Array) =>
-  btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "")
-const unbase64url = (text: string) =>
-  Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (char) => char.charCodeAt(0))
 
-/** AES-GCM under the auth secret, like content-origin labels. Once ViteHub ships VITEHUB_SECRET, `deriveSecret("drop:review-token")`. */
+/**
+ * AES-GCM under a key from the auth secret, like content-origin labels. Not VITEHUB_SECRET: not every Drop sets it
+ * (Quiver's doesn't).
+ */
 async function sealKey(event: H3Event) {
   // Optional: an environment without the auth secret (the tests' one) gets the 503 below, not a TypeError.
   const secret = useServerEnv(event).auth?.secret?.unseal()
   // No fallback: a known key would let anyone mint tokens.
   if (!secret)
     throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`review-token:${secret}`))
-  return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"])
+  return importSealKey(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(`review-token:${secret}`))))
 }
 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
@@ -87,18 +83,7 @@ type SealPurpose = "token" | "choice" | "upload" | "app-files"
 
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const sealed = new Uint8Array(
-    await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv, additionalData: encoder.encode(purpose) },
-      await sealKey(event),
-      encoder.encode(JSON.stringify(value)),
-    ),
-  )
-  const bytes = new Uint8Array(iv.length + sealed.length)
-  bytes.set(iv)
-  bytes.set(sealed, iv.length)
-  return `v2.${base64url(bytes)}`
+  return sealValue(await sealKey(event), encoder.encode(purpose), JSON.stringify(value))
 }
 
 /** The sealed value, when it was sealed for `purpose` and parses as `schema`. Null for anything else. */
@@ -107,21 +92,14 @@ export async function unseal<T extends v.GenericSchema>(
   purpose: SealPurpose,
   schema: T,
   text: string,
-  maxLength = 2048,
+  maxLength = 3072,
 ): Promise<v.InferOutput<T> | null> {
-  const [version, body, extra] = text.split(".")
-  if (version !== "v2" || !body || extra !== undefined || text.length > maxLength) return null
+  if (text.length > maxLength) return null
+  const key = await sealKey(event)
   try {
-    const bytes = unbase64url(body)
-    const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: bytes.slice(0, 12), additionalData: encoder.encode(purpose) },
-      await sealKey(event),
-      bytes.slice(12),
-    )
-    const parsed = v.safeParse(schema, JSON.parse(new TextDecoder().decode(plain)))
+    const parsed = v.safeParse(schema, JSON.parse(await unsealValue(key, encoder.encode(purpose), text)))
     return parsed.success ? parsed.output : null
-  } catch (error) {
-    if (HTTPError.isError(error)) throw error
+  } catch {
     return null
   }
 }
