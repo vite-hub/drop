@@ -146,6 +146,48 @@ test("Highlight draws on the page and sends the screenshot with the strokes, anc
   }
 })
 
+test("Highlight blocks keyboard scrolling and page shortcuts until canceled", async () => {
+  const browser = await chromium.launch({ args: ["--disable-smooth-scrolling"] })
+  try {
+    const { page, ui } = await open(browser)
+    await page.evaluate(() => {
+      document.body.style.width = "1800px"
+      document.body.tabIndex = -1
+      scrollTo(100, 400)
+    })
+    await ui.getByRole("button", { name: "Highlight" }).click()
+    await page.locator("body").focus()
+    const position = await page.evaluate(() => [scrollX, scrollY])
+    for (const key of [
+      "End",
+      "PageDown",
+      "Space",
+      "ArrowDown",
+      "ArrowRight",
+      "PageUp",
+      "Shift+Space",
+      "ArrowUp",
+      "ArrowLeft",
+      "Home",
+      "Control+End",
+      "Control+Home",
+    ]) {
+      await page.keyboard.press(key)
+      const after = await page.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => resolve([scrollX, scrollY]))),
+      )
+      assert.deepEqual(after, position, `${key} must not scroll while drawing`)
+    }
+    assert.deepEqual(await page.evaluate(() => window.pageKeys), ["Shift", "Control", "Control"])
+    await page.keyboard.press("Escape")
+    await page.keyboard.press("End")
+    await page.waitForFunction((y) => scrollY > y, position[1])
+    assert.equal(await page.evaluate(() => window.pageKeys.at(-1)), "End", "page keys resume after canceling")
+  } finally {
+    await browser.close()
+  }
+})
+
 test("Esc and Undo take strokes back", async () => {
   const browser = await chromium.launch()
   try {

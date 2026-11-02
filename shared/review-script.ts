@@ -125,10 +125,10 @@ const SEPARATOR = `<span class="sep" aria-hidden="true"></span>`
 const TOOLS =
   `<div class="bar tools" role="group" aria-label="Highlight" hidden>` +
   Object.entries(MARK_TIPS)
-    .map(
-      ([id, tip]) =>
-        `<button class="icon" type="button" data-tip="${id}" aria-keyshortcuts="${tip.key}" aria-label="${tip.label}" title="${tip.label} (${tip.key})">${ICONS[id as keyof typeof MARK_TIPS]}</button>`,
-    )
+    .map(([id, tip]) => {
+      // SAFETY: id is an own key of the local MARK_TIPS literal, and ICONS defines an icon for every tip.
+      return `<button class="icon" type="button" data-tip="${id}" aria-keyshortcuts="${tip.key}" aria-label="${tip.label}" title="${tip.label} (${tip.key})">${ICONS[id as keyof typeof MARK_TIPS]}</button>`
+    })
     .join("") +
   SEPARATOR +
   [0, 1, 2, 3]
@@ -767,6 +767,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("keydown", (e) => {
     // While someone draws, the tips' keys, [ and ] for the size, Undo, Enter, and Esc are Highlight's, not the page's.
     if (!paint.hidden) {
+      // The screenshot and strokes use viewport coordinates, so native scroll keys must also stay here.
+      if (/^( |ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(e.key)) {
+        e.preventDefault(); e.stopPropagation(); return;
+      }
       const key = e.key.toLowerCase(), command = e.metaKey || e.ctrlKey;
       const named = Object.keys(TIPS).find((name) => TIPS[name].key.toLowerCase() === key);
       if (e.key === "Escape") cancel();
