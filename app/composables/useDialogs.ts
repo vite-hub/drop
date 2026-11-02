@@ -1,5 +1,12 @@
 import type { Component } from "vue"
-import { ConfirmModal, FolderModal, MoveModal, PromptModal, SiteModal } from "#components"
+
+// Each dialog loads when it first opens. Imported here, they and the folder picker's search (Fuse, a virtual list) would
+// load with every page: the app's entry needs useConfirm, and this module shares a chunk with it.
+const ConfirmModal = defineAsyncComponent(() => import("~/components/ConfirmModal.vue"))
+const PromptModal = defineAsyncComponent(() => import("~/components/PromptModal.vue"))
+const SiteModal = defineAsyncComponent(() => import("~/components/SiteModal.vue"))
+const FolderModal = defineAsyncComponent(() => import("~/components/FolderModal.vue"))
+const MoveModal = defineAsyncComponent(() => import("~/components/MoveModal.vue"))
 
 function useDialog<T extends Component>(component: T) {
   const overlay = useOverlay()
