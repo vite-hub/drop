@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { editorlessSyntax, hasEditorlessSyntax, joinFrontmatter, splitFrontmatter } from "../../shared/frontmatter.ts"
+import { editorlessSyntax, joinFrontmatter, splitFrontmatter } from "../../shared/frontmatter.ts"
+
+const hasEditorlessSyntax = (markdown) => editorlessSyntax(markdown).length > 0
 
 test("the editor gets the body; publishing puts the front matter back without the old supersedes", () => {
   const source = "---\ntitle: Plan\nsupersedes: 3f1c7a52-0000-4000-8000-000000000000\n---\n\n# Plan\n\nText.\n"

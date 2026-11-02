@@ -8,7 +8,9 @@ const { findDrop, listDrops, listFolders, listSharedWithMe, permissions, toSumma
 const { updateDrop } = await import("../../server/utils/drop-update.ts")
 const { createFolder: makeFolder, requireFolder } = await import("../../server/utils/folders.ts")
 const { closePublicLinks } = await import("../../server/utils/share.ts")
-const { liveShare, shareBlock, sharesFor } = await import("../../shared/share.ts")
+const { liveShare, shareBlock, SHARES } = await import("../../shared/share.ts")
+// The states someone may pick for a drop: every one `shareBlock` lets through.
+const sharesFor = (mode, days, drop) => SHARES.filter((share) => !shareBlock(share, mode, days, drop))
 const { roleFor } = await import("../../shared/roles.ts")
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: listFoldersTool } = await import("../../server/mcp/tools/list_folders.ts")

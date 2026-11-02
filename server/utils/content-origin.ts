@@ -131,9 +131,6 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
   )
 }
 
-/** Whether this request came in on a content origin rather than Drop itself. */
-export const isContentRequest = (event: H3Event) => contentHost(event) === "content"
-
 /**
  * The only page the content origin serves, at every path so an app sees the URL it was built for. The viewer sends
  * the document over postMessage, so docs and unpublished edits never pass through this origin's server. An app's other

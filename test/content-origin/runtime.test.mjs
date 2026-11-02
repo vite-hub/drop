@@ -3,7 +3,8 @@ import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext, Script } from "node:vm"
 import { H3Event } from "h3"
 import { migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
-const { contentOrigin, FRAME_HOST_HTML, isContentRequest } = await import("../../server/utils/content-origin.ts")
+const { contentHost, contentOrigin, FRAME_HOST_HTML } = await import("../../server/utils/content-origin.ts")
+const isContentRequest = (event) => contentHost(event) === "content"
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
 const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
