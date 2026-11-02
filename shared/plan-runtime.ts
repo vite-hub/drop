@@ -5,7 +5,7 @@ import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { MAX_QUIZ_BLOCKS } from "./quiz"
 import { CAPTURE } from "./viewport-capture"
-import COMMENTS_CSS from "#comark-comments-css"
+import COMMENTS_CSS from "comark-comments/style.css?raw"
 
 const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
 
@@ -1694,7 +1694,7 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
   const theme =
     authored && !usesDropTheme(html)
       ? ""
-      : `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});</script>`
+      : `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});document.documentElement.classList.toggle("light", ${!dark});</script>`
   const head = `<script>${ERROR_REPORTER}</script><script>${EVENT_HOLD}</script><script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
   const tail = `<script>${ANNOTATOR_SCRIPT.replace("__COMMENTS_CSS__", () => JSON.stringify(COMMENTS_CSS))
     .replace("__AUTHORED__", String(authored))

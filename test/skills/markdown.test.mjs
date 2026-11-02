@@ -38,13 +38,13 @@ const examples = [reference, blocks].flatMap((text) =>
 )
 
 test("every component Drop renders is in the Markdown reference agents read", () => {
-  const missing = COMPONENT_TAGS.filter((tag) => !reference.includes(tag === "mermaid" ? "```mermaid" : `::${tag}`))
+  const missing = COMPONENT_TAGS.filter((tag) => !reference.includes(`::${tag}`))
   assert.deepEqual(missing, [])
 })
 
 test("every comark-ui package Drop renders has a section in the Markdown references", () => {
   const preset = createRequire(import.meta.url)("comark-ui/package.json")
-  // include reads files, which Drop turns off, reading-time only measures, Drop draws Mermaid itself, not with pele, and
+  // include reads files, which Drop turns off, reading-time only measures, pele draws the ```mermaid fences markdown.md documents, and
   // the security plugin drops mathml's MathML, so markdown.md lists math under what Drop doesn't render. magic-move's
   // animation needs its script, which /f/ pages block, so blocks.md (a stopgap that doesn't grow) leaves it out.
   const packages = Object.keys(preset.dependencies).filter(
@@ -61,7 +61,7 @@ test("every example in the Markdown references renders without an unsupported co
   assert.ok(examples.length >= 30)
   for (const [index, example] of examples.entries()) {
     const { html } = await renderMarkdownCached(`example-${index}.md`, async () => example)
-    assert.doesNotMatch(html, /unsupported-component|render-error|mermaid-error/, example)
+    assert.doesNotMatch(html, /unsupported-component|render-error|pele-diagram" data-error/, example)
     // A block draws its own parts, so one the allowlist took out can vanish from the HTML without a trace.
     assert.doesNotMatch(JSON.stringify((await parseMarkdown(example)).nodes), /unsupported-component/, example)
   }

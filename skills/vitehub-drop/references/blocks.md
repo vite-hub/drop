@@ -396,10 +396,10 @@ Open the preview on your phone: :qr{value="https://drop.vitehub.dev"}
 ## Video and audio
 
 ```md
-![The upload flow, recorded](https://drop.vitehub.dev/f/0b9f6a52-1c3e-4d8a-9f7e-2a6c5d4b3e10.mp4){loop muted}
+![The upload flow, recorded](https://drop.vitehub.dev/f/0b9f6a52-1c3e-4d8a-9f7e-2a6c5d4b3e10.mp4){loop muted width=1280 height=720}
 ```
 
-An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file plays as a video or audio. Publish the recording with `file` and link its `fileUrl`, as with an image. [comark-media](https://comark-ui.onmax.me/media/)
+An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file plays as a video or audio. Publish the recording with `file` and link its `fileUrl`, as with an image, and give a video its `width` and `height` in pixels so the page keeps its room while it loads. [comark-media](https://comark-ui.onmax.me/media/)
 
 ## Embeds
 

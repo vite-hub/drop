@@ -45,7 +45,7 @@ test("a private video in a Markdown doc plays in the viewer's sandboxed frame", 
     await once(server, "listening")
     const host = `127.0.0.1:${server.address().port}`
     const path = "/f/11111111-1111-4111-8111-111111111111.webm"
-    const markdown = `# Recording\n\n![The upload flow](http://${host}${path}){muted}\n`
+    const markdown = `# Recording\n\n![The upload flow](http://${host}${path}){muted width=64 height=36}\n`
     const { html } = await renderMarkdownCached("video", async () => markdown)
     const paths = embeddedMediaPaths([markdown, html], host)
     assert.deepEqual(paths, [path])

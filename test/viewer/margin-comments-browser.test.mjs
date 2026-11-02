@@ -49,10 +49,7 @@ const markers = [
 ]
 
 async function open(browser, width) {
-  const document = planDocument("markdown", "", false, html).replace(
-    `<style>${FONTS}`,
-    `<style>${typeset}${shell}</style><style>${theme}`,
-  )
+  const document = planDocument("markdown", "", false, html).replace(FONTS, `${typeset}${shell}</style><style>${theme}`)
   const escaped = document.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   const context = await browser.newContext({ viewport: { width, height: 900 } })
   await context.route("**/*", (route) =>

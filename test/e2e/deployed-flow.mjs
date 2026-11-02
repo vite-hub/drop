@@ -113,7 +113,7 @@ const markdownPage = await fetch(markdownUrl, { headers: auth, signal: timeout()
 assert.equal(markdownPage.status, 200)
 assert.equal(markdownPage.headers.get("content-type"), "text/html; charset=utf-8")
 assert.match(markdownPage.headers.get("cache-control") ?? "", /private,\s*no-store/)
-assert.match(await markdownPage.text(), /<div class="mermaid"><svg/)
+assert.match(await markdownPage.text(), /class="pele-diagram" data-diagram="flowchart"><svg/)
 assert.match(markdownPage.headers.get("content-security-policy"), /script-src 'self'/)
 
 markdownUrl.search = "?raw"
