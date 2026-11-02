@@ -116,57 +116,31 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
       return null
     }
     const blobKey = files.get(file)!
-    // Every publish writes its files under a new folder, so that folder names this content.
-    const etag = `"${blobKey.split("/")[2] ?? "0"}"`
-    const type = contentTypeOf(file)
-    const headers = {
-      "Content-Type": isTextFile(file) ? `${type}; charset=utf-8` : type,
+    event.res.headers.set("X-Robots-Tag", "noindex, nofollow")
+    // ViteHub streams the file from storage, or just the range a video asks for: Firefox resumes one mid-file and gives
+    // up with a network error unless the answer starts where it asked, and Safari won't play one without ranges.
+    const [error, body] = await blob.serve(event, blobKey, {
       // Private: the grant decides who gets a file, so no shared cache may keep one.
-      "Cache-Control": isHashedAsset(file) ? "private, max-age=31536000, immutable" : "private, no-cache",
-      ETag: etag,
-      "X-Content-Type-Options": "nosniff",
-      "X-Robots-Tag": "noindex, nofollow",
+      cacheControl: isHashedAsset(file) ? "private, max-age=31536000, immutable" : "private, no-cache",
+    })
+    if (error?.code === "BLOB_NOT_FOUND") {
+      if (!wasKept) return null
+      continue
     }
-    if (event.req.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers })
-    const [error, body] = await blob.get(blobKey)
     // Not the cacheable 404 a missing file gets: the store failing is brief, and a cached miss would outlast it.
-    if (error && error.code !== "BLOB_NOT_FOUND") {
+    if (error) {
       useLogger(event).error(error, { action: "storage" })
       return new Response("File storage is temporarily unavailable.", {
         status: 503,
         headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5" },
       })
     }
-    if (body) return fileResponse(event, body, headers)
-    if (!wasKept) return null
-  }
-  return null
-}
-
-/**
- * A video needs byte ranges: Firefox resumes one mid-file with `Range: bytes=<n>-` and gives up with a network error
- * when the answer starts back at byte 0, and Safari won't play one at all. One range only; an If-Range naming another
- * version gets the whole file.
- */
-function fileResponse(event: H3Event, body: Blob, headers: Record<string, string>): Response {
-  const size = body.size
-  const all = { ...headers, "Accept-Ranges": "bytes" }
-  const range = event.req.headers.get("range")
-  const ifRange = event.req.headers.get("if-range")
-  const ranged = range && (!ifRange || ifRange === headers.ETag) ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null
-  if (!ranged || (!ranged[1] && !ranged[2])) {
-    return new Response(event.req.method === "HEAD" ? null : body.stream(), {
-      headers: { ...all, "Content-Length": String(size) },
+    const type = contentTypeOf(file)
+    if (body) event.res.headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
+    return new Response(event.req.method === "HEAD" ? null : body, {
+      status: event.res.status || 200,
+      headers: event.res.headers,
     })
   }
-  const start = ranged[1] ? Number(ranged[1]) : Math.max(0, size - Number(ranged[2]))
-  const end = ranged[1] && ranged[2] ? Math.min(Number(ranged[2]), size - 1) : size - 1
-  if (start >= size || start > end) {
-    return new Response(null, { status: 416, headers: { ...all, "Content-Range": `bytes */${size}` } })
-  }
-  const part = body.slice(start, end + 1)
-  return new Response(event.req.method === "HEAD" ? null : part.stream(), {
-    status: 206,
-    headers: { ...all, "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Length": String(part.size) },
-  })
+  return null
 }
