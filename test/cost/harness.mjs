@@ -84,7 +84,7 @@ export const planOf = ({ query, params }) =>
     .join("\n")
 export const objects = new Map()
 const entries = new Map()
-export const calls = { get: 0, head: 0, del: 0, writes: [] }
+export const calls = { get: 0, head: 0, del: 0, serve: 0, writes: [] }
 // The stubs in test/stubs.ts hand this state to the server code under test.
 export const state = (globalThis.dropTest = {
   db,
@@ -97,6 +97,7 @@ export const state = (globalThis.dropTest = {
   refreshedLinks: [],
   ogBrowser: true,
   failDelete: false,
+  failServe: false,
   failCacheDelete: false,
   blob: {
     list: async () => [null, { blobs: [...objects.keys()].map((pathname) => ({ pathname })) }],
@@ -108,6 +109,32 @@ export const state = (globalThis.dropTest = {
       calls.head++
       const file = objects.get(key)
       return [null, file ? { ...file, size: file.body?.size ?? file.size } : null]
+    },
+    // Like ViteHub's serve(): headers on event.res, then the file, or the one range asked for, as a stream.
+    serve: async (event, key, options = {}) => {
+      calls.serve++
+      const body = objects.get(key)?.body
+      if (!body) return [{ code: "BLOB_NOT_FOUND" }, undefined]
+      if (state.failServe) return [{ code: "BLOB_R0001", message: "injected blob serve failure" }, undefined]
+      const etag = `"${key}"`
+      event.res.headers.set("ETag", etag)
+      event.res.headers.set("Cache-Control", options.cacheControl ?? "private, no-cache")
+      event.res.headers.set("Accept-Ranges", "bytes")
+      event.res.headers.set("X-Content-Type-Options", "nosniff")
+      event.res.headers.set("Content-Type", body.type || "application/octet-stream")
+      if (event.req.headers.get("if-none-match") === etag) {
+        event.res.status = 304
+        return [null, null]
+      }
+      const range = /^bytes=(\d+)-(\d*)$/.exec(event.req.headers.get("range") ?? "")
+      const start = range ? Number(range[1]) : 0
+      const end = range?.[2] ? Number(range[2]) : body.size - 1
+      if (range) {
+        event.res.status = 206
+        event.res.headers.set("Content-Range", `bytes ${start}-${end}/${body.size}`)
+      }
+      event.res.headers.set("Content-Length", String(end - start + 1))
+      return [null, body.slice(start, end + 1).stream()]
     },
     put: async (key, body) => {
       objects.set(key, { body: new Blob([body]), uploadedAt: new Date() })
@@ -189,13 +216,14 @@ export function reset() {
   state.publicLinkDays = ""
   state.admins = ""
   state.failDelete = false
+  state.failServe = false
   state.failCacheDelete = false
   state.who = null
   state.draft = null
   objects.clear()
   entries.clear()
   queries.length = 0
-  calls.get = calls.head = calls.del = 0
+  calls.get = calls.head = calls.del = calls.serve = 0
   calls.writes.length = 0
   sql.prepare("INSERT INTO user (id, name, email) VALUES (?, ?, ?)").run("owner", "Owner", "owner@example.com")
 }

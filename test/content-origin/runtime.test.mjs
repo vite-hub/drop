@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext, Script } from "node:vm"
 import { H3Event } from "h3"
-import { migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
+import { calls, migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
 const { contentHost, contentOrigin, FRAME_HOST_HTML } = await import("../../server/utils/content-origin.ts")
 const isContentRequest = (event) => contentHost(event) === "content"
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
@@ -246,25 +246,20 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     const woff = await load("/_nuxt/inter.woff2", { dest: "font" })
     assert.equal(woff.headers.get("content-type"), "font/woff2")
     assert.deepEqual(new Uint8Array(await woff.arrayBuffer()), font, "binary files come back byte for byte")
-    assert.equal(woff.headers.get("accept-ranges"), "bytes")
-    // Firefox resumes a video mid-file this way, and a whole file in answer stops playback with a network error.
+    // Firefox resumes a video mid-file, and stops with a network error unless the answer starts where it asked.
+    const served = calls.serve
     const tail = await load("/_nuxt/inter.woff2", { dest: "video", headers: { range: "bytes=4-" } })
+    assert.equal(calls.serve, served + 1, "ViteHub serves the bytes")
     assert.equal(tail.status, 206)
     assert.equal(tail.headers.get("content-range"), "bytes 4-5/6")
-    assert.equal(tail.headers.get("content-length"), "2")
+    assert.equal(tail.headers.get("content-type"), "font/woff2")
+    assert.equal(tail.headers.get("x-robots-tag"), "noindex, nofollow")
     assert.deepEqual(new Uint8Array(await tail.arrayBuffer()), font.slice(4))
-    const head = await load("/_nuxt/inter.woff2", { dest: "video", headers: { range: "bytes=0-1" } })
-    assert.deepEqual(new Uint8Array(await head.arrayBuffer()), font.slice(0, 2))
-    const last = await load("/_nuxt/inter.woff2", { dest: "video", headers: { range: "bytes=-1" } })
-    assert.equal(last.headers.get("content-range"), "bytes 5-5/6")
-    const past = await load("/_nuxt/inter.woff2", { dest: "video", headers: { range: "bytes=6-" } })
-    assert.equal(past.status, 416)
-    assert.equal(past.headers.get("content-range"), "bytes */6")
-    const stale = await load("/_nuxt/inter.woff2", {
-      dest: "video",
-      headers: { range: "bytes=4-", "if-range": '"old"' },
-    })
-    assert.equal(stale.status, 200, "a range of another version gets the whole file")
+    state.failServe = true
+    const down = await load("/_nuxt/inter.woff2", { dest: "font" })
+    assert.equal(down.status, 503, "a store failing is brief, so no cacheable 404")
+    assert.equal(down.headers.get("cache-control"), "no-store")
+    state.failServe = false
     assert.equal(
       await (await load("/docs/", { dest: "empty" })).text(),
       "<p>Docs</p>",

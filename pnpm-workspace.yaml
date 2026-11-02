@@ -59,6 +59,9 @@ patchedDependencies:
   # took the failure for "no Database", and left Comments uninstalled, so every comments call answered 503
   # (vite-hub/vitehub#3222).
   "@vite-hub/comments@0.1.0": patches/@vite-hub__comments@0.1.0.patch
+  # `blob.serve()` streams an object, or the range a video asks for, straight from the R2 binding instead of reading
+  # all of it into the Worker first (vite-hub/vitehub#3279).
+  "@vite-hub/blob@0.1.0": patches/@vite-hub__blob@0.1.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
