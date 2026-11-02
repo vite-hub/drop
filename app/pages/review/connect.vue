@@ -47,6 +47,23 @@ async function connect(site: ReviewSite) {
   }
 }
 
+/** No review covers the page yet, or none is shared with this person: they start their own and connect to it. */
+async function start() {
+  pending.value = "start"
+  error.value = ""
+  try {
+    await startSiteReview(origin.value)
+    const [site] = (await reviewSites(origin.value)).sites
+    if (!site) throw new Error("The new review didn't show up. Press Comment on the site again.")
+    await connect(site)
+  } catch (cause) {
+    error.value = errorText(cause, "Couldn't start a review of this site.")
+    state.value = "error"
+  } finally {
+    pending.value = null
+  }
+}
+
 onMounted(async () => {
   if (!origin.value) {
     error.value = "This link is missing the site. Press Comment on the site again."
@@ -156,19 +173,18 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
         </template>
 
         <template v-else-if="state === 'none'">
-          <h1 class="text-lg font-semibold tracking-tight text-highlighted">No review for you here</h1>
+          <h1 class="text-lg font-semibold tracking-tight text-highlighted">Start reviewing {{ host }}</h1>
           <p class="mt-2 text-sm leading-relaxed text-muted">
-            No review of <span class="font-mono text-highlighted">{{ host }}</span> is shared with you. Ask the site's
-            owner to share it, or create one from your Drops.
+            No review of <span class="font-mono text-highlighted">{{ host }}</span> is shared with you yet. Start one
+            and your comments go to it, in your Site reviews folder.
           </p>
           <UButton
             block
             class="mt-6"
             color="neutral"
-            label="Open Drops"
-            target="_blank"
-            to="/drops"
-            variant="outline"
+            label="Start a review"
+            :loading="pending === 'start'"
+            @click="start"
           />
         </template>
 

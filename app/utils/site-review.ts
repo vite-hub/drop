@@ -8,6 +8,9 @@ export const reviewSites = (origin: string) => $fetch("/api/review/sites", { met
 
 export type ReviewSite = Awaited<ReturnType<typeof reviewSites>>["sites"][number]
 
+/** A new site review of `origin`, owned by this person, in their Site reviews folder. */
+export const startSiteReview = (origin: string) => $fetch("/api/sites", { method: "POST", body: { url: origin } })
+
 /** A review token for the site drop picked, for `origin` only. Guests sign their comments with `name`. */
 export const issueReviewToken = (body: { origin: string; choice: string; name?: string }) =>
   $fetch("/api/review/token", { method: "POST", body })

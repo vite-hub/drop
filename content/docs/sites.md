@@ -73,7 +73,7 @@ Show the bookmarks bar with :kbd[⌘] :kbd[Shift] :kbd[B] on a Mac or :kbd[Ctrl]
 
 ## Comment {#comment}
 
-1. Press **Comment**. The first time, a Drop window opens with the reviews that cover the page and that you may comment on. With one, you're connected for 12 hours; with several, you pick one by its name and owner. Signed out, you can comment only on a review shared as **Public, anyone comments**.
+1. Press **Comment**. The first time, a Drop window opens with the reviews that cover the page and that you may comment on. With one, you're connected for 12 hours; with several, you pick one by its name and owner; with none, **Start a review** creates one in your Site reviews folder and connects you to it. Signed out, you can comment only on a review shared as **Public, anyone comments**.
 2. Drag a box over what you mean. :kbd[Esc] cancels.
 3. Write the note and press **Send**.
 
