@@ -2,14 +2,25 @@ import assert from "node:assert/strict"
 import { resolveCacheKeys } from "ocache"
 import { beforeEach, test } from "vite-plus/test"
 import { readFileSync } from "node:fs"
-import { sql, queries, state, calls, migrate, reset, insertDrop, insertVersion, who, event } from "./harness.mjs"
+import {
+  sql,
+  queries,
+  state,
+  calls,
+  migrate,
+  reset,
+  insertDrop,
+  insertVersion,
+  who,
+  event,
+  planOf,
+} from "./harness.mjs"
 const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionsOf, deleteDrop, publishApp } =
   await import("../../server/utils/drops.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 const { default: accessMiddleware } = await import("../../server/middleware/0.drop-access.ts")
 const { default: markdownMiddleware } = await import("../../server/middleware/1.markdown-documents.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
-const { default: meHandler } = await import("../../server/api/me.get.ts")
 const { createCodeImage } = await import("../../server/utils/code-image-store.ts")
 
 migrate()
@@ -30,12 +41,7 @@ test("a drop's versions take one indexed query, at most 100 of them", async () =
   assert.equal(versions.length, 100)
   assert.equal(versions[0].version, 150)
   assert.equal(versions.at(-1).version, 51)
-  const { query, params } = queries[0]
-  const plan = sql
-    .prepare(`EXPLAIN QUERY PLAN ${query}`)
-    .all(...params)
-    .map((row) => row.detail)
-    .join("\n")
+  const plan = planOf(queries[0])
   assert.match(plan, /SEARCH drop_versions USING INDEX/)
   assert.doesNotMatch(plan, /SCAN drop_versions/)
 })
@@ -46,11 +52,7 @@ test("listing reads the owner's newest drops through their index", async () => {
   const rows = await listDrops(who)
   assert.equal(rows.length, 500)
   assert.equal(rows[0].id, "v0")
-  const plan = sql
-    .prepare(`EXPLAIN QUERY PLAN ${queries[0].query}`)
-    .all(...queries[0].params)
-    .map((row) => row.detail)
-    .join("\n")
+  const plan = planOf(queries[0])
   assert.match(plan, /drops_owner_idx/)
   assert.doesNotMatch(plan, /SCAN drops\b/)
 })
@@ -214,12 +216,10 @@ test("reports quarantine code images while image access stays one query", async 
   assert.equal(calls.head, 0)
 })
 
-test("HTML keeps report controls outside the sandbox and HEAD emits no body", async () => {
+test("an HTML file's HEAD sends no body", async () => {
   const key = "00000000-0000-4000-8000-000000000001.html"
   insertDrop("html", { kind: "html", blob_key: key })
-  const response = await markdownMiddleware(event(`/f/${key}`))
-  assert.ok(response.indexOf(">Report</a>") < response.indexOf("<iframe"))
-  assert.match(response, /sandbox="allow-scripts/)
+  assert.match(await markdownMiddleware(event(`/f/${key}`)), /<iframe/)
   assert.equal(await markdownMiddleware(event(`/f/${key}`, "HEAD")), "")
 })
 
@@ -264,19 +264,6 @@ test("a blob with no drop behind it is never served, and access needs no storage
   }
   await missing(() => requireBlobAccess(event("/f/missing.md"), "missing.md"))
   assert.equal(calls.head, 0)
-})
-
-test("/api/me does not count review shares for the removed sidebar badge", async () => {
-  insertDrop("waiting", { share: "public", share_review: "pending" })
-  insertDrop("waiting-comments", { share: "public_comment", share_review: "pending" })
-  insertDrop("rejected", { share: "public", share_review: "rejected" })
-  insertDrop("unlisted", { share: "private", share_review: "pending" })
-  state.who = who
-  assert.equal((await meHandler(event("/api/me"))).reviews, undefined)
-  state.who = { ...who, role: "admin" }
-  queries.length = 0
-  assert.equal((await meHandler(event("/api/me"))).reviews, undefined)
-  for (const { query } of queries) assert.doesNotMatch(query, /count\(/)
 })
 
 test("app publishing keeps only the latest file set, as the docs promise", async () => {

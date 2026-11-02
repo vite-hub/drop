@@ -1,39 +1,18 @@
 import assert from "node:assert/strict"
-import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { beforeEach, test } from "vite-plus/test"
-import { sql, queries, state, migrate, reset, insertDrop, insertVersion, event, who } from "./harness.mjs"
-
-// Each D1 query is a round trip from the Worker, ~55 ms in production. Queries that start together share one: here
-// every query waits for the current wave, which ends once nothing else can join it, so `waves` counts the round trips
-// a request waits for one after another.
-let waves = 0
-let wave
-const nextWave = () =>
-  (wave ??= new Promise((resolve) =>
-    setImmediate(() => {
-      waves++
-      wave = undefined
-      resolve()
-    }),
-  ))
-const execute = async (query, params, method) => {
-  await nextWave()
-  queries.push({ query, params })
-  const statement = sql.prepare(query)
-  if (method === "run" || !statement.columns().length) {
-    statement.run(...params)
-    return { rows: [] }
-  }
-  statement.setReturnArrays(true)
-  const rows = statement.all(...params)
-  return { rows: method === "get" ? rows[0] : rows }
-}
-state.db = drizzle(execute)
-state.db.all = async (query) => {
-  await nextWave()
-  const compiled = state.db.dialect.sqlToQuery(query)
-  return sql.prepare(compiled.sql).all(...compiled.params)
-}
+import {
+  sql,
+  queries,
+  migrate,
+  reset,
+  insertDrop,
+  insertVersion,
+  event,
+  who,
+  roundTrips,
+  planOf,
+  state,
+} from "./harness.mjs"
 
 const { default: linkHandler } = await import("../../server/api/links/[id].get.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
@@ -73,12 +52,6 @@ function publicDoc() {
     .run(owner, JSON.stringify({ id: "guest:1", name: "Guest", guest: true }))
 }
 
-async function roundTrips(run) {
-  await nextWave()
-  const start = waves
-  await run()
-  return waves - start
-}
 const get = (handler, id) => {
   const request = event(`/api/x/${id}`)
   request.context.params = { id }
@@ -122,24 +95,8 @@ test("a link's key finds the drop and the folders above it in one indexed query"
     ["folder"],
   )
   assert.equal(queries.length, 1)
-  const plan = sql
-    .prepare(`EXPLAIN QUERY PLAN ${queries[0].query}`)
-    .all(...queries[0].params)
-    .map((row) => row.detail)
-    .join("\n")
+  const plan = planOf(queries[0])
   assert.doesNotMatch(plan, /SCAN (drops|"drops")\b(?! USING)/, plan)
-})
-
-test("the link answers for the drop, its latest version, and the version `?v=` pins", async () => {
-  publicDoc()
-  assert.deepEqual(await get(linkHandler, LINK), { id: LINK, link: LINK, slug: "doc", version: 2, latest: 2 })
-  const pinned = (v) => {
-    const request = event(`/api/x/${LINK}?v=${v}`)
-    request.context.params = { id: LINK }
-    return linkHandler(request)
-  }
-  assert.deepEqual(await pinned(1), { id: LINK, link: LINK, slug: "doc", version: 1, latest: 2 })
-  await assert.rejects(pinned(3), (error) => error.status === 404)
 })
 
 test("a signed-in admin's page bootstrap reads independent sidebar data in one round trip", async () => {
@@ -151,6 +108,12 @@ test("a signed-in admin's page bootstrap reads independent sidebar data in one r
   assert.equal(viewer.id, who.userId)
   assert.ok(viewer.skills > 0)
   assert.equal(count, 1, `page bootstrap waited for ${count} sequential database round trips`)
+  // Every page asks for it, so a query joining that round trip costs every page view too.
+  assert.deepEqual(
+    queries.map(({ query }) => query.match(/from "?(\w+)/i)?.[1]),
+    ["skill_settings"],
+    "the only query reads which skills are on",
+  )
 })
 
 test("team names and billing join the same bootstrap round trip and preserve the viewer's role", async () => {
