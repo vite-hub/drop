@@ -339,9 +339,8 @@ export default defineNuxtConfig({
           process.env.CLOUDFLARE_D1_DATABASE_ID === HOSTED_D1 ? { region: "gcp:europe-west8" } : { mode: "smart" },
       },
     },
-    // Listing publicAssets replaces Nuxt's default, so `public/` is listed too.
+    // Added to Nuxt's own list, which already serves `public/`.
     publicAssets: [
-      { baseURL: "/", dir: "public", maxAge: 60 * 60 },
       { baseURL: "/vendor/medium-zoom", dir: "node_modules/medium-zoom/dist", maxAge: 60 * 60 * 24 * 365 },
     ],
   },
