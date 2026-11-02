@@ -182,13 +182,13 @@ export default defineMcpTool({
  * The comments, or what to say in their place when Comments can't be read (a 503 from server/utils/comments.ts). The
  * rest of the drop still comes back, and the agent is told not to take the empty list for no comments.
  */
-async function unlessUnavailable<T>(pending: Promise<T[]>) {
+async function unlessUnavailable<T>(pending: Promise<T[]>): Promise<{ list: T[]; unavailable: string | null }> {
   try {
     return { list: await pending, unavailable: null }
   } catch (error) {
     if (!(error instanceof HTTPError) || error.status !== 503) throw error
     return {
-      list: [] as T[],
+      list: [],
       unavailable: `Comments couldn't be read just now (${error.statusText}). This drop may have open comments: read it again before publishing a version that addresses them.`,
     }
   }
