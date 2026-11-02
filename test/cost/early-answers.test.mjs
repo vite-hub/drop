@@ -1,11 +1,12 @@
 import assert from "node:assert/strict"
 import { toResponse } from "h3"
 import { beforeEach, test } from "vite-plus/test"
-import { queries, state, migrate, reset, event, who } from "./harness.mjs"
+import { queries, state, migrate, reset, insertDrop, event, who } from "./harness.mjs"
 const { default: mcpRoute } = await import("../../server/routes/mcp.ts")
 const { default: mcpGet } = await import("../../server/routes/mcp.get.ts")
+const { default: accessMiddleware } = await import("../../server/middleware/0.drop-access.ts")
 
-// Requests that can be answered before the costly part: a token check on D1.
+// Requests that can be answered before the costly part: a token check on D1, or a server render of the page.
 migrate()
 let identified = 0
 let current = null
@@ -47,4 +48,31 @@ test("GET /mcp without a token is still the 401 that points at the protected res
 test("POST /mcp still checks the token", async () => {
   await mcp("POST", { authorization: "Bearer token", "content-type": "application/json" })
   assert.equal(identified, 1)
+})
+
+const page = async (path, method) => {
+  const request = event(path, method)
+  const answer = await accessMiddleware(request)
+  return answer === undefined ? undefined : toResponse(answer, request)
+}
+
+test("HEAD on a share page answers without rendering it", async () => {
+  insertDrop("doc", { title: "The doc", share: "public" })
+  const response = await page("/d/doc/the-doc", "HEAD")
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get("content-type"), "text/html;charset=utf-8")
+  assert.equal(response.headers.get("cache-control"), "private, no-store")
+  assert.equal(await response.text(), "")
+  // The address the page moves to, as its render would.
+  const moved = await page("/d/doc?from=1", "HEAD")
+  assert.equal(moved.status, 302)
+  assert.equal(moved.headers.get("location"), "/d/doc/the-doc?from=1")
+  // A pinned version renders, since the page checks that it exists; GET renders.
+  assert.equal(await page("/d/doc/the-doc?v=3", "HEAD"), undefined)
+  assert.equal(await page("/d/doc/the-doc", "GET"), undefined)
+})
+
+test("HEAD on a share page someone can't open keeps the page's status", async () => {
+  insertDrop("doc", { title: "The doc", share: "private" })
+  await assert.rejects(page("/d/doc/the-doc", "HEAD"), (error) => error.status === 404)
 })
