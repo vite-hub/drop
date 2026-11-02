@@ -137,8 +137,36 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
         headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5" },
       })
     }
-    if (body) return new Response(event.req.method === "HEAD" ? null : body.stream(), { headers })
+    if (body) return fileResponse(event, body, headers)
     if (!wasKept) return null
   }
   return null
+}
+
+/**
+ * A video needs byte ranges: Firefox resumes one mid-file with `Range: bytes=<n>-` and gives up with a network error
+ * when the answer starts back at byte 0, and Safari won't play one at all. One range only; an If-Range naming another
+ * version gets the whole file.
+ */
+function fileResponse(event: H3Event, body: Blob, headers: Record<string, string>): Response {
+  const size = body.size
+  const all = { ...headers, "Accept-Ranges": "bytes" }
+  const range = event.req.headers.get("range")
+  const ifRange = event.req.headers.get("if-range")
+  const ranged = range && (!ifRange || ifRange === headers.ETag) ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null
+  if (!ranged || (!ranged[1] && !ranged[2])) {
+    return new Response(event.req.method === "HEAD" ? null : body.stream(), {
+      headers: { ...all, "Content-Length": String(size) },
+    })
+  }
+  const start = ranged[1] ? Number(ranged[1]) : Math.max(0, size - Number(ranged[2]))
+  const end = ranged[1] && ranged[2] ? Math.min(Number(ranged[2]), size - 1) : size - 1
+  if (start >= size || start > end) {
+    return new Response(null, { status: 416, headers: { ...all, "Content-Range": `bytes */${size}` } })
+  }
+  const part = body.slice(start, end + 1)
+  return new Response(event.req.method === "HEAD" ? null : part.stream(), {
+    status: 206,
+    headers: { ...all, "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Length": String(part.size) },
+  })
 }
