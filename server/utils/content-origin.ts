@@ -1,6 +1,7 @@
 import type { H3Event } from "h3"
 import { deriveSecret, useServerEnv } from "#vitehub/env/server"
 import { siteMatches } from "#shared/review"
+import { escapeRegExp } from "#shared/utils/text"
 
 /**
  * Apps and HTML docs run real code, and real apps need a real origin: storage, cookies, and history.pushState all
@@ -105,8 +106,6 @@ export async function onOwnOrigin(event: H3Event, dropId: string): Promise<boole
   return !!config?.perDrop && (await hostFor(event, config, dropId)) === event.url.host
 }
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
 /**
  * How this request's host relates to the content origin: `content` for a drop's own host, `stray` for a host that has
  * the wildcard's shape but no valid label (evil-drop.example.com), which a `*-drop.example.com/*` route also sends
@@ -119,7 +118,7 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
   if (port !== config.port) return false
   if (!config.perDrop) return hostname === config.host && "content"
   const { prefix, suffix } = config.perDrop
-  if (new RegExp(`^${escape(prefix)}${LABEL}${escape(suffix)}$`).test(hostname)) return "content"
+  if (new RegExp(`^${escapeRegExp(prefix)}${LABEL}${escapeRegExp(suffix)}$`).test(hostname)) return "content"
   // Only when the `*` shares its label with fixed text (`*-drop`): a whole level (`*.example.com`) may also hold Drop.
   if (!prefix && suffix.startsWith(".")) return false
   return (
@@ -189,7 +188,9 @@ export function siteCoversDrop(event: H3Event, siteUrl: string): boolean {
     const { hostname, port } = new URL(siteUrl)
     if (port !== config.port) return false
     return config.perDrop
-      ? new RegExp(`^${escape(config.perDrop.prefix)}${LABEL}${escape(config.perDrop.suffix)}$`).test(hostname)
+      ? new RegExp(`^${escapeRegExp(config.perDrop.prefix)}${LABEL}${escapeRegExp(config.perDrop.suffix)}$`).test(
+          hostname,
+        )
       : hostname === config.host
   }
   // A pattern covers the content origin when it covers any one drop's host on it.
