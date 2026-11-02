@@ -205,7 +205,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
   let area = null, start = null, busy = false, toastTimer = 0;
   let threads = [], openN = null, pinsShown = true, here = "";
-  let strokes = [], stroke = null, still = null, inkAt = { x: 0, y: 0 };
+  let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
   const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map();
 
   function save(value) {
@@ -294,9 +294,6 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   const visible = () => threads.filter((item) => !item.resolved || showResolved.checked);
 
-  function initials(name) {
-    return String(name || "?").trim().split(/\s+/).slice(0, 2).map((word) => word[0] || "").join("").toUpperCase() || "?";
-  }
   function avatar(person, into) {
     into.textContent = initials(person.name);
     if (!person.image || !/^https:\/\//.test(person.image)) return into;
@@ -577,7 +574,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     draw.hidden = true; box.hidden = true; pop.hidden = true; bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
     newBox.show("");
-    area = null; start = null; strokes = []; stroke = null; still = null;
+    area = null; start = null; strokes = []; still = null;
+    forgetStroke();
     layout();
   }
 
@@ -673,39 +671,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
   }
 
-  paint.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    paint.setPointerCapture(e.pointerId);
-    stroke = Object.assign(penNow(), { points: [[e.clientX, e.clientY]], straight: false });
-    stroke.el = drawStroke(stroke, ink);
-  });
-  paint.addEventListener("pointermove", (e) => {
-    if (!stroke) return;
-    const p = [e.clientX, e.clientY], first = stroke.points[0];
-    // Shift draws straight: a marker stays on its line, a pen and an arrow go point to point.
-    if (stroke.tool === "arrow" || e.shiftKey) {
-      stroke.straight = e.shiftKey;
-      stroke.points = [first, stroke.tool === "marker" && e.shiftKey ? [p[0], first[1]] : p];
-    } else {
-      const last = stroke.points[stroke.points.length - 1];
-      if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 2) stroke.points.push(p);
-    }
-    stroke.el.setAttribute("d", strokePath(stroke));
-  });
-  const endStroke = () => {
-    if (!stroke) return;
-    const s = stroke, a = s.points[0], b = s.points[s.points.length - 1];
-    stroke = null;
-    if (s.tool === "arrow" && Math.hypot(b[0] - a[0], b[1] - a[1]) < 10) return s.el.remove();
+  forgetStroke = takeStrokes(paint, ink, penNow, (s) => {
     strokes.push(s);
     paintTools();
-  };
-  paint.addEventListener("pointerup", endStroke);
-  paint.addEventListener("pointercancel", endStroke);
-  // The screenshot is of the viewport, so the page stays where it is under the strokes.
-  paint.addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
-  paint.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+  });
 
   function undoMark() {
     const s = strokes.pop();

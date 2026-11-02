@@ -66,8 +66,9 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
   }`
 
 /**
- * The Marker's ink, shared by the frame's comment layer and the site review script: the path of a stroke (marker, pen,
- * or arrow, in viewport pixels), drawn on an SVG layer or a canvas, and the pointer for a tip.
+ * What the frame's comment layer and the site review script share: the Marker's ink (the path of a stroke, a marker,
+ * pen, or arrow in viewport pixels, drawn on an SVG layer or a canvas, the pointer for a tip, and drawing strokes on a
+ * layer) and people's initials.
  */
 export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
   // The pointer is the tip: its size and colour, see-through for the marker. The arrow keeps the crosshair.
@@ -112,6 +113,46 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
       g.stroke(new Path2D(strokePath(s)));
       g.restore();
     }
+  }
+  // Draws the strokes made on a layer into an SVG, each with pen()'s tip, and hands each finished one to done. The page
+  // stays still under the layer. Handlers are on* properties: the frame hands held events only to those (EVENT_HOLD).
+  // Returns a function that forgets the stroke in progress.
+  function takeStrokes(layer, into, pen, done) {
+    let stroke = null;
+    layer.onpointerdown = (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      layer.setPointerCapture(e.pointerId);
+      stroke = Object.assign(pen(), { points: [[e.clientX, e.clientY]], straight: false });
+      stroke.el = drawStroke(stroke, into);
+    };
+    layer.onpointermove = (e) => {
+      if (!stroke) return;
+      const p = [e.clientX, e.clientY], first = stroke.points[0];
+      // Shift draws straight: a marker stays on its line, a pen and an arrow go point to point.
+      if (stroke.tool === "arrow" || e.shiftKey) {
+        stroke.straight = e.shiftKey;
+        stroke.points = [first, stroke.tool === "marker" && e.shiftKey ? [p[0], first[1]] : p];
+      } else {
+        const last = stroke.points[stroke.points.length - 1];
+        if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 2) stroke.points.push(p);
+      }
+      stroke.el.setAttribute("d", strokePath(stroke));
+    };
+    const end = () => {
+      if (!stroke) return;
+      const s = stroke, a = s.points[0], b = s.points[s.points.length - 1];
+      stroke = null;
+      // An arrow this short is a slip.
+      if (s.tool === "arrow" && Math.hypot(b[0] - a[0], b[1] - a[1]) < 10) return s.el.remove();
+      done(s);
+    };
+    layer.onpointerup = layer.onpointercancel = end;
+    layer.onwheel = layer.ontouchmove = (e) => e.preventDefault();
+    return () => { stroke = null; };
+  }
+  function initials(name) {
+    return String(name || "?").trim().split(/\s+/).slice(0, 2).map((word) => word[0] || "").join("").toUpperCase() || "?";
   }`
 
 /**
@@ -357,7 +398,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     return null;
   }
 
-  const initials = (name) => (name || "?").trim().split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "?";
   let lastUnplaced = null;
   // Open comments on a Markdown doc's text sit beside it, the way comark-comments draws a doc's own threads: a bubble
   // after the quote and a card in a margin on the right. The margin is --drop-rail, which widens the column
@@ -1045,7 +1085,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    * screenshot sends the area with no picture.
    */
   ${INK}
-  let pen = { tool: "marker", color: "#ec4899", width: 14 }, strokes = [], stroke = null, shot = null, frozen = null, ink = null;
+  let pen = { tool: "marker", color: "#ec4899", width: 14 }, strokes = [], shot = null, frozen = null, ink = null;
   let markSession = 0, finishing = false;
   function setPen(next) {
     if (/^(marker|pen|arrow)$/.test(next.tool)) pen.tool = next.tool;
@@ -1091,42 +1131,17 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     ink = document.createElementNS(SVG, "svg");
     ink.setAttribute("class", "ink");
     el.appendChild(ink);
-    el.onpointerdown = (e) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      stroke = { tool: pen.tool, color: pen.color, width: pen.width, points: [[e.clientX, e.clientY]], straight: false };
-      stroke.el = drawStroke(stroke, ink);
-    };
-    el.onpointermove = (e) => {
-      if (!stroke) return;
-      const p = [e.clientX, e.clientY], first = stroke.points[0];
-      // Shift draws straight: a marker stays on its line, a pen and an arrow go point to point.
-      if (stroke.tool === "arrow" || e.shiftKey) {
-        stroke.straight = e.shiftKey;
-        stroke.points = [first, stroke.tool === "marker" && e.shiftKey ? [p[0], first[1]] : p];
-      } else {
-        const last = stroke.points[stroke.points.length - 1];
-        if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 2) stroke.points.push(p);
-      }
-      stroke.el.setAttribute("d", strokePath(stroke));
-    };
-    el.onpointerup = el.onpointercancel = () => {
-      if (!stroke) return;
-      const s = stroke, a = s.points[0], b = s.points[s.points.length - 1];
-      stroke = null;
-      if (s.tool === "arrow" && Math.hypot(b[0] - a[0], b[1] - a[1]) < 10) return s.el.remove();
+    // The layer goes with the mark, and the stroke in progress with it.
+    takeStrokes(el, ink, () => ({ ...pen }), (s) => {
       strokes.push(s);
       post({ type: "marks", count: strokes.length });
-    };
-    // The snapshot is of the viewport, so the page stays where it is under it.
-    el.onwheel = el.ontouchmove = (e) => e.preventDefault();
+    });
     return el;
   }
   function leaveMark() {
     markSession++; finishing = false;
     unfreeze();
-    strokes = []; stroke = null; shot = null; ink = null;
+    strokes = []; shot = null; ink = null;
     post({ type: "marks", count: 0 });
   }
   function undoMark() {
