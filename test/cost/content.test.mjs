@@ -383,6 +383,7 @@ test("quota publishing keeps share review and uses one owner burst bucket for do
   )
   assert.equal(result.isError, true)
   assert.equal(result.structuredContent.quota.unit, "burstPublishes")
+  assert.equal(result.structuredContent.retryAfterSeconds, 42, "the limiter's own wait")
   assert.equal((await getUsage(who.userId)).writes.used, 3)
 })
 

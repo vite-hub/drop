@@ -160,14 +160,14 @@ test("the hourly cleanup removes only old clients with no authorization evidence
 
 test("publishing burst protection counts by owner across calls", async () => {
   const { H3Event } = await import("h3")
-  const { requirePublishBurst } = await import("../../server/utils/publish-burst.ts")
+  const { publishBurst } = await import("../../server/utils/publish-burst.ts")
   const owner = crypto.randomUUID()
   const request = () => new H3Event(new Request("https://drop.example/mcp", { method: "POST" }))
   // The harness stands in for ViteHub's limiter: it records the bucket and fails when told to.
-  await requirePublishBurst(request(), owner)
+  assert.equal((await publishBurst(request(), owner)).allowed, true)
   assert.equal(state.bursts.at(-1).key, owner)
   state.failBurst = true
-  await assert.rejects(requirePublishBurst(request(), owner), (error) => error.status === 429)
+  assert.equal((await publishBurst(request(), owner)).allowed, false)
   state.failBurst = false
 })
 
