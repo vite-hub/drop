@@ -16,11 +16,8 @@ export default defineHandler(async (event) => {
   const { DOCS_PAGES } = await import("#shared/utils/docs")
   const path = suffixed ? pathname.slice(0, -".md".length) : pathname.replace(/(.)\/$/, "$1")
   if (!DOCS_PAGES.some((page) => page.to === path)) return
-  // A sub-request through this app, not the network; it keeps the platform runtime (bindings) of this request.
-  const request = Object.assign(new Request(new URL(path, event.url), { headers: { accept: "text/html" } }), {
-    runtime: event.req.runtime,
-  })
-  const response = await event.app!.fetch(request)
+  const { appFetch } = await import("../utils/app-fetch")
+  const response = await appFetch(event, path, { accept: "text/html" })
   if (!response.ok) return
   const html = await response.text()
   const page = html.match(/<article\b[\s\S]*<\/article>/)?.[0] ?? html.match(/<main\b[\s\S]*<\/main>/)?.[0]
