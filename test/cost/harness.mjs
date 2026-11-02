@@ -93,14 +93,17 @@ export const state = (globalThis.dropTest = {
   },
 })
 const { comments } = await import("../../server/comments.ts")
-/** Applies the migrations, and gives Drop's Comments (server/comments.ts) the database, as ViteHub does at start. */
-export function migrate() {
+/**
+ * Applies the migrations, and gives Drop's Comments (server/comments.ts) the database, as ViteHub does at start.
+ * `comments: false` leaves Comments without one, as a server whose ViteHub plugin found no Database.
+ */
+export function migrate({ comments: install = true } = {}) {
   const directory = new URL("server/databases/migrations/", root)
   for (const name of readdirSync(directory)
     .filter((name) => name.endsWith(".sql"))
     .sort())
     sql.exec(readFileSync(new URL(name, directory), "utf8"))
-  installComments(comments, { database: state.db })
+  if (install) installComments(comments, { database: state.db })
 }
 /** Every comment thread, by scope and number, with its JSON fields read. */
 export const threads = () =>

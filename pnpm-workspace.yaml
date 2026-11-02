@@ -55,6 +55,10 @@ patchedDependencies:
   "@vite-hub/schedule@0.1.0": patches/@vite-hub__schedule@0.1.0.patch
   # The Nitro cache driver behind `cache: { driver: "kv" }` (vite-hub/vitehub#3178).
   "@vite-hub/kv@0.1.0": patches/@vite-hub__kv@0.1.0.patch
+  # Comments gets its Database on Cloudflare: the generated plugin probed D1 before any request brought the binding,
+  # took the failure for "no Database", and left Comments uninstalled, so every comments call answered 503
+  # (vite-hub/vitehub#3222).
+  "@vite-hub/comments@0.1.0": patches/@vite-hub__comments@0.1.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
