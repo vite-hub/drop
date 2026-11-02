@@ -797,7 +797,7 @@ watch(
       />
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <ViewerHistory
+      <LazyViewerHistory
         v-if="tab === 'history'"
         :comments="comments"
         :drop="drop"
@@ -1002,8 +1002,8 @@ watch(
             :synced="live.synced.value || live.refused.value !== undefined"
             :width="docWidth"
           />
-          <ViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
-          <ViewerSite
+          <LazyViewerFolder v-else-if="drop.kind === 'folder'" :drop="drop" :public-view="publicView" />
+          <LazyViewerSite
             v-else-if="drop.kind === 'site'"
             ref="siteRef"
             :comments="comments"
@@ -1014,7 +1014,7 @@ watch(
             @resolve="resolve"
           />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
-          <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
+          <LazyViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
           <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
           <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
             <div>
@@ -1084,7 +1084,7 @@ watch(
             </UTooltip>
           </template>
 
-          <ViewerDiff
+          <LazyViewerDiff
             v-if="shownVersion && !editing"
             :key="shownVersion.version"
             :previous="previousVersion"
@@ -1140,7 +1140,7 @@ watch(
           </template>
           <template #toolbar>
             <template v-if="galleryShown">
-              <ViewerGallery
+              <LazyViewerGallery
                 :at="galleryAt"
                 :items="galleryItems"
                 :to="gallery.to"
@@ -1150,7 +1150,7 @@ watch(
               <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
             <template v-if="variants && !editing && !lightbox && !shownVersion">
-              <ViewerVariants :state="variants" @command="picker" />
+              <LazyViewerVariants :state="variants" @command="picker" />
               <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
             <template v-if="editing">
@@ -1198,7 +1198,7 @@ watch(
               />
             </template>
             <template v-else-if="hasComments && !trashed && marking">
-              <ViewerMarkTools
+              <LazyViewerMarkTools
                 :finishing="annotations.finishing.value"
                 :marks="annotations.marks.value"
                 :pen="pen"
@@ -1245,7 +1245,7 @@ watch(
                   @click="startEdit"
                 />
               </UTooltip>
-              <ViewerEditNote
+              <LazyViewerEditNote
                 v-else-if="showEditTool && drop.editNote"
                 v-model:open="editNoteOpen"
                 :can-comment="drop.canComment"
@@ -1341,7 +1341,7 @@ watch(
       {{ selection ? "Text selected. Press C to comment on it, or E to suggest new words." : "" }}
     </p>
 
-    <ViewerLightbox
+    <LazyViewerLightbox
       v-if="lightbox"
       :alt="lightbox.alt"
       :can-comment="drop.canComment"
