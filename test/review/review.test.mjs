@@ -262,10 +262,14 @@ test("people create a site review in the app, in Site reviews or a folder they p
     { kind: "site", title: "Acme previews", share: "private", lifetime: "review" },
   )
   assert.equal(sql.prepare("SELECT site_url FROM drops WHERE id = ?").get(top.id).site_url, PATTERN)
-  sql.prepare("UPDATE drops SET title = 'Previews' WHERE id = ?").run(reviews.id)
+  const earlier = Date.now() - 86_400_000
+  sql
+    .prepare("UPDATE drops SET title = 'Previews', slug = 'site-reviews-2', last_accessed_at = ? WHERE id = ?")
+    .run(earlier, reviews.id)
   const named = await newSite(post("/api/sites", { url: "http://localhost:3000" }))
   assert.equal(named.title, "localhost:3000", "named after its host by default")
   assert.equal(named.parentId, reviews.id, "the same folder, renamed or not")
+  assert.ok(sql.prepare("SELECT last_accessed_at FROM drops WHERE id = ?").get(reviews.id).last_accessed_at > earlier)
 
   // One that has to outlive the folder, or go sooner, stays at the top.
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
@@ -309,6 +313,92 @@ test("people create a site review in the app, in Site reviews or a folder they p
   const full = await answer(newSite, post("/api/sites", { url: SITE }))
   assert.equal(full.status, 402)
   assert.equal((await json(full)).code, "DROP_LIMIT_REACHED")
+})
+
+test("a quota-rejected review neither creates nor renews its implicit folder", async () => {
+  state.who = who
+  state.quotasEnabled = true
+  for (let index = 0; index < 50; index++) insertDrop(`filler${index}`)
+  const full = await answer(newSite, post("/api/sites", { url: SITE }))
+  assert.equal(full.status, 402)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE kind = 'folder'").get().n, 0)
+  assert.equal(state.bursts.filter((burst) => burst.bucket === "file-upload").length, 1)
+
+  const earlier = Date.now() - 86_400_000
+  insertDrop("reviews", {
+    kind: "folder",
+    slug: "site-reviews",
+    last_accessed_at: earlier,
+    updated_at: earlier,
+  })
+  assert.equal((await answer(newSite, post("/api/sites", { url: SITE }))).status, 402)
+  assert.deepEqual(
+    { ...sql.prepare("SELECT last_accessed_at, updated_at FROM drops WHERE id = 'reviews'").get() },
+    { last_accessed_at: earlier, updated_at: earlier },
+  )
+})
+
+test("a failed site insert rolls back implicit folder creation and renewal", async () => {
+  state.who = who
+  sql.exec(`CREATE TRIGGER reject_site BEFORE INSERT ON drops WHEN NEW.kind = 'site'
+    BEGIN SELECT RAISE(ABORT, 'test site insert failure'); END`)
+  try {
+    await assert.rejects(newSite(post("/api/sites", { url: SITE })), /test site insert failure/)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM quota_reservations").get().n, 0)
+
+    const earlier = Date.now() - 86_400_000
+    insertDrop("reviews", {
+      kind: "folder",
+      slug: "site-reviews",
+      last_accessed_at: earlier,
+      updated_at: earlier,
+    })
+    await assert.rejects(newSite(post("/api/sites", { url: SITE })), /test site insert failure/)
+    assert.deepEqual(
+      { ...sql.prepare("SELECT last_accessed_at, updated_at FROM drops WHERE id = 'reviews'").get() },
+      { last_accessed_at: earlier, updated_at: earlier },
+    )
+  } finally {
+    sql.exec("DROP TRIGGER reject_site")
+  }
+})
+
+test("concurrent first reviews share one folder and each consume one publish burst", async () => {
+  state.who = who
+  const reviews = await Promise.all(Array.from({ length: 4 }, () => newSite(post("/api/sites", { url: SITE }))))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE kind = 'folder'").get().n, 1)
+  assert.ok(reviews[0].parentId)
+  assert.equal(new Set(reviews.map((review) => review.parentId)).size, 1)
+  assert.equal(state.bursts.filter((burst) => burst.bucket === "file-upload").length, 4)
+})
+
+test("implicit folders preserve private sharing on team Drops and after a folder is made public", async () => {
+  state.mode = "team"
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const privateReview = () => call(publish, { site: { url: SITE }, note: "x", lifetime: "review", share: "private" })
+  const first = await privateReview()
+  assert.equal((await findDrop(first.structuredContent.id)).share, "private")
+
+  // A folder created by an older version may already share with the team.
+  sql.prepare("UPDATE drops SET share = 'team' WHERE kind = 'folder'").run()
+  state.who = who
+  const teamDefault = await newSite(post("/api/sites", { url: SITE }))
+  assert.ok(teamDefault.parentId)
+  assert.equal((await findDrop(teamDefault.id)).share, "team")
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const teamPrivate = await privateReview()
+  assert.equal((await findDrop(teamPrivate.structuredContent.id)).share, "private")
+  assert.equal((await findDrop(teamPrivate.structuredContent.id)).parentId, null)
+
+  state.mode = "personal"
+  sql.prepare("UPDATE drops SET share = 'public_comment' WHERE kind = 'folder'").run()
+  const personalPrivate = await privateReview()
+  assert.equal((await findDrop(personalPrivate.structuredContent.id)).share, "private")
+  assert.equal((await findDrop(personalPrivate.structuredContent.id)).parentId, null)
+  state.who = who
+  const browserPrivate = await newSite(post("/api/sites", { url: SITE }))
+  assert.equal((await findDrop(browserPrivate.id)).share, "private", "the browser's default stays private too")
 })
 
 test("a site review can't be Drop itself or where Drop shows drops", async () => {

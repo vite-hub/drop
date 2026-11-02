@@ -1,5 +1,5 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, desc, eq, inArray, isNull } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull, ne, notExists, or, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { textValue } from "#shared/utils/text"
@@ -8,6 +8,7 @@ import { detectContentType } from "vite-hub/blob/content-type"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { newLink, slugify } from "#shared/links"
+import { DAY_MS, TEMPORARY_DAYS } from "#shared/expiry"
 import {
   isSitePattern,
   REVIEW_TOKEN_HOURS,
@@ -19,13 +20,12 @@ import {
 } from "#shared/review"
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { ReviewThread, SiteReviewItem } from "#shared/types"
-import { defaultShare, isPublic, type Share } from "#shared/share"
+import { defaultShare, isPublic, SHARE_RANK, type Share } from "#shared/share"
 import { drops, user } from "../databases/config"
 import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
 import { addThread, authorOf, siteCommentList, threadsFor, toComment, undoThread } from "./comments"
 import { siteCoversDrop } from "./content-origin"
-import { isExpired, expiryPolicy, renewDrop } from "./expiry"
-import { createFolder } from "./folders"
+import { expiryPolicy, renewDrop } from "./expiry"
 import {
   deleteDrop,
   type DropRow,
@@ -38,7 +38,7 @@ import {
 import { type Identity, roleOf } from "./identity"
 import { isMember, membersOnly } from "./members"
 import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
-import { modeFor, shareFields } from "./share"
+import { modeFor, shareFields, shareNow } from "./share"
 import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
 
@@ -289,16 +289,13 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
   })
 }
 
-const SITE_REVIEWS_SLUG = /^site-reviews(-\d+)?$/
-
 /**
- * The top-level folder site reviews go in when nobody picks one: the owner's newest Site reviews folder that hasn't
- * expired, renewed since a review is going in, or a new one. Found by its slug, so renaming it keeps it.
+ * The owner's newest active Site reviews folder. Keep this as a query so the metadata batch can also guard against
+ * another first review creating one after our lookup. Found by its slug, so renaming it keeps it.
  */
-async function siteReviewsFolder(who: Identity, event?: H3Event) {
-  const now = Date.now()
+function siteReviewsFolders(who: Identity, now: number, event?: H3Event, exceptId?: string) {
   const { days } = expiryPolicy(event)
-  const folders = await db
+  return db
     .select()
     .from(drops)
     .where(
@@ -309,18 +306,18 @@ async function siteReviewsFolder(who: Identity, event?: H3Event) {
         isNull(drops.parentId),
         isNull(drops.trashedAt),
         isNull(drops.quarantinedAt),
+        sql`(${drops.slug} = 'site-reviews' OR (${drops.slug} GLOB 'site-reviews-[0-9]*' AND substr(${drops.slug}, 14) NOT GLOB '*[^0-9]*'))`,
+        days > 0
+          ? or(
+              eq(drops.lifetime, "keep"),
+              sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt}) > ${now} - (CASE ${drops.lifetime} WHEN 'temporary' THEN ${Math.min(TEMPORARY_DAYS, days)} ELSE ${days} END) * ${DAY_MS}`,
+            )
+          : undefined,
+        exceptId ? ne(drops.id, exceptId) : undefined,
       ),
     )
-    .orderBy(desc(drops.createdAt))
-  const folder = folders.find((row) => SITE_REVIEWS_SLUG.test(row.slug ?? "") && !isExpired(row, now, days))
-  if (!folder)
-    return createFolder(
-      who,
-      { title: "Site reviews", slug: "site-reviews", note: "Site reviews made without a folder land here." },
-      event,
-    )
-  await renewDrop(folder, now)
-  return folder
+    .orderBy(desc(drops.createdAt), desc(drops.id))
+    .limit(1)
 }
 
 /** A new site drop: no file, just the address people review. In a folder it lives with the folder, like any drop. */
@@ -345,8 +342,8 @@ export async function createSiteDrop(
     })
   // Without a folder, a review goes in the owner's Site reviews folder, unless it asks to live longer or shorter than
   // the folder does: a drop in a folder lives with it.
-  const folder =
-    input.folder ?? (!input.lifetime || input.lifetime === "review" ? await siteReviewsFolder(who, event) : null)
+  const folder = input.folder
+  const implicitFolder = !folder && (!input.lifetime || input.lifetime === "review")
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
   await requireKeepSlot(ownerId, life, false, !folder)
@@ -390,8 +387,59 @@ export async function createSiteDrop(
       teamId: null,
       resources: null,
     }
-    await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
-    return row
+    if (!implicitFolder) {
+      await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
+      return row
+    }
+
+    for (let attempt = 0; ; attempt++) {
+      const [existing] = await siteReviewsFolders(who, now, event)
+      // A private container cannot broaden a review's sharing, including explicit private publishes on a team Drop.
+      const created: DropRow | null = existing
+        ? null
+        : {
+            ...row,
+            id: newLink(),
+            kind: "folder",
+            title: "Site reviews",
+            filename: "site-reviews/",
+            slug: "site-reviews",
+            share: "private",
+            publicUntil: null,
+            shareReview: null,
+            agent: null,
+            lifetime: "review",
+            keepReason: null,
+            note: "Site reviews made without a folder land here.",
+            siteUrl: null,
+          }
+      const candidate = existing ?? created!
+      const folderShare = shareNow(candidate, now, mode)
+      // Public ancestors can also outlive the review's own public-link window. Keep these reviews at the top.
+      const parent = !isPublic(folderShare) && SHARE_RANK[folderShare] <= SHARE_RANK[share] ? candidate : null
+      const site: DropRow = parent
+        ? {
+            ...row,
+            parentId: parent.id,
+            slug: await uniqueSlug(parent.id, row.slug ?? ""),
+            ...lifetimeFields(who, {}, parent, event),
+          }
+        : row
+      try {
+        await quota.commit(
+          [
+            ...(created ? [db.insert(drops).values(created)] : []),
+            db.insert(drops).values(site),
+            ...(parent ? [touchFolder(parent.id, now), renewDrop(parent, now)] : []),
+          ],
+          // A competing batch wins as a whole; this batch rolls back and retries with its folder and reservation.
+          created ? notExists(siteReviewsFolders(who, now, event, created.id)) : undefined,
+        )
+        return site
+      } catch (error) {
+        if (!created || attempt >= 2 || !HTTPError.isError(error) || error.status !== 409) throw error
+      }
+    }
   })
 }
 

@@ -8,7 +8,7 @@ const root = new URL("../../", import.meta.url)
 
 export const sql = new DatabaseSync(":memory:")
 export const queries = []
-const execute = async (query, params, method) => {
+const execute = (query, params, method) => {
   queries.push({ query, params })
   const statement = sql.prepare(query)
   if (method === "run" || !statement.columns().length) {
@@ -23,7 +23,8 @@ const db = drizzle(execute, async (queries) => {
   sql.exec("BEGIN")
   try {
     const result = []
-    for (const item of queries) result.push(await execute(item.sql, item.params, item.method))
+    // D1 batches are isolated: concurrent requests must not read another batch's uncommitted rows.
+    for (const item of queries) result.push(execute(item.sql, item.params, item.method))
     sql.exec("COMMIT")
     return result
   } catch (error) {

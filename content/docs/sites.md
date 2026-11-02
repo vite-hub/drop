@@ -5,7 +5,7 @@ description: People comment on a running website, such as a preview deploy, stag
 
 ## Create the review {#create}
 
-A **site review** is a drop for one website. Create one with **New › Site review** on the Drops page or in a folder, or have an agent call `publish` with `site`. Made outside a folder, it goes in your **Site reviews** folder, which Drop makes the first time; one that's kept or temporary stays at the top, since a drop in a folder lives as long as the folder. Give it the address people review:
+A **site review** is a drop for one website. Create one with **New › Site review** on the Drops page or in a folder, or have an agent call `publish` with `site`. Made outside a folder, it goes in your **Site reviews** folder, which Drop makes private the first time; one that's kept or temporary stays at the top, since a drop in a folder lives as long as the folder. If that folder's sharing would broaden the review's access, or it has a public link, the review stays at the top too. Give it the address people review:
 
 | Address                                                                     | Covers                                                                                                                  |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
