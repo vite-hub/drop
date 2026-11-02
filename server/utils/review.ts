@@ -2,6 +2,7 @@ import type { AgentMetadata } from "#shared/agent"
 import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
+import { sha256 } from "#shared/utils/bytes"
 import { textValue } from "#shared/utils/text"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
@@ -75,7 +76,7 @@ async function sealKey(event: H3Event) {
   // No fallback: a known key would let anyone mint tokens.
   if (!secret)
     throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
-  return importSealKey(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(`review-token:${secret}`))))
+  return importSealKey(await sha256(encoder.encode(`review-token:${secret}`)))
 }
 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
