@@ -26,9 +26,8 @@ definePageMeta({
 
 useSeoMeta({ title: "Drops" })
 const { data: drops, status, error, refresh } = useDrops()
-const { upload, remove, restore, deleteForever, emptyTrash, createFolder, createSite } = useDropActions()
+const { remove, restore, deleteForever, emptyTrash, createFolder, newSite } = useDropActions()
 const folderDialog = useFolderDialog()
-const siteDialog = useSiteDialog()
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const { data: trash } = useTrash()
@@ -175,21 +174,7 @@ async function trashOne(drop: DropSummary) {
 const preview = useResizeHandle(useFolderPreviewWidth(), { min: 18, max: 40, initial: 22 })
 
 // Files dropped anywhere on the page upload to the top; one opens once it's in.
-const root = useTemplateRef("root")
-const uploading = ref(0)
-async function uploadFiles(files: File[]) {
-  if (!files.length) return
-  uploading.value = files.length
-  let last: { id: string } | undefined
-  for (const file of files) {
-    last = (await upload(file)) ?? last
-    uploading.value--
-  }
-  if (!last) return
-  if (wide.value) selected.value = last.id
-  else if (files.length === 1) await navigateTo(`/drops/${last.id}`)
-}
-const { isOverDropZone } = useDropZone(root, { multiple: true, onDrop: (files) => void uploadFiles(files ?? []) })
+const { uploading, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), { wide, selected })
 const dropping = computed(() => isOverDropZone.value && place.value !== "trash" && place.value !== "with-me")
 
 // Admins on a team Drop make the team's folders; on the Team page that's what a new folder is by default.
@@ -197,13 +182,6 @@ async function newTeamFolder() {
   const input = await folderDialog({ offerTeam: true, team: true })
   if (input) await createFolder(input.title, undefined, { description: input.description, team: input.team })
 }
-async function newSite() {
-  const input = await siteDialog()
-  const site = input && (await createSite(input))
-  if (site) await navigateTo(`/drops/${site.id}`)
-}
-const picker = useFileDialog({ multiple: true, reset: true })
-picker.onChange((files) => void uploadFiles([...(files ?? [])]))
 </script>
 
 <template>
@@ -374,8 +352,8 @@ picker.onChange((files) => void uploadFiles([...(files ?? [])]))
             <GetStarted
               v-else-if="!place && !searching && !drops.length && !getStartedHidden"
               :drops="drops"
-              @site="newSite"
-              @upload="picker.open()"
+              @site="newSite()"
+              @upload="openPicker()"
             />
 
             <div
@@ -394,7 +372,7 @@ picker.onChange((files) => void uploadFiles([...(files ?? [])]))
                   icon="i-mingcute-upload-2-line"
                   label="Upload"
                   variant="outline"
-                  @click="picker.open()"
+                  @click="openPicker()"
                 />
               </div>
             </div>
@@ -406,8 +384,8 @@ picker.onChange((files) => void uploadFiles([...(files ?? [])]))
             <GetStarted
               v-if="!place && !searching && drops.length"
               :drops="drops"
-              @site="newSite"
-              @upload="picker.open()"
+              @site="newSite()"
+              @upload="openPicker()"
             />
 
             <div v-if="visible.length" ref="list" @keydown="walk">

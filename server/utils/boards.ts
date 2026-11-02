@@ -14,6 +14,7 @@ import {
   parseBoard,
   serializeBoard,
 } from "#shared/board"
+import { base64 } from "#shared/utils/bytes"
 import { drops } from "../databases/config"
 import { type DropRow, escapesFolder, MAX_FILE_BYTES, readText, storageFailure } from "./drops"
 import type { Identity } from "./identity"
@@ -102,8 +103,5 @@ export async function boardImage(drop: DropRow, frame: string) {
   // Any other error is the store failing, which must not read as "no image yet".
   if (error) throw storageFailure(error)
   if (!file) return null
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  let binary = ""
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  return btoa(binary)
+  return base64(new Uint8Array(await file.arrayBuffer()))
 }

@@ -1,10 +1,11 @@
+import { escapeRegExp } from "./utils/text"
+
 /** A comment's suggested edit in words, for agents: what replaces the quote, or that it goes. Empty on a plain comment. */
 export const suggestionLine = (suggestion: string | null | undefined, indent = "   ") =>
   suggestion == null
     ? ""
     : `\n${indent}${suggestion ? `Suggests replacing it with: ${suggestion.replace(/\n/g, `\n${indent}`)}` : "Suggests deleting it."}`
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 /** Rendered text as Markdown would read it plainly: no emphasis, code ticks, or link targets. */
 const plain = (markdown: string) =>
   markdown
@@ -25,7 +26,7 @@ export function applySuggestion(
   suggestion: string,
   label: string | null,
 ): { body: string } | { error: string } {
-  const pattern = new RegExp(quote.trim().split(/\s+/).map(escape).join("\\s+"), "g")
+  const pattern = new RegExp(quote.trim().split(/\s+/).map(escapeRegExp).join("\\s+"), "g")
   let matches = [...body.matchAll(pattern)]
   if (matches.length > 1) {
     const start = label?.match(/^[a-z0-9]+ "(.*?)…?"$/)?.[1]

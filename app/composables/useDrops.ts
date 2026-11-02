@@ -100,6 +100,7 @@ export function useDropActions() {
   }
   const notify = useNotify()
   const confirm = useConfirm()
+  const siteDialog = useSiteDialog()
   // Sharing, trashing or moving a folder changes what its open listings show, so they refetch too.
   const nuxtApp = useNuxtApp()
   const folders = () => Object.keys(nuxtApp.payload.data).filter((key) => key.startsWith(keys.folder("")))
@@ -289,15 +290,20 @@ export function useDropActions() {
     }
   }
 
-  /** A new site review inside `parent`, where it lives with the folder; without one, the server puts it in Site reviews. */
-  async function createSite(input: { url: string; title?: string }, parent?: Pick<DropSummary, "id">) {
+  /**
+   * Asks for a new site review's address and name, makes it inside `parent`, where it lives with the folder, and opens
+   * it. Without a parent the server puts it in Site reviews.
+   */
+  async function newSite(parent?: Pick<DropSummary, "id">) {
+    const input = await siteDialog()
+    if (!input) return
     try {
       const site = await $fetch<DropSummary>("/api/sites", {
         method: "POST",
         body: { ...input, ...(parent ? { folder: parent.id } : {}) },
       })
       refreshAfterCreate(parent ?? (site.parentId ? { id: site.parentId } : undefined))
-      return site
+      await navigateTo(`/drops/${site.id}`)
     } catch (error) {
       notify.fail("Couldn't create the site review", error)
     }
@@ -374,7 +380,7 @@ export function useDropActions() {
     deleteForever,
     emptyTrash,
     createFolder,
-    createSite,
+    newSite,
     createDoc,
     createBoard,
     describe,

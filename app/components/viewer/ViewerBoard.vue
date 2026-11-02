@@ -91,13 +91,6 @@ onBeforeUnmount(() => {
   root?.unmount()
 })
 
-async function toBase64(blob: Blob) {
-  const bytes = new Uint8Array(await blob.arrayBuffer())
-  let binary = ""
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  return btoa(binary)
-}
-
 // Excalidraw's label layout (its BOUND_TEXT_PADDING, getBoundTextMaxWidth and getFontString), for agents' words.
 const PADDING = 5
 type Shape = { type: string; width: number; fontSize?: number }
@@ -320,7 +313,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
           return { width: width * scale, height: height * scale, scale }
         },
       })
-      return toBase64(blob)
+      return base64(new Uint8Array(await blob.arrayBuffer()))
     }
     try {
       const frames = elements.filter((element) => element.type === "frame").slice(0, 20)

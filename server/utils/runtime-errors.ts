@@ -1,7 +1,7 @@
 import { useStorage } from "nitro/storage"
 
 /** What a page reported going wrong while someone had it open: see ERROR_REPORTER in shared/plan-runtime.ts. */
-export interface RuntimeError {
+interface RuntimeError {
   kind: "error" | "rejection" | "console" | "load"
   message: string
   source?: string

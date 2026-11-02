@@ -6,7 +6,7 @@ import { version as comarkUiVersion } from "comark-ui/package.json"
 
 export const MARKDOWN_CACHE_TTL = 60 * 60 * 24 * 30
 
-export interface MarkdownRender {
+interface MarkdownRender {
   title: string
   html: string
   source: string

@@ -5,7 +5,7 @@ import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
 import { blob } from "vite-hub/blob"
-import { PUBLISH_BURST, requirePublishBurst } from "./publish-burst"
+import { PUBLISH_BURST, publishBurst } from "./publish-burst"
 import {
   MAX_APP_BYTES,
   MAX_APP_FILES,
@@ -157,18 +157,13 @@ export async function withDropQuota<T>(
     if (cost.app.bytes > usage.app.bytes)
       throw new DropQuotaError(quotaFailure("appBytes", cost.app.bytes, usage.app.bytes))
   }
-  if (event) {
-    try {
-      await requirePublishBurst(event, ownerId)
-    } catch (error) {
-      if (HTTPError.isError(error) && error.status === 429) {
-        const retryAfter = Number(new Headers(error.headers).get("retry-after"))
-        throw new DropQuotaError(
-          quotaFailure("burstPublishes", PUBLISH_BURST, PUBLISH_BURST, retryAfter > 0 ? Math.ceil(retryAfter) : 60),
-        )
-      }
-      throw error
-    }
+  const burst = event && (await publishBurst(event, ownerId))
+  if (burst && !burst.allowed) {
+    if (burst.reason === "unavailable")
+      throw new HTTPError({ status: 503, statusText: "Rate limiting is unavailable.", cause: burst.cause })
+    throw new DropQuotaError(
+      quotaFailure("burstPublishes", PUBLISH_BURST, PUBLISH_BURST, Math.ceil(burst.retryAfter ?? 60) || 60),
+    )
   }
 
   const id = crypto.randomUUID()

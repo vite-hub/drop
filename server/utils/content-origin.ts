@@ -1,6 +1,7 @@
 import type { H3Event } from "h3"
 import { deriveSecret, useServerEnv } from "#vitehub/env/server"
 import { siteMatches } from "#shared/review"
+import { escapeRegExp } from "#shared/utils/text"
 
 /**
  * Apps and HTML docs run real code, and real apps need a real origin: storage, cookies, and history.pushState all
@@ -105,8 +106,6 @@ export async function onOwnOrigin(event: H3Event, dropId: string): Promise<boole
   return !!config?.perDrop && (await hostFor(event, config, dropId)) === event.url.host
 }
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
 /**
  * How this request's host relates to the content origin: `content` for a drop's own host, `stray` for a host that has
  * the wildcard's shape but no valid label (evil-drop.example.com), which a `*-drop.example.com/*` route also sends
@@ -119,7 +118,7 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
   if (port !== config.port) return false
   if (!config.perDrop) return hostname === config.host && "content"
   const { prefix, suffix } = config.perDrop
-  if (new RegExp(`^${escape(prefix)}${LABEL}${escape(suffix)}$`).test(hostname)) return "content"
+  if (new RegExp(`^${escapeRegExp(prefix)}${LABEL}${escapeRegExp(suffix)}$`).test(hostname)) return "content"
   // Only when the `*` shares its label with fixed text (`*-drop`): a whole level (`*.example.com`) may also hold Drop.
   if (!prefix && suffix.startsWith(".")) return false
   return (
@@ -130,9 +129,6 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
     "stray"
   )
 }
-
-/** Whether this request came in on a content origin rather than Drop itself. */
-export const isContentRequest = (event: H3Event) => contentHost(event) === "content"
 
 /**
  * The only page the content origin serves, at every path so an app sees the URL it was built for. The viewer sends
@@ -150,7 +146,7 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
     if (event.source !== parent || !message || message.__drop !== true) return;
     if (message.type === "hello") return ask();
     if (message.type !== "document" || typeof message.html !== "string") return;
-    if (typeof message.grant === "string" && /^[\\w.-]+$/.test(message.grant))
+    if (typeof message.grant === "string" && /^[\\w.:-]+$/.test(message.grant))
       document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (isSecureContext ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
     // A written document paints before its stylesheets load, unlike one the browser navigates to, so an app would show
     // unstyled first. Keep it hidden until they load or fail, with a 3-second cap for a stylesheet that never answers.
@@ -192,7 +188,9 @@ export function siteCoversDrop(event: H3Event, siteUrl: string): boolean {
     const { hostname, port } = new URL(siteUrl)
     if (port !== config.port) return false
     return config.perDrop
-      ? new RegExp(`^${escape(config.perDrop.prefix)}${LABEL}${escape(config.perDrop.suffix)}$`).test(hostname)
+      ? new RegExp(`^${escapeRegExp(config.perDrop.prefix)}${LABEL}${escapeRegExp(config.perDrop.suffix)}$`).test(
+          hostname,
+        )
       : hostname === config.host
   }
   // A pattern covers the content origin when it covers any one drop's host on it.

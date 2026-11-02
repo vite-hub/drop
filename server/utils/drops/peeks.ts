@@ -4,6 +4,7 @@ import type { DropPeek, DropPeeks } from "#shared/types"
 import { dropTexts, drops } from "../../databases/config"
 import { ancestorsOf } from "../nodes"
 import { SEARCH_KINDS } from "../search"
+import { d1Chunks } from "../d1"
 
 /** About a card's worth of a doc: the Drops page shows its first lines, not the whole text. */
 export const PEEK_TEXT = 360
@@ -42,11 +43,11 @@ export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks
   const inside = folders.length ? await newestInside(ownerId, folders) : []
   const texted = [...rows, ...inside].flatMap((row) => (hasText(row.kind) ? [row.id] : []))
   const texts = new Map<string, string>()
-  for (let offset = 0; offset < texted.length; offset += MAX_PEEKS)
+  for (const chunk of d1Chunks(texted))
     for (const row of await db
       .select({ id: dropTexts.dropId, text: sql<string>`substr(${dropTexts.text}, 1, ${PEEK_TEXT})` })
       .from(dropTexts)
-      .where(inArray(dropTexts.dropId, texted.slice(offset, offset + MAX_PEEKS))))
+      .where(inArray(dropTexts.dropId, chunk)))
       if (row.text) texts.set(row.id, row.text.replace(CALLOUT, " ").replace(/\s+/g, " ").trim())
   const peek = (row: { id: string; kind: DropPeek["kind"]; title: string; blobKey: string | null }): DropPeek => ({
     id: row.id,

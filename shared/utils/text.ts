@@ -7,3 +7,6 @@ const Text = v.string()
  * form field that isn't a file, a field of parsed JSON.
  */
 export const textValue = (value: unknown) => (v.is(Text, value) ? value : undefined)
+
+/** `text` matched literally inside a RegExp. */
+export const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")

@@ -2,7 +2,6 @@ import { Placeholder } from "@tiptap/extension-placeholder"
 import { Link } from "@tiptap/extension-link"
 import { Editor } from "@tiptap/vue-3"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
-import { RealtimeCaret } from "vite-hub/realtime/vue"
 
 /**
  * The live editor's room and its Tiptap editor: Yjs, ProseMirror, and the code highlighter. useLiveEditor imports this
@@ -10,8 +9,16 @@ import { RealtimeCaret } from "vite-hub/realtime/vue"
  * leaves the room.
  */
 export function useLiveRoom(documentId: Ref<string | undefined>) {
-  // Carets come from RealtimeCaret below, with a lighter selection tint than its default.
-  const realtime = useRealtimeTiptap("drops", documentId, { enabled: () => Boolean(documentId.value), carets: false })
+  const realtime = useRealtimeTiptap("drops", documentId, {
+    enabled: () => Boolean(documentId.value),
+    // A lighter selection tint than the default.
+    carets: {
+      selectionRender: (user) => ({
+        class: "ProseMirror-yjs-selection",
+        style: `background-color: color-mix(in oklab, ${user.color} 18%, transparent)`,
+      }),
+    },
+  })
   const editor = shallowRef<Editor>()
   // Whether this person typed since the editor opened. The room's own changes (loading the draft, others typing) come
   // in as y-sync transactions and don't count.
@@ -34,13 +41,6 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
         CodeHighlight,
         Link.configure({ openOnClick: false }),
         Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
-        RealtimeCaret.configure({
-          awareness: markRaw(realtime.provider.value.awareness),
-          selectionRender: (user) => ({
-            class: "ProseMirror-yjs-selection",
-            style: `background-color: color-mix(in oklab, ${user.color} 18%, transparent)`,
-          }),
-        }),
       ],
       autofocus: "end",
     })

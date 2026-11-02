@@ -16,17 +16,24 @@ export default defineHandler(async (event) => {
   const { DOCS_PAGES } = await import("#shared/utils/docs")
   const path = suffixed ? pathname.slice(0, -".md".length) : pathname.replace(/(.)\/$/, "$1")
   if (!DOCS_PAGES.some((page) => page.to === path)) return
-  const { htmlToMarkdown } = await import("../utils/html-markdown")
-  // A sub-request through this app, not the network; it keeps the platform runtime (bindings) of this request.
-  const request = Object.assign(new Request(new URL(path, event.url), { headers: { accept: "text/html" } }), {
-    runtime: event.req.runtime,
-  })
-  const response = await event.app!.fetch(request)
+  const { appFetch } = await import("../utils/app-fetch")
+  const response = await appFetch(event, path, { accept: "text/html" })
   if (!response.ok) return
   const html = await response.text()
   const page = html.match(/<article\b[\s\S]*<\/article>/)?.[0] ?? html.match(/<main\b[\s\S]*<\/main>/)?.[0]
   if (!page) return
-  return new Response(event.req.method === "HEAD" ? null : htmlToMarkdown(page, event.url.origin), {
+  // Links between docs pages point at their Markdown too. Figures are screenshots and the landing stories
+  // (DocsFigure): the text around them says what they show.
+  const linked = page.replace(
+    /href="(\/docs(?:\/[^"#?]*)?)([#?][^"]*)?"/g,
+    (_, to: string, rest = "") => `href="${to.replace(/\/$/, "")}.md${rest}"`,
+  )
+  const markdown = (await import("mdream")).htmlToMarkdown(linked, {
+    origin: event.url.origin,
+    clean: { selfLinkHeadings: true },
+    filter: { exclude: ["figure", "button", "nav", "svg"] },
+  })
+  return new Response(event.req.method === "HEAD" ? null : `${markdown}\n`, {
     headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "public, max-age=300", Vary: "Accept" },
   })
 })

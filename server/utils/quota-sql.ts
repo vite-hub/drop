@@ -1,5 +1,6 @@
 import { getTableColumns, sql, type SQL } from "drizzle-orm"
 import { dropFiles } from "../databases/drops.ts"
+import { d1Chunks } from "./d1.ts"
 
 export const QUOTA_RESERVATION_TTL_MS = 15 * 60 * 1000
 
@@ -11,13 +12,9 @@ export function bindQuotaSQL(query: string, values: unknown[]): SQL {
   )
 }
 
-/** D1 accepts at most 100 bound values in one statement. */
-export function appFileChunks(rows: (typeof dropFiles.$inferInsert)[]) {
-  const size = Math.max(1, Math.floor(100 / Object.keys(getTableColumns(dropFiles)).length))
-  const chunks: (typeof dropFiles.$inferInsert)[][] = []
-  for (let offset = 0; offset < rows.length; offset += size) chunks.push(rows.slice(offset, offset + size))
-  return chunks
-}
+/** An app's file rows in inserts D1 takes: one bound value per column. */
+export const appFileChunks = (rows: (typeof dropFiles.$inferInsert)[]) =>
+  d1Chunks(rows, { perItem: Object.keys(getTableColumns(dropFiles)).length, others: 0 })
 
 // The same conditional INSERT runs on D1 and in the SQLite concurrency tests. Drops in the Trash (on their own or in
 // a folder that is), folders, and files a doc embeds don't count as drops; drops in folders do. Bytes still count

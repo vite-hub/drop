@@ -401,7 +401,7 @@ test("a token is for the picked review and the page's origin only", async () => 
   )
 
   // The page can't read the token: no id, no link.
-  const sealed = Buffer.from(guest.body.token.split(".")[1], "base64url").toString("latin1")
+  const sealed = Buffer.from(guest.body.token.split(":")[1], "hex").toString("latin1")
   assert.doesNotMatch(sealed, /previews|"d"/)
 
   // A choice works for its origin and its person only, and never as a token.
@@ -431,15 +431,11 @@ test("tokens are sealed, bound to their review, and expire", async () => {
   assert.equal(expiresAt, 1_000 + 12 * 3_600_000)
   assert.ok(await readReviewToken(event, value, 2_000))
   assert.equal(await readReviewToken(event, value, expiresAt), null, "expired")
-  const [version, body] = value.split(".")
-  const bytes = Buffer.from(body, "base64url")
+  const [iv, body] = value.split(":")
+  const bytes = Buffer.from(body, "hex")
   bytes[bytes.length - 1] ^= 1
-  assert.equal(
-    await readReviewToken(event, `${version}.${bytes.toString("base64url")}`, 2_000),
-    null,
-    "a changed token",
-  )
-  assert.equal(await readReviewToken(event, `v1.${body}.x`, 2_000), null)
+  assert.equal(await readReviewToken(event, `${iv}:${bytes.toString("hex")}`, 2_000), null, "a changed token")
+  assert.equal(await readReviewToken(event, `${iv}:${body}:x`, 2_000), null)
   const choice = await sealChoice(event, { id: "site" }, SITE, null)
   assert.equal(await readReviewToken(event, choice, 2_000), null, "a choice isn't a token")
   state.authSecret = "another-secret"
@@ -706,7 +702,7 @@ test("Open in Drop opens the review only for people who could open it without it
   state.who = null
   assert.equal((await answer(openPost, post("/api/review/open", { token: link }))).status, 401)
   state.who = ada
-  assert.equal((await answer(openPost, post("/api/review/open", { token: "v2.nonsense" }))).status, 404)
+  assert.equal((await answer(openPost, post("/api/review/open", { token: "00:nonsense" }))).status, 404)
 })
 
 test("what the page sends is checked: the token, the image's bytes, and the fields", async () => {
@@ -715,7 +711,7 @@ test("what the page sends is checked: the token, the image's bytes, and the fiel
   const missing = await comment(undefined, {})
   assert.equal(missing.status, 401)
   assert.equal(missing.headers.get("access-control-allow-origin"), SITE, "the script can tell an ended session")
-  assert.equal((await comment("v2.forged", {})).status, 401)
+  assert.equal((await comment("00:forged", {})).status, 401)
 
   assert.equal(
     (await comment(body.token, {}, { screenshot: new TextEncoder().encode("<svg onload=alert(1)>") })).status,
@@ -841,7 +837,7 @@ test("the page shows its threads where they were left: element, spot, replies, i
   assert.equal((await image(thread.screenshot)).status, 200)
   insertDrop("elsewhere", { kind: "image", blob_key: "elsewhere.png" })
   assert.equal((await image("elsewhere")).status, 404)
-  assert.equal((await image(thread.images[0].id, "v2.forged")).status, 401)
+  assert.equal((await image(thread.images[0].id, "00:forged")).status, 401)
 
   // A reply from the page, with an image, as the guest.
   const form = new FormData()

@@ -4,6 +4,7 @@ import { db } from "vite-hub/database/drizzle"
 import { createTarGzip } from "nanotar"
 import comarkUiSkill from "comark-ui/skills/comark-ui/SKILL.md?raw"
 import { skills as comarkSkills } from "comark-ui/skills"
+import { hex, sha256 } from "#shared/utils/bytes"
 import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
@@ -172,10 +173,7 @@ export async function setSkillEnabled(name: string, enabled: boolean, userId: st
 }
 
 /** `sha256:<hex>`, the digest format both the MCP Skills extension and Discovery v0.2.0 use. */
-export async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))
-  return `sha256:${Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join("")}`
-}
+export const digest = async (bytes: Uint8Array<ArrayBuffer>) => `sha256:${hex(await sha256(bytes))}`
 
 /**
  * A multi-file skill as one .tar.gz (Discovery v0.2.0 `archive`): the skill directory itself, `SKILL.md` at the
