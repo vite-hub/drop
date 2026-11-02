@@ -318,3 +318,19 @@ test("a comment being written on a selection keeps its card's place in the margi
     await browser.close()
   }
 }, 30_000)
+
+test("a margin card's avatar without a picture is tinted by its author's name", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { frame } = await open(browser, 1440)
+    const colors = await frame.evaluate(() =>
+      [...document.querySelector("drop-comments").shadowRoot.querySelectorAll(".rail .g .cr-av")].map(
+        (avatar) => getComputedStyle(avatar).backgroundColor,
+      ),
+    )
+    assert.ok(colors.length > 0)
+    for (const color of colors) assert.notEqual(color, "rgba(0, 0, 0, 0)")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

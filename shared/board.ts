@@ -32,7 +32,7 @@ export const BOARD_ITEM_TYPES = ["note", "text", "box", "ellipse", "frame"] as c
 type BoardColor = (typeof BOARD_COLORS)[number]
 
 /** What an agent writes. `id` is the agent's own short name for it; edges and `in` refer to it. */
-export interface BoardItem {
+interface BoardItem {
   id: string
   type: (typeof BOARD_ITEM_TYPES)[number]
   /** The note's, box's or text's words; a frame's name. */

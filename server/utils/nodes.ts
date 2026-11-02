@@ -4,6 +4,7 @@ import { MAX_SLUG } from "#shared/links"
 import { MAX_DEPTH } from "#shared/nodes"
 import { type Share, SHARE_RANK } from "#shared/share"
 import { drops } from "../databases/config"
+import { d1Chunks } from "./d1"
 import type { DropRow } from "./drops"
 import { isExpired } from "./expiry"
 import { shareNow, sharePolicy } from "./share"
@@ -25,9 +26,9 @@ const MAX_WALK = MAX_DEPTH + 2
 export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"> & { teamFolder?: boolean })[]) {
   const parents = [...new Set(rows.flatMap((row) => (row.parentId ? [row.parentId] : [])))]
   const byId = new Map<string, Row>()
-  for (let offset = 0; offset < parents.length; offset += 90) {
+  for (const chunk of d1Chunks(parents)) {
     const seeds = sql.join(
-      parents.slice(offset, offset + 90).map((id) => sql`${id}`),
+      chunk.map((id) => sql`${id}`),
       sql`, `,
     )
     const found = await db
@@ -217,11 +218,11 @@ export const touchFolder = (id: string, now = Date.now()) =>
 /** How many drops sit directly in each folder, Trash aside. */
 export async function itemCounts(ids: string[]) {
   const counts = new Map<string, number>()
-  for (let offset = 0; offset < ids.length; offset += 90) {
+  for (const chunk of d1Chunks(ids)) {
     const rows = await db
       .select({ parentId: drops.parentId, count: sql<number>`count(*)`.mapWith(Number) })
       .from(drops)
-      .where(and(inArray(drops.parentId, ids.slice(offset, offset + 90)), isNull(drops.trashedAt)))
+      .where(and(inArray(drops.parentId, chunk), isNull(drops.trashedAt)))
       .groupBy(drops.parentId)
     for (const row of rows) counts.set(row.parentId!, row.count)
   }

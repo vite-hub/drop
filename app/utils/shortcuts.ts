@@ -1,7 +1,7 @@
 // Every keyboard shortcut, once: the ? dialog (ShortcutsModal) and the docs' table read this list. The bindings
 // themselves live where they act (the dashboard layout, the Drops page, DropViewer); keep them in step with it.
 // Keys are UKbd values, so `meta` shows as ⌘ on a Mac and Ctrl elsewhere.
-export interface Shortcut {
+interface Shortcut {
   keys: string[]
   label: string
   /** Where it works, when that's narrower than its group's. */

@@ -10,9 +10,8 @@ import { dropPath } from "#shared/links"
 import type { DropDetail, DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView?: boolean }>()
-const { createBoard, createDoc, createFolder, createSite, upload, rename, remove } = useDropActions()
+const { createBoard, createDoc, createFolder, newSite, rename, remove } = useDropActions()
 const folderDialog = useFolderDialog()
-const siteDialog = useSiteDialog()
 const children = computed(() => props.drop.children ?? [])
 const to = (child: DropSummary) => (props.publicView ? dropPath(child) : `/drops/${child.id}`)
 const [DefineRowParts, ReuseRowParts] = createReusableTemplate<{ child: DropSummary; part: "icon" | "meta" }>()
@@ -191,27 +190,11 @@ function walk(event: KeyboardEvent) {
 
 // Upload, a paste, and files dropped on the page all land here, one after another. The last one shows in the preview;
 // on a narrow screen a single file opens instead, as it did before the preview.
-const uploading = ref(0)
-async function uploadFiles(files: File[]) {
-  if (!adds.value || !files.length) return
-  uploading.value = files.length
-  let last: { id: string } | undefined
-  for (const file of files) {
-    last = (await upload(file, props.drop)) ?? last
-    uploading.value--
-  }
-  if (!last) return
-  if (wide.value) selected.value = last.id
-  else if (files.length === 1) await navigateTo(`/drops/${last.id}`)
-}
-
-const picker = useFileDialog({ multiple: true, reset: true })
-picker.onChange((files) => void uploadFiles([...(files ?? [])]))
-
-const root = useTemplateRef("root")
-const { isOverDropZone } = useDropZone(root, {
-  multiple: true,
-  onDrop: (files) => void uploadFiles(files ?? []),
+const { uploading, uploadFiles, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), {
+  folder: () => props.drop,
+  enabled: () => adds.value,
+  wide,
+  selected,
 })
 const dropping = computed(() => adds.value && isOverDropZone.value)
 
@@ -242,12 +225,6 @@ async function newDoc() {
 async function newBoard() {
   const board = await createBoard(props.drop)
   if (board) await navigateTo(`/drops/${board.id}`)
-}
-
-async function newSite() {
-  const input = await siteDialog()
-  const site = input && (await createSite(input, props.drop))
-  if (site) await navigateTo(`/drops/${site.id}`)
 }
 </script>
 
@@ -304,7 +281,7 @@ async function newSite() {
           />
           <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
           <div v-if="adds" class="flex items-center gap-1">
-            <NewMenu :folder="addsFolders" @board="newBoard" @doc="newDoc" @folder="newFolder" @site="newSite" />
+            <NewMenu :folder="addsFolders" @board="newBoard" @doc="newDoc" @folder="newFolder" @site="newSite(drop)" />
             <UTooltip text="Or paste files, or drop them on the page">
               <UButton
                 color="neutral"
@@ -313,7 +290,7 @@ async function newSite() {
                 :loading="uploading > 0"
                 size="sm"
                 variant="outline"
-                @click="picker.open()"
+                @click="openPicker()"
               />
             </UTooltip>
           </div>

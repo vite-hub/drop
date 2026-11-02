@@ -49,12 +49,10 @@ export default defineHandler(async (event) => {
   // Loaded lazily: middleware lands in the Worker's entry module, and its static imports would be re-exported
   // from there, which Workers rejects for anything that isn't a handler.
   const { renderMarkdownDocument, RENDERER_SCRIPTS } = await import("../utils/markdown-document")
+  const { base64, sha256 } = await import("#shared/utils/bytes")
   // Authorize only the renderer's exact inline runtimes, never scripts supplied by the document's author.
   const scriptHashes = await Promise.all(
-    RENDERER_SCRIPTS.map(async (script) => {
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(script))
-      return btoa(String.fromCharCode(...new Uint8Array(digest)))
-    }),
+    RENDERER_SCRIPTS.map(async (script) => base64(await sha256(new TextEncoder().encode(script)))),
   )
   event.res.headers.set("Content-Security-Policy", markdownContentSecurityPolicy(scriptHashes))
   const rendered = await renderMarkdownDocument(readSource, event.url.pathname, key, event)

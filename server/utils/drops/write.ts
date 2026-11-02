@@ -28,6 +28,7 @@ import { MAX_FILE_BYTES } from "#shared/schemas"
 import { MAX_APP_BYTES, MAX_APP_FILES, MIB } from "#shared/quotas"
 import { permissions } from "./access"
 import { findDrop, findDropByBlob, storageFailure } from "./query"
+import { d1Chunks } from "../d1"
 
 // Storage that was down (503), not a row someone else published first.
 const Unavailable = v.object({ status: v.literal(503) })
@@ -42,21 +43,20 @@ const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
  * another doc, or in a folder, stays where it is.
  */
 async function adoptAttachments(doc: DropRow, source: string) {
-  // 90 keys and the other parameters stay under D1's 100 bound parameters per query.
-  const keys = [...new Set([...source.matchAll(FILE_LINK)].map((match) => match[1]!))].slice(0, 90)
-  if (!keys.length) return
-  await db
-    .update(drops)
-    .set({ parentId: doc.id })
-    .where(
-      and(
-        inArray(drops.blobKey, keys),
-        eq(drops.ownerId, doc.ownerId),
-        inArray(drops.kind, ["image", "file"]),
-        isNull(drops.parentId),
-        ne(drops.id, doc.id),
-      ),
-    )
+  const keys = [...new Set([...source.matchAll(FILE_LINK)].map((match) => match[1]!))]
+  for (const chunk of d1Chunks(keys))
+    await db
+      .update(drops)
+      .set({ parentId: doc.id })
+      .where(
+        and(
+          inArray(drops.blobKey, chunk),
+          eq(drops.ownerId, doc.ownerId),
+          inArray(drops.kind, ["image", "file"]),
+          isNull(drops.parentId),
+          ne(drops.id, doc.id),
+        ),
+      )
 }
 
 /** What the publisher says about a drop's life. Later versions inherit it unless they say otherwise. */
@@ -90,14 +90,10 @@ async function queueBlobCleanup(keys: string[]) {
   const unique = [...new Set(keys)]
   if (!unique.length) return
   try {
-    for (let offset = 0; offset < unique.length; offset += 25)
+    for (const chunk of d1Chunks(unique, { perItem: 3, others: 0 }))
       await db
         .insert(blobCleanup)
-        .values(
-          unique
-            .slice(offset, offset + 25)
-            .map((blobKey) => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() })),
-        )
+        .values(chunk.map((blobKey) => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() })))
         .onConflictDoNothing()
   } catch (error) {
     log.error({ action: "blob-cleanup-queue", error: String(error) })
@@ -131,8 +127,7 @@ export async function deleteBlobKeys(keys: string[]) {
     await queueBlobCleanup(unique)
     return
   }
-  for (let offset = 0; offset < unique.length; offset += 80)
-    await db.delete(blobCleanup).where(inArray(blobCleanup.blobKey, unique.slice(offset, offset + 80)))
+  for (const chunk of d1Chunks(unique)) await db.delete(blobCleanup).where(inArray(blobCleanup.blobKey, chunk))
 }
 
 /**

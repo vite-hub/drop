@@ -11,7 +11,7 @@ export type Lifetime = (typeof LIFETIMES)[number]
 /** An agent's reason for keeping a drop: a sentence or two. */
 export const MAX_KEEP_REASON = 280
 
-export interface ExpiryRow {
+interface ExpiryRow {
   createdAt: number
   lastAccessedAt: number | null
   lifetime: Lifetime

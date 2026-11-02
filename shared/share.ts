@@ -86,15 +86,6 @@ export function shareBlock(
   return null
 }
 
-/** The states someone may pick for a drop: every one `shareBlock` lets through. */
-export function sharesFor(
-  mode: DropMode,
-  publicLinkDays: number | null,
-  drop: { kind: DropKind; teamFolder?: boolean },
-): Share[] {
-  return SHARES.filter((share) => !shareBlock(share, mode, publicLinkDays, drop))
-}
-
 /** When a link made public now closes. Null keeps it open until someone changes it. */
 export const publicUntilFrom = (publicLinkDays: number | null, now = Date.now()) =>
   publicLinkDays ? now + publicLinkDays * 86_400_000 : null

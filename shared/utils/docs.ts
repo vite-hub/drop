@@ -1,7 +1,7 @@
 import type { HostId } from "../../scripts/deployment"
 
 // The docs' sidebar, page order, and the hosts Drop deploys to (nuxt.config.ts reads DROP_HOST at build time).
-export interface DocsLink {
+interface DocsLink {
   label: string
   to: string
   icon?: string

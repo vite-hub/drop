@@ -1,6 +1,7 @@
 import { eq, like, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
 import { blobCleanup, commentCleanup, dropFiles, drops, dropVersions } from "../databases/config"
+import { d1Chunks } from "./d1"
 import type { DropRow } from "./drops"
 
 /** Removes the drop and every version of it at the batch's snapshot, including a version committed meanwhile. */
@@ -39,7 +40,6 @@ export async function deleteRetainedDrop(
     .from(blobCleanup)
     .where(like(blobCleanup.id, `${token}:%`))
   const [, , , rows] = await db.batch([queue, queueComments, remove, pending])
-  // Cleanup's retry INSERT binds three values per key, below D1's 100-value ceiling.
-  for (let offset = 0; offset < rows.length; offset += 25)
-    await deleteKeys(rows.slice(offset, offset + 25).map((item) => item.key))
+  // Cleanup's retry INSERT binds three values per key.
+  for (const chunk of d1Chunks(rows, { perItem: 3, others: 0 })) await deleteKeys(chunk.map((item) => item.key))
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { sql, state, migrate, reset, insertDrop, who, objects } from "../cost/harness.mjs"
+import { sql, state, migrate, reset, insertDrop, who, objects, queries } from "../cost/harness.mjs"
 const { findDrop, listDrops, listSharedWithMe, permissions, toSummary } = await import("../../server/utils/drops.ts")
 const { updateDrop } = await import("../../server/utils/drop-update.ts")
 const { recordVisit } = await import("../../server/utils/expiry.ts")
@@ -209,6 +209,16 @@ test("a folder's lifetime and Trash apply to everything below it: trash, restore
   await cleanup.handler({ scheduledAt: new Date(Date.now()) })
   for (const id of [review.id, inner.id, shot.id, plan.id, head, embedded.id]) assert.equal(exists(id), false, id)
   assert.equal(objects.size, 0, "every blob below the folder is gone")
+})
+
+test("a doc embedding more files than D1 binds in one query adopts every one of them", async () => {
+  const keys = Array.from({ length: 95 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}.png`)
+  keys.forEach((key, i) => insertDrop(`shot-${i}`, { kind: "image", filename: `${i}.png`, blob_key: key }))
+  queries.length = 0
+  const plan = await doc(`# Plan\n\n${keys.map((key) => `![](/f/${key})`).join("\n")}`)
+  const adopted = sql.prepare("SELECT count(*) AS n FROM drops WHERE kind = 'image' AND parent_id = ?").get(plan.id).n
+  assert.equal(adopted, keys.length)
+  assert.ok(queries.every((query) => query.params.length <= 100))
 })
 
 test("folders nest eight levels deep and never inside themselves", async () => {

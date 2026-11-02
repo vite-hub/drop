@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
+import { hex, sha256 } from "#shared/utils/bytes"
 import { dropTexts } from "../databases/config"
 import type { DropKind } from "#shared/types"
 import { SEARCH_KINDS, searchableText } from "./search"
@@ -54,7 +55,7 @@ const CARD_KINDS: Record<DropKind, string> = {
   board: "Board",
 }
 
-export interface OgCard {
+interface OgCard {
   title: string
   excerpt?: string
   kind: DropKind
@@ -99,8 +100,5 @@ const CARD_VERSION = 1
 
 /** A cached card's key: it changes with whatever the card shows, so a renamed drop gets a new card. */
 export async function ogCardKey(id: string, card: OgCard) {
-  const bytes = new TextEncoder().encode(JSON.stringify([CARD_VERSION, card]))
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))
-  const hash = Array.from(digest.slice(0, 8), (byte) => byte.toString(16).padStart(2, "0")).join("")
-  return `og:${id}:${hash}`
+  return `og:${id}:${hex((await sha256(new TextEncoder().encode(JSON.stringify([CARD_VERSION, card])))).slice(0, 8))}`
 }

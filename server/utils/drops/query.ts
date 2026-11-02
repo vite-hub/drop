@@ -43,6 +43,7 @@ import { dropFiles, drops, dropVersions, dropVisits, user } from "../../database
 import type { Identity } from "../identity"
 import type { DropRow } from "./types"
 import { permissions, toCrumb, toSummary } from "./access"
+import { d1Chunks } from "../d1"
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
@@ -255,11 +256,11 @@ export async function listFolder(
   // A team folder holds everyone's drops: each says whose it is, unless it's the reader's own.
   const ownerIds = [...new Set(listed.map((row) => row.ownerId).filter((id) => id !== options.who?.userId))]
   const owners = new Map<string, { name: string; image: string | null }>()
-  for (let offset = 0; offset < ownerIds.length; offset += 90)
+  for (const chunk of d1Chunks(ownerIds))
     for (const row of await db
       .select({ id: user.id, name: user.name, image: user.image })
       .from(user)
-      .where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
+      .where(inArray(user.id, chunk)))
       owners.set(row.id, { name: row.name, image: row.image })
   const ownerOf = new Map(listed.map((row) => [row.id, row.ownerId]))
   return summaries.map((summary) => {
@@ -426,11 +427,11 @@ async function searchShared(
   ).filter((node) => !node.expired && !node.quarantinedAt && permissions(node, who).view)
   const ownerIds = [...new Set(nodes.map((node) => node.ownerId))]
   const owners = new Map<string, { name: string; image: string | null }>()
-  for (let offset = 0; offset < ownerIds.length; offset += 90)
+  for (const chunk of d1Chunks(ownerIds))
     for (const row of await db
       .select({ id: user.id, name: user.name, image: user.image })
       .from(user)
-      .where(inArray(user.id, ownerIds.slice(offset, offset + 90))))
+      .where(inArray(user.id, chunk)))
       owners.set(row.id, { name: row.name, image: row.image })
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const summaries = await summarize(nodes, days, {

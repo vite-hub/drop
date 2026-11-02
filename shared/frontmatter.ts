@@ -28,5 +28,3 @@ export function editorlessSyntax(markdown: string) {
   }
   return [...found]
 }
-
-export const hasEditorlessSyntax = (markdown: string) => editorlessSyntax(markdown).length > 0
