@@ -6,38 +6,38 @@ import { createMarkdownParser } from "@comark/html/parse"
 import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
 import frontmatter from "@comark/html/plugins/frontmatter"
-import mermaid, { Mermaid } from "@comark/html/plugins/mermaid"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { visitAsync } from "@comark/html/utils"
 import { lint } from "comark-linter"
-import comarkUi from "comark-ui/html"
+import comarkUi, { mermaidScript } from "comark-ui/html"
 import { escapeUTF8 as escapeHtml } from "entities"
 import * as v from "valibot"
 import { stringifyTokenStyle } from "shiki/core"
-import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
+import { TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { codeLanguage, loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
-import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
 
 /**
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
  * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
- * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments, and
- * Mermaid stays Drop's, with its limits, and Drop supplies the document's typography.
+ * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments,
+ * Mermaid draws at most 4 diagrams and 8,000 characters of source a doc, and Drop supplies the document's typography.
  */
-const preset = comarkUi({ chips: { download: false }, mermaid: false, typeset: false, zoom: { images: false } })
-// Writes comark-zoom's script once per render, using the renderer's context to track it.
-const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
-  preset.components["zoom-runtime"]!(["zoom-runtime", {}], state)
+const preset = comarkUi({
+  chips: { download: false },
+  mermaid: { maxDiagrams: 4, maxSource: 8_000 },
+  typeset: false,
+  zoom: { images: false },
+})
 
 /**
  * The inline scripts the renderer writes itself, which the /f/ pages' CSP allows by hash: Mermaid's copy buttons and
  * comark-zoom, which zooms diagrams and annotated screenshots. Scripts in a document's own source stay blocked.
  */
 export const RENDERER_SCRIPTS = [
-  MERMAID_COPY_SCRIPT,
+  mermaidScript,
   (await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })).match(
     /<script>([\s\S]*)<\/script>/,
   )![1]!,
@@ -60,37 +60,12 @@ export const RENDERER_SCRIPTS = [
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
- * kinds), `::drop` (another drop shown in the doc), Mermaid, and comark-annotate's screenshot, compare, and annotation
+ * kinds), `::drop` (another drop shown in the doc), and comark-annotate's screenshot, compare, and annotation
  * for PR evidence. Its blocks.md documents every other plugin.
  */
 export const COMPONENT_TAGS =
-  "alert annotation callout caution compare drop important info mermaid note screenshot tip warning".split(" ")
-const ALLOWED_TAGS = [
-  // Markdown's own, and the raw HTML comark-github lets through: GitHub's allowlist.
-  ..."a abbr b bdo blockquote br caption cite code dd del details dfn div dl dt em figcaption figure h1 h2 h3 h4 h5 h6 hr i img input ins kbd li mark ol p picture pre q rp rt ruby s samp section small source span strike strong sub summary sup table tbody td tfoot th thead time tr tt ul var wbr".split(
-    " ",
-  ),
-  // What the plugins draw with that isn't a component of theirs: comark-table's sort buttons, comark-tabs' items, and the
-  // parts comark-quiz builds a question, poll, or recall card from.
-  "button",
-  "tabs-item",
-  ..."quiz-after quiz-answer quiz-explain quiz-hint quiz-label quiz-option quiz-options quiz-prompt quiz-rationale".split(
-    " ",
-  ),
-  ...Object.keys(preset.components),
-  ...COMPONENT_TAGS,
-]
-/**
- * Markup a plugin's renderer writes as it is, trusting its parse plugin to have drawn it. An author can write the same
- * component by hand, so these attributes go before the plugins run: comark-diagrams would otherwise print a
- * `::diagram{svg="…"}` from the doc into the page.
- */
-const DRAWN_ATTRIBUTES = new Map([
-  ["chart", ["svg", "marks"]],
-  ["diagram", ["svg"]],
-])
-const MAX_MERMAID_DIAGRAMS = 4
-const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
+  "alert annotation callout caution compare drop important info note screenshot tip warning".split(" ")
+const ALLOWED_TAGS = [...preset.tags, ...Object.keys(preset.components), ...COMPONENT_TAGS]
 const MAX_HIGHLIGHTED_CHARACTERS = 200_000
 
 type MarkdownTree = Parameters<typeof visitAsync>[0]
@@ -134,29 +109,12 @@ const highlight = () => ({
   },
 })
 
-/** Drops the markup in DRAWN_ATTRIBUTES that a doc wrote itself, before the plugins draw theirs. */
-const authored = () => ({
-  name: "drop-authored",
-  async post(state: { tree: MarkdownTree }) {
-    await visitAsync(
-      state.tree,
-      (node) => Array.isArray(node) && DRAWN_ATTRIBUTES.has(textValue(node[0]) ?? ""),
-      (node) => {
-        if (!Array.isArray(node)) return
-        for (const name of DRAWN_ATTRIBUTES.get(textValue(node[0]) ?? "") ?? []) delete node[1][name]
-      },
-    )
-  },
-})
-
 const pluginsBeforeCode = preset.plugins.findIndex((plugin) => plugin.name === "comark-code")
 const plugins = [
   frontmatter(),
   taskList(),
   components(),
   attributes(),
-  mermaid({ theme: "zinc-light" }),
-  authored(),
   ...preset.plugins.slice(0, pluginsBeforeCode),
   // Before comark-code, which marks and numbers the lines Shiki drew.
   highlight(),
@@ -230,35 +188,6 @@ function supersedesHref(input: unknown): string | undefined {
 const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render }) => {
   const kind = textValue(attrs.type) ?? tag
   return `<aside class="callout" data-kind="${escapeHtml(kind)}">${await render(children)}</aside>`
-}
-
-function createMermaidRenderer(): NodeHandler {
-  let diagrams = 0
-  let sourceCharacters = 0
-  let hasCopyRuntime = false
-
-  return async (node, state) => {
-    const content = textValue(node[1].content) ?? ""
-    const fallback = `<pre class="mermaid-error"><code>${escapeHtml(content)}</code></pre>`
-
-    diagrams += 1
-    sourceCharacters += content.length
-    if (diagrams > MAX_MERMAID_DIAGRAMS || sourceCharacters > MAX_MERMAID_SOURCE_CHARACTERS) return fallback
-
-    const rendered = Mermaid(node)
-    if (!rendered.startsWith('<div class="mermaid">')) return fallback
-    const runtime = hasCopyRuntime ? "" : `<style>${MERMAID_COPY_CSS}</style><script>${MERMAID_COPY_SCRIPT}</script>`
-    hasCopyRuntime = true
-    // The diagram's own width lets a wide one spread past the text column (document-shell.css), and a click zooms it.
-    const width = Number(rendered.match(/<svg[^>]* width="([\d.]+)"/)?.[1]) || 0
-    return (
-      `<figure class="drop-mermaid" data-source="${escapeHtml(content)}" style="--mermaid-width: ${Math.ceil(width)}px">` +
-      rendered
-        .replace('<div class="mermaid">', '<div class="mermaid" data-zoom tabindex="0">')
-        .replace(/^\s*@import url\([^\n]+\);\s*$/gm, "") +
-      `</figure>${runtime}${await zoomRuntime(state)}`
-    )
-  }
 }
 
 /** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
@@ -344,14 +273,8 @@ export interface MarkdownProblem {
  */
 const DROP_ERROR_RULE = /^comark\/(?:unclosed-block|malformed-attributes|unknown-component|annotate\/.+)$/
 
-/**
- * The components a doc may write: the allowlist, and the blocks comark-ui's plugins turn into other components before
- * the allowlist sees them (comark-linter's own list for comark-ui, which it uses when it loads the preset itself).
- */
-const LINT_COMPONENTS = [
-  ...ALLOWED_TAGS,
-  ..."accordion-item code-group collapsible details ref stats table tabs-item".split(" "),
-]
+/** The components a doc may write: the allowlist, and the blocks comark-ui's plugins turn into other components. */
+const LINT_COMPONENTS = [...ALLOWED_TAGS, ...preset.blocks]
 
 /**
  * comark-linter over the parse Drop renders with: the same plugins, the components the allowlist keeps, and the
@@ -398,8 +321,8 @@ export async function requirePublishableMarkdown(markdown: string): Promise<Mark
 }
 
 /**
- * The one Markdown renderer: Comark with front matter, task lists, server-rendered Mermaid SVG, every comark-ui
- * package, and a tag allowlist. The /f/ document pages and the viewer (via /api/drops/:id) both show its output.
+ * The one Markdown renderer: Comark with front matter, task lists, every comark-ui package, and a tag allowlist. The
+ * /f/ document pages and the viewer (via /api/drops/:id) both show its output.
  */
 async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string; retry?: true }> {
   try {
@@ -419,7 +342,6 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
         drop: renderDropEmbed,
         important: renderCallout,
         info: renderCallout,
-        mermaid: createMermaidRenderer(),
         note: renderCallout,
         tip: renderCallout,
         warning: renderCallout,
@@ -454,14 +376,14 @@ export async function renderMarkdownDocument(
 ): Promise<string> {
   const { title, html: body } = await renderMarkdownCached(key, markdown, event)
   return `<!doctype html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <title>${escapeHtml(title)} · Drop</title>
-  <style>${TYPESET_CSS}${CALLOUT_CSS}</style>
+  <style>${TYPESET_CSS}</style>
 </head>
 <body>
   <main>

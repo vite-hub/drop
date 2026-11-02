@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import type { Plugin } from "vite-plus"
@@ -47,7 +48,8 @@ export function dropTestStubs(): Plugin {
     apply: () => Boolean(process.env.VITEST),
     resolveId(id, importer) {
       if (!importer || importer.startsWith(`${root}test/`)) return
-      if (id === "#comark-comments-css") return `${root}.nuxt/comark-comments-css.ts`
+      // Vitest empties CSS `?raw` imports; the frame's comment layer needs comark-comments' real stylesheet.
+      if (id === "comark-comments/style.css?raw") return `${PREFIX}comments-css`
       if (id in stubs || id.endsWith("/utils/identity") || id === "./identity")
         return PREFIX + (id in stubs ? id : "identity")
       if (id.startsWith("#shared/")) return this.resolve(`${root}shared/${id.slice(8)}`, importer)
@@ -55,6 +57,8 @@ export function dropTestStubs(): Plugin {
     load(id) {
       if (id.startsWith(PREFIX)) {
         const name = id.slice(PREFIX.length)
+        if (name === "comments-css")
+          return `export default ${JSON.stringify(readFileSync(`${root}node_modules/comark-comments/dist/style.css`, "utf8"))}`
         return name === "identity" ? identity : stubs[name]
       }
       const ref = process.env.DROP_TEST_BASELINE

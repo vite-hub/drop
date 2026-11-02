@@ -72,7 +72,7 @@ graph LR
 ```
 ````
 
-Drop draws the diagram on the server. Use one per doc when you can: a doc shows at most 4 diagrams and 8,000 characters of Mermaid. Past that, or when the source is invalid, the diagram shows as its source text.
+Drop draws the diagram on the server. Use one per doc when you can: a doc shows at most 4 diagrams and 8,000 characters of Mermaid. Past that, or when the source is invalid, the diagram shows as its source text, and past the limits the box above the doc says why.
 
 ## Footnotes
 
