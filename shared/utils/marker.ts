@@ -1,4 +1,7 @@
-/** The Marker's tips, as the review dock shows them (ViewerMarkTools): each one's key and its four sizes, in pixels. */
+/**
+ * The Marker's tips, as the review dock (ViewerMarkTools) and the site review script show them: each one's key and its
+ * four sizes, in pixels.
+ */
 export const MARK_TIPS = {
   marker: { label: "Marker", key: "B", icon: "i-mingcute-mark-pen-line", sizes: [8, 14, 22, 32] },
   pen: { label: "Pen", key: "P", icon: "i-mingcute-pen-2-line", sizes: [2, 3, 5, 8] },

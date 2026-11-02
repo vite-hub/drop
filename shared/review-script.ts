@@ -2,9 +2,10 @@
 // preview builds or from the "Review with Drop" bookmarklet. It adds one element, a toolbar in a closed shadow root,
 // so the page's CSS can't reach it and it touches nothing else on the page. Presses, focus, and keys inside it stop at
 // that element, so the page doesn't take them for its own: a menu it has open stays open while someone comments on it.
-// It does nothing until someone presses Comment. It carries no key: Drop finds the site drop from the page's origin
-// when someone connects.
-import { ELEMENT_NAMING } from "./plan-runtime"
+// It does nothing until someone presses Comment or Highlight. It carries no key: Drop finds the site drop from the
+// page's origin when someone connects.
+import { ELEMENT_NAMING, INK } from "./plan-runtime"
+import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
 import { CAPTURE } from "./viewport-capture"
 
 const STYLE = `
@@ -80,9 +81,20 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .pin.done { opacity: .6; filter: grayscale(1); }
 .toast { position: fixed; right: 16px; bottom: 64px; display: flex; gap: 8px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .toast a { color: var(--fg); font-weight: 500; }
+.icon[aria-pressed=true] { background: var(--soft); color: var(--fg); }
+.sep { width: 1px; height: 20px; margin: 0 2px; flex: none; background: var(--border); }
+.dot { display: block; border-radius: 50%; }
+.swatch { width: 14px; height: 14px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .1); }
+.tools { max-width: calc(100vw - 32px); overflow-x: auto; }
+.tools > * { flex: none; }
+.paint { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
+.inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
+.ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.ink .mk { stroke-opacity: .4; stroke-linecap: butt; }
 `
 
-// Line icons, drawn with the stroke in STYLE. The bubble is Comment, the stack is the list of threads.
+// Line icons, drawn with the stroke in STYLE. The bubble is Comment, the stack is the list of threads, and the marker,
+// pen, and arrow are Highlight's tips.
 const svg = (path: string) => `<svg viewBox="0 0 256 256" aria-hidden="true">${path}</svg>`
 const ICONS = {
   comment: svg(`<path d="M128 32a96 96 0 0 0-84 142l-12 42 42-12a96 96 0 1 0 54-172z"/>`),
@@ -96,6 +108,9 @@ const ICONS = {
   check: svg(`<path d="M52 136l44 44 108-108"/>`),
   reopen: svg(`<path d="M88 152 40 104l48-48"/><path d="M40 104h112a64 64 0 0 1 0 128h-40"/>`),
   close: svg(`<path d="M68 68l120 120M188 68 68 188"/>`),
+  marker: svg(`<path d="M164 44l48 48-96 96-56 8 8-56z"/><path d="M140 68l48 48"/><path d="M40 220h88"/>`),
+  pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
+  arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
 }
 
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
@@ -104,12 +119,41 @@ const COMPOSE = (label: string, placeholder: string, send: string, cancel: boole
   (cancel ? `<button class="btn ghost" type="button" data-act="cancel">Cancel</button>` : "") +
   `<button class="btn primary" type="submit">${send}</button></div><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>`
 
+// Highlight's controls, in place of the toolbar while someone draws: the tips, four sizes, the colours, Undo, Cancel,
+// and Done. The script sizes and colours the dots.
+const SEPARATOR = `<span class="sep" aria-hidden="true"></span>`
+const TOOLS =
+  `<div class="bar tools" role="group" aria-label="Highlight" hidden>` +
+  Object.entries(MARK_TIPS)
+    .map(
+      ([id, tip]) =>
+        `<button class="icon" type="button" data-tip="${id}" aria-keyshortcuts="${tip.key}" aria-label="${tip.label}" title="${tip.label} (${tip.key})">${ICONS[id as keyof typeof MARK_TIPS]}</button>`,
+    )
+    .join("") +
+  SEPARATOR +
+  [0, 1, 2, 3]
+    .map((index) => `<button class="icon" type="button" data-size="${index}"><span class="dot"></span></button>`)
+    .join("") +
+  SEPARATOR +
+  Object.keys(MARK_COLORS)
+    .map((name) => {
+      const label = `${name[0]!.toUpperCase()}${name.slice(1)} ink`
+      return `<button class="icon" type="button" data-color="${name}" aria-label="${label}" title="${label}"><span class="dot swatch"></span></button>`
+    })
+    .join("") +
+  SEPARATOR +
+  `<button class="icon" type="button" data-act="undo" aria-keyshortcuts="Meta+Z Control+Z" aria-label="Undo" title="Undo" disabled>${ICONS.reopen}</button>` +
+  `<button class="btn ghost" type="button" data-act="cancel">Cancel</button><button class="btn primary" type="button" data-act="done" aria-keyshortcuts="Enter" disabled>Done</button></div>`
+
 const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
-<div class="bar"><button class="btn primary" type="button" data-act="comment">${ICONS.comment}Comment</button><button class="btn ghost" type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button class="icon" type="button" data-act="pins" hidden aria-pressed="true" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="inked" hidden><svg class="ink"></svg></div>
+<div class="bar"><button class="btn primary" type="button" data-act="comment">${ICONS.comment}Comment</button><button class="btn ghost" type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button class="btn ghost" type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button class="icon" type="button" data-act="pins" hidden aria-pressed="true" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
+<div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
+${TOOLS}
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
 <div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
@@ -123,6 +167,10 @@ const MARKUP = `<div class="ui">
  * with the note, the images, the page's address, the element under it with where on it the pin goes, and the box in
  * thousandths of the viewport. Requests carry the token and never cookies. The token is sealed: neither it nor
  * anything Drop answers tells the page which drop the comments go to.
+ *
+ * Highlight draws on the page instead: a marker, a pen, or arrows, on a screenshot taken as it opens, while the page
+ * holds still. Done anchors the comment to the smallest element under the strokes and sends the screenshot with the
+ * strokes on it; the strokes stay on the page, scrolling with it, while the note is written.
  *
  * Once connected, the page shows its threads the way Figma does: a pin with the author's picture on the element each
  * was left on, found again by its CSS path, that opens the thread to read, reply (with images too), and resolve. A
@@ -154,8 +202,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
   const showResolved = $("[data-act=resolved]", list);
+  const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
   let area = null, start = null, busy = false, toastTimer = 0;
   let threads = [], openN = null, pinsShown = true, here = "";
+  let strokes = [], stroke = null, still = null, inkAt = { x: 0, y: 0 };
   const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map();
 
   function save(value) {
@@ -326,7 +376,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   let frame = 0;
   const schedule = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; layout(); }); };
   function layout() {
-    pinLayer.hidden = !pinsShown || !draw.hidden;
+    pinLayer.hidden = !pinsShown || !draw.hidden || !paint.hidden;
+    if (!inked.hidden) inked.style.translate = inkAt.x - scrollX + "px " + (inkAt.y - scrollY) + "px";
     for (const item of threads) {
       const pin = pinFor.get(item.n);
       if (!pin) continue;
@@ -524,8 +575,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
   function cancel() {
     draw.hidden = true; box.hidden = true; pop.hidden = true; bar.hidden = false;
+    paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
     newBox.show("");
-    area = null; start = null;
+    area = null; start = null; strokes = []; stroke = null; still = null;
     layout();
   }
 
@@ -560,11 +612,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
     box.hidden = Boolean(point);
     place(box, r);
+    // The screenshot is of this moment, so it still matches the box if the reviewer scrolls while writing.
+    compose(r, target, point, capture().catch(() => null));
+  });
+  draw.addEventListener("pointercancel", () => { start = null; box.hidden = true; });
+
+  // The note for an area: point is a click's spot, or null for a box or strokes, whose pin goes on its corner.
+  function compose(r, target, point, shot) {
     const er = target.getBoundingClientRect();
     const pinAt = point || { x: r.left, y: r.top };
     const spot = { x: er.width ? clamp(((pinAt.x - er.left) / er.width) * 1000) : 0, y: er.height ? clamp(((pinAt.y - er.top) / er.height) * 1000) : 0 };
-    // The screenshot is of this moment, so it still matches the box if the reviewer scrolls while writing.
-    area = { rect: r, viewport: { width: innerWidth, height: innerHeight }, selector: pathOf(target), label: describe(target), spot, shot: capture().catch(() => null) };
+    area = { rect: r, viewport: { width: innerWidth, height: innerHeight }, selector: pathOf(target), label: describe(target), spot, shot };
     const width = Math.min(320, innerWidth - 16);
     pop.style.width = width + "px";
     pop.hidden = false;
@@ -575,10 +633,153 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     $(".who", pop).textContent = authorName() ? "As " + authorName() : "";
     newBox.note.focus();
     layout();
+  }
+
+  // ---- Highlighting: a marker, a pen, and arrows on a screenshot of the page ----
+
+  ${INK}
+  const TIPS = ${JSON.stringify(MARK_TIPS)}, COLORS = ${JSON.stringify(MARK_COLORS)}, DOTS = [5, 8, 11, 15];
+  const tip = { name: "marker", color: "pink", sizes: { marker: 1, pen: 1, arrow: 1 } };
+  const penNow = () => ({ tool: tip.name, color: COLORS[tip.color], width: TIPS[tip.name].sizes[tip.sizes[tip.name]] });
+  tools.querySelectorAll("[data-color]").forEach((button) => { button.firstChild.style.background = COLORS[button.dataset.color]; });
+
+  function paintTools() {
+    const sizes = TIPS[tip.name].sizes;
+    tools.querySelectorAll("[data-tip]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tip === tip.name)));
+    tools.querySelectorAll("[data-color]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.color === tip.color)));
+    tools.querySelectorAll("[data-size]").forEach((button) => {
+      const index = Number(button.dataset.size), dot = button.firstChild;
+      button.setAttribute("aria-pressed", String(tip.sizes[tip.name] === index));
+      button.title = sizes[index] + "px";
+      button.setAttribute("aria-label", "Size " + (index + 1) + " of " + sizes.length + ", " + sizes[index] + " pixels");
+      dot.style.width = dot.style.height = DOTS[index] + "px";
+      dot.style.background = COLORS[tip.color];
+      dot.style.opacity = tip.name === "marker" ? ".55" : "1";
+    });
+    $("[data-act=undo]", tools).disabled = $("[data-act=done]", tools).disabled = !strokes.length;
+    paint.style.cursor = penCursor(penNow());
+  }
+
+  function startMarking() {
+    cancel();
+    closeThread();
+    list.hidden = true;
+    // The screenshot starts now, with the page as the reviewer marks it; it holds still until Done.
+    still = capture().catch(() => null);
+    inkAt = { x: scrollX, y: scrollY };
+    bar.hidden = true;
+    tools.hidden = paint.hidden = inked.hidden = false;
+    paintTools();
+    layout();
+  }
+
+  paint.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    paint.setPointerCapture(e.pointerId);
+    stroke = Object.assign(penNow(), { points: [[e.clientX, e.clientY]], straight: false });
+    stroke.el = drawStroke(stroke, ink);
   });
-  draw.addEventListener("pointercancel", () => { start = null; box.hidden = true; });
+  paint.addEventListener("pointermove", (e) => {
+    if (!stroke) return;
+    const p = [e.clientX, e.clientY], first = stroke.points[0];
+    // Shift draws straight: a marker stays on its line, a pen and an arrow go point to point.
+    if (stroke.tool === "arrow" || e.shiftKey) {
+      stroke.straight = e.shiftKey;
+      stroke.points = [first, stroke.tool === "marker" && e.shiftKey ? [p[0], first[1]] : p];
+    } else {
+      const last = stroke.points[stroke.points.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 2) stroke.points.push(p);
+    }
+    stroke.el.setAttribute("d", strokePath(stroke));
+  });
+  const endStroke = () => {
+    if (!stroke) return;
+    const s = stroke, a = s.points[0], b = s.points[s.points.length - 1];
+    stroke = null;
+    if (s.tool === "arrow" && Math.hypot(b[0] - a[0], b[1] - a[1]) < 10) return s.el.remove();
+    strokes.push(s);
+    paintTools();
+  };
+  paint.addEventListener("pointerup", endStroke);
+  paint.addEventListener("pointercancel", endStroke);
+  // The screenshot is of the viewport, so the page stays where it is under the strokes.
+  paint.addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
+  paint.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+
+  function undoMark() {
+    const s = strokes.pop();
+    if (s) s.el.remove();
+    paintTools();
+  }
+  function pickTip(name) { tip.name = name; paintTools(); }
+  function stepSize(by) {
+    tip.sizes[tip.name] = Math.max(0, Math.min(TIPS[tip.name].sizes.length - 1, tip.sizes[tip.name] + by));
+    paintTools();
+  }
+
+  // The screenshot with the strokes on it, as the reviewer saw them.
+  async function withInk(picture, list) {
+    const image = await createImageBitmap(picture), k = image.width / innerWidth;
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width; canvas.height = image.height;
+    const g = canvas.getContext("2d");
+    g.drawImage(image, 0, 0);
+    g.scale(k, k);
+    inkOn(g, list);
+    const blob = (type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+    let out = await blob("image/webp", 0.9);
+    if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
+    return out && out.size <= MAX_BYTES ? out : picture;
+  }
+
+  function finishMark() {
+    if (!strokes.length) return;
+    const list = strokes.slice(), picture = still;
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    for (const s of list) {
+      // The rendered path includes an arrow's bow and head, beyond its pointer endpoints.
+      const b = s.el.getBBox(), pad = s.width / 2 + 2;
+      left = Math.min(left, b.x - pad); top = Math.min(top, b.y - pad); right = Math.max(right, b.x + b.width + pad); bottom = Math.max(bottom, b.y + b.height + pad);
+    }
+    const r = rectOf({ x: Math.max(0, left), y: Math.max(0, top) }, { x: Math.min(innerWidth, right), y: Math.min(innerHeight, bottom) });
+    paint.hidden = tools.hidden = true;
+    const target = anchorFor(r.left, r.top, r.right, r.bottom, host);
+    compose(r, target, null, picture.then((taken) => taken && withInk(taken, list).catch(() => taken)));
+  }
+
+  $("[data-act=mark]", bar).addEventListener("click", async () => {
+    try { await ensureToken(); }
+    catch (error) { if (error.message) say(error.message); return; }
+    startMarking();
+  });
+  tools.addEventListener("click", (e) => {
+    const button = e.target.closest("button");
+    if (!button || button.disabled) return;
+    if (button.dataset.tip) pickTip(button.dataset.tip);
+    else if (button.dataset.size) { tip.sizes[tip.name] = Number(button.dataset.size); paintTools(); }
+    else if (button.dataset.color) { tip.color = button.dataset.color; paintTools(); }
+    else if (button.dataset.act === "undo") undoMark();
+    else if (button.dataset.act === "cancel") cancel();
+    else if (button.dataset.act === "done") finishMark();
+  });
 
   addEventListener("keydown", (e) => {
+    // While someone draws, the tips' keys, [ and ] for the size, Undo, Enter, and Esc are Highlight's, not the page's.
+    if (!paint.hidden) {
+      const key = e.key.toLowerCase(), command = e.metaKey || e.ctrlKey;
+      const named = Object.keys(TIPS).find((name) => TIPS[name].key.toLowerCase() === key);
+      if (e.key === "Escape") cancel();
+      else if (e.key === "Enter") finishMark();
+      else if (command && key === "z") undoMark();
+      else if (command || e.altKey) return;
+      else if (named) pickTip(named);
+      else if (e.key === "[" || e.key === "]") stepSize(e.key === "]" ? 1 : -1);
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (e.key !== "Escape" || busy) return;
     if (!draw.hidden || !pop.hidden) { e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }

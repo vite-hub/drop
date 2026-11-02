@@ -66,6 +66,55 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
   }`
 
 /**
+ * The Marker's ink, shared by the frame's comment layer and the site review script: the path of a stroke (marker, pen,
+ * or arrow, in viewport pixels), drawn on an SVG layer or a canvas, and the pointer for a tip.
+ */
+export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
+  // The pointer is the tip: its size and colour, see-through for the marker. The arrow keeps the crosshair.
+  function penCursor(pen) {
+    if (pen.tool === "arrow") return "";
+    const d = Math.max(8, Math.ceil(pen.width) + 4), r = d / 2;
+    const svg = '<svg xmlns="' + SVG + '" width="' + d + '" height="' + d + '"><circle cx="' + r + '" cy="' + r + '" r="' + Math.max(2, pen.width / 2) + '" fill="' + pen.color + '" fill-opacity="' + (pen.tool === "marker" ? 0.4 : 0.9) + '" stroke="#0a0a0a" stroke-opacity=".55"/></svg>';
+    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '") ' + r + " " + r + ", crosshair";
+  }
+  const pt = (p) => p[0].toFixed(1) + " " + p[1].toFixed(1);
+  function smoothPath(points) {
+    if (points.length === 1) return "M" + pt(points[0]) + "l0.1 0";
+    let d = "M" + pt(points[0]);
+    for (let i = 1; i < points.length - 1; i++) d += "Q" + pt(points[i]) + " " + pt([(points[i][0] + points[i + 1][0]) / 2, (points[i][1] + points[i + 1][1]) / 2]);
+    return d + "L" + pt(points[points.length - 1]);
+  }
+  // A hand-drawn arrow: the shaft bows a little unless Shift keeps it straight, and the head is two strokes along its end.
+  function arrowPath(a, b, straight, width) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, bow = straight ? 0 : Math.min(18, length * 0.08);
+    const c = [(a[0] + b[0]) / 2 - (dy / length) * bow, (a[1] + b[1]) / 2 + (dx / length) * bow];
+    const angle = Math.atan2(b[1] - c[1], b[0] - c[0]), head = Math.min(14, length * 0.4) + width;
+    const side = (turn) => [b[0] - head * Math.cos(angle + turn), b[1] - head * Math.sin(angle + turn)];
+    return "M" + pt(a) + "Q" + pt(c) + " " + pt(b) + "M" + pt(side(-0.5)) + "L" + pt(b) + "L" + pt(side(0.5));
+  }
+  const strokePath = (s) => (s.tool === "arrow" ? arrowPath(s.points[0], s.points[s.points.length - 1], s.straight, s.width) : smoothPath(s.points));
+  function drawStroke(s, into) {
+    const path = document.createElementNS(SVG, "path");
+    path.setAttribute("d", strokePath(s));
+    path.setAttribute("stroke", s.color);
+    path.setAttribute("stroke-width", String(s.width));
+    if (s.tool === "marker") path.setAttribute("class", "mk");
+    into.appendChild(path);
+    return path;
+  }
+  // The marker multiplies, so the words under it stay dark.
+  function inkOn(g, list) {
+    for (const s of list) {
+      g.save();
+      g.globalAlpha = s.tool === "marker" ? 0.4 : 1;
+      g.globalCompositeOperation = s.tool === "marker" ? "multiply" : "source-over";
+      g.strokeStyle = s.color; g.lineWidth = s.width; g.lineCap = s.tool === "marker" ? "butt" : "round"; g.lineJoin = "round";
+      g.stroke(new Path2D(strokePath(s)));
+      g.restore();
+    }
+  }`
+
+/**
  * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
  * Select text to comment on it; click an image to zoom and comment on a spot. The viewer's toolbar picks a tool: with
  * Comment (R), click an element to pin a comment to it or drag a rectangle; with Measure, inspect sizes and distances;
@@ -995,48 +1044,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    * strokes stay on the page while the comment is written; Drop clears them with the area. A page whose CSP blocks the
    * screenshot sends the area with no picture.
    */
-  const SVG = "http://www.w3.org/2000/svg";
+  ${INK}
   let pen = { tool: "marker", color: "#ec4899", width: 14 }, strokes = [], stroke = null, shot = null, frozen = null, ink = null;
   let markSession = 0, finishing = false;
   function setPen(next) {
     if (/^(marker|pen|arrow)$/.test(next.tool)) pen.tool = next.tool;
     if (/^#[0-9a-f]{6}$/i.test(next.color)) pen.color = next.color;
     if (typeof next.width === "number" && next.width >= 1 && next.width <= 64) pen.width = next.width;
-    if (layer && tool === "mark") layer.style.cursor = penCursor();
+    if (layer && tool === "mark") layer.style.cursor = penCursor(pen);
   }
-  // The pointer is the tip: its size and colour, see-through for the marker. The arrow keeps the crosshair.
-  function penCursor() {
-    if (pen.tool === "arrow") return "";
-    const d = Math.max(8, Math.ceil(pen.width) + 4), r = d / 2;
-    const svg = '<svg xmlns="' + SVG + '" width="' + d + '" height="' + d + '"><circle cx="' + r + '" cy="' + r + '" r="' + Math.max(2, pen.width / 2) + '" fill="' + pen.color + '" fill-opacity="' + (pen.tool === "marker" ? 0.4 : 0.9) + '" stroke="#0a0a0a" stroke-opacity=".55"/></svg>';
-    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '") ' + r + " " + r + ", crosshair";
-  }
-  const pt = (p) => p[0].toFixed(1) + " " + p[1].toFixed(1);
-  function smoothPath(points) {
-    if (points.length === 1) return "M" + pt(points[0]) + "l0.1 0";
-    let d = "M" + pt(points[0]);
-    for (let i = 1; i < points.length - 1; i++) d += "Q" + pt(points[i]) + " " + pt([(points[i][0] + points[i + 1][0]) / 2, (points[i][1] + points[i + 1][1]) / 2]);
-    return d + "L" + pt(points[points.length - 1]);
-  }
-  // A hand-drawn arrow: the shaft bows a little unless Shift keeps it straight, and the head is two strokes along its end.
-  function arrowPath(a, b, straight, width) {
-    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, bow = straight ? 0 : Math.min(18, length * 0.08);
-    const c = [(a[0] + b[0]) / 2 - (dy / length) * bow, (a[1] + b[1]) / 2 + (dx / length) * bow];
-    const angle = Math.atan2(b[1] - c[1], b[0] - c[0]), head = Math.min(14, length * 0.4) + width;
-    const side = (turn) => [b[0] - head * Math.cos(angle + turn), b[1] - head * Math.sin(angle + turn)];
-    return "M" + pt(a) + "Q" + pt(c) + " " + pt(b) + "M" + pt(side(-0.5)) + "L" + pt(b) + "L" + pt(side(0.5));
-  }
-  const strokePath = (s) => (s.tool === "arrow" ? arrowPath(s.points[0], s.points[s.points.length - 1], s.straight, s.width) : smoothPath(s.points));
-  function drawStroke(s, into) {
-    const path = document.createElementNS(SVG, "path");
-    path.setAttribute("d", strokePath(s));
-    path.setAttribute("stroke", s.color);
-    path.setAttribute("stroke-width", String(s.width));
-    if (s.tool === "marker") path.setAttribute("class", "mk");
-    into.appendChild(path);
-    return path;
-  }
-
   function freeze() {
     const roots = [document], hovering = [], styles = [];
     for (const root of roots) {
@@ -1071,7 +1087,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     strokes = [];
     const el = document.createElement("div");
     el.className = "draw mark";
-    el.style.cursor = penCursor();
+    el.style.cursor = penCursor(pen);
     ink = document.createElementNS(SVG, "svg");
     ink.setAttribute("class", "ink");
     el.appendChild(ink);
@@ -1191,7 +1207,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     }).filter(Boolean).join(" … ").slice(0, 2000);
   }
   // The screenshot with the strokes on it, as the reader saw them, cut to the strokes and some of what's around them
-  // (at least 640 by 360). The marker multiplies, so the words under it stay dark.
+  // (at least 640 by 360).
   async function drawOn(picture, list, box) {
     const image = await createImageBitmap(picture), k = image.width / innerWidth;
     const grow = (from, to, min, max) => {
@@ -1208,14 +1224,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     g.drawImage(image, -x0 * k, -y0 * k);
     g.scale(k, k);
     g.translate(-x0, -y0);
-    for (const s of list) {
-      g.save();
-      g.globalAlpha = s.tool === "marker" ? 0.4 : 1;
-      g.globalCompositeOperation = s.tool === "marker" ? "multiply" : "source-over";
-      g.strokeStyle = s.color; g.lineWidth = s.width; g.lineCap = s.tool === "marker" ? "butt" : "round"; g.lineJoin = "round";
-      g.stroke(new Path2D(strokePath(s)));
-      g.restore();
-    }
+    inkOn(g, list);
     const blob = (type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
     let out = await blob("image/webp", 0.9);
     if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
