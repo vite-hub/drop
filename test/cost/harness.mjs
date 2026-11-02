@@ -8,7 +8,7 @@ const root = new URL("../../", import.meta.url)
 
 export const sql = new DatabaseSync(":memory:")
 export const queries = []
-const execute = async (query, params, method) => {
+const run = (query, params, method) => {
   queries.push({ query, params })
   const statement = sql.prepare(query)
   if (method === "run" || !statement.columns().length) {
@@ -19,24 +19,69 @@ const execute = async (query, params, method) => {
   const rows = statement.all(...params)
   return { rows: method === "get" ? rows[0] : rows }
 }
-const db = drizzle(execute, async (queries) => {
-  sql.exec("BEGIN")
+
+// Each D1 query is a round trip from the Worker, ~6 ms from Milan where drop.vitehub.dev runs and ~40 ms from elsewhere.
+// Queries that start together share one: while `roundTrips` runs, every query (or batch) waits for the current wave,
+// which ends once nothing else can join it, so the count is the round trips a request waits for one after another.
+let counting = false
+let waves = 0
+let wave
+const nextWave = () =>
+  (wave ??= new Promise((resolve) =>
+    setImmediate(() => {
+      waves++
+      wave = undefined
+      resolve()
+    }),
+  ))
+const waited = async () => {
+  if (counting) await nextWave()
+}
+/** How many database round trips `request` waited for one after another. */
+export async function roundTrips(request) {
+  counting = true
   try {
-    const result = []
-    for (const item of queries) result.push(await execute(item.sql, item.params, item.method))
-    sql.exec("COMMIT")
-    return result
-  } catch (error) {
-    sql.exec("ROLLBACK")
-    throw error
+    await nextWave()
+    const start = waves
+    await request()
+    return waves - start
+  } finally {
+    counting = false
   }
-})
+}
+
+const db = drizzle(
+  async (query, params, method) => {
+    await waited()
+    return run(query, params, method)
+  },
+  async (batch) => {
+    await waited()
+    sql.exec("BEGIN")
+    try {
+      const result = batch.map((item) => run(item.sql, item.params, item.method))
+      sql.exec("COMMIT")
+      return result
+    } catch (error) {
+      sql.exec("ROLLBACK")
+      throw error
+    }
+  },
+)
 // Match D1's raw all() results, which return named columns instead of proxy arrays.
 db.all = async (query) => {
+  await waited()
   const compiled = db.dialect.sqlToQuery(query)
   queries.push({ query: compiled.sql, params: compiled.params })
   return sql.prepare(compiled.sql).all(...compiled.params)
 }
+/** SQLite's plan for a query `queries` recorded, one step a line. */
+export const planOf = ({ query, params }) =>
+  sql
+    .prepare(`EXPLAIN QUERY PLAN ${query}`)
+    .all(...params)
+    .map((row) => row.detail)
+    .join("\n")
 export const objects = new Map()
 const entries = new Map()
 export const calls = { get: 0, head: 0, del: 0, writes: [] }

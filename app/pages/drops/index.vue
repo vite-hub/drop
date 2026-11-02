@@ -480,7 +480,8 @@ picker.onChange((files) => void uploadFiles([...(files ?? [])]))
             v-bind="preview.handle"
           />
           <aside aria-label="Preview" class="shrink-0" :style="{ width: `${preview.width.value}rem` }">
-            <ViewerFolderPreview
+            <!-- Lazy: the preview frames docs with Drop's document runtime, which the list doesn't need until a click. -->
+            <LazyViewerFolderPreview
               :key="picked.id"
               :child="picked"
               :title="picked.title"
