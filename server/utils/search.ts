@@ -118,7 +118,7 @@ function snippetOf(words: string[]): SQL<string | null> {
 }
 
 /** Trims a snippet to whole words and marks where the text goes on. */
-export function cleanSnippet(snippet: string | null) {
+function cleanSnippet(snippet: string | null) {
   if (!snippet) return undefined
   const lead = snippet.startsWith("…")
   let text = lead ? snippet.slice(1).replace(/^\S*\s/, "") : snippet

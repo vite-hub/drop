@@ -39,7 +39,7 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
   }
 }
 
-export type McpDrop = ReturnType<typeof mcpDrop>
+type McpDrop = ReturnType<typeof mcpDrop>
 
 /** A drop's views for its owner's agents, split the way Details shows them. */
 export const mcpViews = (views: Record<ViewerKind, number>) => ({

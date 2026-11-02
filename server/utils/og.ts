@@ -55,7 +55,7 @@ const CARD_KINDS: Record<DropKind, string> = {
   board: "Board",
 }
 
-export interface OgCard {
+interface OgCard {
   title: string
   excerpt?: string
   kind: DropKind

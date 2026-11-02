@@ -8,7 +8,7 @@ import { DAY_MS, DEFAULT_EXPIRY_DAYS, expiresAt } from "#shared/expiry"
 import { drops } from "../databases/config"
 import type { Identity } from "./identity"
 
-export interface ExpiryPolicy {
+interface ExpiryPolicy {
   /** Days a `review` drop lives after its last visit (`temporary` ones get at most 14). 0 turns expiry off. */
   days: number
   /** Whether owners and their agents may keep drops. Admins always may. */

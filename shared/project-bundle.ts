@@ -5,7 +5,7 @@
 import { lookup } from "mrmime"
 import { prependToHead } from "./plan-runtime.ts"
 
-export type ProjectFiles = Record<string, string>
+type ProjectFiles = Record<string, string>
 
 /** Resolves `ref` relative to the file at `from`. Returns null for external URLs. Embedded in the page runtime. */
 function resolvePath(from: string, ref: string): string | null {

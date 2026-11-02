@@ -14,7 +14,7 @@ export const DEFAULT_FREE_KEPT = 10
 /** Members a team has before it needs a subscription (`DROP_FREE_TEAM_MEMBERS`). */
 export const DEFAULT_FREE_TEAM_MEMBERS = 2
 
-export interface PlanLimits {
+interface PlanLimits {
   drops: number | null
   bytes: number | null
   writes: number | null
@@ -59,7 +59,7 @@ export interface Usage {
 }
 
 const QUOTA_UNITS = ["drops", "bytes", "writes", "kept", "appFiles", "appBytes", "burstPublishes"] as const
-export type QuotaUnit = (typeof QUOTA_UNITS)[number]
+type QuotaUnit = (typeof QUOTA_UNITS)[number]
 export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
   quota: { unit: QuotaUnit; used: number; limit: number }

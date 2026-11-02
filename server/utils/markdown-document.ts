@@ -254,7 +254,7 @@ function issuesOf(meta: DocumentMeta) {
   return { all, retry: all.some((issue) => RETRIED_RULE.test(rules[issue] ?? "")) }
 }
 
-export interface MarkdownProblem {
+interface MarkdownProblem {
   rule: string
   /** An error stops the doc from publishing; a warning publishes with it. */
   severity: "error" | "warning"

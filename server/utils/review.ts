@@ -58,7 +58,7 @@ import { touchFolder, uniqueSlug } from "./nodes"
 
 /** What a review token says: the site drop, who sends (null for a guest on a "Can comment" link), and the page's origin. */
 const ReviewClaims = v.object({ d: v.string(), u: v.nullable(v.string()), n: v.string(), o: v.string(), e: v.number() })
-export type ReviewClaims = v.InferOutput<typeof ReviewClaims>
+type ReviewClaims = v.InferOutput<typeof ReviewClaims>
 
 /** What the popup sends back when someone picks a site drop: which one, for which origin and person. Sealed too. */
 const Choice = v.object({ c: v.string(), o: v.string(), u: v.nullable(v.string()), e: v.number() })

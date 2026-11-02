@@ -1,6 +1,6 @@
 export type DiffLine = { type: "same" | "add" | "remove"; text: string }
 /** A run of unchanged lines folded away between hunks. */
-export type DiffGap = { type: "gap"; lines: number }
+type DiffGap = { type: "gap"; lines: number }
 
 /**
  * Lines removed and added between two texts. The common start and end are trimmed first, so an edit in a long doc
