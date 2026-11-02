@@ -35,12 +35,14 @@ export default defineHandler(async (event) => {
   if (expiredLink(drop, who)) throw new HTTPError({ status: 410, statusText: "Expired" })
   if (!drop || !permissions(drop, who).view) throw notFound()
   event.res.headers.set("Cache-Control", "private, no-store")
-  // HEAD wants the status, not the page (a full render, ~0.9 s). A pinned `?v=` still renders: the page checks that
-  // the version exists.
-  if (event.req.method !== "HEAD" || event.url.searchParams.has("v")) return
+  // A pinned `?v=` renders: the page checks that the version exists.
+  if (!["GET", "HEAD"].includes(event.req.method) || event.url.searchParams.has("v")) return
   const { dropPath, slugify } = await import("../../shared/links")
-  // The page moves to the doc's own address (pages/d/[id]/[[slug]].vue), so HEAD on any other one is that redirect.
+  // The page moves to the doc's own address (pages/d/[id]/[[slug]].vue). Redirecting here saves rendering a page only
+  // to send that redirect, as `/d/<link>` without its slug did.
   const to = dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
   if (event.url.pathname !== to) return redirect(to + event.url.search)
-  return new HTTPResponse(null, { headers: { "content-type": "text/html;charset=utf-8" } })
+  // HEAD wants the status, not the page (a full render, ~0.9 s).
+  if (event.req.method === "HEAD")
+    return new HTTPResponse(null, { headers: { "content-type": "text/html;charset=utf-8" } })
 })

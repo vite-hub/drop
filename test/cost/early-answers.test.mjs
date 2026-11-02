@@ -72,6 +72,17 @@ test("HEAD on a share page answers without rendering it", async () => {
   assert.equal(await page("/d/doc/the-doc", "GET"), undefined)
 })
 
+test("GET on a share link without its slug redirects before the page renders", async () => {
+  insertDrop("doc", { title: "The doc", share: "public" })
+  for (const path of ["/d/doc", "/d/doc/an-old-title"]) {
+    const response = await page(`${path}?present`, "GET")
+    assert.equal(response.status, 302)
+    assert.equal(response.headers.get("location"), "/d/doc/the-doc?present")
+  }
+  // A pinned version is the page's to check first.
+  assert.equal(await page("/d/doc?v=3", "GET"), undefined)
+})
+
 test("HEAD on a share page someone can't open keeps the page's status", async () => {
   insertDrop("doc", { title: "The doc", share: "private" })
   await assert.rejects(page("/d/doc/the-doc", "HEAD"), (error) => error.status === 404)
