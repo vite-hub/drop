@@ -20,7 +20,7 @@ import { editorlessSyntax } from "#shared/frontmatter"
 import { MAX_DEPTH } from "#shared/nodes"
 import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
-import { LIVE_EDITING } from "#live-drafts"
+import { LIVE_EDITING } from "../live-drafts"
 import { expiryPolicy } from "../expiry"
 import {
   ancestorsOf,

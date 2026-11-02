@@ -4,7 +4,7 @@ import { requireRateLimit } from "vite-hub/rate-limit"
 import { joinFrontmatter, splitFrontmatter } from "#shared/frontmatter"
 import { createDocDrop, findDrop, permissions, readText, toSummary } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
-import { deleteDrafts, readDraft } from "#live-drafts"
+import { deleteDrafts, readDraft } from "../../../utils/live-drafts"
 import { routeId } from "../../../utils/params"
 
 /**

@@ -2,7 +2,7 @@ import { defineHandler, HTTPError } from "h3"
 import { splitFrontmatter } from "#shared/frontmatter"
 import { findDrop, liveEditable, readText } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
-import { ensureDraft } from "#live-drafts"
+import { ensureDraft } from "../../../utils/live-drafts"
 import { routeId } from "../../../utils/params"
 
 /** Opens the live draft of a Markdown drop's current version, starting it from the published text. People only. */

@@ -5,8 +5,15 @@ import type { Plugin } from "vite-plus"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
 const ocache = createRequire(import.meta.resolve("nitro/package.json")).resolve("ocache")
-const identity =
-  "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async () => {}"
+// Drop modules swapped by their file name, wherever they're imported from.
+const modules: Record<string, string> = {
+  identity:
+    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async () => {}",
+  "code-image-png":
+    "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
+  "live-drafts":
+    "export const LIVE_EDITING = false; export const ensureDraft = async drop => `drafts/${drop.id}/v${drop.version}.md`; export const readDraft = async () => globalThis.dropTest.draft ?? null; export const deleteDrafts = async () => {}; export const refreshLatest = async id => { globalThis.dropTest.refreshedLinks.push(id) }",
+}
 // Server modules Drop reads from Nitro and ViteHub at runtime, backed by test/cost/harness.mjs's `globalThis.dropTest`.
 const stubs: Record<string, string> = {
   "vite-hub/database/drizzle": "export const db = globalThis.dropTest.db",
@@ -21,12 +28,10 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
   "vite-hub/rate-limit":
     "export const requireRateLimit = async (_event, bucket, options) => { globalThis.dropTest.bursts.push({ bucket, ...options }); if (globalThis.dropTest.failBurst) throw Object.assign(new Error('burst limit'), { name: 'HTTPError', status: 429 }) }",
   "vite-hub/schedule": "export const defineSchedule = value => value",
+  "vite-hub/realtime/server":
+    "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true",
   "#vitehub/env/server":
     "export const deriveSecret = async (purpose) => `test-secret:${purpose}`; export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: t.githubOrg ?? '', authProxy: t.authProxy ?? false, authProxyCookie: '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: { unseal: () => t.billing ? 'sk_test' : '' }, stripeWebhookSecret: { unseal: () => t.billing ? 'whsec_test' : '' }, priceId: t.billing ? 'price_team' : '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
-  "#code-image-png":
-    "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
-  "#live-drafts":
-    "export const LIVE_EDITING = false; export const ensureDraft = async drop => `drafts/${drop.id}/v${drop.version}.md`; export const readDraft = async () => globalThis.dropTest.draft ?? null; export const deleteDrafts = async () => {}; export const refreshLatest = async id => { globalThis.dropTest.refreshedLinks.push(id) }",
 }
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.
 const baseline = new Set([
@@ -48,14 +53,17 @@ export function dropTestStubs(): Plugin {
     resolveId(id, importer) {
       if (!importer || importer.startsWith(`${root}test/`)) return
       if (id === "#comark-comments-css") return `${root}.nuxt/comark-comments-css.ts`
-      if (id in stubs || id.endsWith("/utils/identity") || id === "./identity")
-        return PREFIX + (id in stubs ? id : "identity")
+      if (id in stubs) return PREFIX + id
+      const module = Object.keys(modules).find(
+        (name) => id.endsWith(`/utils/${name}`) || id === `./${name}` || id === `../${name}`,
+      )
+      if (module) return PREFIX + module
       if (id.startsWith("#shared/")) return this.resolve(`${root}shared/${id.slice(8)}`, importer)
     },
     load(id) {
       if (id.startsWith(PREFIX)) {
         const name = id.slice(PREFIX.length)
-        return name === "identity" ? identity : stubs[name]
+        return modules[name] ?? stubs[name]
       }
       const ref = process.env.DROP_TEST_BASELINE
       const path = id.startsWith(root) ? id.slice(root.length) : ""
