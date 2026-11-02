@@ -92,7 +92,7 @@ const blocks: EditorSuggestionMenuItem[][] = [
         <USkeleton class="h-4 w-11/12" />
         <USkeleton class="h-4 w-4/5" />
       </div>
-      <EditorContent v-show="editor && synced" class="typeset" :editor="editor" />
+      <EditorContent v-show="editor && synced" class="typeset comark-typeset" :editor="editor" />
       <ViewerCodeLanguages v-if="editor && synced" :editor="editor" />
     </main>
     <template v-if="editor">

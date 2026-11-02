@@ -1,6 +1,9 @@
+/* comark-ui's typeset sits between Tailwind's base, which it styles over, and the utilities, which win over it. */
+@layer theme, base, comark, components, utilities;
 @import "tailwindcss";
 @import "@nuxt/ui";
 /* The reader's typography, for the live editor (.drop-doc below). Only the .typeset rules: never shared/document-shell.css. */
+@import "comark-ui/typeset.css";
 @import "../../../shared/typeset.css";
 
 /* Drop's colors in shadcn's names (Neutral), shared with every drop's document. */

@@ -3,7 +3,7 @@
 import { escapeUTF8 as escapeHtml } from "entities"
 import type { PlanKind } from "./plans"
 import { injectRuntime, QUIZ_BRIDGE, THEME_CSS } from "./plan-runtime"
-import { CALLOUT_CSS, TYPESET_CSS } from "./typeset"
+import { TYPESET_CSS } from "./typeset"
 
 /**
  * How wide a Markdown doc's text column runs, the reader's choice in the viewer's More menu: a readable line, a wider
@@ -13,9 +13,7 @@ import { CALLOUT_CSS, TYPESET_CSS } from "./typeset"
 export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "80rem" } as const
 export type DocWidth = keyof typeof DOC_WIDTHS
 
-const DOCUMENT_EXTRA_CSS =
-  CALLOUT_CSS +
-  `
+const DOCUMENT_EXTRA_CSS = `
 /* The text moves left only as far as it must to clear the viewer's floating panel (--drop-inset). Once the column
    can't fit beside it, the column narrows: the panel never covers the text. The outline can set --drop-outline and
    --drop-shift itself, to keep a column of its own (OUTLINE_SCRIPT); a compare keeps clear of both (document-shell.css). */
@@ -28,9 +26,6 @@ body { margin: 0; background: var(--background); color: var(--foreground); trans
 html, body { background-image: var(--surface-grain); background-size: var(--surface-grain-size); }
 main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
 @media (max-width: 36rem) { main { width: min(100% - 1.25rem, var(--drop-column, 46rem)); } }
-.task-list-item { list-style: none; margin-left: -1.25rem; }
-.mermaid { display: flex; justify-content: center; margin: 1.5rem 0; }
-.mermaid svg { max-width: 100%; height: auto; }
 .typeset :is(h2, h3) { scroll-margin-top: 1.5rem; }
 /* \`::drop\` (EMBEDS_SCRIPT): another drop's box, a link until the viewer fills it with the drop in a frame. */
 .drop-embed { display: grid; place-items: center; height: var(--drop-embed-height, 480px); margin: 1.5rem 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted); overflow: hidden; }
@@ -202,14 +197,14 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   // only as far as that needs (like for the viewer's panel). It only shows while they keep at least the text's width.
   // A doc with threads keeps them in the column, since comark-comments' cards take that room (document-shell.css), and
   // so does any doc while review comments sit in the margin (data-drop-rail, ANNOTATOR_SCRIPT).
-  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .drop-mermaid")].filter((block) => !block.closest(".cr"));
+  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .cmm[data-wide]")].filter((block) => !block.closest(".cr"));
   const column = 264;
   const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
     const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
     const text = main.getBoundingClientRect().width - 48;
     const railed = document.documentElement.getAttribute("data-drop-rail") === "open";
-    const wide = railed ? [] : blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--mermaid-width")) > text);
+    const wide = railed ? [] : blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--cmm-svg")) > text);
     if (blocks.length && !wide.length) {
       document.body.style.removeProperty("--drop-outline");
       document.body.style.removeProperty("--drop-shift");

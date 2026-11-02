@@ -7,40 +7,35 @@ const { renderMarkdownCached, RENDERER_SCRIPTS } = await import("../../server/ut
 migrate()
 beforeEach(reset)
 
-const render = async (source) => (await renderMarkdownCached("mermaid-copy.md", async () => source)).html
+const render = async (source) => (await renderMarkdownCached("mermaid.md", async () => source)).html
 
-test("Mermaid preserves its source as escaped text and loads copy controls and zoom once per document", async () => {
+test("comark-ui draws Mermaid with its source, copy buttons, and zoom, from scripts the CSP allows", async () => {
   const source = 'graph TD\n A["A & B"] --> B["Copy <text>"]\n'
   const html = await render(("```mermaid\n" + source + "```\n\n").repeat(2))
-  const sources = [
-    ...html.matchAll(/<figure class="drop-mermaid" data-source="([^"]*)" style="--mermaid-width: (\d+)px">/g),
-  ]
+  const sources = [...html.matchAll(/<div class="cmm" data-wide style="--cmm-svg:(\d+)px" data-source="([^"]*)">/g)]
   assert.equal(sources.length, 2)
-  for (const [, escaped, width] of sources) {
+  for (const [, width, escaped] of sources) {
     assert.equal(decodeHTML(escaped), source)
-    assert.ok(Number(width) > 0, "the figure carries the diagram's own width")
+    assert.ok(Number(width) > 0, "the diagram carries its own width")
   }
-  // Copy buttons and comark-zoom.
+  // Copy buttons and comark-zoom, once per document.
   assert.equal([...html.matchAll(/<script>/g)].length, 2)
   for (const [, script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
     assert.ok(RENDERER_SCRIPTS.includes(script), "every renderer script is allowed by the CSP")
   }
   assert.match(html, /Copy image/)
-  assert.match(html, /Copy Markdown/)
-  assert.match(html, /<div class="mermaid" data-zoom tabindex="0"><svg/)
-  assert.doesNotMatch(html, /@import url/)
+  assert.match(html, /<div data-zoom tabindex="0" class="pele-diagram"/)
 })
 
-test("Mermaid's render limits still leave excess and invalid diagrams as selectable source", async () => {
+test("Mermaid past a doc's limits shows its source as code and says why above the doc", async () => {
   const html = await render("```mermaid\ngraph LR\n A --> B\n```\n\n".repeat(5))
-  assert.equal([...html.matchAll(/<figure class="drop-mermaid"/g)].length, 4)
-  assert.equal([...html.matchAll(/<pre class="mermaid-error">/g)].length, 1)
+  assert.equal([...html.matchAll(/<div class="cmm"/g)].length, 4)
+  assert.match(html, /class="render-error"[\s\S]*Mermaid diagram 5 shows its source as code/)
 })
 
-test("invalid Mermaid has no copy-image controls", async () => {
+test("invalid Mermaid shows its source", async () => {
   const html = await render("```mermaid\nnot a diagram\n```")
-  assert.match(html, /mermaid-error/)
-  assert.doesNotMatch(html, /drop-mermaid|Copy image/)
+  assert.match(html, /<div class="pele-diagram" data-error="[^"]+"><pre class="pele-source"><code>not a diagram/)
 })
 
 test("a diagram label cannot inject markup through its preserved source", async () => {
@@ -56,4 +51,13 @@ test("a frontmatter date gets comark-properties' locale script, which the CSP al
   assert.ok(scripts.some((script) => script.includes("localizeDates")))
   for (const script of scripts)
     assert.ok(RENDERER_SCRIPTS.includes(script), "every renderer script is allowed by the CSP")
+})
+
+test("a doc past the Mermaid limits still publishes, with a warning", async () => {
+  const { lintMarkdown } = await import("../../server/utils/markdown-document.ts")
+  const problems = await lintMarkdown("```mermaid\ngraph LR\n A --> B\n```\n\n".repeat(5))
+  assert.deepEqual(
+    problems.map(({ rule, severity }) => [rule, severity]),
+    [["comark/mermaid/too-many-diagrams", "warning"]],
+  )
 })

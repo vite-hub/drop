@@ -211,58 +211,32 @@ p.render-error {
   }
 }
 
-/* Wide tables. Typeset keeps headers on one line, so a table with several long headers outgrew the column and ran
-   off the page. Headers wrap like cells, and a table that still can't fit scrolls inside the column (GitHub's way). */
-.typeset table:not(.typeset-scroll table) {
-  display: block;
-  overflow-x: auto;
-}
-.typeset thead th {
-  white-space: normal;
-}
-
-/* A before/after compare takes the room beside the text column, so its screenshots read at about twice the size.
-   It centers on the column, which sits --drop-shift left of the page's middle, and keeps 1.5rem clear of the page's
-   left edge and of what covers its right: the viewer's floating panel and the outline's column (--drop-right). It never
-   gets narrower than the text. A heading right above it spans the same width, so it starts where Before does and
-   reads as the compare's title. The first compare has the annotation styles between the two. */
-.typeset .ca-compare,
-.typeset :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare) {
-  --ca-wide: max(
-    100%,
-    min(
-      72rem,
-      100vw - 2 * var(--drop-right, 0px) + var(--drop-shift, 0px) - 3rem,
-      100vw - var(--drop-shift, 0px) - 3rem
-    )
+/* comark-ui's wide blocks (data-wide: a before/after compare, a Mermaid diagram wider than the text) take the room
+   beside the text column, up to their own width and 72rem, so screenshots read at about twice the size and a diagram's
+   labels keep their size. They center on the column, which sits --drop-shift left of the page's middle, and keep 1.5rem
+   clear of the page's left edge and of what covers its right: the viewer's floating panel and the outline's column
+   (--drop-right). OUTLINE_SCRIPT moves the text and the outline aside for them. A heading right above a compare spans
+   the same width, so it starts where Before does and reads as the compare's title. */
+.typeset {
+  --comark-wide-start: calc(
+    (min(100vw - 2 * var(--drop-right, 0px) + var(--drop-shift, 0px), 100vw - var(--drop-shift, 0px)) - 3rem - 100%) / 2
   );
-  width: var(--ca-wide);
-  margin-inline: calc((100% - var(--ca-wide)) / 2);
+  --comark-wide-end: var(--comark-wide-start);
+  /* The doc keeps the page's system font rather than the app's Geist, and Drop paints the app's grain on the whole
+     frame (DOCUMENT_EXTRA_CSS), not again on the text. */
+  --comark-font: var(--font-body);
+  --comark-grain: none;
 }
-
-/* A Mermaid diagram wider than the text takes the same room, up to its own width, so its labels keep their size
-   instead of shrinking to fit the column. OUTLINE_SCRIPT moves the text and the outline aside for it as for a compare.
-   Where even that room is too narrow, it shrinks, and a click zooms it. */
-.typeset .drop-mermaid {
-  --ca-wide: max(
-    100%,
-    min(
-      var(--mermaid-width, 0px),
-      72rem,
-      100vw - 2 * var(--drop-right, 0px) + var(--drop-shift, 0px) - 3rem,
-      100vw - var(--drop-shift, 0px) - 3rem
-    )
-  );
+.typeset > :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare) {
+  --ca-wide: max(100%, min(72rem, 100% + 2 * var(--comark-wide-start)));
   width: var(--ca-wide);
   margin-inline: calc((100% - var(--ca-wide)) / 2);
 }
 
 /* In a doc with threads, or review comments in the margin, the room beside the text is the cards', so a compare, its
    heading, and a wide diagram stay in the column. */
-:is(.typeset .cr, [data-drop-rail="open"] .typeset)
-  :is(.ca-compare, .drop-mermaid, :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare)) {
-  width: auto;
-  margin-inline: 0;
+:is(.typeset:has(.cr), [data-drop-rail="open"] .typeset) {
+  --comark-wide-start: 0px;
 }
 
 /* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.
