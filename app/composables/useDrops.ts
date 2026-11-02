@@ -289,14 +289,14 @@ export function useDropActions() {
     }
   }
 
-  /** A new site review at the top, or inside `parent`, where it lives with the folder. */
+  /** A new site review inside `parent`, where it lives with the folder; without one, the server puts it in Site reviews. */
   async function createSite(input: { url: string; title?: string }, parent?: Pick<DropSummary, "id">) {
     try {
       const site = await $fetch<DropSummary>("/api/sites", {
         method: "POST",
         body: { ...input, ...(parent ? { folder: parent.id } : {}) },
       })
-      refreshAfterCreate(parent)
+      refreshAfterCreate(parent ?? (site.parentId ? { id: site.parentId } : undefined))
       return site
     } catch (error) {
       notify.fail("Couldn't create the site review", error)

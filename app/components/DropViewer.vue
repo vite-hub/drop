@@ -1006,8 +1006,12 @@ watch(
           <ViewerSite
             v-else-if="drop.kind === 'site'"
             ref="siteRef"
+            :comments="comments"
             :drop="drop"
             :reviewing="commentsOpen && drop.canComment && annotationsEnabled && !editing"
+            :screenshots="screenshots"
+            @focus="focusComment"
+            @resolve="resolve"
           />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
           <ViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />

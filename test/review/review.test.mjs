@@ -243,16 +243,46 @@ test("an agent creates one site drop for every preview, and the tag it gets carr
   assert.match((await call(publish, { previous: drop.id, markdown: "# A", note: "x" })).message, /previous is a site/)
 })
 
-test("people create a site review in the app, at the top or in a folder, within their plan", async () => {
+test("people create a site review in the app, in Site reviews or a folder they pick, within their plan", async () => {
   state.who = who
   const top = await newSite(post("/api/sites", { url: ` ${PATTERN}/ `, title: "Acme previews" }))
+  const reviews = sql.prepare("SELECT * FROM drops WHERE id = ?").get(top.parentId)
   assert.deepEqual(
-    { kind: top.kind, title: top.title, share: top.share, lifetime: top.lifetime, parentId: top.parentId },
-    { kind: "site", title: "Acme previews", share: "private", lifetime: "review", parentId: null },
+    {
+      kind: reviews.kind,
+      title: reviews.title,
+      slug: reviews.slug,
+      parent: reviews.parent_id,
+      owner: reviews.owner_id,
+    },
+    { kind: "folder", title: "Site reviews", slug: "site-reviews", parent: null, owner: who.userId },
+  )
+  assert.deepEqual(
+    { kind: top.kind, title: top.title, share: top.share, lifetime: top.lifetime },
+    { kind: "site", title: "Acme previews", share: "private", lifetime: "review" },
   )
   assert.equal(sql.prepare("SELECT site_url FROM drops WHERE id = ?").get(top.id).site_url, PATTERN)
+  sql.prepare("UPDATE drops SET title = 'Previews' WHERE id = ?").run(reviews.id)
   const named = await newSite(post("/api/sites", { url: "http://localhost:3000" }))
   assert.equal(named.title, "localhost:3000", "named after its host by default")
+  assert.equal(named.parentId, reviews.id, "the same folder, renamed or not")
+
+  // One that has to outlive the folder, or go sooner, stays at the top.
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const agents = await call(publish, { site: { url: SITE }, note: "x", lifetime: "review" })
+  assert.equal(
+    sql.prepare("SELECT parent_id FROM drops WHERE id = ?").get(agents.structuredContent.id).parent_id,
+    reviews.id,
+  )
+  const brief = await call(publish, { site: { url: SITE }, note: "x", lifetime: "temporary" })
+  assert.equal(sql.prepare("SELECT parent_id FROM drops WHERE id = ?").get(brief.structuredContent.id).parent_id, null)
+  state.who = who
+
+  // An expired one is left alone: a new folder takes the reviews from then on.
+  sql.prepare("UPDATE drops SET last_accessed_at = 0, created_at = 0 WHERE id = ?").run(reviews.id)
+  const later = await newSite(post("/api/sites", { url: SITE }))
+  assert.notEqual(later.parentId, reviews.id)
+  assert.equal(sql.prepare("SELECT title FROM drops WHERE id = ?").get(later.parentId).title, "Site reviews")
 
   const folder = await newFolder(post("/api/folders", { title: "Acme" }))
   sql.prepare("UPDATE drops SET lifetime = 'temporary' WHERE id = ?").run(folder.id)

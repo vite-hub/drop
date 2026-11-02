@@ -1,11 +1,17 @@
 <script setup lang="ts">
-// A site drop's page: the website under review and the ways to comment on it. Opening it here in Drop comes first; the
-// bookmarklet (for sites that refuse frames) and the optional tag in preview builds sit below it. Feedback and
-// screenshots live in the viewer's bottom review dock.
+// A site drop's page: the address to open the website at, then its comments. The other ways to comment (the bookmarklet
+// for sites that refuse frames, the tag for preview builds) fold away below once there's feedback to read. A comment's
+// thread opens in the viewer's bottom review dock.
 import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
-import type { DropDetail } from "#shared/types"
+import type { DropComment, DropDetail, SiteReviewItem } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; reviewing: boolean }>()
+const props = defineProps<{
+  drop: DropDetail
+  reviewing: boolean
+  comments: DropComment[]
+  screenshots: Map<string, SiteReviewItem["screenshot"]>
+}>()
+const emit = defineEmits<{ focus: [comment: DropComment]; resolve: [id: string, resolved: boolean] }>()
 
 const origin = useRequestURL().origin
 const snippet = reviewSnippet(origin)
@@ -49,6 +55,19 @@ defineExpose({
   canDraw: computed(() => Boolean(framed.value)),
   pending: computed(() => siteFrame.value?.pending ?? false),
 })
+// Where a comment was written, as an address the frame can open: a pattern's comments carry their preview's origin.
+function pageUrl(comment: DropComment) {
+  const page = comment.page
+  if (!page) return undefined
+  const url = /^https?:\/\//.test(page)
+    ? page
+    : siteLink.value && page.startsWith("/")
+      ? new URL(page, siteLink.value).href
+      : ""
+  return url && siteCovers(props.drop.siteUrl, url) ? url : undefined
+}
+// Ways to comment start open until the first comment, then fold away under the feedback.
+const setupOpen = ref(props.comments.length === 0)
 function openHere(event: SubmitEvent) {
   if (addressCovered.value) {
     framed.value = new URL(address.value).href
@@ -71,7 +90,7 @@ function openHere(event: SubmitEvent) {
     @close="framed = null"
   />
   <div v-else class="min-h-0 flex-1 overflow-y-auto">
-    <div class="mx-auto max-w-3xl space-y-10 px-4 py-10 sm:px-6">
+    <div class="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
       <section class="space-y-3">
         <form v-if="drop.canComment" class="flex items-center gap-2" novalidate @submit.prevent="openHere">
           <UInput
@@ -136,9 +155,8 @@ function openHere(event: SubmitEvent) {
             Paste any preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span
             >.
           </template>
-          Open Comments to write feedback. You can also drag over the page to include an area, or press
-          <UKbd value="R" />
-          to start. Your browser asks to share the screen only when you mark an area.
+          Open it here, then drag over anything to comment on it, or press <UKbd value="R" />. Your browser asks to
+          share the screen only when you mark an area.
         </p>
         <p v-else-if="pattern" class="text-sm text-pretty text-muted">
           Covers every preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span
@@ -146,10 +164,37 @@ function openHere(event: SubmitEvent) {
         </p>
       </section>
 
-      <section v-if="drop.canComment" class="space-y-3">
-        <h2 class="label-mono">Other ways to comment</h2>
-        <ul class="divide-y divide-default">
-          <li class="flex flex-wrap items-center gap-x-6 gap-y-3 pb-5 last:pb-0">
+      <ViewerSiteComments
+        :can-manage="drop.isOwner"
+        :comments="comments"
+        :page-url="pageUrl"
+        :pattern="pattern"
+        :screenshots="screenshots"
+        @focus="emit('focus', $event)"
+        @resolve="(id, resolved) => emit('resolve', id, resolved)"
+        @review="(url) => (framed = url)"
+      />
+
+      <details
+        v-if="drop.canComment"
+        class="group/setup rounded-lg border border-default"
+        :open="setupOpen"
+        @toggle="setupOpen = ($event.target as HTMLDetailsElement).open"
+      >
+        <summary
+          class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg px-4 text-sm font-medium text-highlighted transition-colors duration-150 select-none focus-visible:ring-2 focus-visible:ring-inverted focus-visible:outline-none pointer-fine:hover:bg-elevated/50 [&::-webkit-details-marker]:hidden"
+        >
+          <UIcon
+            name="i-mingcute-right-line"
+            class="size-4 text-muted transition-transform duration-150 ease-(--ease-out) group-open/setup:rotate-90 motion-reduce:transition-none"
+          />
+          Other ways to comment
+          <span class="ml-auto text-xs font-normal text-muted"
+            >Bookmarklet{{ drop.isOwner ? ", preview tag" : "" }}</span
+          >
+        </summary>
+        <ul class="divide-y divide-default border-t border-default px-4">
+          <li class="flex flex-wrap items-center gap-x-6 gap-y-3 py-4">
             <div class="min-w-0 flex-1 space-y-1">
               <h3 class="text-sm font-medium text-highlighted">Bookmarklet</h3>
               <p class="text-sm text-pretty text-muted">
@@ -170,7 +215,7 @@ function openHere(event: SubmitEvent) {
               </a>
             </UTooltip>
           </li>
-          <li v-if="drop.isOwner" class="space-y-3 pt-5">
+          <li v-if="drop.isOwner" class="space-y-3 py-4">
             <div class="space-y-1">
               <h3 class="text-sm font-medium text-highlighted">Comment button on previews</h3>
               <p class="text-sm text-pretty text-muted">
@@ -181,7 +226,7 @@ function openHere(event: SubmitEvent) {
             <AgentsCodeBlock :code="snippet" />
           </li>
         </ul>
-      </section>
+      </details>
     </div>
   </div>
 </template>

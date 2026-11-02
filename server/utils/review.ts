@@ -24,6 +24,8 @@ import { drops, user } from "../databases/config"
 import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
 import { addThread, authorOf, siteCommentList, threadsFor, toComment, undoThread } from "./comments"
 import { siteCoversDrop } from "./content-origin"
+import { isExpired, expiryPolicy, renewDrop } from "./expiry"
+import { createFolder } from "./folders"
 import {
   deleteDrop,
   type DropRow,
@@ -287,6 +289,40 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
   })
 }
 
+const SITE_REVIEWS_SLUG = /^site-reviews(-\d+)?$/
+
+/**
+ * The top-level folder site reviews go in when nobody picks one: the owner's newest Site reviews folder that hasn't
+ * expired, renewed since a review is going in, or a new one. Found by its slug, so renaming it keeps it.
+ */
+async function siteReviewsFolder(who: Identity, event?: H3Event) {
+  const now = Date.now()
+  const { days } = expiryPolicy(event)
+  const folders = await db
+    .select()
+    .from(drops)
+    .where(
+      and(
+        eq(drops.ownerId, who.userId),
+        eq(drops.kind, "folder"),
+        eq(drops.teamFolder, false),
+        isNull(drops.parentId),
+        isNull(drops.trashedAt),
+        isNull(drops.quarantinedAt),
+      ),
+    )
+    .orderBy(desc(drops.createdAt))
+  const folder = folders.find((row) => SITE_REVIEWS_SLUG.test(row.slug ?? "") && !isExpired(row, now, days))
+  if (!folder)
+    return createFolder(
+      who,
+      { title: "Site reviews", slug: "site-reviews", note: "Site reviews made without a folder land here." },
+      event,
+    )
+  await renewDrop(folder, now)
+  return folder
+}
+
 /** A new site drop: no file, just the address people review. In a folder it lives with the folder, like any drop. */
 export async function createSiteDrop(
   who: Identity,
@@ -307,7 +343,10 @@ export async function createSiteDrop(
       status: 400,
       statusText: "That address is Drop itself or where it shows drops, which can't be a site to review.",
     })
-  const folder = input.folder ?? null
+  // Without a folder, a review goes in the owner's Site reviews folder, unless it asks to live longer or shorter than
+  // the folder does: a drop in a folder lives with it.
+  const folder =
+    input.folder ?? (!input.lifetime || input.lifetime === "review" ? await siteReviewsFolder(who, event) : null)
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
   await requireKeepSlot(ownerId, life, false, !folder)
