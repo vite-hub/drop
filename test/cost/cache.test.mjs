@@ -15,11 +15,12 @@ beforeEach(() => {
   state.failCacheDelete = false
 })
 const render = async (text) => ({ title: text, html: `<p>${text}</p>` })
+// Nitro's own unstorage, as the server stores renders with it.
+const unstorage = createRequire(import.meta.resolve("nitro/package.json"))
+const { createStorage } = await import(pathToFileURL(unstorage.resolve("unstorage")))
 
 test("KV writes physically expire in 30 days through the actual unstorage driver", async () => {
-  const require = createRequire(import.meta.resolve("nitro/package.json"))
-  const { createStorage } = await import(pathToFileURL(require.resolve("unstorage")))
-  const { default: driver } = await import(pathToFileURL(require.resolve("unstorage/drivers/cloudflare-kv-binding")))
+  const { default: driver } = await import(pathToFileURL(unstorage.resolve("unstorage/drivers/cloudflare-kv-binding")))
   const writes = []
   const binding = { get: async () => null, delete: async () => {}, put: async (...args) => writes.push(args) }
   const previous = state.storage
@@ -40,8 +41,6 @@ test("KV writes physically expire in 30 days through the actual unstorage driver
 
 test("off Cloudflare the memory cache keeps a 30-day render instead of dropping it at once", async () => {
   // Before unstorage alpha.11, this TTL overflowed setTimeout and evicted the render after 1 ms.
-  const require = createRequire(import.meta.resolve("nitro/package.json"))
-  const { createStorage } = await import(pathToFileURL(require.resolve("unstorage")))
   const previous = state.storage
   state.storage = createStorage()
   try {
@@ -63,26 +62,19 @@ test("expired memory/filesystem entries refetch and rerender rather than serving
   assert.equal(calls.writes.length, 2)
 })
 
-test("renders cached before the comments preset are refreshed on the next read", async () => {
-  state.entries.set(KEY, {
-    integrity: "13",
-    mtime: Date.now(),
-    value: { title: "Old document", html: "Unsupported component: comment", source: "source" },
-  })
-  const next = await cachedMarkdown("doc.md", async () => "source", render)
-  assert.equal(next.html, "<p>source</p>")
-  assert.equal(calls.writes.length, 1)
-})
-
-test("renders from an older comark-ui release are refreshed on the next read", async () => {
-  state.entries.set(KEY, {
-    integrity: "0.7.6+drop.18",
-    mtime: Date.now(),
-    value: { title: "Old document", html: "<p>old</p>", source: "source" },
-  })
-  const next = await cachedMarkdown("doc.md", async () => "source", render)
-  assert.equal(next.html, "<p>source</p>")
-  assert.equal(calls.writes.length, 1)
+test("renders from an older release of Drop's renderer are refreshed on the next read", async () => {
+  // Before the comments preset, and from an older comark-ui.
+  for (const integrity of ["13", "0.7.6+drop.18"]) {
+    state.entries.set(KEY, {
+      integrity,
+      mtime: Date.now(),
+      value: { title: "Old", html: "<p>old</p>", source: "source" },
+    })
+    calls.writes.length = 0
+    const next = await cachedMarkdown("doc.md", async () => "source", render)
+    assert.equal(next.html, "<p>source</p>")
+    assert.equal(calls.writes.length, 1)
+  }
 })
 
 test("cache hits do not read source or render again, and deletion removes the render", async () => {
