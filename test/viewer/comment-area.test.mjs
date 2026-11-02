@@ -15,7 +15,7 @@ import {
 import { createInjectionState, useFileDialog } from "@vueuse/core"
 import { useViewerAnnotations } from "../../app/composables/useViewerAnnotations.ts"
 import { useImagePicks } from "../../app/composables/useImagePicks.ts"
-import { MARK_COLORS, MARK_TIPS } from "../../app/utils/marker.ts"
+import { MARK_COLORS, MARK_TIPS } from "../../shared/utils/marker.ts"
 
 for (const [name, value] of Object.entries({
   computed,

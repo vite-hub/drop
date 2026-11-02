@@ -323,7 +323,7 @@ export default defineNuxtConfig({
         "mingcute:pad-line",
         "mingcute:laptop-line",
         "mingcute:monitor-line",
-        // The Marker's tips (MARK_TIPS in app/utils/marker.ts).
+        // The Marker's tips (MARK_TIPS in shared/utils/marker.ts).
         "mingcute:mark-pen-line",
         "mingcute:pen-2-line",
         "mingcute:arrow-right-up-line",
