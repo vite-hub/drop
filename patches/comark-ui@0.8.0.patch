@@ -1,0 +1,133 @@
+diff --git a/dist/index-DVGSDzBS.d.mts b/dist/index-DVGSDzBS.d.mts
+index 574da0f..e13f1df 100644
+--- a/dist/index-DVGSDzBS.d.mts
++++ b/dist/index-DVGSDzBS.d.mts
+@@ -36,6 +36,12 @@ declare const TYPESET_TAG = "typeset-styles";
+ declare const typeset: import("comark").ComarkPluginFactory<unknown, {}, {}>;
+ //#endregion
+ //#region src/index.d.ts
++/** What the preset needs of a Shiki highlighter: a `HighlighterCore` from `shiki/core` fits it. */
++type ShikiHighlighter = {
++  codeToTokens(code: string, options: { lang: string; themes: { light: string; dark?: string } }): {
++    tokens: { content: string; color?: string; htmlStyle?: Record<string, string> }[][];
++  };
++};
+ /**
+  * `false` turns a plugin off, and an object turns it on with those options. Everything but `include` is on, and cast,
+  * table, and tests read no files until they get options.
+@@ -108,6 +114,21 @@ type PresetOptions = {
+   /** Reads no JUnit reports unless you pass `{ root }` or `{ read }`; inline reports render either way. */
+   tests?: TestsOptions | boolean;
+   zoom?: ZoomOptions | boolean;
++  /**
++   * Highlights fenced code with your own Shiki, before comark-code. Off unless you pass one, so the preset bundles no
++   * grammars. A host that renders documents it didn't write can pass `{ maxBlocks, maxSource }`: the blocks past either
++   * limit show without colors, each with an issue.
++   */
++  shiki?: {
++    /** Your Shiki, with the fence's language loaded, or `undefined` to leave the block plain. */
++    highlighter: (language: string) => ShikiHighlighter | undefined | Promise<ShikiHighlighter | undefined>;
++    /** Theme names your highlighter has loaded. The dark one goes in `--shiki-dark`. */
++    themes: { light: string; dark?: string };
++    /** How many code blocks a document highlights. The ones after show without colors. */
++    maxBlocks?: number;
++    /** How many characters of code a document highlights, over all its blocks. A block past it shows without colors. */
++    maxSource?: number;
++  } | false;
+   code?: CodeOptions | boolean;
+   codeNotes?: boolean;
+   /**
+diff --git a/dist/src-PkmYCSNu.mjs b/dist/src-PkmYCSNu.mjs
+index 05fd6d6..97555d5 100644
+--- a/dist/src-PkmYCSNu.mjs
++++ b/dist/src-PkmYCSNu.mjs
+@@ -20,6 +20,81 @@ const typeset = defineComarkPlugin(() => ({
+ 	}
+ }));
+ //#endregion
++//#region src/shiki.ts
++const isElement = (node) => Array.isArray(node) && node[0] !== null;
++const childrenOf = ([, , ...rest]) => rest;
++function blocksOf(nodes, found = []) {
++	for (const node of nodes) {
++		if (!isElement(node)) continue;
++		if (node[0] === "pre" && node[1].$?.html !== 1) found.push(node);
++		else blocksOf(childrenOf(node), found);
++	}
++	return found;
++}
++const spanOf = (token) => {
++	const style = Object.entries(token.htmlStyle ?? (token.color ? { color: token.color } : {})).map(([name, value]) => `${name}:${value}`).join(";");
++	return style ? [
++		"span",
++		{ style },
++		token.content
++	] : token.content;
++};
++/**
++* Highlights fenced code with the host's own Shiki, before comark-code reads the lines, within a document's limits, so
++* a host that renders other people's documents bounds the time Shiki spends. Each block past them is a `meta.issues`
++* entry. A grammar that fails leaves its block plain.
++*/
++const shiki = defineComarkPlugin((options) => ({
++	name: "comark-ui-shiki",
++	async post({ tree }) {
++		const { highlighter, themes, maxBlocks = Infinity, maxSource = Infinity } = options;
++		const issues = [];
++		let drawn = 0;
++		let source = 0;
++		for (const [n, pre] of blocksOf(tree.nodes).entries()) {
++			const code = childrenOf(pre)[0];
++			const language = pre[1].language;
++			if (!language || !isElement(code) || code[0] !== "code") continue;
++			const [text, ...rest] = childrenOf(code);
++			if (text === void 0 || Array.isArray(text) || rest.length) continue;
++			let shiki;
++			try {
++				shiki = await highlighter(language);
++			} catch {}
++			if (!shiki) continue;
++			const why = drawn >= maxBlocks ? ["comark/shiki/too-many-blocks", `a document highlights at most ${maxBlocks} code blocks. Move it to another document`] : source + text.length > maxSource ? ["comark/shiki/source-too-long", `a document highlights at most ${maxSource} characters of code. Shorten it or move it to another document`] : void 0;
++			if (why) {
++				issues.push([why[0], `Code block ${n + 1} shows without colors, because ${why[1]}.`]);
++				continue;
++			}
++			let tokens;
++			try {
++				tokens = shiki.codeToTokens(text, {
++					lang: language,
++					themes
++				}).tokens;
++			} catch {
++				continue;
++			}
++			drawn++;
++			source += text.length;
++			const lines = tokens.flatMap((line, index) => [...index ? ["\n"] : [], [
++				"span",
++				{ class: "line" },
++				...line.map(spanOf)
++			]]);
++			code.splice(2, code.length - 2, ...lines);
++			pre[1].class = ["shiki", pre[1].class].filter(Boolean).join(" ");
++		}
++		if (!issues.length) return;
++		tree.meta.issues = [...tree.meta.issues ?? [], ...issues.map(([, message]) => message)];
++		tree.meta.issueRules = {
++			...tree.meta.issueRules,
++			...Object.fromEntries(issues.map(([rule, message]) => [message, rule]))
++		};
++	}
++}));
++//#endregion
+ //#region src/index.ts
+ const on = (value, fallback = true) => value === void 0 ? fallback : value !== false;
+ const optionsOf = (value) => value === true || value === false ? void 0 : value;
+@@ -101,6 +176,7 @@ function preset(renderer, options = {}) {
+ 	parse(xref, options.xref);
+ 	add(renderer.tests, options.tests, optionsOf(options.tests) ?? noFiles);
+ 	add(renderer.zoom, options.zoom);
++	if (options.shiki) plugins.push(shiki(options.shiki));
+ 	add(renderer.code, options.code, {
+ 		iconResolver: icons,
+ 		...optionsOf(options.code)

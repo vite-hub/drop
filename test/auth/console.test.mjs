@@ -131,55 +131,28 @@ test("access notes describe the configured allowlist, organization and sign-in m
   assert.match(restricted, /Email and password/)
 })
 
-test("Console roles and Admins membership follow policy changes for accounts without new sessions", async () => {
+// The Console reads every other account's role through `console.roles.read` in server/auth.ts, so opening it writes
+// none of them; it never sweeps the user table.
+test("opening the Console writes no other account's role", async () => {
   sql.exec(`INSERT INTO user (id, name, email, email_verified, role) VALUES
-    ('promoted', 'Promoted', 'Promoted@example.com', 1, 'member'),
-    ('removed', 'Removed', 'removed@example.com', 1, 'admin'),
-    ('unverified', 'Unverified', 'unverified@example.com', 0, 'admin')`)
-  state.admins = `${user.email}, PROMOTED@example.com unverified@example.com`
+    ('promoted', 'Promoted', 'promoted@example.com', 1, 'member'),
+    ('removed', 'Removed', 'removed@example.com', 1, 'admin')`)
+  state.admins = `${user.email}, promoted@example.com`
+  queries.length = 0
   assert.equal(await authorize({ request, user }), true)
-  const rows = sql.prepare("SELECT id, role FROM user ORDER BY id").all()
   assert.deepEqual(
-    rows.map(({ id, role }) => [id, role]),
+    sql
+      .prepare("SELECT id, role FROM user WHERE id IN ('promoted', 'removed') ORDER BY id")
+      .all()
+      .map(({ id, role }) => [id, role]),
     [
-      ["operator", "admin"],
-      ["owner", "member"],
-      ["promoted", "admin"],
-      ["removed", "member"],
-      ["unverified", "member"],
+      ["promoted", "member"],
+      ["removed", "admin"],
     ],
   )
-  assert.deepEqual(
-    sql
-      .prepare("SELECT id FROM user WHERE role = 'admin' ORDER BY id")
-      .all()
-      .map((row) => row.id),
-    ["operator", "promoted"],
+  assert.equal(
+    queries.filter(({ query }) => query.startsWith("select") && query.includes('from "user"') && !query.includes("where"))
+      .length,
+    0,
   )
-  state.admins = `${user.email}, removed@example.com`
-  await authorize({ request, user })
-  assert.deepEqual(
-    sql
-      .prepare("SELECT id FROM user WHERE role = 'admin' ORDER BY id")
-      .all()
-      .map((row) => row.id),
-    ["operator", "removed"],
-  )
-})
-
-test("Console role sweeps are shared by concurrent requests and cached until policy changes", async () => {
-  state.admins = `${user.email}, cache-test@example.com`
-  queries.length = 0
-  await Promise.all(Array.from({ length: 5 }, async () => authorize({ request, user })))
-  const sweeps = () =>
-    queries.filter(
-      ({ query }) => query.startsWith("select") && query.includes('from "user"') && !query.includes("where"),
-    )
-  assert.equal(sweeps().length, 1)
-  queries.length = 0
-  await authorize({ request, user })
-  assert.equal(sweeps().length, 0)
-  state.admins = user.email
-  await authorize({ request, user })
-  assert.equal(sweeps().length, 1)
 })

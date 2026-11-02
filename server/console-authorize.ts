@@ -3,7 +3,6 @@ import * as v from "valibot"
 import { defineConsoleAuthorize } from "vite-hub/console/auth"
 import { contentHost } from "./utils/content-origin"
 import { roleOf, syncRole } from "./utils/identity"
-import { syncConsoleRoles } from "./utils/auth-console"
 import { isMember } from "./utils/members"
 
 const Operator = v.object({
@@ -19,8 +18,7 @@ export default defineConsoleAuthorize(async ({ request, user }) => {
   const parsed = v.safeParse(Operator, user)
   if (!parsed.success || parsed.output.banned || roleOf(parsed.output) !== "admin") return false
   if (!(await isMember(parsed.output.id))) return false
-  // Refresh all accounts once per deployment policy, and always repair the current operator.
-  await syncConsoleRoles()
+  // Always repair the current operator, whose stored role Better Auth's admin endpoints check.
   await syncRole(parsed.output.id)
   // Grant all sections, including Comments for the page toolbar, Console triage, and ViteHub MCP tools.
   return true

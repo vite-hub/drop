@@ -1,0 +1,136 @@
+diff --git a/dist/console-runtime.js b/dist/console-runtime.js
+index cd50a07..864ee44 100644
+--- a/dist/console-runtime.js
++++ b/dist/console-runtime.js
+@@ -20,6 +20,13 @@ const userSummary = (user) => ({
+ 	email: string(user.email),
+ 	image: typeof user.image === "string" ? user.image : null
+ });
++const publicUser = (row) => ({
++	...userSummary(row),
++	emailVerified: row.emailVerified === true,
++	createdAt: new Date(date(row.createdAt)),
++	updatedAt: new Date(date(row.updatedAt))
++});
++const publicUserFields = ["id", "name", "email", "image", "emailVerified", "createdAt", "updatedAt"];
+ const equality = (field, value) => [{
+ 	field,
+ 	value
+@@ -36,6 +43,7 @@ function adminPlugin(options) {
+ 		userIds: strings(settings.adminUserIds)
+ 	};
+ }
++const isAdmin = (admin, id, role) => (role || string(admin.settings.defaultRole) || "user").split(",").some((name) => admin.roles.includes(name)) || admin.userIds.includes(id);
+ const endpoints = {
+ 	ban: "banUser",
+ 	unban: "unbanUser",
+@@ -163,9 +171,14 @@ function describeAuthConsoleFields(options, policy = {}) {
+ * Impersonation stays off unless `host.impersonation` is `true`.
+ */
+ function createAuthConsole(auth, policy = {}, events, host = {}) {
++	const readRoles = policy.roles && typeof policy.roles === "object" && "read" in policy.roles ? policy.roles.read : void 0;
+ 	async function context() {
+ 		return await auth.$context;
+ 	}
++	async function rolesOf(rows) {
++		const computed = readRoles ? await readRoles(rows.map(publicUser)) : {};
++		return new Map(rows.map((row) => [string(row.id), string(computed[string(row.id)]) || string(row.role)]));
++	}
+ 	function endpoint(name) {
+ 		const call = Reflect.get(auth.api, name);
+ 		if (typeof call !== "function") return void 0;
+@@ -270,7 +283,9 @@ function createAuthConsole(auth, policy = {}, events, host = {}) {
+ 		const ban = new Date(date(row.banExpires) || NaN).getTime();
+ 		if (row.banned === true && !(ban < Date.now())) return disabled("Better Auth does not open sessions for banned users.");
+ 		const admin = adminPlugin((await context()).options);
+-		if (((string(row.role) || string(admin.settings.defaultRole) || "user").split(",").some((role) => admin.roles.includes(role)) || admin.userIds.includes(string(row.id))) && admin.settings.allowImpersonatingAdmins !== true && !(request && await permitted(request, { user: ["impersonate-admins"] }))) return disabled("Better Auth does not impersonate administrators.");
++		const id = string(row.id);
++		const computed = readRoles ? (await rolesOf([row])).get(id) : void 0;
++		if ((isAdmin(admin, id, string(row.role)) || computed !== void 0 && isAdmin(admin, id, computed)) && admin.settings.allowImpersonatingAdmins !== true && !(request && await permitted(request, { user: ["impersonate-admins"] }))) return disabled("Better Auth does not impersonate administrators.");
+ 		return { enabled: true };
+ 	}
+ 	async function activity(query = {}) {
+@@ -472,7 +487,10 @@ function createAuthConsole(auth, policy = {}, events, host = {}) {
+ 			mode: "insensitive",
+ 			connector: "OR"
+ 		}]);
+-		if (query.filter === "admins") {
++		if (query.filter === "admins" && readRoles) {
++			const adminIds = await computedAdminIds(adminPlugin(ctx.options));
++			matches = matches ? matches.filter((id) => adminIds.has(id)) : [...adminIds].sort();
++		} else if (query.filter === "admins") {
+ 			const admin = adminPlugin(ctx.options);
+ 			const matchesRole = admin.roles.flatMap((role) => [
+ 				{
+@@ -536,19 +554,29 @@ function createAuthConsole(auth, policy = {}, events, host = {}) {
+ 			items: await enrichUsers(result.items)
+ 		};
+ 	}
++	async function computedAdminIds(admin) {
++		const db = await adapter();
++		const result = /* @__PURE__ */ new Set();
++		for (let offset = 0;; offset += 500) {
++			const rows = await db.findMany({
++				model: "user",
++				select: [...publicUserFields, "role"],
++				offset,
++				limit: 500,
++				sortBy: { field: "id", direction: "asc" }
++			});
++			for (const [id, role] of await rolesOf(rows)) if (isAdmin(admin, id, role)) result.add(id);
++			if (rows.length < 500) return result;
++		}
++	}
+ 	async function enrichUsers(rows) {
+ 		const db = await adapter();
+ 		const fields = describeAuthConsoleFields((await context()).options, policy);
+ 		const computed = /* @__PURE__ */ new Map();
+-		const publicUsers = rows.map((row) => ({
+-			...userSummary(row),
+-			emailVerified: row.emailVerified === true,
+-			createdAt: new Date(date(row.createdAt)),
+-			updatedAt: new Date(date(row.updatedAt))
+-		}));
+-		await Promise.all(Object.entries(policy.columns ?? {}).map(async ([key, column]) => {
++		const publicUsers = rows.map(publicUser);
++		const [roles] = await Promise.all([rolesOf(rows), ...Object.entries(policy.columns ?? {}).map(async ([key, column]) => {
+ 			computed.set(key, await column.read(publicUsers));
+-		}));
++		})]);
+ 		return await Promise.all(rows.map(async (row) => {
+ 			const userId = string(row.id);
+ 			const [accounts, recent] = await Promise.all([db.findMany({
+@@ -568,7 +596,7 @@ function createAuthConsole(auth, policy = {}, events, host = {}) {
+ 			})]);
+ 			return {
+ 				...userSummary(row),
+-				role: string(row.role) || "user",
++				role: roles.get(userId) || "user",
+ 				banned: row.banned === true,
+ 				banReason: typeof row.banReason === "string" ? row.banReason : null,
+ 				banExpires: date(row.banExpires) || null,
+@@ -719,6 +747,11 @@ function createAuthConsole(auth, policy = {}, events, host = {}) {
+ 			if (input.value === null ? field.required : valueFor(input.value, field) === null) throw new AuthConsoleError(400, "The value does not match the declared field type.");
+ 			if (field.values && input.value !== null && !field.values.includes(String(input.value))) throw new AuthConsoleError(400, "Choose one of the declared field values.");
+ 		}
++		if (input.action === "impersonate" && readRoles) {
++			const target = await find("user", equality("id", input.userId));
++			const allowed = target ? await impersonationTarget(target, request) : { enabled: true };
++			if (!allowed.enabled) throw new AuthConsoleError(403, allowed.reason ?? "Action not supported.");
++		}
+ 		return actionGrant.issue(input.action);
+ 	}
+ 	async function mutate(input, request, grant) {
+diff --git a/dist/events-BkmK2dFY.d.ts b/dist/events-BkmK2dFY.d.ts
+index 2889831..1b48a3a 100644
+--- a/dist/events-BkmK2dFY.d.ts
++++ b/dist/events-BkmK2dFY.d.ts
+@@ -38,7 +38,7 @@ interface AuthConsoleOptions {
+   actions?: Partial<Record<AuthConsoleAction, AuthConsolePolicy>>;
+   columns?: Readonly<Record<string, AuthConsoleColumn>>;
+   fields?: Readonly<Record<string, AuthConsoleFieldPolicy | undefined>>;
+-  roles?: AuthConsolePolicy;
++  roles?: AuthConsolePolicy | { editable: false; reason: string; read: ColumnReader<string> };
+ }
+ interface AuthConsoleCapability {
+   enabled: boolean;

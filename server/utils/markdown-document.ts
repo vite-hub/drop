@@ -14,10 +14,9 @@ import { lint } from "comark-linter"
 import comarkUi from "comark-ui/html"
 import { escapeUTF8 as escapeHtml } from "entities"
 import * as v from "valibot"
-import { stringifyTokenStyle } from "shiki/core"
 import { CALLOUT_CSS, TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
-import { codeLanguage, loadHighlighter } from "#shared/highlighter"
+import { loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
 import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
 
@@ -25,9 +24,24 @@ import { MERMAID_COPY_CSS, MERMAID_COPY_SCRIPT } from "#shared/mermaid-copy"
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
  * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
  * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments, and
- * Mermaid stays Drop's, with its limits, and Drop supplies the document's typography.
+ * Mermaid stays Drop's, with its limits, and Drop supplies the document's typography. Code in a language Drop knows
+ * gets Shiki colors, GitHub light inline and GitHub dark as `--shiki-dark`; past 200,000 characters of code in a doc
+ * the rest stay plain, so a huge dump can't eat the Worker's CPU.
  */
-const preset = comarkUi({ chips: { download: false }, mermaid: false, typeset: false, zoom: { images: false } })
+const preset = comarkUi({
+  chips: { download: false },
+  mermaid: false,
+  typeset: false,
+  zoom: { images: false },
+  shiki: {
+    highlighter: async (language) => {
+      const { shiki, lang } = await loadHighlighter(language, ["github-light", "github-dark"])
+      return lang === "text" ? undefined : shiki
+    },
+    themes: { light: "github-light", dark: "github-dark" },
+    maxSource: 200_000,
+  },
+})
 // Writes comark-zoom's script once per render, using the renderer's context to track it.
 const zoomRuntime = (state: Parameters<NodeHandler>[1]) =>
   preset.components["zoom-runtime"]!(["zoom-runtime", {}], state)
@@ -91,48 +105,8 @@ const DRAWN_ATTRIBUTES = new Map([
 ])
 const MAX_MERMAID_DIAGRAMS = 4
 const MAX_MERMAID_SOURCE_CHARACTERS = 8_000
-const MAX_HIGHLIGHTED_CHARACTERS = 200_000
 
 type MarkdownTree = Parameters<typeof visitAsync>[0]
-
-/**
- * Shiki colors for code blocks in a language Drop knows: GitHub light inline, GitHub dark as `--shiki-dark` for the
- * viewer's dark mode. Everything it adds comes from Shiki's tokens of the escaped code, and `security` checks it after.
- * Past MAX_HIGHLIGHTED_CHARACTERS the rest stay plain, so a huge dump can't eat the Worker's CPU.
- */
-const highlight = () => ({
-  name: "highlight",
-  async post(state: { tree: MarkdownTree }) {
-    let budget = MAX_HIGHLIGHTED_CHARACTERS
-    await visitAsync(
-      state.tree,
-      (node) => Array.isArray(node) && node[0] === "pre",
-      async (node) => {
-        if (!Array.isArray(node) || node.length !== 3) return
-        const [, attrs, code] = node
-        if (!Array.isArray(code) || code[0] !== "code" || code.length !== 3) return
-        const source = textValue(code[2])
-        const language = codeLanguage(textValue(attrs.language))
-        if (source === undefined || !language || (budget -= source.length) < 0) return
-
-        const { shiki, lang } = await loadHighlighter(language, ["github-light", "github-dark"])
-        const { tokens } = shiki.codeToTokens(source, { lang, themes: { light: "github-light", dark: "github-dark" } })
-        const highlighted = new Set(Array.isArray(attrs.highlights) ? attrs.highlights : [])
-        const lines = tokens.flatMap((line, index) => [
-          ...(index ? ["\n"] : []),
-          [
-            "span",
-            { class: highlighted.has(index + 1) ? "line highlight" : "line" },
-            ...line.map((token) => ["span", { style: stringifyTokenStyle(token.htmlStyle ?? {}) }, token.content]),
-          ],
-        ])
-        attrs.class = "shiki"
-        // SAFETY: each line is a Comark element, ["span", attributes, ...children], whose children are strings or more spans.
-        code.splice(2, 1, ...(lines as typeof code))
-      },
-    )
-  },
-})
 
 /** Drops the markup in DRAWN_ATTRIBUTES that a doc wrote itself, before the plugins draw theirs. */
 const authored = () => ({
@@ -149,7 +123,6 @@ const authored = () => ({
   },
 })
 
-const pluginsBeforeCode = preset.plugins.findIndex((plugin) => plugin.name === "comark-code")
 const plugins = [
   frontmatter(),
   taskList(),
@@ -157,10 +130,7 @@ const plugins = [
   attributes(),
   mermaid({ theme: "zinc-light" }),
   authored(),
-  ...preset.plugins.slice(0, pluginsBeforeCode),
-  // Before comark-code, which marks and numbers the lines Shiki drew.
-  highlight(),
-  ...preset.plugins.slice(pluginsBeforeCode),
+  ...preset.plugins,
   // Last, so it checks what every plugin drew from the doc.
   security({
     allowedProtocols: ["http", "https", "mailto", "data"],

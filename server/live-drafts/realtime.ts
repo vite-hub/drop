@@ -1,7 +1,6 @@
 import { log } from "evlog"
 import { blob } from "vite-hub/blob"
-import { RealtimeDocumentConflict, type RealtimeDocumentAdapter } from "vite-hub/realtime"
-import { refreshRealtimeDocument } from "vite-hub/realtime/server"
+import { blobDocument, refreshRealtimeDocument } from "vite-hub/realtime/server"
 import { draftPath } from "#shared/draft-paths"
 
 /**
@@ -13,11 +12,6 @@ import { draftPath } from "#shared/draft-paths"
  */
 
 export const LIVE_EDITING = true
-
-const digestOf = async (text: string) =>
-  Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("")
 
 async function read(key: string) {
   const [error, file] = await blob.get(key)
@@ -32,21 +26,7 @@ async function write(key: string, body: string) {
 }
 
 /** Where a room's document lives. Its id is the draft's Blob key; `authorize` only admits `drafts/<id>.md`. */
-export const draftDocument: RealtimeDocumentAdapter = {
-  kind: "drop-draft",
-  async load({ documentId }) {
-    const body = await read(documentId)
-    return { body: body ?? "", digest: body === null ? null : await digestOf(body) }
-  },
-  // A room saves one at a time, and the only other writers create a missing draft or delete one, so reading the
-  // digest before the write is enough to notice them.
-  async save({ documentId }, { body }, { ifDigest }) {
-    const stored = await read(documentId)
-    if ((stored === null ? null : await digestOf(stored)) !== ifDigest) throw new RealtimeDocumentConflict()
-    await write(documentId, body)
-    return { digest: await digestOf(body) }
-  },
-}
+export const draftDocument = blobDocument(blob)
 
 type Version = { id: string; version: number }
 

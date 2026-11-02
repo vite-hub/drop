@@ -108,7 +108,12 @@ export default defineAuth(({ env, requestOrigin }) => {
           read: (people) => countDropsByUser(people.map((person) => person.id)),
         },
       },
-      roles: { editable: false, reason: "Admins come from DROP_ADMINS, set where Drop is deployed." },
+      // The Console shows and filters the role DROP_ADMINS gives each account, even one that hasn't signed in since.
+      roles: {
+        editable: false,
+        reason: "Admins come from DROP_ADMINS, set where Drop is deployed.",
+        read: (people) => Object.fromEntries(people.map((person) => [person.id, roleOf(person)])),
+      },
       actions: { impersonate: { editable: false, reason: "Drop does not allow signing in as another person." } },
       access: authAccessLines({ members: Boolean(env.drop.members.unseal().trim()), organization, proxied, password }),
     },

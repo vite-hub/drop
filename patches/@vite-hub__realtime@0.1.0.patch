@@ -1,0 +1,84 @@
+diff --git a/dist/server.d.ts b/dist/server.d.ts
+index e842d52..02b74e4 100644
+--- a/dist/server.d.ts
++++ b/dist/server.d.ts
+@@ -33,6 +33,22 @@ export declare function readRealtimeWorkspaceDocument(readable: ReadonlyWorkspac
+  * in a Realtime Definition uses this adapter.
+  */
+ export declare function workspaceDocument(workspaceName: string): RealtimeWorkspaceDocumentAdapter;
++/** The part of a ViteHub Blob store that `blobDocument()` uses, such as `blob` from `vite-hub/blob`. */
++export interface RealtimeBlobStore {
++  get(pathname: string): Promise<[error: unknown, value: Blob | null | undefined]>;
++  put(pathname: string, body: string, options: {
++    access: "private";
++    contentType: string;
++  }): Promise<[error: unknown, value: unknown]>;
++}
++export interface RealtimeBlobDocumentOptions {
++  /** Defaults to `text/markdown; charset=utf-8`. */
++  contentType?: string;
++  /** Prepended to the document id to make the Blob pathname. Defaults to none. */
++  prefix?: string;
++}
++/** Stores each Realtime document as one private Blob file at `prefix + documentId`, digest = SHA-256 of the body. */
++export declare function blobDocument(store: RealtimeBlobStore, options?: RealtimeBlobDocumentOptions): RealtimeDocumentAdapter;
+ export declare function isRealtimeWorkspaceDocument(adapter: RealtimeDocumentAdapter): adapter is RealtimeWorkspaceDocumentAdapter;
+ //#endregion
+ //#region src/server.d.ts
+diff --git a/dist/server.js b/dist/server.js
+index 215ffa3..d60de4e 100644
+--- a/dist/server.js
++++ b/dist/server.js
+@@ -592,6 +592,46 @@ function forwardedRequestOrigin(request) {
+ 	}
+ }
+ //#endregion
++//#region src/blob-document.ts
++function errorCode(error) {
++	return error !== null && typeof error === "object" && "code" in error ? error.code : void 0;
++}
++async function digestOf(text) {
++	const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
++	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
++}
++function blobDocument(store, options = {}) {
++	const { contentType = "text/markdown; charset=utf-8", prefix = "" } = options;
++	const pathnameOf = (documentId) => (prefix + documentId).replaceAll("%", "%25");
++	const read = async (pathname) => {
++		const [error, file] = await store.get(pathname);
++		if (errorCode(error) === "BLOB_NOT_FOUND") return null;
++		if (error) throw error;
++		return file ? await file.text() : null;
++	};
++	return {
++		kind: "blob",
++		async load({ documentId }) {
++			const body = await read(pathnameOf(documentId));
++			return {
++				body: body ?? "",
++				digest: body === null ? null : await digestOf(body)
++			};
++		},
++		async save({ documentId }, { body }, { ifDigest }) {
++			const pathname = pathnameOf(documentId);
++			const stored = await read(pathname);
++			if ((stored === null ? null : await digestOf(stored)) !== ifDigest) throw new RealtimeDocumentConflict(stored === null ? "The Blob file of this document was deleted after the realtime room loaded it." : "The Blob file of this document changed after the realtime room loaded it.");
++			const [error] = await store.put(pathname, body, {
++				access: "private",
++				contentType
++			});
++			if (error) throw error;
++			return { digest: await digestOf(body) };
++		}
++	};
++}
++//#endregion
+ //#region src/server.ts
+ const routePrefix = "/api/_vitehub/realtime/";
+ const maxMessageBytes = 1048576;
+@@ -1955,4 +1995,4 @@ function createRealtimeHandler(registry) {
+ 	} });
+ }
+ //#endregion
+-export { RealtimeDocumentConflict, RealtimeWriteRejected, applyRealtimeAwarenessUpdate, applyRealtimeSyncMessage, assertRealtimeRoomStateQuota, bindAwarenessIdentity, claimAwarenessClientIds, compactRealtimeAwareness, containsRealtimeState, createRealtimeHandler, createRealtimeYDoc, diffRealtimeYDoc, encodeAwarenessState, encodeSyncStep1, encodeSyncUpdate, isRealtimeDocumentConflict, isRealtimeWorkspaceDocument, readRealtimeRequestState, readRealtimeStatus, readRealtimeWorkspaceDocument, readRealtimeYDoc, realtimeDocumentLayout, realtimePersistenceDefaults, realtimeRoomKey, refreshRealtimeDocument, registerRealtimeDurableObject, resolveRealtimeDefinition, restoreRealtimeDocument, workspaceDocument };
++export { RealtimeDocumentConflict, RealtimeWriteRejected, applyRealtimeAwarenessUpdate, applyRealtimeSyncMessage, assertRealtimeRoomStateQuota, bindAwarenessIdentity, blobDocument, claimAwarenessClientIds, compactRealtimeAwareness, containsRealtimeState, createRealtimeHandler, createRealtimeYDoc, diffRealtimeYDoc, encodeAwarenessState, encodeSyncStep1, encodeSyncUpdate, isRealtimeDocumentConflict, isRealtimeWorkspaceDocument, readRealtimeRequestState, readRealtimeStatus, readRealtimeWorkspaceDocument, readRealtimeYDoc, realtimeDocumentLayout, realtimePersistenceDefaults, realtimeRoomKey, refreshRealtimeDocument, registerRealtimeDurableObject, resolveRealtimeDefinition, restoreRealtimeDocument, workspaceDocument };

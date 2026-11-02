@@ -57,6 +57,15 @@ patchedDependencies:
   "@vite-hub/schedule@0.1.0": patches/@vite-hub__schedule@0.1.0.patch
   # The Nitro cache driver behind `cache: { driver: "kv" }` (vite-hub/vitehub#3178).
   "@vite-hub/kv@0.1.0": patches/@vite-hub__kv@0.1.0.patch
+  # `console.roles.read` gives the Console the role DROP_ADMINS computes, for its labels and Admins filter, so Drop no
+  # longer writes every account's role before the Console opens (vite-hub/vitehub#3214).
+  "@vite-hub/auth@0.1.0": patches/@vite-hub__auth@0.1.0.patch
+  # `blobDocument()` stores a Realtime room's document as one Blob file, the adapter Drop wrote for live drafts
+  # (vite-hub/vitehub#3215).
+  "@vite-hub/realtime@0.1.0": patches/@vite-hub__realtime@0.1.0.patch
+  # The preset's `shiki` option colors code with Drop's own highlighter within a size budget, so Drop drops its own
+  # plugin before comark-code (onmax/comark-ui#326).
+  comark-ui@0.8.0: patches/comark-ui@0.8.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
