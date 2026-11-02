@@ -397,6 +397,10 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    // mdream loads its native binary with require("@mdream/rust-<platform>"). Bundled, that require has no
+    // node_modules beside it, so Node hosts trace mdream and Nitro copies the platform package with it.
+    // Until unjs/nf3#84 lists mdream as native.
+    traceDeps: ["mdream"],
     // Keep Node for local development; ViteHub emulates Cloudflare bindings separately.
     devServer: { runner: "node-worker" },
     // Drizzle applies the existing migration journal before a local Node instance serves requests.
