@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// A site drop's comments as the page's main content: each one a card led by its screenshot, newest first. A card opens
-// its thread in the review dock; "Review this page" opens the page it was written on in the frame.
+// A site drop's comments as the page's main content: one row each, its screenshot as a thumbnail, newest first. A row
+// opens its thread in the review dock; "Review this page" opens the page it was written on in the frame.
 import type { DropComment, SiteReviewItem } from "#shared/types"
 
 const props = defineProps<{
@@ -74,7 +74,7 @@ function pageLabel(comment: DropComment) {
     <TransitionGroup
       v-else
       :key="filter"
-      class="grid gap-3 sm:grid-cols-2"
+      class="divide-y divide-default overflow-hidden rounded-lg border border-default"
       enter-active-class="motion-safe:transition-[opacity,translate] motion-safe:duration-200 motion-safe:ease-(--ease-out)"
       enter-from-class="opacity-0 translate-y-1"
       tag="ul"
@@ -82,23 +82,23 @@ function pageLabel(comment: DropComment) {
       <li
         v-for="comment in visible"
         :key="comment.id"
-        class="group/card relative flex flex-col overflow-hidden rounded-lg border border-default bg-default transition-[border-color,box-shadow] duration-150 ease-(--ease-out) has-[[data-comment-id]:focus-visible]:ring-2 has-[[data-comment-id]:focus-visible]:ring-inverted pointer-fine:hover:border-accented pointer-fine:hover:shadow-sm"
+        class="group/row relative flex gap-4 p-3 transition-colors duration-150 has-[[data-comment-id]:focus-visible]:bg-elevated/50 pointer-fine:hover:bg-elevated/50"
       >
+        <!-- The screenshot at thumbnail size, so the list reads as comments; the thread shows it large. -->
         <figure
-          v-if="screenshots.get(comment.id)"
-          class="flex h-40 items-center justify-center border-b border-default bg-muted p-3"
+          class="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted p-1.5 max-sm:hidden"
         >
-          <span class="relative block">
+          <span v-if="screenshots.get(comment.id)" class="relative block">
             <img
               :src="screenshots.get(comment.id)!.url"
               :alt="`Screenshot of ${comment.page || 'the reviewed page'}`"
-              class="block max-h-34 max-w-full rounded-sm object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+              class="block max-h-17 max-w-full rounded-[3px] object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
               loading="lazy"
             />
             <span
               v-if="comment.ow || comment.oh"
               aria-hidden="true"
-              class="pointer-events-none absolute rounded-sm border-2 border-neutral-950 shadow-[0_0_0_2px_rgb(255_255_255_/_0.85)]"
+              class="pointer-events-none absolute rounded-[2px] border-[1.5px] border-neutral-950 shadow-[0_0_0_1.5px_rgb(255_255_255_/_0.85)]"
               :style="{
                 left: `${comment.ox / 10}%`,
                 top: `${comment.oy / 10}%`,
@@ -107,38 +107,40 @@ function pageLabel(comment: DropComment) {
               }"
             />
           </span>
+          <UIcon v-else name="i-mingcute-chat-3-line" class="size-5 text-dimmed" />
         </figure>
-        <div class="flex flex-1 flex-col gap-2 p-3">
-          <!-- The whole card opens the thread; the button's area covers it, under the links and actions. -->
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <!-- The whole row opens the thread; the button's area covers it, under the actions. -->
           <button
             :data-comment-id="comment.id"
-            class="cursor-pointer text-left outline-none before:absolute before:inset-0"
+            class="flex min-w-0 cursor-pointer items-center gap-2 text-left outline-none before:absolute before:inset-0"
             type="button"
             @click="emit('focus', comment)"
           >
-            <span class="flex min-w-0 items-center gap-2">
-              <UAvatar :alt="comment.authorName" :src="comment.authorImage ?? undefined" size="2xs" />
-              <span class="truncate text-sm font-medium text-highlighted">{{ comment.authorName }}</span>
-              <span class="shrink-0 font-mono text-xs text-muted"
-                >#{{ comment.n }} · <TimeAgo :at="comment.createdAt"
-              /></span>
-            </span>
-          </button>
-          <p v-if="comment.quote" class="line-clamp-2 border-l-2 border-default pl-2.5 text-sm text-muted">
-            {{ comment.quote }}
-          </p>
-          <p v-if="comment.body" class="line-clamp-4 text-sm text-pretty wrap-anywhere">{{ comment.body }}</p>
-          <div class="relative mt-auto flex items-center gap-3 pt-1 text-xs text-muted">
+            <UAvatar :alt="comment.authorName" :src="comment.authorImage ?? undefined" size="3xs" />
+            <span class="truncate text-sm font-medium text-highlighted">{{ comment.authorName }}</span>
+            <span class="shrink-0 font-mono text-xs text-muted"
+              >#{{ comment.n }} · <TimeAgo :at="comment.createdAt"
+            /></span>
             <span
               v-if="comment.page"
-              class="min-w-0 truncate font-mono text-[11px] text-dimmed"
+              class="ml-auto min-w-0 truncate font-mono text-[11px] text-dimmed"
               :title="comment.page"
               >{{ pageLabel(comment) }}</span
             >
+          </button>
+          <p v-if="comment.body" class="line-clamp-2 text-sm text-pretty wrap-anywhere">{{ comment.body }}</p>
+          <p v-else-if="comment.quote" class="line-clamp-2 text-sm text-muted">{{ comment.quote }}</p>
+          <div class="relative mt-auto flex min-h-6 items-center gap-3 text-xs text-muted">
             <span v-if="comment.replies.length" class="flex shrink-0 items-center gap-1">
-              <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />{{ comment.replies.length }}
+              <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />{{
+                comment.replies.length === 1 ? "1 reply" : `${comment.replies.length} replies`
+              }}
             </span>
-            <span class="ml-auto flex shrink-0 items-center gap-3">
+            <!-- Shown on the row the pointer is on, or always on touch screens, so the list stays quiet. -->
+            <span
+              class="ml-auto flex shrink-0 items-center gap-3 transition-opacity duration-150 pointer-fine:opacity-0 pointer-fine:group-hover/row:opacity-100 pointer-fine:group-focus-within/row:opacity-100"
+            >
               <button
                 v-if="pageUrl(comment)"
                 class="min-h-6 cursor-pointer hover:text-highlighted pointer-coarse:min-h-11"
