@@ -596,7 +596,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       card.className = "cr-card";
       const entry = document.createElement("span"), avatar = document.createElement("span"), name = document.createElement("b"), body = document.createElement("span");
       entry.className = "cr-entry"; avatar.className = "cr-av"; avatar.setAttribute("aria-hidden", "true");
-      avatar.style.setProperty("--cr-av", "oklch(0.55 0.15 " + [...(m.author || "")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0) + ")");
+      avatar.style.setProperty("--cr-hue", String([...(m.author || "")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0)));
       if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); avatar.textContent = initials(m.author).slice(0, 1); }; avatar.appendChild(img); }
       else avatar.textContent = initials(m.author).slice(0, 1);
       name.textContent = m.author || "Comment";
