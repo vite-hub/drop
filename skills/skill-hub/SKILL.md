@@ -51,11 +51,12 @@ Done when the CLI reports the skill installed for each agent the user named and 
 ## Publish
 
 1. **Read the skill** from disk: its `SKILL.md` and every file beside it. Check the frontmatter has `name` (lowercase letters, digits and dashes) and a `description` that says when to use it.
-2. **Check the hub.** When a subfolder with that name exists and the user didn't write that skill, ask before replacing it.
+2. **Check the hub.** When a subfolder with that name exists and the user didn't write that skill, ask before replacing it. Read the existing skill folder recursively and compare its active doc and file paths with the local tree, using the Layout rules. Show any paths missing locally, including old paths of renamed files, and ask before moving those Drops to the Trash. If the user declines, stop before publishing the replacement.
 3. **Prepare folders.** Reuse existing folders. For a personal hub, create missing folders with `create_folder`. For a team hub, give a team admin the complete missing folder tree (the skill subfolder and any folders such as `references` or `scripts`) to create in the browser. Wait for their links and verify the folders with `read_drop` before publishing; agents cannot create folders anywhere inside a team hub.
 4. **Publish.** Publish `SKILL.md` as a doc with slug `skill`, each other Markdown file as a doc in its folder (`references/format.md` as `format` in `references`), and each other file as a file drop with its name. Strip `drop-version`, `drop-link`, `drop-folder` and `drop-state` from the frontmatter first. For a new version, match each file by its relative path and publish each changed doc **or file drop** with `previous` set to that existing Drop's id and a `note` saying what changed. Create a new Drop only for a new path, so an updated script replaces its earlier version instead of leaving two files with the same name.
+5. **Remove deleted files.** After the new and changed files publish successfully, call `update_drop` with `id` set to each approved removed doc or file Drop's id and `trash: true`. Re-read the skill folder recursively and verify that its active doc and file paths match the local tree. Report any failed operation or remaining difference instead of calling the release complete.
 
-Done when every file of the skill is in the hub and you've given the user the subfolder's link.
+Done when the skill subfolder's active file set matches the local skill and you've given the user the subfolder's link.
 
 ## Update
 
