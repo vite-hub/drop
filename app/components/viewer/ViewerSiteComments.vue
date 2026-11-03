@@ -129,7 +129,11 @@ function pageLabel(comment: DropComment) {
               >{{ pageLabel(comment) }}</span
             >
           </button>
-          <p v-if="comment.body" class="line-clamp-2 text-sm text-pretty wrap-anywhere">{{ comment.body }}</p>
+          <ViewerCommentBody
+            v-if="comment.body"
+            class="line-clamp-2 text-sm text-pretty wrap-anywhere"
+            :text="comment.body"
+          />
           <p v-else-if="comment.quote" class="line-clamp-2 text-sm text-muted">{{ comment.quote }}</p>
           <div class="relative mt-auto flex min-h-6 items-center gap-3 text-xs text-muted">
             <span v-if="comment.replies.length" class="flex shrink-0 items-center gap-1">

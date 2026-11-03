@@ -98,6 +98,9 @@ defineExpose({
   },
 })
 const thread = useTemplateRef("thread")
+const participants = computed(() =>
+  props.comment ? [props.comment.authorName, ...props.comment.replies.map((reply) => reply.authorName)] : [],
+)
 const mayDelete = computed(() => Boolean(props.comment && (props.canManage || props.comment.mine)))
 const menu = computed<DropdownMenuItem[][]>(() => [
   [
@@ -172,7 +175,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         />
       </div>
       <div class="flex items-end gap-1" @dragover.prevent @drop="drop">
-        <UTextarea
+        <ViewerCommentField
           v-model="body"
           aria-label="Comment"
           :autofocus="!suggesting"
@@ -272,7 +275,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
           <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
           </p>
-          <p v-if="comment.body" class="text-sm whitespace-pre-wrap">{{ comment.body }}</p>
+          <ViewerCommentBody v-if="comment.body" class="text-sm whitespace-pre-wrap" :text="comment.body" />
           <ViewerCommentImages :attachments="comment.attachments" />
         </div>
         <div v-for="reply in comment.replies" :key="reply.id" class="group space-y-1.5 px-3 py-3">
@@ -291,7 +294,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
               @click="emit('deleteReply', comment.id, reply.id)"
             />
           </div>
-          <p class="text-sm whitespace-pre-wrap">{{ reply.body }}</p>
+          <ViewerCommentBody class="text-sm whitespace-pre-wrap" :text="reply.body" />
           <ViewerCommentImages :attachments="reply.attachments" />
         </div>
       </div>
@@ -304,9 +307,10 @@ const menu = computed<DropdownMenuItem[][]>(() => [
         @dragover.prevent
         @drop="drop"
       >
-        <UTextarea
+        <ViewerCommentField
           v-model="body"
           aria-label="Reply"
+          :participants="participants"
           autofocus
           autoresize
           class="flex-1"

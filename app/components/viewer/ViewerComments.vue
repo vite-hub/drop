@@ -135,7 +135,7 @@ async function sendPageComment() {
           <p v-else-if="comment.quote" class="line-clamp-3 border-l-2 border-default pl-2.5 text-sm text-muted">
             {{ comment.quote }}
           </p>
-          <p v-if="comment.body" class="text-sm">{{ comment.body }}</p>
+          <ViewerCommentBody v-if="comment.body" class="text-sm" :text="comment.body" />
           <ViewerCommentImages :attachments="comment.attachments" />
           <span v-if="comment.replies.length" class="flex items-center gap-1.5 text-xs text-muted">
             <UAvatarGroup :max="3" size="2xs">
@@ -181,7 +181,7 @@ async function sendPageComment() {
         >
           {{ comment.quote }}
         </p>
-        <p class="text-sm">{{ comment.body }}</p>
+        <ViewerCommentBody class="text-sm" :text="comment.body" />
         <div class="flex items-center gap-3 text-xs">
           <NuxtLink
             v-if="versionOf(comment.version)"
@@ -209,7 +209,7 @@ async function sendPageComment() {
       @dragover.prevent
       @drop="drop"
     >
-      <UTextarea
+      <ViewerCommentField
         v-model="pageBody"
         aria-label="Write a comment"
         autoresize

@@ -11,9 +11,8 @@ import "vite-hub/ui/styles.css"
 const props = defineProps<{ editor?: Editor; synced: boolean; width: DocWidth }>()
 const prompt = usePrompt()
 
-// Everyone in this Drop, for "@". Editors are always signed in. The editor only mounts in the browser, and nothing
-// waits on the list.
-const { data: members } = useApi("/api/people", { key: keys.people, default: () => [] })
+// Everyone in this Drop, for "@".
+const { people: members } = usePeople()
 const people = computed(() =>
   members.value.map((member) => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })),
 )
