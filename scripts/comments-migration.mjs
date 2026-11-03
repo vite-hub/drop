@@ -40,7 +40,8 @@ export const dropBackfills = [
 // but bind them and their claim trigger to the replacement table so retries and deletes still work.
 const reviewSubmissions = [
   "CREATE TABLE `review_submissions_next` (`scope` text NOT NULL, `request_id` text NOT NULL, `thread_id` text NOT NULL, PRIMARY KEY (`scope`, `request_id`), FOREIGN KEY (`thread_id`) REFERENCES `vitehub_comment_threads` (`id`) ON UPDATE no action ON DELETE cascade)",
-  "INSERT INTO `review_submissions_next` SELECT `scope`, `request_id`, `thread_id` FROM `review_submissions`",
+  // Explicit destination columns let ViteHub verify that this rebuild preserves every receipt column.
+  "INSERT INTO `review_submissions_next` (`scope`, `request_id`, `thread_id`) SELECT `scope`, `request_id`, `thread_id` FROM `review_submissions`",
   "DROP TABLE `review_submissions`",
   "ALTER TABLE `review_submissions_next` RENAME TO `review_submissions`",
   "CREATE INDEX `review_submissions_thread_idx` ON `review_submissions` (`thread_id`)",

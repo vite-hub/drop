@@ -48,7 +48,7 @@ UPDATE `vitehub_comment_threads` SET `metadata` = json_remove(`metadata`, '$.ver
 --> statement-breakpoint
 CREATE TABLE `review_submissions_next` (`scope` text NOT NULL, `request_id` text NOT NULL, `thread_id` text NOT NULL, PRIMARY KEY (`scope`, `request_id`), FOREIGN KEY (`thread_id`) REFERENCES `vitehub_comment_threads` (`id`) ON UPDATE no action ON DELETE cascade);
 --> statement-breakpoint
-INSERT INTO `review_submissions_next` SELECT `scope`, `request_id`, `thread_id` FROM `review_submissions`;
+INSERT INTO `review_submissions_next` (`scope`, `request_id`, `thread_id`) SELECT `scope`, `request_id`, `thread_id` FROM `review_submissions`;
 --> statement-breakpoint
 DROP TABLE `review_submissions`;
 --> statement-breakpoint
