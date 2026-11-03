@@ -18,8 +18,8 @@ const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
  *   the content below it doesn't move up.
  *
  * Clones only reach the hook without their original, so originals carry a data attribute for the length of a capture.
- * `describe` names the element under a box, and says when it's on a sticky or fixed one, which doesn't scroll. Needs
- * ELEMENT_NAMING's labelOf.
+ * `describe` names the element under a box, and says when it's on a sticky or fixed one, which doesn't scroll, with the
+ * CSS that pins it. Needs ELEMENT_NAMING's labelOf and pinnedOf.
  *
  * What kept a comment's box from showing for seconds, measured in Firefox on a dashboard (2026-10-29):
  *
@@ -134,6 +134,11 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
     }
     return null;
   }
+  function contentBox(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return range.getBoundingClientRect();
+  }
   function pinsNow(skip) {
     const attr = "data-drop-pin-" + (++pinRun);
     const found = [];
@@ -143,7 +148,10 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
       const style = getComputedStyle(el);
       if (style.position !== "fixed" && style.position !== "sticky") continue;
       const r = el.getBoundingClientRect();
-      if (style.visibility === "hidden" || r.width < 1 || r.height < 1 || r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) continue;
+      // What it shows: its own box, or, when that's 0 wide or tall (Tailwind's sticky top-12 h-0 around a bar), the
+      // content overflowing it. Skipping such a wrapper left its bar scrolled away in the clone.
+      const seen = r.width >= 1 && r.height >= 1 ? r : contentBox(el);
+      if (style.visibility === "hidden" || seen.width < 1 || seen.height < 1 || seen.bottom <= 0 || seen.right <= 0 || seen.top >= innerHeight || seen.left >= innerWidth) continue;
       // In a scrolled element, the clone moves its siblings with transforms, which paints them over it unless it's raised.
       const parent = el.parentElement;
       found.push({ el, sticky: style.position === "sticky", rect: r, raise: style.zIndex === "auto" && Boolean(parent && (parent.scrollTop || parent.scrollLeft)) });
@@ -207,14 +215,20 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
   }
 
   const PINNED_NAMES = { header: "header", nav: "navigation", footer: "footer", aside: "sidebar", button: "button", a: "link", dialog: "dialog" };
+  // The element under a box, and the sticky or fixed one it's on with the CSS that pins it, so whoever fixes the page
+  // finds the rule: like div "Combo 12,400 On hand" in a sticky element (its parent: top: 48px; z-index: 20; height: 0).
   function describe(el) {
-    const label = labelOf(el);
-    for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
-      const position = getComputedStyle(node).position;
-      if (position !== "fixed" && position !== "sticky") continue;
-      const role = node.getAttribute("role");
-      const what = position + " " + (PINNED_NAMES[node.localName] || (role && /^[a-z]{3,20}$/.test(role) ? role : "element"));
-      return node === el ? label + " (" + what + ")" : label + " in a " + what;
-    }
-    return label;
+    const label = labelOf(el), node = pinnedOf(el);
+    if (!node) return label;
+    const style = getComputedStyle(node), role = node.getAttribute("role"), r = node.getBoundingClientRect();
+    const what = style.position + " " + (PINNED_NAMES[node.localName] || (role && /^[a-z]{3,20}$/.test(role) ? role : "element"));
+    // A sticky element's insets as set in CSS; a fixed one's come back in pixels even where they're auto, so they're left out.
+    const sides = style.position === "sticky" ? ["top", "right", "bottom", "left"] : [];
+    const css = sides.filter((side) => style[side] !== "auto").map((side) => side + ": " + style[side]);
+    if (style.zIndex !== "auto") css.push("z-index: " + style.zIndex);
+    if (r.height < 1) css.push("height: 0");
+    let up = 0;
+    for (let n = el; n !== node; n = n.parentElement) up++;
+    if (!up) return label + " (" + what + (css.length ? ": " + css.join("; ") : "") + ")";
+    return label + " in a " + what + " (" + (up === 1 ? "its parent" : up + " levels up") + (css.length ? ": " + css.join("; ") : "") + ")";
   }`
