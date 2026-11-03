@@ -39,9 +39,9 @@ function message(thread: DropComment, item: DropComment | CommentReply, id: stri
 }
 
 /**
- * A comment and its replies as one thread. Drop draws its own pins inside the drop's frame, where the parts can't
- * measure them, and the thread's `#anchor` slot shows the quote or the suggestion. The anchor still carries the quote,
- * which a list row shows when the comment has no words of its own, such as a suggestion without a note.
+ * A comment and its replies as one thread. Its anchor is the whole page: Drop draws its own pins inside the drop's
+ * frame, where the parts can't measure them (a text anchor there reads "Detached"), and the thread's `#anchor` slot
+ * shows the quote or the suggestion.
  */
 export function toThread(comment: DropComment, subject: CommentSubject): CommentThread {
   const messages = [
@@ -53,9 +53,7 @@ export function toThread(comment: DropComment, subject: CommentSubject): Comment
     scope: `${subject.kind}:${subject.id}`,
     n: comment.n,
     subject,
-    anchor: comment.quote
-      ? { kind: "text", selector: comment.selector || "body", exact: comment.quote, prefix: "", suffix: "" }
-      : { kind: "page" },
+    anchor: { kind: "page" },
     status: comment.resolved ? "resolved" : "open",
     author: person(comment.authorId, comment.authorName, comment.authorImage),
     messages,

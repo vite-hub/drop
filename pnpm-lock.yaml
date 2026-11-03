@@ -27,6 +27,7 @@ pnpmfileChecksum: sha256-8nGb6beLH6d2nsxD8QO9rz+ZxKMtdjGwf9yIYJVcy0c=
 
 patchedDependencies:
   '@nuxt/ui@4.11.0': ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc
+  '@vite-hub/comments@0.0.0-preview-fa476a0': 8ce154e34a84ec2e7f48966b461e776f62390884af27442891002ddddce76f98
   h3-mcp@0.2.0: 300cf58df36ba2b9ab6602a27409863902c2da7639cc56fa781c8390df14693b
   nitro@3.0.261029-rc: fbc7b5975b15fef6ea4f468e36f0a4f20bdb342e113f0acda377b72e96f69f42
   nuxt-security@2.7.0: d1112d15a1d8f4227f55eeacac6e28d4e2e2c918aa4679be7a30fd0cf620da6b
@@ -118,7 +119,7 @@ importers:
         version: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@fa476a05309b793cab521538e3e18a9de0a0dd35(34a43634627c3c3b1719403606cc7837)
       '@vite-hub/comments':
         specifier: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35
-        version: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(ce7eaf87b0b993218bfb8e83ebb18ced)
+        version: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(patch_hash=8ce154e34a84ec2e7f48966b461e776f62390884af27442891002ddddce76f98)(ce7eaf87b0b993218bfb8e83ebb18ced)
       '@vite-hub/content':
         specifier: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@fa476a05309b793cab521538e3e18a9de0a0dd35
         version: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@fa476a05309b793cab521538e3e18a9de0a0dd35(67e70c639403e34e0073de9c6ec7f944)
@@ -235,7 +236,7 @@ importers:
         version: 1.5.0(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@fa476a05309b793cab521538e3e18a9de0a0dd35
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@fa476a05309b793cab521538e3e18a9de0a0dd35(bb3142f7028fe7ab8286c7b53c9c15e3)
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@fa476a05309b793cab521538e3e18a9de0a0dd35(9fbc4b15ebc2ef9dba1b68ebb1c24956)
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -13823,7 +13824,7 @@ snapshots:
       defu: 6.1.7
       destr: 2.0.5
       errx: 0.2.2
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       ignore: 7.0.14
       klona: 2.0.6
       microdiff: 1.6.0
@@ -13857,7 +13858,7 @@ snapshots:
       defu: 6.1.7
       destr: 2.0.5
       errx: 0.1.2
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       ignore: 7.0.14
       jiti: 2.7.0
       klona: 2.0.6
@@ -13882,7 +13883,7 @@ snapshots:
       defu: 6.1.7
       destr: 2.0.5
       errx: 0.2.2
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       ignore: 7.0.14
       klona: 2.0.6
       microdiff: 1.6.0
@@ -13915,7 +13916,7 @@ snapshots:
       defu: 6.1.7
       destr: 2.0.5
       errx: 0.2.2
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       ignore: 7.0.14
       klona: 2.0.6
       microdiff: 1.6.0
@@ -13953,7 +13954,7 @@ snapshots:
       devalue: 6.0.3
       errx: 0.2.2
       escape-string-regexp: 5.0.0
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       flru: 1.0.2
       impound: 1.2.1(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))(esbuild@0.28.2)(rolldown@1.2.15)
       klona: 2.0.6
@@ -14166,7 +14167,7 @@ snapshots:
       consola: 3.4.2
       defu: 6.1.7
       escape-string-regexp: 5.0.0
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       generic-names: 4.0.0
       get-port-please: 3.2.0
       js-tokens: 10.0.0
@@ -14229,7 +14230,7 @@ snapshots:
       '@nuxt/kit': '@nuxt/kit-nightly@5.0.0-2610292252-da55a91(@nuxt/schema-nightly@5.0.0-2610292252-da55a91)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))(esbuild@0.28.2)(rolldown@1.2.15))'
       clickable-path: 0.1.1
       defu: 6.1.7
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       mocked-exports: 0.1.1
       my-bad: 0.2.11(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))
       nuxt: nuxt-nightly@5.0.0-2610292252-da55a91(0a957c546114219739673b8e869567b2)
@@ -16222,7 +16223,7 @@ snapshots:
       - crossws
       - ocache
 
-  '@vite-hub/comments@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(ce7eaf87b0b993218bfb8e83ebb18ced)':
+  '@vite-hub/comments@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(patch_hash=8ce154e34a84ec2e7f48966b461e776f62390884af27442891002ddddce76f98)(ce7eaf87b0b993218bfb8e83ebb18ced)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@valibot/to-json-schema': 1.8.0(valibot@1.5.0(typescript@6.0.3))
@@ -17009,7 +17010,7 @@ snapshots:
       '@nuxt/kit': 4.6.2(@nuxt/schema-nightly@5.0.0-2610292252-da55a91)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))(esbuild@0.28.2)(rolldown@1.2.15))
       '@shikijs/langs': 4.5.0
       '@types/node': 24.19.2
-      '@vite-hub/comments': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(ce7eaf87b0b993218bfb8e83ebb18ced)
+      '@vite-hub/comments': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(patch_hash=8ce154e34a84ec2e7f48966b461e776f62390884af27442891002ddddce76f98)(ce7eaf87b0b993218bfb8e83ebb18ced)
       '@vite-hub/icons': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/icons@9c97b9e04bc3c6919ec5dbd31d7d33a313123a19
       ai: 7.0.130(zod@4.6.7)
       comark: 0.8.1(beautiful-mermaid@1.1.3)(katex@0.18.11)(shiki@4.5.0)
@@ -17181,7 +17182,7 @@ snapshots:
       ai: 7.0.130(zod@4.6.7)
       defu: 6.1.7
       esbuild: 0.28.2
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       h3: 2.0.8(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
       isomorphic-git: 1.44.10
       jiti: 2.7.0
@@ -17255,7 +17256,7 @@ snapshots:
       ai: 7.0.130(zod@4.6.7)
       defu: 6.1.7
       esbuild: 0.28.2
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       h3: 2.0.8(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
       isomorphic-git: 1.44.10
       jiti: 2.7.0
@@ -17622,7 +17623,7 @@ snapshots:
       '@workflow/rollup': 5.0.1(@swc/helpers@0.5.23)(supports-color@10.2.2)(ws@8.22.0)
       '@workflow/swc-plugin': 5.0.0(@swc/core@1.15.3(@swc/helpers@0.5.23))
       '@workflow/vite': 5.0.1(@swc/helpers@0.5.23)(supports-color@10.2.2)(ws@8.22.0)
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       pathe: 2.0.3
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -17841,7 +17842,7 @@ snapshots:
       '@workflow/rollup': 5.0.1(@swc/helpers@0.5.23)(supports-color@10.2.2)(ws@8.22.0)
       '@workflow/swc-plugin': 5.0.0(@swc/core@1.15.3(@swc/helpers@0.5.23))
       '@workflow/vite': 5.0.1(@swc/helpers@0.5.23)(supports-color@10.2.2)(ws@8.22.0)
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       fs-extra: 11.4.1
       pathe: 2.0.3
     transitivePeerDependencies:
@@ -18449,7 +18450,7 @@ snapshots:
       confbox: 0.2.4
       defu: 6.1.7
       dotenv: 17.4.2
-      exsolve: 1.1.3
+      exsolve: 1.2.0
       giget: 3.3.1
       jiti: 2.7.0
       ohash: 2.0.12
@@ -22371,8 +22372,8 @@ snapshots:
 
   pkg-types@2.4.0:
     dependencies:
-      confbox: 0.3.1
-      exsolve: 1.1.3
+      confbox: 0.3.2
+      exsolve: 1.2.0
       pathe: 2.0.3
 
   playwright-core@1.64.1: {}
@@ -24065,7 +24066,7 @@ snapshots:
       - magicast
       - supports-color
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@fa476a05309b793cab521538e3e18a9de0a0dd35(bb3142f7028fe7ab8286c7b53c9c15e3):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@fa476a05309b793cab521538e3e18a9de0a0dd35(9fbc4b15ebc2ef9dba1b68ebb1c24956):
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@cloudflare/workers-types': 5.20261023.1
@@ -24115,7 +24116,7 @@ snapshots:
       '@nuxt/ui': 4.11.0(patch_hash=ff7507c80756da3b5e98d551107c610cb49be719325194b8f1b937235f8b82dc)(010d099bbd231247f35ee39a5e71588b)
       '@vite-hub/agent': 0.1.0(c9a59d8f4066c901b8c57205d7f85039)
       '@vite-hub/auth': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@fa476a05309b793cab521538e3e18a9de0a0dd35(34a43634627c3c3b1719403606cc7837)
-      '@vite-hub/comments': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(ce7eaf87b0b993218bfb8e83ebb18ced)
+      '@vite-hub/comments': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35(patch_hash=8ce154e34a84ec2e7f48966b461e776f62390884af27442891002ddddce76f98)(ce7eaf87b0b993218bfb8e83ebb18ced)
       '@vite-hub/content': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@fa476a05309b793cab521538e3e18a9de0a0dd35(67e70c639403e34e0073de9c6ec7f944)
       '@vite-hub/database': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@fa476a05309b793cab521538e3e18a9de0a0dd35(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))(crossws@0.4.17(srvx@1.0.8))(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(kysely@0.29.7)(sql.js@1.15.1))(ocache@0.3.1)
       '@vite-hub/presets': 0.1.0(a07548549e797b7e015a9658bd92770f)

@@ -39,6 +39,10 @@ patchedDependencies:
   # package chunk and everything it imports. That was about half the code of a cold /drops request.
   # Preserve registered virtual handler ids: resolving ViteHub's MCP discovery middleware as a file breaks the build.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
+  # In an app with the Console, the Comments API asked the Console first and refused everyone it doesn't admit, before
+  # `identify` and `authorize` ran: only Drop admins got "@" people and comment images. With `identify`, the app's
+  # policy decides alone, as vite-hub/vitehub#3320 means createRestTransport to work for guests and share links.
+  "@vite-hub/comments@0.0.0-preview-fa476a0": patches/@vite-hub__comments@0.0.0-preview-fa476a0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
