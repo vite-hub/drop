@@ -1,7 +1,6 @@
 import { APIError, createAuthEndpoint } from "better-auth/api"
 import { setSessionCookie } from "better-auth/cookies"
 import { handleOAuthUserInfo } from "better-auth/oauth2"
-import { github } from "better-auth/social-providers"
 import { HTTPError } from "h3"
 import * as v from "valibot"
 import { isGitHubMember } from "./github-membership"
@@ -10,7 +9,14 @@ export const authProxy = readAuthProxyConfig
 
 const signIns = new Map<string, Promise<void>>()
 
-const GitHubIdentity = v.object({ id: v.number(), login: v.string() })
+const GitHubIdentity = v.object({
+  id: v.number(),
+  login: v.string(),
+  name: v.nullish(v.string()),
+  email: v.nullish(v.string()),
+  avatar_url: v.nullish(v.string()),
+})
+const GitHubEmails = v.array(v.object({ email: v.string(), primary: v.boolean(), verified: v.boolean() }))
 
 /** Exchange oauth2-proxy's GitHub token for Drop's session. Header names alone prove nothing. */
 export const proxyAuth = () => ({
@@ -32,14 +38,18 @@ export const proxyAuth = () => ({
           },
         )
       }
-      // The proxy already exchanged the authorization code. Better Auth only needs its access token here.
-      const profile = await github({ clientId: "", clientSecret: "" })
-        .getUserInfo({ accessToken: token })
-        .catch(() => null)
-      const identity = v.safeParse(GitHubIdentity, profile?.data)
-      if (!profile || !identity.success)
+      // Better Auth's GitHub getUserInfo erases HTTP errors, including a revoked token after membership was cached.
+      const identity = v.safeParse(GitHubIdentity, await githubApi("user", token))
+      if (!identity.success)
         throw new APIError("SERVICE_UNAVAILABLE", { message: "GitHub identity is unavailable. Try again shortly." })
       const accountId = String(identity.output.id)
+      const profile = identity.output
+      const emails = v.safeParse(GitHubEmails, await githubApi("user/emails", token))
+      const addresses = emails.success ? emails.output : []
+      const email =
+        profile.email ||
+        (addresses.find((entry) => entry.primary) ?? addresses[0])?.email ||
+        `${accountId}@users.noreply.github.com`
       // Parallel proxy requests must finish provisioning the GitHub account before another sign-in reads it.
       const key = `${ctx.context.baseURL}:${accountId}`
       const previous = signIns.get(key)
@@ -49,10 +59,11 @@ export const proxyAuth = () => ({
       try {
         const { data, error } = await handleOAuthUserInfo(ctx, {
           userInfo: {
-            ...profile.user,
             id: accountId,
-            name: profile.user.name || identity.output.login,
-            email: profile.user.email || `${accountId}@users.noreply.github.com`,
+            name: profile.name || profile.login,
+            email,
+            image: profile.avatar_url ?? undefined,
+            emailVerified: addresses.find((entry) => entry.email === email)?.verified ?? false,
           },
           account: { providerId: "github", accountId, accessToken: token },
           overrideUserInfo: true,
@@ -68,3 +79,15 @@ export const proxyAuth = () => ({
     }),
   },
 })
+
+/** Keep GitHub's credential failures distinct from unavailable or malformed profile data. */
+async function githubApi(path: string, token: string): Promise<unknown> {
+  const response = await fetch(`https://api.github.com/${path}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Drop" },
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => null)
+  if (response?.status === 401)
+    throw new APIError("UNAUTHORIZED", { message: "GitHub sign-in expired or was revoked. Sign in again to Drop." })
+  if (!response?.ok) return null
+  return response.json().catch(() => null)
+}

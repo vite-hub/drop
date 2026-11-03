@@ -25,16 +25,18 @@ afterEach(() => {
   delete state.auth
 })
 
-function github(membership = () => Response.json({ state: "active" })) {
+function github(
+  membership = () => Response.json({ state: "active" }),
+  profile = () => Response.json({ id: 42, login: "maxi", name: "Maxi", email: "maxi@example.com" }),
+  emails = () => Response.json([{ email: "maxi@example.com", primary: true, verified: true }]),
+) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input) => {
       const url = new URL(input instanceof Request ? input.url : input)
       if (url.pathname.startsWith("/user/memberships/")) return membership()
-      if (url.pathname === "/user")
-        return Response.json({ id: 42, login: "maxi", name: "Maxi", email: "maxi@example.com" })
-      if (url.pathname === "/user/emails")
-        return Response.json([{ email: "maxi@example.com", primary: true, verified: true }])
+      if (url.pathname === "/user") return profile()
+      if (url.pathname === "/user/emails") return emails()
       throw new Error(`Unexpected GitHub request: ${url}`)
     }),
   )
@@ -98,6 +100,89 @@ function auth(databaseHooks = {}) {
     database: drizzleAdapter(state.db, { provider: "sqlite", schema: schema.schema }),
     databaseHooks,
     plugins: [proxyAuth(), admin()],
+  })
+}
+
+for (const [label, profile, status, message] of [
+  ["revoked token", () => Response.json({ message: "Bad credentials" }, { status: 401 }), 401, /sign in again/i],
+  ["GitHub outage", () => Response.json({}, { status: 502 }), 503, /try again/i],
+  ["rate limit", () => Response.json({}, { status: 429 }), 503, /try again/i],
+  ["malformed identity", () => Response.json({ login: "maxi" }), 503, /try again/i],
+  [
+    "network failure",
+    () => {
+      throw new TypeError("fetch failed")
+    },
+    503,
+    /try again/i,
+  ],
+]) {
+  test(`proxy sign-in reports ${label} during identity lookup after caching membership`, async () => {
+    const token = `test-cached-profile-${label}`
+    github()
+    assert.equal(await isGitHubMember(token), true)
+    const membership = vi.fn(() => assert.fail("The successful membership check should be cached"))
+    github(membership, profile)
+    const instance = auth()
+    state.auth = instance
+    const response = await instance.api.proxySignIn({
+      headers: new Headers({ "x-auth-request-access-token": token }),
+      asResponse: true,
+    })
+    assert.equal(response.status, status)
+    assert.match((await response.json()).message, message)
+    await assert.rejects(connect(token), (error) => error.status === status)
+    assert.equal(membership.mock.calls.length, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id <> 'owner'").get().n, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM account").get().n, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 0)
+  })
+}
+
+for (const [label, publicEmail, emails, email, emailVerified] of [
+  [
+    "primary private email",
+    null,
+    () =>
+      Response.json([
+        { email: "secondary@example.com", primary: false, verified: true },
+        { email: "primary@example.com", primary: true, verified: true },
+      ]),
+    "primary@example.com",
+    true,
+  ],
+  [
+    "unverified public email",
+    "public@example.com",
+    () => Response.json([{ email: "primary@example.com", primary: true, verified: true }]),
+    "public@example.com",
+    false,
+  ],
+  ["unavailable email lookup", null, () => Response.json({}, { status: 503 }), "42@users.noreply.github.com", false],
+]) {
+  test(`proxy sign-in preserves profile mapping for ${label}`, async () => {
+    github(
+      undefined,
+      () =>
+        Response.json({
+          id: 42,
+          login: "maxi",
+          name: null,
+          email: publicEmail,
+          avatar_url: "https://example.com/avatar",
+        }),
+      emails,
+    )
+    const response = await auth().api.proxySignIn({
+      headers: new Headers({ "x-auth-request-access-token": `test-profile-${label}` }),
+      asResponse: true,
+    })
+    assert.equal(response.status, 200, await response.text())
+    const user = sql.prepare("SELECT name, email, email_verified, image FROM user WHERE id <> 'owner'").get()
+    assert.equal(user.name, "maxi")
+    assert.equal(user.email, email)
+    assert.equal(Boolean(user.email_verified), emailVerified)
+    assert.equal(user.image, "https://example.com/avatar")
   })
 }
 
