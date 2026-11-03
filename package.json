@@ -14,7 +14,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config .output/server/wrangler.json",
     "deploy": "pnpm db:migrate:remote && node scripts/deploy-cloudflare.mjs",
     "dev": "nuxt dev",
-    "postinstall": "vitehub types prepare && nuxt prepare",
+    "postinstall": "nuxt prepare && vitehub types prepare",
     "preview": "wrangler d1 migrations apply DB --local --config .output/server/wrangler.json && wrangler dev --config .output/server/wrangler.json --enable-containers=false --port 8788",
     "doctor": "vite-doctor . --config doctor.config.ts --no-cache --severity warn --max-warnings 0",
     "test": "vp test",
