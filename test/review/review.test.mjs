@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "vite-plus/test"
+import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { insertDrop, migrate, objects, reset, sql, state, threads, who } from "../cost/harness.mjs"
@@ -606,6 +606,102 @@ test("review request ids persist with and without screenshots, while older clien
     listed.threads.toSorted((a, b) => a.n - b.n).map((thread) => thread.requestId),
     [...requestIds, undefined],
   )
+})
+
+for (const screenshot of [undefined, PNG]) {
+  test(`repeated review submissions reuse the thread and its images${screenshot ? " and screenshot" : ""}`, async () => {
+    site()
+    const { body } = await token(SITE, { name: "Ole" })
+    const data = { requestId: crypto.randomUUID() }
+    const options = { screenshot, images: [PNG] }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await comment(body.token, data, options)
+      assert.equal(response.status, 200)
+      assert.equal((await json(response)).n, 1)
+    }
+    assert.equal(threads().length, 1)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, 1)
+    assert.equal(objects.size, screenshot ? 2 : 1)
+  })
+
+  test(`an in-flight review POST and its resend persist once${screenshot ? " with a screenshot" : ""}`, async () => {
+    site()
+    const { body } = await token(SITE, { name: "Ole" })
+    const data = { requestId: crypto.randomUUID() }
+    const options = { screenshot, images: [PNG] }
+    const started = Promise.withResolvers()
+    const resume = Promise.withResolvers()
+    const batch = state.db.batch.bind(state.db)
+    let held = false
+    vi.spyOn(state.db, "batch").mockImplementation(async (queries) => {
+      if (!held && queries.some((query) => query.toSQL().sql.startsWith('insert into "vitehub_comment_threads"'))) {
+        held = true
+        started.resolve()
+        await resume.promise
+      }
+      return batch(queries)
+    })
+    const original = comment(body.token, data, options)
+    let resent
+    try {
+      await started.promise
+      // The response can be lost before the original POST's write becomes visible to the retry lookup.
+      assert.deepEqual((await json(await count(body.token, "/pricing?plan=pro"))).threads, [])
+      resent = await comment(body.token, data, options)
+    } finally {
+      resume.resolve()
+    }
+    const first = await original
+    assert.equal(first.status, 200)
+    assert.equal(resent.status, 200)
+    assert.equal((await json(first)).n, (await json(resent)).n)
+    assert.equal(threads().length, 1)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, 1)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE kind = 'image'").get().n, screenshot ? 2 : 1)
+    assert.equal(objects.size, screenshot ? 2 : 1)
+  })
+}
+
+test("legacy submissions and distinct request ids still create separate threads", async () => {
+  site()
+  const { body } = await token(SITE, { name: "Ole" })
+  for (const data of [{}, {}, { requestId: crypto.randomUUID() }, { requestId: crypto.randomUUID() }]) {
+    assert.equal((await comment(body.token, data)).status, 200)
+  }
+  assert.deepEqual(
+    threads().map((thread) => thread.number),
+    [1, 2, 3, 4],
+  )
+})
+
+test("the same request id is independent on different sites", async () => {
+  site()
+  const first = await token(SITE, { name: "Ole" })
+  site("other-site", { site_url: "https://other.example" })
+  const second = await token("https://other.example", { name: "Ole" })
+  const data = { requestId: crypto.randomUUID() }
+  assert.equal((await comment(first.body.token, data)).status, 200)
+  assert.equal((await comment(second.body.token, data, { origin: "https://other.example" })).status, 200)
+  assert.equal(threads().length, 2)
+})
+
+test("a failed Comments batch rolls back its request claim so a retry can save it", async () => {
+  site()
+  const { body } = await token(SITE, { name: "Ole" })
+  const data = { requestId: crypto.randomUUID() }
+  sql.exec(`CREATE TRIGGER fail_review_comment BEFORE INSERT ON vitehub_comments
+    BEGIN SELECT RAISE(ABORT, 'Comments unavailable'); END`)
+  try {
+    assert.equal((await comment(body.token, data)).status, 500)
+    assert.equal(threads().length, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM review_submissions").get().n, 0)
+  } finally {
+    sql.exec("DROP TRIGGER fail_review_comment")
+  }
+  const saved = await comment(body.token, data)
+  assert.equal(saved.status, 200)
+  assert.equal((await json(saved)).n, 1)
+  assert.equal(threads().length, 1)
 })
 
 test("comments on a pattern keep the origin of the preview they came from", async () => {

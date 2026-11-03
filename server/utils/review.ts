@@ -22,9 +22,9 @@ import {
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
-import { drops, user } from "../databases/config"
+import { drops, reviewSubmissions, user } from "../databases/config"
 import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
-import { addThread, authorOf, siteCommentList, threadsFor, toComment, undoThread } from "./comments"
+import { addThread, authorOf, findThread, siteCommentList, threadsFor, toComment, undoThread } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { isExpired, expiryPolicy, renewDrop } from "./expiry"
 import { createFolder } from "./folders"
@@ -433,19 +433,42 @@ export async function addReviewComment(
   origin: string,
   images: CommentImage[] = [],
 ) {
-  const { row } = await withImages(
-    images,
-    () => insertReviewComment(site, author, input, shot, origin),
-    (added) =>
-      attachImages(site, images, { commentId: added.comments[0]!.id, replyId: null, n: added.number }, author.name),
-    async (added) => {
-      // With a screenshot, the comment is on the screenshot's drop: deleting that takes the comment with it.
-      const shotDrop = added.meta.dropId === site.id ? null : await findDrop(added.meta.dropId)
-      if (shotDrop) await deleteDrop(shotDrop)
-      else await undoThread(added)
-    },
-  )
-  return row
+  if (input.requestId) {
+    const existing = await submittedReview(site, input.requestId)
+    if (existing) return existing
+  }
+  try {
+    const { row } = await withImages(
+      images,
+      () => insertReviewComment(site, author, input, shot, origin),
+      (added) =>
+        attachImages(site, images, { commentId: added.comments[0]!.id, replyId: null, n: added.number }, author.name),
+      async (added) => {
+        // With a screenshot, the comment is on the screenshot's drop: deleting that takes the comment with it.
+        const shotDrop = added.meta.dropId === site.id ? null : await findDrop(added.meta.dropId)
+        if (shotDrop) await deleteDrop(shotDrop)
+        else await undoThread(added)
+      },
+    )
+    return row
+  } catch (error) {
+    // A competing POST may have committed after the lookup above. The database claim rejects our whole Comments
+    // batch, and insertReviewComment removes any extra screenshot before we reuse the winning thread.
+    if (input.requestId) {
+      const existing = await submittedReview(site, input.requestId)
+      if (existing) return existing
+    }
+    throw error
+  }
+}
+
+async function submittedReview(site: Pick<DropRow, "id">, requestId: string) {
+  const [receipt] = await db
+    .select({ threadId: reviewSubmissions.threadId })
+    .from(reviewSubmissions)
+    .where(and(eq(reviewSubmissions.scope, siteCommentList(site).scope), eq(reviewSubmissions.requestId, requestId)))
+    .limit(1)
+  return receipt ? findThread(receipt.threadId) : null
 }
 
 async function insertReviewComment(
