@@ -29,9 +29,9 @@ type DropCommentsUser = CommentsUser & { identity?: Identity }
  * Who a Comments user is in Drop. The Comments API and MCP get theirs from `identify`; the Console's operations hand
  * over the Console's user instead, so that one is looked up by id. Guests are nobody.
  */
-async function identityIn(user: CommentsUser | null): Promise<Identity | null> {
+async function identityIn(user: DropCommentsUser | null): Promise<Identity | null> {
   if (!user || user.guest) return null
-  return (user as DropCommentsUser).identity ?? (await identityOf(user.id))
+  return user.identity ?? (await identityOf(user.id))
 }
 
 const dropLink = (kind: string) =>
