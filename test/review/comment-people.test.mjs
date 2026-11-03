@@ -39,8 +39,10 @@ function request(path, { method = "GET", body, params = {} } = {}) {
   event.context.params = params
   return event
 }
-const listPeople = (id, q = "") => people(request(`/api/drops/${id}/people?q=${encodeURIComponent(q)}`, { params: { id } }))
-const comment = (id, body) => commentsPost(request(`/api/drops/${id}/comments`, { method: "POST", body, params: { id } }))
+const listPeople = (id, q = "") =>
+  people(request(`/api/drops/${id}/people?q=${encodeURIComponent(q)}`, { params: { id } }))
+const comment = (id, body) =>
+  commentsPost(request(`/api/drops/${id}/comments`, { method: "POST", body, params: { id } }))
 const page = { kind: "page", selector: "", ox: 0, oy: 0 }
 
 test("@ suggests people who may read the drop, and only to people signed in", async () => {
@@ -93,7 +95,9 @@ test("its author edits a comment's words; nobody else does", async () => {
   state.who = who
   const posted = await comment("shared", { ...page, body: "Frist" })
   const edit = (body) =>
-    messagePatch(request(`/api/messages/${posted.messageId}`, { method: "PATCH", body, params: { id: posted.messageId } }))
+    messagePatch(
+      request(`/api/messages/${posted.messageId}`, { method: "PATCH", body, params: { id: posted.messageId } }),
+    )
   state.who = bo
   await assert.rejects(edit({ body: "Mine now" }), { status: 404 })
   state.who = who
@@ -122,8 +126,17 @@ test("ViteHub's surfaces follow Drop's sharing: drop threads by the drop, Drop's
 
 test("a file sent through ViteHub's upload becomes an image of the drop, out of its lists", async () => {
   insertDrop("shared")
-  const png = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64"))
-  const id = await storeCommentFile({ name: "shot.png", size: png.byteLength, data: png }, { kind: "drop", id: "shared" }, bo)
+  const png = Uint8Array.from(
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  )
+  const id = await storeCommentFile(
+    { name: "shot.png", size: png.byteLength, data: png },
+    { kind: "drop", id: "shared" },
+    bo,
+  )
   const row = sql.prepare("SELECT kind, parent_id, owner_id, content_type FROM drops WHERE id = ?").get(id)
   assert.deepEqual({ ...row }, { kind: "image", parent_id: "shared", owner_id: "owner", content_type: "image/png" })
   assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments WHERE drop_id = ?").get(id).n, 1)
