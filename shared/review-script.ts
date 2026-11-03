@@ -830,6 +830,47 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
   });
 
+  // While Drop restarts or moves to another machine, the proxy in front of it answers without CORS headers, so the
+  // browser only sees a failed fetch. That can't tell a comment that never arrived from one Drop saved before the
+  // answer was lost. So before each resend the script looks for it among the page's threads: a thread that wasn't
+  // there before, with the same words, is this one. It keeps trying for two minutes; the note stays if it gives up.
+  const RETRY_FOR = 120000;
+  const unreachable = (response) => !response || response.status === 502 || response.status === 503 || response.status === 504;
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  async function postComment(form, body) {
+    const page = pageKey(), before = new Set(threads.map((item) => item.n)), until = Date.now() + RETRY_FOR;
+    const attempt = () => fetch(api, { method: "POST", body: form, headers: { authorization: "Bearer " + token }, credentials: "omit" }).catch(() => null);
+    let response = await attempt();
+    for (let wait = 2000; unreachable(response); wait = Math.min(wait * 2, 15000)) {
+      if (Date.now() + wait > until) throw new Error("Couldn't reach Drop. Your comment is still here: press Send to try again.");
+      newBox.show("Can't reach Drop. Trying again…");
+      await pause(wait);
+      const n = await landed(page, body, before);
+      if (n) return { n };
+      // undefined: Drop is still out of reach, so wait again. null: Drop answered and the comment isn't there.
+      if (n === null) response = await attempt();
+    }
+    const answer = await response.json().catch(() => ({}));
+    if (response.status === 401) { save(null); throw new Error("Your review session ended. Press Send to connect again."); }
+    if (!response.ok) throw new Error(answer.message || "Drop didn't take the comment.");
+    return answer;
+  }
+
+  async function landed(page, body, before) {
+    try {
+      const response = await fetch(api + "?page=" + encodeURIComponent(page), { headers: { authorization: "Bearer " + token }, credentials: "omit" });
+      // A session that ended goes to the resend, whose 401 says so.
+      if (response.status === 401) return null;
+      if (!response.ok) return undefined;
+      const answer = await response.json();
+      const found = (Array.isArray(answer.threads) ? answer.threads : []).find((item) => !before.has(item.n) && item.body === body.trim());
+      return found ? found.n : null;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   pop.addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = newBox.note.value.trim();
@@ -852,10 +893,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       const shot = await area.shot;
       if (shot) form.append("screenshot", shot, "screenshot");
       newBox.files().forEach((file) => form.append("image", file, file.name || "image"));
-      const response = await fetch(api, { method: "POST", body: form, headers: { authorization: "Bearer " + token }, credentials: "omit" });
-      const answer = await response.json().catch(() => ({}));
-      if (response.status === 401) { save(null); throw new Error("Your review session ended. Press Send to connect again."); }
-      if (!response.ok) throw new Error(answer.message || "Drop didn't take the comment.");
+      const answer = await postComment(form, data.body);
       newBox.reset();
       cancel();
       say("Sent as #" + answer.n + ". ", reviewUrl());
