@@ -23,15 +23,17 @@ import { type Identity, identify, identityOf } from "./utils/identity"
 /** Drop's identity rides on the Comments user, so `authorize` and `canMention` read Drop's permissions. */
 type DropCommentsUser = CommentsUser & { identity?: Identity }
 
-const identityIn = (user: CommentsUser | null): Identity | null =>
-  user ? ((user as DropCommentsUser).identity ?? null) : null
+function identityIn(user: CommentsUser | null): Identity | null {
+  // SAFETY: `identify` below builds every Comments user of a request, and puts Drop's identity on it.
+  return user ? ((user as DropCommentsUser).identity ?? null) : null
+}
 
 const dropLink = (kind: string) =>
   defineCommentSubject({
     kind,
     scope: (id) => `${kind}:${id}`,
     // A suggestion keeps its words in `metadata.suggestion`, so its note may be empty.
-    emptyBody: ({ metadata }) => typeof metadata?.suggestion === "string",
+    emptyBody: ({ metadata }) => (metadata?.suggestion ?? null) !== null,
     link: (thread) => `/drops/${thread.subject.id}?comment=${thread.n}`,
   })
 

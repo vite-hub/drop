@@ -167,7 +167,7 @@ export async function imageParent(drop: DropRow) {
  * each one a comment's image from the start, which keeps it out of lists and search; `linkImages` then says whose it
  * is. When anything fails, the blobs go and nothing points at them.
  */
-export async function storeImages(parent: DropRow, images: CommentImage[], actorName: string): Promise<DropRow[]> {
+async function storeImages(parent: DropRow, images: CommentImage[], actorName: string): Promise<DropRow[]> {
   if (!images.length) return []
   const bytes = images.reduce((sum, image) => sum + image.bytes.byteLength, 0)
   return withDropQuota(parent.ownerId, { drops: 0, bytes, writes: 1 }, undefined, async (quota) => {
@@ -213,7 +213,7 @@ export async function storeImages(parent: DropRow, images: CommentImage[], actor
 }
 
 /** Says which thread (by its first message) or reply the stored images are in. */
-export async function linkImages(ids: string[], owner: { commentId: string; replyId: string | null }) {
+async function linkImages(ids: string[], owner: { commentId: string; replyId: string | null }) {
   if (!ids.length) return
   await db.update(commentAttachments).set(owner).where(inArray(commentAttachments.dropId, ids))
 }

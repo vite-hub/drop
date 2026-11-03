@@ -149,9 +149,6 @@ importers:
       comark-comments:
         specifier: 0.9.0
         version: 0.9.0(@comark/html@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))(comark@0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0))
-      comark-content:
-        specifier: 0.4.1
-        version: 0.4.1(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(beautiful-mermaid@1.1.3)(db0@0.4.1)(katex@0.17.0)(shiki@4.5.0)
       comark-linter:
         specifier: 0.9.0
         version: 0.9.0(20df1d3efb667db51f39b3480369babf)
@@ -6585,10 +6582,6 @@ packages:
       '@comark/html':
         optional: true
 
-  comark-content@0.4.1:
-    resolution: {integrity: sha512-z0nuo3PM53FwBYbxP4rNrUo1QW7jv8YO44HDYaGm2Wx4pmHsLqKdsA6CiHcSOaURze6m7my0Z0YFaLL77LtDUA==}
-    hasBin: true
-
   comark-content@0.4.3:
     resolution: {integrity: sha512-xi/M//OUa5cBaNaV8fzWFdWEqcUbmDCjPbqdf88/3SYd2gIL4zoKMoi5J+fulRnzVG56WPRu5wnafxOV8FPoKQ==}
     hasBin: true
@@ -8742,11 +8735,6 @@ packages:
 
   isomorphic-git@1.44.10:
     resolution: {integrity: sha512-OMlkGP84A84E01mEuXXTzaVJtBqDpK8n8KevA229oVscY4SqgkQ20ByGudME5V6Y2wPpHbH7gYjY5dMK1PXFkQ==}
-    engines: {node: '>=14.17'}
-    hasBin: true
-
-  isomorphic-git@1.44.3:
-    resolution: {integrity: sha512-xlEIMsVUrMfOR25F4jWB9He9s/rUHWsgfJJJ3zpdwFssv9X2QfoIUyYH9CEFok9yk2tx2UDipj2gJ+KVvV/qGA==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -17183,7 +17171,7 @@ snapshots:
       esbuild: 0.28.2
       exsolve: 1.1.3
       h3: 2.0.8(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
-      isomorphic-git: 1.44.3
+      isomorphic-git: 1.44.10
       jiti: 2.7.0
       minimatch: 10.2.6
       mountx: 0.0.2(unstorage@1.17.6(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(db0@0.4.1))
@@ -18787,43 +18775,6 @@ snapshots:
     optionalDependencies:
       '@comark/html': 0.8.1(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
 
-  comark-content@0.4.1(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(beautiful-mermaid@1.1.3)(db0@0.4.1)(katex@0.17.0)(shiki@4.5.0):
-    dependencies:
-      citty: 0.2.2
-      comark: 0.7.0(beautiful-mermaid@1.1.3)(katex@0.17.0)(shiki@4.5.0)
-      hookable: 6.1.2
-      jiti: 2.7.0
-      ofetch: 1.5.1
-      pathe: 2.0.3
-      picomatch: 4.0.7
-      slugify: 1.6.9
-      ufo: 1.6.4
-      unstorage: 1.17.5(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(db0@0.4.1)
-    transitivePeerDependencies:
-      - '@azure/app-configuration'
-      - '@azure/cosmos'
-      - '@azure/data-tables'
-      - '@azure/identity'
-      - '@azure/keyvault-secrets'
-      - '@azure/storage-blob'
-      - '@capacitor/preferences'
-      - '@deno/kv'
-      - '@netlify/blobs'
-      - '@planetscale/database'
-      - '@upstash/redis'
-      - '@vercel/blob'
-      - '@vercel/functions'
-      - '@vercel/kv'
-      - aws4fetch
-      - beautiful-mermaid
-      - db0
-      - idb-keyval
-      - ioredis
-      - katex
-      - rangi
-      - shiki
-      - uploadthing
-
   comark-content@0.4.3(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(beautiful-mermaid@1.1.3)(db0@0.4.1)(katex@0.18.11)(shiki@4.5.0):
     dependencies:
       citty: 0.2.2
@@ -20335,7 +20286,7 @@ snapshots:
       pathe: 2.0.3
       ufo: 1.6.4
       unifont: 0.7.5
-      unstorage: 1.17.5(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(db0@0.4.1)
+      unstorage: 1.17.6(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(db0@0.4.1)
     optionalDependencies:
       vite: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)'
     transitivePeerDependencies:
@@ -20809,21 +20760,6 @@ snapshots:
       readable-stream: 4.7.0
       sha.js: 2.4.12
       simple-get: 4.0.1
-
-  isomorphic-git@1.44.3:
-    dependencies:
-      async-lock: 1.4.1
-      clean-git-ref: 2.0.1
-      crc-32: 1.2.2
-      diff3: 0.0.3
-      ignore: 5.3.2
-      minimisted: 2.0.1
-      pako: 1.0.11
-      pify: 4.0.1
-      readable-stream: 4.7.0
-      sha.js: 2.4.12
-      simple-get: 4.0.1
-    optional: true
 
   isomorphic.js@0.2.5: {}
 
