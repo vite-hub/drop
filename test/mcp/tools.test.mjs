@@ -937,7 +937,8 @@ test("read_drop gives a doc's results for every block and the user's own answers
   )
   assert.match(text, /\n- card \(recall\)\. The user: missed\n/)
   assert.match(text, /\n- lunch \(poll, 2 people\): pizza 2, tacos 1\n/)
-  assert.doesNotMatch(JSON.stringify(read), /ada|bob/)
+  // Match whole identities: a random file UUID can contain "ada" without exposing a person.
+  assert.doesNotMatch(JSON.stringify(read), /\b(?:ada|bob)\b/)
 
   const page = (await call(publish, { html: "<p>Hi</p>", note: "v1", lifetime: "review" })).structuredContent
   assert.equal((await call(readDrop, { id: page.id })).structuredContent.answers, undefined)
