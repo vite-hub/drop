@@ -161,13 +161,27 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
       pin.el.style.removeProperty("position");
       if (pin.el.getAttribute("style") !== saved[i]) saved[i] === null ? pin.el.removeAttribute("style") : pin.el.setAttribute("style", saved[i]);
     });
+    // A zero-size fixed host's rect doesn't describe how its transform paints overflowing children. Keep that
+    // transform in the clone and position its layout box instead; folding it into the rect would lose rotation/scale.
+    const transforms = ["transform", "translate", "rotate", "scale"];
+    found.filter((pin) => !pin.sticky && (pin.rect.width < 1 || pin.rect.height < 1)).forEach((pin) => {
+      const saved = pin.el.getAttribute("style");
+      try {
+        transforms.forEach((name) => pin.el.style.setProperty(name, "none", "important"));
+        pin.layout = pin.el.getBoundingClientRect();
+      } finally {
+        transforms.forEach((name) => pin.el.style.removeProperty(name));
+        if (pin.el.getAttribute("style") !== saved) saved === null ? pin.el.removeAttribute("style") : pin.el.setAttribute("style", saved);
+      }
+    });
     found.forEach((pin, i) => {
       if (!pin.sticky) {
         const box = containerOf(pin.el), parent = pin.el.parentElement;
         const at = box ? box.getBoundingClientRect() : { left: 0, top: 0 };
+        const rect = pin.layout || pin.rect;
         // A child of a scrolled element gets that scroll as a transform in the clone; this offsets it.
-        pin.left = pin.rect.left - (box ? at.left + box.clientLeft : 0) + (parent ? parent.scrollLeft : 0);
-        pin.top = pin.rect.top - (box ? at.top + box.clientTop : 0) + (parent ? parent.scrollTop : 0);
+        pin.left = rect.left - (box ? at.left + box.clientLeft : 0) + (parent ? parent.scrollLeft : 0);
+        pin.top = rect.top - (box ? at.top + box.clientTop : 0) + (parent ? parent.scrollTop : 0);
       }
       pin.el.setAttribute(attr, String(i));
     });
@@ -197,13 +211,14 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
         set("position", "absolute");
         set("left", pin.left + "px");
         set("top", pin.top + "px");
-        set("width", pin.rect.width + "px");
-        set("height", pin.rect.height + "px");
+        const rect = pin.layout || pin.rect;
+        set("width", rect.width + "px");
+        set("height", rect.height + "px");
         set("margin", "0");
         set("box-sizing", "border-box");
         set("min-width", "0"); set("min-height", "0"); set("max-width", "none"); set("max-height", "none");
         // Its rect already includes any translate, as in a centered toast.
-        set("transform", "none"); set("translate", "none"); set("rotate", "none"); set("scale", "none");
+        if (!pin.layout) transforms.forEach((name) => set(name, "none"));
       },
       release() { found.forEach((pin) => pin.el.removeAttribute(attr)); },
     };

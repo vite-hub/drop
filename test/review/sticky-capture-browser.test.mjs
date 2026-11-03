@@ -216,3 +216,72 @@ for (const rendering of ["shadow root", "pseudo-element"]) {
     })
   }
 }
+
+for (const transforms of ["transform:rotate(-90deg)", "rotate:-90deg;translate:20px 20px;scale:1.5"]) {
+  test(`an offscreen zero-size fixed host preserves its transformed overflow (${transforms})`, async () => {
+    const browser = await chromium.launch()
+    try {
+      const page = await browser.newPage({ viewport: { width: 1200, height: 700 } })
+      await page.route("**/*", (route) =>
+        route.fulfill(
+          new URL(route.request().url()).hostname === "esm.sh"
+            ? {
+                contentType: "text/javascript",
+                headers: { "access-control-allow-origin": "*" },
+                body: SCREENSHOT_MODULE,
+              }
+            : {
+                contentType: "text/html; charset=utf-8",
+                body: html.replace(`<script src="${DROP}/review.js" defer></script>`, ""),
+              },
+        ),
+      )
+      await page.goto(SITE + "/product")
+      await page.evaluate((transforms) => {
+        const host = document.createElement("div")
+        host.style.cssText = `position:fixed;left:-100px;top:200px;width:0;height:0;${transforms}`
+        host.innerHTML = '<div id="transformed-bar" style="width:40px;height:300px;background:rgb(255 0 170)"></div>'
+        document.body.appendChild(host)
+        document.querySelector(".scroll").scrollTop = 600
+      }, transforms)
+      await page.addScriptTag({ content: CAPTURE + "\nwindow.captureViewport = captureViewport;" })
+      const pixels = await page.evaluate(async () => {
+        const bar = document.querySelector("#transformed-bar")
+        const host = bar.parentElement
+        const rect = host.getBoundingClientRect()
+        const before = host.getAttribute("style")
+        const barRect = bar.getBoundingClientRect()
+        const x = Math.max(0, barRect.left) + (Math.min(innerWidth, barRect.right) - Math.max(0, barRect.left)) / 2
+        const y = barRect.top + barRect.height / 2
+        const shot = await window.captureViewport(null)
+        const image = await createImageBitmap(shot)
+        const canvas = document.createElement("canvas")
+        canvas.width = image.width
+        canvas.height = image.height
+        const g = canvas.getContext("2d")
+        g.drawImage(image, 0, 0)
+        const k = image.width / innerWidth
+        const pixel = (y) => Array.from(g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data)
+        return {
+          hostSize: [rect.width, rect.height],
+          hostRight: rect.right,
+          live: document.elementFromPoint(x, y) === bar,
+          restored: host.getAttribute("style") === before,
+          onBar: pixel(y),
+          below: pixel(barRect.bottom + 20),
+        }
+      })
+      assert.deepEqual(pixels.hostSize, [0, 0])
+      assert.ok(pixels.hostRight < 0, "the host's own rect is offscreen")
+      assert.equal(pixels.live, true, "the transform brings the overflowing bar into view")
+      assert.equal(pixels.restored, true, "capture restores the live host's inline styles")
+      assert.ok(
+        pixels.onBar[0] > 200 && pixels.onBar[1] < 80 && pixels.onBar[2] > 120,
+        `the bar keeps its rendered geometry, got ${pixels.onBar}`,
+      )
+      assert.ok(pixels.below[0] < 40 && pixels.below[2] > 200, `the page stays below the bar, got ${pixels.below}`)
+    } finally {
+      await browser.close()
+    }
+  })
+}
