@@ -22,12 +22,16 @@ import { type Identity, identify, identityOf } from "./utils/identity"
  * images, the toolbar, the Console, and ViteHub MCP.
  */
 
-/** Drop's identity rides on the Comments user, so `authorize` and `canMention` read Drop's permissions. */
+/** Drop's identity rides on the Comments user that `identify` builds, so `authorize` reads Drop's permissions. */
 type DropCommentsUser = CommentsUser & { identity?: Identity }
 
-function identityIn(user: CommentsUser | null): Identity | null {
-  // SAFETY: `identify` below builds every Comments user of a request, and puts Drop's identity on it.
-  return user ? ((user as DropCommentsUser).identity ?? null) : null
+/**
+ * Who a Comments user is in Drop. The Comments API and MCP get theirs from `identify`; the Console's operations hand
+ * over the Console's user instead, so that one is looked up by id. Guests are nobody.
+ */
+async function identityIn(user: CommentsUser | null): Promise<Identity | null> {
+  if (!user || user.guest) return null
+  return (user as DropCommentsUser).identity ?? (await identityOf(user.id))
 }
 
 const dropLink = (kind: string) =>
@@ -77,7 +81,7 @@ export default defineComments({
   },
 
   async authorize({ user, action, thread, subject }) {
-    const who = identityIn(user)
+    const who = await identityIn(user)
     const can = await allowed(subject ?? thread?.subject, who)
     if (action === "read") return can.view
     if (action === "write") return can.comment
@@ -114,7 +118,7 @@ export default defineComments({
   onMention() {},
 
   /** A file from ViteHub's surfaces: an image drop under the commented drop, like the images Drop's own routes take. */
-  storeAttachment: (file, { user, subject }) => storeCommentFile(file, subject, identityIn(user)),
+  storeAttachment: async (file, { user, subject }) => storeCommentFile(file, subject, await identityIn(user)),
 
   /**
    * A comment image by its key, the image drop's id. ViteHub serves it at /api/_vitehub/comments/attachments/<id> once

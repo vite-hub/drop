@@ -52,10 +52,12 @@ async function request(path, { cookie = "", method = "GET", body, headers = {} }
   return { status: response.status, headers: response.headers, data, text }
 }
 
-// A browser opening a page. fetch always sends `sec-fetch-mode: cors`, so node:http sends this one.
+// A browser opening a page, with the Fetch Metadata it sends. fetch always sends `sec-fetch-mode: cors`, so node:http
+// sends this one.
 const navigate = (path, cookie = "") =>
   new Promise((resolve, reject) => {
-    get(`${origin}${path}`, { headers: { cookie, "sec-fetch-mode": "navigate" } }, (response) => {
+    const headers = { cookie, accept: "text/html", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" }
+    get(`${origin}${path}`, { headers }, (response) => {
       response.resume()
       resolve({ status: response.statusCode, location: response.headers.location })
     }).on("error", reject)
@@ -106,9 +108,9 @@ await test("Worker Console authorization, admin-only pages, every section for ad
       const page = await navigate("/_vitehub/auth", cookie)
       assert.equal(page.status, cookie ? 404 : 302)
       if (!cookie) assert.equal(page.location, "/signin?redirect=%2F_vitehub%2Fauth")
-      // A script or tool fetching the page gets no Console either.
+      // A script or tool fetching the page gets no Console either, and no redirect to sign in.
       const shell = await request("/_vitehub/auth", { cookie })
-      assert.equal(shell.status, cookie ? 404 : 302)
+      assert.equal(shell.status, cookie ? 404 : 401)
       assert.doesNotMatch(shell.text, /console-(?:admin|member|other)@example\.com/)
       assert.equal((await manage(cookie, { operation: "users" })).status, expected)
       assert.equal((await rpc(cookie, "sections.list")).status, expected)

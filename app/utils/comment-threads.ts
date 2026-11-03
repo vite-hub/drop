@@ -12,7 +12,7 @@ const person = (id: string, name: string, image: string | null): CommentUser => 
 })
 
 /**
- * What a drop's comments are about, as server/utils/comments.ts `subjectFor` says: a site with its screenshots, or the
+ * What a drop's comments are about, as server/utils/comments.ts `commentList` says: a site with its screenshots, or the
  * drop itself across its versions.
  */
 export function commentSubject(drop: Pick<DropDetail, "id" | "kind" | "ancestors"> | null | undefined): CommentSubject {

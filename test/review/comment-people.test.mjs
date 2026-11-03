@@ -126,6 +126,11 @@ test("ViteHub's surfaces follow Drop's sharing: drop threads by the drop, Drop's
   assert.equal(await can(as(bo), "delete", drop("shared")), false, "only managers delete other people's words")
   assert.equal(await can(as(bo), "read", { kind: "page", id: "/drops" }), false)
   assert.equal(await can(as(admin), "read", { kind: "page", id: "/drops" }), true)
+  // The Console's operations hand over the Console's user, without Drop's identity: it is looked up by id.
+  const consoleUser = (person) => ({ id: person.userId, name: person.name, email: person.email })
+  assert.equal(await can(consoleUser(who), "read", drop("private")), true)
+  assert.equal(await can(consoleUser(bo), "read", drop("private")), false)
+  assert.equal(await can({ id: "guest:1", name: "Guest", guest: true }, "write", drop("shared")), false)
 })
 
 test("a file sent through ViteHub's upload becomes an image of the drop, out of its lists, and reads back", async () => {

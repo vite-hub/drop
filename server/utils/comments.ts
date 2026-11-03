@@ -65,9 +65,6 @@ async function commentList(row: Commented): Promise<CommentList> {
   return ownList(row)
 }
 
-/** What a drop's threads are about: the drop, or for a site and its screenshots, the site. */
-export const subjectFor = async (row: Commented) => (await commentList(row)).subject
-
 /**
  * What a thread keeps in `metadata`: the drop it was written on, and its anchor as Drop's viewers draw it. `kind`:
  * `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of a page, `page` is the
