@@ -56,6 +56,9 @@ const get = (handler, id) => {
 
 test("a shared doc's page and the APIs it calls wait for few round trips, one after another", async () => {
   publicDoc()
+  // Comments reads its tables' shape once per process, on its first query, to tell an old schema (COMMENTS_R0019).
+  // A Worker pays that once per isolate; this counts what every request after it waits for.
+  await get(commentsHandler, LINK)
   const counts = {
     link: await roundTrips(() => get(linkHandler, LINK)),
     detail: await roundTrips(() => get(detailHandler, LINK)),
