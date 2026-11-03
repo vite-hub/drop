@@ -14,9 +14,9 @@ test("the viewer saves an answer for the version the reader has open", async () 
     const drop = ref({ id: "quiz", link: "quiz", version: 1, quiz: { answers: {}, results: {} } })
     const send = vi.fn()
     const viewer = scope.run(() => useViewerQuiz(drop, send))
-    viewer.receive({ type: "quiz-ready", ids: ["capital"] })
+    viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["capital"] } })
     send.mockClear()
-    viewer.receive({ type: "quiz-answer", answer })
+    viewer.receive({ type: "comark-quiz:answer", detail: answer })
     await vi.waitFor(() => assert.equal(send.mock.calls.length, 1))
     const order = fetch.mock.calls[0][1].body.order
     assert.equal(order.sequence, 1)
@@ -25,7 +25,7 @@ test("the viewer saves an answer for the version the reader has open", async () 
     assert.deepEqual(fetch.mock.calls, [
       ["/api/drops/quiz/answers", { method: "POST", query: { v: 1 }, body: { ...answer, order } }],
     ])
-    assert.deepEqual(send.mock.calls[0][0].state.answers.capital, { choice: ["rome"], correct: true })
+    assert.deepEqual(send.mock.calls[0][0].detail.answers.capital, { choice: ["rome"], correct: true })
   } finally {
     scope.stop()
     vi.unstubAllGlobals()
@@ -46,9 +46,12 @@ for (const staleFails of [false, true]) {
       const drop = ref({ id: "quiz", link: "quiz", version: 1, quiz: { answers: {}, results: {} } })
       const send = vi.fn()
       const viewer = scope.run(() => useViewerQuiz(drop, send))
-      viewer.receive({ type: "quiz-ready", ids: ["lunch"] })
+      viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
       send.mockClear()
-      const vote = (choice) => ({ type: "quiz-answer", answer: { id: "lunch", kind: "poll", choice, correct: null } })
+      const vote = (choice) => ({
+        type: "comark-quiz:answer",
+        detail: { id: "lunch", kind: "poll", choice, correct: null },
+      })
       viewer.receive(vote(["pizza"]))
       viewer.receive(vote(["tacos"]))
       const saved = { answer: { choice: ["tacos"], correct: null }, results: { counts: { tacos: 1 }, total: 1 } }
@@ -59,9 +62,9 @@ for (const staleFails of [false, true]) {
       await new Promise((resolve) => setImmediate(resolve))
       assert.equal(fail.mock.calls.length, 0)
       assert.equal(send.mock.calls.length, 1)
-      viewer.receive({ type: "quiz-ready", ids: ["lunch"] })
-      assert.deepEqual(send.mock.lastCall[0].state.answers.lunch, saved.answer)
-      assert.deepEqual(send.mock.lastCall[0].state.results.lunch, saved.results)
+      viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
+      assert.deepEqual(send.mock.lastCall[0].detail.answers.lunch, saved.answer)
+      assert.deepEqual(send.mock.lastCall[0].detail.results.lunch, saved.results)
       const orders = fetch.mock.calls.map((call) => call[1].body.order)
       assert.equal(orders[0].session, orders[1].session)
       assert.ok(orders[1].issuedAt > orders[0].issuedAt)
@@ -91,20 +94,23 @@ test("a failed vote restores the last confirmed vote, and old pages cannot updat
     const drop = ref({ id: "quiz", link: "quiz", version: 1, quiz: { answers: {}, results: {} } })
     const send = vi.fn()
     const viewer = scope.run(() => useViewerQuiz(drop, send))
-    const vote = (choice) => ({ type: "quiz-answer", answer: { id: "lunch", kind: "poll", choice, correct: null } })
-    viewer.receive({ type: "quiz-ready", ids: ["lunch"] })
+    const vote = (choice) => ({
+      type: "comark-quiz:answer",
+      detail: { id: "lunch", kind: "poll", choice, correct: null },
+    })
+    viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
     viewer.receive(vote(["pizza"]))
     await vi.waitFor(() => assert.equal(send.mock.calls.length, 2))
     viewer.receive(vote(["tacos"]))
     await vi.waitFor(() => assert.equal(send.mock.calls.length, 3))
-    assert.deepEqual(send.mock.lastCall[0].state.answers.lunch, { choice: ["pizza"], correct: null })
+    assert.deepEqual(send.mock.lastCall[0].detail.answers.lunch, { choice: ["pizza"], correct: null })
     viewer.receive(vote(["tacos"]))
     drop.value = { id: "other", link: "other", version: 1, quiz: { answers: {}, results: {} } }
     await new Promise((resolve) => setImmediate(resolve))
     pending.resolve({ answer: { choice: ["tacos"], correct: null } })
     await new Promise((resolve) => setImmediate(resolve))
-    viewer.receive({ type: "quiz-ready", ids: ["lunch"] })
-    assert.deepEqual(send.mock.lastCall[0].state.answers, {})
+    viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
+    assert.deepEqual(send.mock.lastCall[0].detail.answers, {})
   } finally {
     scope.stop()
     vi.unstubAllGlobals()
@@ -130,8 +136,11 @@ for (const earlierCompletesFirst of [false, true]) {
       })
       const send = vi.fn()
       const viewer = scope.run(() => useViewerQuiz(drop, send))
-      const vote = (choice) => ({ type: "quiz-answer", answer: { id: "lunch", kind: "poll", choice, correct: null } })
-      viewer.receive({ type: "quiz-ready", ids: ["lunch"] })
+      const vote = (choice) => ({
+        type: "comark-quiz:answer",
+        detail: { id: "lunch", kind: "poll", choice, correct: null },
+      })
+      viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
       viewer.receive(vote(["pizza"]))
       viewer.receive(vote([]))
       const saved = { answer: { choice: ["pizza"], correct: null }, results: { counts: { pizza: 1 }, total: 1 } }
@@ -142,12 +151,12 @@ for (const earlierCompletesFirst of [false, true]) {
       }
       second.reject(new Error("Failed newest vote"))
       await vi.waitFor(() => assert.equal(send.mock.calls.length, 2))
-      assert.deepEqual(send.mock.lastCall[0].state.answers.lunch, earlierCompletesFirst ? saved.answer : before)
+      assert.deepEqual(send.mock.lastCall[0].detail.answers.lunch, earlierCompletesFirst ? saved.answer : before)
       first.resolve(saved)
       await new Promise((resolve) => setImmediate(resolve))
-      viewer.receive({ type: "quiz-ready", ids: ["lunch"] })
-      assert.deepEqual(send.mock.lastCall[0].state.answers.lunch, saved.answer)
-      assert.deepEqual(send.mock.lastCall[0].state.results.lunch, saved.results)
+      viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
+      assert.deepEqual(send.mock.lastCall[0].detail.answers.lunch, saved.answer)
+      assert.deepEqual(send.mock.lastCall[0].detail.results.lunch, saved.results)
       assert.equal(
         send.mock.calls.length,
         earlierCompletesFirst ? 3 : 4,

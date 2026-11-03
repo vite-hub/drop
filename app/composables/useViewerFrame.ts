@@ -228,8 +228,8 @@ export function useViewerFrame(options: {
   const quiz = useViewerQuiz(drop, (message) => send(message))
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
-      case "quiz-ready":
-      case "quiz-answer":
+      case "comark-quiz:ready":
+      case "comark-quiz:answer":
         if (drop.value.kind === "markdown") quiz.receive(message)
         return
       case "runtime-error":

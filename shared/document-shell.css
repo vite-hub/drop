@@ -215,8 +215,8 @@ p.render-error {
    beside the text column, up to their own width and 72rem, so screenshots read at about twice the size and a diagram's
    labels keep their size. They center on the column, which sits --drop-shift left of the page's middle, and keep 1.5rem
    clear of the page's left edge and of what covers its right: the viewer's floating panel and the outline's column
-   (--drop-right). OUTLINE_SCRIPT moves the text and the outline aside for them. A heading right above a compare spans
-   the same width, so it starts where Before does and reads as the compare's title. */
+   (--drop-right). OUTLINE_SCRIPT moves the text and the outline aside for them. comark-ui widens a heading right above
+   a compare to match, so it reads as the compare's title. */
 .typeset {
   --comark-wide-start: calc(
     (min(100vw - 2 * var(--drop-right, 0px) + var(--drop-shift, 0px), 100vw - var(--drop-shift, 0px)) - 3rem - 100%) / 2
@@ -226,11 +226,6 @@ p.render-error {
      frame (DOCUMENT_EXTRA_CSS), not again on the text. */
   --comark-font: var(--font-body);
   --comark-grain: none;
-}
-.typeset > :is(h2, h3, h4):has(+ .ca-compare, + style + .ca-compare) {
-  --ca-wide: max(100%, min(72rem, 100% + 2 * var(--comark-wide-start)));
-  width: var(--ca-wide);
-  margin-inline: calc((100% - var(--ca-wide)) / 2);
 }
 
 /* In a doc with threads, or review comments in the margin, the room beside the text is the cards', so a compare, its

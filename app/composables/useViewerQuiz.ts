@@ -1,10 +1,10 @@
 import type { FrameMessage } from "#shared/frame-messages"
 import type { DropDetail, QuizAnswer, QuizResult, QuizSaved } from "#shared/types"
 
-type QuizMessage = Extract<FrameMessage, { type: "quiz-ready" | "quiz-answer" }>
+type QuizMessage = Extract<FrameMessage, { type: "comark-quiz:ready" | "comark-quiz:answer" }>
 
 /**
- * A Markdown doc's questions, polls, and recall cards (comark-quiz), over the frame's bridge (QUIZ_BRIDGE). The frame
+ * A Markdown doc's questions, polls, and recall cards (comark-quiz), over its script's relay to the viewer. The frame
  * can't reach Drop's API, so the viewer keeps the answers. A reader whose answers count (the drop's `quiz`) saves each
  * one and gets back how everyone answered that block; a guest's answers last the page view, so questions still grade,
  * and polls ask them to sign in to vote.
@@ -40,8 +40,8 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
     const result = (id: string) => results.get(id) ?? saved?.results[id]
     // Fresh objects: postMessage can't copy a reactive proxy.
     send({
-      type: "quiz-state",
-      state: {
+      type: "comark-quiz:state",
+      detail: {
         answers: Object.fromEntries(
           shown.flatMap((id) => {
             const value = answer(id)
@@ -64,7 +64,7 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
     })
   }
 
-  async function save(answer: Extract<QuizMessage, { type: "quiz-answer" }>["answer"]) {
+  async function save(answer: Extract<QuizMessage, { type: "comark-quiz:answer" }>["detail"]) {
     const before = drop.value.quiz?.answers[answer.id]
     const sequence = (sequences.get(answer.id) ?? 0) + 1
     sequences.set(answer.id, sequence)
@@ -104,11 +104,11 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
   }
 
   function receive(message: QuizMessage) {
-    if (message.type === "quiz-ready") {
-      shown = message.ids
+    if (message.type === "comark-quiz:ready") {
+      shown = message.detail.ids
       return push()
     }
-    const { answer } = message
+    const answer = message.detail
     if (drop.value.quiz) return void save(answer)
     if (answer.kind !== "poll") answers.set(answer.id, { choice: answer.choice, correct: answer.correct })
     push()
