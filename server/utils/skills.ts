@@ -7,6 +7,10 @@ import { skills as comarkSkills } from "comark-ui/skills"
 import { hex, sha256 } from "#shared/utils/bytes"
 import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
+import learningGrading from "../../skills/learning/references/grading.md?raw"
+import learningModel from "../../skills/learning/references/model.md?raw"
+import learningQuiz from "../../skills/learning/references/quiz.md?raw"
+import learningMd from "../../skills/learning/SKILL.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
 import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
 import prototypeCanvas from "../../skills/prototype/references/canvas.md?raw"
@@ -110,6 +114,12 @@ const LOCAL_SKILLS: Skill[] = [
     file("references/canvas.md", prototypeCanvas),
   ]),
   skill([file("SKILL.md", showMeMd)]),
+  skill([
+    file("SKILL.md", learningMd),
+    file("references/model.md", learningModel),
+    file("references/grading.md", learningGrading),
+    file("references/quiz.md", learningQuiz),
+  ]),
   skill(
     Object.entries(slidevFiles)
       .map(([path, text]) => file(path.replace("../../skills/slidev/", ""), text))

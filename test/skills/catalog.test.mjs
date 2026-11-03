@@ -14,7 +14,15 @@ const names = (await readdir(root, { withFileTypes: true }))
   .map((entry) => entry.name)
 
 test("ships the built-in skills and Slidev's own", () => {
-  assert.deepEqual(names.sort(), ["handoff", "pr-evidence", "prototype", "show-me", "slidev", "vitehub-drop"])
+  assert.deepEqual(names.sort(), [
+    "handoff",
+    "learning",
+    "pr-evidence",
+    "prototype",
+    "show-me",
+    "slidev",
+    "vitehub-drop",
+  ])
 })
 
 for (const name of names) {
