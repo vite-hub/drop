@@ -10,12 +10,21 @@ import { authProxy } from "../utils/proxy-auth"
 export default defineHandler(async (event) => {
   const proxy = authProxy()
   if (!proxy.enabled) return
+  const path = event.url.pathname
+  if (path === "/signin" || path === "/api/sign-in") return
+  if (path === "/api/auth/sign-out" && event.req.method === "POST") {
+    if (proxy.cookie)
+      event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
+    return
+  }
   const token = event.req.headers.get("x-auth-request-access-token")
   if (!token) return // Machine OAuth requests use Drop's bearer tokens, not proxy headers.
   if (!(await isGitHubMember(token)))
-    throw new HTTPError({ status: 403, statusText: "Active organization membership required." })
-  if (proxy.cookie && event.url.pathname === "/api/auth/sign-out" && event.req.method === "POST")
-    event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
+    throw new HTTPError({
+      status: 403,
+      statusText: "Active organization membership required.",
+      data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
+    })
   const auth = authFor(event)
   const current = await auth.api.getSession({ headers: event.req.headers }).catch(() => null)
   if (current) {
