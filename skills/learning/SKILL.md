@@ -57,13 +57,14 @@ Done when every answer from the session is in a record, every unanswered questio
 
 ## Writing the model
 
-Drop doesn't lock a doc, so two agents that read the same version and both publish lose one update. Before you publish the model:
+Drop rejects a publish if another write commits between its internal read and commit, but `previous` identifies a drop, not an expected version. There is no lock between your `read_drop` and `publish`. When publishing the model:
 
 1. `read_drop` it again and compare its version with the one you started from. When it moved, merge the other agent's changes into yours. Keep a copy of the source and version you are about to publish against.
 2. `publish` with `previous` set to the model and a `note` naming the concepts that changed, like "dep-prebundling: gap → shaky (record-2026-11-04-vite)".
-3. Check that the version `publish` returned is the one you read plus one. When it isn't, your write may have overwritten another agent's update. Use `read_drop` on the model's link with `?v=<version>` to read every intervening version, from the one you read plus one through the returned version minus one. Compare them with your saved source and recover changes to the mission, concepts, evidence and `Pending`. For overlapping grades, replay their records in answer-date order, counting each answer once; a correction replaces the entry it names. Retain the recovered changes when returning to 1 before publishing again. Reading only your own new version does not recover the overwritten changes.
+3. If `publish` fails with a concurrent-update `409` (such as "This drop was published by someone else"), it created no version. Keep your intended changes and return to 1: re-read the latest model, merge its changes with yours, and retry. Do not resend the old source unchanged. If the retry also conflicts, keep the session's record and tell the user the model update is still pending.
+4. On success, check that the version `publish` returned is the one you read plus one. If it skipped versions, another update landed after your read but before `publish` read the head. Use `read_drop` on the model's link with `?v=<version>` to read every intervening version, from the one you read plus one through the returned version minus one. Compare them with your saved source and recover changes to the mission, concepts, evidence and `Pending`. Retain the recovered changes when returning to 1 before publishing again. Reading only your own new version does not recover the overwritten changes.
 
-Records preserve the answer evidence for rebuilding concept states when merging concurrent updates.
+Records preserve the answer evidence for rebuilding concept states when merging concurrent updates. For overlapping grades, replay their records in answer-date order, counting each answer once; a correction replaces the entry it names.
 
 ## Corrections
 
