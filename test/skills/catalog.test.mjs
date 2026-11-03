@@ -20,6 +20,7 @@ test("ships the built-in skills and Slidev's own", () => {
     "pr-evidence",
     "prototype",
     "show-me",
+    "skill-hub",
     "slidev",
     "vitehub-drop",
   ])

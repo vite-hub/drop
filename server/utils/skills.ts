@@ -16,6 +16,7 @@ import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
 import prototypeCanvas from "../../skills/prototype/references/canvas.md?raw"
 import prototypeMd from "../../skills/prototype/SKILL.md?raw"
 import showMeMd from "../../skills/show-me/SKILL.md?raw"
+import skillHubMd from "../../skills/skill-hub/SKILL.md?raw"
 import blocksGuide from "../../skills/vitehub-drop/references/blocks.md?raw"
 import boardGuide from "../../skills/vitehub-drop/references/board.md?raw"
 import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
@@ -120,6 +121,7 @@ const LOCAL_SKILLS: Skill[] = [
     file("references/grading.md", learningGrading),
     file("references/quiz.md", learningQuiz),
   ]),
+  skill([file("SKILL.md", skillHubMd)]),
   skill(
     Object.entries(slidevFiles)
       .map(([path, text]) => file(path.replace("../../skills/slidev/", ""), text))
