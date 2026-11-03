@@ -19,7 +19,6 @@ test("ships the built-in skills and Slidev's own", () => {
     "learning",
     "pr-evidence",
     "prototype",
-    "quiz-me",
     "show-me",
     "slidev",
     "vitehub-drop",

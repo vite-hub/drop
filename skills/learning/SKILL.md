@@ -1,6 +1,6 @@
 ---
 name: learning
-description: Keeps a learner model of the user in Drop, which records what they know, half-know, and get wrong per topic, with the evidence behind each claim and when to review it, so the next lesson starts where their knowledge stops. Use when teaching or quizzing the user anything, before and after, or when they ask what they know or what to learn next.
+description: Keeps a learner model of the user in Drop, which records what they know, half-know, and get wrong per topic, with the evidence behind each claim and when to review it, so the next lesson starts where their knowledge stops. Use when teaching the user anything, before and after, when they ask to be quizzed or reviewed, or when they ask what they know or what to learn next.
 ---
 
 # Learning
@@ -11,7 +11,7 @@ Coverage is not learning. A lesson read or a video watched changes nothing in th
 
 The model records what the user knows. How agents should work goes in agent memory and `AGENTS.md`, never here.
 
-This skill works through Drop's MCP tools (`list_folders`, `create_folder`, `read_drop`, `list_drops`, `publish`). Follow the `vitehub-drop` skill for publishing. The doc formats are in [the model reference](references/model.md), and grades and states in [the grading reference](references/grading.md).
+This skill works through Drop's MCP tools (`list_folders`, `create_folder`, `read_drop`, `list_drops`, `publish`). Follow the `vitehub-drop` skill for publishing. The doc formats are in [the model reference](references/model.md), and grades and states in [the grading reference](references/grading.md). When the user asks to be quizzed, or a step below calls for a diagnostic or a review, follow [the quiz reference](references/quiz.md).
 
 ## 1. Find the model
 
@@ -31,9 +31,9 @@ Done when you hold the topic folder's id and its `model` doc, or the user declin
 ## 2. Before teaching
 
 1. **Collect pending answers.** The model's `Pending` section lists questions published to Drop that the user hasn't been graded on. For each one, `read_drop` the lesson or quiz and take the user's answer for that question id from `answers`. Grade it with [the grading reference](references/grading.md), then record it as in step 4. An entry with no answer yet stays pending.
-2. **Read the model.** Read the mission and every concept. A topic with no model needs one first: write the mission with the user (why they learn it, what success looks like, by when), map the concepts, and run a diagnostic with the `quiz-me` skill.
+2. **Read the model.** Read the mission and every concept. A topic with no model needs one first: write the mission with the user (why they learn it, what success looks like, by when), map the concepts, and run a [diagnostic](references/quiz.md).
 3. **Pick what to teach.**
-   - When five or more concepts are due (`next` on or before today), offer a review with `quiz-me` before anything new.
+   - When five or more concepts are due (`next` on or before today), offer a [review](references/quiz.md) before anything new.
    - Otherwise open with one or two due concepts as warm-up questions, each a new variant of the question.
    - Then teach one concept at the edge: its state is `unseen`, `claimed`, `gap` or `shaky`, and every concept in its `needs` is `solid` or `durable`. Among those, prefer the one the mission needs most, then `gap` over `shaky` over `claimed` over `unseen`.
    - When a prerequisite's state rests on thin evidence (only `claimed`, or one answer long ago), check it with one quick question before building on it.

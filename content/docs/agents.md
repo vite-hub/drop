@@ -30,8 +30,7 @@ Drop's skills come with the server through the MCP Skills extension (`skills/lis
 - `handoff` sums up the current conversation in a doc and drops it, so another agent, a colleague, or a new session picks the work up from the link.
 - `prototype` builds a UI several radically different ways in one page with a shared picker, so people switch between the variants, comment, and pick one; each round of feedback becomes the next version.
 - `show-me` explains the current topic with diagrams and short docs in Drop. Agents use it only when you ask for it.
-- `learning` keeps a model of what you know per topic in a `learning` folder, with the answers behind it and when each concept is due for review, so a lesson starts where your knowledge stops. The first time, it suggests the folders to create.
-- `quiz-me` quizzes you in chat or in a doc, to place you on a new topic or review what's due, and records your answers in that model.
+- `learning` keeps a model of what you know per topic in a `learning` folder, with the answers behind it and when each concept is due for review, so a lesson starts where your knowledge stops. It also quizzes you, in chat or in a doc, to place you on a new topic or review what's due. The first time, it suggests the folders to create.
 
 The **Skills** page lists the skills this Drop serves, each with its source on GitHub. An admin can switch a skill off there for everyone; every way of getting skills then leaves it out.
 
