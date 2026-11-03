@@ -26,3 +26,10 @@ test("code stays escaped, and unknown or unlabelled fences stay plain", async ()
   assert.match(html, /<pre><code>&lt;b&gt;plain&lt;\/b&gt;<\/code><\/pre>/)
   assert.equal(html.match(/class="shiki"/g)?.length, 1)
 })
+
+test("a doc's code past 200,000 characters stays plain, so a huge dump can't eat the Worker's CPU", async () => {
+  const block = "```ts\n" + "const a = 1\n".repeat(12_000) + "```"
+  const html = await render(`${block}\n\n${block}`)
+  assert.equal(html.match(/class="shiki"/g)?.length, 1)
+  assert.equal(html.match(/<pre/g)?.length, 2)
+})

@@ -3,7 +3,6 @@
 // so a page an agent built for T3 renders the same way in Drop.
 import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
-import { MAX_QUIZ_BLOCKS } from "./quiz"
 import { CAPTURE } from "./viewport-capture"
 import COMMENTS_CSS from "comark-comments/style.css?raw"
 
@@ -309,10 +308,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       host.attachShadow({ mode: "open" }).innerHTML = STYLE + LAYERS;
       box.appendChild(host);
     }
-    if (box === zoom.layer) {
-      const scale = parseFloat((/scale\(([\d.]+)\)/.exec(box.parentElement.style.transform) || [])[1]) || 1;
-      host.style.setProperty("--drop-z", String(1 / scale));
-    }
+    if (box === zoom.layer) host.style.setProperty("--drop-z", String(1 / (zoom.scale || 1)));
     return host.shadowRoot;
   }
   const zoomLayer = () => zoom && zoomShadow(zoom.layer);
@@ -1615,39 +1611,6 @@ const ERROR_REPORTER = String.raw`(() => {
     return original.apply(this, args);
   };
 })();`
-
-/**
- * The host side of comark-quiz's questions, polls, and recall cards (#shared/quiz), for Markdown docs. The frame can't
- * reach Drop's API, so each answer goes up to the viewer, which keeps it, and what the reader may see comes back down:
- * their answers, the results of the blocks they answered, and whether they can vote. It goes first in the head, so it
- * hears the blocks' script start, and hands that script the last state again then, since the viewer may send it first.
- */
-export const QUIZ_BRIDGE = String.raw`(() => {
-  const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
-  let state = null;
-  const apply = () => { if (state) document.dispatchEvent(new CustomEvent("comark-quiz:state", { detail: state })); };
-  document.addEventListener("comark-quiz:ready", (e) => {
-    const ids = e.detail && Array.isArray(e.detail.ids) ? e.detail.ids : [];
-    post({ type: "quiz-ready", ids: ids.slice(0, ${MAX_QUIZ_BLOCKS}).map(String) });
-    apply();
-  });
-  // Only what Drop reads, copied: a detail may hold what postMessage can't send. Drop knows which answer came first.
-  document.addEventListener("comark-quiz:answer", (e) => {
-    const d = e.detail || {};
-    post({ type: "quiz-answer", answer: {
-      id: typeof d.id === "string" ? d.id : "",
-      kind: String(d.kind),
-      choice: Array.isArray(d.choice) ? d.choice.map(String) : [],
-      correct: typeof d.correct === "boolean" ? d.correct : null,
-    } });
-  });
-  addEventListener("message", (e) => {
-    const m = e.data;
-    if (!m || !m.__drop || e.source !== parent || m.type !== "quiz-state" || !m.state) return;
-    state = m.state;
-    apply();
-  });
-})()`
 
 /** Puts `snippet` first in the head, or after the doctype when there's no head tag, so the page keeps standards mode. */
 export function prependToHead(html: string, snippet: string): string {

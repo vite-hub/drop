@@ -95,10 +95,6 @@ export const FrameMessage = v.variant("type", [
     message: v.string(),
     source: v.optional(v.string()),
   }),
-  // A Markdown doc's questions, polls, and recall cards (QUIZ_BRIDGE in ./plan-runtime): the blocks on the page once
-  // comark-quiz's script starts, and each answer a reader gives.
-  v.object({ type: v.literal("quiz-ready"), ids: v.pipe(v.array(QuizId), v.maxLength(MAX_QUIZ_BLOCKS)) }),
-  v.object({ type: v.literal("quiz-answer"), answer: QuizAnswerInput }),
   // A prototype's variants and the one showing, from the prototype skill's picker.js, for Drop's bottom bar to show.
   v.pipe(
     v.object({
@@ -122,14 +118,31 @@ export const FrameMessage = v.variant("type", [
   ),
 ])
 
-export type FrameMessage = v.InferOutput<typeof FrameMessage>
+/**
+ * A Markdown doc's questions, polls, and recall cards, as comark-quiz's script relays them up (`data-quiz-relay` on the
+ * doc, ./documents): the blocks on the page once it starts, past the first MAX_QUIZ_BLOCKS ignored, and each answer a
+ * reader gives. They carry no Drop mark, and only the fields Drop reads are kept.
+ */
+const QuizMessage = v.variant("type", [
+  v.object({
+    type: v.literal("comark-quiz:ready"),
+    detail: v.object({
+      ids: v.pipe(
+        v.array(QuizId),
+        v.transform((ids) => ids.slice(0, MAX_QUIZ_BLOCKS)),
+      ),
+    }),
+  }),
+  v.object({ type: v.literal("comark-quiz:answer"), detail: QuizAnswerInput }),
+])
+
+export type FrameMessage = v.InferOutput<typeof FrameMessage> | v.InferOutput<typeof QuizMessage>
 
 // Drop's runtimes mark every message they post; other scripts in the page post their own.
 const Marked = v.object({ __drop: v.literal(true) })
 
 /** The message, or null when it isn't one a drop frame sends. */
 export function parseFrameMessage(data: unknown): FrameMessage | null {
-  if (!v.is(Marked, data)) return null
-  const result = v.safeParse(FrameMessage, data)
+  const result = v.is(Marked, data) ? v.safeParse(FrameMessage, data) : v.safeParse(QuizMessage, data)
   return result.success ? result.output : null
 }

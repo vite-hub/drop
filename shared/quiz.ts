@@ -1,6 +1,6 @@
 // Questions, polls, and recall cards in Markdown docs (comark-quiz's ::question, ::poll, ::recall). Each block has an
-// id and its options a key (`data-quiz-id`, `data-key`); its script reports answers to Drop through the frame
-// (QUIZ_BRIDGE in ./plan-runtime), and Drop keeps the ones signed-in readers give (server/utils/answers.ts).
+// id and its options a key (`data-quiz-id`, `data-key`); its script relays answers up to the viewer
+// (useViewerQuiz), and Drop keeps the ones signed-in readers give (server/utils/answers.ts).
 import * as v from "valibot"
 
 /** How many blocks of one doc keep answers, across its versions. */
