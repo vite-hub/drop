@@ -7,7 +7,6 @@ import {
 import { provideComments, useComments } from "vite-hub/ui/headless"
 import type { DropComment } from "#shared/types"
 import type { Sent } from "~/composables/useDrop"
-import { attachmentUrls, dropSubject, toThread } from "~/utils/comment-threads"
 
 /** What a viewer action sent, or its failure as the error the comment parts show under the box. */
 async function settled<T>(sent: Promise<Sent<T>>) {
