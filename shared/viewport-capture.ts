@@ -134,11 +134,6 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
     }
     return null;
   }
-  function contentBox(el) {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    return range.getBoundingClientRect();
-  }
   function pinsNow(skip) {
     const attr = "data-drop-pin-" + (++pinRun);
     const found = [];
@@ -148,10 +143,10 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
       const style = getComputedStyle(el);
       if (style.position !== "fixed" && style.position !== "sticky") continue;
       const r = el.getBoundingClientRect();
-      // What it shows: its own box, or, when that's 0 wide or tall (Tailwind's sticky top-12 h-0 around a bar), the
-      // content overflowing it. Skipping such a wrapper left its bar scrolled away in the clone.
-      const seen = r.width >= 1 && r.height >= 1 ? r : contentBox(el);
-      if (style.visibility === "hidden" || seen.width < 1 || seen.height < 1 || seen.bottom <= 0 || seen.right <= 0 || seen.top >= innerHeight || seen.left >= innerWidth) continue;
+      // A zero-size wrapper can paint outside its box through children, a shadow root, or pseudo-elements. Ranges
+      // miss the latter two, so keep these wrappers even when their own box is outside the viewport.
+      if (style.visibility === "hidden") continue;
+      if (r.width >= 1 && r.height >= 1 && (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth)) continue;
       // In a scrolled element, the clone moves its siblings with transforms, which paints them over it unless it's raised.
       const parent = el.parentElement;
       found.push({ el, sticky: style.position === "sticky", rect: r, raise: style.zIndex === "auto" && Boolean(parent && (parent.scrollTop || parent.scrollLeft)) });

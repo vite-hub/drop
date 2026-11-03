@@ -4,6 +4,7 @@ import { createRequire } from "node:module"
 import { chromium } from "playwright"
 import { test } from "vite-plus/test"
 import { REVIEW_SCRIPT } from "../../shared/review-script.ts"
+import { CAPTURE } from "../../shared/viewport-capture.ts"
 
 const SITE = "https://site.test"
 const DROP = "https://drop.test"
@@ -137,3 +138,81 @@ test("a box on a zero-height sticky bar gets the bar in its screenshot, and name
     await browser.close()
   }
 })
+
+for (const rendering of ["shadow root", "pseudo-element"]) {
+  for (const position of ["sticky", "fixed"]) {
+    test(`a zero-height ${position} wrapper preserves its ${rendering} bar in the screenshot`, async () => {
+      const browser = await chromium.launch()
+      try {
+        const page = await browser.newPage({ viewport: { width: 1200, height: 700 } })
+        await page.route("**/*", (route) =>
+          route.fulfill(
+            new URL(route.request().url()).hostname === "esm.sh"
+              ? {
+                  contentType: "text/javascript",
+                  headers: { "access-control-allow-origin": "*" },
+                  body: SCREENSHOT_MODULE,
+                }
+              : {
+                  contentType: "text/html; charset=utf-8",
+                  body: html.replace(`<script src="${DROP}/review.js" defer></script>`, ""),
+                },
+          ),
+        )
+        await page.goto(SITE + "/product")
+        await page.evaluate(
+          ({ rendering, position }) => {
+            const host = document.querySelector(".stick")
+            host.replaceChildren()
+            host.style.position = position
+            if (position === "fixed") host.style.cssText += ";left:0;right:0"
+            const barStyle = "display:block;height:40px;background:rgb(255 0 170)"
+            if (rendering === "shadow root") {
+              host.attachShadow({ mode: "open" }).innerHTML = `<div style="${barStyle}"></div>`
+            } else {
+              const style = document.createElement("style")
+              style.textContent = `.stick::before { content: ""; ${barStyle} }`
+              document.head.appendChild(style)
+            }
+            document.querySelector(".scroll").scrollTop = 600
+          },
+          { rendering, position },
+        )
+        await page.addScriptTag({ content: CAPTURE + "\nwindow.captureViewport = captureViewport;" })
+        const pixels = await page.evaluate(async () => {
+          const host = document.querySelector(".stick")
+          const rect = host.getBoundingClientRect()
+          const range = document.createRange()
+          range.selectNodeContents(host)
+          const content = range.getBoundingClientRect()
+          const shot = await window.captureViewport(null)
+          const image = await createImageBitmap(shot)
+          const canvas = document.createElement("canvas")
+          canvas.width = image.width
+          canvas.height = image.height
+          const g = canvas.getContext("2d")
+          g.drawImage(image, 0, 0)
+          const k = image.width / innerWidth
+          const pixel = (y) => Array.from(g.getImageData(Math.round(480 * k), Math.round(y * k), 1, 1).data)
+          return {
+            top: rect.top,
+            height: rect.height,
+            contentSize: [content.width, content.height],
+            onBar: pixel(68),
+            below: pixel(108),
+          }
+        })
+        assert.equal(pixels.top, 48)
+        assert.equal(pixels.height, 0)
+        assert.deepEqual(pixels.contentSize, [0, 0], "a light-DOM range cannot measure this bar")
+        assert.ok(
+          pixels.onBar[0] > 200 && pixels.onBar[1] < 80 && pixels.onBar[2] > 120,
+          `the bar is where the reviewer saw it, got ${pixels.onBar}`,
+        )
+        assert.ok(pixels.below[0] < 40 && pixels.below[2] > 200, `the page stays below the bar, got ${pixels.below}`)
+      } finally {
+        await browser.close()
+      }
+    })
+  }
+}
