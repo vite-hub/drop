@@ -18,8 +18,8 @@ const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
  *   the content below it doesn't move up.
  *
  * Clones only reach the hook without their original, so originals carry a data attribute for the length of a capture.
- * `describe` names the element under a box, and says when it's on a sticky or fixed one, which doesn't scroll. Needs
- * ELEMENT_NAMING's labelOf.
+ * `describe` names the element under a box, and says when it's on a sticky or fixed one, which doesn't scroll, with the
+ * CSS that pins it. Needs ELEMENT_NAMING's labelOf and pinnedOf.
  *
  * What kept a comment's box from showing for seconds, measured in Firefox on a dashboard (2026-10-29):
  *
@@ -143,7 +143,10 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
       const style = getComputedStyle(el);
       if (style.position !== "fixed" && style.position !== "sticky") continue;
       const r = el.getBoundingClientRect();
-      if (style.visibility === "hidden" || r.width < 1 || r.height < 1 || r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) continue;
+      // A zero-size wrapper can paint outside its box through children, a shadow root, or pseudo-elements. Ranges
+      // miss the latter two, so keep these wrappers even when their own box is outside the viewport.
+      if (style.visibility === "hidden") continue;
+      if (r.width >= 1 && r.height >= 1 && (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth)) continue;
       // In a scrolled element, the clone moves its siblings with transforms, which paints them over it unless it's raised.
       const parent = el.parentElement;
       found.push({ el, sticky: style.position === "sticky", rect: r, raise: style.zIndex === "auto" && Boolean(parent && (parent.scrollTop || parent.scrollLeft)) });
@@ -158,13 +161,27 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
       pin.el.style.removeProperty("position");
       if (pin.el.getAttribute("style") !== saved[i]) saved[i] === null ? pin.el.removeAttribute("style") : pin.el.setAttribute("style", saved[i]);
     });
+    // A zero-size fixed host's rect doesn't describe how its transform paints overflowing children. Keep that
+    // transform in the clone and position its layout box instead; folding it into the rect would lose rotation/scale.
+    const transforms = ["transform", "translate", "rotate", "scale"];
+    found.filter((pin) => !pin.sticky && (pin.rect.width < 1 || pin.rect.height < 1)).forEach((pin) => {
+      const saved = pin.el.getAttribute("style");
+      try {
+        transforms.forEach((name) => pin.el.style.setProperty(name, "none", "important"));
+        pin.layout = pin.el.getBoundingClientRect();
+      } finally {
+        transforms.forEach((name) => pin.el.style.removeProperty(name));
+        if (pin.el.getAttribute("style") !== saved) saved === null ? pin.el.removeAttribute("style") : pin.el.setAttribute("style", saved);
+      }
+    });
     found.forEach((pin, i) => {
       if (!pin.sticky) {
         const box = containerOf(pin.el), parent = pin.el.parentElement;
         const at = box ? box.getBoundingClientRect() : { left: 0, top: 0 };
+        const rect = pin.layout || pin.rect;
         // A child of a scrolled element gets that scroll as a transform in the clone; this offsets it.
-        pin.left = pin.rect.left - (box ? at.left + box.clientLeft : 0) + (parent ? parent.scrollLeft : 0);
-        pin.top = pin.rect.top - (box ? at.top + box.clientTop : 0) + (parent ? parent.scrollTop : 0);
+        pin.left = rect.left - (box ? at.left + box.clientLeft : 0) + (parent ? parent.scrollLeft : 0);
+        pin.top = rect.top - (box ? at.top + box.clientTop : 0) + (parent ? parent.scrollTop : 0);
       }
       pin.el.setAttribute(attr, String(i));
     });
@@ -194,27 +211,34 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
         set("position", "absolute");
         set("left", pin.left + "px");
         set("top", pin.top + "px");
-        set("width", pin.rect.width + "px");
-        set("height", pin.rect.height + "px");
+        const rect = pin.layout || pin.rect;
+        set("width", rect.width + "px");
+        set("height", rect.height + "px");
         set("margin", "0");
         set("box-sizing", "border-box");
         set("min-width", "0"); set("min-height", "0"); set("max-width", "none"); set("max-height", "none");
         // Its rect already includes any translate, as in a centered toast.
-        set("transform", "none"); set("translate", "none"); set("rotate", "none"); set("scale", "none");
+        if (!pin.layout) transforms.forEach((name) => set(name, "none"));
       },
       release() { found.forEach((pin) => pin.el.removeAttribute(attr)); },
     };
   }
 
   const PINNED_NAMES = { header: "header", nav: "navigation", footer: "footer", aside: "sidebar", button: "button", a: "link", dialog: "dialog" };
+  // The element under a box, and the sticky or fixed one it's on with the CSS that pins it, so whoever fixes the page
+  // finds the rule: like div "Combo 12,400 On hand" in a sticky element (its parent: top: 48px; z-index: 20; height: 0).
   function describe(el) {
-    const label = labelOf(el);
-    for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
-      const position = getComputedStyle(node).position;
-      if (position !== "fixed" && position !== "sticky") continue;
-      const role = node.getAttribute("role");
-      const what = position + " " + (PINNED_NAMES[node.localName] || (role && /^[a-z]{3,20}$/.test(role) ? role : "element"));
-      return node === el ? label + " (" + what + ")" : label + " in a " + what;
-    }
-    return label;
+    const label = labelOf(el), node = pinnedOf(el);
+    if (!node) return label;
+    const style = getComputedStyle(node), role = node.getAttribute("role"), r = node.getBoundingClientRect();
+    const what = style.position + " " + (PINNED_NAMES[node.localName] || (role && /^[a-z]{3,20}$/.test(role) ? role : "element"));
+    // A sticky element's insets as set in CSS; a fixed one's come back in pixels even where they're auto, so they're left out.
+    const sides = style.position === "sticky" ? ["top", "right", "bottom", "left"] : [];
+    const css = sides.filter((side) => style[side] !== "auto").map((side) => side + ": " + style[side]);
+    if (style.zIndex !== "auto") css.push("z-index: " + style.zIndex);
+    if (r.height < 1) css.push("height: 0");
+    let up = 0;
+    for (let n = el; n !== node; n = n.parentElement) up++;
+    if (!up) return label + " (" + what + (css.length ? ": " + css.join("; ") : "") + ")";
+    return label + " in a " + what + " (" + (up === 1 ? "its parent" : up + " levels up") + (css.length ? ": " + css.join("; ") : "") + ")";
   }`

@@ -61,7 +61,32 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
       return best;
     };
     const front = under[0];
-    return smallest(under.filter((el) => el !== document.body && front && el.contains(front))) || smallest(under) || front || document.body;
+    const held = smallest(under.filter((el) => el !== document.body && front && el.contains(front))) || smallest(under) || front || document.body;
+    // A box whose middle is on a sticky or fixed bar is about the bar, even where it spills past it: what holds the
+    // box then is the page under the bar. When the pinned element is 0 tall, like Tailwind's sticky top-12 h-0 around
+    // a bar, the bar is its outermost child under the box with a size.
+    const layer = front && pinnedOf(front);
+    if (!layer || layer === held || !held.contains(layer)) return held;
+    let shown = front;
+    for (let node = front; node && node !== layer; node = node.parentElement) {
+      const r = node.getBoundingClientRect();
+      if (r.width >= 1 && r.height >= 1) shown = node;
+    }
+    const r = layer.getBoundingClientRect();
+    return r.width >= 1 && r.height >= 1 ? layer : shown;
+  }
+
+  // The sticky or fixed element that el is, or is in, which stays put while the page scrolls; null when there's none.
+  // A fixed element that covers the whole viewport is the app's frame (Nuxt UI's dashboard shell), so it doesn't count.
+  function pinnedOf(el) {
+    for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
+      const position = getComputedStyle(node).position;
+      if (position !== "fixed" && position !== "sticky") continue;
+      const r = node.getBoundingClientRect();
+      if (position === "fixed" && r.left <= 0 && r.top <= 0 && r.right >= innerWidth - 1 && r.bottom >= innerHeight - 1) continue;
+      return node;
+    }
+    return null;
   }`
 
 /**
