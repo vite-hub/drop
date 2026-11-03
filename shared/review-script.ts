@@ -66,6 +66,7 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .file svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 28; stroke-linecap: round; }
 .row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .who { margin-right: auto; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.shortcut { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 .msg { margin: 6px 0 0; color: var(--error); font-size: 13px; }
 .empty { padding: 16px 12px; color: var(--muted); }
 .row-item { display: flex; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -114,10 +115,10 @@ const ICONS = {
 }
 
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
-  `<div class="compose"><textarea aria-label="${label}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
-  `<div class="row"><button class="icon" type="button" data-act="attach" title="Add images (or paste them)" aria-label="Add images">${ICONS.image}</button><span class="who"></span>` +
+  `<div class="compose"><textarea aria-label="${label}" aria-describedby="send-shortcut-${label.toLowerCase()}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
+  `<div class="row"><span class="who"></span><button class="btn primary" type="submit" aria-keyshortcuts="Meta+Enter Control+Enter">${send}</button><button class="icon" type="button" data-act="attach" title="Add images (or paste them)" aria-label="Add images">${ICONS.image}</button>` +
   (cancel ? `<button class="btn ghost" type="button" data-act="cancel">Cancel</button>` : "") +
-  `<button class="btn primary" type="submit">${send}</button></div><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>`
+  `</div><p class="shortcut" id="send-shortcut-${label.toLowerCase()}"></p><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>`
 
 // Highlight's controls, in place of the toolbar while someone draws: the tips, four sizes, the colours, Undo, Cancel,
 // and Done. The script sizes and colours the dots.
@@ -511,6 +512,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   function composer(form) {
     const note = $("textarea", form), files = $(".files", form), input = $("input[type=file]", form), msg = $(".msg", form);
+    const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    $(".shortcut", form).textContent = (isMac ? "⌘" : "Ctrl+") + "Enter to send · Enter for a new line";
     const picked = [];
     const show = (text) => { msg.textContent = text; msg.hidden = !text; };
     function add(incoming) {
@@ -543,8 +546,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     });
     form.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault(); });
     form.addEventListener("drop", (e) => { if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); add(Array.from(e.dataTransfer.files)); } });
-    note.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(); }
+    form.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); e.stopPropagation(); form.requestSubmit(); }
     });
     return {
       note, show,
@@ -571,12 +574,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
   }
   function cancel() {
+    const wasOpen = !draw.hidden || !pop.hidden;
     draw.hidden = true; box.hidden = true; pop.hidden = true; bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
     newBox.show("");
     area = null; start = null; strokes = []; still = null;
     forgetStroke();
     layout();
+    if (wasOpen) $("[data-act=comment]", bar).focus({ preventScroll: true });
   }
 
   draw.addEventListener("pointerdown", (e) => {
@@ -753,8 +758,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       e.stopPropagation();
       return;
     }
-    if (e.key !== "Escape" || busy) return;
-    if (!draw.hidden || !pop.hidden) { e.stopPropagation(); cancel(); }
+    if (e.key !== "Escape" || busy || e.isComposing) return;
+    if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }
     else if (!list.hidden) { e.stopPropagation(); list.hidden = true; }
   }, true);
@@ -830,6 +835,48 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
   });
 
+  // While Drop restarts or moves to another machine, the proxy in front of it answers without CORS headers, so the
+  // browser only sees a failed fetch. That can't tell a comment that never arrived from one Drop saved before the
+  // answer was lost. So before each resend the script looks for its request id among the page's threads. Matching
+  // words could belong to another reviewer or an older comment. It keeps trying for two minutes; the note stays if
+  // it gives up.
+  const RETRY_FOR = 120000;
+  const unreachable = (response) => !response || response.status === 502 || response.status === 503 || response.status === 504;
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  async function postComment(form, data) {
+    const until = Date.now() + RETRY_FOR;
+    const attempt = () => fetch(api, { method: "POST", body: form, headers: { authorization: "Bearer " + token }, credentials: "omit" }).catch(() => null);
+    let response = await attempt();
+    for (let wait = 2000; unreachable(response); wait = Math.min(wait * 2, 15000)) {
+      if (Date.now() + wait > until) throw new Error("Couldn't reach Drop. Your comment is still here: press Send to try again.");
+      newBox.show("Can't reach Drop. Trying again…");
+      await pause(wait);
+      const n = await landed(data.page, data.requestId);
+      if (n) return { n };
+      // undefined: Drop is still out of reach, so wait again. null: Drop answered and the comment isn't there.
+      if (n === null) response = await attempt();
+    }
+    const answer = await response.json().catch(() => ({}));
+    if (response.status === 401) { save(null); throw new Error("Your review session ended. Press Send to connect again."); }
+    if (!response.ok) throw new Error(answer.message || "Drop didn't take the comment.");
+    return answer;
+  }
+
+  async function landed(page, requestId) {
+    try {
+      const response = await fetch(api + "?page=" + encodeURIComponent(page), { headers: { authorization: "Bearer " + token }, credentials: "omit" });
+      // A session that ended goes to the resend, whose 401 says so.
+      if (response.status === 401) return null;
+      if (!response.ok) return undefined;
+      const answer = await response.json();
+      const found = (Array.isArray(answer.threads) ? answer.threads : []).find((item) => item.requestId === requestId);
+      return found ? found.n : null;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   pop.addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = newBox.note.value.trim();
@@ -843,6 +890,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       const ox = at(r.left, w), oy = at(r.top, h);
       const data = {
         body: body.slice(0, 4000), page: (location.pathname + location.search + location.hash).slice(0, 1000),
+        requestId: crypto.randomUUID(),
         selector: area.selector.slice(0, 2000), label: area.label.slice(0, 200), spot: area.spot,
         ox, oy, ow: Math.max(1, Math.min(1000 - ox, at(r.right, w) - ox)), oh: Math.max(1, Math.min(1000 - oy, at(r.bottom, h) - oy)),
         viewport: { width: w, height: h },
@@ -852,10 +900,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       const shot = await area.shot;
       if (shot) form.append("screenshot", shot, "screenshot");
       newBox.files().forEach((file) => form.append("image", file, file.name || "image"));
-      const response = await fetch(api, { method: "POST", body: form, headers: { authorization: "Bearer " + token }, credentials: "omit" });
-      const answer = await response.json().catch(() => ({}));
-      if (response.status === 401) { save(null); throw new Error("Your review session ended. Press Send to connect again."); }
-      if (!response.ok) throw new Error(answer.message || "Drop didn't take the comment.");
+      const answer = await postComment(form, data);
       newBox.reset();
       cancel();
       say("Sent as #" + answer.n + ". ", reviewUrl());

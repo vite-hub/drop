@@ -276,6 +276,8 @@ export interface CommentAttachment {
  * the screenshot (the viewport they saw); `page` is the address they were on.
  */
 export interface SiteReviewItem extends DropComment {
+  /** Identifies the submission when its POST response is lost. Absent on older comments. */
+  requestId?: string
   /** The screenshot's own drop, which shows the box and takes replies. Null when the page couldn't take one. */
   screenshot: { id: string; link: string; slug: string; url: string } | null
   /** Where the pin sits on the element `label` names, in thousandths of its box. Null without an element. */
@@ -288,6 +290,7 @@ export interface SiteReviewItem extends DropComment {
  */
 export interface ReviewThread {
   n: number
+  requestId?: string
   body: string
   author: { name: string; image: string | null }
   createdAt: number

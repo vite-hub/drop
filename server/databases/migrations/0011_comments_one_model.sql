@@ -2,6 +2,8 @@
 -- scripts/comments-migration.mjs: ViteHub's commentsMigrationSql({ from: "live" }), then Drop's backfills.
 -- It deletes nothing: the old threads stay in vitehub_comment_threads_live, with vitehub_comments and
 -- vitehub_comment_scope_counters beside them, until a later migration drops them.
+DROP TRIGGER `review_submission_claim`;
+--> statement-breakpoint
 ALTER TABLE `vitehub_comment_threads` RENAME TO `vitehub_comment_threads_live`;
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS `vitehub_comment_threads` (`id` text PRIMARY KEY NOT NULL, `scope` text NOT NULL, `n` integer NOT NULL, `subject_kind` text NOT NULL, `subject_id` text NOT NULL, `anchor` text NOT NULL, `status` text NOT NULL, `resolved_by` text, `resolved_at` integer, `author_id` text NOT NULL, `author_name` text, `author_image` text, `actor` text, `metadata` text, `context` text, `revision` integer, `created_at` integer NOT NULL, `updated_at` integer NOT NULL);
@@ -43,3 +45,15 @@ UPDATE `vitehub_comment_messages` SET `attachments` = (SELECT json_group_array(`
 UPDATE `vitehub_comment_threads` SET `anchor` = CASE WHEN json_extract(`metadata`, '$.kind') = 'page' THEN '{"kind":"page"}' WHEN json_extract(`metadata`, '$.kind') = 'text' AND coalesce(json_extract(`metadata`, '$.quote'), '') <> '' THEN json_object('kind', 'text', 'selector', coalesce(nullif(json_extract(`metadata`, '$.selector'), ''), 'body'), 'exact', substr(json_extract(`metadata`, '$.quote'), 1, 2000), 'prefix', '', 'suffix', '') WHEN json_extract(`metadata`, '$.kind') = 'image' AND json_extract(`metadata`, '$.ow') > 0 AND json_extract(`metadata`, '$.oh') > 0 THEN json_object('kind', 'image', 'selector', coalesce(nullif(json_extract(`metadata`, '$.selector'), ''), 'body'), 'x', json_extract(`metadata`, '$.ox'), 'y', json_extract(`metadata`, '$.oy'), 'width', json_extract(`metadata`, '$.ow'), 'height', json_extract(`metadata`, '$.oh')) WHEN json_extract(`metadata`, '$.kind') = 'image' THEN json_object('kind', 'image', 'selector', coalesce(nullif(json_extract(`metadata`, '$.selector'), ''), 'body'), 'x', json_extract(`metadata`, '$.ox'), 'y', json_extract(`metadata`, '$.oy')) WHEN json_extract(`metadata`, '$.ow') > 0 AND json_extract(`metadata`, '$.oh') > 0 THEN json_object('kind', 'area', 'selector', coalesce(nullif(json_extract(`metadata`, '$.selector'), ''), 'body'), 'x', json_extract(`metadata`, '$.ox'), 'y', json_extract(`metadata`, '$.oy'), 'width', json_extract(`metadata`, '$.ow'), 'height', json_extract(`metadata`, '$.oh')) ELSE json_object('kind', 'element', 'selector', coalesce(nullif(json_extract(`metadata`, '$.selector'), ''), 'body'), 'x', json_extract(`metadata`, '$.ox'), 'y', json_extract(`metadata`, '$.oy')) END WHERE `subject_kind` IN ('drop', 'site') AND json_type(`metadata`, '$.kind') = 'text';
 --> statement-breakpoint
 UPDATE `vitehub_comment_threads` SET `metadata` = json_remove(`metadata`, '$.version', '$.emptyBody') WHERE `subject_kind` IN ('drop', 'site') AND `metadata` IS NOT NULL;
+--> statement-breakpoint
+CREATE TABLE `review_submissions_next` (`scope` text NOT NULL, `request_id` text NOT NULL, `thread_id` text NOT NULL, PRIMARY KEY (`scope`, `request_id`), FOREIGN KEY (`thread_id`) REFERENCES `vitehub_comment_threads` (`id`) ON UPDATE no action ON DELETE cascade);
+--> statement-breakpoint
+INSERT INTO `review_submissions_next` SELECT `scope`, `request_id`, `thread_id` FROM `review_submissions`;
+--> statement-breakpoint
+DROP TABLE `review_submissions`;
+--> statement-breakpoint
+ALTER TABLE `review_submissions_next` RENAME TO `review_submissions`;
+--> statement-breakpoint
+CREATE INDEX `review_submissions_thread_idx` ON `review_submissions` (`thread_id`);
+--> statement-breakpoint
+CREATE TRIGGER `review_submission_claim` AFTER INSERT ON `vitehub_comment_threads` WHEN substr(NEW.`scope`, 1, 5) = 'site:' AND json_type(NEW.`metadata`, '$.requestId') = 'text' BEGIN INSERT INTO `review_submissions` (`scope`, `request_id`, `thread_id`) VALUES (NEW.`scope`, json_extract(NEW.`metadata`, '$.requestId'), NEW.`id`); END;

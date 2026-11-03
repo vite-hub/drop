@@ -1,11 +1,12 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, desc, eq, inArray, isNull } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { sha256 } from "#shared/utils/bytes"
 import { textValue } from "#shared/utils/text"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
+import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { importSealKey, seal as sealValue, unseal as unsealValue } from "vite-hub/env/seal"
@@ -22,9 +23,9 @@ import {
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
-import { drops, user } from "../databases/config"
+import { drops, reviewSubmissions, user } from "../databases/config"
 import { type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
-import { addThread, authorOf, siteCommentList, threadsFor, toComment } from "./comments"
+import { addThread, authorOf, findThread, removeThread, siteCommentList, threadsFor, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { isExpired, expiryPolicy, renewDrop } from "./expiry"
 import { createFolder } from "./folders"
@@ -433,17 +434,65 @@ export async function addReviewComment(
   origin: string,
   images: CommentImage[] = [],
 ) {
-  const { row } = await withImages(
-    site,
-    images,
-    author.name,
-    async (ids) => {
-      const added = await insertReviewComment(site, author, input, shot, origin, ids)
-      return added
-    },
-    (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
-  )
-  return row
+  if (input.requestId) {
+    const existing = await submittedReview(site, input.requestId)
+    if (existing) return existing
+  }
+  let created: Awaited<ReturnType<typeof insertReviewComment>> | undefined
+  try {
+    const { row } = await withImages(
+      site,
+      images,
+      author.name,
+      async (ids) => {
+        created = await insertReviewComment(
+          site,
+          author,
+          input,
+          shot,
+          origin,
+          ids,
+          Boolean(input.requestId && images.length),
+        )
+        return created
+      },
+      (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
+    )
+    // The claim is visible before its images are linked. Only publish it once no work can roll it back.
+    if (row.meta.requestPending) {
+      const threads = commentsSchema.vitehubCommentThreads
+      await db
+        .update(threads)
+        .set({ metadata: sql`json_remove(${threads.metadata}, '$.requestPending')` })
+        .where(eq(threads.id, row.id))
+    }
+    return row
+  } catch (error) {
+    if (created) {
+      const shotDrop = created.meta.dropId === site.id ? null : await findDrop(created.meta.dropId)
+      await removeThread(created)
+      if (shotDrop) await deleteDrop(shotDrop)
+    }
+    // A competing POST may have committed after the lookup above. The database claim rejects our whole Comments
+    // batch, and insertReviewComment removes any extra screenshot before we reuse the winning thread.
+    if (input.requestId) {
+      const existing = await submittedReview(site, input.requestId)
+      if (existing) return existing
+    }
+    throw error
+  }
+}
+
+async function submittedReview(site: Pick<DropRow, "id">, requestId: string) {
+  const [receipt] = await db
+    .select({ threadId: reviewSubmissions.threadId })
+    .from(reviewSubmissions)
+    .where(and(eq(reviewSubmissions.scope, `site:${site.id}`), eq(reviewSubmissions.requestId, requestId)))
+    .limit(1)
+  const thread = receipt ? await findThread(receipt.threadId) : null
+  if (thread?.meta.requestPending)
+    throw new HTTPError({ status: 503, statusText: "The comment's images are still being stored. Try again shortly." })
+  return thread
 }
 
 async function insertReviewComment(
@@ -453,9 +502,12 @@ async function insertReviewComment(
   shot: Screenshot | null,
   origin: string,
   attachments: string[],
+  pending: boolean,
 ) {
   const now = Date.now()
   const element = {
+    ...(input.requestId ? { requestId: input.requestId } : {}),
+    ...(pending ? { requestPending: true } : {}),
     ox: input.ox,
     oy: input.oy,
     ow: input.ow,
@@ -539,7 +591,9 @@ export async function siteItems(
       .where(and(eq(drops.parentId, site.id), eq(drops.kind, "image"))),
   ])
   const byId = new Map(shots.map((shot) => [shot.id, shot]))
+  // The browser uses this list to acknowledge a lost POST. Pending claims may still be rolled back.
   return threads
+    .filter(({ meta }) => !meta.requestPending)
     .filter(({ meta }) => !page || meta.page === page || Boolean(meta.page?.startsWith(`${page}#`)))
     .sort((a, b) => b.createdAt - a.createdAt || b.n - a.n)
     .map((thread) => {
@@ -547,6 +601,7 @@ export async function siteItems(
       const shot = byId.get(meta.dropId)
       return {
         ...toComment(thread, who, attachments),
+        requestId: meta.requestId,
         spot: meta.elementX !== null && meta.elementY !== null ? { x: meta.elementX, y: meta.elementY } : null,
         screenshot: shot?.blobKey
           ? {
@@ -570,6 +625,7 @@ export function reviewThreads(site: DropRow, who: Identity | null, items: SiteRe
   const manage = permissions(site, who).manage
   return items.map((item) => ({
     n: item.n,
+    requestId: item.requestId,
     body: item.body,
     author: { name: item.authorName, image: item.authorImage },
     createdAt: item.createdAt,

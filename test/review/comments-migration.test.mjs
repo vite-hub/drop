@@ -7,7 +7,42 @@ import { readMigrationFiles } from "drizzle-orm/migrator"
 import { migrationFile } from "../../scripts/comments-migration.mjs"
 
 const directory = new URL("../../server/databases/migrations/", import.meta.url)
-const file = "0010_comments_one_model.sql"
+const file = "0011_comments_one_model.sql"
+
+test("review retry claims follow the replacement thread table", () => {
+  const database = beforeMove()
+  try {
+    seed(database)
+    database.exec(`
+      UPDATE vitehub_comment_threads SET metadata = json_set(metadata, '$.requestId', 'old-request') WHERE id = 't4';
+      INSERT INTO review_submissions VALUES ('site:site', 'old-request', 't4');
+    `)
+    database.exec(readFileSync(new URL(file, directory), "utf8"))
+    assert.equal(
+      database.prepare("SELECT thread_id FROM review_submissions WHERE request_id = 'old-request'").get().thread_id,
+      "t4",
+    )
+    assert.equal(database.prepare("PRAGMA foreign_key_list(review_submissions)").get().table, "vitehub_comment_threads")
+    const insert = database.prepare(`
+      INSERT INTO vitehub_comment_threads
+        (id, scope, n, subject_kind, subject_id, anchor, status, author_id, metadata, created_at, updated_at)
+      VALUES (?, 'site:site', ?, 'site', 'site', '{"kind":"page"}', 'open', 'ana', ?, 1, 1)
+    `)
+    assert.throws(() => insert.run("duplicate-old", 5, json({ requestId: "old-request" })), /UNIQUE/)
+    insert.run("new-thread", 5, json({ requestId: "new-request" }))
+    assert.equal(
+      database.prepare("SELECT thread_id FROM review_submissions WHERE request_id = 'new-request'").get().thread_id,
+      "new-thread",
+    )
+    assert.throws(() => insert.run("duplicate-new", 6, json({ requestId: "new-request" })), /UNIQUE/)
+    database.exec("DELETE FROM vitehub_comment_threads WHERE id IN ('t4', 'new-thread')")
+    assert.equal(database.prepare("SELECT count(*) AS n FROM review_submissions").get().n, 0)
+    assert.equal(database.prepare("SELECT count(*) AS n FROM vitehub_comment_threads_live WHERE id = 't4'").get().n, 1)
+    assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
+  } finally {
+    database.close()
+  }
+})
 
 /** Drop's database just before the move: every migration up to the comments move, as production has them. */
 function beforeMove() {

@@ -71,6 +71,8 @@ Browser pages and shared links can require proxy authentication. Exempt `/oauth2
 
 Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
 
+If a browser cannot connect a site review, check the response from `/review/connect`. A 401 means GitHub rejected the token; open `/signin` to sign in again. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means verification failed because GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` and `data.githubStatus` distinguish these cases without including credentials. Sign-in and sign-out stay available when a proxy token fails verification.
+
 Keep `/_vitehub/**` and `/api/_vitehub/console/**` behind the same proxy authentication as Drop's browser pages. Forward cookies, the public `Host` and `Origin`, and `X-Auth-Request-Access-Token` on Console requests, including its RPC POSTs. Drop establishes its session from the proxy before the Console checks the verified email against `DROP_ADMINS`; organization membership alone does not grant Console access.
 
 ## Keep an existing D1 database {#d1}

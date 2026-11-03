@@ -127,6 +127,7 @@ export const CommentSchema = v.pipe(
 export const ReviewCommentSchema = v.pipe(
   v.object({
     body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
+    requestId: v.optional(v.pipe(v.string(), v.uuid())),
     page: v.pipe(v.string(), v.startsWith("/"), v.maxLength(MAX_REVIEW_PAGE)),
     selector: v.optional(v.pipe(v.string(), v.maxLength(2000)), ""),
     label: v.optional(v.pipe(v.string(), v.maxLength(200))),
