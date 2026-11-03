@@ -209,6 +209,8 @@ export interface QuizSaved {
 
 export interface DropComment {
   id: string
+  /** The id of its first message, which a reply or an edit names. */
+  messageId: string
   n: number
   /** `text` quotes a selection, `image` marks a spot or area of an image, `area` a rectangle of a page, `page` the whole page. */
   kind: "text" | "image" | "area" | "page"
@@ -224,11 +226,16 @@ export interface DropComment {
   label: string | null
   page: string | null
   body: string
+  /** `guest:<uuid>` for someone on a "Can comment" link. */
+  authorId: string
   authorName: string
   /** The author's picture, when they have one; pins and threads fall back to initials. */
   authorImage: string | null
+  /** The ids of the people its `@`s name. */
+  mentions: string[]
   resolved: boolean
   createdAt: number
+  editedAt: number | null
   /** The version it was written on. Open comments carry over to later versions until someone resolves them. */
   version: number
   mine: boolean
@@ -236,15 +243,20 @@ export interface DropComment {
   replies: CommentReply[]
   /** Images sent with it. */
   attachments: CommentAttachment[]
+  /** The people its and its replies' `@`s name, so their names show to readers who can't list people. */
+  people: { id: string; name: string; image: string | null }[]
 }
 
 /** A reply in a comment's thread: words and images; the comment keeps the anchor and the resolved state. */
 export interface CommentReply {
   id: string
   body: string
+  authorId: string
   authorName: string
   authorImage: string | null
+  mentions: string[]
   createdAt: number
+  editedAt: number | null
   mine: boolean
   attachments: CommentAttachment[]
 }

@@ -66,7 +66,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     cache: { driver: "kv" },
     rateLimit: true,
     schedule: true,
-    // Live editing: rooms in a SQLite Durable Object, drafts in BLOB (server/live-drafts/realtime.ts).
+    // Live editing: rooms in a SQLite Durable Object, drafts in BLOB (server/utils/live-drafts.ts).
     realtime: { authority: "cloudflare" },
   },
   // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job.
@@ -109,6 +109,9 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
             connection: {
               url: env({ source: env.source("DROP_DATABASE_URL"), default: "file:.data/database/drop.db" }),
             },
+            // Pending migrations run before the server listens. A fresh database runs them all, and
+            // 0004_drop_comments_on_vitehub drops the old comment tables, which ViteHub counts as data loss.
+            migrateOnStart: { allowDataLoss: true },
           }
         : d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },
@@ -148,19 +151,11 @@ export default defineNuxtConfig({
   vitehub: {
     ...VITEHUB[host],
     auth: true,
-    console: { auth: "app", authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
-  },
-
-  alias: {
-    // PNG code images are a Browser Run screenshot. Browser Run only exists on Cloudflare, and ViteHub only
-    // generates its runtime module in builds that enable it, so other hosts get a stub that says so.
-    "#code-image-png": fileURLToPath(
-      new URL(`./server/code-image-png/${host === "cloudflare" ? "browser-run" : "unavailable"}.ts`, import.meta.url),
-    ),
-    // Live editing needs Realtime rooms, which only Cloudflare and VPS builds have. The others get a stub that says so.
-    "#live-drafts": fileURLToPath(
-      new URL(`./server/live-drafts/${liveEditing ? "realtime" : "unavailable"}.ts`, import.meta.url),
-    ),
+    console: {
+      auth: "app",
+      authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)),
+      signInPage: "/signin",
+    },
   },
 
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
@@ -308,14 +303,25 @@ export default defineNuxtConfig({
     // agent logos, Nuxt UI's own in app.config) are named in TypeScript, so it reads the app's and shared/'s too.
     clientBundle: {
       scan: { globInclude: ["**/*.{vue,md}", "app.config.ts", "app/**/*.ts", "shared/**/*.ts"] },
+      // The icons vite-hub/ui's comment parts draw. The scanner skips dependencies.
+      icons: [
+        "ph:arrow-clockwise",
+        "ph:arrow-counter-clockwise",
+        "ph:arrow-left",
+        "ph:arrow-up",
+        "ph:check",
+        "ph:file-light",
+        "ph:pencil-simple-light",
+        "ph:plus",
+        "ph:trash-light",
+        "ph:x-light",
+      ],
     },
   },
 
   nitro: {
     // Keep Node for local development; ViteHub emulates Cloudflare bindings separately.
     devServer: { runner: "node-worker" },
-    // Drizzle applies the existing migration journal before a local Node instance serves requests.
-    plugins: database === "sqlite" ? [fileURLToPath(new URL("./server/database-migrate.ts", import.meta.url))] : [],
     // `nuxt dev` keeps Nitro's cache in memory instead of the dev KV store.
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
@@ -361,6 +367,13 @@ export default defineNuxtConfig({
       // Nuxt's, which renders app/error.vue. Nuxt only adds its handler when nitro.errorHandler is unset, so ours goes
       // in front of it here instead.
       config.errorHandler = [contentErrorHandler, ...[config.errorHandler ?? []].flat()]
+    },
+    // vite-hub/ui's comment parts look these up by name when they render (resolveComponent), which finds only global
+    // components, and Nuxt imports Nuxt UI's into each template instead.
+    "components:extend": function (components) {
+      for (const component of components)
+        if (["UButton", "UIcon", "UBadge", "UModal", "UCollapsible"].includes(component.pascalName))
+          component.global = true
     },
   },
 

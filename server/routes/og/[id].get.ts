@@ -3,7 +3,7 @@ import { defineHandler, getValidatedRouterParams, type H3Event, redirect } from 
 import { useStorage } from "nitro/storage"
 import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
-import { renderOgPng } from "#code-image-png"
+import { renderOgPng } from "../../utils/code-image-png"
 
 /** As long as a Markdown render: the drop expires sooner unless someone opens it. */
 const CARD_TTL = 60 * 60 * 24 * 30

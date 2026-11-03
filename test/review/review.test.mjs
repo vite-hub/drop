@@ -508,7 +508,7 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   assert.deepEqual(
     {
       scope: first.scope,
-      page: first.page,
+      subject: `${first.subject_kind}:${first.subject_id}`,
       kind: first.metadata.kind,
       selector: first.metadata.selector,
       ox: first.metadata.ox,
@@ -518,12 +518,12 @@ test("a comment with a screenshot becomes an image of the site with the box on i
       label: first.metadata.label,
       quote: first.metadata.quote,
       reviewPage: first.metadata.page,
-      author: first.createdBy.name,
-      guest: first.createdBy.guest,
+      author: first.author.name,
+      guest: first.author.guest,
     },
     {
       scope: "site:site",
-      page: "/pricing",
+      subject: "site:site",
       kind: "image",
       selector: "body > img",
       ox: 100,
@@ -537,7 +537,7 @@ test("a comment with a screenshot becomes an image of the site with the box on i
       guest: true,
     },
   )
-  assert.match(first.createdBy.id, /^guest:/, "a guest is nobody's account")
+  assert.match(first.author.id, /^guest:/, "a guest is nobody's account")
 
   const plain = await comment(body.token, {
     body: "Typo in the footer",
@@ -645,14 +645,7 @@ test("Drop's embedded review stores a box on a screen capture like the script's,
   assert.equal(image.title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
   const [row] = threads()
   assert.deepEqual(
-    [
-      row.metadata.dropId,
-      row.metadata.kind,
-      row.metadata.page,
-      row.createdBy.id,
-      row.createdBy.name,
-      row.metadata.label,
-    ],
+    [row.metadata.dropId, row.metadata.kind, row.metadata.page, row.author.id, row.author.name, row.metadata.label],
     [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null],
     "no element: Drop can't see inside the frame",
   )
@@ -928,7 +921,7 @@ test("comments and replies in Drop take images, which belong to the drop and go 
   const keys = sql.prepare("SELECT blob_key FROM drops WHERE parent_id = 'doc'").all()
   assert.equal(keys.length, 2)
   // A reply goes by its own id, with its image. The thread's first comment is no reply.
-  const opening = threads().find((thread) => thread.id === posted.id).comments[0].id
+  const opening = threads().find((thread) => thread.id === posted.id).messages[0].id
   const first = request(`/api/replies/${opening}`, { method: "DELETE", id: opening })
   assert.equal((await answer(replyDelete, first)).status, 404)
   const gone = request(`/api/replies/${answered.id}`, { method: "DELETE", id: answered.id })
@@ -994,7 +987,7 @@ test("deleting a screenshot takes its own comments, and deleting the site takes 
   const image = sql.prepare("SELECT id FROM drops WHERE parent_id = 'site'").get()
   await deleteDrop(await findDrop(image.id))
   assert.deepEqual(
-    threads().map((thread) => [thread.number, thread.metadata.dropId]),
+    threads().map((thread) => [thread.n, thread.metadata.dropId]),
     [[2, "site"]],
   )
   // The next comment still counts on from the site's list.

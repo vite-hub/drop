@@ -7,7 +7,7 @@ import * as v from "valibot"
 export type Sent<T> = { value: T } | { error?: string }
 
 /** A comment's or reply's body: JSON, or multipart with the JSON in `data` when it carries images. */
-function withImages(data: Partial<CommentInput>, files: File[]) {
+function withImages(data: Partial<CommentInput> & { body: string; mentions: string[] }, files: File[]) {
   if (!files.length) return data
   const form = new FormData()
   form.append("data", JSON.stringify(data))
@@ -34,15 +34,16 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
 
   // No toast either way: the new pin shows it went through, and a failure shows under the box that sent it.
   async function addComment(
-    input: Omit<CommentInput, "body">,
+    input: Omit<CommentInput, "body" | "mentions">,
     body: string,
     files: File[] = [],
+    mentions: string[] = [],
   ): Promise<Sent<DropComment>> {
     try {
       const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, {
         method: "POST",
         query: query.value,
-        body: withImages({ ...input, body }, files),
+        body: withImages({ ...input, body, mentions }, files),
       })
       comments.data.value = [...comments.data.value, comment]
       return { value: comment }
@@ -79,16 +80,45 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment,
     ))
 
-  async function addReply(commentId: string, body: string, files: File[] = []): Promise<Sent<CommentReply>> {
+  async function addReply(
+    commentId: string,
+    body: string,
+    files: File[] = [],
+    mentions: string[] = [],
+  ): Promise<Sent<CommentReply>> {
     try {
       const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, {
         method: "POST",
-        body: withImages({ body }, files),
+        body: withImages({ body, mentions }, files),
       })
       setReplies(commentId, (replies) => [...replies, reply])
       return { value: reply }
     } catch (error) {
       return { error: notify.problem(error) }
+    }
+  }
+
+  /** New words for one's own comment (its `messageId`) or reply. */
+  async function editMessage(commentId: string, messageId: string, body: string, mentions: string[] = []) {
+    try {
+      const edited = await $fetch<CommentReply>(`/api/messages/${messageId}`, {
+        method: "PATCH",
+        body: { body, mentions },
+      })
+      comments.data.value = comments.data.value.map((comment) => {
+        if (comment.id !== commentId) return comment
+        if (comment.messageId === messageId)
+          return { ...comment, body: edited.body, mentions: edited.mentions, editedAt: edited.editedAt }
+        return {
+          ...comment,
+          replies: comment.replies.map((reply) =>
+            reply.id === messageId ? { ...edited, attachments: reply.attachments } : reply,
+          ),
+        }
+      })
+      return { value: edited } satisfies Sent<CommentReply>
+    } catch (error) {
+      return { error: notify.problem(error) } satisfies Sent<CommentReply>
     }
   }
 
@@ -150,6 +180,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     resolveComment,
     removeComment,
     addReply,
+    editMessage,
     removeReply,
     acceptSuggestion,
   }

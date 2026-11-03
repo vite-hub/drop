@@ -1,7 +1,7 @@
 import { log } from "evlog"
+import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import { RealtimeDocumentConflict, type RealtimeDocumentAdapter } from "vite-hub/realtime"
-import { refreshRealtimeDocument } from "vite-hub/realtime/server"
+import { isRealtimeAvailable, refreshRealtimeDocument } from "vite-hub/realtime/server"
 import { draftPath } from "#shared/draft-paths"
 
 /**
@@ -9,15 +9,10 @@ import { draftPath } from "#shared/draft-paths"
  * without front matter. Its Realtime room (server/realtime/drops.ts) loads from the file and saves back into it a
  * couple of seconds after people stop typing; publishing turns it into the next version and deletes it. Drafts have
  * no history of their own: the drop's versions are its history. `/f/` never serves them (utils/content-access.ts).
- * Hosts without Realtime get ./unavailable.ts instead (nuxt.config.ts `#live-drafts`).
+ * Only builds with Realtime rooms (Cloudflare, VPS) have a live editor, so only they have drafts.
  */
 
-export const LIVE_EDITING = true
-
-const digestOf = async (text: string) =>
-  Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("")
+export const LIVE_EDITING = isRealtimeAvailable()
 
 async function read(key: string) {
   const [error, file] = await blob.get(key)
@@ -26,38 +21,20 @@ async function read(key: string) {
   return file ? file.text() : null
 }
 
-async function write(key: string, body: string) {
-  const [error] = await blob.put(key, body, { access: "private", contentType: "text/markdown; charset=utf-8" })
-  if (error) throw error
-}
-
-/** Where a room's document lives. Its id is the draft's Blob key; `authorize` only admits `drafts/<id>.md`. */
-export const draftDocument: RealtimeDocumentAdapter = {
-  kind: "drop-draft",
-  async load({ documentId }) {
-    const body = await read(documentId)
-    return { body: body ?? "", digest: body === null ? null : await digestOf(body) }
-  },
-  // A room saves one at a time, and the only other writers create a missing draft or delete one, so reading the
-  // digest before the write is enough to notice them.
-  async save({ documentId }, { body }, { ifDigest }) {
-    const stored = await read(documentId)
-    if ((stored === null ? null : await digestOf(stored)) !== ifDigest) throw new RealtimeDocumentConflict()
-    await write(documentId, body)
-    return { digest: await digestOf(body) }
-  },
-}
-
 type Version = { id: string; version: number }
 
 /** Creates the draft from the published body unless one exists. Returns its path, which is also its room's id. */
 export async function ensureDraft(drop: Version, body: string) {
+  if (!LIVE_EDITING) throw new HTTPError({ status: 404, statusText: "Live editing isn't available on this host." })
   const path = draftPath(drop.id, drop.version)
-  if ((await read(path)) === null) await write(path, body)
+  if ((await read(path)) === null) {
+    const [error] = await blob.put(path, body, { access: "private", contentType: "text/markdown; charset=utf-8" })
+    if (error) throw error
+  }
   return path
 }
 
-export const readDraft = (drop: Version) => read(draftPath(drop.id, drop.version))
+export const readDraft = async (drop: Version) => (LIVE_EDITING ? read(draftPath(drop.id, drop.version)) : null)
 
 /** Drops drafts that no room continues (a published or deleted version). Best effort: a stray file costs a few bytes. */
 export async function deleteDrafts(drops: Version[]) {

@@ -48,9 +48,10 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
       else database.exec(`BEGIN; ${sql}; COMMIT;`)
       return Response.json({ success: true, result: [{ success: true, results }] })
     }
-    assert.equal(await migrate.run([], context), 1)
-    assert.match(stderr, /0004_drop_comments_on_vitehub/)
-    assert.equal(database.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get().n, 0)
+    // A fresh D1 has no rows to lose: ViteHub leaves out drops of tables that the same run created, so 0004's drop of
+    // the old comment tables needs no flag there.
+    assert.equal(await migrate.run([], context), 0, stderr)
+    assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
 
     const commands = [
       readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8").match(/^command = "([^"]+)"/m)[1],

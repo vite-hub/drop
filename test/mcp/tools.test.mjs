@@ -556,7 +556,7 @@ test("accepting a suggestion, from the page or an agent, publishes its words as 
     ["Accepted suggestion #2", "Undid suggestion #2", "Accepted suggestion #2", "Accepted suggestion #1", "Draft"],
   )
   assert.deepEqual(
-    threads().map((thread) => [thread.number, thread.status]),
+    threads().map((thread) => [thread.n, thread.status]),
     [
       [1, "resolved"],
       [2, "resolved"],
@@ -619,7 +619,7 @@ test("open comments follow a doc to its next versions, numbered across them, and
   ).structuredContent
   assert.deepEqual(v3.resolved, [1, 2])
   assert.deepEqual(
-    threads().map((thread) => [thread.number, thread.status]),
+    threads().map((thread) => [thread.n, thread.status]),
     [
       [1, "resolved"],
       [2, "resolved"],
@@ -743,14 +743,14 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
   // A resolved thread still takes a reply, and stays resolved.
   await call(publish, { previous: v2.id, markdown: "# Plan\n\nShip it on Friday.", note: "Same", resolves: [1] })
   assert.equal((await call(reply, { id: v2.id, comment: 1, body: "Done." })).structuredContent.comment, 1)
-  assert.deepEqual([threads()[0].status, threads()[0].comments.length], ["resolved", 3])
+  assert.deepEqual([threads()[0].status, threads()[0].messages.length], ["resolved", 3])
 
   // Deleting the comment takes its thread with it.
   const remove = new H3Event(new Request(`https://drop.example/api/comments/${listed.id}`, { method: "DELETE" }))
   remove.context.params = { id: listed.id }
   assert.deepEqual(await commentDelete(remove), { ok: true })
   assert.equal(threads().length, 0)
-  assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_comments").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_comment_messages").get().n, 0)
 })
 
 test("deleting a doc for good deletes the comments on every version", async () => {
@@ -777,7 +777,7 @@ test("deleting a doc for good deletes the comments on every version", async () =
   assert.deepEqual(
     threads()
       .filter((thread) => thread.metadata.dropId === v1.id)
-      .map((thread) => thread.metadata.version),
+      .map((thread) => thread.revision),
     [1, 2],
   )
   await deleteDrop(await findDrop(v2.id))

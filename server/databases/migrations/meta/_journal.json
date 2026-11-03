@@ -71,6 +71,13 @@
       "when": 1793529936151,
       "tag": "0009_drop_comments_release_upgrade",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793616336151,
+      "tag": "0010_comments_one_model",
+      "breakpoints": true
     }
   ]
 }

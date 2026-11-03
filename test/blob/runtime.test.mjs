@@ -65,11 +65,12 @@ test("serve answers a byte range with 206 so videos can seek", async () => {
   setActiveCloudflareEnv({
     BLOB: {
       head: async () => object,
-      get: async (key, { onlyIf, range } = {}) => {
+      get: async (key, { range } = {}) => {
         assert.equal(key, object.key)
-        assert.deepEqual(onlyIf, { etagMatches: "v1" })
-        ranges.push(range)
-        const part = range ? bytes.slice(range.offset, range.offset + range.length) : bytes
+        // R2 takes `{ offset, length }` or the last bytes as `{ suffix }`.
+        const at = range && "suffix" in range ? { offset: bytes.length - range.suffix, length: range.suffix } : range
+        ranges.push(at)
+        const part = at ? bytes.slice(at.offset, at.offset + at.length) : bytes
         return { ...object, body: new Blob([part]).stream() }
       },
     },
@@ -102,5 +103,6 @@ test("serve answers a byte range with 206 so videos can seek", async () => {
   const beyond = await serve("bytes=5000-")
   assert.equal(beyond.status, 416)
   assert.equal(beyond.headers.get("content-range"), "bytes */1000")
-  assert.deepEqual(ranges, [undefined, { offset: 100, length: 100 }, { offset: 990, length: 10 }])
+  // A range past the end still asks R2, which answers without a body; the 416 comes from its size.
+  assert.deepEqual(ranges, [undefined, { offset: 100, length: 100 }, { offset: 990, length: 10 }, { offset: 5000 }])
 })

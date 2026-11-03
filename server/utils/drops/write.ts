@@ -10,7 +10,7 @@ import { blobCleanup, dropFiles, drops, dropVersions, suggestionAcceptances } fr
 import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
-import { refreshLatest } from "#live-drafts"
+import { refreshLatest } from "../live-drafts"
 import { deleteMarkdownCache } from "../markdown-cache"
 import { appLinkIssues, contentTypeOf } from "#shared/project-bundle"
 import { defaultShare, isPublic, type Share } from "#shared/share"

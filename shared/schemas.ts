@@ -74,6 +74,9 @@ export const AppSchema = v.object({
   removes: v.optional(v.pipe(v.array(v.string()), v.maxLength(200))),
 })
 
+/** The ids of the people a comment's `@`s name. ViteHub Comments checks each one may read the drop. */
+const MentionsSchema = v.optional(v.pipe(v.array(v.pipe(v.string(), v.maxLength(200))), v.maxLength(20)), [])
+
 const thousandths = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000))
 
 /**
@@ -95,6 +98,7 @@ export const CommentSchema = v.pipe(
     suggestion: v.optional(v.pipe(v.string(), v.maxLength(2000))),
     // Empty only with images, such as the Marker's snapshot: the endpoint checks once it has read them.
     body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
+    mentions: MentionsSchema,
   }),
   v.check(
     (input) => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000,
@@ -174,8 +178,16 @@ export const SiteSchema = v.object({
 
 export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 
+/** A reply: words, or only images. The endpoint checks once it has read them. */
 export const CommentReplySchema = v.object({
-  body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a reply."), v.maxLength(4000)),
+  body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
+  mentions: MentionsSchema,
+})
+
+/** A new text for one's own comment or reply. */
+export const CommentEditSchema = v.object({
+  body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
+  mentions: MentionsSchema,
 })
 
 export const SkillPatchSchema = v.object({ enabled: v.boolean("Say whether the skill is enabled.") })

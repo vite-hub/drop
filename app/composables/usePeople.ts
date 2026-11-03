@@ -1,16 +1,19 @@
-import type { Person } from "~/utils/mentions"
+import type { CommentUser } from "vite-hub/comments/client"
 
 /**
- * Everyone in this Drop, for "@" in the doc editor and the comment boxes. Only signed-in people may list them, so a
- * signed-out reader gets none, and nobody's page waits on the list: it loads in the browser.
+ * Whom "@" may name in the open drop's editor: ViteHub Comments' people who may read the drop, as the comment boxes ask
+ * (server/api/drops/[id]/people.get.ts). Only signed-in people may list them, so a signed-out reader gets none, and
+ * nobody's page waits on the list: it loads in the browser.
  */
 export function usePeople() {
+  const state = injectDrop()!
   const { data: me } = useMe()
-  const signedIn = computed(() => Boolean(me.value))
+  const id = computed(() => state.drop.data.value?.id)
   const { data } = useLazyAsyncData(
-    keys.people,
-    (): Promise<Person[]> => (signedIn.value ? $fetch("/api/people") : Promise.resolve([])),
-    { server: false, default: () => [], watch: [signedIn] },
+    () => keys.people(id.value ?? ""),
+    (): Promise<CommentUser[]> =>
+      me.value && id.value ? $fetch(`/api/drops/${id.value}/people`) : Promise.resolve([]),
+    { server: false, default: () => [], watch: [() => Boolean(me.value), id] },
   )
-  return { people: data, me: computed(() => me.value?.id) }
+  return { people: data }
 }

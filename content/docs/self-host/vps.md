@@ -27,7 +27,7 @@ ${EDITOR:-nano} .env
 docker compose up -d --build
 ```
 
-Compose builds for `DROP_HOST=vps`, applies the existing Drizzle migrations, and starts Drop. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. If migrations fail, the server does not start.
+Compose builds for `DROP_HOST=vps` and starts Drop, which applies pending migrations before it listens. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. If migrations fail, the server does not start.
 
 ## Serve HTTPS {#proxy}
 

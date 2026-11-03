@@ -5,7 +5,7 @@ import { db } from "vite-hub/database/drizzle"
 import { drops, dropVersions } from "../../databases/config"
 import { slugify, dropPath } from "#shared/links"
 import { DAY_MS, TEMPORARY_DAYS, TRASH_DAYS } from "#shared/expiry"
-import { LIVE_EDITING } from "#live-drafts"
+import { LIVE_EDITING } from "../live-drafts"
 import { draftPath } from "#shared/draft-paths"
 import { deleteRetainedDrop } from "../quota-deletion"
 import { commentCleanupFor, drainCommentCleanup } from "../comments"
@@ -43,7 +43,7 @@ export async function deleteDrop(row: DropRow, gone = new Set<string>()) {
   // Queue Comments cleanup in the deletion batch, before its scope can no longer be found from the Drop rows.
   await deleteRetainedDrop(row, deleteBlobKeys, await commentCleanupFor(row))
   await drainCommentCleanup()
-  // Live drafts are Blob files too (#live-drafts), one per version anyone opened in the editor.
+  // Live drafts are Blob files too (utils/live-drafts.ts), one per version anyone opened in the editor.
   if (row.kind === "markdown" && LIVE_EDITING)
     await deleteBlobKeys([row.version, ...versions.map((item) => item.version)].map((n) => draftPath(row.id, n)))
 }

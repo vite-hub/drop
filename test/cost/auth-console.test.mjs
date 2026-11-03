@@ -1,9 +1,8 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
-import { event, insertDrop, insertVersion, migrate, queries, reset, sql, state, who } from "./harness.mjs"
+import { insertDrop, insertVersion, migrate, queries, reset, sql } from "./harness.mjs"
 
 const { countDropsByUser } = await import("../../server/utils/auth-console.ts")
-const { default: people } = await import("../../server/api/people.get.ts")
 
 migrate()
 beforeEach(() => reset())
@@ -30,14 +29,4 @@ test("Console drop counts use one query and one bind past D1's 100-parameter lim
   queries.length = 0
   assert.deepEqual(await countDropsByUser([]), {})
   assert.equal(queries.length, 0)
-})
-
-test("editor suggestions require sign-in and return only public names and avatars, excluding banned users", async () => {
-  await assert.rejects(people(event("/api/people")), { status: 401 })
-  sql.exec("INSERT INTO user (id, name, email, banned) VALUES ('banned', 'Banned', 'banned@example.com', 1)")
-  state.who = who
-  const result = await people(event("/api/people"))
-  assert.equal(result.length, 1)
-  assert.equal(result[0].id, "owner")
-  assert.deepEqual(Object.keys(result[0]).sort(), ["id", "image", "name"])
 })

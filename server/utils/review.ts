@@ -23,8 +23,8 @@ import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#s
 import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { drops, user } from "../databases/config"
-import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
-import { addThread, authorOf, siteCommentList, threadsFor, toComment, undoThread } from "./comments"
+import { type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
+import { addThread, authorOf, siteCommentList, threadsFor, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { isExpired, expiryPolicy, renewDrop } from "./expiry"
 import { createFolder } from "./folders"
@@ -434,16 +434,14 @@ export async function addReviewComment(
   images: CommentImage[] = [],
 ) {
   const { row } = await withImages(
+    site,
     images,
-    () => insertReviewComment(site, author, input, shot, origin),
-    (added) =>
-      attachImages(site, images, { commentId: added.comments[0]!.id, replyId: null, n: added.number }, author.name),
-    async (added) => {
-      // With a screenshot, the comment is on the screenshot's drop: deleting that takes the comment with it.
-      const shotDrop = added.meta.dropId === site.id ? null : await findDrop(added.meta.dropId)
-      if (shotDrop) await deleteDrop(shotDrop)
-      else await undoThread(added)
+    author.name,
+    async (ids) => {
+      const added = await insertReviewComment(site, author, input, shot, origin, ids)
+      return added
     },
+    (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
   )
   return row
 }
@@ -454,6 +452,7 @@ async function insertReviewComment(
   input: ReviewCommentInput,
   shot: Screenshot | null,
   origin: string,
+  attachments: string[],
 ) {
   const now = Date.now()
   const element = {
@@ -467,12 +466,9 @@ async function insertReviewComment(
     elementX: input.selector && input.spot ? input.spot.x : null,
     elementY: input.selector && input.spot ? input.spot.y : null,
   }
-  const thread = {
-    body: input.body,
-    author: authorOf(author.who, author.name),
-    // Comments files the thread under the page's path, without its query and hash.
-    page: input.page.replace(/[?#].*$/, "") || "/",
-  }
+  const thread = { body: input.body, author: authorOf(author.who, author.name), attachments }
+  // The page's path, without its query and hash.
+  const path = input.page.replace(/[?#].*$/, "") || "/"
   if (!shot)
     return addThread(
       site,
@@ -489,7 +485,7 @@ async function insertReviewComment(
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
       const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
       if (storageError) throw storageFailure(storageError)
-      const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + thread.page : thread.page
+      const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
       const row = imageDrop(
         site,
         {
@@ -545,7 +541,7 @@ export async function siteItems(
   const byId = new Map(shots.map((shot) => [shot.id, shot]))
   return threads
     .filter(({ meta }) => !page || meta.page === page || Boolean(meta.page?.startsWith(`${page}#`)))
-    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.number - a.number)
+    .sort((a, b) => b.createdAt - a.createdAt || b.n - a.n)
     .map((thread) => {
       const { meta } = thread
       const shot = byId.get(meta.dropId)

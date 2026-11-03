@@ -1,6 +1,8 @@
 blockExoticSubdeps: false
 
 overrides:
+  # @vite-hub/ui comes from vite-hub/vitehub#3308 and depends on @vite-hub/comments; the one comments model is #3320.
+  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@d88be2f6e7dccf382dd0a3f97db25dd59e1109fd
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.10
   "@better-auth/oauth-provider": 1.7.10
@@ -37,31 +39,6 @@ patchedDependencies:
   # package chunk and everything it imports. That was about half the code of a cold /drops request.
   # Preserve registered virtual handler ids: resolving ViteHub's MCP discovery middleware as a file breaks the build.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
-  # Four open ViteHub PRs in one patch, since pnpm takes one per version:
-  # - Netlify builds on the Nitro RC: ViteHub looked for the beta's functions-internal/ entry and failed the build. It
-  #   now finds .netlify/v1/functions/server/server.mjs and writes no wrapper (vite-hub/vitehub#3173).
-  # - One Wrangler entry per binding name, flag, and required secret: Nitro concatenates the project's wrangler.jsonc
-  #   arrays with the generated ones, and a real id replaces a placeholder (vite-hub/vitehub#3175).
-  # - `cache: { driver: "kv" }` mounts Nitro's cache on the app's KV (vite-hub/vitehub#3178).
-  # - `detectPreset()` from vite-hub/deployment reads the host from the build env (vite-hub/vitehub#3179).
-  vite-hub@0.1.0: patches/vite-hub@0.1.0.patch
-  # - `vitehub db migrate` on D1 over HTTP keeps Wrangler's d1_migrations ledger, so Vercel and Netlify builds migrate
-  #   without Drizzle Kit or Drop's script (vite-hub/vitehub#3174).
-  # - A real D1 id replaces the template's all-zero one instead of conflicting with it (vite-hub/vitehub#3175).
-  "@vite-hub/database@0.1.0": patches/@vite-hub__database@0.1.0.patch
-  # `schedule: { cron }` sets a Schedule's cron for one host's build, so Vercel Hobby runs the cleanup daily
-  # (vite-hub/vitehub#3177, the Vercel part only).
-  # Nuxt's Netlify builds emit scheduled functions through Nitro so they include its generated service bindings.
-  "@vite-hub/schedule@0.1.0": patches/@vite-hub__schedule@0.1.0.patch
-  # The Nitro cache driver behind `cache: { driver: "kv" }` (vite-hub/vitehub#3178).
-  "@vite-hub/kv@0.1.0": patches/@vite-hub__kv@0.1.0.patch
-  # Comments gets its Database on Cloudflare: the generated plugin probed D1 before any request brought the binding,
-  # took the failure for "no Database", and left Comments uninstalled, so every comments call answered 503
-  # (vite-hub/vitehub#3222).
-  "@vite-hub/comments@0.1.0": patches/@vite-hub__comments@0.1.0.patch
-  # `blob.serve()` streams an object, or the range a video asks for, straight from the R2 binding instead of reading
-  # all of it into the Worker first (vite-hub/vitehub#3279).
-  "@vite-hub/blob@0.1.0": patches/@vite-hub__blob@0.1.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
@@ -99,35 +76,6 @@ minimumReleaseAgeExclude:
   - "@nuxt/vite-server-nightly@5.0.0-2610292252-da55a91"
   - nuxt-nightly@5.0.0-2610292252-da55a91
   - nitro@3.0.261029-rc
-  - "@vite-hub/agent@0.1.0"
-  - "@vite-hub/auth@0.1.0"
-  - "@vite-hub/blob@0.1.0"
-  - "@vite-hub/browser@0.1.0"
-  - "@vite-hub/channels@0.1.0"
-  - "@vite-hub/cli@0.1.0"
-  - "@vite-hub/comments@0.1.0"
-  - "@vite-hub/connections@0.1.0"
-  - "@vite-hub/content@0.1.0"
-  - "@vite-hub/database@0.1.0"
-  - "@vite-hub/email@0.1.0"
-  - "@vite-hub/env@0.1.0"
-  - "@vite-hub/forge@0.1.0"
-  - "@vite-hub/gateways@0.1.0"
-  - "@vite-hub/kv@0.1.0"
-  - "@vite-hub/markdown-template@0.1.0"
-  - "@vite-hub/presets@0.1.0"
-  - "@vite-hub/queue@0.1.0"
-  - "@vite-hub/rate-limit@0.1.0"
-  - "@vite-hub/realtime@0.1.0"
-  - "@vite-hub/runtime@0.1.0"
-  - "@vite-hub/sandbox@0.1.0"
-  - "@vite-hub/schedule@0.1.0"
-  - "@vite-hub/shell@0.1.0"
-  - "@vite-hub/source@0.1.0"
-  - "@vite-hub/ui@0.1.0"
-  - "@vite-hub/workflow@0.1.0"
-  - "@vite-hub/workspace@0.1.0"
-  - vite-hub@0.1.0
   - comark-annotate@0.9.0
   - comark-badge@0.9.0
   - comark-cards@0.9.0
@@ -174,6 +122,7 @@ minimumReleaseAgeExclude:
   - comark-ui@0.9.0
   - comark-xref@0.9.0
   - comark-zoom@0.9.0
+  - "@vercel/queue@0.11.0"
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0
@@ -182,3 +131,5 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: "*"
+    # vite-hub peers the @vite-hub/ui of its own preview; Drop takes #3308's.
+    "@vite-hub/ui": "*"
