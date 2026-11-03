@@ -7,10 +7,14 @@ import { skills as comarkSkills } from "comark-ui/skills"
 import { hex, sha256 } from "#shared/utils/bytes"
 import { skillSettings } from "../databases/config"
 import handoffMd from "../../skills/handoff/SKILL.md?raw"
+import learningGrading from "../../skills/learning/references/grading.md?raw"
+import learningModel from "../../skills/learning/references/model.md?raw"
+import learningMd from "../../skills/learning/SKILL.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
 import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
 import prototypeCanvas from "../../skills/prototype/references/canvas.md?raw"
 import prototypeMd from "../../skills/prototype/SKILL.md?raw"
+import quizMeMd from "../../skills/quiz-me/SKILL.md?raw"
 import showMeMd from "../../skills/show-me/SKILL.md?raw"
 import blocksGuide from "../../skills/vitehub-drop/references/blocks.md?raw"
 import boardGuide from "../../skills/vitehub-drop/references/board.md?raw"
@@ -110,6 +114,12 @@ const LOCAL_SKILLS: Skill[] = [
     file("references/canvas.md", prototypeCanvas),
   ]),
   skill([file("SKILL.md", showMeMd)]),
+  skill([
+    file("SKILL.md", learningMd),
+    file("references/model.md", learningModel),
+    file("references/grading.md", learningGrading),
+  ]),
+  skill([file("SKILL.md", quizMeMd)]),
   skill(
     Object.entries(slidevFiles)
       .map(([path, text]) => file(path.replace("../../skills/slidev/", ""), text))
