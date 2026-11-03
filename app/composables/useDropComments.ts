@@ -3,8 +3,9 @@ import {
   type CommentThread,
   type CommentUser,
   createCommentsClient,
+  createRestTransport,
 } from "vite-hub/comments/client"
-import { provideComments, useComments } from "vite-hub/ui/headless"
+import { type CommentCan, useComments } from "vite-hub/ui/headless"
 import type { DropComment } from "#shared/types"
 import type { Sent } from "~/composables/useDrop"
 
@@ -16,23 +17,22 @@ async function settled<T>(sent: Promise<Sent<T>>) {
 }
 
 /**
- * The comments of the open drop for vite-hub/ui's comment parts (CommentPanel, CommentThread, CommentComposer): a
- * ViteHub comments client over Drop's own comment routes, which check Drop's sharing and take guests on a "Can
- * comment" link. The threads are the ones the viewer already holds (useDrop), so the pins in the frame and the parts
- * show the same list; a change from either side shows in both.
+ * The comments of the open drop for vite-hub/ui's comment parts (CommentPanel, CommentThread, CommentComposer).
+ *
+ * Threads go through Drop's own comment routes, which keep the anchor, the suggestion, and the screenshot Drop's viewer
+ * draws, and answer the comments the viewer already holds (useDrop): the pins in the frame and the parts show the same
+ * list, and a change from either side shows in both. Whom "@" names and the comment images go straight to ViteHub's
+ * Comments API (`createRestTransport`), which asks server/comments.ts who may.
  *
  * `source` is what the dock lists: the drop's comments, or an image's in the lightbox. `page` is the app page a new
  * comment on the whole page is about.
  */
-function useDropComments(options: {
-  source: () => DropComment[]
-  page: () => string | undefined
-  site?: () => string | null
-}) {
+function useDropComments(options: { source: () => DropComment[]; page: () => string | undefined }) {
   const state = injectDrop()!
   const { data: me } = useMe()
-  const dropId = () => state.drop.data.value?.id ?? ""
-  const subject = computed(() => dropSubject(dropId(), options.site?.()))
+  const rest = createRestTransport()
+  const drop = () => state.drop.data.value
+  const subject = computed(() => commentSubject(drop()))
   const user = computed<CommentUser | undefined>(() =>
     me.value
       ? { id: me.value.id, name: me.value.name, ...(me.value.image ? { image: me.value.image } : {}) }
@@ -112,22 +112,30 @@ function useDropComments(options: {
       await state.resolveComment(threadId, false)
       return threadOf(threadId)
     },
-    // Whom "@" may name here: ViteHub Comments' people that may read this drop (server/api/drops/[id]/people.get.ts).
-    users: ({ query }) =>
-      user.value
-        ? $fetch<CommentUser[]>(`/api/drops/${dropId()}/people`, { query: { q: query } })
-        : Promise.resolve([]),
+    // Signed-out readers name nobody (server/comments.ts `canMention`), so they don't ask.
+    users: (input) => (user.value ? rest.users({ ...input, subject: subject.value }) : Promise.resolve([])),
+  }
+
+  // As Drop's routes decide: whoever may comment replies; a thread's author or the drop's managers resolve it; authors
+  // edit their own words; authors and managers delete them. The routes still check.
+  const mine = (author: CommentUser) => Boolean(user.value && author.id === user.value.id)
+  const can: CommentCan = (action, { thread, message }) => {
+    const shown = drop()
+    if (!shown) return false
+    if (action === "reply") return shown.canComment
+    if (action === "resolve") return shown.isOwner || mine(thread.author)
+    if (!message) return false
+    if (action === "edit") return mine(message.author)
+    return shown.isOwner || mine(message.author)
   }
 
   // The client and the parts keep their own copy of the threads. Whatever changes the viewer's list (a send, a new
   // version, the lightbox) has them read it again.
   const client = createCommentsClient({ transport, user: user.value, refreshOnFocus: false })
   watch([options.source, subject], () => void client.refresh().catch(() => undefined), { flush: "post" })
-  const comments = useComments({ client, subject, user, hotkey: false })
-  // A CommentPanel handed `comments` keeps it to itself; its composer finds "@" people through the context.
-  provideComments(comments)
+  const comments = useComments({ client, subject, user, can, hotkey: false })
 
-  const urls = computed(() => attachmentUrls(options.source()))
+  const images = computed(() => attachmentsOf(options.source()))
   // The people the comments mention, so their "@" shows as a chip even to readers who can't look people up.
   const people = computed(() => {
     const named = new Map<string, CommentUser>()
@@ -140,8 +148,13 @@ function useDropComments(options: {
     comments,
     user,
     people,
+    can,
     upload: async (list: File[]) => stash(list),
-    attachmentUrl: (key: string) => urls.value.get(key),
+    /** A comment image by its key (its drop id), served by ViteHub's Comments API to whoever may read the thread. */
+    attachmentUrl: (key: string) => {
+      const file = images.value.get(key)
+      return { url: rest.attachmentUrl(key), ...(file ? { name: file.filename, type: file.contentType } : {}) }
+    },
     /** The thread of a comment the viewer holds, for a CommentThread outside the panel. */
     thread: (comment: DropComment): CommentThread => toThread(comment, subject.value),
     /** Sends a reply from a CommentThread outside the panel; a failure keeps the text and says why. */

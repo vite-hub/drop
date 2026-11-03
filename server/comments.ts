@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull, like, or } from "drizzle-orm"
 import type { CommentSubject, CommentsUser, CommentUser } from "vite-hub/comments"
 import { defineComments, defineCommentSubject } from "vite-hub/comments"
+import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
 import { user as users } from "./databases/config"
 import { storeCommentFile } from "./utils/comment-images"
@@ -17,7 +18,8 @@ import { type Identity, identify, identityOf } from "./utils/identity"
  * - `page` threads are the Console's toolbar on Drop's own pages, for Drop admins.
  *
  * Drop's own routes check who may with `permissions` and review tokens (server/utils/comments.ts) and call the server
- * API. `authorize` answers the same for ViteHub's surfaces: the toolbar, the Console, and ViteHub MCP.
+ * API. `authorize` answers the same for ViteHub's surfaces: the Comments API the viewer asks for "@" people and comment
+ * images, the toolbar, the Console, and ViteHub MCP.
  */
 
 /** Drop's identity rides on the Comments user, so `authorize` and `canMention` read Drop's permissions. */
@@ -65,7 +67,7 @@ export async function peopleByIds(ids: readonly string[]): Promise<CommentUser[]
   return rows.map(person)
 }
 
-export const comments = defineComments({
+export default defineComments({
   subjects: [dropLink("drop"), dropLink("site")],
 
   async identify({ event }) {
@@ -98,8 +100,12 @@ export const comments = defineComments({
     byIds: peopleByIds,
   },
 
-  /** An `@` names someone who can read what the thread is on, so the link in it opens for them. */
-  async canMention({ person: mentioned, subject, thread }) {
+  /**
+   * An `@` names someone who can read what the thread is on, so the link in it opens for them. Guests name nobody:
+   * a stranger on a public link would otherwise list everyone who can read it.
+   */
+  async canMention({ user, person: mentioned, subject, thread }) {
+    if (!user || user.guest) return false
     const who = await identityOf(mentioned.id)
     return Boolean(who && (await allowed(subject ?? thread?.subject, who)).view)
   },
@@ -109,4 +115,16 @@ export const comments = defineComments({
 
   /** A file from ViteHub's surfaces: an image drop under the commented drop, like the images Drop's own routes take. */
   storeAttachment: (file, { user, subject }) => storeCommentFile(file, subject, identityIn(user)),
+
+  /**
+   * A comment image by its key, the image drop's id. ViteHub serves it at /api/_vitehub/comments/attachments/<id> once
+   * it found a thread that lists the key and the reader may read.
+   */
+  async readAttachment(key) {
+    const row = await findDrop(key)
+    if (!row?.blobKey || row.kind !== "image") return null
+    const [error, file] = await blob.get(row.blobKey)
+    if (error || !file) return null
+    return new Blob([file], { type: row.contentType ?? "application/octet-stream" })
+  },
 })

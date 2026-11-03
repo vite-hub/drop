@@ -3,8 +3,7 @@ import { H3Event } from "h3"
 import { beforeEach, test } from "vite-plus/test"
 import { insertDrop, migrate, reset, sql, state, threads, who } from "../cost/harness.mjs"
 
-const { comments } = await import("../../server/comments.ts")
-const { default: people } = await import("../../server/api/drops/[id]/people.get.ts")
+const { default: comments } = await import("../../server/comments.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: replyPost } = await import("../../server/api/comments/[id]/replies.post.ts")
 const { default: messagePatch } = await import("../../server/api/messages/[id].patch.ts")
@@ -39,8 +38,13 @@ function request(path, { method = "GET", body, params = {} } = {}) {
   event.context.params = params
   return event
 }
-const listPeople = (id, q = "") =>
-  people(request(`/api/drops/${id}/people?q=${encodeURIComponent(q)}`, { params: { id } }))
+// What ViteHub's Comments API answers GET /people?subjectKind=drop&subjectId=<id> with, for the one signed in.
+async function listPeople(id, q = "") {
+  const user = state.who ? { id: state.who.userId, name: state.who.name, identity: state.who } : null
+  const [error, people] = await comments.people({ query: q, user, subject: { kind: "drop", id } })
+  if (error) throw error
+  return people
+}
 const comment = (id, body) =>
   commentsPost(request(`/api/drops/${id}/comments`, { method: "POST", body, params: { id } }))
 const page = { kind: "page", selector: "", ox: 0, oy: 0 }
@@ -124,7 +128,7 @@ test("ViteHub's surfaces follow Drop's sharing: drop threads by the drop, Drop's
   assert.equal(await can(as(admin), "read", { kind: "page", id: "/drops" }), true)
 })
 
-test("a file sent through ViteHub's upload becomes an image of the drop, out of its lists", async () => {
+test("a file sent through ViteHub's upload becomes an image of the drop, out of its lists, and reads back", async () => {
   insertDrop("shared")
   const png = Uint8Array.from(
     Buffer.from(
@@ -140,6 +144,11 @@ test("a file sent through ViteHub's upload becomes an image of the drop, out of 
   const row = sql.prepare("SELECT kind, parent_id, owner_id, content_type FROM drops WHERE id = ?").get(id)
   assert.deepEqual({ ...row }, { kind: "image", parent_id: "shared", owner_id: "owner", content_type: "image/png" })
   assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments WHERE drop_id = ?").get(id).n, 1)
+  // ViteHub's GET /attachments/<id> reads it back with its type, once it checked the reader may read a thread with it.
+  const file = await comments.options.readAttachment(id, { user: null, thread: {} })
+  assert.equal(file.type, "image/png")
+  assert.deepEqual(new Uint8Array(await file.arrayBuffer()), png)
+  assert.equal(await comments.options.readAttachment("missing", { user: null, thread: {} }), null)
   await assert.rejects(
     storeCommentFile({ name: "a.txt", size: 2, data: new Uint8Array([104, 105]) }, { kind: "drop", id: "shared" }, bo),
     { status: 400 },

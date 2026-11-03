@@ -267,7 +267,7 @@ export interface CommentAttachment {
   filename: string
   contentType: string
   size: number
-  /** Where Drop serves it, relative to Drop's origin (`/f/<key>`), for whoever may view the drop. */
+  /** Where ViteHub Comments serves it (`/api/_vitehub/comments/attachments/<id>`), to whoever may read its thread. */
   url: string
 }
 

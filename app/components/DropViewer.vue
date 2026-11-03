@@ -11,6 +11,9 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
+// The parts' one stylesheet: comments, presence, and the editor's carets. vite-hub/ui/styles.css is the same file from
+// vite-hub/vitehub#3308 on; the vite-hub preview of #3320 still ships an older copy.
+import "@vite-hub/ui/styles.css"
 
 const { publicView = false } = defineProps<{ publicView?: boolean }>()
 
@@ -839,13 +842,11 @@ watch(
       v-if="popover && !siteRef?.pending"
       :key="popover.type === 'thread' ? popover.id : 'new'"
       ref="popoverRef"
-      :can-manage="drop.isOwner"
       :comment="threadComment"
       :screenshot="threadComment ? screenshots.get(threadComment.id) : undefined"
       :pending="popover.type === 'new' ? popover.pending : undefined"
       :draft="popover.type === 'new' ? popover.body : undefined"
       :draft-error="popover.type === 'new' ? popover.error : undefined"
-      :can-reply="drop.canComment"
       :can-accept="canAccept"
       :accepting="Boolean(accepting) && accepting === threadComment?.id"
       :version="drop.version"
@@ -1112,6 +1113,7 @@ watch(
               ref="commentsRef"
               :can-comment="drop.canComment && !shownVersion && !lightbox"
               :comments="lightbox ? imageComments : comments"
+              :outdated="outdated"
               @focus="focusComment"
             />
           </template>

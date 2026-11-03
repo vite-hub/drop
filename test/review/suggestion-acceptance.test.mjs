@@ -4,7 +4,7 @@ import { H3Event } from "h3"
 import { installComments } from "vite-hub/comments"
 import { migrate, reset, sql, state, threads, who } from "../cost/harness.mjs"
 
-const { comments } = await import("../../server/comments.ts")
+const { default: comments } = await import("../../server/comments.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: acceptSuggestion } = await import("../../server/api/comments/[id]/accept.post.ts")
 const { default: undoSuggestion } = await import("../../server/api/comments/[id]/accept.delete.ts")

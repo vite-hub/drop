@@ -7,6 +7,7 @@ import { db } from "vite-hub/database/drizzle"
 import { newLink } from "#shared/links"
 import { COMMENT_IMAGE_TYPES, MAX_COMMENT_IMAGES, MAX_FILE_BYTES } from "#shared/schemas"
 import type { CommentSubject } from "vite-hub/comments"
+import { commentAttachmentUrl } from "vite-hub/comments/client"
 import type { CommentAttachment } from "#shared/types"
 import { textValue } from "#shared/utils/text"
 import { commentAttachments, drops } from "../databases/config"
@@ -218,12 +219,13 @@ async function linkImages(ids: string[], owner: { commentId: string; replyId: st
   await db.update(commentAttachments).set(owner).where(inArray(commentAttachments.dropId, ids))
 }
 
-export const toAttachment = (row: Pick<DropRow, "id" | "filename" | "contentType" | "size" | "blobKey">) => ({
+/** A comment image as Drop's API answers it. ViteHub Comments serves its file (`readAttachment` in server/comments.ts). */
+export const toAttachment = (row: Pick<DropRow, "id" | "filename" | "contentType" | "size">) => ({
   id: row.id,
   filename: row.filename,
   contentType: row.contentType ?? "image/png",
   size: row.size,
-  url: `/f/${row.blobKey}`,
+  url: commentAttachmentUrl(row.id),
 })
 
 /**

@@ -6,7 +6,6 @@
 // in `#anchor`, Accept and the thread's menu in `#actions`, a site's screenshot in `#after`.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import { CommentComposer, type CommentComposerSubmit, CommentThread } from "vite-hub/ui/comments"
-import "@vite-hub/ui/styles.css"
 import { COMMENT_IMAGE_TYPES, type CommentInput } from "#shared/schemas"
 import type { DropComment, SiteReviewItem } from "#shared/types"
 
@@ -16,8 +15,6 @@ const props = defineProps<{
   screenshot?: SiteReviewItem["screenshot"]
   pending?: PendingComment
   comment?: DropComment
-  canManage: boolean
-  canReply: boolean
   /** Whether this reader may put a suggestion's words into the doc (an editor, on its latest version). */
   canAccept?: boolean
   accepting?: boolean
@@ -38,7 +35,7 @@ const emit = defineEmits<{
   accept: [id: string]
 }>()
 const dropComments = injectDropComments()!
-const { user, people, attachmentUrl } = dropComments
+const { user, people, attachmentUrl, can } = dropComments
 const accept = COMMENT_IMAGE_TYPES.join(",")
 
 // A new comment keeps its words and images in the viewer's draft while areas come and go.
@@ -104,7 +101,9 @@ const earlier = computed(() =>
     ? state.drop.data.value?.versions.find((item) => item.version === props.comment!.version)
     : undefined,
 )
-const mayDelete = computed(() => Boolean(props.comment && (props.canManage || props.comment.mine)))
+const mayDelete = computed(() =>
+  Boolean(thread.value && can("delete", { thread: thread.value, message: thread.value.messages[0] })),
+)
 const menu = computed<DropdownMenuItem[][]>(() => [
   [
     {
@@ -231,6 +230,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
       v-else-if="comment && thread"
       :accept="accept"
       :attachment-url="attachmentUrl"
+      :can="can"
       :dismissible="false"
       navigation="back"
       :people="people"
@@ -239,7 +239,6 @@ const edit = (messageId: string, text: string, ids: string[]) =>
       :on-reopen="() => emit('resolve', comment!.id, false)"
       :on-reply="reply"
       :on-resolve="() => emit('resolve', comment!.id, true)"
-      :read-only="!canReply"
       :thread="thread"
       :user="user"
       :users="dropComments.users"

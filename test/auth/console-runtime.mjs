@@ -213,7 +213,7 @@ await test("Worker Console authorization, admin-only pages, every section for ad
     }
     assert.equal((await request("/members", { cookie: admin.cookie })).status, 404)
     assert.equal((await request("/api/members", { cookie: admin.cookie })).status, 404)
-    // "@" lists people per drop now (/api/drops/<id>/people); the Drop-wide list is gone.
+    // "@" asks ViteHub Comments per drop (/api/_vitehub/comments/people?subjectKind=drop); the Drop-wide list is gone.
     assert.equal((await request("/api/people", { cookie: admin.cookie })).status, 404)
     assert.equal(
       (

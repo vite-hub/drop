@@ -1079,7 +1079,8 @@ test("comments and replies in Drop take images, which belong to the drop and go 
     posted.attachments.map((file) => [file.filename, file.contentType]),
     [["mock.png", "image/png"]],
   )
-  assert.match(posted.attachments[0].url, /^\/f\/[0-9a-f-]{36}\.png$/)
+  // ViteHub Comments serves it (server/comments.ts `readAttachment`), to whoever may read the thread.
+  assert.equal(posted.attachments[0].url, `/api/_vitehub/comments/attachments/${posted.attachments[0].id}`)
   const stored = sql.prepare("SELECT * FROM drops WHERE parent_id = 'doc'").get()
   assert.equal(stored.kind, "image")
   assert.equal(stored.owner_id, "owner")

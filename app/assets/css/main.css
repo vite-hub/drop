@@ -124,19 +124,6 @@
   --ui-border-accented: rgb(255 255 255 / 18%);
   --ui-border-inverted: #fafafa;
   --ui-primary: #fafafa;
-  /* vite-hub/ui's comment parts read these. They resolve Nuxt UI's tokens where they're declared, on :root, so the
-     surface declares them again with its own. */
-  --vh-ui-border: var(--ui-border);
-  --vh-ui-muted: var(--ui-text-muted);
-  --vh-ui-dimmed: var(--ui-text-muted);
-  --vh-ui-text: var(--ui-text);
-  --vh-ui-bg: var(--ui-bg);
-  --vh-ui-bg-muted: var(--ui-bg-muted);
-  --vh-ui-bg-elevated: var(--ui-bg-elevated);
-  --vh-ui-bg-accented: var(--ui-bg-accented);
-  --vh-ui-highlighted: var(--ui-text-highlighted);
-  --vh-ui-inverted: var(--ui-text-inverted);
-  --vh-ui-primary: var(--ui-primary);
   color: var(--ui-text);
   background-color: var(--review-surface);
   box-shadow: 0 8px 24px rgb(0 0 0 / 25%);

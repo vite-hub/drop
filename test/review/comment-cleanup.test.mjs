@@ -3,7 +3,7 @@ import { beforeEach, test } from "vite-plus/test"
 import { installComments } from "vite-hub/comments"
 import { insertDrop, migrate, reset, sql, state, threads } from "../cost/harness.mjs"
 
-const { comments } = await import("../../server/comments.ts")
+const { default: comments } = await import("../../server/comments.ts")
 const { deleteDrop, deleteExpiredDrops, findDrop } = await import("../../server/utils/drops.ts")
 
 migrate()

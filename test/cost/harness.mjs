@@ -164,7 +164,7 @@ export const state = (globalThis.dropTest = {
     },
   },
 })
-const { comments } = await import("../../server/comments.ts")
+const { default: comments } = await import("../../server/comments.ts")
 /**
  * Applies the migrations, and gives Drop's Comments (server/comments.ts) the database, as ViteHub does at start.
  * `comments: false` leaves Comments without one, as a server whose ViteHub plugin found no Database.

@@ -6,7 +6,7 @@ import type { CommentAnchor, CommentMessage, CommentSubject, CommentThread, Comm
 import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database/drizzle"
 import type { CommentAttachment, CommentReply, DropComment } from "#shared/types"
-import { comments, peopleByIds } from "../comments"
+import comments, { peopleByIds } from "../comments"
 import { commentCleanup, drops } from "../databases/config"
 import { attachmentsUnder, deleteImages, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
