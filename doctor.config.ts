@@ -12,6 +12,12 @@ export default defineDoctorConfig({
   ],
   suppressions: [
     {
+      ruleId: "nuxt/imports/no-explicit-auto-import",
+      file: "app/components/viewer/ViewerCommentField.vue",
+      reason:
+        "Keep the mention helpers explicit alongside the Person type in this mixed import. Nuxt supports the explicit import; the redundant-import warning is stylistic.",
+    },
+    {
       ruleId: "nuxt/middleware/no-route-middleware-api-security",
       file: "node_modules/*/vite-hub/dist/console/runtime/server/auth-manage.js",
       reason:

@@ -132,8 +132,20 @@ watch(
   color: var(--ui-text-inverted);
 }
 
+/* Closing the panel with Esc hands focus back to Comments. A solid white ring outside the button boxed it in against the
+   pill's edge, so focus is the hover's fill with a grey hairline inside, still 4.5:1 against the pill. */
 .review-toolbar :deep(button:focus-visible) {
-  outline: 2px solid var(--ui-bg-inverted);
+  outline: 1px solid rgb(255 255 255 / 45%);
+  outline-offset: -1px;
+}
+
+.review-toolbar :deep(button:focus-visible:not([aria-pressed="true"], [aria-expanded="true"], [data-review-primary])) {
+  background: rgb(255 255 255 / 8%);
+  color: var(--ui-text);
+}
+
+/* A pressed button is already white, so its hairline sits just outside. */
+.review-toolbar :deep(button:focus-visible:is([aria-pressed="true"], [aria-expanded="true"], [data-review-primary])) {
   outline-offset: 1px;
 }
 
