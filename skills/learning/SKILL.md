@@ -11,7 +11,7 @@ Coverage is not learning. A lesson read or a video watched changes nothing in th
 
 The model records what the user knows. How agents should work goes in agent memory and `AGENTS.md`, never here.
 
-This skill works through Drop's MCP tools (`list_folders`, `create_folder`, `read_drop`, `list_drops`, `publish`). Follow the `vitehub-drop` skill for publishing. The doc formats are in [the model reference](references/model.md), and grades and states in [the grading reference](references/grading.md). When the user asks to be quizzed, or a step below calls for a diagnostic or a review, follow [the quiz reference](references/quiz.md).
+This skill works through Drop's MCP tools (`list_folders`, `create_folder`, `read_drop`, `list_drops`, `publish`, `update_drop`). Follow the `vitehub-drop` skill for publishing. The doc formats are in [the model reference](references/model.md), and grades and states in [the grading reference](references/grading.md). When the user asks to be quizzed, or a step below calls for a diagnostic or a review, follow [the quiz reference](references/quiz.md).
 
 ## 1. Find the model
 
@@ -42,7 +42,7 @@ Done when you can name to the teaching skill the concept to teach, its warm-ups,
 
 ## 3. While teaching
 
-Give every `::question` and `::recall` an id that starts with its concept id: `#dep-prebundling--cjs-lib`. Use a new id each time a question is asked again, even reworded: Drop keeps a user's answers per id and doc across versions, so a reused id brings back the old answer instead of a new one.
+Give every `::question` and `::recall` an id that starts with its concept id: `#dep-prebundling--cjs-lib` in Markdown attributes. Store the bare id `dep-prebundling--cjs-lib` in `Pending` and records, matching `answers[].id` from `read_drop`. Use a new id each time a question is asked again, even reworded: Drop keeps a user's answers per id and doc across versions, so a reused id brings back the old answer instead of a new one.
 
 Publish lessons and quizzes into the topic folder, a new drop for each session. Answers disappear with their drop, so a lesson elsewhere with a short lifetime loses them.
 
@@ -59,12 +59,12 @@ Done when every answer from the session is in a record, every unanswered questio
 
 Drop doesn't lock a doc, so two agents that read the same version and both publish lose one update. Before you publish the model:
 
-1. `read_drop` it again and compare its version with the one you started from. When it moved, merge the other agent's changes into yours.
+1. `read_drop` it again and compare its version with the one you started from. When it moved, merge the other agent's changes into yours. Keep a copy of the source and version you are about to publish against.
 2. `publish` with `previous` set to the model and a `note` naming the concepts that changed, like "dep-prebundling: gap → shaky (record-2026-11-04-vite)".
-3. Check that the version `publish` returned is the one you read plus one. When it isn't, go back to 1.
+3. Check that the version `publish` returned is the one you read plus one. When it isn't, your write may have overwritten another agent's update. Use `read_drop` on the model's link with `?v=<version>` to read every intervening version, from the one you read plus one through the returned version minus one. Compare them with your saved source and recover changes to the mission, concepts, evidence and `Pending`. For overlapping grades, replay their records in answer-date order, counting each answer once; a correction replaces the entry it names. Retain the recovered changes when returning to 1 before publishing again. Reading only your own new version does not recover the overwritten changes.
 
-Records are what makes this safe: when a model update is lost, the evidence is still in its record, and the next agent rebuilds the state from it.
+Records preserve the answer evidence for rebuilding concept states when merging concurrent updates.
 
 ## Corrections
 
-The user can comment on the model or a record: "I knew that already" or "that grade is wrong". Treat it as a correction to apply, not to argue with: write a record noting the correction, update the model, and resolve the comment.
+The user can comment on the model or a record: "I knew that already" or "that grade is wrong". Treat it as a correction to apply, not to argue with: write a record noting the correction and update the model. For a comment on the model, pass its comment number in `publish.resolves` when publishing the model's next version. For a comment on a separate record, after the model update succeeds call `update_drop` with that record's id and `resolves: [<comment number>]`. This resolves the comment without publishing a new version of the immutable record; publishing the model cannot resolve a comment on another drop.

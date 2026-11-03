@@ -46,7 +46,7 @@ Explains why `no-undef` fires on an extglob pattern and how to fix it.
 
 ## Pending
 
-- https://drop.vitehub.dev/d/<key>/lesson-dep-prebundling `#dep-prebundling--cjs-lib`, published 2026-11-04
+- https://drop.vitehub.dev/d/<key>/lesson-dep-prebundling `dep-prebundling--cjs-lib`, published 2026-11-04
 ```
 
 A concept's heading is its id: lowercase words joined with dashes, unique in the topic. Under it, one sentence says what knowing it means: what the user can explain or do. Then its fields:
@@ -64,6 +64,8 @@ A concept's heading is its id: lowercase words joined with dashes, unique in the
 `state`, `needs` and `evidence` exist from the start; `last`, `interval` and `next` appear after the first graded answer.
 
 Keep the model to the current state. History lives in the records and in the model's own versions.
+
+`Pending` and record question headings use bare question ids, without the `#` used in Markdown attributes, so they match `read_drop`'s `answers[].id`.
 
 ## Record
 
@@ -96,4 +98,4 @@ Graded by: claude-opus-5-5 in Claude Code
 
 Write what the user answered short and close to their words, or the option text they picked, never just its key. Name `help` when they had a hint, the answer shown, or a nudge in chat.
 
-A correction is a new record whose first line names the record and question it corrects, and why: "Corrects record-2026-11-04-prebundling `#dep-prebundling--cjs-lib`: the user said they misread the question."
+A correction is a new record whose first line names the record and question it corrects, and why: "Corrects record-2026-11-04-prebundling `dep-prebundling--cjs-lib`: the user said they misread the question."
