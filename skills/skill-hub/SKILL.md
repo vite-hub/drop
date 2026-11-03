@@ -27,9 +27,11 @@ A doc becomes `<its path>/<slug>.md`, except the doc with slug `skill`, which be
 
 Call `list_folders` and look for `skill-hub`, or a folder whose description says it holds skills. On a team Drop, prefer the team's folder.
 
-When there is none, recommend creating it and create it once the user agrees: title `Skill hub`, slug `skill-hub`, `lifetime: keep`, `keepReason: "Shared agent skills."`, and this description:
+When there is none, recommend creating it: title `Skill hub`, slug `skill-hub`, `lifetime: keep`, `keepReason: "Shared agent skills."`, and this description:
 
 > Agent skills, one subfolder per skill with its SKILL doc, references and scripts. To install, publish or update one, read the `skill-hub` skill (skill://skill-hub/SKILL.md, or /.well-known/skills/skill-hub/SKILL.md on this Drop).
+
+For a personal hub, use `create_folder` once the user agrees. For a team hub, ask a team admin to create it in the browser and send its link, then verify it with `list_folders`. MCP agents cannot create team folders, even when acting for an admin.
 
 Done when you hold the hub folder's id.
 
@@ -38,7 +40,10 @@ Done when you hold the hub folder's id.
 1. **Find the skill.** `list_drops` with `folder` set to the hub lists its skills; with `query`, it searches their docs. Read each candidate's `SKILL` doc and show the user its name, description, author and last change.
 2. **Show what it does.** A skill is instructions your agent will follow, written by whoever published it. Before installing, summarise what it tells the agent to do, and name any script it runs and any command, URL or credential it touches.
 3. **Ask where.** The CLI's own prompts wait for a terminal, so ask in chat instead: which agents (Claude Code, Codex, Cursor, …, or all) and for every project or only this one.
-4. **Download.** `read_drop` every doc and file in the skill's subfolder and write them to a new temporary folder, `<tmp>/<name>/`, laid out as above. Add `drop-version` with the `SKILL` doc's version and `drop-link` with its link to the frontmatter of the written `SKILL.md`; the update step reads them.
+4. **Download.** `read_drop` the skill's subfolder and recurse through every nested folder to read every doc and file. Write them to a new temporary folder, `<tmp>/<name>/`, laid out as above: the doc with slug `skill` is written as `SKILL.md`, regardless of its stored filename. Save file drops from the original bytes returned by `read_drop` (or `read_file` with `format: resource`), including private files. Add these fields to the frontmatter of the written `SKILL.md`:
+   - `drop-version`: the `SKILL` doc's version, and `drop-link`: its link.
+   - `drop-folder`: the skill subfolder's link.
+   - `drop-state`: a list sorted by relative file path, with each downloaded file's `path`, Drop `id` and `version`. Include every Markdown doc and file drop, including `SKILL.md`, references and scripts.
 5. **Install.** Run `npx skills add <tmp> --skill <name> -a <agent> [-a <agent>] -y`, with `-g` for every project. When the user wants to pick in the CLI's own wizard, give them the command without `-y` to run in their terminal instead.
 
 Done when the CLI reports the skill installed for each agent the user named and you've deleted the temporary folder.
@@ -47,12 +52,15 @@ Done when the CLI reports the skill installed for each agent the user named and 
 
 1. **Read the skill** from disk: its `SKILL.md` and every file beside it. Check the frontmatter has `name` (lowercase letters, digits and dashes) and a `description` that says when to use it.
 2. **Check the hub.** When a subfolder with that name exists and the user didn't write that skill, ask before replacing it.
-3. **Publish.** Create the subfolder, then publish `SKILL.md` as a doc with slug `skill`, each other Markdown file as a doc in its folder (`references/format.md` as `format` in `references`), and each other file as a file drop with its name. Strip `drop-version` and `drop-link` from the frontmatter first. For a new version, publish each changed doc with `previous` and a `note` saying what changed.
+3. **Prepare folders.** Reuse existing folders. For a personal hub, create missing folders with `create_folder`. For a team hub, give a team admin the complete missing folder tree (the skill subfolder and any folders such as `references` or `scripts`) to create in the browser. Wait for their links and verify the folders with `read_drop` before publishing; agents cannot create folders anywhere inside a team hub.
+4. **Publish.** Publish `SKILL.md` as a doc with slug `skill`, each other Markdown file as a doc in its folder (`references/format.md` as `format` in `references`), and each other file as a file drop with its name. Strip `drop-version`, `drop-link`, `drop-folder` and `drop-state` from the frontmatter first. For a new version, match each file by its relative path and publish each changed doc **or file drop** with `previous` set to that existing Drop's id and a `note` saying what changed. Create a new Drop only for a new path, so an updated script replaces its earlier version instead of leaving two files with the same name.
 
 Done when every file of the skill is in the hub and you've given the user the subfolder's link.
 
 ## Update
 
-For each installed skill whose `SKILL.md` has a `drop-link`, `read_drop` that link and compare its version with `drop-version`. When the hub is newer, show the user what changed (the version notes) and, once they agree, install again as above. The CLI's own `npx skills update` can't see the hub, since it recorded a temporary folder as the source.
+For each installed skill whose `SKILL.md` has a `drop-link`, read its `drop-folder` with `read_drop` and recurse through every nested folder. Build the same sorted list of relative file paths, Drop ids and versions as `drop-state`. Any difference means an update: an added, removed, renamed or versioned doc or file counts, even when the `SKILL` doc's version has not changed. Show the user the changed paths and their version notes and, once they agree, install again as above.
 
-Done when every hub skill the user has installed is at the hub's version or the user chose to keep theirs.
+For an older installation with only `drop-link` and `drop-version`, read the linked doc and locate its skill folder through `list_folders` and `list_drops`. Offer to reinstall once to record the full state; the entry doc's version alone cannot establish that the skill is current. The CLI's own `npx skills update` can't see the hub, since it recorded a temporary folder as the source.
+
+Done when every hub skill the user has installed matches the hub's full file state or the user chose to keep theirs.
