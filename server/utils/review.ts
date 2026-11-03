@@ -457,6 +457,7 @@ async function insertReviewComment(
 ) {
   const now = Date.now()
   const element = {
+    ...(input.requestId ? { requestId: input.requestId } : {}),
     ox: input.ox,
     oy: input.oy,
     ow: input.ow,
@@ -551,6 +552,7 @@ export async function siteItems(
       const shot = byId.get(meta.dropId)
       return {
         ...toComment(thread, who, attachments),
+        requestId: meta.requestId,
         spot: meta.elementX !== null && meta.elementY !== null ? { x: meta.elementX, y: meta.elementY } : null,
         screenshot: shot?.blobKey
           ? {
@@ -574,6 +576,7 @@ export function reviewThreads(site: DropRow, who: Identity | null, items: SiteRe
   const manage = permissions(site, who).manage
   return items.map((item) => ({
     n: item.n,
+    requestId: item.requestId,
     body: item.body,
     author: { name: item.authorName, image: item.authorImage },
     createdAt: item.createdAt,

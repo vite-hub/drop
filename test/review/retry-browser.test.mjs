@@ -28,8 +28,16 @@ const CORS = {
  * A fake Drop. `down` makes it answer the way the proxy does while Drop restarts: a 503 without CORS headers, which
  * the browser reports as a failed fetch. `loseAnswer` saves the next comment and then drops the connection.
  */
-async function open(browser) {
-  const drop = { down: false, loseAnswer: false, posts: 0, saved: [] }
+async function open(browser, { saved = [], hideUntilPost = false } = {}) {
+  const drop = {
+    down: false,
+    loseAnswer: false,
+    rejectPost: false,
+    onRejectedPost: null,
+    posts: 0,
+    saved,
+    requestIds: [],
+  }
   const context = await browser.newContext({ viewport: { width: 900, height: 600 } })
   await context.addInitScript(
     ({ drop }) => {
@@ -60,24 +68,31 @@ async function open(browser) {
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
     if (request.method() === "POST") {
       drop.posts++
-      const body = JSON.parse(
+      const data = JSON.parse(
         request
           .postDataBuffer()
           .toString("utf8")
           .match(/\{"body".*?\}(?=\r\n)/)[0],
-      ).body
+      )
+      drop.requestIds.push(data.requestId)
+      if (drop.rejectPost) {
+        drop.rejectPost = false
+        drop.onRejectedPost?.()
+        return route.abort("connectionreset")
+      }
       const n = 3 + drop.saved.length
-      drop.saved.push({ n, body, resolved: false, replies: [], images: [], author: { name: "Ada" } })
+      drop.saved.push(savedThread(n, data.body, data.requestId))
       if (drop.loseAnswer) {
         drop.loseAnswer = false
         return route.abort("connectionreset")
       }
       return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ n }) })
     }
+    const visible = hideUntilPost && !drop.posts ? [] : drop.saved
     return route.fulfill({
       contentType: "application/json",
       headers: CORS,
-      body: JSON.stringify({ open: drop.saved.length, threads: drop.saved }),
+      body: JSON.stringify({ open: visible.length, threads: visible }),
     })
   })
   const page = await context.newPage()
@@ -85,6 +100,10 @@ async function open(browser) {
   const ui = page.locator("drop-review")
   await ui.getByRole("button", { name: "Comment" }).waitFor()
   return { drop, page, ui }
+}
+
+function savedThread(n, body, requestId) {
+  return { n, body, requestId, resolved: false, replies: [], images: [], author: { name: "Ada" } }
 }
 
 async function comment(page, ui, words) {
@@ -127,6 +146,48 @@ test("a comment Drop saved before the answer was lost isn't sent twice", async (
     await ui.getByText("Sent as #3.").waitFor({ timeout: 10_000 })
     assert.equal(drop.posts, 1)
     assert.equal(drop.saved.length, 1)
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("another reviewer's matching comment cannot replace a submission that did not arrive", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { drop, page, ui } = await open(browser)
+    drop.rejectPost = true
+    drop.onRejectedPost = () => {
+      drop.saved.push({
+        ...savedThread(3, "Should be 10 €", "00000000-0000-4000-8000-000000000002"),
+        author: { name: "Grace" },
+      })
+    }
+    await comment(page, ui, "Should be 10 €")
+    await ui.getByText("Sent as #4.").waitFor({ timeout: 10_000 })
+    assert.equal(drop.posts, 2)
+    assert.equal(drop.saved.length, 2)
+    assert.equal(drop.requestIds[0], drop.requestIds[1], "resends keep the original request id")
+    assert.equal(drop.saved[1].requestId, drop.requestIds[0])
+    assert.notEqual(drop.saved[0].requestId, drop.saved[1].requestId)
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("an older matching comment missing from the local snapshot cannot replace an unsaved submission", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { drop, page, ui } = await open(browser, {
+      saved: [savedThread(3, "Should be 10 €")],
+      hideUntilPost: true,
+    })
+    drop.rejectPost = true
+    await comment(page, ui, "Should be 10 €")
+    await ui.getByText("Sent as #4.").waitFor({ timeout: 10_000 })
+    assert.equal(drop.posts, 2)
+    assert.equal(drop.saved.length, 2)
+    assert.equal(drop.requestIds[0], drop.requestIds[1])
+    assert.equal(typeof drop.saved[1].requestId, "string")
   } finally {
     await browser.close()
   }

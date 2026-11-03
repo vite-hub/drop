@@ -590,6 +590,24 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   assert.doesNotMatch(JSON.stringify(page), /"site"|\/d\//, "no link or id of the review")
 })
 
+test("review request ids persist with and without screenshots, while older clients can omit them", async () => {
+  site()
+  const { body } = await token(SITE, { name: "Ole" })
+  const requestIds = [crypto.randomUUID(), crypto.randomUUID()]
+  assert.equal((await comment(body.token, { requestId: requestIds[0] }, { screenshot: PNG })).status, 200)
+  assert.equal((await comment(body.token, { requestId: requestIds[1] })).status, 200)
+  assert.equal((await comment(body.token, {})).status, 200)
+  assert.deepEqual(
+    threads().map((thread) => thread.metadata.requestId),
+    [...requestIds, undefined],
+  )
+  const listed = await json(await count(body.token, "/pricing?plan=pro"))
+  assert.deepEqual(
+    listed.threads.toSorted((a, b) => a.n - b.n).map((thread) => thread.requestId),
+    [...requestIds, undefined],
+  )
+})
+
 test("comments on a pattern keep the origin of the preview they came from", async () => {
   site("previews", { site_url: PATTERN })
   const pr12 = (await token(SITE, { name: "Ole" })).body.token
@@ -721,10 +739,11 @@ test("what the page sends is checked: the token, the image's bytes, and the fiel
   assert.equal((await comment(body.token, { body: "x".repeat(4001) })).status, 400)
   assert.equal((await comment(body.token, { page: "https://elsewhere.example/" })).status, 400)
   assert.equal((await comment(body.token, { ox: 900, ow: 300 })).status, 400)
+  assert.equal((await comment(body.token, { requestId: "not-a-uuid" })).status, 400)
   assert.equal(threads().length, 0)
   assert.equal(
     state.bursts.filter((burst) => burst.bucket === "review-comment").length,
-    5,
+    6,
     "each signed request counts",
   )
 
