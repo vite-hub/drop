@@ -660,6 +660,86 @@ for (const screenshot of [undefined, PNG]) {
     assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE kind = 'image'").get().n, screenshot ? 2 : 1)
     assert.equal(objects.size, screenshot ? 2 : 1)
   })
+
+  for (const fail of [false, true]) {
+    test(`a claimed review waits for attachments to ${fail ? "fail" : "finish"}${screenshot ? " with a screenshot" : ""}`, async () => {
+      site()
+      const { body } = await token(SITE, { name: "Ole" })
+      const data = { requestId: crypto.randomUUID() }
+      const options = { screenshot, images: [PNG] }
+      const started = Promise.withResolvers()
+      const resume = Promise.withResolvers()
+      const put = state.blob.put.bind(state.blob)
+      let held = false
+      vi.spyOn(state.blob, "put").mockImplementation(async (...args) => {
+        // A screenshot is stored before the claim. Hold the attachment written after it becomes visible.
+        if (!held && threads().length) {
+          held = true
+          started.resolve()
+          await resume.promise
+          if (fail) return [{ code: "BLOB_WRITE_FAILED", message: "Attachment storage unavailable" }]
+        }
+        return put(...args)
+      })
+      const original = comment(body.token, data, options)
+      try {
+        await started.promise
+        assert.equal(threads().length, 1, "the database claim is already visible")
+        const duplicate = await comment(body.token, data, options)
+        const listed = await json(await count(body.token, "/pricing?plan=pro"))
+        assert.deepEqual(
+          { status: duplicate.status, threads: listed.threads },
+          { status: 503, threads: [] },
+          "neither POST nor GET may acknowledge a claim that can still roll back",
+        )
+      } finally {
+        resume.resolve()
+        await original
+      }
+      const first = await original
+      assert.equal(first.status, fail ? 503 : 200)
+      if (fail) {
+        assert.equal(threads().length, 0)
+        assert.equal(sql.prepare("SELECT count(*) AS n FROM review_submissions").get().n, 0)
+        assert.equal(objects.size, 0)
+      }
+      const retry = await comment(body.token, data, options)
+      assert.equal(retry.status, 200)
+      const { n } = await json(retry)
+      if (!fail) assert.equal((await json(first)).n, n)
+      const listed = (await json(await count(body.token, "/pricing?plan=pro"))).threads
+      assert.equal(listed.length, 1)
+      assert.equal(listed[0].n, n)
+      assert.equal(listed[0].requestId, data.requestId)
+      assert.equal(listed[0].images.length, 1)
+      assert.equal(threads().length, 1)
+      assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, 1)
+      assert.equal(objects.size, screenshot ? 2 : 1)
+    })
+  }
+
+  test(`failed review finalization removes stored images and releases its claim${screenshot ? " with a screenshot" : ""}`, async () => {
+    site()
+    const { body } = await token(SITE, { name: "Ole" })
+    const data = { requestId: crypto.randomUUID() }
+    const options = { screenshot, images: [PNG] }
+    sql.exec(`CREATE TRIGGER fail_review_finalization BEFORE UPDATE OF metadata ON vitehub_comment_threads
+      BEGIN SELECT RAISE(ABORT, 'Finalization unavailable'); END`)
+    try {
+      assert.equal((await comment(body.token, data, options)).status, 500)
+    } finally {
+      sql.exec("DROP TRIGGER fail_review_finalization")
+    }
+    assert.equal(threads().length, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM review_submissions").get().n, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE kind = 'image'").get().n, 0)
+    assert.equal(objects.size, 0)
+    assert.equal((await comment(body.token, data, options)).status, 200)
+    assert.equal(threads().length, 1)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_attachments").get().n, 1)
+    assert.equal(objects.size, screenshot ? 2 : 1)
+  })
 }
 
 test("legacy submissions and distinct request ids still create separate threads", async () => {

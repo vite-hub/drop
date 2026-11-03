@@ -92,6 +92,7 @@ const CommentMeta = v.object({
   elementX: v.nullable(v.number()),
   elementY: v.nullable(v.number()),
   requestId: v.optional(v.string()),
+  requestPending: v.optional(v.boolean()),
 })
 type CommentMeta = v.InferOutput<typeof CommentMeta>
 export type DropThread = CommentThread & { meta: CommentMeta }

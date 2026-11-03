@@ -1,11 +1,12 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, desc, eq, inArray, isNull } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { sha256 } from "#shared/utils/bytes"
 import { textValue } from "#shared/utils/text"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
+import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
 import { importSealKey, seal as sealValue, unseal as unsealValue } from "vite-hub/env/seal"
@@ -24,7 +25,7 @@ import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { drops, reviewSubmissions, user } from "../databases/config"
 import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
-import { addThread, authorOf, findThread, siteCommentList, threadsFor, toComment, undoThread } from "./comments"
+import { addThread, authorOf, findThread, removeThread, siteCommentList, threadsFor, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { isExpired, expiryPolicy, renewDrop } from "./expiry"
 import { createFolder } from "./folders"
@@ -440,14 +441,30 @@ export async function addReviewComment(
   try {
     const { row } = await withImages(
       images,
-      () => insertReviewComment(site, author, input, shot, origin),
-      (added) =>
-        attachImages(site, images, { commentId: added.comments[0]!.id, replyId: null, n: added.number }, author.name),
+      () => insertReviewComment(site, author, input, shot, origin, Boolean(input.requestId && images.length)),
       async (added) => {
-        // With a screenshot, the comment is on the screenshot's drop: deleting that takes the comment with it.
+        const attachments = await attachImages(
+          site,
+          images,
+          { commentId: added.comments[0]!.id, replyId: null, n: added.number },
+          author.name,
+        )
+        // The claim is visible before attachment storage finishes. Only publish it once no work can roll it back.
+        if (added.meta.requestPending) {
+          const threads = commentsSchema.vitehubCommentThreads
+          await db
+            .update(threads)
+            .set({ metadata: sql`json_remove(${threads.metadata}, '$.requestPending')` })
+            .where(eq(threads.id, added.id))
+        }
+        return attachments
+      },
+      async (added) => {
+        // With a screenshot, the comment's drop must go too.
         const shotDrop = added.meta.dropId === site.id ? null : await findDrop(added.meta.dropId)
+        // Finalizing the claim can fail after the images were stored, so undo those too.
+        await removeThread(added)
         if (shotDrop) await deleteDrop(shotDrop)
-        else await undoThread(added)
       },
     )
     return row
@@ -468,7 +485,10 @@ async function submittedReview(site: Pick<DropRow, "id">, requestId: string) {
     .from(reviewSubmissions)
     .where(and(eq(reviewSubmissions.scope, siteCommentList(site).scope), eq(reviewSubmissions.requestId, requestId)))
     .limit(1)
-  return receipt ? findThread(receipt.threadId) : null
+  const thread = receipt ? await findThread(receipt.threadId) : null
+  if (thread?.meta.requestPending)
+    throw new HTTPError({ status: 503, statusText: "The comment's images are still being stored. Try again shortly." })
+  return thread
 }
 
 async function insertReviewComment(
@@ -477,10 +497,12 @@ async function insertReviewComment(
   input: ReviewCommentInput,
   shot: Screenshot | null,
   origin: string,
+  pending: boolean,
 ) {
   const now = Date.now()
   const element = {
     ...(input.requestId ? { requestId: input.requestId } : {}),
+    ...(pending ? { requestPending: true } : {}),
     ox: input.ox,
     oy: input.oy,
     ow: input.ow,
@@ -567,7 +589,9 @@ export async function siteItems(
       .where(and(eq(drops.parentId, site.id), eq(drops.kind, "image"))),
   ])
   const byId = new Map(shots.map((shot) => [shot.id, shot]))
+  // The browser uses this list to acknowledge a lost POST. Pending claims may still be rolled back.
   return threads
+    .filter(({ meta }) => !meta.requestPending)
     .filter(({ meta }) => !page || meta.page === page || Boolean(meta.page?.startsWith(`${page}#`)))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.number - a.number)
     .map((thread) => {
