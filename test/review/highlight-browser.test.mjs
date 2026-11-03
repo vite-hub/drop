@@ -83,6 +83,50 @@ async function drag(page, from, to) {
   await page.mouse.up()
 }
 
+test("comment composers put Send next in the tab order and support keyboard submission", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, ui } = await open(browser)
+    const comment = ui.getByRole("button", { name: "Comment", exact: true })
+    const note = ui.getByRole("textbox", { name: "Comment" })
+    const focused = (locator) => locator.evaluate((node) => node.getRootNode().activeElement === node)
+
+    await comment.click()
+    await page.mouse.click(100, 100)
+    await note.fill("Remove this option")
+    await page.keyboard.press("Tab")
+    assert.equal(await focused(ui.getByRole("button", { name: "Send", exact: true })), true)
+    await page.keyboard.press("Shift+Tab")
+    assert.equal(await focused(note), true)
+    await page.keyboard.press("Enter")
+    assert.equal(await note.inputValue(), "Remove this option\n")
+    assert.equal(await page.evaluate(() => window.sent.length), 0)
+    await page.keyboard.press("Tab")
+    await page.keyboard.press("Tab")
+    assert.equal(await focused(ui.getByRole("button", { name: "Add images" })), true)
+    await page.keyboard.press("Tab")
+    assert.equal(await focused(ui.getByRole("button", { name: "Cancel", exact: true })), true)
+    await page.keyboard.press("Escape")
+    assert.equal(await focused(comment), true)
+
+    for (const [index, key] of ["Enter", "Meta+Enter", "Control+Enter"].entries()) {
+      await comment.click()
+      await page.mouse.click(100, 100)
+      await note.fill("Remove this option")
+      await note.dispatchEvent("keydown", { key: "Enter", metaKey: true, isComposing: true })
+      assert.equal(await page.evaluate(() => window.sent.length), index)
+      assert.match(await ui.locator(".pop .shortcut").textContent(), /Enter to send/)
+      if (key === "Enter") await page.keyboard.press("Tab")
+      await page.keyboard.press(key)
+      await page.waitForFunction((count) => window.sent.length === count, index + 1)
+      await ui.locator(".pop").waitFor({ state: "hidden" })
+      assert.equal(await focused(comment), true)
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
 test("Highlight draws on the page and sends the screenshot with the strokes, anchored to what's under them", async () => {
   const browser = await chromium.launch()
   try {
