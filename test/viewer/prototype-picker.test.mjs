@@ -112,6 +112,75 @@ const look = (target) =>
   }))
 const ALL = ["v-one", "v-two", "v-three"]
 
+test("canvas labels respect nearby items and the viewport even below 120px", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(
+      page("")
+        .replaceAll("<section ", '<section data-width="100" data-height="180" ')
+        .replaceAll('data-variant="', 'data-variant="A long name for this prototype item: ')
+        .replaceAll(
+          'data-note="',
+          'data-note="A long note that should wrap below the name without covering its neighbor. ',
+        ),
+      false,
+      0,
+      true,
+    )
+    await context.route("https://picker.test/labels", (route) =>
+      route.fulfill({ contentType: "text/html", body: html }),
+    )
+    for (const positions of [
+      [0, 160, 2200],
+      [0, 1600, 3200],
+      [0, 8, 2400],
+    ]) {
+      const standalone = await context.newPage()
+      await standalone.addInitScript((positions) => {
+        localStorage.setItem(
+          "drop-prototype-canvas:/labels",
+          JSON.stringify({
+            v: 1,
+            camera: { x: 48, y: 160, z: 0.41 },
+            positions: Object.fromEntries(["v-one", "v-two", "v-three"].map((id, i) => [id, [positions[i], 0]])),
+          }),
+        )
+      }, positions)
+      await standalone.goto("https://picker.test/labels")
+      await standalone.waitForFunction(() =>
+        [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")].every(
+          (tag) => tag.style.maxWidth,
+        ),
+      )
+      const bounds = await standalone.evaluate(() => {
+        const tags = [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")]
+        return tags.map((tag, i) => ({
+          right: tag.getBoundingClientRect().right,
+          width: tag.getBoundingClientRect().width,
+          visible: getComputedStyle(tag).visibility !== "hidden",
+          next: document.getElementById(["v-two", "v-three"][i])?.getBoundingClientRect().left,
+        }))
+      })
+      for (const label of bounds.filter((label) => label.visible)) {
+        assert.ok(label.right <= 1000, "label stays within the viewport")
+        if (label.next !== undefined) assert.ok(label.right <= label.next, "label stops before the next item")
+      }
+      if (positions[1] === 160) {
+        assert.ok(bounds[0].visible && bounds[0].width < 120, "close neighbors constrain the preferred minimum")
+        assert.ok(bounds[2].visible && bounds[2].width < 120, "the viewport constrains the preferred minimum")
+      } else if (positions[1] === 1600) {
+        assert.ok(bounds[0].visible && bounds[0].width >= 120, "labels still expand when there is room")
+      } else {
+        assert.ok(!bounds[0].visible && !bounds[2].visible, "labels disappear when their decorations cannot fit")
+      }
+      await standalone.close()
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
 test("a prototype opens on the canvas; an item opens in focus and comes back as it was", async () => {
   const browser = await chromium.launch()
   try {

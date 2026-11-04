@@ -213,7 +213,10 @@
       const sx = cam.x + it.x * cam.z, sy = cam.y + it.y * cam.z;
       it.el.style.setProperty("transform", `translate(${sx}px, ${sy}px) scale(${cam.z})`, "important");
       it.tag.style.transform = `translate(${sx}px, ${sy - 6}px) translateY(-100%)`;
-      it.tag.style.maxWidth = Math.max(Math.min(room(it) * cam.z - 12, 520, view().w - sx - 8), 120) + "px";
+      const width = Math.max(Math.min(room(it) * cam.z - 12, 520, view().w - sx - 8), 0);
+      it.tag.style.maxWidth = width + "px";
+      // When even the padding and border cannot fit, keep the label out of the way.
+      it.tag.style.visibility = width > 0 ? "" : "hidden";
     }
     const zoom = Math.round(cam.z * 100);
     zoomText.textContent = zoom + "%";
