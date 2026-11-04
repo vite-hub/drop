@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The header locates the drop, the bottom dock owns editing, comments, and sharing, and the right sidebar holds Details and
-// History. Frame annotations open their composer or thread in the same review dock.
+// The header locates the drop; the bottom review pill owns editing, comments, sharing, Details, and History.
+// Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
 import { breakpointsTailwind } from "@vueuse/core"
@@ -71,7 +71,9 @@ async function restoreDrop() {
 }
 
 // Wide screens float a new comment's card over the page; narrower ones write it in the dock.
-const wide = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 }).greaterOrEqual("lg")
+const breakpoints = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 })
+const wide = breakpoints.greaterOrEqual("lg")
+const phone = breakpoints.smaller("sm")
 /**
  * The drop's details and actions, in a segment that grows inside the review pill (ViewerDetailsSegment): ⓘ or I opens
  * it, and `detailsPop` is the popover open from it, the details or History.
@@ -84,14 +86,16 @@ function showDetails(pop: "meta" | "history" | null = null) {
   detailsOpen.value = true
   detailsPop.value = pop
 }
-// A popover from the segment and the Comments panel would stack over each other: one closes the other. An Escape that
+// Share, a segment popover, and Comments would stack over each other: opening one closes the others. An Escape that
 // just closed the popover (Reka hears it first) leaves the segment open: the next one folds it.
 let detailsPopClosedAt = 0
 watch(
   detailsPop,
   (value, before) => {
-    if (value && commentsOpen.value) closeComments()
-    else if (!value && before) detailsPopClosedAt = performance.now()
+    if (value) {
+      shareOpen.value = false
+      if (commentsOpen.value) closeComments()
+    } else if (before) detailsPopClosedAt = performance.now()
   },
   { flush: "sync" },
 )
@@ -214,7 +218,9 @@ function closeLightbox() {
 const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 watch(shareOpen, (open) => {
-  if (open && commentsOpen.value) closeComments()
+  if (!open) return
+  detailsPop.value = null
+  if (commentsOpen.value) closeComments()
 })
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
@@ -474,7 +480,7 @@ function showVersion(version: DropVersion) {
   const opening = !shownVersion.value
   void setQuery({ changes: version.version }, { push: opening })
   if (opening) pushedChanges = true
-  if (!wide.value) detailsPop.value = null
+  if (phone.value) detailsPop.value = null
 }
 function closeChanges() {
   if (!shownVersion.value) return

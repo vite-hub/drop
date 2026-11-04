@@ -48,21 +48,15 @@
     "@fontsource-variable/geist-mono",
     "@fontsource/instrument-serif",
     // Nuxt Icon reads the icon collections by name at build time.
-    "@iconify-json/ph",
     "@iconify-json/mingcute",
     "@iconify-json/simple-icons",
     // Served from node_modules/medium-zoom/dist through nitro.publicAssets, never imported.
     "medium-zoom",
-    // Loaded by the dynamic latest-room import, so knip cannot connect these runtime imports to an entry. Keeping
-    // them ignored also ensures the SSR bundle uses one Yjs copy and avoids "Yjs was already imported" in the Worker.
-    "yjs",
-    "@tiptap/y-tiptap",
     // `nuxt typecheck` runs it.
     "vue-tsc",
     // `nuxt` is installed as an alias of nuxt-nightly, which knip reports under its real name (`#app` in app/error.vue).
     "nuxt-nightly",
-    // Tests load these through nitro's and vite-hub's own resolution (createRequire), to test the copies they use.
-    "unstorage",
+    // Tests load this through vite-hub's own resolution (createRequire), to test the copy it uses.
     "@vite-hub/rate-limit",
   ],
 }
