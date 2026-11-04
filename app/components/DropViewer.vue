@@ -11,9 +11,8 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
-// The parts' one stylesheet: comments, presence, and the editor's carets. vite-hub/ui/styles.css is the same file from
-// vite-hub/vitehub#3308 on; the vite-hub preview of #3320 still ships an older copy.
-import "@vite-hub/ui/styles.css"
+// The parts' one stylesheet: comments, presence, and the editor's carets.
+import "vite-hub/ui/styles.css"
 
 const { publicView = false } = defineProps<{ publicView?: boolean }>()
 

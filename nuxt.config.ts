@@ -2,7 +2,6 @@ import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import type { NuxtSecurityRouteRules } from "nuxt-security"
-import { addViteHubUIRuntime } from "@vite-hub/ui/nuxt"
 import { env } from "vite-hub/env"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
@@ -147,16 +146,7 @@ const DROP_PAGE: RouteRule = {
 const SIGNED_IN: RouteRule = { appMiddleware: { auth: true }, appLayout: "dashboard" }
 
 export default defineNuxtConfig({
-  modules: [
-    "@nuxt/ui",
-    "@vueuse/nuxt",
-    "vite-hub/nuxt",
-    // The comment parts' Nuxt icon and their icons in the client bundle. vite-hub/nuxt adds them itself from
-    // vite-hub/vitehub#3308 on, which the vite-hub preview of #3320 doesn't have yet; drop this line once one does.
-    (_options, nuxt) => addViteHubUIRuntime(nuxt),
-    "vite-doctor/nuxt",
-    "nuxt-security",
-  ],
+  modules: ["@nuxt/ui", "@vueuse/nuxt", "vite-hub/nuxt", "vite-doctor/nuxt", "nuxt-security"],
 
   vitehub: {
     ...VITEHUB[host],

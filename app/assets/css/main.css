@@ -430,7 +430,7 @@ body {
   --comark-grain: none;
 }
 
-/* Other people's carets come from @vite-hub/ui/styles.css. Drop sets their name pill in its mono face. */
+/* Other people's carets come from vite-hub/ui/styles.css. Drop sets their name pill in its mono face. */
 .drop-doc .collaboration-carets__label {
   font: 500 11px/1.4 var(--font-mono);
   padding: 1px 5px;
