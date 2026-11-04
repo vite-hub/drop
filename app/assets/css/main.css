@@ -185,6 +185,12 @@
     }
   }
 
+  /* Keyboard focus still shows: the row rings while its field has it. */
+  & [data-slot="prompt-input-group"]:has([data-slot="prompt-input-textarea"]:focus-visible) {
+    border-radius: 8px;
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--ui-text-highlighted) 28%, transparent);
+  }
+
   /* A file dragged over the box still lights it. */
   &[data-dragging="true"] [data-slot="prompt-input-group"] {
     border-radius: 8px;
