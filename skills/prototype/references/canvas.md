@@ -1,51 +1,35 @@
 # Canvas
 
-The picker shows one variant at a time. The canvas shows every variant side by side, at its real size, on a plane people pan and zoom. Both come from the same page and the same [picker.js](../assets/picker.js); readers switch with the Canvas button in the bar (Drop's bottom bar, or the page's own when it's opened alone) or the C key.
+Drop opens a page with two or more `<section data-variant>` items as a canvas: every item side by side at its real size, live, on a plane people pan and zoom. The reader opens one item full size (focus) and goes back without losing what they typed, since it's the same element. Drop runs the picker itself, the same current code on every prototype; [assets/picker.js](../assets/picker.js) is only for a page opened outside Drop.
 
-## When to open in the canvas
+What readers get, so you can tell them:
 
-Open the page in the canvas when the comparison needs it:
+- Canvas: drag empty space, Space + drag, or middle-drag to pan; Ctrl/⌘ + wheel or pinch to zoom; Fit and Reset in Drop's bar. Click a name to copy it, drag the handle beside it to move the item. The canvas remembers each reader's camera and positions by section `id`.
+- Focus: double-click a name, press Enter on it, or press 1–9. ← and → step, Esc or Canvas go back to the canvas, centred on that item. The address's `#v-…` opens that item in focus.
 
-- Size matters: a phone layout beside a desktop one, or a card at its real width.
-- There are more than four variants, and flipping through them hides the differences.
-- The question is answered at a glance: density, rhythm, how much fits above the fold.
+## Live pages as items
 
-Keep the picker for full-page variants that each fill the screen, or when one variant should get the reader's full attention.
-
-## Declare the items
-
-Each variant is still a `<section>` directly inside `<body>`, with `id`, `data-variant`, and `data-note` as in the skill. Two attributes set its size on the canvas:
+A section with `data-src` shows that URL in a frame, live, as an item like any other. That is how one page compares deployed builds (a pull request's preview, production, an older commit) with HTML sketches:
 
 ```html
-<body data-layout="canvas">
-  <section id="v-tiers" data-variant="Pricing · three tiers" data-note="Free, Team, Business; Team highlighted" data-width="1280">…</section>
-  <section id="v-mobile" data-variant="Pricing · mobile stack" data-note="One card per plan, Team first" data-width="390" data-height="844">…</section>
-</body>
+<section id="v-portal-main" data-variant="Portal · main" data-src="https://demo.preview.quiver.dk/orders" data-width="1440" data-height="900"></section>
+<section id="v-portal-pr" data-variant="Portal · current PR" data-src="https://pr1473-demo.preview.quiver.dk/orders" data-width="1440" data-height="900"></section>
+<section id="v-orders-sketch" data-variant="Orders · grouped sketch" data-width="1440">…</section>
 ```
 
-- `data-width` is the width in pixels. The default is 1280.
-- `data-height` fixes the height and scrolls the rest inside the section. Leave it out and the section is as tall as its content.
-- `data-layout="canvas"` on `<body>` opens the canvas first. A reader's own choice wins after that.
-- Put everything visible inside a section. On the canvas, content outside the sections sits under them.
-- In the canvas every variant is visible at once, so `variantchange` lists them all in `event.detail.visible`. A variant that animates checks `visible.includes(its id)`, not `id`.
+- Leave the section empty; Drop fills it. Its height defaults to 900 on the canvas and the full screen in focus.
+- The frame keeps the reader's login when the URL is on the same site as Drop. A Quiver preview such as `https://pr1473-demo.preview.quiver.dk` inside drop.quiver.dk, whose drops run on drop-usercontent.quiver.dk, is all `quiver.dk`, so its SameSite=Lax cookies flow. On another site the page loads signed out, or not at all if the browser blocks its cookies.
+- A site that sends `X-Frame-Options` or a CSP `frame-ancestors` that excludes Drop shows an empty frame. Check one item renders before publishing the rest.
+- Wheel and clicks over a live page go to that page. Pan from empty space or with Space + drag.
 
-## Name each item so people can say it
+## Hold open what reviewers comment on
 
-The name is how people and agents point at an item: "make Pricing · mobile stack denser". Write it as `Thing · variation`, such as `Pricing card · compact` or `Hero · split image`. Keep every name unique on the page, and keep it readable. `v-2` or `Variant B` says nothing.
+Give a tooltip, popover, or menu its role (`role="tooltip"`, `"menu"`, `"dialog"`) and name it from its trigger with `aria-describedby` or `aria-controls`. Open it with script, on hover and on a click that keeps it open, not with CSS `:hover` alone. Drop then keeps it open while someone comments on it and pins the comment to its trigger once it closes; a CSS-only one closes as soon as the Comment tool covers the page.
 
-Clicking a name copies it. Reviewers paste it into chat, or comment on the item in Drop.
+## Animation
 
-## Change the page between rounds
+On the canvas every item is visible, so `variantchange` on `document` lists them all in `event.detail.visible`; in focus it lists one. An item that animates runs only while `event.detail.visible` includes its id.
 
-- "Try another version" adds a new section with a new `id` and a new name. Keep the original.
-- "Change this one" edits that section in place. Keep its `id` and name unless asked to rename it.
-- "Remove it" deletes only that section.
-- When the variants compare one thing, keep the copy, data, and sizes the same in all of them.
+## One at a time instead
 
-The canvas remembers each reader's camera and positions by section `id`. Keeping ids keeps both, and Drop keeps each comment pinned to the section it was left on.
-
-## Read the comments
-
-A comment left on an item anchors inside its section, so its anchor shows `in #v-…`. Sort the comments by that id, as step 5 of the skill says.
-
-Inspired by ibelick's [create-canvas](https://github.com/ibelick/ui-skills/blob/main/skills/create-canvas/SKILL.md) skill.
+`<body data-layout="single">` opens the page in focus, one item at a time, for full-page items that each need the whole screen. The Canvas button and the C key still show them side by side. A page with one item always opens in focus.

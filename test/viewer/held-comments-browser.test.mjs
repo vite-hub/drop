@@ -6,7 +6,8 @@ import { injectRuntime } from "../../shared/plan-runtime.ts"
 
 // A tooltip like the demand-outlier prototype's (drop z1ddehrxxznb): hover opens it, a click keeps it open, and it
 // closes when the pointer leaves, when its button loses focus, and on any click outside it. It opens over a row smaller
-// than itself, as the prototype's opens over the next alert.
+// than itself, as the prototype's opens over the next alert. One variant at a time (`data-layout="single"`), so the
+// second one is off, as Drop's picker leaves it.
 const html = `<!doctype html><html><head><style>
   body { margin: 40px; font: 16px/1.5 sans-serif; }
   .tip { position: relative; display: inline-block; }
@@ -16,7 +17,7 @@ const html = `<!doctype html><html><head><style>
   .fade .fade-content { position: absolute; left: 0; top: 32px; width: 200px; padding: 8px; background: #222; color: #fff; visibility: hidden; opacity: 0; }
   .fade.is-open .fade-content { visibility: visible; opacity: 1; }
   dialog p { width: 300px; height: 80px; margin: 0; }
-</style></head><body>
+</style></head><body data-layout="single">
 <section id="v-a" data-variant="A">
   <span class="tip" data-tip><button id="v-a-trigger" type="button" aria-describedby="v-a-tip">25.8× average demand line</button>
   <span class="tip-content" role="tooltip" id="v-a-tip"><b>Compared with</b> the average line for this product.</span></span>
