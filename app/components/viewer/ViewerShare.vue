@@ -45,14 +45,12 @@ async function pick(next: Share) {
 </script>
 
 <template>
-  <!-- The popover's surface is see-through: over a light page it lightens to Nuxt UI's elevated gray, which hid the
-       hovers in it, so they tint with the inverted color instead, as the review toolbar's do. -->
   <UPopover
     v-model:open="open"
     :content="{ align: 'end', side: 'top' }"
     :ui="{
       content:
-        'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px] border border-default surface-review bg-(--review-surface) ring-0',
+        'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px]',
     }"
   >
     <UButton

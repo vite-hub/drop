@@ -264,7 +264,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
         </UDropdownMenu>
       </template>
       <template #anchor>
-        <div class="space-y-2">
+        <div class="space-y-2 px-3 pt-3 empty:hidden">
           <p v-if="earlier" class="text-xs text-muted">
             Written on
             <NuxtLink class="underline hover:text-highlighted" :to="versionTo(earlier)">v{{ earlier.version }}</NuxtLink
