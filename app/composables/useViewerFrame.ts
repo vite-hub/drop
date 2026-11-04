@@ -4,6 +4,7 @@ import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runti
 import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
+import type { CommentStyle } from "~/composables/usePreferences"
 
 type RuntimeReport = {
   kind: Extract<FrameMessage, { type: "runtime-error" }>["kind"]
@@ -38,6 +39,8 @@ export function useViewerFrame(options: {
   /** How wide a Markdown doc's text runs. */
   width: Ref<DocWidth>
   annotations: ReturnType<typeof useViewerAnnotations>
+  /** How comments on a Markdown doc's text show (useCommentStyle), and who's reading, for the Pin style's draft pin. */
+  comments?: Ref<{ style: CommentStyle; me: { name: string; image: string | null } | null }>
   /** Whether the viewer's bar shows a prototype's variants, in place of the bar the page draws itself. */
   variantBar?: boolean
   /** ← or → on an image's page, while the page has focus: the viewer moves along the image's folder. */
@@ -307,6 +310,7 @@ export function useViewerFrame(options: {
       case "marker":
       case "marks":
       case "draft-place":
+      case "page-click":
         annotations.receive(message, box)
     }
   })
@@ -384,8 +388,8 @@ export function useViewerFrame(options: {
   )
   watch(annotations.penStyle, (pen) => ready.value && send({ type: "pen", ...pen }))
   watch(
-    [ready, () => ({ ...annotations.overlays })],
-    () => ready.value && send({ type: "view", ...annotations.overlays }),
+    [ready, () => ({ ...annotations.overlays }), () => options.comments?.value],
+    () => ready.value && send({ type: "view", ...annotations.overlays, ...options.comments?.value }),
   )
   watch(annotations.draftingArea, (now, before) => before && !now && send({ type: "clear-area" }))
   watch(

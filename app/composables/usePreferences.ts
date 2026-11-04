@@ -31,6 +31,17 @@ export const useDropsLayout = () =>
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
+/**
+ * How comments on a Markdown doc's text show: "card", the cards in the margin and the composer floating over its place
+ * (89c9927), or "pin", an avatar pin in the gutter with a small bubble beside it. Chosen in the Details panel.
+ */
+export type CommentStyle = "card" | "pin"
+export const useCommentStyle = () =>
+  useCookie<CommentStyle>("drop-comment-style", { default: () => "card", maxAge: year, sameSite: "lax" })
+/** Whether the page shows its comments' pins and highlights: the review pill's eye (Hide comments), for every drop. */
+export const useCommentsShown = () =>
+  useCookie<boolean>("drop-comments-shown", { default: () => true, maxAge: year, sameSite: "lax" })
+
 /** Device mode for HTML docs, apps, and reviewed sites (ViewerDevice), for every drop. */
 export const useDeviceSize = () =>
   useCookie<DeviceSize>("drop-device-mode", {

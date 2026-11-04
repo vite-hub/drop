@@ -203,6 +203,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.m img{display:block;width:100%;height:100%;object-fit:cover}' +
     '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-11px 0 0 -11px;border-radius:11px}' +
     '.m.pulse{animation:p 900ms ease-out 2}@keyframes p{50%{transform:scale(1.4)}}' +
+    // The Pin comment style (view.style): a 28px avatar in the gutter right of the text, level with the quote's last line.
+    '.m.gp{display:grid;place-items:center;width:28px;height:28px;margin:0;overflow:visible;padding:0;border:0;border-radius:50% 50% 50% 4px;font:600 11px/1 var(--font-sans);box-shadow:0 0 0 2px var(--background),0 2px 8px rgb(0 0 0/.18);transition:scale 150ms cubic-bezier(.23,1,.32,1)}' +
+    '.m.gp img{border-radius:inherit}.m.gp:hover{transform:none;scale:1.06}.m.gp:active{scale:.96}.m.gp[aria-expanded="true"]{scale:1.06}' +
+    '.m.gp:focus-visible{outline:2px solid var(--foreground);outline-offset:2px}.m.gp::before{content:"";position:absolute;inset:-6px}' +
+    '.m.gp b{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--background);color:var(--foreground);font:600 10px/16px var(--font-sans);font-variant-numeric:tabular-nums;box-shadow:0 0 0 1px var(--border)}' +
+    '.m.gp.me{cursor:default}.m.gp.in{animation:gp-in 200ms cubic-bezier(.23,1,.32,1) both}@keyframes gp-in{from{opacity:0;scale:.7}}' +
+    '@media (prefers-reduced-motion:reduce){.m.gp{transition:none}.m.gp.in{animation:none}}' +
     // On what opens a closed tooltip or menu (standIn), not on the thing itself.
     '.m.away{outline:1.5px dashed var(--foreground);outline-offset:2px}' +
     '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
@@ -481,6 +488,49 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     root.setAttribute("data-drop-rail", wide ? "open" : "reserved");
     return wide;
   }
+  // The Pin style: comments on a Markdown doc's text get an avatar pin in the gutter right of the column instead of the
+  // margin's cards. A pin pops in (scale .7 to 1) the first time it shows, but not when the page first draws its
+  // comments, and not for the comment just sent from the draft's pin: that one takes the draft's place without a pop.
+  const pinMode = () => Boolean(article) && view.style === "pin";
+  const seenPins = new Set();
+  let pinsPrimed = false, draftPinShown = false, quietUntil = 0;
+  /** The right edge of the doc's text, and room for a pin beside it: a narrow page pads the column to make that room. */
+  function gutter() {
+    const root = document.documentElement, want = pinMode() && view.pins && (drafting() || markers.some((m) => m.kind === "text"));
+    if (!want) { root.removeAttribute("data-drop-pins"); return 0; }
+    root.removeAttribute("data-drop-pins");
+    let r = article.getBoundingClientRect(), pad = parseFloat(getComputedStyle(article).paddingRight) || 0;
+    if (innerWidth - (r.right - pad) < 52) {
+      root.setAttribute("data-drop-pins", "tight");
+      r = article.getBoundingClientRect(); pad = parseFloat(getComputedStyle(article).paddingRight) || 0;
+    }
+    return Math.min(r.right - pad + 12, innerWidth - 34) + scrollX;
+  }
+  function gutterPin(m, last, x) {
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "m gp" + (m ? (m.resolved ? " done" : "") : " me");
+    const who = m ? m.author : view.me && view.me.name;
+    const image = m ? m.image : view.me && view.me.image;
+    if (image) { const img = document.createElement("img"); img.src = image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.prepend(initials(who)); }; dot.appendChild(img); }
+    else dot.textContent = initials(who);
+    dot.style.left = x + "px";
+    dot.style.top = last.top + scrollY + (last.height - 28) / 2 + "px";
+    if (!m) {
+      dot.tabIndex = -1; dot.setAttribute("aria-hidden", "true"); dot.dataset.draft = "";
+      if (!draftPinShown) { draftPinShown = true; dot.classList.add("in"); }
+      marks.appendChild(dot);
+      return;
+    }
+    const replies = m.replies || 0;
+    if (replies) { const count = document.createElement("b"); count.textContent = String(replies + 1); count.setAttribute("aria-hidden", "true"); dot.appendChild(count); }
+    dot.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (replies ? ", " + (replies + 1) + " comments" : ""));
+    dot.setAttribute("aria-expanded", String(m.id === opened));
+    dot.dataset.id = m.id;
+    if (!seenPins.has(m.id)) { seenPins.add(m.id); if (pinsPrimed && !drafted && Date.now() > quietUntil) dot.classList.add("in"); }
+    dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
+    marks.appendChild(dot);
+  }
   function placePin(m, x, y, into, away) {
     const dot = document.createElement("div");
     dot.className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "") + (away ? " away" : "");
@@ -507,7 +557,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
     const ranges = new Map(markers.filter((m) => m.kind === "text" && m.quote).map((m) => [m.id, findRange(m.selector, m.quote)]));
     // Under a zoom the page's comments don't draw, so the column stays as it was.
-    const wide = zoom ? document.documentElement.getAttribute("data-drop-rail") === "open" : setRail(view.pins && (drafting() || markers.some((m) => inRail(m) && ranges.get(m.id))));
+    const pins = pinMode() && !zoom;
+    const wide = zoom ? document.documentElement.getAttribute("data-drop-rail") === "open" : !pins && setRail(view.pins && (drafting() || markers.some((m) => inRail(m) && ranges.get(m.id))));
+    if (pins) setRail(false);
+    const gutterX = pins ? gutter() : 0;
     textRanges = [];
     if (wide && view.pins && !zoom) {
       if (!BUBBLES.isConnected) document.head.appendChild(BUBBLES);
@@ -567,12 +620,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
           else lines.push({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
         }
         if (railedHere) { railed.push({ m, last, lines }); continue; }
+        if (pins && article.contains(range.commonAncestorContainer)) { gutterPin(m, last, gutterX); continue; }
         for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
       placePin(m, x, y, into, false);
     }
     railHits = railed.map(({ m, lines }) => ({ id: m.id, boxes: lines.map((l) => ({ left: l.left + scrollX, right: l.right + scrollX, top: l.top + scrollY, bottom: l.bottom + scrollY })) }));
+    if (pins && view.pins && drafting()) { const lines = drafted.getClientRects(); if (lines.length) gutterPin(null, lines[lines.length - 1], gutterX); }
+    if (!drafted) draftPinShown = false;
     const draftLines = wide && view.pins && !zoom && drafting() ? drafted.getClientRects() : [];
     if (draftLines.length) railed.push({ m: null, last: draftLines[draftLines.length - 1], lines: [] });
     if (railed.length) drawRail(railed);
@@ -609,9 +665,22 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   /** Where the composer for the held selection goes: its place in the margin, else the quote, for Drop to float it under. */
   function placeDraft() {
+    const box = (r) => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    // Where a pin is laid out, not as it's drawn: a pin popping in or pressed is scaled, and the bubble mustn't follow that.
+    const pinBox = (dot) => {
+      const left = parseFloat(dot.style.left) - scrollX, top = parseFloat(dot.style.top) - scrollY;
+      return { left, top, right: left + dot.offsetWidth, bottom: top + dot.offsetHeight };
+    };
+    // Pin style: the composer and an open thread both sit beside their pin, so Drop hears where the pin is.
+    if (pinMode()) {
+      const draftPin = drafted && marks.querySelector(".gp[data-draft]");
+      if (draftPin) return post({ type: "draft-place", rail: false, pin: true, rect: pinBox(draftPin) });
+      const open = opened && marks.querySelector('.gp[data-id="' + CSS.escape(opened) + '"]');
+      if (open) return post({ type: "draft-place", rail: false, pin: true, id: opened, rect: pinBox(open) });
+    }
     if (!drafted) return;
     const slot = marks.querySelector(".rail .slot > .cr-card"), r = (slot || drafted).getBoundingClientRect();
-    post({ type: "draft-place", rail: Boolean(slot), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
+    post({ type: "draft-place", rail: Boolean(slot), rect: box(r) });
   }
 
   /**
@@ -727,17 +796,25 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The selection's range too: the page loses the selection once focus moves to Drop's composer, and "hold-selection"
   // keeps its text marked (drop-draft) until the comment is sent or dropped.
   let lastQuote = "", lastRange = null;
-  function reportSelection() {
+  function reportSelection(settled) {
     const sel = getSelection();
     const text = sel && sel.rangeCount ? sel.toString().trim().replace(/\s+/g, " ") : "";
     if (!text || host.contains(sel.anchorNode)) { if (lastQuote) post({ type: "selection", clear: true }); lastQuote = ""; return; }
     const range = sel.getRangeAt(0), r = range.getBoundingClientRect(), block = blockOf(range.commonAncestorContainer);
     lastQuote = text.slice(0, 500);
     lastRange = range.cloneRange();
-    post({ type: "selection", quote: lastQuote, selector: pathOf(block), label: labelOf(block), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
+    post({ type: "selection", quote: lastQuote, selector: pathOf(block), label: labelOf(block), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom }, ...(settled === true ? { settled: true } : {}) });
   }
   let selectionTimer = 0;
-  document.addEventListener("mouseup", () => setTimeout(reportSelection, 0));
+  // Pin style: a click on the page away from its pins puts away what's open beside a pin (Drop keeps a draft with words).
+  document.addEventListener("click", (e) => {
+    if (!pinMode() || e.target === host || (!drafted && !opened)) return;
+    const sel = getSelection();
+    if (sel && !sel.isCollapsed) return;
+    post({ type: "page-click" });
+  });
+  // A mouse let go: the selection is done, and the Pin style opens its composer on it at once (settled).
+  document.addEventListener("mouseup", (e) => setTimeout(() => reportSelection(e.button === 0), 0));
   document.addEventListener("selectionchange", () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(reportSelection, 250); });
   document.addEventListener("keyup", (e) => { if (e.shiftKey || e.key === "Shift") reportSelection(); });
   document.addEventListener("scroll", () => { if (lastQuote) reportSelection(); placeDraft(); }, { passive: true });
@@ -779,7 +856,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    * it to whatever the pointer is over.
    */
   let tool = "browse", layer = null, hovered = null, picked = null, pointComments = false;
-  const view = { rulers: false, xray: false, pins: true };
+  // style: how comments on a Markdown doc's text show ("card": the margin's cards, "pin": gutter pins); me: who the
+  // reader is, for the draft's pin.
+  const view = { rulers: false, xray: false, pins: true, style: "card", me: null };
   const fx = document.createElement("div");
   fx.className = "fx";
   function finishArea(left, top, right, bottom) {
@@ -1414,6 +1493,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   xrayStyle.textContent = "*:not(drop-comments){outline:1px solid oklch(0.62 0.18 255) !important;outline-offset:-1px !important}";
   function setView(next) {
     view.rulers = Boolean(next.rulers); view.pins = next.pins !== false;
+    view.style = next.style === "pin" ? "pin" : "card";
+    view.me = next.me && typeof next.me.name === "string" ? { name: next.me.name, image: typeof next.me.image === "string" ? next.me.image : null } : null;
     if (Boolean(next.xray) !== xrayStyle.isConnected) { if (next.xray) document.head.appendChild(xrayStyle); else xrayStyle.remove(); }
     view.xray = Boolean(next.xray);
     render(); redraw();
@@ -1446,8 +1527,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   window.addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
-    if (m.type === "markers") { markers = m.markers; render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; render(); } }
+    if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } render(); }
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
     if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("drop-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
@@ -1468,7 +1549,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
-    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; emphasise(); }
+    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; emphasise(); if (pinMode()) { render(); } }
+    // Pin style: the composer opened below the fold scrolls the page until it shows.
+    if (m.type === "scroll-by" && typeof m.y === "number") scrollBy({ top: m.y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     if (m.type === "focus") {
       active = m.id; render();
       // A pin, or a margin comment's bubble.

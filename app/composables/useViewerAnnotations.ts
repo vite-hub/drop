@@ -7,7 +7,8 @@ import type { FrameBox } from "~/composables/useDropFrame"
 type PendingComment = Omit<CommentInput, "body" | "mentions">
 type Area = { ox: number; oy: number; ow: number; oh: number }
 type Rect = { left: number; top: number; right: number; bottom: number }
-type Selection = { quote: string; selector: string; label: string; rect: Rect }
+/** `settled`: the mouse let go, so the reader is done selecting. */
+type Selection = { quote: string; selector: string; label: string; rect: Rect; settled?: boolean }
 type Lightbox = {
   src: string
   alt: string
@@ -28,7 +29,7 @@ export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
 /** What the frame reports about the reader's pointer and keys, in frame coordinates. */
 type PointerMessage = Extract<
   FrameMessage,
-  { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" | "marks" | "draft-place" }
+  { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" | "marks" | "draft-place" | "page-click" }
 >
 
 /**
@@ -46,13 +47,21 @@ export function useViewerAnnotations(options: {
    * is on another area, sent, or put away, so its picture goes too.
    */
   shot?: (file: File | null) => void
+  /** Pin style: the reader clicked the page away from its pins while something was open beside one. */
+  onPageClick?: () => void
 }) {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
   const popover = ref<Popover | null>(null)
   /** Where the frame keeps the place of the comment being written on a selection, in page coordinates (draft-place). */
-  const draftPlace = ref<{ rail: boolean; rect: Rect } | null>(null)
+  const draftPlace = ref<{ rail: boolean; pin?: boolean; rect: Rect } | null>(null)
+  /** Pin style: where the pin of the thread on show is, in page coordinates, as the page scrolls (draft-place with an id). */
+  const threadPlace = ref<{ id: string; rect: Rect } | null>(null)
+  watch(
+    () => (popover.value?.type === "thread" ? popover.value.id : null),
+    (id) => threadPlace.value?.id !== id && (threadPlace.value = null),
+  )
   watch(
     () => popover.value?.type === "new" && popover.value.pending.kind === "text",
     (text) => !text && (draftPlace.value = null),
@@ -199,6 +208,7 @@ export function useViewerAnnotations(options: {
             quote: message.quote,
             selector: message.selector,
             label: message.label,
+            settled: message.settled,
             rect: {
               left: x(message.rect.left),
               top: y(message.rect.top),
@@ -217,16 +227,19 @@ export function useViewerAnnotations(options: {
       lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
     }
     if (message.type === "marks") marks.value = message.count
-    if (message.type === "draft-place" && popover.value?.type === "new")
-      draftPlace.value = {
-        rail: message.rail,
-        rect: {
-          left: x(message.rect.left),
-          top: y(message.rect.top),
-          right: x(message.rect.right),
-          bottom: y(message.rect.bottom),
-        },
+    if (message.type === "page-click") options.onPageClick?.()
+    if (message.type === "draft-place") {
+      const rect = {
+        left: x(message.rect.left),
+        top: y(message.rect.top),
+        right: x(message.rect.right),
+        bottom: y(message.rect.bottom),
       }
+      if (message.id) {
+        if (popover.value?.type === "thread" && popover.value.id === message.id)
+          threadPlace.value = { id: message.id, rect }
+      } else if (popover.value?.type === "new") draftPlace.value = { rail: message.rail, pin: message.pin, rect }
+    }
     if (message.type === "area") {
       dropShot()
       awaitedShot = commenting.value ? message.shot : undefined
@@ -335,6 +348,7 @@ export function useViewerAnnotations(options: {
     lightbox,
     popover,
     draftPlace,
+    threadPlace,
     tool,
     frameTool,
     overlays,

@@ -51,6 +51,12 @@ body {
   padding-right: var(--drop-rail);
 }
 
+/* The Pin comment style puts each comment's pin in the gutter right of the text. On a page too narrow for that gutter
+   (data-drop-pins, set by ANNOTATOR_SCRIPT), the column gives up room on its right, so a pin never covers the text. */
+:root[data-drop-pins="tight"] main > article.typeset {
+  padding-right: 2.75rem;
+}
+
 main {
   width: min(100% - 2rem, 48rem + var(--drop-rail, 0rem));
   margin: 0 auto;

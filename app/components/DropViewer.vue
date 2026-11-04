@@ -2,6 +2,7 @@
 // The header locates the drop, the bottom dock owns editing, comments, and sharing, and the right sidebar holds Details and
 // History. Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
+import type { CommentStyle } from "~/composables/usePreferences"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
@@ -130,12 +131,18 @@ const annotations = useViewerAnnotations({
     autoShot = file && !reviewDraft.sending.value ? file : null
     if (autoShot) images.add([autoShot])
   },
+  // Pin style: a click on the page puts away the thread beside a pin, or a composer with nothing typed in it.
+  onPageClick: () => {
+    if (pinThread.value) popover.value = null
+    else if (pinDraft.value && !reviewDraft.body.value.trim()) popover.value = null
+  },
 })
 const {
   selection,
   lightbox,
   popover,
   draftPlace,
+  threadPlace,
   tool,
   overlays,
   areaMode,
@@ -147,6 +154,13 @@ const {
   pickImage,
   pen,
 } = annotations
+// Hidden comments (the review pill's eye) stay hidden on every drop until the eye shows them again.
+const commentsShown = useCommentsShown()
+overlays.pins = commentsShown.value
+watch(
+  () => overlays.pins,
+  (pins) => (commentsShown.value = pins),
+)
 /** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
 const framed = computed(
   () =>
@@ -246,8 +260,11 @@ function startComment() {
   showComments()
 }
 watch(popover, (value, before) => {
-  if (value?.type === "new" && !before) startComment()
+  // A pin's thread floats beside it too, so the list comes back after it only if it was open before.
+  if (!before && (value?.type === "new" || (value?.type === "thread" && pinStyle.value))) startComment()
   else if (value) showComments()
+  // Writing a comment or opening one brings hidden comments back.
+  if (value) overlays.pins = true
 })
 watch(areaMode, (active) => active && showComments())
 watch(
@@ -257,20 +274,71 @@ watch(
 // On wide screens a new comment on a selection, an element, or an area is written in a card floating over the page,
 // where its card lands once sent: in the margin beside a doc's text (the frame keeps that place, draft-place), else
 // under what it points at. Page-wide comments, threads, sites, and the lightbox's keep the dock.
+// The Pin style (useCommentStyle) on a Markdown doc's text: a pin in the gutter, and beside it, at any width, a small
+// composer for a new comment or the thread of the pin clicked. Selecting text with a mouse opens the composer at once.
+const commentStyle = useCommentStyle()
+const commentStyles: { value: CommentStyle; label: string }[] = [
+  { value: "card", label: "Cards beside the text" },
+  { value: "pin", label: "Pins beside the text" },
+]
+const coarse = useMediaQuery("(pointer: coarse)")
+const pinStyle = computed(() => commentStyle.value === "pin" && drop.value.kind === "markdown")
+const pinOpen = computed(() => commentsOpen.value && !editing.value && !trashed.value && !lightbox.value)
+const pinDraft = computed(
+  () => pinStyle.value && pinOpen.value && popover.value?.type === "new" && popover.value.pending.kind === "text",
+)
+const pinThread = computed(
+  () =>
+    pinStyle.value &&
+    pinOpen.value &&
+    popover.value?.type === "thread" &&
+    threadComment.value?.kind === "text" &&
+    threadPlace.value?.id === popover.value.id,
+)
+watch(selection, (value) => {
+  if (value?.settled && pinStyle.value && !coarse.value) commentOnSelection()
+})
+// Escape in the composer drops the draft, words and all.
+function dropPinDraft() {
+  reviewDraft.body.value = ""
+  popover.value = null
+}
+const PIN_BUBBLE_WIDTH = 300
+// Right of the pin, level with it; past the page's right edge, under it instead. The bubble grows from the pin.
+const pinBubbleStyle = computed(() => {
+  const rect = pinDraft.value ? draftPlace.value?.rect : threadPlace.value?.rect
+  if (!rect) return undefined
+  const width = Math.min(PIN_BUBBLE_WIDTH, windowWidth.value - 24)
+  let left = rect.right + 8
+  let top = rect.top
+  let origin = "0 14px"
+  if (left + width > windowWidth.value - 12) {
+    left = Math.max(12, windowWidth.value - 12 - width)
+    top = rect.bottom + 8
+    origin = `${rect.left + 14 - left}px -8px`
+  }
+  return { width: `${width}px`, left: `${left}px`, top: `${top}px`, transformOrigin: origin }
+})
+const pinShown = computed(() => Boolean((pinDraft.value && draftPlace.value?.pin) || pinThread.value))
+
 const floating = computed(
   () =>
-    wide.value &&
-    commentsOpen.value &&
-    !editing.value &&
-    !trashed.value &&
-    !lightbox.value &&
-    !siteRef.value?.pending &&
-    popover.value?.type === "new",
+    pinDraft.value ||
+    pinThread.value ||
+    (wide.value &&
+      commentsOpen.value &&
+      !editing.value &&
+      !trashed.value &&
+      !lightbox.value &&
+      !siteRef.value?.pending &&
+      popover.value?.type === "new"),
 )
 // A selection's card waits for its place, which the frame reports once the margin has made room for it.
 const floatShown = computed(
   () =>
-    floating.value && (popover.value?.type !== "new" || popover.value.pending.kind !== "text" || !!draftPlace.value),
+    !pinStyle.value &&
+    floating.value &&
+    (popover.value?.type !== "new" || popover.value.pending.kind !== "text" || !!draftPlace.value),
 )
 const FLOAT_WIDTH = 288
 const floatStyle = computed(() => {
@@ -291,13 +359,30 @@ watch(floatShown, async (open) => {
   await whenHeld()
   if (floatShown.value) floatRef.value?.querySelector<HTMLElement>("[data-comment-editor] textarea")?.focus()
 })
+const pinRef = useTemplateRef<HTMLElement>("pinRef")
+// A bubble that opens below the fold scrolls the page until it shows, above the dock; the frame then moves the pin
+// and the bubble follows.
+watch(
+  () => pinShown.value && (pinDraft.value ? "new" : popover.value?.type === "thread" ? popover.value.id : null),
+  async (open) => {
+    if (!open) return
+    await nextTick()
+    await whenHeld()
+    const box = pinRef.value?.getBoundingClientRect()
+    if (pinDraft.value) pinRef.value?.querySelector<HTMLElement>("textarea")?.focus({ preventScroll: true })
+    if (!box) return
+    const over = box.bottom - (windowHeight.value - 88)
+    if (over > 0) send({ type: "scroll-by", y: Math.min(over, Math.max(0, box.top - 64)) })
+  },
+)
 watch(floating, (open, was) => {
   if (!open && was && commentsOpen.value && !popover.value && !listBefore) closeComments()
 })
 // The page loses its selection once the composer takes focus; it keeps the quote marked while the comment is written.
+// A new selection while one is held (the Pin style's draft moving with the reader) holds the new one.
 watch(
-  () => popover.value?.type === "new" && popover.value.pending.kind === "text",
-  (text) => send({ type: text ? "hold-selection" : "clear-selection" }),
+  () => (popover.value?.type === "new" && popover.value.pending.kind === "text" ? popover.value.pending : null),
+  (pending, before) => (pending || before) && send({ type: pending ? "hold-selection" : "clear-selection" }),
 )
 function toggleCommentArea() {
   if (canMarkArea.value) showComments()
@@ -339,6 +424,10 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
     bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
     width: docWidth,
     annotations,
+    comments: computed(() => ({
+      style: pinStyle.value ? "pin" : "card",
+      me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
+    })),
     variantBar: true,
     arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
   })
@@ -804,6 +893,10 @@ watch(
           <div v-if="widens" class="space-y-2 px-2 pb-4">
             <label for="drop-reading-width" class="text-xs font-medium text-muted">Reading width</label>
             <USelect id="drop-reading-width" v-model="docWidth" class="w-full" :items="widths" />
+          </div>
+          <div v-if="widens" class="space-y-2 px-2 pb-4">
+            <label for="drop-comment-style" class="text-xs font-medium text-muted">Comments</label>
+            <USelect id="drop-comment-style" v-model="commentStyle" class="w-full" :items="commentStyles" />
           </div>
           <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
           <ViewerAction v-if="printsPdf" icon="i-mingcute-pdf-line" label="Export as PDF" @click="exportPdf" />
@@ -1311,8 +1404,28 @@ watch(
     >
       <ReuseComposer />
     </section>
+    <Transition
+      enter-active-class="motion-safe:transition-[opacity,scale] motion-safe:duration-180 motion-safe:ease-[cubic-bezier(.23,1,.32,1)]"
+      enter-from-class="scale-96 opacity-0"
+      leave-active-class="motion-safe:transition-[opacity,scale] motion-safe:duration-120 motion-safe:ease-out"
+      leave-to-class="scale-98 opacity-0"
+    >
+      <section
+        v-if="pinShown"
+        ref="pinRef"
+        :aria-label="pinDraft ? 'Comment on selected text' : 'Comment thread'"
+        class="fixed z-40 flex max-h-[min(28rem,60dvh)] flex-col overflow-y-auto overscroll-contain border border-default bg-default shadow-lg"
+        :class="pinDraft ? 'rounded-[6px_18px_18px_18px]' : 'rounded-[6px_16px_16px_16px] p-1.5'"
+        role="dialog"
+        :style="pinBubbleStyle"
+        @keydown.esc="popover = null"
+      >
+        <ViewerPinComposer v-if="pinDraft" ref="popoverRef" @cancel="dropPinDraft" @submit="submit" />
+        <ReuseComposer v-else />
+      </section>
+    </Transition>
     <div
-      v-if="selection && (!commentsOpen || !popover)"
+      v-if="selection && (!commentsOpen || !popover) && !(pinStyle && !coarse)"
       class="fixed z-30 -translate-x-1/2 -translate-y-full"
       :style="{
         left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,

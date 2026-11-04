@@ -35,11 +35,21 @@ export const FrameMessage = v.variant("type", [
       selector: v.string(),
       label: v.string(),
       rect: Rect,
+      // The mouse let go: the reader is done selecting, and the Pin style opens its composer.
+      settled: v.optional(v.literal(true)),
     }),
   ]),
   // Where the composer for a held selection goes, in the frame's viewport: its card's place in the margin (`rail`), or
-  // the quote's box.
-  v.object({ type: v.literal("draft-place"), rail: v.boolean(), rect: Rect }),
+  // the quote's box. In the Pin style (`pin`) it's the draft's pin, or, with `id`, the pin of the thread Drop shows.
+  // Pin style: a click on the page, away from the pins, with a composer or a thread open beside a pin.
+  v.object({ type: v.literal("page-click") }),
+  v.object({
+    type: v.literal("draft-place"),
+    rail: v.boolean(),
+    pin: v.optional(v.literal(true)),
+    id: v.optional(v.string()),
+    rect: Rect,
+  }),
   v.object({
     type: v.literal("image"),
     src: v.string(),
