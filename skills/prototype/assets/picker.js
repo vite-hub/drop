@@ -66,32 +66,33 @@
     button:hover { color: #fafafa; background: rgb(255 255 255 / .08); }
     button:focus-visible { outline: 2px solid #fafafa; outline-offset: 1px; }
     .bar > span { padding: 0 8px; color: #a3a3a3; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .bar .current { color: #fafafa; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; }
-    .bar .note { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; }
+    .bar .current { color: #fafafa; max-width: 44ch; overflow: hidden; text-overflow: ellipsis; }
+    .bar .note { max-width: 64ch; overflow: hidden; text-overflow: ellipsis; }
     .bar .zoom { min-width: 5ch; padding: 0; text-align: center; }
     .bar .sep { width: 1px; height: 16px; padding: 0; margin: 0 4px; background: rgb(255 255 255 / .12); }
     .bar:not(.canvas) .cam, .bar.canvas .one { display: none; }
     .tags { display: none; position: fixed; inset: 0 var(--drop-inset, 0px) 0 0; z-index: 2147482000; overflow: hidden; pointer-events: none; }
     .tags.on { display: block; }
-    .tag { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 24px; padding: 0 6px 0 0; pointer-events: auto;
+    .tag { position: absolute; left: 0; top: 0; display: flex; flex-wrap: wrap; align-items: center; min-height: 24px; padding: 0 6px 0 0; pointer-events: auto;
       border: 1px solid rgb(0 0 0 / .08); border-radius: 6px; background: rgb(255 255 255 / .92); color: #171717; box-shadow: 0 1px 2px rgb(0 0 0 / .06);
-      font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+      font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
     .tag button { height: 22px; border-radius: 5px; color: inherit; cursor: default; }
     .tag button:hover { background: none; }
     .tag button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
     .tag > * { flex: none; }
     .tag > .name, .tag > .tnote, .tag > .hint, .tag > .done { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
-    .tag > .name { flex-shrink: 0; max-width: calc(100% - 44px); }
+    .tag > .name { flex-shrink: 1; max-width: calc(100% - 44px); }
+    .tag > .tnote { box-sizing: border-box; flex: 1 0 100%; width: 100%; order: 9; padding: 0 4px 5px 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .tag > .tnote:empty { display: none; }
     .handle, .open { width: 20px; padding: 0; display: grid; place-items: center; color: #a3a3a3 !important; }
     .handle { touch-action: none; }
     .handle:hover, .open:hover { color: #525252 !important; }
     .name { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; user-select: text; -webkit-user-select: text; }
     .name:hover { text-decoration: underline dotted rgb(0 0 0 / .35); text-underline-offset: 3px; }
     .tnote, .hint, .done { color: #737373; overflow: hidden; text-overflow: ellipsis; }
-    .tnote { padding-left: 4px; }
-    .hint { display: none; padding-left: 4px; }
+        .hint { display: none; padding-left: 4px; }
     .name:hover ~ .hint, .name:focus-visible ~ .hint { display: inline; }
-    .name:hover ~ .tnote, .name:focus-visible ~ .tnote, .done:not(:empty) ~ .tnote, .done:not(:empty) ~ .hint { display: none; }
+    .done:not(:empty) ~ .hint { display: none; }
     .done:not(:empty) { padding-left: 4px; color: #15803d; }
     .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   </style>
@@ -145,6 +146,7 @@
     name.textContent = it.name;
     name.title = "Copy “" + it.name + "”";
     tag.querySelector(".tnote").textContent = el.dataset.note || "";
+    tag.querySelector(".tnote").title = el.dataset.note || "";
     it.tag = tag;
     let timer = 0;
     name.onclick = async () => {
@@ -210,12 +212,26 @@
     for (const it of items) {
       const sx = cam.x + it.x * cam.z, sy = cam.y + it.y * cam.z;
       it.el.style.setProperty("transform", `translate(${sx}px, ${sy}px) scale(${cam.z})`, "important");
-      it.tag.style.transform = `translate(${sx}px, ${sy - 30}px)`;
-      it.tag.style.maxWidth = Math.max(it.w * cam.z, 76) + "px";
+      it.tag.style.transform = `translate(${sx}px, ${sy - 6}px) translateY(-100%)`;
+      const width = Math.max(Math.min(room(it) * cam.z - 12, 520, view().w - sx - 8), 0);
+      it.tag.style.maxWidth = width + "px";
+      // When even the padding and border cannot fit, keep the label out of the way.
+      it.tag.style.visibility = width > 0 ? "" : "hidden";
     }
     const zoom = Math.round(cam.z * 100);
     zoomText.textContent = zoom + "%";
     if (zoom !== reportedZoom) report();
+  }
+  // A label may run past its item, up to the nearest item to its right in the same band.
+  function room(it) {
+    const b = box(it);
+    let edge = Infinity;
+    for (const o of items) {
+      if (o === it || o.x <= it.x) continue;
+      const ob = box(o);
+      if (ob.y < b.y + 48 && ob.y + ob.h > b.y - 80) edge = Math.min(edge, o.x - it.x);
+    }
+    return edge === Infinity ? Math.max(it.w, 480 / cam.z) : edge;
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
   const bound = () => { cam.z = clamp(cam.z, MIN_Z, MAX_Z); cam.x = clamp(cam.x, -LIMIT, LIMIT); cam.y = clamp(cam.y, -LIMIT, LIMIT); };
@@ -321,6 +337,7 @@
     scrollTo(0, 0);
     currentText.textContent = `${it.name} (${i + 1}/${variants.length})`;
     noteText.textContent = it.el.dataset.note || "";
+    currentText.title = it.name; noteText.title = it.el.dataset.note || "";
     noteText.title = it.el.dataset.note || "";
     noteText.hidden = !it.el.dataset.note;
     try { localStorage.setItem(key, it.el.id); } catch {}
