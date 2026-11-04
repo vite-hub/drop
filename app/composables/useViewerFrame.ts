@@ -41,6 +41,8 @@ export function useViewerFrame(options: {
   annotations: ReturnType<typeof useViewerAnnotations>
   /** How comments on a Markdown doc's text show (useCommentStyle), and who's reading, for the Pin style's draft pin. */
   comments?: Ref<{ style: CommentStyle; me: { name: string; image: string | null } | null }>
+  /** Comments mode (ViewerCommentsSegment): a click on the page, without a drag, comments on the element under it. */
+  clickComments?: Ref<boolean>
   /** Whether the viewer's bar shows a prototype's variants, in place of the bar the page draws itself. */
   variantBar?: boolean
   /** ← or → on an image's page, while the page has focus: the viewer moves along the image's folder. */
@@ -376,13 +378,14 @@ export function useViewerFrame(options: {
   )
   watch([ready, openThread], () => ready.value && send({ type: "active", id: openThread.value }))
   watch(
-    [ready, annotations.frameTool],
+    [ready, annotations.frameTool, () => options.clickComments?.value],
     () =>
       ready.value &&
       send({
         type: "tool",
         tool: annotations.frameTool.value,
         pointComments: drop.value.kind === "image",
+        clickComments: options.clickComments?.value ?? false,
         pen: annotations.penStyle.value,
       }),
   )

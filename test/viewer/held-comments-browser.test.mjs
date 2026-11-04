@@ -70,9 +70,9 @@ const marker = (id, selector, extra = {}) => ({
   ...extra,
 })
 
-async function open(browser) {
+async function open(browser, options = {}) {
   const escaped = injectRuntime(html, false, 0, true).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
-  const context = await browser.newContext({ viewport: { width: 900, height: 700 } })
+  const context = await browser.newContext({ viewport: { width: 900, height: 700 }, ...options })
   await context.route("**/*", (route) => {
     const url = new URL(route.request().url())
     if (url.hostname === "esm.sh")
@@ -119,6 +119,61 @@ async function setTool(page, tool) {
   await page.evaluate((tool) => send({ type: "tool", tool }), tool)
   await page.waitForFunction((tool) => posts.some((m) => m.type === "tool" && m.tool === tool), tool, { timeout: 5000 })
 }
+
+for (const touch of [false, true]) {
+  test(`click comments select the current element without a prior pointer move (${touch ? "touch" : "mouse"})`, async () => {
+    const browser = await chromium.launch()
+    try {
+      const { page, frame } = await open(browser, { hasTouch: touch })
+      const box = await frame.locator("#v-a-row").boundingBox()
+      const x = box.x + 20,
+        y = box.y + 20
+      if (!touch) await page.mouse.move(x, y)
+      await page.evaluate(() => send({ type: "tool", tool: "comment", clickComments: true }))
+      await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw"))
+      if (touch) await page.touchscreen.tap(x, y)
+      else {
+        await page.mouse.down()
+        await page.mouse.up()
+      }
+      const area = await page
+        .waitForFunction(() => posts.find((m) => m.type === "area"), null, { timeout: 5000 })
+        .then((h) => h.jsonValue())
+      assert.match(area.selector, /#v-a-row/)
+      assert.equal(area.ow, 1000)
+      assert.equal(area.oh, 1000)
+    } finally {
+      await browser.close()
+    }
+  })
+}
+
+test("click comments hit-test again when the page changes under a stationary pointer", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser)
+    const box = await frame.locator("#v-a-row").boundingBox()
+    await page.evaluate(() => send({ type: "tool", tool: "comment", clickComments: true }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw"))
+    await page.mouse.move(box.x + 20, box.y + 20)
+    await frame.evaluate(() => {
+      const before = document.getElementById("v-a-row")
+      const after = before.cloneNode(true)
+      after.id = "current-row"
+      before.replaceWith(after)
+    })
+    await page.mouse.down()
+    await page.mouse.up()
+    const area = await page
+      .waitForFunction(() => posts.find((m) => m.type === "area"), null, { timeout: 5000 })
+      .then((h) => h.jsonValue())
+    assert.match(area.selector, /#current-row/)
+    assert.equal(area.ow, 1000)
+    assert.equal(area.oh, 1000)
+  } finally {
+    await browser.close()
+  }
+})
 
 test("under the Comment tool a pinned tooltip stays open through focus leaving, the drawn box, and its click", async () => {
   const browser = await chromium.launch()
