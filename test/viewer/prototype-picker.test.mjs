@@ -112,67 +112,82 @@ const look = (target) =>
   }))
 const ALL = ["v-one", "v-two", "v-three"]
 
-test("canvas labels respect nearby items and the viewport even below 120px", async () => {
+test("canvas labels align with their items and hide notes below 160 screen pixels", async () => {
   const browser = await chromium.launch()
   try {
     const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
-    const html = injectRuntime(
-      page("")
-        .replaceAll("<section ", '<section data-width="100" data-height="180" ')
-        .replaceAll('data-variant="', 'data-variant="A long name for this prototype item: ')
-        .replaceAll(
-          'data-note="',
-          'data-note="A long note that should wrap below the name without covering its neighbor. ',
-        ),
-      false,
-      0,
-      true,
-    )
-    await context.route("https://picker.test/labels", (route) =>
-      route.fulfill({ contentType: "text/html", body: html }),
-    )
-    for (const positions of [
-      [0, 160, 2200],
-      [0, 1600, 3200],
-      [0, 8, 2400],
+    for (const [width, zoom] of [
+      [320, 0.5],
+      [320, 159 / 320],
+      [120, 0.41],
+      [120, 0.05],
     ]) {
+      const html = injectRuntime(
+        page("")
+          .replaceAll("<section ", `<section data-width="${width}" data-height="180" `)
+          .replaceAll('data-variant="', 'data-variant="A long name for this prototype item: ')
+          .replaceAll('data-note="', `data-note="${"A long note that should wrap within its item. ".repeat(8)}`),
+        false,
+        0,
+        true,
+      )
       const standalone = await context.newPage()
-      await standalone.addInitScript((positions) => {
-        localStorage.setItem(
-          "drop-prototype-canvas:/labels",
-          JSON.stringify({
-            v: 1,
-            camera: { x: 48, y: 160, z: 0.41 },
-            positions: Object.fromEntries(["v-one", "v-two", "v-three"].map((id, i) => [id, [positions[i], 0]])),
-          }),
-        )
-      }, positions)
+      await standalone.route("https://picker.test/labels", (route) =>
+        route.fulfill({ contentType: "text/html", body: html }),
+      )
+      await standalone.addInitScript(
+        ({ width, zoom }) => {
+          localStorage.setItem(
+            "drop-prototype-canvas:/labels",
+            JSON.stringify({
+              v: 1,
+              camera: { x: 48, y: 160, z: zoom },
+              positions: Object.fromEntries(["v-one", "v-two", "v-three"].map((id, i) => [id, [i * (width + 160), 0]])),
+            }),
+          )
+        },
+        { width, zoom },
+      )
       await standalone.goto("https://picker.test/labels")
       await standalone.waitForFunction(() =>
         [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")].every(
-          (tag) => tag.style.maxWidth,
+          (tag) => tag.style.width,
         ),
       )
       const bounds = await standalone.evaluate(() => {
         const tags = [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")]
-        return tags.map((tag, i) => ({
-          right: tag.getBoundingClientRect().right,
-          width: tag.getBoundingClientRect().width,
-          visible: getComputedStyle(tag).visibility !== "hidden",
-          next: document.getElementById(["v-two", "v-three"][i])?.getBoundingClientRect().left,
-        }))
+        return tags.map((tag, i) => {
+          const item = document.querySelectorAll("body > [data-variant]")[i].getBoundingClientRect()
+          const name = tag.querySelector(".name"),
+            note = tag.querySelector(".tnote")
+          const textLeft = (el) => {
+            const range = document.createRange()
+            range.selectNodeContents(el)
+            return range.getBoundingClientRect().left
+          }
+          return {
+            right: tag.getBoundingClientRect().right,
+            itemLeft: item.left,
+            itemRight: item.right,
+            nameLeft: textLeft(name),
+            nameTop: name.getBoundingClientRect().top,
+            openTop: tag.querySelector(".open").getBoundingClientRect().top,
+            noteLeft: textLeft(note),
+            noteVisible: getComputedStyle(note).display !== "none",
+            noteHeight: note.getBoundingClientRect().height,
+            lineHeight: parseFloat(getComputedStyle(note).lineHeight),
+          }
+        })
       })
-      for (const label of bounds.filter((label) => label.visible)) {
-        assert.ok(label.right <= 1000, "label stays within the viewport")
-        if (label.next !== undefined) assert.ok(label.right <= label.next, "label stops before the next item")
-      }
-      if (positions[1] === 160) {
-        assert.ok(bounds[0].visible && bounds[0].width < 120, "close neighbors constrain the preferred minimum")
-        assert.ok(bounds[2].visible && bounds[2].width < 120, "the viewport constrains the preferred minimum")
-      } else if (positions[1] === 1600) {
-        assert.ok(bounds[0].visible && bounds[0].width >= 120, "labels still expand when there is room")
-      } else {
-        assert.ok(!bounds[0].visible && !bounds[2].visible, "labels disappear when their decorations cannot fit")
+      for (const [i, label] of bounds.entries()) {
+        assert.ok(Math.abs(label.right - label.itemRight) < 1, "label ends at the item's right edge")
+        assert.ok(Math.abs(label.nameLeft - label.itemLeft) < 1, "name starts at the item's left edge")
+        assert.equal(label.openTop, label.nameTop, "name and open button stay on one row, even at minimum zoom")
+        assert.equal(label.noteVisible, i < 2 && width * zoom >= 160, "only wide items with notes show them")
+        if (label.noteVisible) {
+          assert.ok(Math.abs(label.noteLeft - label.itemLeft) < 1, "note starts at the item's left edge")
+          assert.ok(Math.abs(label.noteHeight - (2 * label.lineHeight + 2)) < 1, "long notes wrap to two lines")
+        }
       }
       await standalone.close()
     }

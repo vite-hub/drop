@@ -73,15 +73,13 @@
     .bar:not(.canvas) .cam, .bar.canvas .one { display: none; }
     .tags { display: none; position: fixed; inset: 0 var(--drop-inset, 0px) 0 0; z-index: 2147482000; overflow: hidden; pointer-events: none; }
     .tags.on { display: block; }
-    .tag { position: absolute; left: 0; top: 0; display: flex; flex-wrap: wrap; align-items: center; min-height: 22px; pointer-events: auto;
+    .tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; min-height: 22px; pointer-events: auto;
       color: #171717; font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
     .tag button { height: 22px; border-radius: 5px; color: inherit; cursor: default; }
     .tag button:hover { background: none; }
     .tag button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
-    .tag > * { flex: none; }
-    .tag > .name, .tag > .tnote { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
-    .tag > .name { flex-shrink: 1; max-width: calc(100% - 44px); }
-    .tag > .tnote { box-sizing: border-box; flex: 1 0 100%; width: 100%; order: 9; padding: 2px 0 0 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .tag > .name, .tag > .tnote { min-width: 0; white-space: nowrap; }
+    .tag > .tnote { box-sizing: border-box; grid-column: 1 / -1; width: 100%; padding: 2px 0 0 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .tag > .tnote:empty, .tag.narrow > .tnote { display: none; }
     .handle, .open { width: 20px; padding: 0; display: grid; place-items: center; color: #a3a3a3 !important; }
     .handle { touch-action: none; opacity: 0; }
@@ -212,7 +210,7 @@
       // The handle sits in the gap left of the item, so the name and note start at the item's edge and end with it.
       const w = box(it).w * cam.z;
       it.tag.style.transform = `translate(${sx - LABEL_INSET}px, ${sy - 6}px) translateY(-100%)`;
-      it.tag.style.width = Math.max(w, 96) + LABEL_INSET + "px";
+      it.tag.style.width = w + LABEL_INSET + "px";
       it.tag.classList.toggle("narrow", w < 160);
     }
     const zoom = Math.round(cam.z * 100);
