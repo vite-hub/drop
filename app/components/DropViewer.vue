@@ -471,7 +471,7 @@ function download() {
 
 // Export as PDF: the frame prints itself (plan-runtime.ts), so the PDF holds the whole doc as rendered, not the
 // slice of it the viewer shows. Only Markdown docs: their frame alone may open the print dialog (previewSandbox).
-const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value)
+const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value && ready.value)
 const exportPdf = () => send({ type: "print", title: drop.value.title })
 
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
