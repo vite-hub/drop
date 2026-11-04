@@ -11,6 +11,8 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
+// The parts' one stylesheet: comments, presence, and the editor's carets.
+import "vite-hub/ui/styles.css"
 
 const { publicView = false } = defineProps<{ publicView?: boolean }>()
 
@@ -169,10 +171,7 @@ function closeLightbox() {
   lightbox.value = null
   popover.value = null
 }
-const popoverRef = useTemplateRef<{
-  fail: (reason?: string, text?: string) => Promise<void>
-  sent: () => Promise<void>
-}>("popoverRef")
+const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 watch(shareOpen, (open) => {
   if (open && commentsOpen.value) closeComments()
@@ -523,7 +522,7 @@ watch(shownVersion, (version) => {
 })
 
 // Keep drafts and image picks until the server accepts them, including after a retry.
-async function submit(body: string, files: File[] = []) {
+async function submit(body: string, files: File[] = [], mentions: string[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
   // A comment sent the moment its area is drawn still takes the picture the frame is taking of it.
@@ -544,6 +543,7 @@ async function submit(body: string, files: File[] = []) {
       { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
       body,
       attached,
+      mentions,
     )
     if (!("value" in sent)) {
       if (popoverRef.value === composer) composer?.fail(sent.error)
@@ -558,14 +558,6 @@ async function submit(body: string, files: File[] = []) {
     finish(false)
   }
 }
-
-/** A comment on the page as a whole, from the box at the bottom of the Comments panel. On an app, the page showing. */
-const addPageComment = (body: string, files: File[] = []) =>
-  state.addComment(
-    { kind: "page", selector: "", ox: 0, oy: 0, ow: 0, oh: 0, ...(isApp.value ? { page: page.value } : {}) },
-    body,
-    files,
-  )
 
 /**
  * A thread or row that goes away with its comment (resolved, accepted, deleted) drops the focus it held. Hand it to the
@@ -602,14 +594,6 @@ async function removeComment(id: string) {
   popover.value = null
   await state.removeComment(id)
   await keepFocus()
-}
-
-async function reply(id: string, body: string, files: File[] = []) {
-  const composer = popoverRef.value
-  const sent = await state.addReply(id, body, files)
-  if (popoverRef.value !== composer) return
-  if ("value" in sent) await composer?.sent()
-  else await composer?.fail(sent.error, body)
 }
 
 // A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
@@ -764,6 +748,11 @@ const imageComments = computed(() =>
       )
     : [],
 )
+// The dock's list, the open thread, and the composer share one ViteHub comments state over the drop's comments.
+provideDropComments({
+  source: () => (lightbox.value ? imageComments.value : comments.value),
+  page: () => (isApp.value ? page.value : undefined),
+})
 const threadComment = computed(() => {
   const open = popover.value
   return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
@@ -852,21 +841,19 @@ watch(
       v-if="popover && !siteRef?.pending"
       :key="popover.type === 'thread' ? popover.id : 'new'"
       ref="popoverRef"
-      :can-manage="drop.isOwner"
       :comment="threadComment"
       :screenshot="threadComment ? screenshots.get(threadComment.id) : undefined"
       :pending="popover.type === 'new' ? popover.pending : undefined"
       :draft="popover.type === 'new' ? popover.body : undefined"
       :draft-error="popover.type === 'new' ? popover.error : undefined"
-      :can-reply="drop.canComment"
       :can-accept="canAccept"
       :accepting="Boolean(accepting) && accepting === threadComment?.id"
+      :version="drop.version"
       @accept="accept"
       @cancel="backToComments"
       @copy-link="copyCommentLink"
       @delete="removeComment"
       @delete-reply="(id, replyId) => state.removeReply(id, replyId)"
-      @reply="reply"
       @resolve="resolve"
       @submit="submit"
       @suggest="(text) => popover?.type === 'new' && (popover.pending.suggestion = text)"
@@ -1124,18 +1111,9 @@ watch(
               v-if="!popover && !siteRef?.pending"
               ref="commentsRef"
               :can-comment="drop.canComment && !shownVersion && !lightbox"
-              :can-manage="drop.isOwner"
-              :can-accept="canAccept"
-              :accepting="accepting"
               :comments="lightbox ? imageComments : comments"
-              :screenshots="screenshots"
-              :add-page-comment="addPageComment"
               :outdated="outdated"
-              :version="drop.version"
-              :versions="drop.versions"
               @focus="focusComment"
-              @resolve="resolve"
-              @accept="accept"
             />
           </template>
           <template #toolbar>

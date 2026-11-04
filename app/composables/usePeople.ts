@@ -1,16 +1,22 @@
-import type { Person } from "~/utils/mentions"
+import type { CommentUser } from "vite-hub/comments/client"
+import { createRestTransport } from "vite-hub/comments/client"
 
 /**
- * Everyone in this Drop, for "@" in the doc editor and the comment boxes. Only signed-in people may list them, so a
+ * Whom "@" may name in the open drop's editor: the people ViteHub Comments suggests for the drop's comments
+ * (server/comments.ts `people` and `canMention`), as the comment boxes ask. Only signed-in people may list them, so a
  * signed-out reader gets none, and nobody's page waits on the list: it loads in the browser.
  */
 export function usePeople() {
+  const state = injectDrop()!
   const { data: me } = useMe()
-  const signedIn = computed(() => Boolean(me.value))
+  const subject = computed(() => commentSubject(state.drop.data.value))
   const { data } = useLazyAsyncData(
-    keys.people,
-    (): Promise<Person[]> => (signedIn.value ? $fetch("/api/people") : Promise.resolve([])),
-    { server: false, default: () => [], watch: [signedIn] },
+    () => keys.people(subject.value.id),
+    (): Promise<CommentUser[]> =>
+      me.value && subject.value.id
+        ? createRestTransport().users({ query: "", limit: 20, subject: subject.value })
+        : Promise.resolve([]),
+    { server: false, default: () => [], watch: [() => Boolean(me.value), subject] },
   )
-  return { people: data, me: computed(() => me.value?.id) }
+  return { people: data }
 }

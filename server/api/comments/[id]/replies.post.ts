@@ -1,8 +1,8 @@
 import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
-import { attachImages, imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
-import { authorOf, findThread, replyTo, toReply, undoReply } from "../../../utils/comments"
+import { imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
+import { authorOf, findThread, replyTo, toReply } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -17,19 +17,15 @@ export default defineHandler(async (event) => {
   // Replies share the comment limit: a thread is no way around it.
   await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" })
   const { input, images } = await readCommentBody(event, CommentReplySchema)
+  if (!input.body && !images.length) throw new HTTPError({ status: 400, statusText: "Write a reply." })
+  const author = authorOf(who, who?.name ?? "Guest")
   // The images go where the comment's own would.
-  const parent = images.length ? await imageParent(drop) : drop
   const { row, attachments } = await withImages(
+    images.length ? await imageParent(drop) : null,
     images,
-    () => replyTo(thread, authorOf(who, who?.name ?? "Guest"), input.body),
-    (added) =>
-      attachImages(
-        parent,
-        images,
-        { commentId: thread.comments[0]!.id, replyId: added.id, n: thread.number },
-        added.author.name,
-      ),
-    undoReply,
+    author.name ?? "Guest",
+    (ids) => replyTo(thread, author, input.body, { mentions: input.mentions, attachments: ids }),
+    (added) => ({ commentId: thread.messages[0]!.id, replyId: added.id }),
   )
-  return toReply(row, who, new Map([[row.id, attachments]]))
+  return toReply(row, who, new Map(attachments.map((file) => [file.id, file])))
 })

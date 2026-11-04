@@ -4,7 +4,7 @@ import { H3Event } from "h3"
 import { installComments } from "vite-hub/comments"
 import { migrate, reset, sql, state, threads, who } from "../cost/harness.mjs"
 
-const { comments } = await import("../../server/comments.ts")
+const { default: comments } = await import("../../server/comments.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: acceptSuggestion } = await import("../../server/api/comments/[id]/accept.post.ts")
 const { default: undoSuggestion } = await import("../../server/api/comments/[id]/accept.delete.ts")
@@ -51,13 +51,16 @@ async function suggestion(body = "Count twelve pigeons.", replacement = "fifteen
   return { doc, comment }
 }
 
+/** The trigger's failure, as the Comments store throws it: Drizzle wraps the database error in its own. */
+const outage = (error) => (error.cause ?? error).message === "Comments unavailable"
+
 for (const replacement of ["fifteen", ""]) {
   test(`acceptance retries only resolution after publication and a Comments outage (${JSON.stringify(replacement)})`, async () => {
     const { doc, comment } = await suggestion(undefined, replacement)
     sql.exec(`CREATE TRIGGER fail_suggestion_resolution BEFORE UPDATE ON vitehub_comment_threads
       WHEN NEW.status = 'resolved' BEGIN SELECT RAISE(ABORT, 'Comments unavailable'); END`)
     try {
-      await assert.rejects(accept(comment.id), { message: "Comments unavailable" })
+      await assert.rejects(accept(comment.id), outage)
       assert.equal((await findDrop(doc.id)).version, 2, "publication committed before resolution failed")
       assert.equal(threads()[0].status, "open")
       assert.equal(
@@ -134,7 +137,7 @@ test("undo retries only reopening after publication and a Comments outage, then 
   sql.exec(`CREATE TRIGGER fail_suggestion_reopening BEFORE UPDATE ON vitehub_comment_threads
     WHEN NEW.status = 'open' BEGIN SELECT RAISE(ABORT, 'Comments unavailable'); END`)
   try {
-    await assert.rejects(undo(comment.id), { message: "Comments unavailable" })
+    await assert.rejects(undo(comment.id), outage)
     assert.equal((await findDrop(doc.id)).version, 3)
     assert.equal(await readText((await findDrop(doc.id)).blobKey), "Count twelve pigeons.")
     assert.equal(threads()[0].status, "resolved")

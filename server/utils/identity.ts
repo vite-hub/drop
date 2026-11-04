@@ -146,6 +146,27 @@ async function fromAccessToken(event: H3Event, token: string): Promise<Identity 
   }
 }
 
+/**
+ * Someone in this Drop as their browser session would be, by their id, without a request: whom an `@` may name, and
+ * whether they may read the drop it's on. Null for a banned account, or one the member list leaves out.
+ */
+export async function identityOf(userId: string): Promise<Identity | null> {
+  const [person] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!person || person.banned) return null
+  const [member, teams] = await Promise.all([isMember(person.id), teamsOf(person.id)])
+  if (!member) return null
+  return {
+    userId: person.id,
+    name: person.name,
+    email: person.email,
+    image: person.image ?? null,
+    role: roleOf(person),
+    actorKind: "browser",
+    actorName: person.name,
+    teams,
+  }
+}
+
 export async function requireIdentity(event: H3Event): Promise<Identity> {
   const who = await identify(event)
   if (who) return who

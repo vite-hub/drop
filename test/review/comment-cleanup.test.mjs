@@ -3,21 +3,21 @@ import { beforeEach, test } from "vite-plus/test"
 import { installComments } from "vite-hub/comments"
 import { insertDrop, migrate, reset, sql, state, threads } from "../cost/harness.mjs"
 
-const { comments } = await import("../../server/comments.ts")
+const { default: comments } = await import("../../server/comments.ts")
 const { deleteDrop, deleteExpiredDrops, findDrop } = await import("../../server/utils/drops.ts")
 
 migrate()
 beforeEach(reset)
 
 async function thread(dropId, scope = `drop:${dropId}`) {
+  const [kind, id] = scope.split(":")
   const [error, created] = await comments.create({
-    scope,
-    page: `/d/${dropId}`,
+    subject: { kind, id },
     body: "Remove this comment with its drop",
     author: { id: "owner", name: "Owner" },
+    revision: 1,
     metadata: {
       dropId,
-      version: 1,
       kind: "page",
       selector: "",
       ox: 0,
@@ -57,7 +57,7 @@ for (const kind of ["markdown", "site"]) {
     installComments(comments, { database: state.db })
     assert.equal(await deleteExpiredDrops(new Date()), 0)
     assert.deepEqual(threads(), [])
-    assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_comments").get().n, 0)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_comment_messages").get().n, 0)
     assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_cleanup").get().n, 0)
   })
 }

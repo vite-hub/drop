@@ -4,7 +4,7 @@ import type { DropDetail } from "#shared/types"
 import type { FrameBox } from "~/composables/useDropFrame"
 
 // Spelled out here rather than imported from the popover and lightbox SFCs, whose types ESLint can't read.
-type PendingComment = Omit<CommentInput, "body">
+type PendingComment = Omit<CommentInput, "body" | "mentions">
 type Area = { ox: number; oy: number; ow: number; oh: number }
 type Rect = { left: number; top: number; right: number; bottom: number }
 type Selection = { quote: string; selector: string; label: string; rect: Rect }

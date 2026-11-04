@@ -1,8 +1,8 @@
 import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentSchema } from "#shared/schemas"
-import { attachImages, imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
-import { addThread, authorOf, toComment, undoThread } from "../../../utils/comments"
+import { imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
+import { addThread, authorOf, mentionedIn, toComment } from "../../../utils/comments"
 import { findDropAt, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -22,13 +22,14 @@ export default defineHandler(async (event) => {
   const { input, images } = await readCommentBody(event, CommentSchema)
   if (!input.body && !images.length && input.suggestion === undefined)
     throw new HTTPError({ status: 400, statusText: "Write a comment." })
-  const parent = images.length ? await imageParent(drop) : drop
   const author = authorOf(who, who?.name ?? "Guest")
-  const { body, quote, label, page, ...anchor } = input
+  const { body, quote, label, page, mentions, ...anchor } = input
   // Comments numbers the thread in the same statement that adds it, so two comments can't take the same number.
   const { row, attachments } = await withImages(
+    images.length ? await imageParent(drop) : null,
     images,
-    () =>
+    author.name ?? "Guest",
+    (ids) =>
       addThread(drop, {
         fields: {
           ...anchor,
@@ -40,10 +41,10 @@ export default defineHandler(async (event) => {
         },
         body,
         author,
+        mentions,
+        attachments: ids,
       }),
-    (added) =>
-      attachImages(parent, images, { commentId: added.comments[0]!.id, replyId: null, n: added.number }, author.name),
-    undoThread,
+    (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
   )
-  return toComment(row, who, new Map([[row.comments[0]!.id, attachments]]))
+  return toComment(row, who, new Map(attachments.map((file) => [file.id, file])), await mentionedIn([row]))
 })

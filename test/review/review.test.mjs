@@ -508,7 +508,7 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   assert.deepEqual(
     {
       scope: first.scope,
-      page: first.page,
+      subject: `${first.subject_kind}:${first.subject_id}`,
       kind: first.metadata.kind,
       selector: first.metadata.selector,
       ox: first.metadata.ox,
@@ -518,12 +518,12 @@ test("a comment with a screenshot becomes an image of the site with the box on i
       label: first.metadata.label,
       quote: first.metadata.quote,
       reviewPage: first.metadata.page,
-      author: first.createdBy.name,
-      guest: first.createdBy.guest,
+      author: first.author.name,
+      guest: first.author.guest,
     },
     {
       scope: "site:site",
-      page: "/pricing",
+      subject: "site:site",
       kind: "image",
       selector: "body > img",
       ox: 100,
@@ -537,7 +537,7 @@ test("a comment with a screenshot becomes an image of the site with the box on i
       guest: true,
     },
   )
-  assert.match(first.createdBy.id, /^guest:/, "a guest is nobody's account")
+  assert.match(first.author.id, /^guest:/, "a guest is nobody's account")
 
   const plain = await comment(body.token, {
     body: "Typo in the footer",
@@ -662,24 +662,24 @@ for (const screenshot of [undefined, PNG]) {
   })
 
   for (const fail of [false, true]) {
-    test(`a claimed review waits for attachments to ${fail ? "fail" : "finish"}${screenshot ? " with a screenshot" : ""}`, async () => {
+    test(`a claimed review waits for image links to ${fail ? "fail" : "finish"}${screenshot ? " with a screenshot" : ""}`, async () => {
       site()
       const { body } = await token(SITE, { name: "Ole" })
       const data = { requestId: crypto.randomUUID() }
       const options = { screenshot, images: [PNG] }
       const started = Promise.withResolvers()
       const resume = Promise.withResolvers()
-      const put = state.blob.put.bind(state.blob)
+      const query = state.db.session.client
       let held = false
-      vi.spyOn(state.blob, "put").mockImplementation(async (...args) => {
-        // A screenshot is stored before the claim. Hold the attachment written after it becomes visible.
-        if (!held && threads().length) {
+      vi.spyOn(state.db.session, "client").mockImplementation(async (...args) => {
+        // Images are stored before the claim. Hold their links, which are written after it becomes visible.
+        if (!held && args[0].startsWith('update "comment_attachments"')) {
           held = true
           started.resolve()
           await resume.promise
-          if (fail) return [{ code: "BLOB_WRITE_FAILED", message: "Attachment storage unavailable" }]
+          if (fail) throw new Error("Image links unavailable")
         }
-        return put(...args)
+        return query(...args)
       })
       const original = comment(body.token, data, options)
       try {
@@ -697,7 +697,7 @@ for (const screenshot of [undefined, PNG]) {
         await original
       }
       const first = await original
-      assert.equal(first.status, fail ? 503 : 200)
+      assert.equal(first.status, fail ? 500 : 200)
       if (fail) {
         assert.equal(threads().length, 0)
         assert.equal(sql.prepare("SELECT count(*) AS n FROM review_submissions").get().n, 0)
@@ -749,7 +749,7 @@ test("legacy submissions and distinct request ids still create separate threads"
     assert.equal((await comment(body.token, data)).status, 200)
   }
   assert.deepEqual(
-    threads().map((thread) => thread.number),
+    threads().map((thread) => thread.n),
     [1, 2, 3, 4],
   )
 })
@@ -769,7 +769,7 @@ test("a failed Comments batch rolls back its request claim so a retry can save i
   site()
   const { body } = await token(SITE, { name: "Ole" })
   const data = { requestId: crypto.randomUUID() }
-  sql.exec(`CREATE TRIGGER fail_review_comment BEFORE INSERT ON vitehub_comments
+  sql.exec(`CREATE TRIGGER fail_review_comment BEFORE INSERT ON vitehub_comment_messages
     BEGIN SELECT RAISE(ABORT, 'Comments unavailable'); END`)
   try {
     assert.equal((await comment(body.token, data)).status, 500)
@@ -780,7 +780,8 @@ test("a failed Comments batch rolls back its request claim so a retry can save i
   }
   const saved = await comment(body.token, data)
   assert.equal(saved.status, 200)
-  assert.equal((await json(saved)).n, 1)
+  // The one-model primitive reserves a number before the write batch, so a failed batch can leave a gap.
+  assert.equal((await json(saved)).n, 2)
   assert.equal(threads().length, 1)
 })
 
@@ -839,14 +840,7 @@ test("Drop's embedded review stores a box on a screen capture like the script's,
   assert.equal(image.title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
   const [row] = threads()
   assert.deepEqual(
-    [
-      row.metadata.dropId,
-      row.metadata.kind,
-      row.metadata.page,
-      row.createdBy.id,
-      row.createdBy.name,
-      row.metadata.label,
-    ],
+    [row.metadata.dropId, row.metadata.kind, row.metadata.page, row.author.id, row.author.name, row.metadata.label],
     [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null],
     "no element: Drop can't see inside the frame",
   )
@@ -1085,7 +1079,8 @@ test("comments and replies in Drop take images, which belong to the drop and go 
     posted.attachments.map((file) => [file.filename, file.contentType]),
     [["mock.png", "image/png"]],
   )
-  assert.match(posted.attachments[0].url, /^\/f\/[0-9a-f-]{36}\.png$/)
+  // ViteHub Comments serves it (server/comments.ts `readAttachment`), to whoever may read the thread.
+  assert.equal(posted.attachments[0].url, `/api/_vitehub/comments/attachments/${posted.attachments[0].id}`)
   const stored = sql.prepare("SELECT * FROM drops WHERE parent_id = 'doc'").get()
   assert.equal(stored.kind, "image")
   assert.equal(stored.owner_id, "owner")
@@ -1123,7 +1118,7 @@ test("comments and replies in Drop take images, which belong to the drop and go 
   const keys = sql.prepare("SELECT blob_key FROM drops WHERE parent_id = 'doc'").all()
   assert.equal(keys.length, 2)
   // A reply goes by its own id, with its image. The thread's first comment is no reply.
-  const opening = threads().find((thread) => thread.id === posted.id).comments[0].id
+  const opening = threads().find((thread) => thread.id === posted.id).messages[0].id
   const first = request(`/api/replies/${opening}`, { method: "DELETE", id: opening })
   assert.equal((await answer(replyDelete, first)).status, 404)
   const gone = request(`/api/replies/${answered.id}`, { method: "DELETE", id: answered.id })
@@ -1189,7 +1184,7 @@ test("deleting a screenshot takes its own comments, and deleting the site takes 
   const image = sql.prepare("SELECT id FROM drops WHERE parent_id = 'site'").get()
   await deleteDrop(await findDrop(image.id))
   assert.deepEqual(
-    threads().map((thread) => [thread.number, thread.metadata.dropId]),
+    threads().map((thread) => [thread.n, thread.metadata.dropId]),
     [[2, "site"]],
   )
   // The next comment still counts on from the site's list.

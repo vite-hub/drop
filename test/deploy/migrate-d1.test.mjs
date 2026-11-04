@@ -71,6 +71,7 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
   const [baseline, authEvents, suggestions, comments, dropComments, cleanup, acceptances, undos, release] = migrations
+  const oneModel = migrations.at(-1)
   // Comments must follow main's latest migration. Earlier previews can already contain comments at older timestamps.
   for (const {
     appliedMigrations,
@@ -136,12 +137,14 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
           VALUES ('legacy-image', 'legacy-comment', 'legacy-reply', 1);
         `)
       }
-      if (appliedMigrations.includes(comments)) {
+      // Live-site rows, while the database still has the live-site tables.
+      const seeded = appliedMigrations.includes(comments) && !appliedMigrations.includes(oneModel)
+      if (seeded) {
         database.exec(`
           INSERT INTO vitehub_comment_threads (id, number, page, anchor, status, created_by, created_at, updated_at)
-            VALUES ('existing-thread', 12, '/', '{}', 'open', 'admin', 1, 1);
+            VALUES ('existing-thread', 12, '/', '{}', 'open', '{"id":"admin","name":"Admin"}', 1, 1);
           INSERT INTO vitehub_comments (id, thread_id, body, mentions, author, created_at)
-            VALUES ('existing-comment', 'existing-thread', 'Keep this comment', '[]', 'admin', 1);
+            VALUES ('existing-comment', 'existing-thread', 'Keep this comment', '[]', '{"id":"admin","name":"Admin"}', 1);
         `)
         if (appliedMigrations.includes(release))
           database.exec("INSERT INTO vitehub_comment_scope_counters (scope, last_number) VALUES ('pages', 12)")
@@ -181,6 +184,9 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
         "quota_reservations",
         "abuse_reports",
         "vitehub_comment_threads",
+        "vitehub_comment_messages",
+        "vitehub_comment_counters",
+        "vitehub_comment_threads_live",
         "vitehub_comments",
         "vitehub_comment_scope_counters",
         "vitehub_comment_forge",
@@ -227,7 +233,7 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
           .some((column) => column.name === "agent"),
       )
       const threadColumns = database.prepare("PRAGMA table_info(vitehub_comment_threads)").all()
-      for (const name of ["scope", "number", "metadata"])
+      for (const name of ["scope", "n", "subject_kind", "metadata", "revision"])
         assert.ok(threadColumns.some((column) => column.name === name))
       for (const table of ["comments", "comment_replies"])
         assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table), undefined)
@@ -240,18 +246,29 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
         database.prepare("SELECT count(*) AS n FROM comment_cleanup").get().n,
         appliedMigrations.includes(cleanup) ? 1 : 0,
       )
-      if (appliedMigrations.includes(comments)) {
+      if (seeded) {
         assert.equal(
           database.prepare("SELECT last_number FROM vitehub_comment_scope_counters WHERE scope = 'pages'").get()
             .last_number,
           12,
         )
         assert.equal(
-          database.prepare("SELECT body FROM vitehub_comments WHERE id = 'existing-comment'").get().body,
+          database.prepare("SELECT body FROM vitehub_comment_messages WHERE id = 'existing-comment'").get().body,
           "Keep this comment",
         )
+        assert.deepEqual(
+          {
+            ...database
+              .prepare(
+                "SELECT scope, n, subject_kind, subject_id FROM vitehub_comment_threads WHERE id = 'existing-thread'",
+              )
+              .get(),
+          },
+          { scope: "site", n: 12, subject_kind: "page", subject_id: "/" },
+        )
+        // The live-site rows stay behind as the backup.
         assert.equal(
-          database.prepare("SELECT page FROM vitehub_comment_threads WHERE id = 'existing-thread'").get().page,
+          database.prepare("SELECT page FROM vitehub_comment_threads_live WHERE id = 'existing-thread'").get().page,
           "/",
         )
       }

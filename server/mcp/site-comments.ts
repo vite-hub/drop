@@ -3,7 +3,7 @@ import { HTTPError, type H3Event } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { commentsMcpTools } from "vite-hub/comments/runtime"
-import { comments } from "../comments"
+import comments from "../comments"
 import { requireIdentity } from "../utils/identity"
 
 /** The ViteHub Comments tools, by name: the same ones ViteHub MCP serves at /_vitehub/mcp. */

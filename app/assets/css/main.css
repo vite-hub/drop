@@ -424,6 +424,12 @@ body {
   font-weight: var(--shiki-dark-font-weight) !important;
 }
 
+/* A comment's words render as Comark, whose typeset paints its grain behind the text. The review surface has its own,
+   so a message would sit in a lighter box on it. */
+[data-slot="comment-reply-body"] {
+  --comark-grain: none;
+}
+
 /* Other people's carets come from vite-hub/ui/styles.css. Drop sets their name pill in its mono face. */
 .drop-doc .collaboration-carets__label {
   font: 500 11px/1.4 var(--font-mono);

@@ -52,17 +52,19 @@ async function request(path, { cookie = "", method = "GET", body, headers = {} }
   return { status: response.status, headers: response.headers, data, text }
 }
 
-// A browser opening a page. fetch always sends `sec-fetch-mode: cors`, so node:http sends this one.
+// A browser opening a page, with the Fetch Metadata it sends. fetch always sends `sec-fetch-mode: cors`, so node:http
+// sends this one.
 const navigate = (path, cookie = "") =>
   new Promise((resolve, reject) => {
-    get(`${origin}${path}`, { headers: { cookie, "sec-fetch-mode": "navigate" } }, (response) => {
+    const headers = { cookie, accept: "text/html", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" }
+    get(`${origin}${path}`, { headers }, (response) => {
       response.resume()
       resolve({ status: response.statusCode, location: response.headers.location })
     }).on("error", reject)
   })
 const manage = (cookie, body) => request("/_vitehub/auth/manage", { cookie, method: "POST", body })
-const rpc = (cookie, method) =>
-  request("/_vitehub/rpc/__call", { cookie, method: "POST", body: { method: `vitehub:console:${method}`, input: {} } })
+const rpc = (cookie, operation) =>
+  request("/_vitehub/rpc/__call", { cookie, method: "POST", body: { operation, input: {} } })
 
 async function signup(name, email) {
   const password = `Local-${crypto.randomUUID()}`
@@ -89,7 +91,7 @@ await test("Worker Console authorization, admin-only pages, every section for ad
   const member = await signup("Sam Rivera", "console-member@example.com")
   const other = await signup("Jamie Lee", "console-other@example.com")
   try {
-    // Seed a stale non-operator role before the first authorized Console request sweeps this policy.
+    // A stale stored role: the Console shows the one DROP_ADMINS gives now.
     db.prepare("UPDATE user SET role='admin' WHERE id=?").run(other.id)
     const signIn = await request("/api/auth/sign-in/email", {
       method: "POST",
@@ -101,22 +103,22 @@ await test("Worker Console authorization, admin-only pages, every section for ad
     assert.equal(signIns.length, 2, "Sign-up and explicit sign-in each record a completed authentication")
     assert.ok(signIns.every((event) => event.metadata.method === "email-password"))
     for (const cookie of ["", member.cookie]) {
-      const expected = cookie ? 403 : 401
+      const expected = cookie ? 404 : 401
       // Only admins get the Console's pages: a member gets a 404, and a signed-out browser goes to sign in.
       const page = await navigate("/_vitehub/auth", cookie)
       assert.equal(page.status, cookie ? 404 : 302)
       if (!cookie) assert.equal(page.location, "/signin?redirect=%2F_vitehub%2Fauth")
-      // A script or tool fetching the page gets no more than the static shell.
+      // A script or tool fetching the page gets no Console either, and no redirect to sign in.
       const shell = await request("/_vitehub/auth", { cookie })
-      assert.equal(shell.status, cookie ? 404 : 200)
+      assert.equal(shell.status, cookie ? 404 : 401)
       assert.doesNotMatch(shell.text, /console-(?:admin|member|other)@example\.com/)
       assert.equal((await manage(cookie, { operation: "users" })).status, expected)
-      assert.equal((await rpc(cookie, "sections")).status, expected)
-      assert.equal((await rpc(cookie, "status")).status, expected)
+      assert.equal((await rpc(cookie, "sections.list")).status, expected)
+      assert.equal((await rpc(cookie, "status.get")).status, expected)
       assert.equal((await request("/api/_vitehub/console/status", { cookie })).status, 404)
     }
     db.prepare("UPDATE user SET email_verified=0 WHERE id=?").run(admin.id)
-    assert.equal((await manage(admin.cookie, { operation: "users" })).status, 403)
+    assert.equal((await manage(admin.cookie, { operation: "users" })).status, 404)
     db.prepare("UPDATE user SET email_verified=1, role='member' WHERE id=?").run(admin.id)
     const page = await request("/_vitehub/auth", { cookie: admin.cookie })
     assert.equal(page.status, 200, page.text)
@@ -132,13 +134,13 @@ await test("Worker Console authorization, admin-only pages, every section for ad
     assert.equal(description.data.actions.impersonate.enabled, false)
     assert.ok(description.data.access.some((line) => line.includes("DROP_MEMBERS is off")))
     // Admins see every section, Blob included.
-    const sections = await rpc(admin.cookie, "sections")
+    const sections = await rpc(admin.cookie, "sections.list")
     assert.equal(sections.status, 200, sections.text)
     assert.ok(sections.data.value.sections.includes("blob"), sections.text)
     assert.equal(sections.data.value.scoped, undefined)
-    assert.equal((await rpc(admin.cookie, "database")).status, 200)
-    assert.equal((await rpc(admin.cookie, "env")).status, 200)
-    // Other users must also lose stale admin labels and filter membership without signing in again.
+    assert.equal((await rpc(admin.cookie, "databases.browse")).status, 200)
+    assert.equal((await rpc(admin.cookie, "env.get")).status, 200)
+    // Other users lose stale admin labels and filter membership without signing in again.
     const users = await manage(admin.cookie, { operation: "users" })
     assert.equal(users.status, 200, users.text)
     assert.ok(users.data.items.some((user) => user.id === member.id && user.fields.drops === 0))
@@ -149,8 +151,12 @@ await test("Worker Console authorization, admin-only pages, every section for ad
       admins.data.items.map((user) => user.id),
       [admin.id],
     )
-    for (const action of ["setRole", "impersonate"])
-      assert.equal((await manage(admin.cookie, { action, userId: member.id, role: "admin" })).status, 403)
+    // Without `console.impersonation`, the Console has no impersonate action at all.
+    for (const [action, status] of [
+      ["setRole", 403],
+      ["impersonate", 404],
+    ])
+      assert.equal((await manage(admin.cookie, { action, userId: member.id, role: "admin" })).status, status, action)
     for (const action of ["ban", "remove"])
       assert.notEqual((await manage(admin.cookie, { action, userId: admin.id })).status, 200, "Self-action must fail")
     assert.equal(db.prepare("SELECT banned FROM user WHERE id=?").get(admin.id).banned, 0)
@@ -209,10 +215,8 @@ await test("Worker Console authorization, admin-only pages, every section for ad
     }
     assert.equal((await request("/members", { cookie: admin.cookie })).status, 404)
     assert.equal((await request("/api/members", { cookie: admin.cookie })).status, 404)
-    const people = await request("/api/people", { cookie: admin.cookie })
-    assert.equal(people.status, 200, people.text)
-    assert.deepEqual(Object.keys(people.data[0]).sort(), ["id", "image", "name"])
-    assert.equal((await request("/api/people")).status, 401)
+    // "@" asks ViteHub Comments per drop (/api/_vitehub/comments/people?subjectKind=drop); the Drop-wide list is gone.
+    assert.equal((await request("/api/people", { cookie: admin.cookie })).status, 404)
     assert.equal(
       (
         await request("/_vitehub/auth/manage", {

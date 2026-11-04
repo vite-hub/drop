@@ -5,16 +5,17 @@
 import type { EditorEmojiMenuItem, EditorSuggestionMenuItem, EditorToolbarItem } from "@nuxt/ui"
 import { type Editor, EditorContent } from "@tiptap/vue-3"
 import { DOC_WIDTHS, type DocWidth } from "#shared/documents"
-// AvatarStack, ConnectionStatus, and the carets. The viewer loads this component only while someone edits.
-import "vite-hub/ui/styles.css"
 
 const props = defineProps<{ editor?: Editor; synced: boolean; width: DocWidth }>()
 const prompt = usePrompt()
 
-// Everyone in this Drop, for "@".
+// The people who may read this drop, for "@", from the same list as the comment boxes.
 const { people: members } = usePeople()
 const people = computed(() =>
-  members.value.map((member) => ({ label: member.name, avatar: { src: member.image ?? undefined, alt: member.name } })),
+  members.value.map((member) => {
+    const name = member.name ?? member.id
+    return { label: name, avatar: { src: member.image, alt: name } }
+  }),
 )
 
 // GitHub's emoji set, loaded with the editor rather than with the page. Custom GitHub images have no character to insert.

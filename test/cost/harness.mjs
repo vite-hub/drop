@@ -164,7 +164,7 @@ export const state = (globalThis.dropTest = {
     },
   },
 })
-const { comments } = await import("../../server/comments.ts")
+const { default: comments } = await import("../../server/comments.ts")
 /**
  * Applies the migrations, and gives Drop's Comments (server/comments.ts) the database, as ViteHub does at start.
  * `comments: false` leaves Comments without one, as a server whose ViteHub plugin found no Database.
@@ -177,19 +177,31 @@ export function migrate({ comments: install = true } = {}) {
     sql.exec(readFileSync(new URL(name, directory), "utf8"))
   if (install) installComments(comments, { database: state.db })
 }
+const authorOf = (row) => ({
+  id: row.author_id,
+  ...(row.author_name ? { name: row.author_name } : {}),
+  ...(row.author_image ? { image: row.author_image } : {}),
+  ...(row.author_id.startsWith("guest:") ? { guest: true } : {}),
+})
 /** Every comment thread, by scope and number, with its JSON fields read. */
 export const threads = () =>
   sql
-    .prepare("SELECT * FROM vitehub_comment_threads ORDER BY scope, number")
+    .prepare("SELECT * FROM vitehub_comment_threads ORDER BY scope, n")
     .all()
     .map((row) => ({
       ...row,
       metadata: JSON.parse(row.metadata),
-      createdBy: JSON.parse(row.created_by),
-      comments: sql
-        .prepare("SELECT * FROM vitehub_comments WHERE thread_id = ? ORDER BY created_at")
+      anchor: JSON.parse(row.anchor),
+      author: authorOf(row),
+      messages: sql
+        .prepare("SELECT * FROM vitehub_comment_messages WHERE thread_id = ? ORDER BY created_at, id")
         .all(row.id)
-        .map((comment) => ({ ...comment, author: JSON.parse(comment.author) })),
+        .map((message) => ({
+          ...message,
+          author: authorOf(message),
+          mentions: JSON.parse(message.mentions),
+          attachments: JSON.parse(message.attachments),
+        })),
     }))
 export function event(path, method = "GET") {
   const request = new H3Event(new Request(`https://drop.example${path}`, { method }))
@@ -198,7 +210,7 @@ export function event(path, method = "GET") {
 }
 export function reset() {
   sql.exec(
-    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comments; DELETE FROM vitehub_comment_threads; DELETE FROM vitehub_comment_scope_counters; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM comment_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
+    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comment_messages; DELETE FROM vitehub_comment_threads; DELETE FROM vitehub_comment_counters; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM comment_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
   )
   state.bursts.length = 0
   state.failBurst = false

@@ -33,23 +33,19 @@ function publicDoc() {
   insertVersion(LINK, 1)
   insertDrop("image", { kind: "image", blob_key: IMAGE, parent_id: LINK, share: "public" })
   // A ViteHub Comments thread on the doc's list (server/utils/comments.ts), with a guest's reply.
-  const metadata = { dropId: LINK, version: 2, kind: "text", selector: "p", ox: 0, oy: 0, ow: 0, oh: 0 }
-  const owner = JSON.stringify({ id: "owner", name: "Owner" })
+  const metadata = { dropId: LINK, kind: "text", selector: "p", ox: 0, oy: 0, ow: 0, oh: 0 }
   sql
     .prepare(
-      "INSERT INTO vitehub_comment_threads (id, scope, number, page, anchor, metadata, status, created_by, created_at, updated_at) VALUES ('c1', ?, 1, ?, 'null', ?, 'open', ?, 1, 2)",
+      "INSERT INTO vitehub_comment_threads (id, scope, n, subject_kind, subject_id, anchor, metadata, revision, status, author_id, author_name, created_at, updated_at) VALUES ('c1', ?, 1, 'drop', ?, '{\"kind\":\"page\"}', ?, 2, 'open', 'owner', 'Owner', 1, 2)",
     )
     .run(
       `drop:${LINK}`,
-      `/d/${LINK}`,
+      LINK,
       JSON.stringify({ ...metadata, quote: null, label: null, page: null, elementX: null, elementY: null }),
-      owner,
     )
-  sql
-    .prepare(
-      "INSERT INTO vitehub_comments (id, thread_id, body, mentions, author, created_at) VALUES ('c1-1', 'c1', 'Hi', '[]', ?, 1), ('r1', 'c1', 'Yes', '[]', ?, 2)",
-    )
-    .run(owner, JSON.stringify({ id: "guest:1", name: "Guest", guest: true }))
+  sql.exec(
+    "INSERT INTO vitehub_comment_messages (id, thread_id, body, author_id, author_name, mentions, attachments, created_at) VALUES ('c1-1', 'c1', 'Hi', 'owner', 'Owner', '[]', '[]', 1), ('r1', 'c1', 'Yes', 'guest:1', 'Guest', '[]', '[]', 2)",
+  )
 }
 
 const get = (handler, id) => {
@@ -60,16 +56,19 @@ const get = (handler, id) => {
 
 test("a shared doc's page and the APIs it calls wait for few round trips, one after another", async () => {
   publicDoc()
+  // Comments reads its tables' shape once per process, on its first query, to tell an old schema (COMMENTS_R0019).
+  // A Worker pays that once per isolate; this counts what every request after it waits for.
+  await get(commentsHandler, LINK)
   const counts = {
     link: await roundTrips(() => get(linkHandler, LINK)),
     detail: await roundTrips(() => get(detailHandler, LINK)),
     comments: await roundTrips(() => get(commentsHandler, LINK)),
     image: await roundTrips(() => requireBlobAccess(event(`/f/${IMAGE}`), IMAGE)),
   }
-  // The page reads the link, then the doc and its comments side by side (pages/d/[id]/[[slug]].vue). Comments reads a
-  // list's threads, then their comments: the doc, then the threads with the images beside them, then the comments.
+  // The page reads the link, then the doc and its comments side by side (pages/d/[id]/[[slug]].vue). Comments reads
+  // the doc, then its threads with their messages, the images beside them.
   const page = counts.link + Math.max(counts.detail, counts.comments)
-  assert.deepEqual({ ...counts, page }, { link: 1, detail: 2, comments: 3, image: 1, page: 4 })
+  assert.deepEqual({ ...counts, page }, { link: 1, detail: 2, comments: 2, image: 1, page: 3 })
 })
 
 test("an image in a folder brings the folder's images without another round trip", async () => {

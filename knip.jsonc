@@ -5,10 +5,7 @@
   "entry": [
     "server/auth.ts",
     "server/console-authorize.ts",
-    "server/database-migrate.ts",
     "server/handlers/*.ts",
-    "server/code-image-png/*.ts",
-    "server/live-drafts/*.ts",
     "server/realtime/*.ts",
     "server/schedules/*.ts",
     "server/databases/*.ts",
@@ -67,9 +64,5 @@
     // Tests load these through nitro's and vite-hub's own resolution (createRequire), to test the copies they use.
     "unstorage",
     "@vite-hub/rate-limit",
-    "@vite-hub/auth",
-    "@vite-hub/content",
-    "@vite-hub/database",
-    "@vite-hub/schedule",
   ],
 }

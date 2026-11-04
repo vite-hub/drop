@@ -1,6 +1,6 @@
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import { defineMcpTool } from "nitro-mcp-toolkit"
-import { PNG_CODE_IMAGES } from "#code-image-png"
+import { PNG_CODE_IMAGES } from "../../utils/code-image-png"
 import { CodeImageSchema } from "#shared/schemas"
 import { createCodeImage } from "../../utils/code-image-store"
 import { requireIdentity } from "../../utils/identity"

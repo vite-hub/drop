@@ -10,7 +10,7 @@ import { type DropThread, setResolved } from "./comments"
 import { createDocDrop, type DropRow, findDropAt, permissions, readText } from "./drops"
 import type { Identity } from "./identity"
 
-const acceptedNote = (thread: DropThread) => `Accepted suggestion #${thread.number}`
+const acceptedNote = (thread: DropThread) => `Accepted suggestion #${thread.n}`
 
 /** Who may accept or undo a suggestion: editors of its Markdown doc, from the page or an agent. */
 function requireSuggestion(drop: DropRow | null, thread: DropThread | null, who: Identity | null) {
@@ -101,7 +101,7 @@ export async function undoSuggestion(
       bytes: new TextEncoder().encode(await readText(before.blobKey)),
       supersedes: drop.id,
       undoneSuggestionId: thread.id,
-      note: `Undid suggestion #${thread.number}`,
+      note: `Undid suggestion #${thread.n}`,
     },
     event,
   )

@@ -24,7 +24,7 @@ import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#s
 import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { drops, reviewSubmissions, user } from "../databases/config"
-import { attachImages, type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
+import { type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
 import { addThread, authorOf, findThread, removeThread, siteCommentList, threadsFor, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { isExpired, expiryPolicy, renewDrop } from "./expiry"
@@ -438,37 +438,41 @@ export async function addReviewComment(
     const existing = await submittedReview(site, input.requestId)
     if (existing) return existing
   }
+  let created: Awaited<ReturnType<typeof insertReviewComment>> | undefined
   try {
     const { row } = await withImages(
+      site,
       images,
-      () => insertReviewComment(site, author, input, shot, origin, Boolean(input.requestId && images.length)),
-      async (added) => {
-        const attachments = await attachImages(
+      author.name,
+      async (ids) => {
+        created = await insertReviewComment(
           site,
-          images,
-          { commentId: added.comments[0]!.id, replyId: null, n: added.number },
-          author.name,
+          author,
+          input,
+          shot,
+          origin,
+          ids,
+          Boolean(input.requestId && images.length),
         )
-        // The claim is visible before attachment storage finishes. Only publish it once no work can roll it back.
-        if (added.meta.requestPending) {
-          const threads = commentsSchema.vitehubCommentThreads
-          await db
-            .update(threads)
-            .set({ metadata: sql`json_remove(${threads.metadata}, '$.requestPending')` })
-            .where(eq(threads.id, added.id))
-        }
-        return attachments
+        return created
       },
-      async (added) => {
-        // With a screenshot, the comment's drop must go too.
-        const shotDrop = added.meta.dropId === site.id ? null : await findDrop(added.meta.dropId)
-        // Finalizing the claim can fail after the images were stored, so undo those too.
-        await removeThread(added)
-        if (shotDrop) await deleteDrop(shotDrop)
-      },
+      (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
     )
+    // The claim is visible before its images are linked. Only publish it once no work can roll it back.
+    if (row.meta.requestPending) {
+      const threads = commentsSchema.vitehubCommentThreads
+      await db
+        .update(threads)
+        .set({ metadata: sql`json_remove(${threads.metadata}, '$.requestPending')` })
+        .where(eq(threads.id, row.id))
+    }
     return row
   } catch (error) {
+    if (created) {
+      const shotDrop = created.meta.dropId === site.id ? null : await findDrop(created.meta.dropId)
+      await removeThread(created)
+      if (shotDrop) await deleteDrop(shotDrop)
+    }
     // A competing POST may have committed after the lookup above. The database claim rejects our whole Comments
     // batch, and insertReviewComment removes any extra screenshot before we reuse the winning thread.
     if (input.requestId) {
@@ -483,7 +487,7 @@ async function submittedReview(site: Pick<DropRow, "id">, requestId: string) {
   const [receipt] = await db
     .select({ threadId: reviewSubmissions.threadId })
     .from(reviewSubmissions)
-    .where(and(eq(reviewSubmissions.scope, siteCommentList(site).scope), eq(reviewSubmissions.requestId, requestId)))
+    .where(and(eq(reviewSubmissions.scope, `site:${site.id}`), eq(reviewSubmissions.requestId, requestId)))
     .limit(1)
   const thread = receipt ? await findThread(receipt.threadId) : null
   if (thread?.meta.requestPending)
@@ -497,6 +501,7 @@ async function insertReviewComment(
   input: ReviewCommentInput,
   shot: Screenshot | null,
   origin: string,
+  attachments: string[],
   pending: boolean,
 ) {
   const now = Date.now()
@@ -513,12 +518,9 @@ async function insertReviewComment(
     elementX: input.selector && input.spot ? input.spot.x : null,
     elementY: input.selector && input.spot ? input.spot.y : null,
   }
-  const thread = {
-    body: input.body,
-    author: authorOf(author.who, author.name),
-    // Comments files the thread under the page's path, without its query and hash.
-    page: input.page.replace(/[?#].*$/, "") || "/",
-  }
+  const thread = { body: input.body, author: authorOf(author.who, author.name), attachments }
+  // The page's path, without its query and hash.
+  const path = input.page.replace(/[?#].*$/, "") || "/"
   if (!shot)
     return addThread(
       site,
@@ -535,7 +537,7 @@ async function insertReviewComment(
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
       const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
       if (storageError) throw storageFailure(storageError)
-      const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + thread.page : thread.page
+      const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
       const row = imageDrop(
         site,
         {
@@ -593,7 +595,7 @@ export async function siteItems(
   return threads
     .filter(({ meta }) => !meta.requestPending)
     .filter(({ meta }) => !page || meta.page === page || Boolean(meta.page?.startsWith(`${page}#`)))
-    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.number - a.number)
+    .sort((a, b) => b.createdAt - a.createdAt || b.n - a.n)
     .map((thread) => {
       const { meta } = thread
       const shot = byId.get(meta.dropId)
