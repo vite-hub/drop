@@ -1,23 +1,12 @@
 import type { DocWidth } from "#shared/documents"
 import type { DeviceSize } from "~/utils/devices"
-import type { SideTab } from "~/utils/viewer"
 
 const year = 60 * 60 * 24 * 365
 
-/**
- * UI preferences that change the layout. They live in cookies, not localStorage, so the server renders
- * the same layout the browser will show: no flash of a closed panel, no hydration mismatch.
- */
-export function useSidePanel() {
-  // Details and History live here. Comments have their own bottom dock.
-  const open = useCookie<boolean>("drop-side-panel", { default: () => false, maxAge: year, sameSite: "lax" })
-  const tab = useCookie<SideTab>("drop-side-tab", { default: () => "details", maxAge: year, sameSite: "lax" })
-  // In rem, like the sidebar's (UDashboardGroup's unit), so the server renders the width they left it at.
-  const width = useCookie<number>("drop-side-width", { default: () => 24, maxAge: year, sameSite: "lax" })
-  return { open, tab, width }
-}
+// UI preferences that change the layout live in cookies, not localStorage, so the server renders the same layout the
+// browser will show: no flash, no hydration mismatch.
 
-/** How wide a folder's preview pane is, in rem like the side panel's, dragged from its left edge. */
+/** How wide a folder's preview pane is, in rem, dragged from its left edge. */
 export const useFolderPreviewWidth = () =>
   useCookie<number>("drop-folder-preview-width", { default: () => 22, maxAge: year, sameSite: "lax" })
 
