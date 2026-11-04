@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Comments as a mode, not a panel over the page: pressing it (C) lets the reader click or drag on the page to comment
-// on that spot, and the button says so ("Click to comment"). A segment grows beside it inside the pill, holding only
+// on that spot, and the button says so ("Click anywhere"). A segment grows beside it inside the pill, holding only
 // actions: Whole page (a comment on the page itself, in the dock), All comments with the open count (the dock's list),
 // and × to stop. On a phone the segment takes its own row above the pill's.
 const on = defineModel<boolean>("on", { required: true })
@@ -20,7 +20,7 @@ const item =
     <button
       :aria-controls="canUseMode ? 'drop-comment-actions' : 'drop-comments'"
       aria-keyshortcuts="C"
-      :aria-label="on ? 'Click to comment' : count ? `Comments, ${count} open` : 'Comments'"
+      :aria-label="on ? 'Comments: click anywhere on the page' : count ? `Comments, ${count} open` : 'Comments'"
       :aria-pressed="canUseMode ? on : undefined"
       :aria-expanded="canUseMode ? undefined : listOpen"
       class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
@@ -30,7 +30,7 @@ const item =
       @click="emit('toggle')"
     >
       <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />
-      {{ on ? "Click to comment" : "Comments" }}
+      {{ on ? "Click anywhere" : "Comments" }}
       <span v-if="count && !on" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
         count
       }}</span>

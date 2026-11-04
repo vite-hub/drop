@@ -344,9 +344,10 @@ const pinThread = computed(
 watch(selection, (value) => {
   if (value?.settled && pinStyle.value && !coarse.value) commentOnSelection()
 })
-// Escape in the composer drops the draft, words and all.
+// Escape in the compact composer drops the draft, words and pictures.
 function dropPinDraft() {
   reviewDraft.body.value = ""
+  reviewDraft.images.clear()
   popover.value = null
 }
 const PIN_BUBBLE_WIDTH = 300
@@ -386,6 +387,9 @@ const floatShown = computed(
     floating.value &&
     (popover.value?.type !== "new" || popover.value.pending.kind !== "text" || !!draftPlace.value),
 )
+// The floating card is one small surface, the line and its send button (ViewerPinComposer); a suggestion keeps the full
+// composer for the words that replace the quote.
+const compactFloat = computed(() => popover.value?.type === "new" && popover.value.pending.suggestion === undefined)
 const FLOAT_WIDTH = 288
 const floatStyle = computed(() => {
   const place = draftPlace.value
@@ -1402,10 +1406,16 @@ watch(
       v-if="floatShown"
       ref="floatRef"
       aria-label="New comment"
-      class="fixed z-40 flex max-h-[min(24rem,60dvh)] origin-top-left flex-col overflow-y-auto overscroll-contain rounded-lg border border-default bg-default shadow-lg motion-safe:[animation:pop-in_150ms_var(--ease-out)]"
+      class="fixed z-40 flex max-h-[min(24rem,60dvh)] origin-top-left flex-col overflow-y-auto overscroll-contain bg-default motion-safe:[animation:pop-in_150ms_var(--ease-out)]"
+      :class="
+        compactFloat
+          ? 'rounded-[6px_18px_18px_18px] shadow-[0_0_0_1px_rgb(0_0_0/6%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:shadow-[0_0_0_1px_rgb(255_255_255/10%)]'
+          : 'rounded-lg border border-default shadow-lg'
+      "
       :style="floatStyle"
     >
-      <ReuseComposer />
+      <ViewerPinComposer v-if="compactFloat" ref="popoverRef" @cancel="dropPinDraft" @submit="submit" />
+      <ReuseComposer v-else />
     </section>
     <Transition
       enter-active-class="motion-safe:transition-[opacity,scale] motion-safe:duration-180 motion-safe:ease-[cubic-bezier(.23,1,.32,1)]"
