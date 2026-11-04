@@ -17,6 +17,14 @@ defineExpose({
     root.value?.querySelector<HTMLButtonElement>(`[data-thread-id="${CSS.escape(id)}"]`)?.focus(),
 })
 
+// A suggestion with no note has no text of its own, so its row shows the redline instead.
+const suggestions = computed(() => {
+  const rows = new Map<string, { quote: string; suggestion: string }>()
+  for (const { id, quote, suggestion } of props.comments)
+    if (quote && suggestion !== null) rows.set(id, { quote, suggestion })
+  return rows
+})
+
 const group = (thread: { id: string; status: string }) =>
   thread.status === "open" && props.outdated.has(thread.id) ? "From earlier versions" : undefined
 
@@ -40,7 +48,12 @@ function select(thread: { id: string }) {
       :upload="upload"
       variant="docked"
       @select="select"
-    />
+    >
+      <template #preview="{ thread, text }">
+        <ViewerSuggestion v-if="!text && suggestions.has(thread.id)" v-bind="suggestions.get(thread.id)!" inline />
+        <template v-else>{{ text }}</template>
+      </template>
+    </CommentPanel>
   </div>
 </template>
 
