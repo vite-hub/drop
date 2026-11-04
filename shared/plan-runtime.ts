@@ -1653,17 +1653,29 @@ const DROP_TOKEN =
 const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\s*:/.test(html)
 
 /**
- * A prototype (skills/prototype) carries its own copy of the skill's picker.js in a script element. Match its whole
- * source inside that element, so authored text and scripts quoting the picker stay intact. Drop runs the current
- * picker in that copy's place, so a prototype published before a picker change still works with Drop's bar.
+ * A prototype (skills/prototype) is a page with `data-variant` items. Drop owns its picker: it runs the current
+ * skills/prototype/assets/picker.js in every one, whether the author pasted a copy or not, so a prototype published
+ * before a picker change gets the new one and no prototype depends on a copy surviving intact. Any copy the author
+ * pasted (whole, trimmed, or older) or loaded from a URL goes: the signature is loose on purpose, since a trimmed copy
+ * that runs never posts its items to Drop's bar and hides all but the first. A copy that slips through steps aside for
+ * Drop's, which `__dropPicker` announces before the page's scripts run.
  */
-const EMBEDDED_PICKER = /^\s*\/\/ Drop prototype picker\.[\s\S]*\n\}\)\(\);\s*$/
-function upgradePicker(html: string): string {
-  return html.replace(
-    /(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/gi,
-    (script, open: string, source: string, close: string) =>
-      EMBEDDED_PICKER.test(source) ? `${open}${PICKER.trimEnd()}${close}` : script,
+const PROTOTYPE = /<[a-z][^>]*\sdata-variant[\s=>]/i
+const PASTED_PICKER =
+  /Drop prototype picker|prototype-picker|__dropVariantBar|["'`]drop-prototype(?:-canvas)?:|CustomEvent\(\s*["'`]variantchange/
+const PICKER_URL = /\ssrc\s*=\s*["']?[^"'\s>]*picker\.js/i
+function withPicker(html: string): string {
+  if (!PROTOTYPE.test(html)) return html
+  const stripped = html.replace(
+    /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi,
+    (script, attributes: string, source: string) =>
+      PICKER_URL.test(attributes) || (!/\ssrc\s*=/i.test(attributes) && PASTED_PICKER.test(source)) ? "" : script,
   )
+  const marked = prependToHead(stripped, "<script>self.__dropPicker = true;</script>")
+  const picker = `<script data-drop-picker>${PICKER.trimEnd()}</script>`
+  return /<\/body>/i.test(marked)
+    ? marked.replace(/<\/body>(?![\s\S]*<\/body>)/i, () => picker + "</body>")
+    : marked + picker
 }
 
 /**
@@ -1676,19 +1688,19 @@ export const withVariantBar = (document: string) =>
 /**
  * An HTML drop as a Markdown doc's `::drop` box shows it (EMBEDS_SCRIPT in ./documents): no comment layer or error
  * reporter, since the doc around it is what readers review, but storage that works in its opaque origin, Drop's theme
- * when it reads Drop's tokens, and the reader's color mode as a `dark` class on its root either way.
+ * when it reads Drop's tokens, the reader's color mode as a `dark` class on its root either way, and a prototype's picker.
  */
 export function embedDocument(html: string, dark: boolean): string {
   const theme = usesDropTheme(html) ? `<style data-drop-theme>${THEME_CSS}</style>` : ""
   return prependToHead(
-    html,
+    withPicker(html),
     `<script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.classList.toggle("dark", ${dark});</script>`,
   )
 }
 
 /**
- * Injects Drop's runtime into a full HTML document. The author's markup stays as it is, except a prototype's picker,
- * which becomes the current one (EMBEDDED_PICKER).
+ * Injects Drop's runtime into a full HTML document. The author's markup stays as it is, except that a prototype runs
+ * Drop's current picker in place of any it carries (withPicker).
  * `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it.
  * `authored`: a page someone else built (an HTML doc or an app page), which gets only what comments need: Drop's
  * theme only if it reads Drop's tokens, and a comment layer that leaves its clicks alone (ANNOTATOR_SCRIPT).
@@ -1703,7 +1715,7 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
     .replace("__AUTHORED__", String(authored))
     .replace("__THEMED__", String(Boolean(theme)))
     .replace("__DARK__", String(dark))}</script>`
-  let out = prependToHead(authored ? upgradePicker(html) : html, head)
+  let out = prependToHead(authored ? withPicker(html) : html, head)
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, tail + "</body>") : out + tail
   return out
 }

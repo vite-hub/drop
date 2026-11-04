@@ -1,17 +1,17 @@
 <script setup lang="ts">
-// A prototype's variants in the review dock's bar, in place of the bar its picker (skills/prototype) draws on a page
-// alone: previous, the numbered variants, next, the showing one's note, and the canvas with its camera. The page keeps
-// the state and does the switching; this shows it and sends the reader's commands. ← → and 1–9 work here too while the
-// page isn't focused, and the address's #v-… names the variant showing, as it does on the page alone.
+// A prototype's state in the review dock's bar, in place of the bar its picker (skills/prototype) draws on a page alone.
+// On the canvas: how many items, and the camera. In focus: the item showing with its note, a step either way, and the
+// way back to the canvas. The page keeps the state and does the switching; this shows it and sends the reader's
+// commands. While the page isn't focused, 1–9 open an item here too and ← → step in focus. The address's #v-… names
+// the item in focus, as it does on the page alone, and opens it in focus on the next visit.
 import type { PickerCommand, ViewerVariants } from "~/composables/useViewerFrame"
 
 const props = defineProps<{ state: ViewerVariants }>()
 const emit = defineEmits<{ command: [command: PickerCommand, index?: number] }>()
 const group = useTemplateRef<HTMLElement>("group")
 const shown = computed(() => props.state.variants[props.state.current]!)
-const name = (variant: { id: string; label: string }) => variant.label || variant.id
+const count = computed(() => props.state.variants.length)
 
-// The address opens the variant it names, then follows the one showing.
 const named = () => props.state.variants.findIndex((variant) => variant.id && `#${variant.id}` === location.hash)
 let opened = false
 watch(
@@ -20,21 +20,14 @@ watch(
     if (!opened) {
       opened = true
       const at = named()
-      if (at >= 0 && at !== state.current) return emit("command", "show", at)
+      if (at >= 0 && (state.canvas || at !== state.current)) return emit("command", "show", at)
     }
-    const { id } = shown.value
-    if (id && location.hash !== `#${id}`) history.replaceState(history.state, "", `#${id}`)
+    if (!state.canvas && shown.value.id) {
+      if (location.hash !== `#${shown.value.id}`) history.replaceState(history.state, "", `#${shown.value.id}`)
+    } else if (state.canvas && named() >= 0)
+      history.replaceState(history.state, "", location.pathname + location.search)
   },
   { immediate: true },
-)
-watch(
-  () => props.state.current,
-  async () => {
-    await nextTick()
-    group.value
-      ?.querySelector("[data-variant][aria-pressed=true]")
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" })
-  },
 )
 
 useEventListener("hashchange", () => {
@@ -45,11 +38,15 @@ useEventListener("hashchange", () => {
 useEventListener("keydown", (event: KeyboardEvent) => {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
   const target = event.target
-  if (target !== document.body && !(target instanceof Node && group.value?.contains(target))) return
+  const inBar = target instanceof Node && Boolean(group.value?.contains(target))
+  if (target !== document.body && !inBar) return
   const n = Number(event.key)
-  if (event.key === "ArrowLeft") emit("command", "prev")
+  if (/^[1-9]$/.test(event.key) && n <= count.value) emit("command", "show", n - 1)
+  else if (props.state.canvas) return
+  else if (event.key === "ArrowLeft") emit("command", "prev")
   else if (event.key === "ArrowRight") emit("command", "next")
-  else if (/^[1-9]$/.test(event.key) && n <= props.state.variants.length) emit("command", "show", n - 1)
+  // Only from the bar: on the page, Escape is Drop's, which closes what's open first.
+  else if (event.key === "Escape" && inBar) emit("command", "canvas")
   else return
   event.preventDefault()
 })
@@ -63,59 +60,14 @@ const camera: { command: PickerCommand; label: string; icon?: string; kbd: strin
 </script>
 
 <template>
-  <div ref="group" aria-label="Prototype variants" class="flex max-w-full min-w-0 items-center gap-0.5" role="group">
-    <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['←']" text="Previous variant">
-      <button
-        aria-label="Previous variant"
-        class="inline-flex shrink-0 items-center"
-        type="button"
-        @click="emit('command', 'prev')"
-      >
-        <UIcon aria-hidden="true" name="i-mingcute-arrow-left-line" />
-      </button>
-    </UTooltip>
-    <div class="flex min-w-0 gap-0.5 overflow-x-auto [scrollbar-width:none]">
-      <UTooltip
-        v-for="(variant, index) in state.variants"
-        :key="variant.id || index"
-        :content="{ side: 'top', sideOffset: 8 }"
-        :disabled="!variant.note"
-        :kbds="index < 9 ? [String(index + 1)] : undefined"
-        :text="variant.note"
-      >
-        <button
-          :aria-pressed="index === state.current"
-          class="inline-flex shrink-0 items-center whitespace-nowrap"
-          data-variant
-          type="button"
-          @click="emit('command', 'show', index)"
-        >
-          <span aria-hidden="true" class="tabular-nums opacity-60">{{ index + 1 }}</span
-          >{{ name(variant) }}
-        </button>
+  <div ref="group" aria-label="Prototype" class="flex max-w-full min-w-0 items-center gap-0.5" role="group">
+    <template v-if="state.canvas">
+      <UTooltip :content="{ side: 'top', sideOffset: 8 }" text="Double-click a name, or press 1–9, to open one">
+        <span class="shrink-0 px-2 text-muted tabular-nums">{{ count }} items</span>
       </UTooltip>
-    </div>
-    <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['→']" text="Next variant">
-      <button
-        aria-label="Next variant"
-        class="inline-flex shrink-0 items-center"
-        type="button"
-        @click="emit('command', 'next')"
-      >
-        <UIcon aria-hidden="true" name="i-mingcute-arrow-right-line" />
-      </button>
-    </UTooltip>
-    <span v-if="!state.canvas && shown.note" class="hidden max-w-[32ch] truncate px-2 text-muted lg:block">
-      {{ shown.note }}
-    </span>
-    <div
-      v-if="state.canvas"
-      aria-label="Camera"
-      class="flex shrink-0 items-center gap-0.5 border-l border-(--ui-border) pl-1"
-      role="group"
-    >
+      <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border)" />
       <template v-for="(item, index) in camera" :key="item.command">
-        <span v-if="index === 1" aria-live="polite" class="min-w-[5ch] text-center text-muted tabular-nums">
+        <span v-if="index === 1" aria-live="polite" class="min-w-[5ch] shrink-0 text-center text-muted tabular-nums">
           {{ state.zoom }}%
         </span>
         <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="[item.kbd]" :text="item.label">
@@ -130,16 +82,40 @@ const camera: { command: PickerCommand; label: string; icon?: string; kbd: strin
           </button>
         </UTooltip>
       </template>
-    </div>
-    <UTooltip :content="{ side: 'top', sideOffset: 8 }" text="Show every variant side by side">
-      <button
-        :aria-pressed="state.canvas"
-        class="inline-flex shrink-0 items-center"
-        type="button"
-        @click="emit('command', 'canvas')"
-      >
-        Canvas
-      </button>
-    </UTooltip>
+    </template>
+    <template v-else>
+      <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['←']" text="Previous">
+        <button
+          aria-label="Previous"
+          class="inline-flex shrink-0 items-center"
+          type="button"
+          @click="emit('command', 'prev')"
+        >
+          <UIcon aria-hidden="true" name="i-mingcute-left-line" />
+        </button>
+      </UTooltip>
+      <span aria-live="polite" class="max-w-[28ch] min-w-0 truncate px-1">
+        {{ shown.label || shown.id }} <span class="text-muted tabular-nums">({{ state.current + 1 }}/{{ count }})</span>
+      </span>
+      <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['→']" text="Next">
+        <button
+          aria-label="Next"
+          class="inline-flex shrink-0 items-center"
+          type="button"
+          @click="emit('command', 'next')"
+        >
+          <UIcon aria-hidden="true" name="i-mingcute-right-line" />
+        </button>
+      </UTooltip>
+      <UTooltip v-if="shown.note" :content="{ side: 'top', sideOffset: 8 }" :text="shown.note">
+        <span class="hidden max-w-[32ch] min-w-0 truncate px-1 text-muted sm:block">{{ shown.note }}</span>
+      </UTooltip>
+      <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border)" />
+      <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['Esc']" text="Every item side by side">
+        <button class="inline-flex shrink-0 items-center" type="button" @click="emit('command', 'canvas')">
+          Canvas
+        </button>
+      </UTooltip>
+    </template>
   </div>
 </template>

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises"
 import { chromium } from "playwright"
 import { test } from "vite-plus/test"
 const { parseFrameMessage } = await import("../../shared/frame-messages.ts")
-const { injectRuntime, withVariantBar } = await import("../../shared/plan-runtime.ts")
+const { embedDocument, injectRuntime, withVariantBar } = await import("../../shared/plan-runtime.ts")
 
 const PICKER = await readFile(new URL("../../skills/prototype/assets/picker.js", import.meta.url), "utf8")
 const variants = (fields) => parseFrameMessage({ __drop: true, type: "variants", canvas: false, zoom: 100, ...fields })
@@ -23,62 +23,120 @@ test("a prototype's variants reach the viewer only within limits, with the showi
   assert.equal(variants({ variants: [{ ...one("v-a"), note: "x".repeat(501) }], current: 0 }), null)
 })
 
-const page = (script) => `<!doctype html><html><head><meta charset="utf-8"></head><body>
-<section id="v-one" data-variant="One" data-note="The first">one</section>
+const page = (script, body = "") => `<!doctype html><html><head><meta charset="utf-8"></head><body${body}>
+<section id="v-one" data-variant="One" data-note="The first"><input id="v-one-input"></section>
 <section id="v-two" data-variant="Two" data-note="The second">two</section>
 <section id="v-three" data-variant="Three">three</section>
-<script>${script}</script>
+${script ? `<script>${script}</script>` : ""}
 </body></html>`
+// What an agent pasted on drop.quiver.dk to save space: no header, no footer, and it never reports to Drop's bar.
+const TRIMMED = `(() => {
+  const variants = [...document.querySelectorAll("body > [data-variant]")];
+  const key = "drop-prototype:" + location.pathname;
+  variants.forEach((el, i) => { el.hidden = i !== 0; });
+  window.trimmed = true;
+})();`
+const injected = (html) => html.split("<script data-drop-picker>").length - 1
 
-test("an authored page runs the current picker in place of the copy it was published with", () => {
-  const old = `// Drop prototype picker. Paste into a <script> at the end of the prototype's <body>, unchanged.\n(() => {\n  window.oldPicker = true;\n})();`
-  const html = injectRuntime(page(old), false, 0, true)
-  assert.ok(html.includes(PICKER.trimEnd()))
-  assert.ok(!html.includes("window.oldPicker"))
+test("Drop runs its own picker in every prototype and drops any copy the author pasted", () => {
+  for (const pasted of [
+    "",
+    PICKER,
+    TRIMMED,
+    "// Drop prototype picker. Paste into a <script> at the end of the prototype's <body>, unchanged.\n(() => {\n  window.oldPicker = true;\n})();",
+  ]) {
+    const html = injectRuntime(page(pasted), false, 0, true)
+    assert.equal(injected(html), 1)
+    assert.ok(html.includes(`<script data-drop-picker>${PICKER.trimEnd()}</script>`))
+    assert.equal(html.split("Drop prototype picker.").length, 2, "only Drop's copy is left")
+    assert.ok(!html.includes("window.trimmed") && !html.includes("window.oldPicker"))
+    assert.ok(html.includes("self.__dropPicker = true;"))
+  }
   // `$` patterns in the picker's text stay as written.
-  assert.ok(html.includes("${i + 1}"))
-  assert.equal(injectRuntime(page(PICKER), false, 0, true).split("// Drop prototype picker.").length, 2)
-})
-
-test("quoted picker source before the real script stays intact while the real picker is upgraded", () => {
-  const old = "// Drop prototype picker.\n(() => {\n  window.oldPicker = true;\n})();"
-  const sample = `<pre><code>${old}</code></pre>`
-  const html = injectRuntime(
-    page(old).replace("<body>", () => `<body>${sample}`),
+  assert.ok(injectRuntime(page(""), false, 0, true).includes("${i + 1}"))
+  // A copy loaded from a URL goes too.
+  const linked = page("").replace(
+    "</body>",
+    '<script src="https://example.com/prototype/assets/picker.js"></script></body>',
+  )
+  assert.ok(!injectRuntime(linked, false, 0, true).includes("example.com/prototype"))
+  // The page's own scripts and a code sample of the picker stay.
+  const own = `document.addEventListener("variantchange", (event) => { window.seen = event.detail.id; });`
+  const sample = "<pre><code>// Drop prototype picker.</code></pre>"
+  const authored = injectRuntime(
+    page(own).replace("<body>", () => `<body>${sample}`),
     false,
     0,
     true,
   )
-  assert.ok(html.includes(sample), "the authored code sample is preserved")
-  assert.ok(html.includes(`<script>${PICKER.trimEnd()}</script>`), "the actual script is upgraded")
-  assert.ok(!html.includes(`<script>${old}</script>`))
-
-  const quotedScript = `<script>const source = \`${old}\`;</script>`
-  const quoted = injectRuntime(
-    page("").replace("<body>", () => `<body>${sample}${quotedScript}`),
-    false,
-    0,
-    true,
-  )
-  assert.ok(quoted.includes(sample))
-  assert.ok(quoted.includes(quotedScript), "another script quoting the source is preserved")
-  assert.ok(!quoted.includes(PICKER.trimEnd()), "quoted source alone does not introduce a picker")
+  assert.ok(authored.includes(`<script>${own}</script>`))
+  assert.ok(authored.includes(sample))
+  // A page without items gets no picker; a Markdown doc's `::drop` box gets one like the viewer.
+  assert.equal(injected(injectRuntime("<html><head></head><body><p>Hi</p></body></html>", false, 0, true)), 0)
+  assert.equal(injected(embedDocument(page(TRIMMED), false)), 1)
 })
 
-/** The variant showing, the picker's own bar, and the hash, read from a page or a frame. */
+/** The items showing, the mode, the picker's own bar, and the hash, read from a page or a frame. */
 const look = (target) =>
   target.evaluate(() => ({
     shown: [...document.querySelectorAll("body > [data-variant]")].filter((el) => !el.hidden).map((el) => el.id),
+    canvas: document.documentElement.dataset.prototypeLayout === "canvas",
     bar: Boolean(document.querySelector("prototype-picker")?.shadowRoot?.querySelector(".bar")),
     hash: location.hash,
   }))
+const ALL = ["v-one", "v-two", "v-three"]
 
-test("on its own the page draws its bar; inside Drop's viewer it reports to Drop's bar and takes its commands", async () => {
+test("a prototype opens on the canvas; an item opens in focus and comes back as it was", async () => {
   const browser = await chromium.launch()
   try {
     const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
-    const alone = page(PICKER)
-    const framed = withVariantBar(injectRuntime(alone, false, 0, true))
+    const alone = injectRuntime(page(""), false, 0, true)
+    await context.route("https://picker.test/alone", (route) =>
+      route.fulfill({ contentType: "text/html", body: alone }),
+    )
+    await context.route("https://picker.test/single", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: injectRuntime(page("", ' data-layout="single"'), false, 0, true),
+      }),
+    )
+    const standalone = await context.newPage()
+    await standalone.goto("https://picker.test/alone")
+    assert.deepEqual(await look(standalone), { shown: ALL, canvas: true, bar: true, hash: "" })
+    await standalone.keyboard.press("2")
+    assert.deepEqual(await look(standalone), { shown: ["v-two"], canvas: false, bar: true, hash: "#v-two" })
+    await standalone.keyboard.press("ArrowRight")
+    assert.deepEqual((await look(standalone)).shown, ["v-three"])
+    await standalone.keyboard.press("ArrowRight")
+    assert.deepEqual((await look(standalone)).shown, ["v-one"])
+    // Typed text survives the trip back to the canvas: the same element, never remounted.
+    await standalone.fill("#v-one-input", "kept")
+    await standalone.locator("#v-one").click({ position: { x: 600, y: 4 } })
+    await standalone.keyboard.press("Escape")
+    assert.deepEqual(await look(standalone), { shown: ALL, canvas: true, bar: true, hash: "" })
+    assert.equal(await standalone.inputValue("#v-one-input"), "kept")
+    // Double-clicking a name opens its item; a hash opens one in focus; `data-layout="single"` opts out of the canvas.
+    await standalone.evaluate(() =>
+      document
+        .querySelector("prototype-picker")
+        .shadowRoot.querySelectorAll(".tag .name")[2]
+        .dispatchEvent(new MouseEvent("dblclick")),
+    )
+    assert.deepEqual((await look(standalone)).shown, ["v-three"])
+    await standalone.goto("https://picker.test/alone#v-two")
+    assert.deepEqual((await look(standalone)).shown, ["v-two"])
+    await standalone.goto("https://picker.test/single")
+    assert.equal((await look(standalone)).canvas, false)
+  } finally {
+    await browser.close()
+  }
+})
+
+test("inside Drop's viewer the page reports to Drop's bar and takes its commands, even with a trimmed copy pasted", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
+    const framed = withVariantBar(injectRuntime(page(TRIMMED), false, 0, true))
     // The viewer's side of the bridge: it syncs once the frame's runtime is ready and keeps what the picker reports.
     const viewer = `<!doctype html><html><body style="margin:0"><iframe id="f" style="width:900px;height:600px;border:0"></iframe><script>
       window.reports = [];
@@ -92,43 +150,36 @@ test("on its own the page draws its bar; inside Drop's viewer it reports to Drop
       });
       frame.srcdoc = ${JSON.stringify(framed).replaceAll("</script", "<\\/script")};
     </script></body></html>`
-    await context.route("https://picker.test/alone", (route) =>
-      route.fulfill({ contentType: "text/html", body: alone }),
-    )
     await context.route("https://picker.test/viewer", (route) =>
       route.fulfill({ contentType: "text/html", body: viewer }),
     )
-
-    const standalone = await context.newPage()
-    await standalone.goto("https://picker.test/alone#v-two")
-    assert.deepEqual(await look(standalone), { shown: ["v-two"], bar: true, hash: "#v-two" })
-    await standalone.keyboard.press("3")
-    assert.deepEqual(await look(standalone), { shown: ["v-three"], bar: true, hash: "#v-three" })
-    await standalone.keyboard.press("ArrowRight")
-    assert.deepEqual((await look(standalone)).shown, ["v-one"])
-    // The variant picked last opens next time.
-    await standalone.goto("https://picker.test/alone")
-    assert.deepEqual((await look(standalone)).shown, ["v-one"])
 
     const hosted = await context.newPage()
     await hosted.goto("https://picker.test/viewer")
     const last = () => hosted.evaluate(() => reports.at(-1))
     await hosted.waitForFunction(() => reports.length > 0)
     const frame = hosted.frame({ url: "about:srcdoc" })
-    assert.deepEqual({ ...(await look(frame)), hash: undefined }, { shown: ["v-one"], bar: false, hash: undefined })
-    assert.deepEqual(await last(), {
-      __drop: true,
-      type: "variants",
-      variants: [
-        { id: "v-one", label: "One", note: "The first" },
-        { id: "v-two", label: "Two", note: "The second" },
-        { id: "v-three", label: "Three", note: "" },
-      ],
-      current: 0,
-      canvas: false,
-      zoom: 100,
-    })
-    assert.ok(parseFrameMessage(await last()), "Drop's viewer accepts what the picker posts")
+    assert.deepEqual(
+      { ...(await look(frame)), hash: undefined },
+      { shown: ALL, canvas: true, bar: false, hash: undefined },
+    )
+    const report = await last()
+    assert.deepEqual(
+      { ...report, zoom: undefined },
+      {
+        __drop: true,
+        type: "variants",
+        variants: [
+          { id: "v-one", label: "One", note: "The first" },
+          { id: "v-two", label: "Two", note: "The second" },
+          { id: "v-three", label: "Three", note: "" },
+        ],
+        current: 0,
+        canvas: true,
+        zoom: undefined,
+      },
+    )
+    assert.ok(parseFrameMessage(report), "Drop's viewer accepts what the picker posts")
 
     const events = () => frame.evaluate(() => window.changes)
     await frame.evaluate(() => {
@@ -136,7 +187,7 @@ test("on its own the page draws its bar; inside Drop's viewer it reports to Drop
       document.addEventListener("variantchange", (event) => window.changes.push(event.detail.id))
     })
     await hosted.evaluate(() => send({ type: "picker", do: "show", index: 2 }))
-    await hosted.waitForFunction(() => reports.at(-1).current === 2)
+    await hosted.waitForFunction(() => reports.at(-1).current === 2 && !reports.at(-1).canvas)
     assert.deepEqual((await look(frame)).shown, ["v-three"])
     await hosted.evaluate(() => send({ type: "picker", do: "next" }))
     await hosted.waitForFunction(() => reports.at(-1).current === 0)
@@ -148,18 +199,15 @@ test("on its own the page draws its bar; inside Drop's viewer it reports to Drop
     })
 
     // Keys pressed in the page still switch, and Drop's bar hears it.
-    await frame.locator("#v-one").click()
+    await frame.locator("#v-one").click({ position: { x: 600, y: 4 } })
     await hosted.keyboard.press("2")
     await hosted.waitForFunction(() => reports.at(-1).current === 1)
-    await hosted.keyboard.press("c")
+    await hosted.evaluate(() => send({ type: "picker", do: "canvas" }))
     await hosted.waitForFunction(() => reports.at(-1).canvas)
-    assert.deepEqual((await look(frame)).shown, ["v-one", "v-two", "v-three"])
+    assert.deepEqual((await look(frame)).shown, ALL)
     const before = (await last()).zoom
     await hosted.evaluate(() => send({ type: "picker", do: "zoom-out" }))
     await hosted.waitForFunction((zoom) => reports.at(-1).zoom < zoom, before)
-    await hosted.evaluate(() => send({ type: "picker", do: "canvas" }))
-    await hosted.waitForFunction(() => !reports.at(-1).canvas)
-    assert.deepEqual((await look(frame)).shown, ["v-two"])
   } finally {
     await browser.close()
   }
