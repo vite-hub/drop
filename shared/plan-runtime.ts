@@ -1142,6 +1142,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       lastQuote = "";
       layer = document.createElement("div");
       layer.className = "draw" + (tool === "measure" ? " measure" : "");
+      // In Comments mode a finger still scrolls and zooms the page: the browser takes the drag and cancels the pointer,
+      // so only a tap comments. A mouse still drags out an area.
+      if (tool === "comment" && clickComments) layer.style.touchAction = "pan-x pan-y pinch-zoom";
       let start = null, box = null;
       layer.onpointerdown = (e) => {
         if (e.button !== 0) return;
@@ -1582,7 +1585,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     post({ type: "key", key: "Escape" });
   }, true);
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") post({ type: "key", key: "Escape" });
+    // Escape the page used itself, to close its own dialog or menu, stays in the page.
+    if (e.key === "Escape" && !e.defaultPrevented) post({ type: "key", key: "Escape" });
     // Drop's tool shortcuts, for when the page has focus. Never while typing, and never once the page used the key.
     const t = e.target;
     const typing = t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));

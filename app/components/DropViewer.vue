@@ -390,6 +390,14 @@ const floatShown = computed(
 // The floating card is one small surface, the line and its send button (ViewerPinComposer); a suggestion keeps the full
 // composer for the words that replace the quote.
 const compactFloat = computed(() => popover.value?.type === "new" && popover.value.pending.suggestion === undefined)
+// Selected text can take a suggestion from the small composer too. It starts as the quote, as E on the page does.
+const canSuggestDraft = computed(
+  () => popover.value?.type === "new" && popover.value.pending.kind === "text" && Boolean(popover.value.pending.quote),
+)
+function suggestOnDraft() {
+  if (popover.value?.type === "new" && popover.value.pending.quote)
+    popover.value.pending.suggestion = popover.value.pending.quote
+}
 const FLOAT_WIDTH = 288
 const floatStyle = computed(() => {
   const place = draftPlace.value
@@ -1413,7 +1421,14 @@ watch(
       "
       :style="floatStyle"
     >
-      <ViewerPinComposer v-if="compactFloat" ref="popoverRef" @cancel="dropPinDraft" @submit="submit" />
+      <ViewerPinComposer
+        v-if="compactFloat"
+        ref="popoverRef"
+        :can-suggest="canSuggestDraft"
+        @cancel="dropPinDraft"
+        @submit="submit"
+        @suggest="suggestOnDraft"
+      />
       <ReuseComposer v-else />
     </section>
     <Transition
@@ -1432,7 +1447,14 @@ watch(
         :style="pinBubbleStyle"
         @keydown.esc="popover = null"
       >
-        <ViewerPinComposer v-if="pinDraft" ref="popoverRef" @cancel="dropPinDraft" @submit="submit" />
+        <ViewerPinComposer
+          v-if="pinDraft && compactFloat"
+          ref="popoverRef"
+          :can-suggest="canSuggestDraft"
+          @cancel="dropPinDraft"
+          @submit="submit"
+          @suggest="suggestOnDraft"
+        />
         <ReuseComposer v-else />
       </section>
     </Transition>

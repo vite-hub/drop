@@ -70,8 +70,8 @@ const marker = (id, selector, extra = {}) => ({
   ...extra,
 })
 
-async function open(browser, options = {}) {
-  const escaped = injectRuntime(html, false, 0, true).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+async function open(browser, { page: source = html, ...options } = {}) {
+  const escaped = injectRuntime(source, false, 0, true).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   const context = await browser.newContext({ viewport: { width: 900, height: 700 }, ...options })
   await context.route("**/*", (route) => {
     const url = new URL(route.request().url())
@@ -147,6 +147,48 @@ for (const touch of [false, true]) {
     }
   })
 }
+
+test("Escape the page used itself stays in the page; any other Escape goes to Drop", async () => {
+  const browser = await chromium.launch()
+  try {
+    // No items, so no picker, which takes Escape itself to go back to the canvas.
+    const { page, frame } = await open(browser, { page: '<!doctype html><body><p id="text">A plain page.</p></body>' })
+    await frame.evaluate(() => {
+      window.ownEscape = (e) => e.key === "Escape" && e.preventDefault()
+      document.addEventListener("keydown", window.ownEscape)
+    })
+    await frame.click("#text")
+    await page.keyboard.press("Escape")
+    await page.waitForTimeout(200)
+    assert.equal(await page.evaluate(() => posts.some((m) => m.type === "key" && m.key === "Escape")), false)
+    await frame.evaluate(() => document.removeEventListener("keydown", window.ownEscape))
+    await page.keyboard.press("Escape")
+    await page.waitForFunction(() => posts.some((m) => m.type === "key" && m.key === "Escape"), null, { timeout: 5000 })
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("in Comments mode a finger's drag scrolls the page and marks no area", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, { hasTouch: true, isMobile: true })
+    await frame.evaluate(() => (document.body.style.height = "3000px"))
+    await page.evaluate(() => send({ type: "tool", tool: "comment", clickComments: true }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw"))
+    const cdp = await page.context().newCDPSession(page)
+    const touch = (type, y) =>
+      cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x: 300, y }] })
+    await touch("touchStart", 450)
+    for (let y = 430; y >= 150; y -= 20) await touch("touchMove", y)
+    await touch("touchEnd")
+    await frame.waitForFunction(() => scrollY > 100, null, { timeout: 5000 })
+    await page.waitForTimeout(300)
+    assert.equal(await page.evaluate(() => posts.some((m) => m.type === "area")), false)
+  } finally {
+    await browser.close()
+  }
+})
 
 test("click comments hit-test again when the page changes under a stationary pointer", async () => {
   const browser = await chromium.launch()

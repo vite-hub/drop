@@ -32,6 +32,7 @@ One self-contained HTML page. Each item is a `<section>` directly inside `<body>
 - `data-width` is the item's real width in pixels (default 1280). `data-height` fixes its height and scrolls the rest; leave it out and the item is as tall as its content.
 - Use the product's real copy and plausible data in every item. Lorem ipsum hides the question.
 - Make the items live: real inputs, hovers, menus. Load libraries from a CDN such as `https://esm.sh/three`.
+- Drop listens for keys on the page too: Esc closes what Drop has open, and C, E and single letters pick its tools. When an item uses one of those keys itself, such as Esc to close its own menu, call `event.preventDefault()` in that handler so Drop leaves the key alone.
 - Put everything visible inside a section. Draw no switcher, bar, or picker of your own, and paste no picker script: Drop runs its own on every page with `data-variant` items.
 
 Canvas details (URL items for live previews, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item shows a deployed page, has a popover, or animates.
