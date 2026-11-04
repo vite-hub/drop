@@ -1165,7 +1165,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
           box.remove(); box = null;
           finishArea(Math.min(s.x, e.clientX), Math.min(s.y, e.clientY), Math.max(s.x, e.clientX), Math.max(s.y, e.clientY));
         } else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
-        else if (clickComments && hovered) { const r = hovered.getBoundingClientRect(); finishArea(r.left, r.top, r.right, r.bottom); }
+        else if (clickComments) { const r = elementAt(e.clientX, e.clientY).getBoundingClientRect(); finishArea(r.left, r.top, r.right, r.bottom); }
         redraw();
       };
       layer.onpointerleave = () => { if (!start) { hovered = null; redraw(); } };

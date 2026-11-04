@@ -133,6 +133,11 @@ function toggleComments() {
  * turning this on folds Details, and opening Details turns this off.
  */
 const commentMode = ref(false)
+function toggleCommentMode() {
+  if (!hasComments.value || editing.value || trashed.value) return
+  if (!canUseCommentMode.value) return toggleComments()
+  commentMode.value = !commentMode.value
+}
 watch(commentMode, (on) => {
   if (on) {
     detailsOpen.value = false
@@ -538,7 +543,7 @@ function present() {
 
 defineShortcuts({
   // With text selected in the page, C and E work on it, as the bar over it says.
-  c: () => (selection.value ? commentOnSelection() : (commentMode.value = !commentMode.value)),
+  c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
   e: () => {
     if (selection.value) return commentOnSelection(true)
     if (editing.value || !showEditTool.value) return
@@ -681,6 +686,12 @@ const canMarkArea = computed(
     !lightbox.value &&
     (canDrawArea.value || (drop.value.canComment && siteRef.value?.canDraw && !siteRef.value.pending)),
 )
+// The primary Comments action opens the list wherever the frame cannot take clicks for a sendable area comment.
+const canUseCommentMode = computed(() => framed.value && canDrawArea.value && !shownVersion.value)
+const canCommentOnPage = computed(
+  () => drop.value.canComment && annotationsEnabled.value && !editing.value && !lightbox.value,
+)
+watch(canUseCommentMode, (available) => !available && (commentMode.value = false))
 const inspectable = computed(
   () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
 )
@@ -1230,7 +1241,7 @@ watch(
             <ViewerComments
               v-if="!popover && !siteRef?.pending"
               ref="commentsRef"
-              :can-comment="drop.canComment && !shownVersion && !lightbox"
+              :can-comment="canCommentOnPage"
               :comments="lightbox ? imageComments : comments"
               :outdated="outdated"
               @focus="focusComment"
@@ -1352,9 +1363,11 @@ watch(
               />
               <ViewerCommentsSegment
                 v-model:on="commentMode"
-                :can-comment="drop.canComment"
+                :can-comment="canCommentOnPage"
+                :can-use-mode="canUseCommentMode"
                 :count="openCount"
                 :list-open="commentsOpen && !popover"
+                @toggle="toggleCommentMode"
                 @list="toggleComments"
                 @page="commentOnPage"
               />

@@ -4,8 +4,8 @@
 // actions: Whole page (a comment on the page itself, in the dock), All comments with the open count (the dock's list),
 // and × to stop. On a phone the segment takes its own row above the pill's.
 const on = defineModel<boolean>("on", { required: true })
-defineProps<{ count: number; listOpen: boolean; canComment: boolean }>()
-const emit = defineEmits<{ page: []; list: [] }>()
+defineProps<{ count: number; listOpen: boolean; canComment: boolean; canUseMode: boolean }>()
+const emit = defineEmits<{ page: []; list: []; toggle: [] }>()
 
 const item =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted aria-expanded:bg-elevated aria-expanded:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
@@ -13,20 +13,21 @@ const item =
 
 <template>
   <UTooltip
-    :text="on ? 'Stop commenting' : 'Comment on the page'"
+    :text="on ? 'Stop commenting' : canUseMode ? 'Comment on the page' : 'Show comments'"
     :kbds="['C']"
     :content="{ side: 'top', sideOffset: 8 }"
   >
     <button
-      aria-controls="drop-comment-actions"
+      :aria-controls="canUseMode ? 'drop-comment-actions' : 'drop-comments'"
       aria-keyshortcuts="C"
       :aria-label="on ? 'Click to comment' : count ? `Comments, ${count} open` : 'Comments'"
-      :aria-pressed="on"
+      :aria-pressed="canUseMode ? on : undefined"
+      :aria-expanded="canUseMode ? undefined : listOpen"
       class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
       :class="on && 'bg-inverted text-inverted hover:bg-inverted hover:text-inverted'"
       data-review-trigger
       type="button"
-      @click="on = !on"
+      @click="emit('toggle')"
     >
       <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />
       {{ on ? "Click to comment" : "Comments" }}
