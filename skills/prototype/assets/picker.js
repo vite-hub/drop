@@ -73,27 +73,22 @@
     .bar:not(.canvas) .cam, .bar.canvas .one { display: none; }
     .tags { display: none; position: fixed; inset: 0 var(--drop-inset, 0px) 0 0; z-index: 2147482000; overflow: hidden; pointer-events: none; }
     .tags.on { display: block; }
-    .tag { position: absolute; left: 0; top: 0; display: flex; flex-wrap: wrap; align-items: center; min-height: 24px; padding: 0 6px 0 0; pointer-events: auto;
-      border: 1px solid rgb(0 0 0 / .08); border-radius: 6px; background: rgb(255 255 255 / .92); color: #171717; box-shadow: 0 1px 2px rgb(0 0 0 / .06);
-      font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+    .tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; min-height: 22px; pointer-events: auto;
+      color: #171717; font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
     .tag button { height: 22px; border-radius: 5px; color: inherit; cursor: default; }
     .tag button:hover { background: none; }
     .tag button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
-    .tag > * { flex: none; }
-    .tag > .name, .tag > .tnote, .tag > .hint, .tag > .done { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
-    .tag > .name { flex-shrink: 1; max-width: calc(100% - 44px); }
-    .tag > .tnote { box-sizing: border-box; flex: 1 0 100%; width: 100%; order: 9; padding: 0 4px 5px 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-    .tag > .tnote:empty { display: none; }
+    .tag > .name, .tag > .tnote { min-width: 0; white-space: nowrap; }
+    .tag > .tnote { box-sizing: border-box; grid-column: 1 / -1; width: 100%; padding: 2px 0 0 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .tag > .tnote:empty, .tag.narrow > .tnote { display: none; }
     .handle, .open { width: 20px; padding: 0; display: grid; place-items: center; color: #a3a3a3 !important; }
-    .handle { touch-action: none; }
+    .handle { touch-action: none; opacity: 0; }
+    .tag:hover .handle, .handle:focus-visible { opacity: 1; }
     .handle:hover, .open:hover { color: #525252 !important; }
     .name { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; user-select: text; -webkit-user-select: text; }
     .name:hover { text-decoration: underline dotted rgb(0 0 0 / .35); text-underline-offset: 3px; }
-    .tnote, .hint, .done { color: #737373; overflow: hidden; text-overflow: ellipsis; }
-        .hint { display: none; padding-left: 4px; }
-    .name:hover ~ .hint, .name:focus-visible ~ .hint { display: inline; }
-    .done:not(:empty) ~ .hint { display: none; }
-    .done:not(:empty) { padding-left: 4px; color: #15803d; }
+    .tnote { color: #737373; overflow: hidden; text-overflow: ellipsis; }
+    .done:not(:empty) { position: absolute; top: 0; right: 0; height: 22px; padding: 0 2px 0 8px; display: grid; align-items: center; background: #fff; color: #15803d; white-space: nowrap; }
     .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   </style>
   <nav class="bar" aria-label="Prototype">
@@ -118,7 +113,7 @@
   $(".count").textContent = variants.length + " items";
 
   // Canvas state. Positions and the camera are in plane pixels; screen = camera + plane × zoom.
-  const GAP = 160, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900;
+  const GAP = 160, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24;
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
@@ -138,13 +133,13 @@
     const it = { el, i, name: nameOf(el), width, height, src, w: width || 1280, h: height || (src ? URL_HEIGHT : null), mw: 0, mh: 0, authored: el.getAttribute("style") };
     const tag = document.createElement("div");
     tag.className = "tag";
-    tag.innerHTML = `<button class="handle" aria-describedby="move-help"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.4"/><circle cx="8" cy="2" r="1.4"/><circle cx="2" cy="7" r="1.4"/><circle cx="8" cy="7" r="1.4"/><circle cx="2" cy="12" r="1.4"/><circle cx="8" cy="12" r="1.4"/></svg></button><button class="name"></button><button class="open"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M7 1.5h3.5V5M5 10.5H1.5V7M10.5 1.5 7 5M1.5 10.5 5 7"/></svg></button><span class="done" role="status"></span><span class="hint">Click to copy · double-click to open</span><span class="tnote"></span>`;
+    tag.innerHTML = `<button class="handle" aria-describedby="move-help"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.4"/><circle cx="8" cy="2" r="1.4"/><circle cx="2" cy="7" r="1.4"/><circle cx="8" cy="7" r="1.4"/><circle cx="2" cy="12" r="1.4"/><circle cx="8" cy="12" r="1.4"/></svg></button><button class="name"></button><button class="open"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M7 1.5h3.5V5M5 10.5H1.5V7M10.5 1.5 7 5M1.5 10.5 5 7"/></svg></button><span class="done" role="status"></span><span class="tnote"></span>`;
     const handle = tag.querySelector(".handle"), name = tag.querySelector(".name"), open = tag.querySelector(".open"), done = tag.querySelector(".done");
     handle.setAttribute("aria-label", "Move " + it.name);
     open.setAttribute("aria-label", "Open " + it.name);
     open.title = "Open (" + (i < 9 ? i + 1 : "double-click the name") + ")";
     name.textContent = it.name;
-    name.title = "Copy “" + it.name + "”";
+    name.title = "Click to copy “" + it.name + "” · double-click to open";
     tag.querySelector(".tnote").textContent = el.dataset.note || "";
     tag.querySelector(".tnote").title = el.dataset.note || "";
     it.tag = tag;
@@ -212,26 +207,15 @@
     for (const it of items) {
       const sx = cam.x + it.x * cam.z, sy = cam.y + it.y * cam.z;
       it.el.style.setProperty("transform", `translate(${sx}px, ${sy}px) scale(${cam.z})`, "important");
-      it.tag.style.transform = `translate(${sx}px, ${sy - 6}px) translateY(-100%)`;
-      const width = Math.max(Math.min(room(it) * cam.z - 12, 520, view().w - sx - 8), 0);
-      it.tag.style.maxWidth = width + "px";
-      // When even the padding and border cannot fit, keep the label out of the way.
-      it.tag.style.visibility = width > 0 ? "" : "hidden";
+      // The handle sits in the gap left of the item, so the name and note start at the item's edge and end with it.
+      const w = box(it).w * cam.z;
+      it.tag.style.transform = `translate(${sx - LABEL_INSET}px, ${sy - 6}px) translateY(-100%)`;
+      it.tag.style.width = w + LABEL_INSET + "px";
+      it.tag.classList.toggle("narrow", w < 160);
     }
     const zoom = Math.round(cam.z * 100);
     zoomText.textContent = zoom + "%";
     if (zoom !== reportedZoom) report();
-  }
-  // A label may run past its item, up to the nearest item to its right in the same band.
-  function room(it) {
-    const b = box(it);
-    let edge = Infinity;
-    for (const o of items) {
-      if (o === it || o.x <= it.x) continue;
-      const ob = box(o);
-      if (ob.y < b.y + 48 && ob.y + ob.h > b.y - 80) edge = Math.min(edge, o.x - it.x);
-    }
-    return edge === Infinity ? Math.max(it.w, 480 / cam.z) : edge;
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
   const bound = () => { cam.z = clamp(cam.z, MIN_Z, MAX_Z); cam.x = clamp(cam.x, -LIMIT, LIMIT); cam.y = clamp(cam.y, -LIMIT, LIMIT); };
