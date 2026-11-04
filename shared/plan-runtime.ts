@@ -855,7 +855,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    * Measure shows the element's size and box model, its type and colors, and, once one is picked, the distances from
    * it to whatever the pointer is over.
    */
-  let tool = "browse", layer = null, hovered = null, picked = null, pointComments = false;
+  // clickComments: Drop's Comments mode, where a click without a drag comments on the element under the pointer.
+  let tool = "browse", layer = null, hovered = null, picked = null, pointComments = false, clickComments = false;
   // style: how comments on a Markdown doc's text show ("card": the margin's cards, "pin": gutter pins); me: who the
   // reader is, for the draft's pin.
   const view = { rulers: false, xray: false, pins: true, style: "card", me: null };
@@ -1164,6 +1165,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
           box.remove(); box = null;
           finishArea(Math.min(s.x, e.clientX), Math.min(s.y, e.clientY), Math.max(s.x, e.clientX), Math.max(s.y, e.clientY));
         } else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
+        else if (clickComments && hovered) { const r = hovered.getBoundingClientRect(); finishArea(r.left, r.top, r.right, r.bottom); }
         redraw();
       };
       layer.onpointerleave = () => { if (!start) { hovered = null; redraw(); } };
@@ -1531,7 +1533,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
     if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("drop-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
-    if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
+    if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; clickComments = m.clickComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
     if (m.type === "pen") setPen(m);
     if (m.type === "mark" && m.do === "undo") undoMark();
     if (m.type === "mark" && m.do === "done") finishMark();

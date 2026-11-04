@@ -127,6 +127,26 @@ function toggleComments() {
   if (commentsOpen.value) closeComments()
   else showComments()
 }
+/**
+ * Comments as a mode (ViewerCommentsSegment): while it's on, a click or a drag on the page comments on that spot, and
+ * the dock's panel opens only for the list or a comment on the whole page. One of the pill's segments shows at a time:
+ * turning this on folds Details, and opening Details turns this off.
+ */
+const commentMode = ref(false)
+watch(commentMode, (on) => {
+  if (on) {
+    detailsOpen.value = false
+    shareOpen.value = false
+    tool.value = "browse"
+  } else if (commentsOpen.value) closeComments()
+})
+watch(detailsOpen, (open) => open && (commentMode.value = false))
+async function commentOnPage() {
+  popover.value = null
+  showComments()
+  await nextTick()
+  commentsRef.value?.focusComposer()
+}
 async function backToComments() {
   const selected = popover.value?.type === "thread" ? popover.value.id : undefined
   popover.value = null
@@ -152,7 +172,15 @@ const annotations = useViewerAnnotations({
   drop,
   editing,
   enabled: annotationsEnabled,
-  reviewOpen: commentsOpen,
+  // The page takes clicks for comments while the mode is on or the dock's panel is open; putting them away ends both.
+  reviewOpen: computed({
+    get: () => commentMode.value || commentsOpen.value,
+    set: (value: boolean) => {
+      if (value) return
+      commentMode.value = false
+      commentsOpen.value = false
+    },
+  }),
   shot: (file) => {
     const { images } = reviewDraft
     const before = images.picks.value.find((pick) => pick.file === autoShot)
@@ -433,6 +461,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPa
     bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
     width: docWidth,
     annotations,
+    clickComments: commentMode,
     comments: computed(() => ({
       style: pinStyle.value ? "pin" : "card",
       me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
@@ -509,7 +538,7 @@ function present() {
 
 defineShortcuts({
   // With text selected in the page, C and E work on it, as the bar over it says.
-  c: () => (selection.value ? commentOnSelection() : showComments()),
+  c: () => (selection.value ? commentOnSelection() : (commentMode.value = !commentMode.value)),
   e: () => {
     if (selection.value) return commentOnSelection(true)
     if (editing.value || !showEditTool.value) return
@@ -562,6 +591,7 @@ onKeyStroke("Escape", (event) => {
   closeChanges()
   if (popover.value) popover.value = null
   else if (commentsOpen.value) closeComments()
+  else if (commentMode.value) commentMode.value = false
   annotations.dismiss()
 })
 
@@ -1320,24 +1350,14 @@ watch(
                 :note="drop.editNote"
                 @copy="copyMarkdown('Markdown copied')"
               />
-              <UButton
-                size="xs"
-                data-review-trigger
-                :aria-label="openCount ? `Comments, ${openCount} open` : 'Comments'"
-                :aria-expanded="commentsOpen"
-                aria-controls="drop-comments"
-                color="neutral"
-                icon="i-mingcute-chat-3-line"
-                :variant="commentsOpen ? 'soft' : 'ghost'"
-                @click="toggleComments"
-              >
-                Comments
-                <span
-                  v-if="openCount && !commentsOpen"
-                  class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums"
-                  >{{ openCount }}</span
-                >
-              </UButton>
+              <ViewerCommentsSegment
+                v-model:on="commentMode"
+                :can-comment="drop.canComment"
+                :count="openCount"
+                :list-open="commentsOpen && !popover"
+                @list="toggleComments"
+                @page="commentOnPage"
+              />
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
             <template v-if="!editing">
