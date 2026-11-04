@@ -39,6 +39,7 @@ function key(event: KeyboardEvent) {
   }
 }
 function paste(event: ClipboardEvent) {
+  if (busy.value) return event.preventDefault()
   const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith("image/"))
   if (!files.length) return
   event.preventDefault()
@@ -64,6 +65,7 @@ defineExpose({
         <button
           aria-label="Remove picture"
           class="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-inverted text-inverted shadow-sm"
+          :disabled="busy"
           type="button"
           @click="draft.images.remove(pick)"
         >
@@ -78,6 +80,7 @@ defineExpose({
         aria-label="Comment"
         class="min-h-7 flex-1 resize-none bg-transparent py-0.5 text-base/6 text-highlighted outline-none placeholder:text-dimmed sm:text-sm/6"
         placeholder="Comment, ↵ to send"
+        :readonly="busy"
         rows="1"
         @keydown="key"
         @paste="paste"
