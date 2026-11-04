@@ -40,7 +40,7 @@ useSeoMeta({ title: () => drop.value.title })
       class="block size-full [color-scheme:light]"
       data-allow-mismatch="attribute"
       :allow="frameAllow(drop.kind)"
-      :sandbox="PREVIEW_SANDBOX"
+      :sandbox="previewSandbox(drop.kind)"
       :srcdoc="srcdoc"
       :title="drop.title"
     />

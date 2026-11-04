@@ -11,6 +11,14 @@ export const PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-pop
 export const CONTENT_SANDBOX = `${PREVIEW_SANDBOX} allow-same-origin`
 
 /**
+ * The sandbox for a srcdoc frame. A Markdown doc may also open the print dialog, for Export as PDF: Drop renders it
+ * and escapes its raw HTML, so only Drop's and Comark's scripts could call print() or alert(). HTML docs and apps run
+ * their author's scripts, and allow-modals would let those put alert() and prompt() over Drop's own page.
+ */
+export const previewSandbox = (kind: string) =>
+  kind === "markdown" ? `${PREVIEW_SANDBOX} allow-modals` : PREVIEW_SANDBOX
+
+/**
  * What a frame may do beyond its sandbox. Only Markdown docs may write to the clipboard, so comark-annotate's Copy
  * button works: Drop renders them itself, escaping raw HTML, so their only scripts are Drop's and Comark's. HTML docs
  * and apps run whatever their author wrote, and writing to a reader's clipboard is how paste-jacking works. Markdown
