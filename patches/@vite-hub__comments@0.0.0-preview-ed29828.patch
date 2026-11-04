@@ -1,7 +1,6 @@
-diff --git a/dist/plugin-AAd9flJM.js b/dist/plugin-AAd9flJM.js
-index 77ef7ff91656af6eef75fe12b76837c5b291ba50..596a7608bb7097f2677df8d70322c84aaa23b59f 100644
---- a/dist/plugin-AAd9flJM.js
-+++ b/dist/plugin-AAd9flJM.js
+diff --git a/dist/plugin-BGhcZPCx.js b/dist/plugin-BGhcZPCx.js
+--- a/dist/plugin-BGhcZPCx.js
++++ b/dist/plugin-BGhcZPCx.js
 @@ -496,9 +496,9 @@ function installViteHubPageTools(nitroApp, options = {}) {
  //#region src/runtime/session.ts
  /** The effective Comments user, shared by the overlay API and MCP tools. */
@@ -14,7 +13,6 @@ index 77ef7ff91656af6eef75fe12b76837c5b291ba50..596a7608bb7097f2677df8d70322c84a
  	return await options.session?.(event).catch(() => null) ?? null;
  }
 diff --git a/dist/runtime/index.js b/dist/runtime/index.js
-index b457df8b8345ba8b42dd5250e4c9aa640a77ede2..f7d2ebe12cc8dbaed68336b6256ed2c70fe161c4 100644
 --- a/dist/runtime/index.js
 +++ b/dist/runtime/index.js
 @@ -287,7 +287,7 @@ function createCommentsHandler(options) {

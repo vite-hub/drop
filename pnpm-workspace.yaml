@@ -2,7 +2,7 @@ blockExoticSubdeps: false
 
 overrides:
   # @vite-hub/ui comes from vite-hub/vitehub#3308 and depends on @vite-hub/comments; the one comments model is #3320.
-  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fa476a05309b793cab521538e3e18a9de0a0dd35
+  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@ed2982855e48fa1c2c802d5f81fe0f59a8de720e
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.10
   "@better-auth/oauth-provider": 1.7.10
@@ -42,7 +42,7 @@ patchedDependencies:
   # In an app with the Console, the Comments API asked the Console first and refused everyone it doesn't admit, before
   # `identify` and `authorize` ran: only Drop admins got "@" people and comment images. With `identify`, the app's
   # policy decides alone, as vite-hub/vitehub#3320 means createRestTransport to work for guests and share links.
-  "@vite-hub/comments@0.0.0-preview-fa476a0": patches/@vite-hub__comments@0.0.0-preview-fa476a0.patch
+  "@vite-hub/comments@0.0.0-preview-ed29828": patches/@vite-hub__comments@0.0.0-preview-ed29828.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
