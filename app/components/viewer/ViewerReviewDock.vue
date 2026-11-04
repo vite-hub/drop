@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The list, thread, and composer sit above the same dark pill as the HTML prototype picker.
+// The list, thread, and composer rise above the pill. Only the pill is dark, like the HTML prototype picker; the panel
+// is a floating surface in the page's own theme, as every popover from the pill is.
 defineOptions({ inheritAttrs: false })
 // settle: what to wait for before the composer takes focus, which the drop's frame would otherwise hear it lose.
 const props = defineProps<{ open: boolean; overlay?: boolean; settle?: () => Promise<void> }>()
@@ -54,7 +55,7 @@ watch(
           ref="panel"
           aria-label="Comments"
           tabindex="-1"
-          class="pointer-events-auto flex h-[min(28rem,60dvh)] origin-bottom min-h-0 w-full max-w-md flex-col overflow-hidden rounded-[12px] border border-default surface-review outline-none focus-visible:ring-2 focus-visible:ring-inverted"
+          class="pointer-events-auto flex h-[min(28rem,60dvh)] origin-bottom min-h-0 w-full max-w-md flex-col overflow-hidden rounded-[12px] bg-default shadow-md ring ring-default outline-none focus-visible:ring-2 focus-visible:ring-inverted"
           @keydown.esc.stop.prevent="emit('close')"
         >
           <div class="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-default pr-1.5 pl-4">
