@@ -469,6 +469,11 @@ function download() {
   anchor.click()
 }
 
+// Export as PDF: the frame prints itself (plan-runtime.ts), so the PDF holds the whole doc as rendered, not the
+// slice of it the viewer shows. Only Markdown docs: their frame alone may open the print dialog (previewSandbox).
+const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value)
+const exportPdf = () => send({ type: "print", title: drop.value.title })
+
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
 const copyMarkdown = (announce?: string) =>
@@ -698,6 +703,7 @@ usePaletteOffer("drop", () => {
     ...(drop.value.url
       ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
       : []),
+    ...(printsPdf.value ? [{ label: "Export as PDF", icon: "i-mingcute-pdf-line", onSelect: exportPdf }] : []),
     ...(slidev.value && contentOrigin.value
       ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
       : []),
@@ -800,6 +806,7 @@ watch(
             <USelect id="drop-reading-width" v-model="docWidth" class="w-full" :items="widths" />
           </div>
           <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
+          <ViewerAction v-if="printsPdf" icon="i-mingcute-pdf-line" label="Export as PDF" @click="exportPdf" />
           <ViewerAction
             v-if="copiesMarkdown"
             :icon="copied('markdown') ? 'i-mingcute-check-line' : 'i-mingcute-markdown-line'"
@@ -1039,7 +1046,7 @@ watch(
               class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
               data-allow-mismatch="attribute"
               :allow="frameAllow(drop.kind)"
-              :sandbox="PREVIEW_SANDBOX"
+              :sandbox="previewSandbox(drop.kind)"
               :srcdoc="srcdoc"
               :title="drop.title"
             />

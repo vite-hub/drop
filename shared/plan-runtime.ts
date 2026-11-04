@@ -1429,6 +1429,20 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   document.addEventListener("comark-zoom:change", onZoom);
   document.addEventListener("comark-zoom:close", () => { zoom = null; render(); });
 
+  // Paper is light and takes no pins: a dark doc prints in its light colors, and comments stay on screen. Any print of
+  // the frame does this, the reader's own Ctrl+P too.
+  const printStyle = document.createElement("style");
+  printStyle.textContent = "@media print{drop-comments,drop-bubble,drop-ins{display:none!important}}";
+  document.head.appendChild(printStyle);
+  let printedDark = false;
+  addEventListener("beforeprint", () => {
+    printedDark = THEMED && document.documentElement.classList.contains("dark");
+    if (printedDark) { document.documentElement.classList.remove("dark"); document.documentElement.classList.add("light"); }
+  });
+  addEventListener("afterprint", () => {
+    if (printedDark) { document.documentElement.classList.add("dark"); document.documentElement.classList.remove("light"); }
+  });
+
   window.addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
@@ -1448,6 +1462,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       document.documentElement.style.setProperty("--drop-bottom", (Number(m.bottom) || 0) + "px");
       render();
     }
+    // Export as PDF: the browser's print dialog for this document alone, under the drop's title (the PDF's file name).
+    // Only Markdown frames may open it (previewSandbox in app/utils/feedback.ts); elsewhere the browser ignores it.
+    if (m.type === "print") { if (typeof m.title === "string" && m.title) document.title = m.title; print(); }
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
