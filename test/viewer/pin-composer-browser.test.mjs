@@ -38,10 +38,22 @@ async function open(browser) {
           window.draft = { body: Vue.ref(""), images, waiting: Vue.ref(false), sending: Vue.ref(false) }
           window.injectReviewDraft = () => draft
           window.submissions = []
-          const app = Vue.createApp(Composer, { onSubmit: (body, files) => {
-            submissions.push({ body, files: files.map(file => file.name) })
-            draft.waiting.value = true
-          } })
+          window.cancellations = 0
+          window.unhandledEscapes = 0
+          document.addEventListener("keydown", event => {
+            if (event.key === "Escape") unhandledEscapes++
+          })
+          const app = Vue.createApp(Composer, {
+            onSubmit: (body, files) => {
+              submissions.push({ body, files: files.map(file => file.name) })
+              draft.waiting.value = true
+            },
+            onCancel: () => {
+              cancellations++
+              draft.body.value = ""
+              picks.value = []
+            },
+          })
           app.component("UButton", {
             props: ["loading", "disabled", "icon", "size"],
             setup: (props, { attrs }) => () => Vue.h("button", { ...attrs, disabled: props.disabled || props.loading }, "Send"),
@@ -87,6 +99,9 @@ test("compact drafts stay unchanged while waiting for a screenshot or sending, t
       await field.pressSequentially(" edits during " + phase)
       await page.getByRole("button", { name: "Remove picture" }).first().click({ force: true })
       await pastePicture(page, "replacement.png")
+      await field.press("Escape")
+      assert.equal(await page.evaluate(() => cancellations), 0, phase)
+      assert.equal(await page.evaluate(() => unhandledEscapes), 0, phase)
       assert.equal(await field.inputValue(), "Keep this feedback", phase)
       assert.deepEqual(
         await page.evaluate(() => draft.images.files.value.map((file) => file.name)),
@@ -108,6 +123,15 @@ test("compact drafts stay unchanged while waiting for a screenshot or sending, t
       body: "Keep this feedback retry",
       files: ["shot.png", "replacement.png"],
     })
+
+    // Escape still discards an idle draft once the submission is no longer in flight.
+    await page.evaluate(() => {
+      draft.waiting.value = false
+    })
+    await field.press("Escape")
+    assert.equal(await page.evaluate(() => cancellations), 1)
+    assert.equal(await field.inputValue(), "")
+    assert.deepEqual(await page.evaluate(() => draft.images.files.value), [])
   } finally {
     await browser.close()
   }

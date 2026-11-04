@@ -35,7 +35,7 @@ function key(event: KeyboardEvent) {
   } else if (event.key === "Escape") {
     event.preventDefault()
     event.stopPropagation()
-    emit("cancel")
+    if (!busy.value) emit("cancel")
   }
 }
 function paste(event: ClipboardEvent) {
