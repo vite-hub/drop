@@ -1656,20 +1656,30 @@ const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\
  * A prototype (skills/prototype) is a page with `data-variant` items. Drop owns its picker: it runs the current
  * skills/prototype/assets/picker.js in every one, whether the author pasted a copy or not, so a prototype published
  * before a picker change gets the new one and no prototype depends on a copy surviving intact. Any copy the author
- * pasted (whole, trimmed, or older) or loaded from a URL goes: the signature is loose on purpose, since a trimmed copy
- * that runs never posts its items to Drop's bar and hides all but the first. A copy that slips through steps aside for
- * Drop's, which `__dropPicker` announces before the page's scripts run.
+ * pasted (whole, trimmed, or older) or loaded from the prototype asset path goes. Recognize Drop's header or a trimmed
+ * copy's item setup and storage namespace together, so authored event handlers and unrelated dependencies stay intact.
+ * A current copy that slips through steps aside for Drop's, which `__dropPicker` announces before the page's scripts run.
  */
 const PROTOTYPE = /<[a-z][^>]*\sdata-variant[\s=>]/i
-const PASTED_PICKER =
-  /Drop prototype picker|prototype-picker|__dropVariantBar|["'`]drop-prototype(?:-canvas)?:|CustomEvent\(\s*["'`]variantchange/
-const PICKER_URL = /\ssrc\s*=\s*["']?[^"'\s>]*picker\.js/i
+const SCRIPT_SRC = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
+const PICKER_URL = /^(?:[^?#]*\/)?prototype\/assets\/picker\.js(?:[?#].*)?$/i
+function isPastedPicker(source: string): boolean {
+  return (
+    /^\s*\/\/ Drop prototype picker\./.test(source) ||
+    (/^\s*\(\s*\(\s*\)\s*=>\s*\{/.test(source) &&
+      /\bdocument\.querySelectorAll\(\s*["'`]body\s*>\s*\[data-variant\]["'`]\s*\)/.test(source) &&
+      /["'`]drop-prototype(?:-canvas)?:["'`]\s*\+\s*location\.pathname/.test(source))
+  )
+}
 function withPicker(html: string): string {
   if (!PROTOTYPE.test(html)) return html
   const stripped = html.replace(
     /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi,
-    (script, attributes: string, source: string) =>
-      PICKER_URL.test(attributes) || (!/\ssrc\s*=/i.test(attributes) && PASTED_PICKER.test(source)) ? "" : script,
+    (script, attributes: string, source: string) => {
+      const src = SCRIPT_SRC.exec(attributes)
+      const picker = src ? PICKER_URL.test(src[1] ?? src[2] ?? src[3] ?? "") : isPastedPicker(source)
+      return picker ? "" : script
+    },
   )
   const marked = prependToHead(stripped, "<script>self.__dropPicker = true;</script>")
   const picker = `<script data-drop-picker>${PICKER.trimEnd()}</script>`

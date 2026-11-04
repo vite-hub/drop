@@ -54,12 +54,19 @@ test("Drop runs its own picker in every prototype and drops any copy the author 
   }
   // `$` patterns in the picker's text stay as written.
   assert.ok(injectRuntime(page(""), false, 0, true).includes("${i + 1}"))
-  // A copy loaded from a URL goes too.
-  const linked = page("").replace(
-    "</body>",
-    '<script src="https://example.com/prototype/assets/picker.js"></script></body>',
-  )
-  assert.ok(!injectRuntime(linked, false, 0, true).includes("example.com/prototype"))
+  // Copies loaded from the prototype's asset path go too, including Drop's published skill URL.
+  for (const script of [
+    '<script src="https://example.com/prototype/assets/picker.js"></script>',
+    "<script src='/.well-known/agent-skills/prototype/assets/picker.js?v=1#picker'></script>",
+    "<script src=../prototype/assets/picker.js></script>",
+    '<script src="prototype/assets/picker.js"></script>',
+  ]) {
+    const linked = page("").replace("</body>", () => `${script}</body>`)
+    for (const output of [injectRuntime(linked, false, 0, true), embedDocument(linked, false)]) {
+      assert.equal(injected(output), 1)
+      assert.ok(!output.includes(script))
+    }
+  }
   // The page's own scripts and a code sample of the picker stay.
   const own = `document.addEventListener("variantchange", (event) => { window.seen = event.detail.id; });`
   const sample = "<pre><code>// Drop prototype picker.</code></pre>"
@@ -74,6 +81,25 @@ test("Drop runs its own picker in every prototype and drops any copy the author 
   // A page without items gets no picker; a Markdown doc's `::drop` box gets one like the viewer.
   assert.equal(injected(injectRuntime("<html><head></head><body><p>Hi</p></body></html>", false, 0, true)), 0)
   assert.equal(injected(embedDocument(page(TRIMMED), false)), 1)
+})
+
+test("Drop preserves authored picker dependencies and variantchange scripts", () => {
+  const scripts = [
+    '<script src="/date-picker.js"></script>',
+    "<script src='/color-picker.js?version=1'></script>",
+    '<script src="https://cdn.example.com/calendar/picker.js"></script>',
+    '<script src="/app.js?module=/prototype/assets/picker.js"></script>',
+    '<script src="/prototype/assets/picker.js.map"></script>',
+    '<script>document.dispatchEvent(new CustomEvent("variantchange", { detail: { id: "v-one" } }));</script>',
+    '<script>document.addEventListener("variantchange", (event) => { window.seen = event.detail.id; });</script>',
+    '<script>window.pickerHost = document.querySelector("prototype-picker"); window.hosted = self.__dropVariantBar;</script>',
+    '<script>const source = "// Drop prototype picker."; const key = "drop-prototype:" + location.pathname;</script>',
+  ]
+  const html = page("").replace("</body>", () => `${scripts.join("\n")}</body>`)
+  for (const output of [injectRuntime(html, false, 0, true), embedDocument(html, false)]) {
+    assert.equal(injected(output), 1)
+    for (const script of scripts) assert.ok(output.includes(script), `preserves ${script}`)
+  }
 })
 
 /** The items showing, the mode, the picker's own bar, and the hash, read from a page or a frame. */
