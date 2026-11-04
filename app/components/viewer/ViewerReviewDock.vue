@@ -3,7 +3,16 @@
 // is a floating surface in the page's own theme, as every popover from the pill is.
 defineOptions({ inheritAttrs: false })
 // settle: what to wait for before the composer takes focus, which the drop's frame would otherwise hear it lose.
-const props = defineProps<{ open: boolean; overlay?: boolean; settle?: () => Promise<void> }>()
+// heading: how the panel's top row is drawn, so it never stacks a second row over one its content already has. "row" is
+// the dock's own row with the title; "over" puts the dock's buttons on the right of the content's own top row (the
+// list's Open and Resolved); "none" leaves the row to the content (a thread's header has its own back and actions).
+const props = defineProps<{
+  open: boolean
+  heading: "row" | "over" | "none"
+  title?: string
+  overlay?: boolean
+  settle?: () => Promise<void>
+}>()
 const emit = defineEmits<{ close: [] }>()
 const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
@@ -55,11 +64,16 @@ watch(
           ref="panel"
           aria-label="Comments"
           tabindex="-1"
-          class="pointer-events-auto flex h-[min(28rem,60dvh)] origin-bottom min-h-0 w-full max-w-md flex-col overflow-hidden rounded-[12px] bg-default shadow-md ring ring-default outline-none focus-visible:ring-2 focus-visible:ring-inverted"
+          class="pointer-events-auto relative flex h-[min(28rem,60dvh)] origin-bottom min-h-0 w-full max-w-md flex-col overflow-hidden rounded-[12px] bg-default shadow-md ring ring-default outline-none focus-visible:ring-2 focus-visible:ring-inverted"
           @keydown.esc.stop.prevent="emit('close')"
         >
-          <div class="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-default pr-1.5 pl-4">
-            <div class="flex min-w-0 flex-1 items-center justify-between gap-2"><slot name="heading" /></div>
+          <div
+            v-if="heading !== 'none'"
+            class="flex h-11 shrink-0 items-center gap-1 pr-1.5"
+            :class="heading === 'over' ? 'absolute top-0 right-0 z-10' : 'border-b border-default pl-4'"
+          >
+            <span v-if="heading === 'row'" class="min-w-0 flex-1 truncate text-sm font-medium">{{ title }}</span>
+            <slot name="actions" />
             <UButton
               aria-label="Collapse comments"
               color="neutral"
