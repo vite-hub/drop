@@ -1222,12 +1222,11 @@ watch(
           :open="commentsOpen && !editing && !trashed && !floating"
           :overlay="Boolean(lightbox)"
           :settle="whenHeld"
+          :heading="popover?.type === 'new' || siteRef?.pending ? 'row' : popover ? 'none' : 'over'"
+          title="New comment"
           @close="closeComments"
         >
-          <template #heading>
-            <span class="text-sm font-medium">{{
-              popover?.type === "new" || siteRef?.pending ? "New comment" : "Comments"
-            }}</span>
+          <template #actions>
             <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
               <UButton
                 aria-label="Copy feedback for your agent"

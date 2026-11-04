@@ -58,7 +58,12 @@ function select(thread: { id: string }) {
 </template>
 
 <style scoped>
-/* The dock's own heading names the list. */
+/* The pill's All comments names the list, and the dock's buttons sit on the right of this row. */
+.drop-comment-panel :deep([data-slot="comment-panel-header"]) {
+  min-height: 2.75rem;
+  padding-inline-end: 5.5rem;
+}
+/* Named for screen readers only. */
 .drop-comment-panel :deep([data-slot="comment-panel-title"]) {
   position: absolute;
   width: 1px;
