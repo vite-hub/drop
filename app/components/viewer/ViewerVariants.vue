@@ -94,7 +94,7 @@ const camera: { command: PickerCommand; label: string; icon?: string; kbd: strin
           <UIcon aria-hidden="true" name="i-mingcute-left-line" />
         </button>
       </UTooltip>
-      <span aria-live="polite" class="max-w-[28ch] min-w-0 truncate px-1">
+      <span aria-live="polite" class="max-w-[44ch] min-w-0 truncate px-1" :title="shown.label || shown.id">
         {{ shown.label || shown.id }} <span class="text-muted tabular-nums">({{ state.current + 1 }}/{{ count }})</span>
       </span>
       <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['→']" text="Next">
@@ -108,7 +108,7 @@ const camera: { command: PickerCommand; label: string; icon?: string; kbd: strin
         </button>
       </UTooltip>
       <UTooltip v-if="shown.note" :content="{ side: 'top', sideOffset: 8 }" :text="shown.note">
-        <span class="hidden max-w-[32ch] min-w-0 truncate px-1 text-muted sm:block">{{ shown.note }}</span>
+        <span class="hidden max-w-[64ch] min-w-0 truncate px-1 text-muted sm:block">{{ shown.note }}</span>
       </UTooltip>
       <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border)" />
       <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['Esc']" text="Every item side by side">
