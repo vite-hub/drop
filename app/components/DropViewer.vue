@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// The header locates the drop, the bottom dock owns editing, comments, and sharing, and the right sidebar holds Details and
-// History. Frame annotations open their composer or thread in the same review dock.
+// The header locates the drop; the bottom review pill owns editing, comments, sharing, Details, and History.
+// Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
+import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
+import { breakpointsTailwind } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
@@ -35,7 +37,8 @@ const route = useRoute()
 const notify = useNotify()
 const { copy, copyLoading, copied } = useCopy()
 const { remove, restore } = useDropActions()
-const [DefineSide, ReuseSide] = createReusableTemplate()
+const [DefineDetails, ReuseDetails] = createReusableTemplate()
+const [DefineHistory, ReuseHistory] = createReusableTemplate()
 const [DefineComposer, ReuseComposer] = createReusableTemplate()
 const { width: windowWidth, height: windowHeight } = useWindowSize()
 
@@ -67,7 +70,35 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-const panel = useViewerPanel({ versions: computed(() => drop.value.versions.length) })
+// Wide screens float a new comment's card over the page; narrower ones write it in the dock.
+const breakpoints = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 })
+const wide = breakpoints.greaterOrEqual("lg")
+const phone = breakpoints.smaller("sm")
+/**
+ * The drop's details and actions, in a segment that grows inside the review pill (ViewerDetailsSegment): ⓘ or I opens
+ * it, and `detailsPop` is the popover open from it, the details or History.
+ */
+const detailsOpen = ref(false)
+const detailsPop = ref<"meta" | "history" | null>(null)
+const hasHistory = computed(() => drop.value.versions.length > 1)
+function showDetails(pop: "meta" | "history" | null = null) {
+  if (editing.value) return
+  detailsOpen.value = true
+  detailsPop.value = pop
+}
+// Share, a segment popover, and Comments would stack over each other: opening one closes the others. An Escape that
+// just closed the popover (Reka hears it first) leaves the segment open: the next one folds it.
+let detailsPopClosedAt = 0
+watch(
+  detailsPop,
+  (value, before) => {
+    if (value) {
+      shareOpen.value = false
+      if (commentsOpen.value) closeComments()
+    } else if (before) detailsPopClosedAt = performance.now()
+  },
+  { flush: "sync" },
+)
 const hasComments = computed(() => drop.value.kind !== "folder")
 const commentsOpen = ref(false)
 const reviewDraft = provideReviewDraft()
@@ -83,7 +114,7 @@ function showComments() {
   shareOpen.value = false
   tool.value = "browse"
   commentsOpen.value = true
-  if (!wide.value) panel.close()
+  detailsPop.value = null
 }
 function closeComments() {
   commentsOpen.value = false
@@ -103,7 +134,6 @@ async function backToComments() {
   if (selected) commentsRef.value?.focusComment(selected)
   else commentsRef.value?.focusComposer()
 }
-const { wide, sideOpen, mobileSide, tabs, tab } = panel
 const app = useAppFiles(drop)
 const { pages, page } = app
 
@@ -188,7 +218,9 @@ function closeLightbox() {
 const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Promise<void> }>("popoverRef")
 const shareOpen = ref(false)
 watch(shareOpen, (open) => {
-  if (open && commentsOpen.value) closeComments()
+  if (!open) return
+  detailsPop.value = null
+  if (commentsOpen.value) closeComments()
 })
 
 // Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
@@ -203,7 +235,7 @@ function startEdit() {
   closeComments()
   popover.value = null
   closeChanges()
-  tab.value = "details"
+  detailsPop.value = null
   void live.open()
 }
 // Both pages key this viewer by the drop's id and version, so another version (a teammate's "Open", the sidebar, an app
@@ -234,25 +266,6 @@ const pinned = computed(() =>
   pageComments.value.filter((comment) => onPage(comment) && !replaced(comment) && comment.kind !== "page"),
 )
 
-const panelOpen = computed(() => (wide.value ? sideOpen.value : mobileSide.value))
-// The panel's tabs look like T3 Code's: small flat chips, the open one filled, the rest muted until hovered. No
-// underline (`after:hidden` covers the one Nuxt UI paints before hydration).
-const panelTabsUi = {
-  list: "gap-1 border-0 mb-0 p-0",
-  indicator: "hidden",
-  trigger:
-    "h-6 gap-1 rounded-md py-0 pr-2 pl-1.5 font-normal after:hidden data-[state=active]:bg-elevated data-[state=active]:text-highlighted hover:data-[state=inactive]:not-disabled:bg-elevated/60 hover:data-[state=inactive]:not-disabled:text-highlighted",
-  leadingIcon: "size-3.5",
-}
-const has = (value: "history" | "details") => tabs.value.some((item) => item.value === value)
-function toggleDetails() {
-  if (panelOpen.value) panel.close()
-  else {
-    if (!wide.value) closeComments()
-    panel.show("details")
-  }
-}
-watch(mobileSide, (open) => open && closeComments())
 // Whether the Comments list was open when a new comment started: it comes back once that comment is sent or dropped.
 let listBefore = false
 function startComment() {
@@ -387,12 +400,8 @@ watch(
 function toggleCommentArea() {
   if (canMarkArea.value) showComments()
 }
-// A `?changes=` link opens with History beside the diff, as if the version had been picked there.
-if (route.query.changes && has("history")) {
-  tab.value = "history"
-  sideOpen.value = true
-}
-const docked = computed(() => sideOpen.value && wide.value && tabs.value.length > 0)
+// A `?changes=` link opens with History over the diff, as if the version had been picked there.
+if (route.query.changes && hasHistory.value) showDetails("history")
 
 // A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
 const docWidth = useDocWidth()
@@ -464,22 +473,20 @@ const galleryShown = computed(() => galleryItems.value.length > 0 && !lightbox.v
 // lands on the document. Closing steps back over that entry rather than adding another one.
 let pushedChanges = false
 watch(shownVersion, (value) => !value && (pushedChanges = false))
-/** Picking the open version again goes back to the document. Below `lg` the panel is a slideover, so it steps aside. */
+/** Picking the open version again goes back to the document. On a phone History steps aside for the diff. */
 function showVersion(version: DropVersion) {
   if (editing.value) return
   if (shownVersion.value?.version === version.version) return closeChanges()
   const opening = !shownVersion.value
   void setQuery({ changes: version.version }, { push: opening })
   if (opening) pushedChanges = true
-  if (!wide.value) mobileSide.value = false
+  if (phone.value) detailsPop.value = null
 }
 function closeChanges() {
   if (!shownVersion.value) return
   if (pushedChanges) return router.back()
   void setQuery({ changes: undefined })
 }
-// The diff belongs to History: another tab goes back to the document.
-watch(tab, (value) => value !== "history" && closeChanges())
 
 // Apps and HTML pages open alone in another window (ViewerPresent): a deck for the projector, which Slidev's presenter
 // view in this frame then drives.
@@ -509,8 +516,8 @@ defineShortcuts({
     if (drop.value.canEdit) startEdit()
     else editNoteOpen.value = true
   },
-  h: () => !editing.value && has("history") && panel.show("history"),
-  i: () => !editing.value && has("details") && panel.show("details"),
+  h: () => hasHistory.value && showDetails("history"),
+  i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
   r: toggleCommentArea,
   v: () => (tool.value = "browse"),
   s: () => framed.value && setTool("measure"),
@@ -542,7 +549,16 @@ onKeyStroke(["[", "]", "Enter"], (event) => {
 })
 // Dialogs and menus consume Escape first. Only handle it here when it reaches the document unhandled.
 onKeyStroke("Escape", (event) => {
-  if (event.defaultPrevented || mobileSide.value || shareOpen.value || lightbox.value || editing.value) return
+  if (event.defaultPrevented || shareOpen.value || lightbox.value || editing.value) return
+  // The segment's popover closes itself first (Escape stops there); the next Escape folds the segment.
+  if (detailsPop.value) {
+    detailsPop.value = null
+    return
+  }
+  if (detailsOpen.value && !popover.value && !commentsOpen.value) {
+    if (performance.now() - detailsPopClosedAt > 100) detailsOpen.value = false
+    return
+  }
   closeChanges()
   if (popover.value) popover.value = null
   else if (commentsOpen.value) closeComments()
@@ -565,6 +581,58 @@ const exportPdf = () => send({ type: "print", title: drop.value.title })
 
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
+
+// The segment's chip: the size (a folder's item count) and, for its owner, the views.
+const detailsMeta = computed(() => {
+  const d = drop.value
+  const size = d.kind === "folder" ? itemCount(d.items ?? 0) : d.kind === "site" ? "Site" : formatBytes(d.size)
+  const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
+  return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
+})
+// What the details panel listed as rows, as the segment's icons: the same rows for the same people.
+const detailsActions = computed<DetailsAction[]>(() => [
+  ...(drop.value.url
+    ? [{ id: "download", label: "Download original", icon: "i-mingcute-download-2-line", kbd: "D", press: download }]
+    : []),
+  ...(copiesMarkdown.value
+    ? [
+        {
+          id: "markdown",
+          label: copied("markdown") ? "Copied" : "Copy as Markdown",
+          icon: copied("markdown") ? "i-mingcute-check-line" : "i-mingcute-markdown-line",
+          kbd: "M",
+          press: () => void copyMarkdown(),
+        },
+      ]
+    : []),
+  ...(printsPdf.value ? [{ id: "pdf", label: "Export as PDF", icon: "i-mingcute-pdf-line", press: exportPdf }] : []),
+  ...(presents.value && !slidev.value
+    ? [{ id: "window", label: "Open in new window", icon: "i-mingcute-external-link-line", press: openWindow }]
+    : []),
+  ...(owner.value && !trashed.value
+    ? [
+        {
+          id: "move",
+          label: "Move to folder",
+          icon: "i-mingcute-new-folder-line",
+          press: () => moveTo({ drop: drop.value }),
+        },
+      ]
+    : []),
+  ...(visitor.value
+    ? [
+        {
+          id: "report",
+          label: "Report",
+          icon: "i-mingcute-flag-1-line",
+          to: { path: "/report", query: { target: `/d/${drop.value.link}` } },
+        },
+      ]
+    : []),
+  ...(drop.value.canTrash && !trashed.value
+    ? [{ id: "trash", label: "Move to Trash", icon: "i-mingcute-delete-2-line", destructive: true, press: deleteDrop }]
+    : []),
+])
 const copyMarkdown = (announce?: string) =>
   copyLoading(
     $fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }),
@@ -782,12 +850,10 @@ usePaletteOffer("drop", () => {
           },
         ]
       : []),
-    ...(has("history")
-      ? [{ label: "History", icon: "i-mingcute-history-line", kbds: ["h"], onSelect: () => panel.show("history") }]
+    ...(hasHistory.value
+      ? [{ label: "History", icon: "i-mingcute-history-line", kbds: ["h"], onSelect: () => showDetails("history") }]
       : []),
-    ...(has("details")
-      ? [{ label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => panel.show("details") }]
-      : []),
+    { label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => showDetails("meta") },
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
     ...(drop.value.url
       ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
@@ -860,79 +926,16 @@ watch(
 </script>
 
 <template>
-  <DefineSide>
-    <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-default px-2">
-      <UTabs
-        v-model="tab"
-        color="neutral"
-        :content="false"
-        :items="tabs.map((item) => ({ ...item, disabled: editing && item.value === 'history' }))"
-        size="xs"
-        :ui="panelTabsUi"
-        variant="link"
-      />
-      <UButton
-        aria-label="Close details and history"
-        color="neutral"
-        icon="i-mingcute-close-line"
-        size="sm"
-        variant="ghost"
-        @click="panel.close"
-      />
+  <DefineDetails>
+    <ViewerOverview :drop="drop" :show-description="owner || (Boolean(me) && !publicView)" />
+    <div v-if="widens" class="space-y-2 border-t border-default p-4">
+      <label for="drop-comment-style" class="text-xs font-medium text-muted">Comments</label>
+      <USelect id="drop-comment-style" v-model="commentStyle" class="w-full" :items="commentStyles" />
     </div>
-    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <LazyViewerHistory
-        v-if="tab === 'history'"
-        :comments="comments"
-        :drop="drop"
-        :selected="shownVersion?.version"
-        @open="showVersion"
-      />
-      <ViewerOverview v-else :drop="drop" :show-description="owner || (Boolean(me) && !publicView)">
-        <template #actions>
-          <div v-if="widens" class="space-y-2 px-2 pb-4">
-            <label for="drop-reading-width" class="text-xs font-medium text-muted">Reading width</label>
-            <USelect id="drop-reading-width" v-model="docWidth" class="w-full" :items="widths" />
-          </div>
-          <div v-if="widens" class="space-y-2 px-2 pb-4">
-            <label for="drop-comment-style" class="text-xs font-medium text-muted">Comments</label>
-            <USelect id="drop-comment-style" v-model="commentStyle" class="w-full" :items="commentStyles" />
-          </div>
-          <ViewerAction v-if="drop.url" icon="i-mingcute-download-2-line" label="Download original" @click="download" />
-          <ViewerAction v-if="printsPdf" icon="i-mingcute-pdf-line" label="Export as PDF" @click="exportPdf" />
-          <ViewerAction
-            v-if="copiesMarkdown"
-            :icon="copied('markdown') ? 'i-mingcute-check-line' : 'i-mingcute-markdown-line'"
-            :icon-class="copied('markdown') ? 'animate-icon-in' : undefined"
-            :label="copied('markdown') ? 'Copied' : 'Copy as Markdown'"
-            @click="copyMarkdown()"
-          />
-          <ViewerAction
-            v-if="presents && !slidev"
-            icon="i-mingcute-external-link-line"
-            label="Open in new window"
-            @click="openWindow"
-          />
-          <ViewerAction
-            v-if="owner && !trashed"
-            icon="i-mingcute-new-folder-line"
-            label="Move to folder"
-            @click="moveTo({ drop })"
-          />
-          <NuxtLink
-            v-if="visitor"
-            class="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm text-muted hover:bg-elevated"
-            :to="{ path: '/report', query: { target: `/d/${drop.link}` } }"
-          >
-            <UIcon name="i-mingcute-flag-1-line" class="size-4" />Report
-          </NuxtLink>
-          <div v-if="drop.canTrash && !trashed" class="mt-2 border-t border-default pt-2">
-            <ViewerAction destructive icon="i-mingcute-delete-2-line" label="Move to Trash" @click="deleteDrop" />
-          </div>
-        </template>
-      </ViewerOverview>
-    </div>
-  </DefineSide>
+  </DefineDetails>
+  <DefineHistory>
+    <LazyViewerHistory :comments="comments" :drop="drop" :selected="shownVersion?.version" @open="showVersion" />
+  </DefineHistory>
   <!-- A new comment's composer, or the open thread: in the dock, or beside the page for a new comment on what's selected
        (floating). -->
   <DefineComposer>
@@ -992,19 +995,6 @@ watch(
         </template>
         <template #trailing>
           <ViewerResources v-if="drop.resources?.length" :resources="drop.resources" />
-        </template>
-        <template #right>
-          <UTooltip text="Details and history" :kbds="['I']">
-            <UButton
-              aria-label="Details and history"
-              :aria-expanded="panelOpen"
-              aria-controls="drop-details"
-              color="neutral"
-              icon="i-mingcute-layout-right-line"
-              :variant="panelOpen ? 'soft' : 'ghost'"
-              @click="toggleDetails"
-            />
-          </UTooltip>
         </template>
       </UDashboardNavbar>
     </template>
@@ -1350,47 +1340,27 @@ watch(
               </UButton>
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
+            <template v-if="!editing">
+              <ViewerDetailsSegment
+                v-model:open="detailsOpen"
+                v-model:pop="detailsPop"
+                :actions="detailsActions"
+                :meta="detailsMeta"
+                :version="hasHistory ? `v${shownVersion?.version ?? drop.version}` : undefined"
+                :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
+                @width="nextWidth"
+              >
+                <template #details><ReuseDetails /></template>
+                <template #history><ReuseHistory /></template>
+              </ViewerDetailsSegment>
+              <span aria-hidden="true" class="w-1 shrink-0" />
+            </template>
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
         </ViewerReviewDock>
       </div>
     </template>
   </UDashboardPanel>
-  <!-- Beside the page, full height, like T3 Code's right panel: it pushes the content instead of covering it. The page's
-       right border divides them, and the handle on it resizes the panel; double-click resets it. -->
-  <template v-if="docked">
-    <UDashboardResizeHandle
-      tabindex="0"
-      aria-label="Resize details sidebar"
-      aria-orientation="vertical"
-      :aria-valuenow="panel.width.value"
-      :aria-valuemin="20"
-      :aria-valuemax="36"
-      class="focus-visible:outline-2 focus-visible:outline-inverted"
-      @keydown="panel.resize.key"
-      @dblclick="panel.resize.reset"
-      @lostpointercapture="panel.resize.end"
-      @pointerdown="panel.resize.start"
-      @pointermove="panel.resize.move"
-    />
-    <UDashboardPanel
-      id="drop-side"
-      class="flex-none lg:w-(--width)"
-      :style="{ '--width': `${panel.width.value}rem` }"
-      :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
-    >
-      <template #body>
-        <div id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
-      </template>
-    </UDashboardPanel>
-  </template>
-  <USlideover v-if="!wide" v-model:open="mobileSide" side="right" :ui="{ content: 'max-w-md' }" title="Drop panel">
-    <template #content>
-      <div class="flex h-full flex-col">
-        <div id="drop-details" class="flex min-h-0 flex-1 flex-col"><ReuseSide /></div>
-      </div>
-    </template>
-  </USlideover>
 
   <!-- On <body>: as the dashboard's last child they'd put the panel's lg:not-last:border-e on it, and the doc would
        shift a pixel whenever text is selected. -->

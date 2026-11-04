@@ -1,5 +1,3 @@
-export type SideTab = "history" | "details"
-
 /** An app's HTML pages, index.html first, then alphabetical. */
 export const appPages = (paths: string[]) =>
   paths

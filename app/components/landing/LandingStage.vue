@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A fixed-size canvas scaled down to fit its container, so scripted positions hold at any width.
 // Phones get the compact canvas, which shows one window at a time. `grow` lets it scale up past its size on wide screens.
-// The server assumes a laptop (as useViewerPanel does), and hydration keeps that until mounted, so the two agree.
+// The server assumes a laptop (as DropViewer's `wide` does), and hydration keeps that until mounted, so the two agree.
 const {
   size,
   compactSize,
