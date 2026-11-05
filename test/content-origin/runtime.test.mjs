@@ -17,6 +17,7 @@ beforeEach(() => {
   reset()
   state.contentOrigin = "https://drop-usercontent.example"
   state.who = { userId: "owner", role: "member" }
+  state.identities = { owner: state.who }
 })
 
 function request(url, { method = "GET", headers = {} } = {}) {
@@ -289,6 +290,92 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     } finally {
       Date.now = now
     }
+  } finally {
+    state.authSecret = undefined
+  }
+})
+
+/**
+ * App `id`, with one file, and a load of that file on the app's own origin with the grant `state.who` got opening it.
+ * Each test names its own app: an isolate keeps an app's files for each grant, across tests.
+ */
+async function appFor(id, drop) {
+  insertDrop(id, { kind: "app", filename: `${id}/`, blob_key: null, ...drop })
+  objects.set(`apps/${id}/1/entry.js`, { body: new Blob(["export default 1"]), uploadedAt: new Date() })
+  sql
+    .prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, 'entry.js', ?, 16)")
+    .run(id, `apps/${id}/1/entry.js`)
+  const detailEvent = request(`https://drop.example/api/drops/${id}`)
+  detailEvent.context.params = { id }
+  const detail = await detailHandler(detailEvent)
+  return async (later = 0) => {
+    const now = Date.now
+    // Past the few seconds an isolate keeps an app's files.
+    Date.now = () => now() + later
+    try {
+      return (
+        await contentMiddleware(
+          request(`${detail.contentOrigin}/entry.js`, {
+            headers: { "sec-fetch-dest": "script", cookie: `drop_grant=${detail.contentGrant}` },
+          }),
+        )
+      ).status
+    } finally {
+      Date.now = now
+    }
+  }
+}
+
+test("an app's files stop for someone taken off its team, though their grant hasn't run out", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  state.teams = true
+  try {
+    sql.prepare("INSERT INTO user (id, name, email) VALUES ('mate', 'Mate', 'mate@example.com')").run()
+    sql.prepare("INSERT INTO organization (id, name, slug) VALUES ('acme', 'Acme', 'acme')").run()
+    insertDrop("folder", {
+      kind: "folder",
+      filename: "folder",
+      blob_key: null,
+      share: "team",
+      team_folder: 1,
+      team_id: "acme",
+    })
+    const mate = { userId: "mate", role: "member", actorKind: "browser", teams: { acme: "member" } }
+    state.who = state.identities.mate = mate
+    const load = await appFor("team-app", { parent_id: "folder", share: "team" })
+    assert.equal(await load(), 200)
+    state.identities.mate = { ...mate, teams: {} }
+    assert.equal(await load(10_000), 404)
+  } finally {
+    state.authSecret = undefined
+  }
+})
+
+test("an app's files stop once it's made private", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  try {
+    state.who = null
+    const load = await appFor("public-app", { share: "public" })
+    assert.equal(await load(), 200, "a visitor signed out opens a public app")
+    sql.prepare("UPDATE drops SET share = 'private' WHERE id = 'public-app'").run()
+    assert.equal(await load(10_000), 404)
+  } finally {
+    state.authSecret = undefined
+  }
+})
+
+test("on a team Drop, an app's files stop for someone whose account is gone", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  state.mode = "team"
+  try {
+    state.who = state.identities.mate = { userId: "mate", role: "member", actorKind: "browser" }
+    const load = await appFor("team-drop-app", { share: "team" })
+    assert.equal(await load(), 200)
+    delete state.identities.mate
+    assert.equal(await load(10_000), 404)
   } finally {
     state.authSecret = undefined
   }
