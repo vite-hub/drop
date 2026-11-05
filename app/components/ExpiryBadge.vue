@@ -1,29 +1,28 @@
 <script setup lang="ts">
-// Only what needs attention: a drop in the Trash, one about to expire, or a temporary one.
+// Only what needs attention: a drop in the Trash, or one that goes there within two weeks unless someone opens it.
 // Grayscale until it's in the Trash; red is reserved for that.
-import { DAY_MS, daysUntil, purgesAt } from "#shared/expiry"
+import { DAY_MS, daysUntil, purgesAt, TEMPORARY_DAYS } from "#shared/expiry"
 import type { DropSummary } from "#shared/types"
 
-const props = defineProps<{ drop: Pick<DropSummary, "expiresAt" | "lifetime" | "trashedAt"> }>()
+const props = defineProps<{ drop: Pick<DropSummary, "expiresAt" | "trashedAt"> }>()
 const now = useRelativeNow()
 const badge = computed(() => {
-  const { expiresAt, lifetime, trashedAt } = props.drop
-  if (trashedAt !== null)
+  const { expiresAt, trashedAt } = props.drop
+  if (trashedAt !== null) {
+    const left = daysUntil(purgesAt(trashedAt), now.value)
     return {
-      label: `Trash · ${daysUntil(purgesAt(trashedAt), now.value)}d`,
-      title: "In the Trash. Restore it before it's deleted.",
+      label: `Trash · ${left}d`,
+      title: `In the Trash. Deleted for good in ${left} ${left === 1 ? "day" : "days"} unless you restore it.`,
       trashed: true,
     }
-  if (expiresAt === null) return null
-  if (expiresAt - now.value <= 7 * DAY_MS)
-    return {
-      label: `${daysUntil(expiresAt, now.value)}d left`,
-      title: "Goes to the Trash unless someone opens it.",
-      trashed: false,
-    }
-  if (lifetime === "temporary")
-    return { label: "Temporary", title: "Goes to the Trash 14 days after the last visit.", trashed: false }
-  return null
+  }
+  if (expiresAt === null || expiresAt - now.value > TEMPORARY_DAYS * DAY_MS) return null
+  const left = daysUntil(expiresAt, now.value)
+  return {
+    label: `${left}d left`,
+    title: `Goes to the Trash in ${left} ${left === 1 ? "day" : "days"} unless someone opens it.`,
+    trashed: false,
+  }
 })
 </script>
 

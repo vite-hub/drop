@@ -796,12 +796,15 @@ test("update_drop shares, trashes, and restores; the Trash lists separately", as
   )
   assert.match(
     (await call(updateDrop, { id: doc.id, trash: true })).structuredContent.status,
-    /^In the Trash, deleting in 15 days$/,
+    /^In the Trash\. Deleted for good in 15 days$/,
   )
   assert.deepEqual((await call(listDrops, {})).structuredContent.drops, [])
   assert.equal((await call(listDrops, { trash: true })).structuredContent.drops[0].id, doc.id)
   assert.match((await call(updateDrop, { id: doc.id, title: "Renamed" })).message, /Restore it first/)
-  assert.equal((await call(updateDrop, { id: doc.id, trash: false })).structuredContent.status, "Expires in 30 days")
+  assert.equal(
+    (await call(updateDrop, { id: doc.id, trash: false })).structuredContent.status,
+    "Goes to the Trash in 30 days",
+  )
 })
 
 test("an agent publishes an app, sends only what changed, and hears about missing files", async () => {
