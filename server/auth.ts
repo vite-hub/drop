@@ -17,6 +17,7 @@ import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 import { billingConfig, checkoutParams, leaveTeams, teamOptions, teamPlans, teamsEnabled } from "./utils/teams"
+import { teamLimitAdapter } from "./utils/team-limit-adapter"
 import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
@@ -64,7 +65,7 @@ export default defineAuth(({ env, requestOrigin }) => {
   return {
     appName: "Drop",
     baseURL: requestOrigin,
-    database: drizzleAdapter(db, { provider: "sqlite", schema }),
+    database: teamLimitAdapter(drizzleAdapter(db, { provider: "sqlite", schema })),
     // Default retention: 90 days / 100,000 events. ViteHub strips IPs and secrets and isolates write failures.
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
