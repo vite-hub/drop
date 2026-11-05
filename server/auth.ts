@@ -61,6 +61,12 @@ export default defineAuth(({ env, requestOrigin }) => {
   const proxied = authProxy().enabled
   const teams = teamsEnabled()
   const billing = billingConfig()
+  const teamBilling = billing.enabled
+    ? {
+        stripeClient: new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
+        plans: teamPlans(billing),
+      }
+    : undefined
   const organization = env.drop.githubOrg.trim()
   const password = import.meta.dev === true || env.drop.testSignin
   const quotas = env.drop.quotas.enabled
@@ -152,7 +158,7 @@ export default defineAuth(({ env, requestOrigin }) => {
             isListedMember(user) ? { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } } : false,
         },
         // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
-        delete: { before: leaveTeams },
+        delete: { before: (user, context) => leaveTeams(user, context, teamBilling) },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
@@ -189,15 +195,15 @@ export default defineAuth(({ env, requestOrigin }) => {
             }),
           ]
         : []),
-      ...(billing.enabled
+      ...(teamBilling
         ? [
             stripe({
-              stripeClient: new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
+              stripeClient: teamBilling.stripeClient,
               stripeWebhookSecret: billing.webhookSecret,
               organization: { enabled: true },
               subscription: {
                 enabled: true,
-                plans: teamPlans(billing),
+                plans: teamBilling.plans,
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
                 authorizeReference: async ({ user, referenceId }) => {
                   const [row] = await db
