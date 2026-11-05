@@ -108,6 +108,12 @@ watch(
     sans-serif;
 }
 
+/* The ViteHub mark folds into a bottom corner on these pages (data-vitehub-pill above), 44px wide with an 8px hit area
+   on a touch screen. While it shows, a bar as wide as the screen keeps clear of both corners. */
+:root:has(> :is(vitehub-pill, vitehub-tools-off)) .review-toolbar {
+  max-width: calc(100% - 6rem);
+}
+
 .review-toolbar :deep(button) {
   min-width: 28px;
   height: 28px;
