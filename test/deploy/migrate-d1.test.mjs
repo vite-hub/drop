@@ -71,7 +71,7 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
   const config = { migrationsFolder: fileURLToPath(directory) }
   const migrations = readMigrationFiles(config)
   const [baseline, authEvents, suggestions, comments, dropComments, cleanup, acceptances, undos, release] = migrations
-  const oneModel = migrations.at(-1)
+  const oneModel = migrations[journal.entries.findIndex((entry) => entry.tag === "0011_comments_one_model")]
   // Comments must follow main's latest migration. Earlier previews can already contain comments at older timestamps.
   for (const {
     appliedMigrations,
