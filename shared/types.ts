@@ -358,4 +358,6 @@ interface ViewerTeam {
   slug: string
   role: "owner" | "admin" | "member"
   paid: boolean
+  /** Stripe couldn't charge the team's card and retries it: the team is on Free until its card works. */
+  pastDue: boolean
 }

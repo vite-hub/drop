@@ -3,12 +3,12 @@ import { stripe } from "@better-auth/stripe"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { github } from "better-auth/social-providers"
 import { admin, jwt, organization as teamsPlugin } from "better-auth/plugins"
-import { and, eq, inArray } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { Stripe } from "stripe"
 import * as v from "valibot"
 import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
 import { db, schema } from "vite-hub/database/drizzle"
-import { member, user as users } from "./databases/config"
+import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
 import { clientRegistrationLimits } from "./utils/oauth-clients"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
@@ -16,7 +16,15 @@ import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
-import { billingConfig, checkoutParams, memberLimit, teamPlans, teamSeats, teamsEnabled } from "./utils/teams"
+import {
+  authorizeBilling,
+  billingConfig,
+  checkoutParams,
+  memberLimit,
+  teamPlans,
+  teamSeats,
+  teamsEnabled,
+} from "./utils/teams"
 import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
@@ -189,20 +197,7 @@ export default defineAuth(({ env, requestOrigin }) => {
                 enabled: true,
                 plans: teamPlans(billing),
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
-                authorizeReference: async ({ user, referenceId }) => {
-                  const [row] = await db
-                    .select({ role: member.role })
-                    .from(member)
-                    .where(
-                      and(
-                        eq(member.userId, user.id),
-                        eq(member.organizationId, referenceId),
-                        inArray(member.role, ["owner", "admin"]),
-                      ),
-                    )
-                    .limit(1)
-                  return Boolean(row)
-                },
+                authorizeReference: authorizeBilling,
                 getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
               },
             }),

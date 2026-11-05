@@ -63,7 +63,7 @@ DROP_PUBLIC_LINK_DAYS=7
 
 ### Bill teams through Stripe {#billing}
 
-With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` then shows the Team plan below the license prices.
+With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` then shows the Team plan below the license prices. When Stripe can't charge a team's card, the team is on the Free plan while Stripe retries it, and its page asks its owner and admins to update the card in Stripe's billing portal.
 
 | Variable | What it does |
 | --- | --- |

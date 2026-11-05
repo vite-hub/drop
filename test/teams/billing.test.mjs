@@ -4,10 +4,10 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { organization } from "better-auth/plugins"
 import { beforeEach, test } from "vite-plus/test"
-import { migrate, reset, state } from "../cost/harness.mjs"
+import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/config.ts")
-const { checkoutParams, teamPlans } = await import("../../server/utils/teams.ts")
+const { authorizeBilling, checkoutParams, teamPlans } = await import("../../server/utils/teams.ts")
 
 // The Team plan through Stripe's plugin, with a Stripe client that keeps what Checkout was asked to bill.
 migrate()
@@ -30,7 +30,7 @@ function stripeClient(sessions) {
   }
 }
 
-async function checkout(annual, managedPayments = false) {
+async function checkout(annual, managedPayments = false, { status } = {}) {
   const sessions = []
   const auth = betterAuth({
     baseURL: "https://drop.example",
@@ -46,7 +46,7 @@ async function checkout(annual, managedPayments = false) {
         subscription: {
           enabled: true,
           plans: teamPlans({ priceId: "price_month", annualPriceId: "price_year" }),
-          authorizeReference: async () => true,
+          authorizeReference: authorizeBilling,
           getCheckoutSessionParams: () => checkoutParams(managedPayments),
         },
       }),
@@ -58,6 +58,10 @@ async function checkout(annual, managedPayments = false) {
   })
   const headers = new Headers({ cookie: signedUp.headers.get("set-cookie").split(";")[0] })
   const team = await auth.api.createOrganization({ headers, body: { name: "Acme", slug: "acme" } })
+  if (status)
+    sql
+      .prepare("INSERT INTO subscription (id, plan, reference_id, status) VALUES ('s1', 'team', ?, ?)")
+      .run(team.id, status)
   await auth.api.upgradeSubscription({
     headers,
     body: {
@@ -92,4 +96,10 @@ test("without Managed Payments, Checkout saves the address it collects on the te
   const session = await checkout(false)
   assert.equal(session.managed_payments, undefined)
   assert.deepEqual(session.customer_update, { address: "auto" })
+})
+
+test("a team whose payment failed updates its card instead of starting a second subscription", async () => {
+  await assert.rejects(checkout(false, false, { status: "past_due" }), /payment failed/i)
+  reset()
+  assert.ok(await checkout(false, false, { status: "canceled" }), "a team whose subscription ended starts a new one")
 })
