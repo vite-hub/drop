@@ -65,6 +65,16 @@ export default defineNuxtConfig({
 
 The tag is the same for every site and carries no key. The button sits in its own shadow root, so your styles and its styles never mix, and it does nothing until someone presses it.
 
+The toolbar is the same pill as ViteHub's page tools. Drag its Drop mark to any edge of the page, or click the mark to shrink the toolbar to a small hexagon. Each reviewer's browser remembers both for the site. To choose where it starts, add these to the tag:
+
+| Attribute | Value | Default |
+| --- | --- | --- |
+| `data-edge` | `top`, `right`, `bottom`, or `left` | `bottom` |
+| `data-at` | The place along that edge, from `0` (left or top) to `100` (right or bottom) | `50` |
+| `data-collapsed` | No value. The toolbar starts as the hexagon. | Open |
+
+For example, `<script src="$ORIGIN/review.js" data-edge="right" data-at="100" data-collapsed defer></script>` starts it collapsed at the bottom of the right edge. A place the reviewer chose wins over the tag.
+
 ## Use the bookmarklet {#bookmarklet}
 
 The site review's page has a **Review with Drop** button. Drag it to your bookmarks bar; clicking it adds the Comment button to the page you're on, for you only, until you reload.

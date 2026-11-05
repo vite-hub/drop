@@ -41,6 +41,8 @@ patchedDependencies:
   # back but the Console or ?vitehub (vite-hub/vitehub#3365). Both packages serve the same built loader. Drop these
   # when Drop moves to a ViteHub build with that PR.
   "@vite-hub/comments@0.0.0-preview-7c60fde": patches/@vite-hub__comments@0.0.0-preview-7c60fde.patch
+  # vite-hub also gets `vite-hub/page/pill.js`, ViteHub's page pill as a browser script, which review.js uses as its
+  # toolbar (vite-hub/vitehub#3377). Built from that PR; drop it with the rest once Drop's ViteHub build has it.
   vite-hub@0.0.0-preview-7c60fde: patches/vite-hub@0.0.0-preview-7c60fde.patch
 
 # Only workerd (local Workers runtime) needs its install script.

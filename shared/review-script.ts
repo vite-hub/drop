@@ -4,6 +4,13 @@
 // that element, so the page doesn't take them for its own: a menu it has open stays open while someone comments on it.
 // It does nothing until someone presses Comment or Highlight. It carries no key: Drop finds the site drop from the
 // page's origin when someone connects.
+//
+// The toolbar is ViteHub's page pill, the same code as ViteHub's page tools (vite-hub/vitehub#3377): it docks to
+// any edge, its mark drags it there and collapses it to the hexagon, and the browser remembers both for the site. The
+// script tag sets where it starts: data-edge (top, right, bottom, left), data-at (0 to 100 along it), data-collapsed.
+// The bookmarklet has no tag, so it starts at the bottom middle.
+import PAGE_PILL from "vite-hub/page/pill.js?raw"
+import DROP_MARK from "./drop-mark.svg?raw"
 import { ELEMENT_NAMING, INK } from "./plan-runtime"
 import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
 import { CAPTURE } from "./viewport-capture"
@@ -14,14 +21,13 @@ const STYLE = `
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 .ui { font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); -webkit-font-smoothing: antialiased; }
-.bar { position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-weight: 500; cursor: pointer; }
 .btn:hover, .icon:hover { background: var(--soft); }
 .btn:focus-visible, .icon:focus-visible, textarea:focus-visible, .pin:focus-visible, .row-item:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .btn.primary { border-color: var(--primary); background: var(--primary); color: var(--primary-fg); }
 .btn.primary:hover { opacity: .9; }
 .btn:disabled, .icon:disabled { opacity: .6; cursor: default; }
-.btn svg, .icon svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; }
+.btn svg, .icon svg, .seg svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; }
 .btn.ghost { border-color: transparent; padding: 0 8px; }
 .btn.on { background: var(--soft); }
 .icon { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
@@ -34,7 +40,7 @@ const STYLE = `
 .card { position: fixed; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); box-shadow: 0 8px 28px rgb(0 0 0 / .16); overflow: hidden; }
 .pop { width: 320px; padding: 10px; }
 .thread { width: 340px; max-height: min(480px, calc(100vh - 32px)); }
-.list { right: 16px; bottom: 64px; width: 320px; max-height: min(520px, calc(100vh - 96px)); }
+.list { width: 320px; max-height: min(520px, calc(100vh - 96px)); }
 .head { display: flex; align-items: center; gap: 4px; height: 40px; flex: none; padding: 0 6px 0 12px; border-bottom: 1px solid var(--border); }
 .head .title { margin-right: auto; font: 500 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
 .head label { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; cursor: pointer; }
@@ -80,14 +86,17 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .pin:hover, .pin.open { scale: 1.12; }
 .pin img { width: 100%; height: 100%; object-fit: cover; }
 .pin.done { opacity: .6; filter: grayscale(1); }
-.toast { position: fixed; right: 16px; bottom: 64px; display: flex; gap: 8px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
+.toast { position: fixed; display: flex; gap: 8px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .toast a { color: var(--fg); font-weight: 500; }
 .icon[aria-pressed=true] { background: var(--soft); color: var(--fg); }
-.sep { width: 1px; height: 20px; margin: 0 2px; flex: none; background: var(--border); }
 .dot { display: block; border-radius: 50%; }
-.swatch { width: 14px; height: 14px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .1); }
-.tools { max-width: calc(100vw - 32px); overflow-x: auto; }
-.tools > * { flex: none; }
+.swatch { width: 14px; height: 14px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); }
+/* The toolbar's segments, in the pill: its buttons, a separator across the flow, and Done as the one filled button. */
+.seg .sep { width: 1px; height: 16px; margin: 0 3px; flex: none; background: var(--vitehub-pill-line); }
+drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 1px; margin: 3px 0; }
+.seg .count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--vitehub-pill-hover); font: 500 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; }
+.seg .go { background: var(--vitehub-pill-on); color: var(--vitehub-pill-on-text); }
+.seg .go:disabled { opacity: .5; cursor: default; }
 .paint { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -124,7 +133,7 @@ const COMPOSE = (label: string, placeholder: string, send: string, cancel: boole
 // and Done. The script sizes and colours the dots.
 const SEPARATOR = `<span class="sep" aria-hidden="true"></span>`
 const TOOLS =
-  `<div class="bar tools" role="group" aria-label="Highlight" hidden>` +
+  `<div class="seg tools" slot="highlight" role="group" aria-label="Highlight" hidden>` +
   Object.entries(MARK_TIPS)
     .map(([id, tip]) => {
       // SAFETY: id is an own key of the local MARK_TIPS literal, and ICONS defines an icon for every tip.
@@ -144,13 +153,13 @@ const TOOLS =
     .join("") +
   SEPARATOR +
   `<button class="icon" type="button" data-act="undo" aria-keyshortcuts="Meta+Z Control+Z" aria-label="Undo" title="Undo" disabled>${ICONS.reopen}</button>` +
-  `<button class="btn ghost" type="button" data-act="cancel">Cancel</button><button class="btn primary" type="button" data-act="done" aria-keyshortcuts="Enter" disabled>Done</button></div>`
+  `<button type="button" data-act="cancel">Cancel</button><button class="go" type="button" data-act="done" aria-keyshortcuts="Enter" disabled>Done</button></div>`
 
 const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="bar"><button class="btn primary" type="button" data-act="comment">${ICONS.comment}Comment</button><button class="btn ghost" type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button class="btn ghost" type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button class="icon" type="button" data-act="pins" hidden aria-pressed="true" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
@@ -194,16 +203,52 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   ${ELEMENT_NAMING}
 
+  ${PAGE_PILL}
+
   const host = document.createElement("drop-review");
   host.style.cssText = "all:initial;position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;";
   const root = host.attachShadow({ mode: "closed" });
-  root.innerHTML = "<style>" + ${JSON.stringify(STYLE)} + "</style>" + ${JSON.stringify(MARKUP)};
+  // The segments' buttons look like the pill's own, from the same styles.
+  root.innerHTML = "<style>" + ${JSON.stringify(STYLE)} + ".seg{" + ViteHubPagePill.viteHubPillButtonStyles + "}</style>" + ${JSON.stringify(MARKUP)};
   const $ = (selector, from) => (from || root).querySelector(selector);
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
+
+  // The comment list and the notes open beside the pill, on its edge, at the end of the edge it is nearer to.
+  function dockCards(place) {
+    const side = place.edge === "left" || place.edge === "right";
+    const off = (place.collapsed ? 2 : 16) + place.thickness + 8 + "px";
+    for (const card of [list, toast]) {
+      const style = card.style;
+      style.left = style.right = style.top = style.bottom = style.translate = "";
+      style[place.edge] = off;
+      const start = side ? "top" : "left", end = side ? "bottom" : "right";
+      if (place.at === 50) { style[start] = "50%"; style.translate = side ? "0 -50%" : "-50% 0"; }
+      else style[place.at < 50 ? start : end] = "16px";
+    }
+  }
+  // The pill sits in this shadow root with the rest of the toolbar, so the page reaches none of it, screenshots leave
+  // it out, and a press on it stays here. The tag's place is where it starts until the reviewer moves it.
+  const dropMark = new DOMParser().parseFromString(${JSON.stringify(DROP_MARK.replace(/<title>[^<]*<\/title>|<metadata>[^<]*<\/metadata>/g, ""))}, "image/svg+xml").documentElement;
+  dropMark.setAttribute("aria-hidden", "true");
+  const pill = ViteHubPagePill.mountViteHubPagePill({
+    name: "drop-review-pill",
+    label: "Drop review tools",
+    mark: document.importNode(dropMark, true),
+    slots: ["review", "highlight"],
+    storage: { collapsed: "drop-review-collapsed", dock: "drop-review-dock" },
+    initial: {
+      dock: ViteHubPagePill.readViteHubPageDock({ edge: script.dataset.edge || "bottom", at: Number(script.dataset.at || 50) }),
+      collapsed: script.hasAttribute("data-collapsed"),
+    },
+    onPlace: dockCards,
+    parent: $(".ui"),
+    signal: new AbortController().signal,
+  });
+  pill.append(bar, tools);
   let area = null, start = null, busy = false, toastTimer = 0;
   let threads = [], openN = null, pinsShown = true, here = "";
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
@@ -569,13 +614,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     closeThread();
     list.hidden = true;
     loadScreenshot().catch(() => { screenshotModule = null; });
-    bar.hidden = true;
+    pill.hidden = true;
     draw.hidden = false;
     layout();
   }
   function cancel() {
     const wasOpen = !draw.hidden || !pop.hidden;
-    draw.hidden = true; box.hidden = true; pop.hidden = true; bar.hidden = false;
+    draw.hidden = true; box.hidden = true; pop.hidden = true; pill.hidden = bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
     newBox.show("");
     area = null; start = null; strokes = []; still = null;
@@ -717,7 +762,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       left = Math.min(left, b.x - pad); top = Math.min(top, b.y - pad); right = Math.max(right, b.x + b.width + pad); bottom = Math.max(bottom, b.y + b.height + pad);
     }
     const r = rectOf({ x: Math.max(0, left), y: Math.max(0, top) }, { x: Math.min(innerWidth, right), y: Math.min(innerHeight, bottom) });
-    paint.hidden = tools.hidden = true;
+    paint.hidden = tools.hidden = pill.hidden = true;
     const target = anchorFor(r.left, r.top, r.right, r.bottom, host);
     compose(r, target, null, picture.then((taken) => taken && withInk(taken, list).catch(() => taken)));
   }
@@ -790,10 +835,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }, true);
   pinsButton.addEventListener("click", () => {
     pinsShown = !pinsShown;
-    pinsButton.setAttribute("aria-pressed", String(pinsShown));
+    // Pressed while the comments are hidden, like any mode the pill has on.
+    pinsButton.setAttribute("aria-pressed", String(!pinsShown));
     pinsButton.title = pinsShown ? "Hide comments" : "Show comments";
     pinsButton.setAttribute("aria-label", pinsButton.title);
-    pinsButton.classList.toggle("on", !pinsShown);
     layout();
   });
   showResolved.addEventListener("change", render);
