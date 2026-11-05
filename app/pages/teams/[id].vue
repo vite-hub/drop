@@ -289,9 +289,18 @@ if (import.meta.client && route.query.billing === "done") {
         <h2 id="team-plan" class="mb-2 text-sm font-medium text-highlighted">Plan</h2>
         <div class="flex flex-wrap items-center gap-3 rounded-lg border border-default px-4 py-3 text-sm">
           <div class="min-w-0 flex-1">
-            <p class="font-medium text-highlighted">{{ team.paid ? "Team" : "Free" }}</p>
+            <p v-if="team.pastDue" class="flex items-center gap-1.5 font-medium text-error">
+              <UIcon name="i-mingcute-warning-line" class="size-4" />
+              Payment failed
+            </p>
+            <p v-else class="font-medium text-highlighted">{{ team.paid ? "Team" : "Free" }}</p>
             <p class="text-xs text-muted">
-              <template v-if="team.paid"
+              <template v-if="team.pastDue"
+                >Stripe couldn't charge the team's card. Until it can, the team is on the Free plan: nobody joins past
+                {{ billing.freeMembers }} members, and members lose the Pro plan.
+                {{ runs ? "Update the card to get the Team plan back." : "Ask the team's owner to update its card." }}
+              </template>
+              <template v-else-if="team.paid"
                 >Billed per member. Everyone on the team gets the Pro plan: any number of drops, more storage, and drops
                 kept forever.</template
               >
@@ -301,9 +310,17 @@ if (import.meta.client && route.query.billing === "done") {
               >
             </p>
           </div>
-          <template v-if="team.role === 'owner' || team.role === 'admin'">
+          <template v-if="runs">
             <UButton
-              v-if="team.paid"
+              v-if="team.pastDue"
+              color="neutral"
+              label="Update card"
+              :loading="paying === 'manage'"
+              size="sm"
+              @click="pay('manage', () => teams.manageBilling(id))"
+            />
+            <UButton
+              v-else-if="team.paid"
               color="neutral"
               label="Manage billing"
               :loading="paying === 'manage'"

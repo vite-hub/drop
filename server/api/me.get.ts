@@ -8,7 +8,7 @@ import { expiryPolicy } from "../utils/expiry"
 import { identify } from "../utils/identity"
 import { sharePolicy } from "../utils/share"
 import { enabledSkills } from "../utils/skills"
-import { billingConfig, paidTeams, teamsEnabled } from "../utils/teams"
+import { billingConfig, teamBilling, teamsEnabled } from "../utils/teams"
 
 export default defineHandler(async (event): Promise<Viewer | null> => {
   const who = await identify(event)
@@ -18,7 +18,7 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
   const billing = billingConfig(event)
   // The page waits for /api/me before loading the drop. These reads depend only on the identity, so start them
   // together: separate awaits add database round trips, including the first skill-settings read per isolate.
-  const [rows, skills, paid] = await Promise.all([
+  const [rows, skills, { paid, pastDue }] = await Promise.all([
     ids.length
       ? db
           .select({ id: organization.id, name: organization.name, slug: organization.slug })
@@ -27,10 +27,15 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
       : [],
     // The sidebar hides Skills from members while none is on.
     enabledSkills().then((enabled) => enabled.length),
-    billing.enabled ? paidTeams(ids) : new Set<string>(),
+    billing.enabled ? teamBilling(ids) : { paid: new Set<string>(), pastDue: new Set<string>() },
   ])
   const teams = rows
-    .map((item) => ({ ...item, role: who.teams![item.id]!, paid: paid.has(item.id) }))
+    .map((item) => ({
+      ...item,
+      role: who.teams![item.id]!,
+      paid: paid.has(item.id),
+      pastDue: pastDue.has(item.id),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name))
   return {
     id: who.userId,

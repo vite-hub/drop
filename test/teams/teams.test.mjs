@@ -196,6 +196,13 @@ test("a team that pays puts its members on Pro and keeps boards; a free team sto
   assert.ok(!(await call(publish, { board: { items: [] }, note: "x", lifetime: "review" })).isError)
   assert.equal((await getUsage("stranger")).plan, "free", "only the paying team's members")
 
+  // Stripe couldn't charge the card: Free while it retries and after retries stop.
+  for (const status of ["past_due", "unpaid"]) {
+    sql.prepare("UPDATE subscription SET status = ?").run(status)
+    assert.equal((await getUsage("mate")).plan, "free", status)
+    assert.equal(await memberLimit("acme"), 3, status)
+  }
+
   sql.prepare("UPDATE subscription SET status = 'canceled'").run()
   assert.equal((await getUsage("mate")).plan, "free")
 })

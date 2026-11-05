@@ -358,4 +358,6 @@ interface ViewerTeam {
   slug: string
   role: "owner" | "admin" | "member"
   paid: boolean
+  /** Stripe couldn't charge the team's card (`past_due` or `unpaid`): Free until payment succeeds. */
+  pastDue: boolean
 }
