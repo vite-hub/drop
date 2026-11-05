@@ -52,10 +52,10 @@ export function mergeResources(current: DropResource[], next: DropResource[]): D
 
 /**
  * A preview deploy of the change, which stays in a doc's header: something to open and try, not a fact about the doc.
- * Agents title it "Preview" (pr-evidence); a host with a `preview` label counts too.
+ * Agents title it exactly "Preview" (pr-evidence); a host with a `preview` label counts too. "Design preview" doesn't.
  */
 export const isPreviewLink = (resource: DropResource) =>
-  /\bpreview\b/i.test(resource.title ?? "") || new URL(resource.url).hostname.split(".").includes("preview")
+  resource.title?.trim().toLowerCase() === "preview" || new URL(resource.url).hostname.split(".").includes("preview")
 
 const REFERENCE =
   /^https:\/\/(?:www\.)?(?:github\.com|gitlab\.com)\/([\w.-]+\/[\w.-]+)\/(?:-\/)?(?:pull|issues|merge_requests)\/(\d+)\/?(?:[?#].*)?$/

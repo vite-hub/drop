@@ -22,6 +22,8 @@ test("a preview stays in the header; a link reads as owner/repo#n, its title, or
   assert.equal(isPreviewLink(PREVIEW), true)
   assert.equal(isPreviewLink({ url: "https://pr7.preview.example.com/" }), true)
   assert.equal(isPreviewLink({ url: PR, title: "PR #42" }), false)
+  assert.equal(isPreviewLink({ url: "https://www.figma.com/file/x", title: " preview " }), true)
+  assert.equal(isPreviewLink({ url: "https://www.figma.com/file/x", title: "Design preview" }), false)
   assert.equal(linkText({ url: PR }), "acme/portal#42")
   assert.equal(linkText({ url: PR, title: "PR #42" }), "PR #42")
   assert.equal(linkText({ url: "https://www.figma.com/file/x" }), "figma.com/file/x")
