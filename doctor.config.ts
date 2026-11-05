@@ -31,6 +31,12 @@ export default defineDoctorConfig({
     },
     {
       ruleId: "nuxt/middleware/no-route-middleware-api-security",
+      file: "server/handlers/oauth-metadata.ts",
+      reason:
+        "Public OAuth discovery (RFC 9728 and RFC 8414 metadata). MCP clients read it before they have a token, so it has no guard by design. Its route /.well-known/oauth-authorization-server/api/auth names the issuer and is not Better Auth's API.",
+    },
+    {
+      ruleId: "nuxt/middleware/no-route-middleware-api-security",
       file: ".vitehub/nitro/comments/page-session.mjs",
       reason:
         "Generated re-export of the same public page-tool discovery handler. Comments checks Console section access and read permission in its allowed callback; denied or failed checks expose no tool. Doctor cannot follow the re-export and callback.",
