@@ -9,7 +9,9 @@ const { setLifetime, restore } = useDropActions()
 const notify = useNotify()
 const now = useRelativeNow()
 const days = computed(() => me.value?.expiry.days ?? 0)
-const status = computed(() => expiryLabel(props.drop, now.value))
+// The shared clock dates from the page load, so a window that just restarted would read a day long; this one is
+// taken again each time the drop changes.
+const status = computed(() => expiryLabel(props.drop, Math.max(now.value, Date.now())))
 const trashed = computed(() => props.drop.trashedAt !== null)
 /** Owners keep drops unless the admin turned that off; admins always may. */
 const canKeep = computed(() => Boolean(me.value && (me.value.expiry.custom || me.value.role === "admin")))
