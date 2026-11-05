@@ -14,6 +14,8 @@ const props = defineProps<{
   settle?: () => Promise<void>
 }>()
 const emit = defineEmits<{ close: [] }>()
+// The pill owns the bottom center, so the ViteHub tools pill folds to its mark at the end of the edge while it shows.
+useHead({ htmlAttrs: { "data-vitehub-pill": "mark" } })
 const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
 function focusTrigger() {
