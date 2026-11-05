@@ -109,9 +109,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
             connection: {
               url: env({ source: env.source("DROP_DATABASE_URL"), default: "file:.data/database/drop.db" }),
             },
-            // Pending migrations run before the server listens. A fresh database runs them all, and
-            // 0004_drop_comments_on_vitehub drops the old comment tables, which ViteHub counts as data loss.
-            migrateOnStart: { allowDataLoss: true },
+            migrateOnStart: true,
           }
         : d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },

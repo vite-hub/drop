@@ -27,7 +27,7 @@ ${EDITOR:-nano} .env
 docker compose up -d --build
 ```
 
-Compose builds for `DROP_HOST=vps` and starts Drop, which applies pending migrations before it listens. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. If migrations fail, the server does not start.
+Compose builds for `DROP_HOST=vps` and starts Drop, which applies pending migrations before it listens. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. If migrations fail, the server does not start. A fresh SQLite database needs no data-loss override. If an upgrade refuses an intentional removal, back up the database and review `DROP_HOST=vps pnpm db:migrate --dry-run` before running `DROP_HOST=vps pnpm db:migrate --allow-data-loss` once against that database.
 
 ## Serve HTTPS {#proxy}
 

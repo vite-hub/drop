@@ -127,7 +127,7 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 | Host | Applies migrations with |
 | --- | --- |
 | Cloudflare | `pnpm run deploy`, which the button runs. Workers Builds that run `npx wrangler deploy` need `pnpm db:migrate:remote` after schema changes. |
-| Vercel, Netlify | `pnpm db:migrate --allow-data-loss` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
+| Vercel, Netlify | `pnpm db:migrate` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
 | Deno Deploy | `pnpm db:migrate:d1` as a pre-deploy command. |
 | Docker Compose | Drop itself before it listens for SQLite, or `pnpm db:migrate:d1` for an explicit D1 build, before Drop starts. |
 
