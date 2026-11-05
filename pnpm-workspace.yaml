@@ -39,8 +39,9 @@ patchedDependencies:
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
   # The page tools' × leaves a 14px ViteHub mark where the pill was, on every page, instead of an "off" note and no way
   # back but the Console or ?vitehub (vite-hub/vitehub#3365), and a page with data-vitehub-pill="mark" on <html> folds
-  # the pill to the mark at the end of its edge, off Drop's review pill (vite-hub/vitehub#3376). Both packages serve the
-  # same built loader. Drop these when Drop moves to a ViteHub build with both PRs.
+  # the pill to the mark at the end of its edge, off Drop's review pill (vite-hub/vitehub#3376). Each patch swaps in
+  # loader.js built from those PRs and asks for loader.js?v=17, so cached loaders refresh. Drop these when Drop moves to a
+  # ViteHub build with both PRs.
   "@vite-hub/comments@0.0.0-preview-7c60fde": patches/@vite-hub__comments@0.0.0-preview-7c60fde.patch
   vite-hub@0.0.0-preview-7c60fde: patches/vite-hub@0.0.0-preview-7c60fde.patch
 
