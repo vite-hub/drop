@@ -18,7 +18,7 @@ interface ExpiryRow {
 }
 
 /** Days a drop with this lifetime lives after its last visit; 0 means it never expires. `days` of 0 turns expiry off. */
-export function lifetimeDays(lifetime: Lifetime, days: number) {
+function lifetimeDays(lifetime: Lifetime, days: number) {
   if (lifetime === "keep" || days <= 0) return 0
   return lifetime === "temporary" ? Math.min(TEMPORARY_DAYS, days) : days
 }
