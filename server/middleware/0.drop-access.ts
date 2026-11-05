@@ -1,4 +1,5 @@
 import { defineHandler, HTTPError, HTTPResponse, redirect } from "h3"
+import { AI_FETCHER } from "../utils/ai-fetcher"
 
 const notFound = () => new HTTPError({ status: 404, statusText: "Not found" })
 
@@ -33,7 +34,30 @@ export default defineHandler(async (event) => {
   if (waitingForReview(drop, who))
     throw new HTTPError({ status: 403, statusText: "Waiting for review", data: { shareReview: "pending" } })
   if (expiredLink(drop, who)) throw new HTTPError({ status: 410, statusText: "Expired" })
-  if (!drop || !permissions(drop, who).view) throw notFound()
+  if (!drop || !permissions(drop, who).view) {
+    const headers = event.req.headers
+    if (
+      ["GET", "HEAD"].includes(event.req.method) &&
+      (AI_FETCHER.test(headers.get("user-agent") ?? "") || !/\btext\/html\b/i.test(headers.get("accept") ?? ""))
+    )
+      // Missing and inaccessible drops give the same hint, so it cannot disclose a private drop.
+      return new Response(
+        event.req.method === "HEAD"
+          ? null
+          : `Not found or sign-in required. Connect to ${event.url.origin}/mcp, sign in with your Drop account, and use the read_drop MCP tool with this link.\n`,
+        {
+          status: 404,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "private, no-store",
+            Vary: "Accept, User-Agent",
+            "X-Content-Type-Options": "nosniff",
+            "X-Robots-Tag": "noindex, nofollow",
+          },
+        },
+      )
+    throw notFound()
+  }
   event.res.headers.set("Cache-Control", "private, no-store")
   // A pinned `?v=` renders: the page checks that the version exists.
   if (!["GET", "HEAD"].includes(event.req.method) || event.url.searchParams.has("v")) return
