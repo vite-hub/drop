@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
+import { user } from "./config"
 
 // Teams on a personal Drop (server/utils/teams.ts): Better Auth's organization plugin keeps who is on which team, and
 // its Stripe plugin keeps each team's subscription. A team's drops live in its team folders (`drops.team_id`).
@@ -23,7 +24,10 @@ export const organization = sqliteTable(
   (table) => [uniqueIndex("organization_slug_idx").on(table.slug)],
 )
 
-/** Who is on a team: `owner` (made it, pays for it), `admin` (manages its folders and people), or `member`. */
+/**
+ * Who is on a team: `owner` (made it, pays for it), `admin` (manages its folders and people), or `member`. Deleting an
+ * account takes it off its teams first (server/utils/teams.ts `leaveTeams`); the foreign key catches any other delete.
+ */
 export const member = sqliteTable(
   "member",
   {
@@ -31,7 +35,9 @@ export const member = sqliteTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
     createdAt: createdAt(),
   },

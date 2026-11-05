@@ -85,6 +85,13 @@
       "when": 1793716344919,
       "tag": "0011_comments_one_model",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793907016903,
+      "tag": "0012_member_user_cascade",
+      "breakpoints": true
     }
   ]
 }

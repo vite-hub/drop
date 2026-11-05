@@ -1,8 +1,9 @@
-import { and, count, eq, inArray, sql } from "drizzle-orm"
+import type { GenericEndpointContext, User } from "better-auth"
+import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
-import { member, subscription } from "../databases/config"
+import { member, organization, subscription } from "../databases/config"
 import type { DropRow } from "./drops/types"
 
 // Teams on a personal Drop. A team is a Better Auth organization: its members, their roles, and invitations live there.
@@ -130,4 +131,40 @@ export async function memberLimit(team: string, event?: H3Event) {
   const billing = billingConfig(event)
   if (!billing.enabled) return Number.MAX_SAFE_INTEGER
   return (await paidTeams([team])).has(team) ? Number.MAX_SAFE_INTEGER : billing.freeMembers
+}
+
+/**
+ * Takes someone off their teams before Better Auth deletes their account (its `user.delete.before` hook). Each team runs
+ * the organization plugin's hooks as if they had been removed, so Stripe's plugin bills one seat less. A team they own passes to its oldest admin,
+ * or to its oldest member when it has no admin. A team with nobody else on it is deleted with its invitations. Stripe's
+ * plugin refuses that while the team still pays, and then the account stays until someone cancels the subscription.
+ */
+export async function leaveTeams(user: User, context: GenericEndpointContext | null) {
+  const hooks = context?.context.getPlugin("organization")?.options.organizationHooks ?? {}
+  const teams = await db
+    .select({ membership: member, team: organization })
+    .from(member)
+    .innerJoin(organization, eq(organization.id, member.organizationId))
+    .where(eq(member.userId, user.id))
+  const left = []
+  for (const { membership, team } of teams) {
+    const others = await db
+      .select({ id: member.id, role: member.role })
+      .from(member)
+      .where(and(eq(member.organizationId, team.id), ne(member.userId, user.id)))
+      .orderBy(asc(member.createdAt), asc(member.id))
+    if (!others.length) await hooks.beforeDeleteOrganization?.({ organization: team, user })
+    left.push({ membership, team, others })
+  }
+  for (const { membership, team, others } of left) {
+    if (!others.length) {
+      await db.delete(organization).where(eq(organization.id, team.id))
+      continue
+    }
+    const heir = others.find((other) => asRole(other.role) === "admin") ?? others[0]!
+    if (asRole(membership.role) === "owner" && !others.some((other) => asRole(other.role) === "owner"))
+      await db.update(member).set({ role: "owner" }).where(eq(member.id, heir.id))
+    await db.delete(member).where(eq(member.id, membership.id))
+    await hooks.afterRemoveMember?.({ member: membership, user, organization: team })
+  }
 }

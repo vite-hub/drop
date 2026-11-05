@@ -55,6 +55,8 @@ DROP_PUBLIC_LINK_DAYS=7
 
 `DROP_TEAMS=true` lets people on a personal Drop make teams on **Teams**. A team works like a small team Drop inside yours: its owner and admins invite people by email and make its folders, and drops in those folders reach its members and their agents, nobody else. Drop sends no email, so whoever invites copies the link and sends it; the invitee joins by opening it, signed in with that email.
 
+Deleting an account takes it off its teams, and Stripe bills each team one seat less. A team the account owned passes to its oldest admin, or to its oldest member when it has no admin. A team with nobody else on it is deleted, but not while it still pays: cancel its subscription first.
+
 | Variable | What it does |
 | --- | --- |
 | [DROP_TEAMS]{.font-mono .text-xs} | Set true to turn teams on. Ignored on a team Drop, which is one team already. |

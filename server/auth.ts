@@ -16,7 +16,15 @@ import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
-import { billingConfig, checkoutParams, memberLimit, teamPlans, teamSeats, teamsEnabled } from "./utils/teams"
+import {
+  billingConfig,
+  checkoutParams,
+  leaveTeams,
+  memberLimit,
+  teamPlans,
+  teamSeats,
+  teamsEnabled,
+} from "./utils/teams"
 import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
@@ -143,6 +151,8 @@ export default defineAuth(({ env, requestOrigin }) => {
           before: async (user) =>
             isListedMember(user) ? { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } } : false,
         },
+        // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
+        delete: { before: leaveTeams },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
