@@ -137,9 +137,10 @@ export async function memberLimit(team: string, event?: H3Event) {
 
 type TeamBilling = { stripeClient: Stripe; plans: StripePlan[] }
 
-/** Better Auth Stripe 1.7 only syncs active/trialing seats. Drop also keeps past-due teams while payment is retried. */
-async function syncPastDueSeats(team: string, billing?: TeamBilling) {
-  if (!billing) return
+/** Sync past-due Stripe seats before cleanup, returning the subscriptions whose local seats must follow on success. */
+async function syncPastDueSeats(team: string, members: number, billing?: TeamBilling) {
+  const synced: string[] = []
+  if (!billing) return synced
   const rows = await db
     .select()
     .from(subscription)
@@ -149,21 +150,22 @@ async function syncPastDueSeats(team: string, billing?: TeamBilling) {
     if (!row.stripeSubscriptionId || !plan?.seatPriceId) continue
     const live = await billing.stripeClient.subscriptions.retrieve(row.stripeSubscriptionId)
     if (!PAYING.some((status) => status === live.status)) continue
-    const { members } = await teamSeats(team)
     const item = live.items.data.find((entry) => entry.price.id === plan.seatPriceId)
     if (item?.quantity !== members)
       await billing.stripeClient.subscriptions.update(live.id, {
         items: [item ? { id: item.id, quantity: members } : { price: plan.seatPriceId, quantity: members }],
         proration_behavior: plan.prorationBehavior ?? "create_prorations",
       })
-    await db.update(subscription).set({ seats: members }).where(eq(subscription.id, row.id))
+    synced.push(row.id)
   }
+  return synced
 }
 
 /**
  * Takes someone off their teams before Better Auth deletes their account (its `user.delete.before` hook). Each team runs
- * the organization plugin's hooks as if they had been removed, with past-due seats synced explicitly. A team they own
- * passes to its oldest admin, or to its oldest member when it has no admin. A team with nobody else on it is deleted
+ * the organization plugin's hooks as if they had been removed, with past-due Stripe seats synced before any cleanup so
+ * a Stripe failure leaves all their teams intact. Better Auth Stripe 1.7 itself only syncs active/trialing seats. A team
+ * they own passes to its oldest admin, or to its oldest member when it has no admin. A team with nobody else on it is deleted
  * with its invitations and content. Stripe's plugin refuses that while the team still pays, and then the account stays
  * until someone cancels the subscription.
  */
@@ -184,6 +186,13 @@ export async function leaveTeams(user: User, context: GenericEndpointContext | n
     if (!others.length) await hooks.beforeDeleteOrganization?.({ organization: team, user })
     left.push({ membership, team, others })
   }
+  // Finish every fallible past-due Stripe call before changing any membership, ownership, local seat count or content.
+  const seats = []
+  for (const { team, others } of left) {
+    if (!others.length) continue
+    const synced = await syncPastDueSeats(team.id, others.length, billing)
+    seats.push(...synced.map((id) => ({ id, members: others.length })))
+  }
   for (const { membership, team, others } of left) {
     if (!others.length) {
       const { deleteDrop } = await import("./drops/lifecycle")
@@ -198,6 +207,7 @@ export async function leaveTeams(user: User, context: GenericEndpointContext | n
       await db.update(member).set({ role: "owner" }).where(eq(member.id, heir.id))
     await db.delete(member).where(eq(member.id, membership.id))
     await hooks.afterRemoveMember?.({ member: membership, user, organization: team })
-    await syncPastDueSeats(team.id, billing)
   }
+  for (const { id, members } of seats)
+    await db.update(subscription).set({ seats: members }).where(eq(subscription.id, id))
 }

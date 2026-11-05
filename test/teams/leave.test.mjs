@@ -100,7 +100,7 @@ async function setup(people, { paying = false, status = "active" } = {}) {
         .all(team.id)
         .map((row) => [row.name, row.role]),
     )
-  return { team, updates, remove, roles, ids }
+  return { team, updates, remove, roles, ids, auth, headers: maker.headers, billing }
 }
 
 for (const status of ["active", "trialing", "past_due"])
@@ -121,6 +121,100 @@ for (const status of ["active", "trialing", "past_due"])
     )
     assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 2)
   })
+
+for (const method of ["retrieve", "update"])
+  test(`a Stripe ${method} failure keeps the account's membership and ownership until a retry`, async () => {
+    const { remove, roles, ids, billing } = await setup(
+      [
+        { name: "owner", role: "owner" },
+        { name: "mate", role: "member" },
+      ],
+      { paying: true, status: "past_due" },
+    )
+    const original = billing.stripeClient.subscriptions[method]
+    billing.stripeClient.subscriptions[method] = async () => {
+      throw new Error("Stripe unavailable")
+    }
+
+    await assert.rejects(remove("owner"), /Stripe unavailable/)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id = ?").get(ids.owner).n, 1)
+    assert.deepEqual(roles(), { owner: "owner", mate: "member" })
+    assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 2)
+
+    billing.stripeClient.subscriptions[method] = original
+    await remove("owner")
+    assert.deepEqual(roles(), { mate: "owner" })
+    assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 1)
+  })
+
+test("a later team's Stripe failure preserves every team, including final-team content, and can be retried", async () => {
+  const { team, remove, roles, ids, auth, headers, billing, updates } = await setup(
+    [
+      { name: "owner", role: "owner" },
+      { name: "mate", role: "member" },
+    ],
+    { paying: true, status: "past_due" },
+  )
+  const alone = await auth.api.createOrganization({ headers, body: { name: "Alone", slug: "alone" } })
+  insertDrop("folder", { kind: "folder", blob_key: null, team_folder: 1, team_id: alone.id })
+  insertDrop("doc", { parent_id: "folder" })
+  const later = await auth.api.createOrganization({ headers, body: { name: "Later", slug: "later" } })
+  await auth.api.addMember({ body: { userId: ids.mate, organizationId: later.id, role: "member" } })
+  sql
+    .prepare(
+      "INSERT INTO subscription (id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status, seats) VALUES ('s2', 'team', ?, 'cus_later', 'sub_later', 'past_due', 2)",
+    )
+    .run(later.id)
+  const subscriptions = billing.stripeClient.subscriptions
+  const retrieve = subscriptions.retrieve
+  const first = structuredClone(await retrieve("sub_team"))
+  const laterSubscription = structuredClone(first)
+  laterSubscription.id = "sub_later"
+  const live = new Map([
+    [first.id, first],
+    [laterSubscription.id, laterSubscription],
+  ])
+  let unavailable = true
+  subscriptions.retrieve = async (id) => live.get(id)
+  subscriptions.update = async (id, params) => {
+    // Whichever team is processed first succeeds; the next one fails.
+    if (unavailable && updates.length === 1) throw new Error("Later team's Stripe unavailable")
+    updates.push({ id, ...params })
+    const subscription = live.get(id)
+    subscription.items.data[0].quantity = params.items[0].quantity
+    return subscription
+  }
+  const memberships = () => sql.prepare("SELECT * FROM member ORDER BY id").all()
+  const before = memberships()
+
+  await assert.rejects(remove("owner"), /Later team's Stripe unavailable/)
+  assert.deepEqual(memberships(), before)
+  assert.deepEqual(roles(), { owner: "owner", mate: "member" })
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM organization").get().n, 3)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id = ?").get(ids.owner).n, 1)
+  const seats = () =>
+    sql
+      .prepare("SELECT seats FROM subscription ORDER BY id")
+      .all()
+      .map((row) => row.seats)
+  assert.deepEqual(seats(), [2, 2])
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 2)
+  assert.ok(objects.has("doc.md"))
+  assert.equal(updates.length, 1)
+
+  unavailable = false
+  await remove("owner")
+  assert.deepEqual(roles(), { mate: "owner" })
+  assert.equal(sql.prepare("SELECT role FROM member WHERE organization_id = ?").get(later.id).role, "owner")
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM organization WHERE id = ?").get(alone.id).n, 0)
+  assert.deepEqual(seats(), [1, 1])
+  assert.equal(first.items.data[0].quantity, 1)
+  assert.equal(laterSubscription.items.data[0].quantity, 1)
+  assert.equal(updates.length, 2)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0)
+  assert.ok(!objects.has("doc.md"))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM member WHERE organization_id = ?").get(team.id).n, 1)
+})
 
 test("a deleted owner's team passes to its oldest admin, or to its oldest member when it has none", async () => {
   const withAdmins = await setup([

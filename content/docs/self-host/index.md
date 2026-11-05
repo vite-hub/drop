@@ -57,6 +57,8 @@ DROP_PUBLIC_LINK_DAYS=7
 
 Deleting an account takes it off its teams, and Stripe bills each team one seat less, including while a payment is past due. A team the account owned passes to its oldest admin, or to its oldest member when it has no admin. A team with nobody else on it is permanently deleted with its folders and their contents, files, and comments, but not while it still pays: cancel its subscription first.
 
+Past-due Stripe seat updates finish for every team before any memberships, ownership, or team content change. If one fails, the account keeps all its teams; retry the deletion once Stripe recovers.
+
 | Variable | What it does |
 | --- | --- |
 | [DROP_TEAMS]{.font-mono .text-xs} | Set true to turn teams on. Ignored on a team Drop, which is one team already. |
