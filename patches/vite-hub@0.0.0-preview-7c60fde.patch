@@ -92,3 +92,27 @@ index a9cee0d..083e337 100644
 \ No newline at end of file
 +e)),o;try{let t=new URL(e.session??a(import.meta.url),location.href);t.searchParams.set(`page`,location.pathname);let n=await fetch(t.origin===location.origin?`${t.pathname}${t.search}`:t.href,{credentials:`same-origin`,headers:{accept:`application/json`}});if(!n.ok)return[];o=c(await n.json())}catch{return[]}if(o.tools.length===0||document.querySelector(`vitehub-pill, vitehub-tools-off`))return[];let s=o.tools.find(e=>e.param&&n.has(e.param));if(n.has(`vitehub`)||s)A(!1);else if(k())return B(()=>{A(!1),V(e)},!1),[];let l=n.get(`vitehub`)||s?.id,u=o.tools.some(e=>e.id===l),d=new AbortController,f=o.tools.map(()=>new AbortController),p=/* @__PURE__ */ new Set,m=(t=!1)=>{if([...p].some(e=>!e()))return;let n=o.tools.filter(e=>x(e.id));for(let e of o.tools)b(e.id,!1);A(!0);let r=new URL(location.href);r.searchParams.delete(`vitehub`);for(let e of o.tools)e.param&&r.searchParams.delete(e.param);r.href!==location.href&&history.replaceState(history.state,``,r);for(let e of f)e.abort();d.abort(),B(()=>{A(!1);for(let e of n)b(e.id,!0);V(e)},t)},h=R(o.tools,m,d.signal),v=/* @__PURE__ */ new Map,y=t=>`vitehub-open:${e.session??a(import.meta.url)}:${t}`,b=(e,t)=>{try{sessionStorage.setItem(y(e),String(t))}catch{}},x=e=>{try{return sessionStorage.getItem(y(e))===`true`}catch{return!1}},S=/* @__PURE__ */ new Map,C=async(e,t)=>await S.get(e)?.(t)??!1,w=(await Promise.all(o.tools.map(async(e,t)=>{let{signal:n}=f[t],a=document.createElement(`vitehub-tool`);a.slot=e.id,h.append(a);let o,s,c,d=()=>(c||(c=i(e.script),c.catch(()=>{c=void 0})),c),y=!1,w=()=>{let t=document.createElement(`vitehub-tool`);t.slot=e.id,a.replaceWith(t),a=t},T=()=>{let e=a.attachShadow({mode:`open`}),t=document.createElement(`style`);t.textContent=r,e.append(t,D)},E=(t,r=!0)=>n.aborted?Promise.resolve(!1):y?(o?.(t),Promise.resolve(!0)):s?s.then(e=>(e&&o?.(t),e)):(s=(async()=>{let i=new AbortController,c=()=>i.abort();n.addEventListener(`abort`,c,{once:!0});try{a.setAttribute(`aria-busy`,`true`);let s=_(await d());if(!s)throw TypeError(`The script ${e.script} has no default export function.`);if(n.aborted)return!1;D.remove(),a.shadowRoot?w():a.replaceChildren();let c=s({beforeExit:e=>{let t=()=>e();p.add(t),i.signal.addEventListener(`abort`,()=>p.delete(t),{once:!0})},tool:e,bar:a,signal:i.signal,open:r&&(e.lazy===!0||e.id===l||x(e.id)),exit:()=>m(),createWindow:t=>{let n=g({...t,signal:i.signal,onHide:()=>{b(e.id,!1),h.hasAttribute(`collapsed`)&&h.shadowRoot.querySelector(`button.mark`).focus({preventScroll:!0}),t.onHide?.()}}),r={...n,show(){if(!i.signal.aborted){for(let[t,n]of v)t!==e.id&&n.hide();b(e.id,!0),n.show()}},destroy(){v.get(e.id)===r&&(v.delete(e.id),b(e.id,!1)),n.destroy()}};return v.set(e.id,r),r},openTool:C,onOpen:e=>{o=e}});return y=!0,t&&o?.(t),!a.shadowRoot&&!a.hasChildNodes()&&(a.hidden=!0),c instanceof Function&&(n.aborted?c():i.signal.addEventListener(`abort`,()=>c(),{once:!0})),!n.aborted}catch(t){return i.abort(),n.removeEventListener(`abort`,c),v.delete(e.id)&&b(e.id,!1),o=void 0,y=!1,console.error(`[vitehub] The page tool "${e.id}" did not start.`,t),e.lazy?(w(),D.textContent=`Retry ${e.label}`,D.title=`The tool could not load. Try again.`,a.hidden=!1,T()):(S.delete(e.id),a.remove()),!1}finally{a.removeAttribute(`aria-busy`),s=void 0}})(),s),D=document.createElement(`button`);D.type=`button`,D.textContent=e.label,D.addEventListener(`click`,()=>void E());for(let e of[`pointerenter`,`pointerdown`,`focus`])D.addEventListener(e,()=>void d());if(S.set(e.id,E),e.lazy&&e.id!==l&&!x(e.id))return T(),e;let O=await E(void 0,!u||e.id===l);return!n.aborted&&(O||e.lazy)?e:void 0}))).filter(e=>!!e);return w.length===0&&d.abort(),w}V({session:new URL(`../session`,import.meta.url).pathname});
 \ No newline at end of file
+diff --git a/dist/page-tools-shared-D8Aw1uub.js b/dist/page-tools-shared-D8Aw1uub.js
+--- a/dist/page-tools-shared-D8Aw1uub.js
++++ b/dist/page-tools-shared-D8Aw1uub.js
+@@ -53,7 +53,7 @@
+ * The URL of the loader script, below the app base. Its version query changes when the loader changes, so caches keep
+ * it 5 minutes.
+ */
+-const viteHubPageToolsLoader = "/_vitehub/page/assets/loader.js?v=15";
++const viteHubPageToolsLoader = "/_vitehub/page/assets/loader.js?v=17";
+ /** The attribute of the script that loads the page tools. A page that has it does not get a second one. */
+ const viteHubPageToolsMarker = "data-vitehub-page-tools";
+ /** The bootstrap's opening tag, so the server can recognize the generated bootstrap when it replaces it. */
+diff --git a/dist/page-tools-CFQG9t3N.js b/dist/page-tools-CFQG9t3N.js
+--- a/dist/page-tools-CFQG9t3N.js
++++ b/dist/page-tools-CFQG9t3N.js
+@@ -28,7 +28,7 @@
+ 	try {
+ 		const path = JSON.parse(inline.slice(at + 7, -1));
+ 		const nonce = tagNonce(inline);
+-		return typeof path === "string" && path.endsWith("/_vitehub/page/assets/loader.js?v=15") && viteHubPageToolsInlineScript(path.slice(0, -36), nonce) === `${inline}<\/script>`;
++		return typeof path === "string" && path.endsWith("/_vitehub/page/assets/loader.js?v=17") && viteHubPageToolsInlineScript(path.slice(0, -36), nonce) === `${inline}<\/script>`;
+ 	} catch {
+ 		return false;
+ 	}
