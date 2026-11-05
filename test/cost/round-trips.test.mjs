@@ -117,16 +117,22 @@ test("a signed-in admin's page bootstrap reads independent sidebar data in one r
 
 test("team names and billing join the same bootstrap round trip and preserve the viewer's role", async () => {
   state.teams = state.billing = true
-  state.who = { ...who, teams: { acme: "owner", other: "member" } }
-  sql.exec("INSERT INTO organization (id, name, slug) VALUES ('other', 'Other', 'other'), ('acme', 'Acme', 'acme')")
-  sql.exec("INSERT INTO subscription (id, plan, reference_id, status) VALUES ('s1', 'team', 'acme', 'active')")
+  state.who = { ...who, teams: { acme: "owner", other: "member", late: "admin", unpaid: "owner" } }
+  sql.exec(
+    "INSERT INTO organization (id, name, slug) VALUES ('other', 'Other', 'other'), ('acme', 'Acme', 'acme'), ('late', 'Late', 'late'), ('unpaid', 'Unpaid', 'unpaid')",
+  )
+  sql.exec(
+    "INSERT INTO subscription (id, plan, reference_id, status) VALUES ('s1', 'team', 'acme', 'active'), ('s2', 'team', 'late', 'past_due'), ('s3', 'team', 'unpaid', 'unpaid')",
+  )
   let viewer
   const count = await roundTrips(async () => {
     viewer = await meHandler(event("/api/me"))
   })
   assert.deepEqual(viewer.teams, [
-    { id: "acme", name: "Acme", slug: "acme", role: "owner", paid: true },
-    { id: "other", name: "Other", slug: "other", role: "member", paid: false },
+    { id: "acme", name: "Acme", slug: "acme", role: "owner", paid: true, pastDue: false },
+    { id: "late", name: "Late", slug: "late", role: "admin", paid: false, pastDue: true },
+    { id: "other", name: "Other", slug: "other", role: "member", paid: false, pastDue: false },
+    { id: "unpaid", name: "Unpaid", slug: "unpaid", role: "owner", paid: false, pastDue: true },
   ])
   assert.equal(viewer.paid, true)
   assert.equal(count, 1, `team bootstrap waited for ${count} sequential database round trips`)

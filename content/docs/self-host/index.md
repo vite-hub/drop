@@ -57,6 +57,8 @@ DROP_PUBLIC_LINK_DAYS=7
 
 Deleting an account takes it off its teams, and Stripe bills each team one seat less, including while a payment is past due. A team the account owned passes to its oldest admin, or to its oldest member when it has no admin. A team with nobody else on it is permanently deleted with its folders and their contents, files, and comments, but not while it still pays: cancel its subscription first.
 
+Past-due Stripe seat updates finish for every team before any memberships, ownership, or team content change. If a later update or local cleanup fails, Drop restores the attempted Stripe seat changes before rejecting the deletion. Memberships, ownership, and local seat counts commit together, so the account keeps all its teams on failure; retry the deletion once the service recovers. An error that also reports a failed Stripe restoration needs its team quantities checked in Stripe before retrying.
+
 | Variable | What it does |
 | --- | --- |
 | [DROP_TEAMS]{.font-mono .text-xs} | Set true to turn teams on. Ignored on a team Drop, which is one team already. |
@@ -65,7 +67,7 @@ Deleting an account takes it off its teams, and Stripe bills each team one seat 
 
 ### Bill teams through Stripe {#billing}
 
-With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` then shows the Team plan below the license prices.
+With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` then shows the Team plan below the license prices. When Stripe can't charge a team's card, the team is on the Free plan until payment succeeds, including after Stripe stops retrying. Its page asks its owner and admins to update the card in Stripe's billing portal instead of starting a second subscription.
 
 | Variable | What it does |
 | --- | --- |
@@ -129,7 +131,7 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 | Host | Applies migrations with |
 | --- | --- |
 | Cloudflare | `pnpm run deploy`, which the button runs. Workers Builds that run `npx wrangler deploy` need `pnpm db:migrate:remote` after schema changes. |
-| Vercel, Netlify | `pnpm db:migrate --allow-data-loss` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
+| Vercel, Netlify | `pnpm db:migrate` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
 | Deno Deploy | `pnpm db:migrate:d1` as a pre-deploy command. |
 | Docker Compose | Drop itself before it listens for SQLite, or `pnpm db:migrate:d1` for an explicit D1 build, before Drop starts. |
 

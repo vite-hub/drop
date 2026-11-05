@@ -100,7 +100,7 @@ async function setup(people, { paying = false, status = "active" } = {}) {
         .all(team.id)
         .map((row) => [row.name, row.role]),
     )
-  return { team, updates, remove, roles, ids }
+  return { team, updates, remove, roles, ids, auth, headers: maker.headers, billing }
 }
 
 for (const status of ["active", "trialing", "past_due"])
@@ -121,6 +121,166 @@ for (const status of ["active", "trialing", "past_due"])
     )
     assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 2)
   })
+
+for (const method of ["retrieve", "update"])
+  test(`a Stripe ${method} failure keeps the account's membership and ownership until a retry`, async () => {
+    const { remove, roles, ids, billing } = await setup(
+      [
+        { name: "owner", role: "owner" },
+        { name: "mate", role: "member" },
+      ],
+      { paying: true, status: "past_due" },
+    )
+    const original = billing.stripeClient.subscriptions[method]
+    billing.stripeClient.subscriptions[method] = async () => {
+      throw new Error("Stripe unavailable")
+    }
+
+    await assert.rejects(remove("owner"), /Stripe unavailable/)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id = ?").get(ids.owner).n, 1)
+    assert.deepEqual(roles(), { owner: "owner", mate: "member" })
+    assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 2)
+
+    billing.stripeClient.subscriptions[method] = original
+    await remove("owner")
+    assert.deepEqual(roles(), { mate: "owner" })
+    assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 1)
+  })
+
+for (const failure of ["read", "update", "response", "content", "commit"])
+  test(`a later ${failure} failure restores live seats, preserves every team, and can be retried`, async () => {
+    const { team, remove, roles, ids, auth, headers, billing, updates } = await setup(
+      [
+        { name: "owner", role: "owner" },
+        { name: "mate", role: "member" },
+      ],
+      { paying: true, status: "past_due" },
+    )
+    const alone = await auth.api.createOrganization({ headers, body: { name: "Alone", slug: "alone" } })
+    insertDrop("folder", { kind: "folder", blob_key: null, team_folder: 1, team_id: alone.id })
+    insertDrop("doc", { parent_id: "folder" })
+    const later = await auth.api.createOrganization({ headers, body: { name: "Later", slug: "later" } })
+    await auth.api.addMember({ body: { userId: ids.mate, organizationId: later.id, role: "member" } })
+    sql
+      .prepare(
+        "INSERT INTO subscription (id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status, seats) VALUES ('s2', 'team', ?, 'cus_later', 'sub_later', 'past_due', 2)",
+      )
+      .run(later.id)
+    const subscriptions = billing.stripeClient.subscriptions
+    const retrieve = subscriptions.retrieve
+    const first = structuredClone(await retrieve("sub_team"))
+    const laterSubscription = structuredClone(first)
+    laterSubscription.id = "sub_later"
+    const live = new Map([
+      [first.id, first],
+      [laterSubscription.id, laterSubscription],
+    ])
+    let unavailable = true
+    let reads = 0
+    let writes = 0
+    subscriptions.retrieve = async (id) => {
+      if (unavailable && failure === "read" && ++reads === 2) throw new Error("Later Stripe read unavailable")
+      return live.get(id)
+    }
+    subscriptions.update = async (id, params) => {
+      // The second reduction can fail before or after Stripe applies it; restoration calls remain available.
+      const fail = unavailable && params.items[0].quantity === 1 && ++writes === 2
+      if (fail && failure === "update") throw new Error("Later Stripe update unavailable")
+      updates.push({ id, ...params })
+      const subscription = live.get(id)
+      subscription.items.data[0].quantity = params.items[0].quantity
+      if (fail && failure === "response") throw new Error("Later Stripe response unavailable")
+      return subscription
+    }
+    if (failure === "content")
+      sql.exec(`CREATE TEMP TRIGGER fail_cleanup BEFORE DELETE ON drops
+      BEGIN SELECT RAISE(ABORT, 'Team cleanup unavailable'); END`)
+    if (failure === "commit")
+      sql.exec(`CREATE TEMP TRIGGER fail_cleanup BEFORE DELETE ON member
+      WHEN OLD.organization_id IN (SELECT id FROM organization WHERE slug = 'later')
+      BEGIN SELECT RAISE(ABORT, 'Team cleanup unavailable'); END`)
+    const memberships = () => sql.prepare("SELECT * FROM member ORDER BY id").all()
+    const before = memberships()
+
+    try {
+      await assert.rejects(remove("owner"), /unavailable/)
+    } finally {
+      sql.exec("DROP TRIGGER IF EXISTS fail_cleanup")
+    }
+    assert.deepEqual(memberships(), before)
+    assert.deepEqual(roles(), { owner: "owner", mate: "member" })
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM organization").get().n, 3)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id = ?").get(ids.owner).n, 1)
+    const seats = () =>
+      sql
+        .prepare("SELECT seats FROM subscription ORDER BY id")
+        .all()
+        .map((row) => row.seats)
+    assert.deepEqual(seats(), [2, 2])
+    if (failure !== "commit") {
+      assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 2)
+      assert.ok(objects.has("doc.md"))
+    }
+    assert.equal(first.items.data[0].quantity, 2)
+    assert.equal(laterSubscription.items.data[0].quantity, 2)
+    const expected = failure === "read" ? 0 : failure === "update" ? 2 : 4
+    assert.equal(updates.length, expected)
+    for (const id of live.keys()) {
+      const changes = updates.filter((update) => update.id === id)
+      if (!changes.length) continue
+      assert.equal(changes[0].items[0].quantity, 1)
+      assert.equal(changes.at(-1).items[0].quantity, 2)
+      assert.equal(changes.at(-1).proration_date, changes[0].proration_date)
+      assert.equal(changes.at(-1).proration_behavior, changes[0].proration_behavior)
+    }
+
+    unavailable = false
+    await remove("owner")
+    assert.deepEqual(roles(), { mate: "owner" })
+    assert.equal(sql.prepare("SELECT role FROM member WHERE organization_id = ?").get(later.id).role, "owner")
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM organization WHERE id = ?").get(alone.id).n, 0)
+    assert.deepEqual(seats(), [1, 1])
+    assert.equal(first.items.data[0].quantity, 1)
+    assert.equal(laterSubscription.items.data[0].quantity, 1)
+    assert.equal(updates.length, expected + 2)
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0)
+    assert.ok(!objects.has("doc.md"))
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM member WHERE organization_id = ?").get(team.id).n, 1)
+  })
+
+test("a lost Stripe response removes a newly added seat item without changing the original items", async () => {
+  const { remove, roles, billing } = await setup(
+    [
+      { name: "owner", role: "owner" },
+      { name: "mate", role: "member" },
+    ],
+    { paying: true, status: "past_due" },
+  )
+  const subscriptions = billing.stripeClient.subscriptions
+  const live = await subscriptions.retrieve("sub_team")
+  live.items.data[0].price.id = "price_other"
+  const original = structuredClone(live.items.data)
+  let unavailable = true
+  subscriptions.update = async (id, params) => {
+    const item = params.items[0]
+    if (item.deleted) live.items.data = live.items.data.filter((entry) => entry.id !== item.id)
+    else live.items.data.push({ id: "si_new", quantity: item.quantity, price: { id: item.price } })
+    if (unavailable && !item.deleted) throw new Error("Stripe response unavailable")
+    return live
+  }
+
+  await assert.rejects(remove("owner"), /Stripe response unavailable/)
+  assert.deepEqual(live.items.data, original)
+  assert.deepEqual(roles(), { owner: "owner", mate: "member" })
+  assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 2)
+
+  unavailable = false
+  await remove("owner")
+  assert.deepEqual(live.items.data[0], original[0])
+  assert.equal(live.items.data[1].quantity, 1)
+  assert.deepEqual(roles(), { mate: "owner" })
+  assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 1)
+})
 
 test("a deleted owner's team passes to its oldest admin, or to its oldest member when it has none", async () => {
   const withAdmins = await setup([

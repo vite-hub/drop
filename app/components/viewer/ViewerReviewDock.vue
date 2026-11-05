@@ -4,16 +4,16 @@
 defineOptions({ inheritAttrs: false })
 // settle: what to wait for before the composer takes focus, which the drop's frame would otherwise hear it lose.
 // heading: how the panel's top row is drawn, so it never stacks a second row over one its content already has. "row" is
-// the dock's own row with the title; "over" puts the dock's buttons on the right of the content's own top row (the
-// list's Open and Resolved); "none" leaves the row to the content (a thread's header has its own back and actions).
+// the dock's own row with the title; "none" leaves the row to the content (a list or thread with its own actions).
 const props = defineProps<{
   open: boolean
-  heading: "row" | "over" | "none"
+  heading: "row" | "none"
   title?: string
   overlay?: boolean
   settle?: () => Promise<void>
 }>()
 const emit = defineEmits<{ close: [] }>()
+useHead({ htmlAttrs: { "data-vitehub-pill": "mark" } })
 const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
 function focusTrigger() {
@@ -68,12 +68,10 @@ watch(
           @keydown.esc.stop.prevent="emit('close')"
         >
           <div
-            v-if="heading !== 'none'"
-            class="flex h-11 shrink-0 items-center gap-1 pr-1.5"
-            :class="heading === 'over' ? 'absolute top-0 right-0 z-10' : 'border-b border-default pl-4'"
+            v-if="heading === 'row'"
+            class="flex h-11 shrink-0 items-center gap-1 border-b border-default pr-1.5 pl-4"
           >
-            <span v-if="heading === 'row'" class="min-w-0 flex-1 truncate text-sm font-medium">{{ title }}</span>
-            <slot name="actions" />
+            <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ title }}</span>
             <UButton
               aria-label="Collapse comments"
               color="neutral"
@@ -104,6 +102,10 @@ watch(
     500 12px/1 ui-sans-serif,
     system-ui,
     sans-serif;
+}
+
+:root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-toolbar {
+  max-width: calc(100% - 6rem);
 }
 
 .review-toolbar :deep(button) {
