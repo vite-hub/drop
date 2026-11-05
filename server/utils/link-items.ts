@@ -29,7 +29,7 @@ const PullRequest = v.object({ title: v.string() })
  * A public pull request's title, from GitHub's API without a token: one request when the link is made, never again.
  * Null for a private repository, a rate limit, or a slow answer; the link then goes by its repository and number.
  */
-export async function pullRequestTitle(href: string): Promise<string | null> {
+async function pullRequestTitle(href: string): Promise<string | null> {
   const pull = pullRequestOf(href)
   if (!pull) return null
   try {
@@ -45,7 +45,7 @@ export async function pullRequestTitle(href: string): Promise<string | null> {
 }
 
 /** Its title: the one given, a pull request's own, or what the address says (`quiverdk/website#33`). */
-export const linkTitle = async (href: string, title?: string) =>
+const linkTitle = async (href: string, title?: string) =>
   (title?.trim() || (await pullRequestTitle(href)) || linkSource(href)).slice(0, 160)
 
 /** Creates a link item at the top, or in `folder`, where it lives as long as the folder. It counts as a drop. */
