@@ -49,7 +49,12 @@ export function billingConfig(event?: H3Event) {
 export function teamPlans({ priceId, annualPriceId }: { priceId: string; annualPriceId?: string }) {
   return [teamPlan("team", priceId), ...(annualPriceId ? [teamPlan("team-annual", annualPriceId)] : [])]
 }
-const teamPlan = (name: string, price: string) => ({ name, priceId: price, seatPriceId: price, freeTrial: { days: 14 } })
+const teamPlan = (name: string, price: string) => ({
+  name,
+  priceId: price,
+  seatPriceId: price,
+  freeTrial: { days: 14 },
+})
 
 /** The teams someone is on, and their role on each. Empty when teams are off. */
 export async function teamsOf(userId: string, event?: H3Event): Promise<Record<string, TeamRole>> {
