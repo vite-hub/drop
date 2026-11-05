@@ -20,8 +20,8 @@ const asRole = (role: string): TeamRole => (role === "owner" || role === "admin"
 
 /**
  * Subscription states that pay for a team, the ones Stripe's plugin counts: it syncs seats, cancels, and refuses a second
- * Checkout only for these. A `past_due` team, whose card Stripe couldn't charge, is on Free while Stripe retries it, and
- * updates its card in Stripe's portal (`authorizeBilling`).
+ * Checkout only for these. A `past_due` or `unpaid` team is on Free until payment succeeds, and updates its card in
+ * Stripe's portal (`authorizeBilling`).
  */
 const PAYING = ["active", "trialing"] as const
 
@@ -102,16 +102,24 @@ export function onTeam(
 export const runsTeam = (team: string | null, who: { teams?: Record<string, TeamRole> } | null) =>
   team !== null && (who?.teams?.[team] === "owner" || who?.teams?.[team] === "admin")
 
-/** Which of the teams `ids` pay now, and which wait on Stripe retrying a card it couldn't charge (`past_due`). */
+/** Which teams pay now, and which need payment recovery (`past_due` while Stripe retries, `unpaid` after retries stop). */
 export async function teamBilling(ids: string[]) {
   const rows = ids.length
     ? await db
         .select({ team: subscription.referenceId, status: subscription.status })
         .from(subscription)
-        .where(and(inArray(subscription.referenceId, ids), inArray(subscription.status, [...PAYING, "past_due"])))
+        .where(
+          and(inArray(subscription.referenceId, ids), inArray(subscription.status, [...PAYING, "past_due", "unpaid"])),
+        )
     : []
-  const paid = new Set(rows.filter((row) => row.status !== "past_due").map((row) => row.team))
-  const pastDue = new Set(rows.filter((row) => row.status === "past_due" && !paid.has(row.team)).map((row) => row.team))
+  const paid = new Set(
+    rows.filter((row) => row.status !== "past_due" && row.status !== "unpaid").map((row) => row.team),
+  )
+  const pastDue = new Set(
+    rows
+      .filter((row) => (row.status === "past_due" || row.status === "unpaid") && !paid.has(row.team))
+      .map((row) => row.team),
+  )
   return { paid, pastDue }
 }
 

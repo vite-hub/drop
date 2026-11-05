@@ -98,8 +98,11 @@ test("without Managed Payments, Checkout saves the address it collects on the te
   assert.deepEqual(session.customer_update, { address: "auto" })
 })
 
-test("a team whose payment failed updates its card instead of starting a second subscription", async () => {
-  await assert.rejects(checkout(false, false, { status: "past_due" }), /payment failed/i)
-  reset()
-  assert.ok(await checkout(false, false, { status: "canceled" }), "a team whose subscription ended starts a new one")
+for (const status of ["past_due", "unpaid"])
+  test(`a team whose payment is ${status} updates its card instead of starting a second subscription`, async () => {
+    await assert.rejects(checkout(false, false, { status }), /payment failed/i)
+  })
+
+test("a team whose subscription ended starts a new one", async () => {
+  assert.ok(await checkout(false, false, { status: "canceled" }))
 })
