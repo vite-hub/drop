@@ -7,7 +7,7 @@ import { beforeEach, test } from "vite-plus/test"
 import { migrate, reset, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/config.ts")
-const { teamPlans } = await import("../../server/utils/teams.ts")
+const { checkoutParams, teamPlans } = await import("../../server/utils/teams.ts")
 
 // The Team plan through Stripe's plugin, with a Stripe client that keeps what Checkout was asked to bill.
 migrate()
@@ -30,7 +30,7 @@ function stripeClient(sessions) {
   }
 }
 
-async function checkout(annual) {
+async function checkout(annual, managedPayments = false) {
   const sessions = []
   const auth = betterAuth({
     baseURL: "https://drop.example",
@@ -47,6 +47,7 @@ async function checkout(annual) {
           enabled: true,
           plans: teamPlans({ priceId: "price_month", annualPriceId: "price_year" }),
           authorizeReference: async () => true,
+          getCheckoutSessionParams: () => checkoutParams(managedPayments),
         },
       }),
     ],
@@ -69,13 +70,26 @@ async function checkout(annual) {
       disableRedirect: true,
     },
   })
-  return sessions[0].line_items
+  return sessions[0]
 }
 
 test("a team billed monthly pays the monthly price per member", async () => {
-  assert.deepEqual(await checkout(false), [{ price: "price_month", quantity: 1 }])
+  assert.deepEqual((await checkout(false)).line_items, [{ price: "price_month", quantity: 1 }])
 })
 
 test("a team billed yearly pays the yearly price per member", async () => {
-  assert.deepEqual(await checkout(true), [{ price: "price_year", quantity: 1 }])
+  assert.deepEqual((await checkout(true)).line_items, [{ price: "price_year", quantity: 1 }])
+})
+
+test("with Managed Payments, Checkout leaves the customer's name and address to Stripe", async () => {
+  const session = await checkout(false, true)
+  assert.deepEqual(session.managed_payments, { enabled: true })
+  // Stripe rejects customer_update[name] and customer_update[address] with Managed Payments; an empty one isn't sent.
+  assert.deepEqual(session.customer_update, {})
+})
+
+test("without Managed Payments, Checkout saves the address it collects on the team's customer", async () => {
+  const session = await checkout(false)
+  assert.equal(session.managed_payments, undefined)
+  assert.deepEqual(session.customer_update, { address: "auto" })
 })

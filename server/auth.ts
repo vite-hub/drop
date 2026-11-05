@@ -16,7 +16,7 @@ import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
-import { billingConfig, memberLimit, teamPlans, teamSeats, teamsEnabled } from "./utils/teams"
+import { billingConfig, checkoutParams, memberLimit, teamPlans, teamSeats, teamsEnabled } from "./utils/teams"
 import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
@@ -203,10 +203,7 @@ export default defineAuth(({ env, requestOrigin }) => {
                     .limit(1)
                   return Boolean(row)
                 },
-                // Managed Payments makes Stripe the merchant of record, which files sales tax and VAT.
-                getCheckoutSessionParams: () => ({
-                  params: billing.managedPayments ? { managed_payments: { enabled: true } } : {},
-                }),
+                getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
               },
             }),
           ]
