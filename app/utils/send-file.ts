@@ -1,31 +1,35 @@
+import * as v from "valibot"
+
 /**
- * Sends a form with a file, like `$fetch`, and reports how much of it has gone. `fetch` can't say how far an upload got,
- * so this goes through XMLHttpRequest. A failure rejects with what `$fetch` would have: `status`, `statusText`, and the
- * server's body as `data`, so `errorText` and the plan-limit dialog read it the same way.
+ * POSTs a form with a file, like `$fetch`, and reports how much of it has gone, from 0 to 1. `fetch` can't say how far
+ * an upload got, so this goes through XMLHttpRequest. The answer is read with `schema`. A failure rejects with what
+ * `$fetch` would have: `status`, `statusText`, and the server's body as `data`, so `errorText` and the plan-limit dialog
+ * read it the same way.
  */
-export function sendFile<T>(
+export function sendFile<Schema extends v.GenericSchema>(
   url: string,
   body: FormData,
-  options: { onProgress?: (fraction: number) => void; signal?: AbortSignal; method?: string } = {},
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
+  schema: Schema,
+  options: { onProgress?: (fraction: number) => void } = {},
+): Promise<v.InferOutput<Schema>> {
+  return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
-    request.open(options.method ?? "POST", url)
+    request.open("POST", url)
     request.responseType = "text"
     request.setRequestHeader("accept", "application/json")
-    if (options.onProgress) {
-      const report = options.onProgress
+    const report = options.onProgress
+    if (report)
       request.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable && event.total) report(event.loaded / event.total)
       })
-    }
     request.addEventListener("load", () => {
       const data = parseBody(request.responseText)
-      if (request.status >= 200 && request.status < 300) {
-        options.onProgress?.(1)
-        // SAFETY: the caller names the JSON shape its endpoint answers with, as with `$fetch<T>`.
-        resolve(data as T)
-      } else reject(new SendFileError(request.status, request.statusText || undefined, data))
+      if (request.status < 200 || request.status >= 300)
+        return reject(new SendFileError(request.status, request.statusText || undefined, data))
+      report?.(1)
+      const parsed = v.safeParse(schema, data)
+      if (parsed.success) resolve(parsed.output)
+      else reject(new SendFileError(request.status, "Drop answered the upload with something unexpected.", data))
     })
     request.addEventListener("error", () =>
       reject(
@@ -37,17 +41,12 @@ export function sendFile<T>(
         ),
       ),
     )
-    const cancelled = () => reject(new DOMException("The upload was cancelled.", "AbortError"))
-    request.addEventListener("abort", cancelled)
-    // Aborting before send() fires no event, so an already-aborted signal rejects here.
-    if (options.signal?.aborted) return cancelled()
-    options.signal?.addEventListener("abort", () => request.abort(), { once: true })
     request.send(body)
   })
 }
 
 /** An upload the server refused, shaped like ofetch's FetchError. */
-export class SendFileError extends Error {
+class SendFileError extends Error {
   constructor(
     readonly status: number,
     // Undefined rather than empty: HTTP/2 sends no status text, and errorText reads the first one that's set.

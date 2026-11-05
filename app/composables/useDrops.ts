@@ -131,7 +131,9 @@ export function useDropActions() {
     form.append("file", file)
     if (folder) form.append("folder", folder.id)
     try {
-      const result = await sendFile<{ id: string }>("/api/files", form, { onProgress: options.onProgress })
+      const result = await sendFile("/api/files", form, v.object({ id: v.string() }), {
+        onProgress: options.onProgress,
+      })
       await (folder ? refreshNuxtData([...LISTS, keys.usage, keys.folder(folder.id), keys.drop(folder.id)]) : refresh())
       notify.done(
         folder
