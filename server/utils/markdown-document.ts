@@ -16,6 +16,8 @@ import { TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
+import { isPreviewLink, linkText } from "#shared/resources"
+import type { DropResource } from "#shared/types"
 
 /**
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
@@ -362,4 +364,62 @@ export async function renderMarkdownDocument(
   <script src="/document-zoom.js" defer></script>
 </body>
 </html>`
+}
+
+type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[]]
+
+/**
+ * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
+ * pull request, its issue) and when this version was published. They read as more front matter rows, at the top of
+ * the doc, where a reader looks for what a doc is about; preview deploys stay in the header, as something to open. A
+ * doc without front matter gets the box. A link its front matter already shows isn't repeated.
+ *
+ * Added to the cached render on each read, since a doc's links change without a new version.
+ */
+export async function withDocProperties(html: string, doc: { resources: DropResource[]; updatedAt: number }) {
+  const open = html.indexOf('<dl class="cfm">')
+  const close = open === -1 ? -1 : html.indexOf("</dl>", open)
+  const box = open === -1 ? "" : html.slice(open, close)
+  const links = doc.resources.filter(
+    (resource) => !isPreviewLink(resource) && !box.includes(`href="${escapeHtml(resource.url)}"`),
+  )
+  const anchors = links.map((resource): PropertyNode => ["a", { href: resource.url }, linkText(resource)])
+  const updated = new Date(doc.updatedAt)
+  const shown = updated.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+  const rows: PropertyNode[] = [
+    ...(links.length
+      ? [
+          [
+            "div",
+            { "data-key": "links", "data-kind": links.length === 1 ? "link" : "tags" },
+            ["dt", {}, links.length === 1 ? "Link" : "Links"],
+            [
+              "dd",
+              {},
+              ...(links.length === 1 ? anchors : anchors.map((a): PropertyNode => ["span", { class: "cfm-tag" }, a])),
+            ],
+          ] satisfies PropertyNode,
+        ]
+      : []),
+    [
+      "div",
+      { "data-key": "updated", "data-kind": "date" },
+      ["dt", {}, "Updated"],
+      ["dd", {}, ["time", { datetime: updated.toISOString().slice(0, 10) }, shown]],
+    ],
+  ]
+  const rendered = await renderHtmlFromDocument(
+    // SAFETY: the rows are Drop's own nodes, with hrefs resources.ts already checked (https, or http on localhost).
+    { nodes: [["properties", {}, ...rows]] } as Parameters<typeof renderHtmlFromDocument>[0],
+    { components: preset.components },
+  )
+  if (open === -1) return rendered + html
+  // The page already has the box's styles and date script: only its rows go in, after the front matter's.
+  const start = rendered.indexOf('<dl class="cfm">') + '<dl class="cfm">'.length
+  return html.slice(0, close) + rendered.slice(start, rendered.lastIndexOf("</dl>")) + html.slice(close)
 }

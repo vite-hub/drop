@@ -8,7 +8,7 @@ import type { CommentStyle } from "~/composables/usePreferences"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
-import { resourceLabel } from "#shared/resources"
+import { isPreviewLink, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
@@ -629,6 +629,13 @@ const exportPdf = () => send({ type: "print", title: drop.value.title })
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
 
+// The header's links: a Markdown doc's preview deploys, which are for opening; its other links read with its front
+// matter at the top of the doc (server/utils/markdown-document.ts withDocProperties). Every other drop shows them all.
+const headerLinks = computed(() => {
+  const links = drop.value.resources ?? []
+  return drop.value.kind === "markdown" ? links.filter(isPreviewLink) : links
+})
+
 // The segment's chip: the size (a folder's item count) and, for its owner, the views.
 const detailsMeta = computed(() => {
   const d = drop.value
@@ -1047,7 +1054,8 @@ watch(
           <ViewerLocation :drop="drop" :public-view="publicView" />
         </template>
         <template #trailing>
-          <ViewerResources v-if="drop.resources?.length" :resources="drop.resources" />
+          <!-- A Markdown doc shows its other links in its properties, at the top of the doc. -->
+          <ViewerResources v-if="headerLinks.length" :resources="headerLinks" />
         </template>
       </UDashboardNavbar>
     </template>
