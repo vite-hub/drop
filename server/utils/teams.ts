@@ -56,6 +56,15 @@ const teamPlan = (name: string, price: string) => ({
   freeTrial: { days: 14 },
 })
 
+/**
+ * What Drop adds to the plugin's Checkout Session. Managed Payments makes Stripe the merchant of record, which files sales
+ * tax and VAT. Stripe then keeps the customer's name and address itself and rejects `customer_update[name]` and
+ * `customer_update[address]`, which the plugin sends unless `customer_update` is set. An empty one sends nothing.
+ */
+export const checkoutParams = (managedPayments: boolean) => ({
+  params: managedPayments ? { managed_payments: { enabled: true }, customer_update: {} } : {},
+})
+
 /** The teams someone is on, and their role on each. Empty when teams are off. */
 export async function teamsOf(userId: string, event?: H3Event): Promise<Record<string, TeamRole>> {
   if (!teamsEnabled(event)) return {}
