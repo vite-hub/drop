@@ -70,9 +70,9 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .file img { width: 100%; height: 100%; object-fit: cover; }
 .file button { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: rgb(0 0 0 / .6); color: #fff; cursor: pointer; }
 .file svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 28; stroke-linecap: round; }
-.row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 8px; }
-.who { margin-right: auto; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.shortcut { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.row { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+.row .icon { margin-left: -2px; }
+.who { flex: 1; min-width: 0; padding-left: 2px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .msg { margin: 6px 0 0; color: var(--error); font-size: 13px; }
 .empty { padding: 16px 12px; color: var(--muted); }
 .row-item { display: flex; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -124,10 +124,11 @@ const ICONS = {
 }
 
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
-  `<div class="compose"><textarea aria-label="${label}" aria-describedby="send-shortcut-${label.toLowerCase()}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
-  `<div class="row"><span class="who"></span><button class="btn primary" type="submit" aria-keyshortcuts="Meta+Enter Control+Enter">${send}</button><button class="icon" type="button" data-act="attach" title="Add images (or paste them)" aria-label="Add images">${ICONS.image}</button>` +
+  `<div class="compose"><textarea aria-label="${label}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
+  `<div class="row"><button class="icon" type="button" data-act="attach" title="Add images (or paste them)" aria-label="Add images">${ICONS.image}</button><span class="who"></span>` +
   (cancel ? `<button class="btn ghost" type="button" data-act="cancel">Cancel</button>` : "") +
-  `</div><p class="shortcut" id="send-shortcut-${label.toLowerCase()}"></p><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>`
+  `<button class="btn primary" type="submit" aria-keyshortcuts="Meta+Enter Control+Enter">${send}</button>` +
+  `</div><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>`
 
 // Highlight's controls, in place of the toolbar while someone draws: the tips, four sizes, the colours, Undo, Cancel,
 // and Done. The script sizes and colours the dots.
@@ -558,7 +559,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function composer(form) {
     const note = $("textarea", form), files = $(".files", form), input = $("input[type=file]", form), msg = $(".msg", form);
     const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-    $(".shortcut", form).textContent = (isMac ? "⌘" : "Ctrl+") + "Enter to send · Enter for a new line";
+    const submit = $("[type=submit]", form);
+    submit.title = submit.textContent + " (" + (isMac ? "⌘" : "Ctrl+") + "Enter)";
     const picked = [];
     const show = (text) => { msg.textContent = text; msg.hidden = !text; };
     function add(incoming) {
