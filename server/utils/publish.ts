@@ -287,10 +287,10 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     })
   if (input.previous && (!previous || !permissions(previous, who).edit))
     throw new HTTPError({ status: 404, message: `No drop you can publish to with id ${input.previous}.` })
-  if (previous?.kind === "site")
+  if (previous?.kind === "site" || previous?.kind === "link")
     throw new HTTPError({
       status: 400,
-      message: "previous is a site, which has no versions. Change it with update_drop.",
+      message: `previous is a ${previous.kind}, which has no versions. Change it with update_drop.`,
     })
   // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest.
   if (previous?.head) previous = await findDrop(previous.id, event)

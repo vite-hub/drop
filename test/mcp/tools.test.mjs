@@ -1037,6 +1037,45 @@ test("an agent adds a pull request to a kept folder as a link; it lists, changes
   assert.equal((await call(updateDrop, { id: named.id, trash: false })).structuredContent.status, "Expires in 30 days")
 })
 
+test("a link cannot be replaced with a document or file version", async () => {
+  const link = (
+    await call(publish, {
+      link: { url: "https://example.com/pull/1" },
+      title: "Pull request",
+      note: "The change under review",
+      lifetime: "review",
+    })
+  ).structuredContent
+  for (const content of [
+    { markdown: "# Replacement" },
+    { html: "<p>Replacement</p>" },
+    { file: { name: "replacement.bin", base64: "eA==" } },
+    { file: { name: "replacement.bin" } },
+  ]) {
+    const result = await call(publish, { ...content, previous: link.id, note: "Replace" })
+    assert.equal(result.isError, true)
+    assert.match(result.message, /previous is a link, which has no versions/)
+  }
+  // Direct uploads bypass publishInput, so the shared file writer must reject them too.
+  const form = new FormData()
+  form.set("file", new File(["Replacement"], "replacement.txt", { type: "text/plain" }))
+  form.set("supersedes", link.id)
+  const event = new H3Event(new Request("https://drop.example/api/files", { method: "POST", body: form }))
+  event.context.log = { set() {}, error() {}, warn() {} }
+  await assert.rejects(uploadFile(event), {
+    status: 400,
+    statusText: "That drop is a link, which has no versions. Change it with update_drop.",
+  })
+  const unchanged = await call(readDrop, { id: link.id })
+  assert.equal(unchanged.structuredContent.kind, "link")
+  assert.equal(unchanged.structuredContent.href, link.href)
+  assert.equal(unchanged.structuredContent.version, 1)
+  assert.deepEqual(
+    unchanged.structuredContent.versions.map((version) => version.version),
+    [1],
+  )
+})
+
 test("publish into a folder says the folder's lifetime wins; update_drop on a folder counts what it holds", async () => {
   state.mode = "team"
   const folder = (await call(createFolder, { title: "SEO", lifetime: "review" })).structuredContent
