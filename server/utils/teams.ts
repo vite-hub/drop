@@ -2,6 +2,7 @@ import type { AuthorizeReferenceAction, StripePlan } from "@better-auth/stripe"
 import type { GenericEndpointContext, User } from "better-auth"
 import { APIError } from "better-auth"
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm"
+import type { BatchItem } from "drizzle-orm/batch"
 import type { H3Event } from "h3"
 import type Stripe from "stripe"
 import { db } from "vite-hub/database/drizzle"
@@ -185,11 +186,17 @@ export async function memberLimit(team: string, event?: H3Event) {
 }
 
 type TeamBilling = { stripeClient: Stripe; plans: StripePlan[] }
+type SeatChange = {
+  id: string
+  members: number
+  apply?: () => Promise<unknown>
+  restore: () => Promise<void>
+}
 
-/** Sync past-due Stripe seats before cleanup, returning the subscriptions whose local seats must follow on success. */
-async function syncPastDueSeats(team: string, members: number, billing?: TeamBilling) {
-  const synced: string[] = []
-  if (!billing) return synced
+/** Read the current seats without changing Stripe. Keep an inverse for every update, including a newly added item. */
+async function pastDueSeatChanges(team: string, members: number, billing?: TeamBilling) {
+  const changes: SeatChange[] = []
+  if (!billing) return changes
   const rows = await db
     .select()
     .from(subscription)
@@ -201,23 +208,45 @@ async function syncPastDueSeats(team: string, members: number, billing?: TeamBil
     // Past-due teams are on Free, but their existing subscription still needs the current seat count on recovery.
     if (live.status !== "past_due" && !PAYING.some((status) => status === live.status)) continue
     const item = live.items.data.find((entry) => entry.price.id === plan.seatPriceId)
-    if (item?.quantity !== members)
-      await billing.stripeClient.subscriptions.update(live.id, {
-        items: [item ? { id: item.id, quantity: members } : { price: plan.seatPriceId, quantity: members }],
-        proration_behavior: plan.prorationBehavior ?? "create_prorations",
-      })
-    synced.push(row.id)
+    const previous = item ? { id: item.id, quantity: item.quantity ?? 1 } : undefined
+    // Use the same instant for the update and its inverse so their prorations cancel on a rejected deletion.
+    const proration = {
+      proration_behavior: plan.prorationBehavior ?? "create_prorations",
+      proration_date: Math.floor(Date.now() / 1000),
+    }
+    changes.push({
+      id: row.id,
+      members,
+      apply:
+        item?.quantity === members
+          ? undefined
+          : () =>
+              billing.stripeClient.subscriptions.update(live.id, {
+                items: [item ? { id: item.id, quantity: members } : { price: plan.seatPriceId, quantity: members }],
+                ...proration,
+              }),
+      restore: async () => {
+        // An update may succeed at Stripe even if the response fails to reach us.
+        const current = await billing.stripeClient.subscriptions.retrieve(live.id)
+        const seat = current.items.data.find((entry) => entry.price.id === plan.seatPriceId)
+        if (previous ? seat?.quantity === previous.quantity : !seat) return
+        await billing.stripeClient.subscriptions.update(live.id, {
+          items: [previous ?? { id: seat!.id, deleted: true }],
+          ...proration,
+        })
+      },
+    })
   }
-  return synced
+  return changes
 }
 
 /**
  * Takes someone off their teams before Better Auth deletes their account (its `user.delete.before` hook). Each team runs
- * the organization plugin's hooks as if they had been removed, with past-due Stripe seats synced before any cleanup so
- * a Stripe failure leaves all their teams intact. Better Auth Stripe 1.7 itself only syncs active/trialing seats. A team
- * they own passes to its oldest admin, or to its oldest member when it has no admin. A team with nobody else on it is deleted
- * with its invitations and content. Stripe's plugin refuses that while the team still pays, and then the account stays
- * until someone cancels the subscription.
+ * the organization plugin's hooks as if they had been removed. Past-due seat changes are compensated if Stripe or local
+ * cleanup fails, and membership, ownership and local seat changes commit together. Better Auth Stripe 1.7 itself only
+ * syncs active/trialing seats. A team they own passes to its oldest admin, or to its oldest member when it has no admin.
+ * A team with nobody else on it is deleted with its invitations and content. Stripe's plugin refuses that while the team
+ * still pays, and then the account stays until someone cancels the subscription.
  */
 export async function leaveTeams(user: User, context: GenericEndpointContext | null, billing?: TeamBilling) {
   const hooks = context?.context.getPlugin("organization")?.options.organizationHooks ?? {}
@@ -236,28 +265,52 @@ export async function leaveTeams(user: User, context: GenericEndpointContext | n
     if (!others.length) await hooks.beforeDeleteOrganization?.({ organization: team, user })
     left.push({ membership, team, others })
   }
-  // Finish every fallible past-due Stripe call before changing any membership, ownership, local seat count or content.
-  const seats = []
+  const seats: SeatChange[] = []
   for (const { team, others } of left) {
     if (!others.length) continue
-    const synced = await syncPastDueSeats(team.id, others.length, billing)
-    seats.push(...synced.map((id) => ({ id, members: others.length })))
+    seats.push(...(await pastDueSeatChanges(team.id, others.length, billing)))
   }
-  for (const { membership, team, others } of left) {
-    if (!others.length) {
-      const { deleteDrop } = await import("./drops/lifecycle")
-      const folders = await db.select().from(drops).where(eq(drops.teamId, team.id))
-      const gone = new Set<string>()
-      for (const folder of folders) if (!gone.has(folder.id)) await deleteDrop(folder, gone)
-      await db.delete(organization).where(eq(organization.id, team.id))
-      continue
+  const attempted: SeatChange[] = []
+  try {
+    for (const seat of seats) {
+      if (!seat.apply) continue
+      attempted.push(seat)
+      await seat.apply()
     }
-    const heir = others.find((other) => asRole(other.role) === "admin") ?? others[0]!
-    if (asRole(membership.role) === "owner" && !others.some((other) => asRole(other.role) === "owner"))
-      await db.update(member).set({ role: "owner" }).where(eq(member.id, heir.id))
-    await db.delete(member).where(eq(member.id, membership.id))
-    await hooks.afterRemoveMember?.({ member: membership, user, organization: team })
+    const changes: BatchItem<"sqlite">[] = []
+    for (const { membership, team, others } of left) {
+      if (!others.length) {
+        const { deleteDrop } = await import("./drops/lifecycle")
+        const folders = await db.select().from(drops).where(eq(drops.teamId, team.id))
+        const gone = new Set<string>()
+        for (const folder of folders) if (!gone.has(folder.id)) await deleteDrop(folder, gone)
+        changes.push(db.delete(organization).where(eq(organization.id, team.id)))
+        continue
+      }
+      const heir = others.find((other) => asRole(other.role) === "admin") ?? others[0]!
+      if (asRole(membership.role) === "owner" && !others.some((other) => asRole(other.role) === "owner"))
+        changes.push(db.update(member).set({ role: "owner" }).where(eq(member.id, heir.id)))
+      changes.push(db.delete(member).where(eq(member.id, membership.id)))
+    }
+    for (const { id, members } of seats)
+      changes.push(db.update(subscription).set({ seats: members }).where(eq(subscription.id, id)))
+    const [first, ...rest] = changes
+    if (first) await db.batch([first, ...rest])
+  } catch (error) {
+    const failures = []
+    for (const seat of attempted.reverse()) {
+      try {
+        await seat.restore()
+      } catch (failure) {
+        failures.push(failure)
+      }
+    }
+    if (failures.length)
+      throw new AggregateError([error, ...failures], `${String(error)}; Stripe seat restoration also failed`, {
+        cause: error,
+      })
+    throw error
   }
-  for (const { id, members } of seats)
-    await db.update(subscription).set({ seats: members }).where(eq(subscription.id, id))
+  for (const { membership, team, others } of left)
+    if (others.length) await hooks.afterRemoveMember?.({ member: membership, user, organization: team })
 }
