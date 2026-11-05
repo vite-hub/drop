@@ -1115,6 +1115,33 @@ test("a doc saved as .md goes up through the file upload URL and publishes like 
   }
 })
 
+test("an uploaded HTML doc returns the same missing-asset warnings as inline html", async () => {
+  state.authSecret = "test-secret"
+  try {
+    const html = '<link rel="stylesheet" href="./styles.css"><img src="./missing.png"><a href="other.html">Next</a>'
+    const inline = await call(publish, { html, note: "Inline", lifetime: "review" })
+    assert.deepEqual(inline.structuredContent.warnings, [
+      'doc.html loads stylesheet or icon "./styles.css", but styles.css isn\'t in the app.',
+      'doc.html loads image or media "./missing.png", but missing.png isn\'t in the app.',
+    ])
+    const ticket = (await call(publish, { file: { name: "report.html" }, note: "Uploaded", lifetime: "review" }))
+      .structuredContent
+    const body = new TextEncoder().encode(html)
+    const event = new H3Event(
+      new Request(ticket.uploadUrl, { method: "PUT", body, headers: { "content-length": String(body.length) } }),
+    )
+    event.context.log = { set() {}, error() {}, warn() {} }
+    event.context.params = { ticket: new URL(ticket.uploadUrl).pathname.split("/").pop() }
+    state.who = null
+    const uploaded = await uploadPut(event)
+    assert.equal(uploaded.kind, "html")
+    assert.deepEqual(uploaded.warnings, inline.structuredContent.warnings)
+  } finally {
+    state.who = who
+    state.authSecret = undefined
+  }
+})
+
 test("a built app goes up as one archive, binary files and all, and its next archive replaces every file", async () => {
   state.authSecret = "test-secret"
   try {

@@ -333,11 +333,6 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     } else {
       const source = (input.markdown ?? input.html)!
       if (!source.trim()) throw new HTTPError({ status: 400, message: "The doc is empty." })
-      // An HTML doc is one file, so anything it loads by relative path is missing.
-      if (input.html)
-        warnings = appLinkIssues({ "doc.html": input.html }, ["doc.html"]).filter(
-          (issue) => !issue.startsWith("doc.html links to"),
-        )
       filename = input.html ? "doc.html" : "doc.md"
       bytes = new TextEncoder().encode(source)
     }
@@ -357,6 +352,11 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       },
       event,
     )
+    // An HTML doc is one file, so anything it loads by relative path is missing, including on file uploads.
+    if (row.kind === "html")
+      warnings = appLinkIssues({ "doc.html": new TextDecoder().decode(bytes) }, ["doc.html"]).filter(
+        (issue) => !issue.startsWith("doc.html links to"),
+      )
     // createDocDrop refused a Markdown doc with errors (requirePublishableMarkdown); these are what it published with.
     if (row.warnings.length) warnings = row.warnings.map(problemLine)
     // The share and the slug apply to every version, like a change on the drop's page.
