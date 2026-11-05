@@ -67,7 +67,7 @@ Past-due Stripe seat updates finish for every team before any memberships, owner
 
 ### Bill teams through Stripe {#billing}
 
-With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` then shows the Team plan below the license prices.
+With billing on, a team past its free members needs the Team plan: one seat per member, kept in step with Stripe as people join and leave, with a 14-day trial. Everyone on a team that pays gets the Pro plan. `/pricing` then shows the Team plan below the license prices. When Stripe can't charge a team's card, the team is on the Free plan until payment succeeds, including after Stripe stops retrying. Its page asks its owner and admins to update the card in Stripe's billing portal instead of starting a second subscription.
 
 | Variable | What it does |
 | --- | --- |
@@ -131,7 +131,7 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 | Host | Applies migrations with |
 | --- | --- |
 | Cloudflare | `pnpm run deploy`, which the button runs. Workers Builds that run `npx wrangler deploy` need `pnpm db:migrate:remote` after schema changes. |
-| Vercel, Netlify | `pnpm db:migrate --allow-data-loss` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
+| Vercel, Netlify | `pnpm db:migrate` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
 | Deno Deploy | `pnpm db:migrate:d1` as a pre-deploy command. |
 | Docker Compose | Drop itself before it listens for SQLite, or `pnpm db:migrate:d1` for an explicit D1 build, before Drop starts. |
 

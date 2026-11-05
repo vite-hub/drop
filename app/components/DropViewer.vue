@@ -1238,23 +1238,10 @@ watch(
           :open="commentsOpen && !editing && !trashed && !floating"
           :overlay="Boolean(lightbox)"
           :settle="whenHeld"
-          :heading="popover?.type === 'new' || siteRef?.pending ? 'row' : popover ? 'none' : 'over'"
+          :heading="popover?.type === 'new' || siteRef?.pending ? 'row' : 'none'"
           title="New comment"
           @close="closeComments"
         >
-          <template #actions>
-            <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
-              <UButton
-                aria-label="Copy feedback for your agent"
-                color="neutral"
-                :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-                :ui="{ leadingIcon: copied('feedback') ? 'animate-icon-in' : undefined }"
-                size="sm"
-                variant="ghost"
-                @click="copyFeedback"
-              />
-            </UTooltip>
-          </template>
           <template #panel>
             <ReuseComposer v-if="!floating" />
             <ViewerComments
@@ -1264,7 +1251,29 @@ watch(
               :comments="lightbox ? imageComments : comments"
               :outdated="outdated"
               @focus="focusComment"
-            />
+            >
+              <template #actions>
+                <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
+                  <UButton
+                    aria-label="Copy feedback for your agent"
+                    color="neutral"
+                    :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+                    :ui="{ leadingIcon: copied('feedback') ? 'animate-icon-in' : undefined }"
+                    size="sm"
+                    variant="ghost"
+                    @click="copyFeedback"
+                  />
+                </UTooltip>
+                <UButton
+                  aria-label="Collapse comments"
+                  color="neutral"
+                  icon="i-mingcute-down-line"
+                  size="sm"
+                  variant="ghost"
+                  @click="closeComments"
+                />
+              </template>
+            </ViewerComments>
           </template>
           <template #toolbar>
             <template v-if="galleryShown">

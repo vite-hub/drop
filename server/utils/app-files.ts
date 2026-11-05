@@ -7,7 +7,8 @@ import { db } from "vite-hub/database/drizzle"
 import { contentTypeOf, isTextFile } from "#shared/project-bundle"
 import { dropFiles } from "../databases/config"
 import { onOwnOrigin } from "./content-origin"
-import { findDrop } from "./drops"
+import { findDrop, permissions } from "./drops"
+import { identityOf, type Identity } from "./identity"
 import { seal, unseal } from "./review"
 
 /**
@@ -15,19 +16,22 @@ import { seal, unseal } from "./review"
  * wasm and fetch() calls load as they were built to. The origin has no session: the viewer, which checked the person
  * may open the drop, hands the frame a grant (FRAME_HOST_HTML keeps it as a cookie). A grant names the drop's link
  * (or its id, before links), and only that link's own origin takes it, so one app can't use another's grant to read its files.
+ * It names who opened the app too, or nobody for a visitor signed out, and every file checks that they may still view
+ * it: someone taken off the team, or a drop made private, loses its files within a few seconds.
  */
 
 const GRANT_MS = 12 * 3_600_000
-const Grant = v.object({ l: v.string(), e: v.number() })
+const Grant = v.object({ l: v.string(), u: v.nullable(v.string()), e: v.number() })
 
-/** A grant to the files of the app behind `link`, for whoever may view it now. */
-export const appFilesGrant = (event: H3Event, link: string, now = Date.now()) =>
-  seal(event, "app-files", { l: link, e: now + GRANT_MS } satisfies v.InferOutput<typeof Grant>)
+/** A grant to the files of the app behind `link`, for `who`, as long as they may view it. */
+export const appFilesGrant = (event: H3Event, link: string, who: Identity | null, now = Date.now()) =>
+  seal(event, "app-files", { l: link, u: who?.userId ?? null, e: now + GRANT_MS } satisfies v.InferOutput<typeof Grant>)
 
 /**
- * Where each of an app's files is, for its content origin. A page load asks for dozens of files at once, so each
- * isolate keeps the answer for a few seconds and shares one lookup between them, instead of two queries per file that
- * queue up on the database. A drop moved to the Trash or republished shows within that window; a path the kept answer
+ * Where each of an app's files is, for its content origin and the person the grant names. A page load asks for dozens of
+ * files at once, so each isolate keeps the answer for a few seconds and shares one lookup between them, instead of a few
+ * queries per file that queue up on the database. A drop moved to the Trash, made private, or republished, and someone
+ * leaving its team, show within that window; a path the kept answer
  * lacks, or a file the store no longer has, looks again at once (serveAppFile).
  */
 const KEEP_MS = 5_000
@@ -38,8 +42,9 @@ type AppFiles = Map<string, string> | null
 const kept = new Map<string, { at: number; files: Promise<AppFiles> }>()
 
 /** The app's files, and whether they were kept from an earlier request rather than looked up for this one. */
-async function appFiles(event: H3Event, link: string, now: number, fresh: boolean) {
-  const entry = kept.get(link)
+async function appFiles(event: H3Event, grant: v.InferOutput<typeof Grant>, now: number, fresh: boolean) {
+  const key = `${grant.l}\n${grant.u ?? ""}`
+  const entry = kept.get(key)
   if (entry && !fresh && now - entry.at < KEEP_MS) {
     const settled = entry.files.then(
       (files) => ({ files }),
@@ -54,17 +59,18 @@ async function appFiles(event: H3Event, link: string, now: number, fresh: boolea
     ])
     if (shared) return { files: shared.files, wasKept: true }
   }
-  const files = lookUpAppFiles(event, link)
-  for (const [key, old] of kept) if (now - old.at >= KEEP_MS) kept.delete(key)
-  kept.set(link, { at: now, files })
+  const files = lookUpAppFiles(event, grant)
+  for (const [other, old] of kept) if (now - old.at >= KEEP_MS) kept.delete(other)
+  kept.set(key, { at: now, files })
   // A failed lookup isn't kept: the next file asks again.
-  files.catch(() => kept.get(link)?.files === files && kept.delete(link))
+  files.catch(() => kept.get(key)?.files === files && kept.delete(key))
   return { files: await files, wasKept: false }
 }
 
-async function lookUpAppFiles(event: H3Event, link: string): Promise<AppFiles> {
-  const drop = await findDrop(link, event)
-  if (!drop || drop.kind !== "app" || drop.trashedAt !== null || drop.expired) return null
+async function lookUpAppFiles(event: H3Event, grant: v.InferOutput<typeof Grant>): Promise<AppFiles> {
+  const [drop, who] = await Promise.all([findDrop(grant.l, event), grant.u ? identityOf(grant.u) : null])
+  if (!drop || drop.kind !== "app" || drop.trashedAt !== null || drop.expired || !permissions(drop, who).view)
+    return null
   const rows = await db
     .select({ path: dropFiles.path, blobKey: dropFiles.blobKey })
     .from(dropFiles)
@@ -108,7 +114,7 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
   const candidates = [path, `${path.replace(/\/$/, "")}/index.html`.replace(/^\//, "")].filter(Boolean)
 
   for (const fresh of [false, true]) {
-    const { files, wasKept } = await appFiles(event, grant.l, now, fresh)
+    const { files, wasKept } = await appFiles(event, grant, now, fresh)
     if (!files) return null
     const file = candidates.find((candidate) => files.has(candidate))
     if (!file) {
