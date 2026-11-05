@@ -19,6 +19,11 @@ export const organization = sqliteTable(
     logo: text("logo"),
     metadata: text("metadata"),
     stripeCustomerId: text("stripe_customer_id"),
+    /**
+     * The most members and pending invitations the team may have, or null for no limit. Drop writes it before each
+     * invitation or new member (server/utils/teams.ts `holdMemberLimit`), and a trigger refuses the insert past it.
+     */
+    memberLimit: integer("member_limit"),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("organization_slug_idx").on(table.slug)],

@@ -1,4 +1,5 @@
 import type { GenericEndpointContext, User } from "better-auth"
+import type { OrganizationOptions } from "better-auth/plugins"
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { db } from "vite-hub/database/drizzle"
@@ -118,20 +119,47 @@ export async function isPaying(userId: string, event?: H3Event): Promise<boolean
 }
 
 /** How many people a team has, and whether it pays. */
-export async function teamSeats(team: string) {
+async function teamSeats(team: string) {
   const [row] = await db.select({ members: count() }).from(member).where(eq(member.organizationId, team))
   return { members: row?.members ?? 0, paid: (await paidTeams([team])).has(team) }
 }
 
 /**
- * The most members a team may have: unlimited when billing is off or the team pays, else the free members. Better Auth's
- * organization plugin asks this before it adds someone or sends an invitation.
+ * The most members a team may have, invitations included: unlimited when billing is off or the team pays, else the free
+ * members.
  */
 export async function memberLimit(team: string, event?: H3Event) {
   const billing = billingConfig(event)
   if (!billing.enabled) return Number.MAX_SAFE_INTEGER
   return (await paidTeams([team])).has(team) ? Number.MAX_SAFE_INTEGER : billing.freeMembers
 }
+
+/**
+ * The team's member limit, written on the team as well. Better Auth counts the team and then adds to it in a separate
+ * query, so two requests at the last free seat could both pass its count. Triggers on `member` and `invitation`
+ * (migration 0013) check the written limit inside the insert itself, and refuse the one past it with `DROP_TEAM_FULL`.
+ */
+async function holdMemberLimit(team: string) {
+  const limit = await memberLimit(team)
+  await db
+    .update(organization)
+    .set({ memberLimit: limit === Number.MAX_SAFE_INTEGER ? null : limit })
+    .where(eq(organization.id, team))
+  return limit
+}
+
+/**
+ * Drop's options for Better Auth's organization plugin (server/auth.ts). It asks for the limit before it adds someone or
+ * sends an invitation. Pending invitations count as seats, so a free team can't invite past its free members.
+ */
+export const teamOptions = {
+  creatorRole: "owner",
+  invitationExpiresIn: 7 * 24 * 60 * 60,
+  cancelPendingInvitationsOnReInvite: true,
+  membershipLimit: (_user, team) => holdMemberLimit(team.id),
+  invitationLimit: async ({ organization: team }) =>
+    Math.max(0, (await holdMemberLimit(team.id)) - (await teamSeats(team.id)).members),
+} satisfies OrganizationOptions
 
 /**
  * Takes someone off their teams before Better Auth deletes their account (its `user.delete.before` hook). Each team runs
