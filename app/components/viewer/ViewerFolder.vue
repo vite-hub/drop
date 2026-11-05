@@ -296,6 +296,10 @@ async function newBoard() {
             </UTooltip>
           </div>
         </div>
+        <!-- Search results replace the normal rows, but uploads still show their progress above them. -->
+        <ul v-if="search.trim() && pending.length" aria-label="Uploading" class="-mx-2 mb-3 flex flex-col gap-px">
+          <DropUpload v-for="item in pending" :key="item.key" class="px-2 py-1.5" layout="row" :upload="item" />
+        </ul>
         <ViewerFolderResults v-if="search.trim()" :folder="drop.id" :public-view="publicView" :query="search" />
         <div
           v-else-if="!children.length && !uploading"
