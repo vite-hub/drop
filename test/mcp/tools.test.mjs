@@ -1081,6 +1081,40 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
   }
 })
 
+test("a doc saved as .md goes up through the file upload URL and publishes like markdown, versions included", async () => {
+  state.authSecret = "test-secret"
+  try {
+    const put = (url, text) => {
+      const body = new TextEncoder().encode(text)
+      const event = new H3Event(
+        new Request(url, { method: "PUT", body, headers: { "content-length": String(body.length) } }),
+      )
+      event.context.log = { set() {}, error() {}, warn() {} }
+      event.context.params = { ticket: new URL(url).pathname.split("/").pop() }
+      return uploadPut(event)
+    }
+    const ticket = (
+      await call(publish, { file: { name: "report.md" }, slug: "long-report", note: "First", lifetime: "review" })
+    ).structuredContent
+    state.who = null
+    const doc = await put(ticket.uploadUrl, "# Long report\n\nEvery section.\n")
+    assert.equal(doc.kind, "markdown")
+    assert.equal(doc.title, "Long report")
+    assert.equal(doc.version, 1)
+
+    state.who = who
+    const next = (await call(publish, { file: { name: "report.md" }, previous: doc.id, note: "Second" }))
+      .structuredContent
+    state.who = null
+    const v2 = await put(next.uploadUrl, "# Long report\n\nEvery section, revised.\n")
+    assert.equal(v2.id, doc.id)
+    assert.equal(v2.version, 2)
+  } finally {
+    state.who = who
+    state.authSecret = undefined
+  }
+})
+
 test("a built app goes up as one archive, binary files and all, and its next archive replaces every file", async () => {
   state.authSecret = "test-secret"
   try {

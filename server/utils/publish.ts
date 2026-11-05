@@ -31,8 +31,20 @@ export const PublishInput = v.object({
       ),
     ),
   ),
-  markdown: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A doc in Markdown."))),
-  html: v.optional(v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES), v.description("A self-contained HTML page."))),
+  markdown: v.optional(
+    v.pipe(
+      v.string(),
+      v.maxLength(MAX_FILE_BYTES),
+      v.description("A doc in Markdown. For a doc saved on disk, pass file with its .md name instead and upload it."),
+    ),
+  ),
+  html: v.optional(
+    v.pipe(
+      v.string(),
+      v.maxLength(MAX_FILE_BYTES),
+      v.description("A self-contained HTML page. For a page saved on disk, pass file with its .html name instead."),
+    ),
+  ),
   files: v.optional(
     v.pipe(
       v.record(v.string(), v.string()),
@@ -73,7 +85,7 @@ export const PublishInput = v.object({
         ),
       }),
       v.description(
-        "Any other file up to 4 MiB: a screenshot, a PDF. Images get pin and area comments. Embed its fileUrl in a doc to make it part of that doc. Without base64 you get an uploadUrl: upload the file with `curl -T <path> '<uploadUrl>'`, which creates the drop and prints it with its fileUrl.",
+        "Any other file up to 4 MiB: a screenshot, a PDF, or a doc saved as .md or .html, which publishes like markdown or html. Images get pin and area comments. Embed its fileUrl in a doc to make it part of that doc. Without base64 you get an uploadUrl: upload the file with `curl -T <path> '<uploadUrl>'`, which creates the drop and prints it with its fileUrl.",
       ),
     ),
   ),
@@ -365,9 +377,10 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
-  const lead = input.markdown
-    ? "It published with these Comark lint warnings."
-    : `These references point at nothing in the ${input.files ? "app" : "page"}.`
+  const lead =
+    fresh.kind === "markdown"
+      ? "It published with these Comark lint warnings."
+      : `These references point at nothing in the ${input.files ? "app" : "page"}.`
   const check = warnings.length
     ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
     : ""
