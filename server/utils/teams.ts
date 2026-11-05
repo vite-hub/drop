@@ -42,6 +42,15 @@ export function billingConfig(event?: H3Event) {
   }
 }
 
+/**
+ * The Team plan in Stripe's plugin: one price per member, billed as the plan's seat price and kept at the team's member
+ * count. The plugin bills that seat price whatever the interval, so a yearly price is a plan of its own, `team-annual`.
+ */
+export function teamPlans({ priceId, annualPriceId }: { priceId: string; annualPriceId?: string }) {
+  return [teamPlan("team", priceId), ...(annualPriceId ? [teamPlan("team-annual", annualPriceId)] : [])]
+}
+const teamPlan = (name: string, price: string) => ({ name, priceId: price, seatPriceId: price, freeTrial: { days: 14 } })
+
 /** The teams someone is on, and their role on each. Empty when teams are off. */
 export async function teamsOf(userId: string, event?: H3Event): Promise<Record<string, TeamRole>> {
   if (!teamsEnabled(event)) return {}
