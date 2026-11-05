@@ -1,10 +1,12 @@
 import type { GenericEndpointContext, User } from "better-auth"
 import type { OrganizationOptions } from "better-auth/plugins"
+import type { StripePlan } from "@better-auth/stripe"
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm"
 import type { H3Event } from "h3"
+import type Stripe from "stripe"
 import { db } from "vite-hub/database/drizzle"
 import { useServerEnv } from "#vitehub/env/server"
-import { member, organization, subscription } from "../databases/config"
+import { drops, member, organization, subscription } from "../databases/config"
 import type { DropRow } from "./drops/types"
 
 // Teams on a personal Drop. A team is a Better Auth organization: its members, their roles, and invitations live there.
@@ -134,6 +136,31 @@ export async function memberLimit(team: string, event?: H3Event) {
   return (await paidTeams([team])).has(team) ? Number.MAX_SAFE_INTEGER : billing.freeMembers
 }
 
+type TeamBilling = { stripeClient: Stripe; plans: StripePlan[] }
+
+/** Better Auth Stripe 1.7 only syncs active/trialing seats. Drop also keeps past-due teams while payment is retried. */
+async function syncPastDueSeats(team: string, billing?: TeamBilling) {
+  if (!billing) return
+  const rows = await db
+    .select()
+    .from(subscription)
+    .where(and(eq(subscription.referenceId, team), eq(subscription.status, "past_due")))
+  for (const row of rows) {
+    const plan = billing.plans.find((entry) => entry.name.toLowerCase() === row.plan)
+    if (!row.stripeSubscriptionId || !plan?.seatPriceId) continue
+    const live = await billing.stripeClient.subscriptions.retrieve(row.stripeSubscriptionId)
+    if (!PAYING.some((status) => status === live.status)) continue
+    const { members } = await teamSeats(team)
+    const item = live.items.data.find((entry) => entry.price.id === plan.seatPriceId)
+    if (item?.quantity !== members)
+      await billing.stripeClient.subscriptions.update(live.id, {
+        items: [item ? { id: item.id, quantity: members } : { price: plan.seatPriceId, quantity: members }],
+        proration_behavior: plan.prorationBehavior ?? "create_prorations",
+      })
+    await db.update(subscription).set({ seats: members }).where(eq(subscription.id, row.id))
+  }
+}
+
 /**
  * The team's member limit, written on the team as well. Better Auth counts the team and then adds to it in a separate
  * query, so two requests at the last free seat could both pass its count. Triggers on `member` and `invitation`
@@ -163,11 +190,12 @@ export const teamOptions = {
 
 /**
  * Takes someone off their teams before Better Auth deletes their account (its `user.delete.before` hook). Each team runs
- * the organization plugin's hooks as if they had been removed, so Stripe's plugin bills one seat less. A team they own passes to its oldest admin,
- * or to its oldest member when it has no admin. A team with nobody else on it is deleted with its invitations. Stripe's
- * plugin refuses that while the team still pays, and then the account stays until someone cancels the subscription.
+ * the organization plugin's hooks as if they had been removed, with past-due seats synced explicitly. A team they own
+ * passes to its oldest admin, or to its oldest member when it has no admin. A team with nobody else on it is deleted
+ * with its invitations and content. Stripe's plugin refuses that while the team still pays, and then the account stays
+ * until someone cancels the subscription.
  */
-export async function leaveTeams(user: User, context: GenericEndpointContext | null) {
+export async function leaveTeams(user: User, context: GenericEndpointContext | null, billing?: TeamBilling) {
   const hooks = context?.context.getPlugin("organization")?.options.organizationHooks ?? {}
   const teams = await db
     .select({ membership: member, team: organization })
@@ -186,6 +214,10 @@ export async function leaveTeams(user: User, context: GenericEndpointContext | n
   }
   for (const { membership, team, others } of left) {
     if (!others.length) {
+      const { deleteDrop } = await import("./drops/lifecycle")
+      const folders = await db.select().from(drops).where(eq(drops.teamId, team.id))
+      const gone = new Set<string>()
+      for (const folder of folders) if (!gone.has(folder.id)) await deleteDrop(folder, gone)
       await db.delete(organization).where(eq(organization.id, team.id))
       continue
     }
@@ -194,5 +226,6 @@ export async function leaveTeams(user: User, context: GenericEndpointContext | n
       await db.update(member).set({ role: "owner" }).where(eq(member.id, heir.id))
     await db.delete(member).where(eq(member.id, membership.id))
     await hooks.afterRemoveMember?.({ member: membership, user, organization: team })
+    await syncPastDueSeats(team.id, billing)
   }
 }

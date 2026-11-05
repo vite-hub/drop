@@ -158,6 +158,39 @@ test("members added at once get the same refusal as a retry", async () => {
   })
 })
 
+// Node SQLite only reports DROP_TEAM_FULL. D1 adds the primary and extended constraint codes to the cause message.
+for (const prefix of ["", "D1_ERROR: "]) {
+  for (const table of ["invitation", "member"]) {
+    test(`D1 ${table} trigger refusals return 403 ${prefix ? "with" : "without"} the D1_ERROR prefix`, async () => {
+      const { post, signUp, owner, team } = await setup()
+      const invitee = await signUp("invitee")
+      const invitationBody = { email: "invitee@team.example", role: "member", organizationId: team.id }
+      let invitation
+      if (table === "member") invitation = await (await post("invite-member", owner.headers, invitationBody)).json()
+      sql.exec(
+        `CREATE TRIGGER d1_limit_error BEFORE INSERT ON ${table} BEGIN SELECT RAISE(ABORT, '${prefix}DROP_TEAM_FULL: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)'); END`,
+      )
+      try {
+        const response =
+          table === "invitation"
+            ? await post("invite-member", owner.headers, invitationBody)
+            : await post("accept-invitation", invitee.headers, { invitationId: invitation.id })
+        assert.equal(response.status, 403)
+        assert.deepEqual(
+          await response.json(),
+          table === "invitation"
+            ? { code: "INVITATION_LIMIT_REACHED", message: "Invitation limit reached" }
+            : { code: "ORGANIZATION_MEMBERSHIP_LIMIT_REACHED", message: "Organization membership limit reached" },
+        )
+        if (table === "member")
+          assert.equal(sql.prepare("SELECT status FROM invitation WHERE id = ?").get(invitation.id).status, "pending")
+      } finally {
+        sql.exec("DROP TRIGGER d1_limit_error")
+      }
+    })
+  }
+}
+
 test("other database errors still return a server error", async () => {
   const { post, owner, team } = await setup()
   sql.exec("CREATE TRIGGER fail_invitation BEFORE INSERT ON invitation BEGIN SELECT RAISE(ABORT, 'OTHER_FAILURE'); END")

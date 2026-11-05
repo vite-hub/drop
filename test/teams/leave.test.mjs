@@ -4,7 +4,7 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { admin, organization } from "better-auth/plugins"
 import { beforeEach, test } from "vite-plus/test"
-import { migrate, reset, sql, state } from "../cost/harness.mjs"
+import { insertDrop, insertVersion, migrate, objects, reset, sql, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/config.ts")
 const { leaveTeams, teamPlans } = await import("../../server/utils/teams.ts")
@@ -15,10 +15,10 @@ migrate()
 beforeEach(() => reset())
 
 /** A Stripe client with one live subscription, `sub_team`, at `quantity` seats. It keeps the seat updates it gets. */
-function stripeClient(quantity, updates) {
+function stripeClient(quantity, updates, status) {
   const subscription = {
     id: "sub_team",
-    status: "active",
+    status,
     items: { data: [{ id: "si_seat", quantity, price: { id: "price_month" } }] },
   }
   // The plugin awaits some lists and iterates others.
@@ -35,28 +35,33 @@ function stripeClient(quantity, updates) {
       retrieve: async () => subscription,
       update: async (id, params) => {
         updates.push({ id, ...params })
+        subscription.items.data[0].quantity = params.items[0].quantity
         return subscription
       },
     },
   }
 }
 
-async function setup(people, { paying = false } = {}) {
+async function setup(people, { paying = false, status = "active" } = {}) {
   const updates = []
+  const billing = {
+    stripeClient: stripeClient(people.length, updates, status),
+    plans: teamPlans({ priceId: "price_month" }),
+  }
   const auth = betterAuth({
     baseURL: "https://drop.example",
     secret: "test-only-secret-at-least-thirty-two-characters",
     database: drizzleAdapter(state.db, { provider: "sqlite", schema: schema.schema }),
     emailAndPassword: { enabled: true },
-    databaseHooks: { user: { delete: { before: leaveTeams } } },
+    databaseHooks: { user: { delete: { before: (user, context) => leaveTeams(user, context, billing) } } },
     plugins: [
       admin(),
       organization({ creatorRole: "owner" }),
       stripe({
-        stripeClient: stripeClient(people.length, updates),
+        stripeClient: billing.stripeClient,
         stripeWebhookSecret: "whsec_test",
         organization: { enabled: true },
-        subscription: { enabled: true, plans: teamPlans({ priceId: "price_month" }) },
+        subscription: { enabled: true, plans: billing.plans },
       }),
     ],
   })
@@ -83,9 +88,9 @@ async function setup(people, { paying = false } = {}) {
     sql.prepare("UPDATE organization SET stripe_customer_id = 'cus_team' WHERE id = ?").run(team.id)
     sql
       .prepare(
-        "INSERT INTO subscription (id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status, seats) VALUES ('s1', 'team', ?, 'cus_team', 'sub_team', 'active', ?)",
+        "INSERT INTO subscription (id, plan, reference_id, stripe_customer_id, stripe_subscription_id, status, seats) VALUES ('s1', 'team', ?, 'cus_team', 'sub_team', ?, ?)",
       )
-      .run(team.id, people.length)
+      .run(team.id, status, people.length)
   }
   const remove = (name) => auth.api.removeUser({ headers: root.headers, body: { userId: ids[name] } })
   const roles = () =>
@@ -98,23 +103,24 @@ async function setup(people, { paying = false } = {}) {
   return { team, updates, remove, roles, ids }
 }
 
-test("a deleted member leaves the team, and Stripe bills one seat less", async () => {
-  const { remove, roles, updates } = await setup(
-    [
-      { name: "owner", role: "owner" },
-      { name: "mate", role: "member" },
-      { name: "pal", role: "member" },
-    ],
-    { paying: true },
-  )
-  await remove("mate")
-  assert.deepEqual(roles(), { owner: "owner", pal: "member" })
-  assert.deepEqual(
-    updates.map((update) => update.items),
-    [[{ id: "si_seat", quantity: 2 }]],
-  )
-  assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 2)
-})
+for (const status of ["active", "trialing", "past_due"])
+  test(`a deleted member leaves a ${status} team, and Stripe bills one seat less`, async () => {
+    const { remove, roles, updates } = await setup(
+      [
+        { name: "owner", role: "owner" },
+        { name: "mate", role: "member" },
+        { name: "pal", role: "member" },
+      ],
+      { paying: true, status },
+    )
+    await remove("mate")
+    assert.deepEqual(roles(), { owner: "owner", pal: "member" })
+    assert.deepEqual(
+      updates.map((update) => update.items),
+      [[{ id: "si_seat", quantity: 2 }]],
+    )
+    assert.equal(sql.prepare("SELECT seats FROM subscription").get().seats, 2)
+  })
 
 test("a deleted owner's team passes to its oldest admin, or to its oldest member when it has none", async () => {
   const withAdmins = await setup([
@@ -143,9 +149,46 @@ test("a team with nobody else on it goes with its owner, unless it still pays", 
 
   reset()
   const paying = await setup([{ name: "owner", role: "owner" }], { paying: true })
+  insertDrop("paying-folder", { kind: "folder", team_folder: 1, team_id: paying.team.id })
+  insertDrop("paying-doc", { parent_id: "paying-folder" })
   await assert.rejects(paying.remove("owner"), /active subscription/i)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id = ?").get(paying.ids.owner).n, 1)
   assert.deepEqual(paying.roles(), { owner: "owner" })
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 2)
+  assert.ok(objects.has("paying-doc.md"))
+})
+
+test("a final team takes its folders, descendants, files and comments with it", async () => {
+  const alone = await setup([{ name: "owner", role: "owner" }])
+  insertDrop("folder", { kind: "folder", blob_key: null, team_folder: 1, team_id: alone.team.id })
+  insertDrop("nested", { kind: "folder", blob_key: null, parent_id: "folder" })
+  insertDrop("doc", { parent_id: "nested", version: 2 })
+  insertVersion("doc", 1)
+  insertDrop("other-folder", { kind: "folder", blob_key: null, team_folder: 1, team_id: alone.team.id })
+  insertDrop("unrelated")
+  const { default: comments } = await import("../../server/comments.ts")
+  const [error] = await comments.create({
+    subject: { kind: "drop", id: "doc" },
+    body: "Team comment",
+    author: { id: alone.ids.owner, name: "Owner" },
+    revision: 1,
+    metadata: { dropId: "doc" },
+  })
+  assert.ifError(error)
+
+  await alone.remove("owner")
+
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM organization").get().n, 0)
+  assert.deepEqual(
+    sql
+      .prepare("SELECT id FROM drops")
+      .all()
+      .map((row) => row.id),
+    ["unrelated"],
+  )
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_versions").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_comment_threads").get().n, 0)
+  assert.deepEqual([...objects.keys()], ["unrelated.md"])
 })
 
 test("a membership never outlives its account", () => {

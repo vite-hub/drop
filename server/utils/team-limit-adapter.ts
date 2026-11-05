@@ -26,7 +26,11 @@ function withLimitErrors(adapter: DBTransactionAdapter): DBTransactionAdapter {
         if (input.model === "invitation" || input.model === "member") {
           let cause: unknown = error
           while (cause instanceof Error) {
-            if (/^(?:D1_ERROR: )?DROP_TEAM_FULL(?:: SQLITE_CONSTRAINT(?:_TRIGGER)?)?$/.test(cause.message))
+            if (
+              /^(?:D1_ERROR: )?DROP_TEAM_FULL(?:: SQLITE_CONSTRAINT(?:_TRIGGER| \(extended: SQLITE_CONSTRAINT_TRIGGER\))?)?$/.test(
+                cause.message,
+              )
+            )
               throw APIError.from(
                 "FORBIDDEN",
                 input.model === "invitation"
