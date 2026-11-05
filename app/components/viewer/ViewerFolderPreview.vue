@@ -4,6 +4,7 @@
 // what it is under it, and double-clicking the name renames it (`renames`); who added it, and when, sits by Open.
 import { planDocument } from "#shared/documents"
 import { videoType } from "#shared/plans"
+import { linkSource } from "#shared/resources"
 import type { DropDetail, DropSummary } from "#shared/types"
 
 const props = defineProps<{ child: DropSummary; to: string; title: string; renames?: boolean }>()
@@ -47,9 +48,11 @@ const about = computed(() =>
     KIND_LABELS[props.child.kind],
     props.child.kind === "folder"
       ? itemCount(props.child.items ?? 0)
-      : props.child.size
-        ? formatBytes(props.child.size)
-        : null,
+      : props.child.href
+        ? linkSource(props.child.href)
+        : props.child.size
+          ? formatBytes(props.child.size)
+          : null,
     props.child.owner?.name,
   ]
     .filter(Boolean)
@@ -102,7 +105,8 @@ const about = computed(() =>
         :title="child.title"
       />
       <div v-else class="px-6 text-center">
-        <UIcon :name="KIND_ICONS[child.kind]" class="size-10 text-dimmed" />
+        <ViewerResourceIcon v-if="child.href" class="mx-auto size-10!" :url="child.href" />
+        <UIcon v-else :name="KIND_ICONS[child.kind]" class="size-10 text-dimmed" />
         <p v-if="detail?.excerpt" class="mt-3 line-clamp-4 text-sm text-muted">{{ detail.excerpt }}</p>
       </div>
     </div>
@@ -115,7 +119,16 @@ const about = computed(() =>
         /></span>
       </p>
       <div class="flex gap-2">
-        <UButton block class="flex-1" color="neutral" label="Open" size="sm" :to="to" />
+        <UButton
+          block
+          class="flex-1"
+          color="neutral"
+          label="Open"
+          :rel="child.href ? 'noopener noreferrer' : undefined"
+          size="sm"
+          :target="child.href ? '_blank' : undefined"
+          :to="to"
+        />
         <UTooltip text="Copy link">
           <UButton
             aria-label="Copy link"
@@ -124,7 +137,7 @@ const about = computed(() =>
             :ui="{ leadingIcon: copied('link') ? 'animate-icon-in' : undefined }"
             size="sm"
             variant="outline"
-            @click="copy(link, { key: 'link' })"
+            @click="copy(child.href ?? link, { key: 'link' })"
           />
         </UTooltip>
         <UTooltip v-if="url && child.kind !== 'folder'" text="Download">

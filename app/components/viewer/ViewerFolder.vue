@@ -4,19 +4,30 @@
 // for people signed in, at its share link on a public page. As in Finder, a slower second click on a picked drop's name,
 // F2, or Rename in its right-click menu renames it. What goes in the folder (its description) is in Details
 // (ViewerOverview). Everyone on the team adds to a team folder, by Upload, by pasting files, or by dropping them on the
-// page; only admins add folders to it or change what it says.
+// page; only admins add folders to it or change what it says. A link item opens its page outside Drop in a new tab,
+// and Copy link copies that page's address.
 import { breakpointsTailwind } from "@vueuse/core"
 import { dropPath } from "#shared/links"
+import { linkSource } from "#shared/resources"
 import type { DropDetail, DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; publicView?: boolean }>()
 const { createBoard, createDoc, createFolder, newSite, rename, remove } = useDropActions()
 const folderDialog = useFolderDialog()
 const children = computed(() => props.drop.children ?? [])
-const to = (child: DropSummary) => (props.publicView ? dropPath(child) : `/drops/${child.id}`)
+const to = (child: DropSummary) => child.href ?? (props.publicView ? dropPath(child) : `/drops/${child.id}`)
+const open = (child: DropSummary) =>
+  child.href ? void window.open(child.href, "_blank", "noopener,noreferrer") : void navigateTo(to(child))
 const [DefineRowParts, ReuseRowParts] = createReusableTemplate<{ child: DropSummary; part: "icon" | "meta" }>()
 const meta = (child: DropSummary) =>
-  [child.kind === "folder" ? itemCount(child.items ?? 0) : KIND_LABELS[child.kind], child.owner?.name]
+  [
+    child.kind === "folder"
+      ? itemCount(child.items ?? 0)
+      : child.href
+        ? linkSource(child.href)
+        : KIND_LABELS[child.kind],
+    child.owner?.name,
+  ]
     .filter(Boolean)
     .join(" · ")
 // Search goes to the ⌘K palette with `in:<folder>` typed in, where kinds and other folders filter too. A public page
@@ -56,7 +67,7 @@ function pick(event: MouseEvent, child: DropSummary) {
   if (!wide.value || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0 || !event.detail) return
   event.preventDefault()
   clearTimeout(slowClick)
-  if (event.detail > 1) return void navigateTo(to(child))
+  if (event.detail > 1) return open(child)
   if (selected.value !== child.id) {
     selected.value = child.id
     pickedAt = event.timeStamp
@@ -114,8 +125,15 @@ const menu = computed(() => {
   if (!child) return []
   return [
     [
-      { label: "Open", icon: "i-mingcute-arrow-right-up-line", onSelect: () => void navigateTo(to(child)) },
-      { label: "Open in new tab", icon: "i-mingcute-external-link-line", to: to(child), target: "_blank" },
+      { label: "Open", icon: "i-mingcute-arrow-right-up-line", onSelect: () => open(child) },
+      // A link opens in a new tab already; its own page, with its comments and Details, is the other way in.
+      child.href
+        ? {
+            label: "Open in Drop",
+            icon: "i-mingcute-arrow-right-line",
+            to: props.publicView ? dropPath(child) : `/drops/${child.id}`,
+          }
+        : { label: "Open in new tab", icon: "i-mingcute-external-link-line", to: to(child), target: "_blank" },
     ],
     [
       ...(manages(child)
@@ -124,7 +142,7 @@ const menu = computed(() => {
       {
         label: "Copy link",
         icon: "i-mingcute-link-line",
-        onSelect: () => void copy(`${origin}${dropPath(child)}`, { announce: "Link copied" }),
+        onSelect: () => void copy(child.href ?? `${origin}${dropPath(child)}`, { announce: "Link copied" }),
       },
       ...(manages(child)
         ? [
@@ -235,8 +253,14 @@ async function newBoard() {
          their kind's icon. The image's own size, not the grid's auto row, sets its box: a tall screenshot would
          stretch that row past the 28px and over the rows below. -->
     <span v-if="part === 'icon'" class="grid size-7 shrink-0 place-items-center">
+      <span
+        v-if="child.href"
+        class="grid size-full place-items-center rounded-md bg-elevated ring-1 ring-default ring-inset"
+      >
+        <ViewerResourceIcon :url="child.href" />
+      </span>
       <img
-        v-if="child.thumbnail"
+        v-else-if="child.thumbnail"
         alt=""
         class="size-7 rounded-md object-cover object-top outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
         loading="lazy"
@@ -346,6 +370,8 @@ async function newBoard() {
                   :class="picked?.id === child.id ? 'bg-accented/70' : 'hover:bg-elevated'"
                   :data-id="child.id"
                   draggable="false"
+                  :rel="child.href ? 'noopener noreferrer' : undefined"
+                  :target="child.href ? '_blank' : undefined"
                   :to="to(child)"
                   @click.capture="pick($event, child)"
                 >

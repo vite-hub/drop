@@ -224,11 +224,11 @@ watch(
   () => overlays.pins,
   (pins) => (commentsShown.value = pins),
 )
-/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
+/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a link, a video. */
 const framed = computed(
   () =>
     !editing.value &&
-    !["folder", "site", "board"].includes(drop.value.kind) &&
+    !["folder", "site", "board", "link"].includes(drop.value.kind) &&
     !video.value &&
     !(drop.value.kind === "file" && !drop.value.html),
 )
@@ -632,7 +632,12 @@ const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.val
 // The segment's chip: the size (a folder's item count) and, for its owner, the views.
 const detailsMeta = computed(() => {
   const d = drop.value
-  const size = d.kind === "folder" ? itemCount(d.items ?? 0) : d.kind === "site" ? "Site" : formatBytes(d.size)
+  const size =
+    d.kind === "folder"
+      ? itemCount(d.items ?? 0)
+      : d.kind === "site" || d.kind === "link"
+        ? KIND_LABELS[d.kind]
+        : formatBytes(d.size)
   const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
   return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
 })
@@ -1144,6 +1149,7 @@ watch(
             @resolve="resolve"
           />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
+          <LazyViewerLink v-else-if="drop.kind === 'link'" :drop="drop" />
           <LazyViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
           <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
           <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">

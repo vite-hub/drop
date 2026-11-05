@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readdirSync } from "node:fs"
-import { beforeEach, test } from "vite-plus/test"
+import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { createTarGzip } from "nanotar"
@@ -10,6 +10,7 @@ const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts"
 const { default: readFile } = await import("../../server/mcp/tools/read_file.ts")
 const { default: listDrops } = await import("../../server/mcp/tools/list_drops.ts")
 const { default: updateDrop } = await import("../../server/mcp/tools/update_drop.ts")
+const { default: createFolder } = await import("../../server/mcp/tools/create_folder.ts")
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
 const { default: acceptTool } = await import("../../server/mcp/tools/accept_suggestion.ts")
 const { default: editBoard } = await import("../../server/mcp/tools/edit_board.ts")
@@ -48,6 +49,7 @@ const server = createMcpHandler({
     acceptTool,
     listDrops,
     updateDrop,
+    createFolder,
     editBoard,
     viewBoard,
     ...siteCommentTools,
@@ -942,6 +944,124 @@ test("read_drop gives a doc's results for every block and the user's own answers
 
   const page = (await call(publish, { html: "<p>Hi</p>", note: "v1", lifetime: "review" })).structuredContent
   assert.equal((await call(readDrop, { id: page.id })).structuredContent.answers, undefined)
+})
+
+test("an agent adds a pull request to a kept folder as a link; it lists, changes, moves, and trashes like a drop", async () => {
+  state.mode = "team"
+  const pr = "https://github.com/quiverdk/website/pull/33"
+  const folder = (
+    await call(createFolder, { title: "SEO", lifetime: "keep", keepReason: "Reference for the SEO work" })
+  ).structuredContent
+  await call(publish, { markdown: "# 1. Marketplace", note: "Report", folder: folder.id })
+  const asked = []
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+    asked.push(String(url))
+    return Response.json({ title: "Get listed on Microsoft Marketplace", state: "open" })
+  })
+  const added = await call(publish, { link: { url: pr }, note: "The PR the reports go with", folder: folder.id })
+  assert.deepEqual(asked, ["https://api.github.com/repos/quiverdk/website/pulls/33"], "one lookup, when it's made")
+  const link = added.structuredContent
+  assert.equal(link.title, "Get listed on Microsoft Marketplace")
+  assert.equal(link.kind, "link")
+  assert.equal(link.href, pr)
+  assert.equal(link.lifetime, "keep", "it lives with the kept folder")
+  assert.equal(link.status, "Kept")
+  assert.match(
+    added.content[0].text,
+    /^Added a link:\n- Get listed on Microsoft Marketplace \(link to https:\/\/github\.com\/quiverdk\/website\/pull\/33, team, keep, kept\)/,
+  )
+
+  // A private repository (GitHub answers 404 without a token) goes by its repo and number.
+  fetch.mockResolvedValue(new Response("Not Found", { status: 404 }))
+  const unnamed = (await call(publish, { link: { url: `${pr}/files` }, note: "Its diff", folder: folder.id }))
+    .structuredContent
+  assert.equal(unnamed.title, "quiverdk/website#33")
+  fetch.mockClear()
+  const named = (
+    await call(publish, {
+      link: { url: "https://quiver.dk/pricing" },
+      title: "Pricing",
+      note: "Live",
+      folder: folder.id,
+    })
+  ).structuredContent
+  assert.equal(fetch.mock.calls.length, 0, "only pull requests are looked up, and only without a title")
+  fetch.mockRestore()
+
+  const listed = (await call(listDrops, { folder: folder.id })).structuredContent.drops
+  assert.deepEqual(
+    listed.map((drop) => [drop.kind, drop.title, drop.href]),
+    [
+      ["link", "Pricing", "https://quiver.dk/pricing"],
+      ["link", "quiverdk/website#33", `${pr}/files`],
+      ["link", "Get listed on Microsoft Marketplace", pr],
+      ["markdown", "1. Marketplace", undefined],
+    ],
+  )
+  assert.deepEqual(
+    (await call(listDrops, { folder: folder.id, kind: "link" })).structuredContent.drops.map((drop) => drop.id),
+    [named.id, unnamed.id, link.id],
+  )
+  // A kept folder keeps everything in it, however long nobody opens it.
+  sql.prepare("UPDATE drops SET last_accessed_at = 1, created_at = 1").run()
+  assert.ok(
+    (await call(listDrops, { folder: folder.id })).structuredContent.drops.every((drop) => drop.status === "Kept"),
+  )
+  const read = await call(readDrop, { id: link.id })
+  assert.match(
+    read.content[0].text,
+    /\n## Link\nOpens https:\/\/github\.com\/quiverdk\/website\/pull\/33\nThe PR the reports go with\n/,
+  )
+  assert.doesNotMatch(read.content[0].text, /## Content/)
+
+  const changed = await call(updateDrop, { id: unnamed.id, url: `${pr}/commits`, description: "Its commits" })
+  assert.equal(changed.structuredContent.href, `${pr}/commits`)
+  assert.equal(changed.structuredContent.note, "Its commits")
+  assert.match((await call(updateDrop, { id: unnamed.id, url: "http://example.com" })).message, /isn't a link/)
+  assert.match((await call(updateDrop, { id: listed.at(-1).id, url: pr })).message, /Only links have an address/)
+  assert.match(
+    (await call(publish, { link: { url: pr }, previous: link.id, note: "v2" })).message,
+    /A link has no versions/,
+  )
+  assert.match(
+    (await call(publish, { link: { url: "javascript:alert(1)" }, note: "x", lifetime: "temporary" })).message,
+    /isn't a link/,
+  )
+
+  const other = (await call(createFolder, { title: "Archive", lifetime: "review" })).structuredContent
+  const moved = (await call(updateDrop, { id: named.id, folder: other.id })).structuredContent
+  assert.equal(moved.lifetime, "review", "moved, it lives with its new folder")
+  const top = (await call(updateDrop, { id: named.id, folder: "" })).structuredContent
+  assert.equal(top.lifetime, "review", "out at the top, it keeps the lifetime it lived by")
+  assert.match((await call(updateDrop, { id: named.id, trash: true })).structuredContent.status, /^In the Trash/)
+  assert.equal((await call(updateDrop, { id: named.id, trash: false })).structuredContent.status, "Expires in 30 days")
+})
+
+test("publish into a folder says the folder's lifetime wins; update_drop on a folder counts what it holds", async () => {
+  state.mode = "team"
+  const folder = (await call(createFolder, { title: "SEO", lifetime: "review" })).structuredContent
+  for (const title of ["1", "2"]) await call(publish, { markdown: `# ${title}`, note: "Report", folder: folder.id })
+  const kept = await call(publish, {
+    markdown: "# 3",
+    note: "Report",
+    folder: folder.id,
+    lifetime: "keep",
+    keepReason: "PR",
+  })
+  assert.equal(kept.structuredContent.lifetime, "review")
+  assert.match(
+    kept.content[0].text,
+    /\nIt lives as long as its folder, which is review, not keep\. To change that, pass lifetime to update_drop on the top-most folder\.$/,
+  )
+  const same = await call(publish, { markdown: "# 4", note: "Report", folder: folder.id, lifetime: "review" })
+  assert.doesNotMatch(same.content[0].text, /lives as long as its folder/)
+
+  const updated = await call(updateDrop, { id: folder.id, lifetime: "keep", keepReason: "Reference" })
+  assert.equal(updated.structuredContent.items, 4)
+  assert.match(updated.content[0].text, /^Updated:\n- SEO \(folder, 4 items, team, keep, kept\)/)
+  assert.ok(
+    (await call(listDrops, { folder: folder.id })).structuredContent.drops.every((drop) => drop.lifetime === "keep"),
+  )
 })
 
 test("an agent links a drop to its pull request and preview; publishing again adds without doubling", async () => {
