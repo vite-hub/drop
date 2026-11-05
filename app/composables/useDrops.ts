@@ -118,13 +118,20 @@ export function useDropActions() {
     return before
   }
 
-  /** Uploads one file as a drop with this Drop's default share, or into `folder`, where it shares and lives with the folder. */
-  async function upload(file: File, folder?: Pick<DropSummary, "id" | "title">) {
+  /**
+   * Uploads one file as a drop with this Drop's default share, or into `folder`, where it shares and lives with the folder.
+   * `onProgress` hears how much of the file has gone, from 0 to 1. It resolves once the lists show the new drop.
+   */
+  async function upload(
+    file: File,
+    folder?: Pick<DropSummary, "id" | "title">,
+    options: { onProgress?: (fraction: number) => void } = {},
+  ) {
     const form = new FormData()
     form.append("file", file)
     if (folder) form.append("folder", folder.id)
     try {
-      const result = await $fetch<{ id: string }>("/api/files", { method: "POST", body: form })
+      const result = await sendFile<{ id: string }>("/api/files", form, { onProgress: options.onProgress })
       await (folder ? refreshNuxtData([...LISTS, keys.usage, keys.folder(folder.id), keys.drop(folder.id)]) : refresh())
       notify.done(
         folder

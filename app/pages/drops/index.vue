@@ -174,7 +174,9 @@ async function trashOne(drop: DropSummary) {
 const preview = useResizeHandle(useFolderPreviewWidth(), { min: 18, max: 40, initial: 22 })
 
 // Files dropped anywhere on the page upload to the top; one opens once it's in.
-const { uploading, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), { wide, selected })
+// Each file shows at the top of Recent or Folders from the moment it's added, with how much has gone.
+const { pending, uploading, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), { wide, selected })
+const showsUploads = computed(() => uploading.value > 0 && !place.value && !searching.value)
 const dropping = computed(() => isOverDropZone.value && place.value !== "trash" && place.value !== "with-me")
 
 // Admins on a team Drop make the team's folders; on the Team page that's what a new folder is by default.
@@ -350,14 +352,14 @@ async function newTeamFolder() {
 
             <!-- A first run gets the checklist instead; once it's dismissed, the empty page still says what goes here. -->
             <GetStarted
-              v-else-if="!place && !searching && !drops.length && !getStartedHidden"
+              v-else-if="!place && !searching && !drops.length && !getStartedHidden && !uploading"
               :drops="drops"
               @site="newSite()"
               @upload="openPicker()"
             />
 
             <div
-              v-else-if="!place && !searching && !drops.length"
+              v-else-if="!place && !searching && !drops.length && !uploading"
               class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
             >
               <UIcon name="i-mingcute-layers-line" class="size-6 text-dimmed" />
@@ -377,7 +379,7 @@ async function newTeamFolder() {
               </div>
             </div>
 
-            <p v-else-if="!visible.length" class="py-16 text-center text-sm text-muted">
+            <p v-else-if="!visible.length && !showsUploads" class="py-16 text-center text-sm text-muted">
               {{ searching && searchStatus === "pending" ? "Searching…" : "No drops match." }}
             </p>
 
@@ -387,6 +389,22 @@ async function newTeamFolder() {
               @site="newSite()"
               @upload="openPicker()"
             />
+
+            <section v-if="showsUploads" class="mb-8">
+              <h2 class="label-mono mb-3">Uploading</h2>
+              <ul v-if="layout === 'grid'" class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4 gap-y-6">
+                <DropUpload v-for="item in pending" :key="item.key" layout="card" :upload="item" />
+              </ul>
+              <ul v-else>
+                <DropUpload
+                  v-for="item in pending"
+                  :key="item.key"
+                  class="-mx-2 h-10 px-2"
+                  layout="line"
+                  :upload="item"
+                />
+              </ul>
+            </section>
 
             <div v-if="visible.length" ref="list" @keydown="walk">
               <section v-for="group in groups" :key="group.label" class="mb-8">
@@ -471,12 +489,12 @@ async function newTeamFolder() {
 
         <!-- Files dragged over the page: one target for all of it. -->
         <div
-          v-if="dropping || uploading"
+          v-if="dropping"
           class="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-lg border-2 border-dashed border-inverted bg-default/85"
         >
           <p class="flex items-center gap-2 text-sm font-medium text-highlighted">
             <UIcon name="i-mingcute-upload-2-line" class="size-4" />
-            {{ uploading ? `Uploading ${uploading}…` : "Drop to upload" }}
+            Drop to upload
           </p>
         </div>
       </div>

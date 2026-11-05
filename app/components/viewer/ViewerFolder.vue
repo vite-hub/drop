@@ -188,9 +188,10 @@ function walk(event: KeyboardEvent) {
   rowOf(children.value[next]!.id)?.focus()
 }
 
-// Upload, a paste, and files dropped on the page all land here, one after another. The last one shows in the preview;
-// on a narrow screen a single file opens instead, as it did before the preview.
-const { uploading, uploadFiles, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), {
+// Upload, a paste, and files dropped on the page all land here, one after another, each a row at the top of the list
+// (DropUpload) until its drop is in. The last one shows in the preview; on a narrow screen a single file opens instead,
+// as it did before the preview.
+const { pending, uploading, uploadFiles, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), {
   folder: () => props.drop,
   enabled: () => adds.value,
   wide,
@@ -296,7 +297,10 @@ async function newBoard() {
           </div>
         </div>
         <ViewerFolderResults v-if="search.trim()" :folder="drop.id" :public-view="publicView" :query="search" />
-        <div v-else-if="!children.length" class="rounded-lg border border-dashed border-default px-6 py-16 text-center">
+        <div
+          v-else-if="!children.length && !uploading"
+          class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
+        >
           <UIcon name="i-mingcute-folder-open-line" class="size-6 text-dimmed" />
           <p class="mt-3 font-medium text-highlighted">Nothing in this folder yet</p>
           <p class="mx-auto mt-1 max-w-sm text-sm text-muted">
@@ -323,6 +327,7 @@ async function newBoard() {
               @contextmenu.capture="aim"
               @keydown="walk"
             >
+              <DropUpload v-for="item in pending" :key="item.key" class="px-2 py-1.5" layout="row" :upload="item" />
               <li v-for="child in children" :key="child.id">
                 <div
                   v-if="renaming === child.id"
