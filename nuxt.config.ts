@@ -342,9 +342,15 @@ export default defineNuxtConfig({
   serverHandlers: [
     { route: "/.well-known/agent-skills/**", handler: skillsHandler, lazy: true },
     { route: "/.well-known/skills/**", handler: skillsHandler, lazy: true },
-    ...["oauth-protected-resource", "oauth-authorization-server", "openid-configuration"].flatMap((name) => [
+    // Exact routes, path-suffixed with the resource (/mcp) or the issuer (/api/auth): ViteHub's Console answers every
+    // other /.well-known/oauth-* path itself, and steps aside only for a GET route an app registers exactly.
+    ...[
+      ["oauth-protected-resource", "/mcp"],
+      ["oauth-authorization-server", "/api/auth"],
+      ["openid-configuration", "/api/auth"],
+    ].flatMap(([name, suffix]) => [
       { route: `/.well-known/${name}`, handler: oauthMetadataHandler, lazy: true },
-      { route: `/.well-known/${name}/**`, handler: oauthMetadataHandler, lazy: true },
+      { route: `/.well-known/${name}${suffix}`, handler: oauthMetadataHandler, lazy: true },
     ]),
   ],
 
