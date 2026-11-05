@@ -16,7 +16,7 @@ import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
-import { billingConfig, memberLimit, teamSeats, teamsEnabled } from "./utils/teams"
+import { billingConfig, memberLimit, teamPlans, teamSeats, teamsEnabled } from "./utils/teams"
 import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
@@ -187,16 +187,7 @@ export default defineAuth(({ env, requestOrigin }) => {
               organization: { enabled: true },
               subscription: {
                 enabled: true,
-                // One price per member: the plugin sets the quantity to the team's members and keeps it there.
-                plans: [
-                  {
-                    name: "team",
-                    priceId: billing.priceId,
-                    seatPriceId: billing.priceId,
-                    annualDiscountPriceId: billing.annualPriceId,
-                    freeTrial: { days: 14 },
-                  },
-                ],
+                plans: teamPlans(billing),
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
                 authorizeReference: async ({ user, referenceId }) => {
                   const [row] = await db
