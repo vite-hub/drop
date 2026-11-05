@@ -49,7 +49,12 @@ export function billingConfig(event?: H3Event) {
 export function teamPlans({ priceId, annualPriceId }: { priceId: string; annualPriceId?: string }) {
   return [teamPlan("team", priceId), ...(annualPriceId ? [teamPlan("team-annual", annualPriceId)] : [])]
 }
-const teamPlan = (name: string, price: string) => ({ name, priceId: price, seatPriceId: price, freeTrial: { days: 14 } })
+const teamPlan = (name: string, price: string) => ({
+  name,
+  priceId: price,
+  seatPriceId: price,
+  freeTrial: { days: 14 },
+})
 
 /**
  * What Drop adds to the plugin's Checkout Session. Managed Payments makes Stripe the merchant of record, which files sales
