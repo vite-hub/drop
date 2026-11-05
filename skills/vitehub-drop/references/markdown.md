@@ -114,9 +114,14 @@ The drop runs in its own sandbox inside the doc, so it can't reach Drop, the rea
 ```md
 ---
 title: Publish permanent plans
+status: Ready for review
+author: onmax
+tags: [plans, publishing]
 supersedes: https://drop.vitehub.dev/d/k7f2q9/publish-plans
 ---
 ```
+
+`status`, `pr`, `author`, `date`, and `tags` show as a box of properties at the top of the doc. Drop adds the drop's `resources` to it as links (a `Preview` stays in the page header) and the day the version was published as Updated, so don't write those again. Facts about the doc go in the front matter, not in a line under its title.
 
 Set `title` when the first heading isn't the doc's title. Add `supersedes`, the link of a separate doc this one replaces, only when the reader needs to see that link. A new version of the same drop goes through `previous`, which keeps the history on the drop page.
 
