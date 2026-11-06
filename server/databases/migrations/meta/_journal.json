@@ -99,6 +99,13 @@
       "when": 1793907352663,
       "tag": "0013_team_member_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1793954839294,
+      "tag": "0014_better_auth_rate_limit",
+      "breakpoints": true
     }
   ]
 }

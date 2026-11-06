@@ -3,6 +3,7 @@ import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import type { NuxtSecurityRouteRules } from "nuxt-security"
 import { env } from "vite-hub/env"
+import { CLIENT_IP_HEADERS } from "./shared/client-ip.ts"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
@@ -15,8 +16,6 @@ declare module "nuxt/schema" {
   }
 }
 
-const skillsHandler = fileURLToPath(new URL("./server/handlers/skills.ts", import.meta.url))
-const oauthMetadataHandler = fileURLToPath(new URL("./server/handlers/oauth-metadata.ts", import.meta.url))
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
@@ -172,7 +171,12 @@ export default defineNuxtConfig({
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
-  runtimeConfig: { seoIndex: false, public: { realtime: liveEditing } },
+  // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
+  runtimeConfig: {
+    seoIndex: false,
+    clientIpHeader: CLIENT_IP_HEADERS[host],
+    public: { realtime: liveEditing },
+  },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
   // check, and body limits, so the module's request middlewares stay off.
@@ -335,22 +339,6 @@ export default defineNuxtConfig({
       { baseURL: "/vendor/medium-zoom", dir: "node_modules/medium-zoom/dist", maxAge: 60 * 60 * 24 * 365 },
     ],
   },
-
-  // Agent Skills Discovery, v0.2.0 and the older v0.1.0 path (server/utils/skills.ts holds the skills).
-  serverHandlers: [
-    { route: "/.well-known/agent-skills/**", handler: skillsHandler, lazy: true },
-    { route: "/.well-known/skills/**", handler: skillsHandler, lazy: true },
-    // Exact routes, path-suffixed with the resource (/mcp) or the issuer (/api/auth): ViteHub's Console answers every
-    // other /.well-known/oauth-* path itself, and steps aside only for a GET route an app registers exactly.
-    ...[
-      ["oauth-protected-resource", "/mcp"],
-      ["oauth-authorization-server", "/api/auth"],
-      ["openid-configuration", "/api/auth"],
-    ].flatMap(([name, suffix]) => [
-      { route: `/.well-known/${name}`, handler: oauthMetadataHandler, lazy: true },
-      { route: `/.well-known/${name}${suffix}`, handler: oauthMetadataHandler, lazy: true },
-    ]),
-  ],
 
   hooks: {
     "nitro:config": function (config) {

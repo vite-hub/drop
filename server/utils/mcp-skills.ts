@@ -7,55 +7,28 @@ import {
   requireParamString,
 } from "h3-mcp"
 import { defineMcpResource } from "nitro-mcp-toolkit"
-import { digest, enabledSkills, findEnabledSkill, type Skill } from "./skills"
+import { skillsMcp } from "vite-hub/skills"
+import { enabledSkills } from "./skills"
 
 /**
- * The MCP Skills extension (SEP-2640, `io.modelcontextprotocol/skills`): `skills/list` and `skills/get` describe
- * each enabled skill (frontmatter plus every file with its digest), and the files themselves are resources
- * under `skill://<name>/<path>`, read with `resources/read`. h3-mcp has no skills support, so this is an
- * extension plugin; it only exists on the 2026-07-28 revision, as extensions do.
- *
- * Admins can switch a skill off, so nothing here is static: every call reads the enabled set, and a disabled
- * skill is missing from lists and unreadable. The cache hint matches how long other isolates may keep serving
- * the old set (see `disabledSkills`).
+ * The MCP Skills extension (SEP-2640, `io.modelcontextprotocol/skills`) on h3-mcp, which has no skills support: an
+ * extension plugin for `skills/list` and `skills/get`, and `skill://` resources for the files. `skillsMcp` reads the
+ * enabled set on every call, so a skill an admin switched off is missing from lists and unreadable.
  */
-const EXTENSION = "io.modelcontextprotocol/skills"
-const CACHE = { ttlMs: 60_000, cacheScope: "public" } as const
-
-const uriOf = (skill: Skill, path: string) => `skill://${skill.name}/${path}`
-
-async function entry(skill: Skill) {
-  return {
-    uri: uriOf(skill, "SKILL.md"),
-    frontmatter: skill.frontmatter,
-    resources: await Promise.all(
-      skill.files.map(async (file) => ({
-        uri: uriOf(skill, file.path),
-        digest: await digest(file.bytes),
-        size: file.bytes.byteLength,
-      })),
-    ),
-  }
-}
+const skills = skillsMcp(enabledSkills)
 
 export function mcpSkills(): ExtensionPlugin {
   return {
-    id: EXTENSION,
+    id: skills.extension,
     settings: () => ({ directoryRead: false }),
     methods: (ctx) => ({
-      "skills/list": (req, event) =>
-        mcpMethod(ctx, req, event, async () => ({
-          resultType: "complete",
-          skills: await Promise.all((await enabledSkills()).map(entry)),
-          ...CACHE,
-        })),
+      "skills/list": (req, event) => mcpMethod(ctx, req, event, () => skills.list()),
       "skills/get": (req, event) =>
         mcpMethod(ctx, req, event, async () => {
           const uri = requireParamString(parseParams(req.params), "uri")
-          const name = uri.match(/^skill:\/\/([^/]+)(?:\/SKILL\.md)?$/)?.[1]
-          const skill = name && (await findEnabledSkill(name))
-          if (!skill) throw invalidParamsError(`No skill at ${uri}.`)
-          return { resultType: "complete", skill: await entry(skill), ...CACHE }
+          const [error, result] = await skills.get(uri)
+          if (error) throw invalidParamsError(error.why)
+          return result
         }),
     }),
   }
@@ -63,57 +36,24 @@ export function mcpSkills(): ExtensionPlugin {
 
 // `-32602` is what the 2026-07-28 revision answers for a resource that doesn't exist (clients still accept the older
 // `-32002`); a disabled skill's files read the same way.
-async function read(name: string, path: string) {
-  const file = (await findEnabledSkill(name))?.files.find((item) => item.path === path)
-  if (!file)
-    throw new McpJsonRpcError(-32602, `No skill file at skill://${name}/${path}.`, {
-      status: 404,
-      data: { uri: `skill://${name}/${path}` },
-    })
-  return { contents: [{ uri: `skill://${name}/${path}`, mimeType: file.mimeType, text: file.text }] }
+async function read(uri: string) {
+  const [error, result] = await skills.read(uri)
+  if (error) throw new McpJsonRpcError(-32602, error.why, { status: 404, data: { uri } })
+  return result
 }
 
 /**
- * Skill files as `skill://` resources. URI template variables can't span a `/`, so one template matches
- * top-level files and others match the bundled reference folders; the first lists every enabled file.
+ * Skill files as `skill://` resources. URI template variables can't span a `/`, so one template matches top-level
+ * files and others match the folders below them; the first lists every enabled file.
  */
-export const skillResources = [
+export const skillResources = [1, 2, 3, 4].map((depth) =>
   defineMcpResource({
-    name: "skill-file",
+    name: depth === 1 ? "skill-file" : `skill-file-${depth}`,
     title: "Skill file",
-    description: "A file of one of Drop's enabled Agent Skills.",
-    uriTemplate: "skill://{name}/{file}",
-    list: async () =>
-      (await enabledSkills()).flatMap((skill) =>
-        skill.files.map((file) => ({
-          uri: uriOf(skill, file.path),
-          name: `${skill.name}/${file.path}`,
-          title: file.path === "SKILL.md" ? `${skill.name} skill` : `${skill.name}: ${file.path}`,
-          ...(file.path === "SKILL.md" ? { description: skill.description } : {}),
-          mimeType: file.mimeType,
-          size: file.bytes.byteLength,
-        })),
-      ),
-    handler: (_uri, { name, file }) => read(name!, file!),
+    description:
+      "A file of one of Drop's enabled Agent Skills, at the top of the skill or in a folder such as references/.",
+    uriTemplate: `skill://{name}/${Array.from({ length: depth }, (_, index) => `{p${index}}`).join("/")}`,
+    ...(depth === 1 ? { list: () => skills.resources() } : {}),
+    handler: (uri) => read(String(uri)),
   }),
-  defineMcpResource({
-    name: "skill-reference",
-    title: "Skill reference",
-    description: "A file in a folder of one of Drop's enabled Agent Skills, such as references/ or assets/.",
-    uriTemplate: "skill://{name}/{dir}/{file}",
-    handler: (_uri, { name, dir, file }) => read(name!, `${dir}/${file}`),
-  }),
-  ...[2, 3].map((depth) =>
-    defineMcpResource({
-      name: `skill-reference-${depth}`,
-      title: "Bundled skill reference",
-      description: "A file in a bundled upstream skill's reference tree.",
-      uriTemplate: `skill://{name}/${Array.from({ length: depth }, (_, index) => `{dir${index}}`).join("/")}/{file}`,
-      handler: (_uri, params) =>
-        read(
-          params.name!,
-          [...Array.from({ length: depth }, (_, index) => params[`dir${index}`]), params.file].join("/"),
-        ),
-    }),
-  ),
-]
+)

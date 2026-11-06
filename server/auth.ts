@@ -1,16 +1,16 @@
-import { oauthProvider } from "@better-auth/oauth-provider"
 import { stripe } from "@better-auth/stripe"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { github } from "better-auth/social-providers"
-import { admin, jwt, organization as teamsPlugin } from "better-auth/plugins"
+import { admin, organization as teamsPlugin } from "better-auth/plugins"
 import { eq } from "drizzle-orm"
 import { Stripe } from "stripe"
+import { useRuntimeConfig } from "nitro/runtime-config"
 import * as v from "valibot"
 import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
+import { mcpOAuth } from "vite-hub/auth/mcp"
 import { db, schema } from "vite-hub/database/drizzle"
 import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
-import { clientRegistrationLimits } from "./utils/oauth-clients"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
@@ -71,6 +71,7 @@ export default defineAuth(({ env, requestOrigin }) => {
   const organization = env.drop.githubOrg.trim()
   const password = import.meta.dev === true || env.drop.testSignin
   const quotas = env.drop.quotas.enabled
+  const { clientIpHeader } = useRuntimeConfig()
   const githubOptions = {
     clientId: proxied ? "" : env.auth.github.clientId.unseal(),
     clientSecret: proxied ? "" : env.auth.github.clientSecret.unseal(),
@@ -83,12 +84,21 @@ export default defineAuth(({ env, requestOrigin }) => {
     // Default retention: 90 days / 100,000 events. ViteHub strips IPs and secrets and isolates write failures.
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
+    // Better Auth's limits: 5 client registrations a minute per IP, 3 sign-in attempts in 10 seconds, and more. It turns
+    // them on only when NODE_ENV is production, which a Worker doesn't set, so they're on here outside `nuxt dev`. Each
+    // request builds its own Auth (`requestOrigin`), so the default memory store would start every counter at zero:
+    // they count in the database (rate_limit).
+    rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
     route: false,
-    // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
-    // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
-    advanced: requestOrigin.startsWith("https://")
-      ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
-      : {},
+    advanced: {
+      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For.
+      ipAddress: { ipAddressHeaders: [clientIpHeader] },
+      // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
+      // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
+      ...(requestOrigin.startsWith("https://")
+        ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
+        : {}),
+    },
     disabledPaths: [
       "/token",
       "/admin/set-role",
@@ -132,7 +142,6 @@ export default defineAuth(({ env, requestOrigin }) => {
       actions: { impersonate: { editable: false, reason: "Drop does not allow signing in as another person." } },
       access: authAccessLines({ members: Boolean(env.drop.members.unseal().trim()), organization, proxied, password }),
     },
-    hooks: { before: clientRegistrationLimits },
     databaseHooks: {
       account: {
         create: {
@@ -182,7 +191,6 @@ export default defineAuth(({ env, requestOrigin }) => {
     plugins: [
       proxyAuth(),
       admin({ ac, roles, defaultRole: "member" }),
-      jwt(),
       ...(teams ? [teamsPlugin(teamOptions)] : []),
       ...(teamBilling
         ? [
@@ -200,19 +208,15 @@ export default defineAuth(({ env, requestOrigin }) => {
             }),
           ]
         : []),
-      oauthProvider({
+      ...mcpOAuth({
+        resource: `${requestOrigin}/mcp`,
         loginPage: "/oauth",
-        consentPage: "/oauth",
-        // The browser approval can involve a GitHub sign-in and a separate executor redirect.
-        // Keep the signed handoff alive long enough for that round trip to finish.
-        codeExpiresIn: 30 * 60,
-        scopes: ["openid", "profile", "email", "offline_access"],
-        resources: [`${requestOrigin}/mcp`],
-        enforcePerClientResources: false,
-        allowDynamicClientRegistration: true,
-        allowUnauthenticatedClientRegistration: true,
-        // MCP clients register loopback or private-use redirects without `application_type`; register them as native.
-        clientRegistrationDefaultApplicationType: "infer",
+        provider: {
+          // The browser approval can involve a GitHub sign-in and a separate executor redirect.
+          // Keep the signed handoff alive long enough for that round trip to finish.
+          codeExpiresIn: 30 * 60,
+          enforcePerClientResources: false,
+        },
       }),
     ],
   }
