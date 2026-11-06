@@ -67,6 +67,9 @@ patchedDependencies:
   # package chunk and everything it imports. That was about half the code of a cold /drops request.
   # Preserve registered virtual handler ids: resolving ViteHub's MCP discovery middleware as a file breaks the build.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
+  # A comment box with text shakes on Esc, and a second Esc discards the text and closes it, instead of shaking again
+  # forever. Remove when Drop moves to a ViteHub build with vite-hub/vitehub console-drop-comments.
+  '@vite-hub/ui@0.0.0-preview-03e8d1b': patches/@vite-hub__ui@0.0.0-preview-03e8d1b.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
