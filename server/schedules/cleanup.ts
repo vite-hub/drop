@@ -12,7 +12,11 @@ export default defineSchedule({
       () => cleanupCodeImages(scheduledAt),
       async () => (await import("../utils/drops")).deleteExpiredDrops(scheduledAt),
       async () => (await import("../utils/share")).closePublicLinks(scheduledAt),
-      async () => (await import("../utils/oauth-cleanup")).cleanupUnusedOAuthClients(scheduledAt),
+      // MCP clients that registered over a day ago and never signed anyone in.
+      async () => {
+        const [error] = await (await import("vite-hub/auth/mcp")).deleteUnusedMcpClients()
+        if (error) throw error
+      },
       // Who viewed a drop is kept for the day only; the counts stay.
       async () => (await import("../utils/views")).forgetViewers(scheduledAt),
       // Text docs published before search read their words, a batch an hour.

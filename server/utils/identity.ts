@@ -1,16 +1,15 @@
 import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
-import { verifyJwsAccessToken } from "better-auth/oauth2"
 import { useLogger } from "evlog/nitro/v3"
+import { verifyMcpRequest } from "vite-hub/auth/mcp"
 import { getAuthForRequest } from "vite-hub/auth/server"
 import { db } from "vite-hub/database/drizzle"
-import { oauthClient, user as users } from "../databases/config"
+import { user as users } from "../databases/config"
 import { isMember } from "./members"
 import { type TeamRole, teamsOf } from "./teams"
 import { useServerEnv } from "#vitehub/env/server"
 import { type Role, roleFor } from "#shared/roles"
 import type { ActorKind } from "#shared/types"
-import { textValue } from "#shared/utils/text"
 
 // What Drop's middleware leaves on the event for later handlers. Declared here, beside the identity lookup that reads
 // it, because the app and shared/ typecheck this file through their imports, outside the server project.
@@ -98,8 +97,7 @@ async function verify(event: H3Event): Promise<Identity | null> {
 }
 
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {
-  const token = bearerFrom(event.req.headers)
-  if (token) return fromAccessToken(event, token)
+  if (bearerFrom(event.req.headers)) return fromAccessToken(event)
   const session = await authFor(event)
     .api.getSession({ headers: event.req.headers })
     .catch(() => null)
@@ -115,34 +113,26 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   }
 }
 
-// Drop's own signing keys, read in-process instead of over HTTP (a Worker fetching its own hostname is a loop). Better
-// Auth keeps them for five minutes per isolate and reloads them for a token signed by a newer key.
-const signingKeys = {}
-
-/** An MCP client's OAuth access token: a JWT this Drop issued, for this Drop's `/mcp`. */
-async function fromAccessToken(event: H3Event, token: string): Promise<Identity | null> {
-  const origin = event.url.origin
-  const payload = await verifyJwsAccessToken(token, {
-    jwksFetch: () => authFor(event).api.getJwks(),
-    jwksCacheKey: signingKeys,
-    verifyOptions: { issuer: `${origin}/api/auth`, audience: `${origin}/mcp` },
-  }).catch(() => null)
-  if (!payload?.sub) return null
-  const [user] = await db.select().from(users).where(eq(users.id, payload.sub)).limit(1)
-  if (!user || user.banned) return null
-  // Better Auth copies `azp` into `client_id`.
-  const clientId = textValue(payload.client_id) ?? null
-  const [client] = clientId
-    ? await db.select({ name: oauthClient.name }).from(oauthClient).where(eq(oauthClient.clientId, clientId)).limit(1)
-    : []
+/**
+ * An MCP client's OAuth access token: a JWT this Drop issued for this Drop's `/mcp`. `verifyMcpRequest` checks it with
+ * the signing keys read in-process (a Worker fetching its own hostname is a loop), and reads the person and the client
+ * again, so a banned person or a deleted client loses access at once.
+ */
+async function fromAccessToken(event: H3Event): Promise<Identity | null> {
+  // Only the URL and the Authorization header are read; a Request of its own leaves the body to the MCP handler.
+  const request = new Request(event.url, { headers: event.req.headers })
+  const [error, caller] = await verifyMcpRequest(request, { resource: `${event.url.origin}/mcp` })
+  if (error) return null
+  const { user } = caller
+  const email = user.email ?? ""
   return {
     userId: user.id,
-    name: user.name,
-    email: user.email,
+    name: user.name ?? "",
+    email,
     image: user.image ?? null,
-    role: roleOf(user),
+    role: roleOf({ email, emailVerified: user.emailVerified === true }),
     actorKind: "agent",
-    actorName: client?.name || "MCP client",
+    actorName: caller.clientName ?? "MCP client",
   }
 }
 

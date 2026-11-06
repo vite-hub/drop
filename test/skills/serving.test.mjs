@@ -6,7 +6,7 @@ import { H3Event, toResponse } from "h3"
 import { parseTarGzip } from "nanotar"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { migrate } from "../cost/harness.mjs"
-const { default: discovery } = await import("../../server/handlers/skills.ts")
+const { default: discovery } = await import("../../server/middleware/0.3.well-known.ts")
 const { mcpSkills, skillResources } = await import("../../server/utils/mcp-skills.ts")
 
 migrate()
@@ -171,7 +171,7 @@ test("admins can toggle bundled skills while their source links point upstream",
         !(await (await get("/.well-known/skills/index.json")).json()).skills.some((item) => item.name === skill.name),
       )
       assert.equal((await mcp("skills/get", { uri: `skill://${skill.name}/SKILL.md` })).error.code, -32602)
-      await assert.rejects(get(`/.well-known/skills/${skill.name}/SKILL.md`))
+      assert.equal((await get(`/.well-known/skills/${skill.name}/SKILL.md`)).status, 404)
       assert.equal((await catalog(event())).find((item) => item.name === skill.name).enabled, false)
       await setSkillEnabled(skill.name, true, "admin")
     }
