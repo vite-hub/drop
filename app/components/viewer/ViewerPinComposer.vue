@@ -3,9 +3,8 @@
 // and a send button. No avatar and no field inside a card. Enter sends, Shift+Enter breaks the line, Escape drops it.
 // The words and pictures are the review draft's, so they follow the reader to other text they select. A picture can
 // still come in: the one the frame takes of a tooltip under an area, or one pasted into the line; each shows above it.
-// On selected text, Suggest trades it for the full composer, which has the field for the new words.
-defineProps<{ canSuggest?: boolean }>()
-const emit = defineEmits<{ submit: [body: string, files: File[]]; cancel: []; suggest: [] }>()
+// Comment or Suggest is picked before it opens (the selection bar, C or E); a suggestion gets the full composer.
+const emit = defineEmits<{ submit: [body: string, files: File[]]; cancel: [] }>()
 const draft = injectReviewDraft()!
 const field = useTemplateRef<HTMLTextAreaElement>("field")
 const error = ref<string>()
@@ -87,18 +86,6 @@ defineExpose({
         @keydown="key"
         @paste="paste"
       />
-      <UTooltip v-if="canSuggest" text="Suggest new words" :content="{ side: 'top', sideOffset: 8 }">
-        <UButton
-          aria-label="Suggest new words"
-          class="shrink-0 rounded-full"
-          color="neutral"
-          icon="i-mingcute-edit-2-line"
-          size="sm"
-          type="button"
-          variant="ghost"
-          @click="emit('suggest')"
-        />
-      </UTooltip>
       <UButton
         aria-label="Send comment"
         class="shrink-0 rounded-full"

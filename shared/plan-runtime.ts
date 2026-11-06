@@ -796,14 +796,14 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The selection's range too: the page loses the selection once focus moves to Drop's composer, and "hold-selection"
   // keeps its text marked (drop-draft) until the comment is sent or dropped.
   let lastQuote = "", lastRange = null;
-  function reportSelection(settled) {
+  function reportSelection() {
     const sel = getSelection();
     const text = sel && sel.rangeCount ? sel.toString().trim().replace(/\s+/g, " ") : "";
     if (!text || host.contains(sel.anchorNode)) { if (lastQuote) post({ type: "selection", clear: true }); lastQuote = ""; return; }
     const range = sel.getRangeAt(0), r = range.getBoundingClientRect(), block = blockOf(range.commonAncestorContainer);
     lastQuote = text.slice(0, 500);
     lastRange = range.cloneRange();
-    post({ type: "selection", quote: lastQuote, selector: pathOf(block), label: labelOf(block), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom }, ...(settled === true ? { settled: true } : {}) });
+    post({ type: "selection", quote: lastQuote, selector: pathOf(block), label: labelOf(block), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }
   let selectionTimer = 0;
   // Pin style: a click on the page away from its pins puts away what's open beside a pin (Drop keeps a draft with words).
@@ -813,8 +813,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (sel && !sel.isCollapsed) return;
     post({ type: "page-click" });
   });
-  // A mouse let go: the selection is done, and the Pin style opens its composer on it at once (settled).
-  document.addEventListener("mouseup", (e) => setTimeout(() => reportSelection(e.button === 0), 0));
+  // A mouse let go: report the selection now rather than after selectionchange's wait.
+  document.addEventListener("mouseup", () => setTimeout(reportSelection, 0));
   document.addEventListener("selectionchange", () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(reportSelection, 250); });
   document.addEventListener("keyup", (e) => { if (e.shiftKey || e.key === "Shift") reportSelection(); });
   document.addEventListener("scroll", () => { if (lastQuote) reportSelection(); placeDraft(); }, { passive: true });

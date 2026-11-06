@@ -321,13 +321,13 @@ watch(
 // where its card lands once sent: in the margin beside a doc's text (the frame keeps that place, draft-place), else
 // under what it points at. Page-wide comments, threads, sites, and the lightbox's keep the dock.
 // The Pin style (useCommentStyle) on a Markdown doc's text: a pin in the gutter, and beside it, at any width, a small
-// composer for a new comment or the thread of the pin clicked. Selecting text with a mouse opens the composer at once.
+// composer for a new comment or the thread of the pin clicked. Selected text gets the selection bar either way, so the
+// reader picks Comment or Suggest before writing.
 const commentStyle = useCommentStyle()
 const commentStyles: { value: CommentStyle; label: string }[] = [
   { value: "card", label: "Cards beside the text" },
   { value: "pin", label: "Pins beside the text" },
 ]
-const coarse = useMediaQuery("(pointer: coarse)")
 const pinStyle = computed(() => commentStyle.value === "pin" && drop.value.kind === "markdown")
 const pinOpen = computed(() => commentsOpen.value && !editing.value && !trashed.value && !lightbox.value)
 const pinDraft = computed(
@@ -341,9 +341,6 @@ const pinThread = computed(
     threadComment.value?.kind === "text" &&
     threadPlace.value?.id === popover.value.id,
 )
-watch(selection, (value) => {
-  if (value?.settled && pinStyle.value && !coarse.value) commentOnSelection()
-})
 // Escape in the compact composer drops the draft, words and pictures.
 function dropPinDraft() {
   reviewDraft.body.value = ""
@@ -390,14 +387,6 @@ const floatShown = computed(
 // The floating card is one small surface, the line and its send button (ViewerPinComposer); a suggestion keeps the full
 // composer for the words that replace the quote.
 const compactFloat = computed(() => popover.value?.type === "new" && popover.value.pending.suggestion === undefined)
-// Selected text can take a suggestion from the small composer too. It starts as the quote, as E on the page does.
-const canSuggestDraft = computed(
-  () => popover.value?.type === "new" && popover.value.pending.kind === "text" && Boolean(popover.value.pending.quote),
-)
-function suggestOnDraft() {
-  if (popover.value?.type === "new" && popover.value.pending.quote)
-    popover.value.pending.suggestion = popover.value.pending.quote
-}
 const FLOAT_WIDTH = 288
 const floatStyle = computed(() => {
   const place = draftPlace.value
@@ -1438,14 +1427,7 @@ watch(
       "
       :style="floatStyle"
     >
-      <ViewerPinComposer
-        v-if="compactFloat"
-        ref="popoverRef"
-        :can-suggest="canSuggestDraft"
-        @cancel="dropPinDraft"
-        @submit="submit"
-        @suggest="suggestOnDraft"
-      />
+      <ViewerPinComposer v-if="compactFloat" ref="popoverRef" @cancel="dropPinDraft" @submit="submit" />
       <ReuseComposer v-else />
     </section>
     <Transition
@@ -1464,19 +1446,12 @@ watch(
         :style="pinBubbleStyle"
         @keydown.esc="popover = null"
       >
-        <ViewerPinComposer
-          v-if="pinDraft && compactFloat"
-          ref="popoverRef"
-          :can-suggest="canSuggestDraft"
-          @cancel="dropPinDraft"
-          @submit="submit"
-          @suggest="suggestOnDraft"
-        />
+        <ViewerPinComposer v-if="pinDraft && compactFloat" ref="popoverRef" @cancel="dropPinDraft" @submit="submit" />
         <ReuseComposer v-else />
       </section>
     </Transition>
     <div
-      v-if="selection && (!commentsOpen || !popover) && !(pinStyle && !coarse)"
+      v-if="selection && (!commentsOpen || !popover)"
       class="fixed z-30 -translate-x-1/2 -translate-y-full"
       :style="{
         left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
