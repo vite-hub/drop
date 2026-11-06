@@ -1,0 +1,28 @@
+diff --git a/dist/mcp.js b/dist/mcp.js
+index f9ee6ea4689bad0ff05a6cf8c9fbd4b172a27fa1..231d2a4d46ce44f514d222722d630ee7bbddd192 100644
+--- a/dist/mcp.js
++++ b/dist/mcp.js
+@@ -257,7 +257,9 @@ async function verifyMcpRequest(request, options = {}) {
+ 		}]
+ 	}) : void 0;
+ 	if (!isRecord(client) || client.disabled) return [mcpErrors.AUTH_MCP_TOKEN_INVALID({ reason: "the OAuth client does not exist or is disabled." }), void 0];
+-	if (typeof payload.sid === "string") {
++	const scope = payload.scope;
++	const scopes = typeof scope === "string" ? scope.split(/\s+/).filter(Boolean) : Array.isArray(scope) ? scope.filter((entry) => typeof entry === "string") : [];
++	if (typeof payload.sid === "string" && !scopes.includes("offline_access")) {
+ 		const session = await context.adapter.findOne({
+ 			model: "session",
+ 			where: [{
+@@ -267,11 +269,10 @@ async function verifyMcpRequest(request, options = {}) {
+ 		});
+ 		if (!isRecord(session) || !(session.expiresAt instanceof Date) || session.expiresAt.getTime() <= Date.now()) return [mcpErrors.AUTH_MCP_TOKEN_INVALID({ reason: "the session does not exist or has expired." }), void 0];
+ 	}
+-	const scope = payload.scope;
+ 	return [void 0, {
+ 		clientId,
+ 		clientName: typeof client.name === "string" && client.name ? client.name : void 0,
+-		scopes: typeof scope === "string" ? scope.split(/\s+/).filter(Boolean) : Array.isArray(scope) ? scope.filter((entry) => typeof entry === "string") : [],
++		scopes,
+ 		user
+ 	}];
+ }
