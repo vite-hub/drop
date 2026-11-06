@@ -67,6 +67,10 @@ patchedDependencies:
   # package chunk and everything it imports. That was about half the code of a cold /drops request.
   # Preserve registered virtual handler ids: resolving ViteHub's MCP discovery middleware as a file breaks the build.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
+  # A refresh copied the approving browser session's id into the new access token even after that session expired,
+  # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
+  # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
+  "@better-auth/oauth-provider@1.7.15": patches/@better-auth__oauth-provider@1.7.15.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:

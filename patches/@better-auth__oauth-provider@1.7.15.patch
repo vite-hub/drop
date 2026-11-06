@@ -1,0 +1,31 @@
+diff --git a/dist/authorize-Cmcf5O5Y.mjs b/dist/authorize-Cmcf5O5Y.mjs
+index 893d6f599208c34e4e614723d89290d9a4f3b57c..ac98073fcfac1d465551fa279d8829372a214ec4 100644
+--- a/dist/authorize-Cmcf5O5Y.mjs
++++ b/dist/authorize-Cmcf5O5Y.mjs
+@@ -2357,6 +2357,17 @@ async function handleRefreshTokenGrant(ctx, opts) {
+ 		error: "invalid_request"
+ 	});
+ 	const authTime = refreshToken.authTime != null ? normalizeTimestampValue(refreshToken.authTime) : void 0;
++	let sessionId = refreshToken.sessionId ?? void 0;
++	if (sessionId) {
++		const session = await ctx.context.adapter.findOne({
++			model: "session",
++			where: [{
++				field: "id",
++				value: sessionId
++			}]
++		});
++		if (!session || session.expiresAt < /* @__PURE__ */ new Date()) sessionId = void 0;
++	}
+ 	return createUserTokens(ctx, opts, {
+ 		client,
+ 		scopes: requestedScopes ?? scopes,
+@@ -2364,7 +2375,7 @@ async function handleRefreshTokenGrant(ctx, opts) {
+ 		grantType: "refresh_token",
+ 		referenceId: refreshToken.referenceId,
+ 		authorizationCodeId: refreshToken.authorizationCodeId,
+-		sessionId: refreshToken.sessionId,
++		sessionId,
+ 		refreshToken,
+ 		resources: resources ?? refreshToken.resources,
+ 		authTime,
