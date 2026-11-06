@@ -91,9 +91,8 @@ export default defineAuth(({ env, requestOrigin }) => {
     rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
     route: false,
     advanced: {
-      // The limits count per client IP, which Better Auth reads from X-Forwarded-For. A Worker gets it in
-      // CF-Connecting-IP instead, which a client can't set (nuxt.config.ts `runtimeConfig.clientIpHeader`).
-      ...(clientIpHeader ? { ipAddress: { ipAddressHeaders: [clientIpHeader] } } : {}),
+      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For.
+      ipAddress: { ipAddressHeaders: [clientIpHeader] },
       // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
       // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
       ...(requestOrigin.startsWith("https://")

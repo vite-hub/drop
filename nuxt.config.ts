@@ -3,6 +3,7 @@ import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import type { NuxtSecurityRouteRules } from "nuxt-security"
 import { env } from "vite-hub/env"
+import { CLIENT_IP_HEADERS } from "./shared/client-ip.ts"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
@@ -170,11 +171,10 @@ export default defineNuxtConfig({
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
-  // `clientIpHeader`: the header with the client's IP, for Better Auth's rate limits (server/auth.ts). Empty reads
-  // X-Forwarded-For.
+  // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
     seoIndex: false,
-    clientIpHeader: host === "cloudflare" ? "cf-connecting-ip" : "",
+    clientIpHeader: CLIENT_IP_HEADERS[host],
     public: { realtime: liveEditing },
   },
 
