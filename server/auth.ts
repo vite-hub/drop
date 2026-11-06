@@ -21,11 +21,11 @@ import {
   billingConfig,
   checkoutParams,
   leaveTeams,
-  memberLimit,
+  teamOptions,
   teamPlans,
-  teamSeats,
   teamsEnabled,
 } from "./utils/teams"
+import { teamLimitAdapter } from "./utils/team-limit-adapter"
 import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
@@ -79,7 +79,7 @@ export default defineAuth(({ env, requestOrigin }) => {
   return {
     appName: "Drop",
     baseURL: requestOrigin,
-    database: drizzleAdapter(db, { provider: "sqlite", schema }),
+    database: teamLimitAdapter(drizzleAdapter(db, { provider: "sqlite", schema })),
     // Default retention: 90 days / 100,000 events. ViteHub strips IPs and secrets and isolates write failures.
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
@@ -183,19 +183,7 @@ export default defineAuth(({ env, requestOrigin }) => {
       proxyAuth(),
       admin({ ac, roles, defaultRole: "member" }),
       jwt(),
-      ...(teams
-        ? [
-            teamsPlugin({
-              creatorRole: "owner",
-              invitationExpiresIn: 7 * 24 * 60 * 60,
-              cancelPendingInvitationsOnReInvite: true,
-              membershipLimit: (_user: unknown, team: { id: string }) => memberLimit(team.id),
-              // Pending invitations count as seats, so a free team can't invite past its free members.
-              invitationLimit: async ({ organization: team }: { organization: { id: string } }) =>
-                Math.max(0, (await memberLimit(team.id)) - (await teamSeats(team.id)).members),
-            }),
-          ]
-        : []),
+      ...(teams ? [teamsPlugin(teamOptions)] : []),
       ...(teamBilling
         ? [
             stripe({
