@@ -80,7 +80,7 @@ defineExpose({
         ref="field"
         v-model="draft.body.value"
         aria-label="Comment"
-        class="min-h-7 flex-1 resize-none bg-transparent py-0.5 text-base/6 text-highlighted outline-none placeholder:text-dimmed sm:text-sm/6"
+        class="min-h-7 min-w-0 flex-1 resize-none bg-transparent py-0.5 text-base/6 text-highlighted outline-none placeholder:text-dimmed sm:text-sm/6"
         placeholder="Comment, ↵ to send"
         :readonly="busy"
         rows="1"
