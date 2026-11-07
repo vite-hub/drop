@@ -69,7 +69,7 @@ patchedDependencies:
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
   # An MCP grant with offline_access outlives the browser session that approved it. Better Auth's refresh grant copies
   # that session's id into every new token, so verifyMcpRequest rejected all of them once it expired (vite-hub/vitehub#3562).
-  '@vite-hub/auth@0.0.0-preview-03e8d1b': patches/@vite-hub__auth@0.0.0-preview-03e8d1b.patch
+  "@vite-hub/auth@0.0.0-preview-03e8d1b": patches/@vite-hub__auth@0.0.0-preview-03e8d1b.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
