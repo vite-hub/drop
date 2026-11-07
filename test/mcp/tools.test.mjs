@@ -1068,6 +1068,50 @@ test("a Markdown doc lists its links in its front matter, also as a .md file sen
   }
 })
 
+test.each(["address", "object"])("front matter resource URLs keep the 2,000-character limit (%s)", async (form) => {
+  const url = "https://example.com/".padEnd(2000, "a")
+  const markdown = (link) => `---\nresources:\n  - ${form === "object" ? "url: " : ""}${link}\n---\n\n# Evidence\n`
+  const bad = await call(publish, { markdown: markdown(`${url}a`), note: "v1", lifetime: "review" })
+  assert.equal(bad.isError, true, "an inline URL over the limit is refused")
+  assert.match(bad.message, /as addresses, or as url and title pairs/)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 0, "nothing is published")
+
+  const inline = (await call(publish, { markdown: markdown(url), note: "v1", lifetime: "review" })).structuredContent
+  assert.deepEqual((await call(readDrop, { id: inline.id })).structuredContent.resources, [{ url }])
+
+  state.authSecret = "test-secret"
+  try {
+    const agent = state.who
+    for (const link of [`${url}a`, url]) {
+      state.who = agent
+      const ticket = (await call(publish, { file: { name: "evidence.md" }, note: "v1", lifetime: "review" }))
+        .structuredContent
+      state.who = null
+      const body = Buffer.from(markdown(link))
+      const event = new H3Event(
+        new Request(ticket.uploadUrl, { method: "PUT", body, headers: { "content-length": String(body.length) } }),
+      )
+      event.context.log = { set() {}, error() {}, warn() {} }
+      event.context.params = { ticket: new URL(ticket.uploadUrl).pathname.split("/").pop() }
+      if (link.length > 2000) {
+        await assert.rejects(
+          uploadPut(event),
+          (error) => error.status === 400 && /as addresses, or as url and title pairs/.test(error.message),
+        )
+        assert.equal(sql.prepare("SELECT count(*) AS n FROM drops").get().n, 1, "the upload publishes nothing")
+      } else {
+        const uploaded = await uploadPut(event)
+        assert.deepEqual(
+          JSON.parse(sql.prepare("SELECT resources FROM drops WHERE id = ?").get(uploaded.id).resources),
+          [{ url }],
+        )
+      }
+    }
+  } finally {
+    state.authSecret = undefined
+  }
+})
+
 test("a file without base64 gets an upload URL; curl -T creates the drop once, and a changed ticket does nothing", async () => {
   state.authSecret = "test-secret"
   try {

@@ -34,6 +34,7 @@ const FrontmatterResources = v.pipe(
     v.union([
       v.pipe(
         v.string(),
+        v.maxLength(MAX_RESOURCE_URL),
         v.transform((url) => ({ url })),
       ),
       ResourceItem,
