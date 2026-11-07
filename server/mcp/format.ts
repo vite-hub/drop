@@ -3,6 +3,7 @@ import { suggestionLine } from "#shared/suggestion"
 import type { DropComment, DropResource, DropSummary, QuizAnswer, ViewerKind } from "#shared/types"
 import type { QuizTally, StoredAnswer } from "../utils/answers"
 import { dropPageUrl, type DropRow } from "../utils/drops"
+import { writtenBy } from "#shared/agents"
 
 /** How every tool describes the share input: one state, the same names the pages use. */
 export const SHARE_INPUT =
@@ -84,7 +85,7 @@ export function commentTarget(
 
 /** `version` is the one being read: a comment written on an earlier version says which. */
 export const commentLine = (comment: DropComment, version: number, origin: string) =>
-  `${comment.n}. ${commentTarget(comment)}${suggestionLine(comment.suggestion)}\n   ${comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")} (${comment.authorName}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
+  `${comment.n}. ${commentTarget(comment)}${suggestionLine(comment.suggestion)}\n   ${comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")} (${writtenBy(comment)}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
 
 /** The images sent with a comment or a reply, as full addresses an agent can fetch. */
 export const imageUrls = (item: Pick<DropComment, "attachments">, origin: string) =>
@@ -96,14 +97,14 @@ const imageLine = (item: Pick<DropComment, "attachments">, origin: string, inden
 /** A comment's thread under it, oldest first, one line per reply. */
 export const replyLines = (comment: Pick<DropComment, "replies">, origin: string) =>
   comment.replies
-    .map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body}${imageLine(reply, origin, "     ")}`)
+    .map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body}${imageLine(reply, origin, "     ")}`)
     .join("")
 
 /** The thread for structured output. */
 export const replyItems = (comment: Pick<DropComment, "replies">, origin: string) =>
   comment.replies.map((reply) => ({
     body: reply.body,
-    author: reply.authorName,
+    author: writtenBy(reply),
     at: new Date(reply.createdAt).toISOString(),
     images: imageUrls(reply, origin),
   }))

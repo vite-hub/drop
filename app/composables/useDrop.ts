@@ -57,7 +57,12 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   // Optimistic: the checkbox flips at once and rolls back if the server says no.
   async function resolveComment(commentId: string, resolved: boolean) {
     const before = comments.data.value
-    comments.data.value = before.map((comment) => (comment.id === commentId ? { ...comment, resolved } : comment))
+    // Resolving again marks the replies since the last time seen, so it counts from the newest one.
+    const resolvedAt = (comment: DropComment) =>
+      resolved ? Math.max(Date.now(), ...comment.replies.map((reply) => reply.createdAt)) : null
+    comments.data.value = before.map((comment) =>
+      comment.id === commentId ? { ...comment, resolved, resolvedAt: resolvedAt(comment) } : comment,
+    )
     try {
       await $fetch(`/api/comments/${commentId}`, { method: "PATCH", body: { resolved } })
     } catch (error) {
