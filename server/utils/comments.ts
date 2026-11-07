@@ -2,10 +2,18 @@ import { and, eq, type SQL, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { HTTPError } from "h3"
 import * as v from "valibot"
-import type { CommentAnchor, CommentMessage, CommentSubject, CommentThread, CommentUser } from "vite-hub/comments"
+import type {
+  CommentActor,
+  CommentAnchor,
+  CommentMessage,
+  CommentSubject,
+  CommentThread,
+  CommentUser,
+} from "vite-hub/comments"
+import { knownAgent } from "#shared/agents"
 import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database/drizzle"
-import type { CommentAttachment, CommentReply, DropComment } from "#shared/types"
+import type { CommentAgent, CommentAttachment, CommentReply, DropComment } from "#shared/types"
 import comments, { peopleByIds } from "../comments"
 import { commentCleanup, drops } from "../databases/config"
 import { attachmentsUnder, deleteImages, toAttachment } from "./comment-images"
@@ -138,6 +146,24 @@ export function authorOf(who: Identity | null, name: string): CommentUser {
   return { id: who.userId, name: shown, ...(who.image && who.image.length <= 2048 ? { image: who.image } : {}) }
 }
 
+/**
+ * The agent that writes for `who`, when they came through an MCP client: its comments show the agent, with the person
+ * beside it. Known clients get their short name ("Claude Code (drop)" is Claude); others keep the name they registered.
+ */
+export function actorOf(who: Identity | null): CommentActor | undefined {
+  if (who?.actorKind !== "agent") return undefined
+  const agent = knownAgent(who.actorName)
+  const name = agent?.label ?? (who.actorName.trim().slice(0, 80) || "Agent")
+  return { id: agent?.key ?? name.toLowerCase(), name }
+}
+
+/** What Drop's API says about the agent that wrote a message, with its logo when Drop knows the agent. */
+function agentOf(actor: CommentActor | undefined): CommentAgent | null {
+  if (!actor) return null
+  const name = actor.name ?? actor.id
+  return { name, image: knownAgent(actor.id)?.logo ?? knownAgent(name)?.logo ?? null }
+}
+
 const isMine = (author: CommentUser, who: Identity | null) => Boolean(who && author.id === who.userId)
 /** Whether `who` wrote the thread's first message, which lets them resolve or delete it. */
 export const wroteThread = (thread: CommentThread, who: Identity | null) => isMine(thread.author, who)
@@ -154,6 +180,7 @@ export const toReply = (message: CommentMessage, who: Identity | null, attachmen
   authorId: message.author.id,
   authorName: message.author.name ?? "Guest",
   authorImage: message.author.image ?? null,
+  agent: agentOf(message.actor),
   createdAt: message.createdAt,
   editedAt: message.editedAt ?? null,
   mentions: message.mentions,
@@ -197,8 +224,10 @@ export function toComment(
     authorId: thread.author.id,
     authorName: thread.author.name ?? "Guest",
     authorImage: thread.author.image ?? null,
+    agent: agentOf(first?.actor ?? thread.actor),
     mentions: first?.mentions ?? [],
     resolved: thread.status === "resolved",
+    resolvedAt: thread.resolvedAt ?? null,
     createdAt: thread.createdAt,
     editedAt: first?.editedAt ?? null,
     version: thread.version,
@@ -261,6 +290,7 @@ export async function addThread(
     fields: Omit<v.InferInput<typeof CommentMeta>, "dropId">
     body: string
     author: CommentUser
+    actor?: CommentActor
     mentions?: string[]
     attachments?: string[]
   },
@@ -274,6 +304,7 @@ export async function addThread(
     revision: row.version,
     body: input.body,
     author: input.author,
+    ...(input.actor ? { actor: input.actor } : {}),
     ...(input.mentions?.length ? { mentions: input.mentions } : {}),
     ...(input.attachments?.length ? { attachments: input.attachments } : {}),
   })
@@ -335,13 +366,14 @@ export async function replyTo(
   thread: CommentThread,
   author: CommentUser,
   body: string,
-  extra: { mentions?: string[]; attachments?: string[] } = {},
+  extra: { actor?: CommentActor; mentions?: string[]; attachments?: string[] } = {},
 ) {
   const [error, message] = await comments.reply(
     thread.id,
     {
       body,
       author,
+      ...(extra.actor ? { actor: extra.actor } : {}),
       ...(extra.mentions?.length ? { mentions: extra.mentions } : {}),
       ...(extra.attachments?.length ? { attachments: extra.attachments } : {}),
     },
@@ -353,7 +385,7 @@ export async function replyTo(
 
 /** A reply with words only, as an agent sends it. */
 export const addReply = async (thread: CommentThread, who: Identity, body: string) =>
-  toReply(await replyTo(thread, authorOf(who, who.name), body), who, new Map())
+  toReply(await replyTo(thread, authorOf(who, who.name), body, { actor: actorOf(who) }), who, new Map())
 
 /** Changes the words of a message, by its author. Mentions are the ones the new words keep. */
 export async function editMessage(message: CommentMessage, body: string, mentions: string[] = []) {

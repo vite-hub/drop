@@ -2,7 +2,7 @@ import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
 import { imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
-import { authorOf, findThread, replyTo, toReply } from "../../../utils/comments"
+import { actorOf, authorOf, findThread, replyTo, toReply } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -24,7 +24,7 @@ export default defineHandler(async (event) => {
     images.length ? await imageParent(drop) : null,
     images,
     author.name ?? "Guest",
-    (ids) => replyTo(thread, author, input.body, { mentions: input.mentions, attachments: ids }),
+    (ids) => replyTo(thread, author, input.body, { actor: actorOf(who), mentions: input.mentions, attachments: ids }),
     (added) => ({ commentId: thread.messages[0]!.id, replyId: added.id }),
   )
   return toReply(row, who, new Map(attachments.map((file) => [file.id, file])))

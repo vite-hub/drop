@@ -1,8 +1,8 @@
-diff --git a/dist/comment-panel-BN-guKU5.js b/dist/comment-panel-BN-guKU5.js
-index 001e8e61801b1451bb7b75c8623d231367f4de1a..08bcf84075c893016fd2657661cf0e979618e022 100644
---- a/dist/comment-panel-BN-guKU5.js
-+++ b/dist/comment-panel-BN-guKU5.js
-@@ -214,6 +214,9 @@ const CommentComposer = defineComponent({
+diff --git a/dist/comment-panel-DPB6kWYs.js b/dist/comment-panel-DPB6kWYs.js
+index ea946cee9606bd95191b5bc60a25dee29c2e48df..188b4469ec78266c53ddcb2c4f45ae0de9dcc6d7 100644
+--- a/dist/comment-panel-DPB6kWYs.js
++++ b/dist/comment-panel-DPB6kWYs.js
+@@ -237,6 +237,9 @@ const CommentComposer = defineComponent({
  		const menuId = useId();
  		const optionId = (index) => `${menuId}-option-${index}`;
  		let timer;
@@ -12,7 +12,7 @@ index 001e8e61801b1451bb7b75c8623d231367f4de1a..08bcf84075c893016fd2657661cf0e97
  		let lookup = 0;
  		let mentionCaret;
  		let dismissed;
-@@ -285,7 +288,10 @@ const CommentComposer = defineComponent({
+@@ -308,7 +311,10 @@ const CommentComposer = defineComponent({
  			timer = setTimeout(() => shaking.value = null, 450);
  			focus();
  		}
@@ -24,7 +24,7 @@ index 001e8e61801b1451bb7b75c8623d231367f4de1a..08bcf84075c893016fd2657661cf0e97
  		onMounted(() => {
  			root.value?.addEventListener(shakeEventName, onShake);
  			if (props.autofocus) nextTick(focus);
-@@ -417,8 +423,23 @@ const CommentComposer = defineComponent({
+@@ -440,8 +446,23 @@ const CommentComposer = defineComponent({
  				lookup++;
  				dismissed = open.start;
  				menu.value = null;
@@ -50,10 +50,10 @@ index 001e8e61801b1451bb7b75c8623d231367f4de1a..08bcf84075c893016fd2657661cf0e97
  		}
  		const hasFiles = (event) => attachmentsOn.value && (event.dataTransfer?.types.includes("Files") ?? false);
  		return () => h("div", {
-diff --git a/dist/comments-Bt_F5e6C.js b/dist/comments-Bt_F5e6C.js
-index 22bb083d5aef4ddb48c930df4ddad7c745352adb..f9abacd85ca60027477675ea926ee2443171676d 100644
---- a/dist/comments-Bt_F5e6C.js
-+++ b/dist/comments-Bt_F5e6C.js
+diff --git a/dist/comments-CVR6G06i.js b/dist/comments-CVR6G06i.js
+index b9915adf255f395594ec39d09f920246eb959089..c57071396c0cd1d9c797e70c8f4147bb5c9e1856 100644
+--- a/dist/comments-CVR6G06i.js
++++ b/dist/comments-CVR6G06i.js
 @@ -25,9 +25,9 @@ const dirtySelector = "[data-slot='comment-composer'][data-dirty='true']";
  function hasDirtyComposer(root = document) {
  	return root.querySelector(dirtySelector) !== null;
@@ -66,7 +66,7 @@ index 22bb083d5aef4ddb48c930df4ddad7c745352adb..f9abacd85ca60027477675ea926ee244
  	return dirty.length > 0;
  }
  const pathOf = (event) => event.composedPath().filter((node) => node instanceof Element);
-@@ -131,9 +131,9 @@ function useComments(options) {
+@@ -145,9 +145,9 @@ function useComments(options) {
  		if (!(next.size === previous.size && [...next].every(([key, position]) => samePosition(position, previous.get(key))))) positions.value = next;
  	}
  	const hasText = () => (draft.value?.body.trim().length ?? 0) > 0 || hasDirtyComposer(uiRoot());
@@ -78,7 +78,7 @@ index 22bb083d5aef4ddb48c930df4ddad7c745352adb..f9abacd85ca60027477675ea926ee244
  	};
  	function enter() {
  		active.value = true;
-@@ -165,8 +165,8 @@ function useComments(options) {
+@@ -179,8 +179,8 @@ function useComments(options) {
  		hoverId.value = null;
  		return true;
  	}
@@ -89,7 +89,7 @@ index 22bb083d5aef4ddb48c930df4ddad7c745352adb..f9abacd85ca60027477675ea926ee244
  		cancelDraft();
  		close();
  		active.value = false;
-@@ -287,7 +287,7 @@ function useComments(options) {
+@@ -301,7 +301,7 @@ function useComments(options) {
  		const origin = path[0];
  		if (event.key === "Escape") {
  			if (path.some((element) => element.matches("[data-slot='comment-composer']"))) return;

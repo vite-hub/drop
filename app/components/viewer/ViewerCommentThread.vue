@@ -175,6 +175,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
         :busy="busy"
         :error="error || problem"
         :guard="false"
+        layout="row"
         :placeholder="
           files.length || suggesting
             ? 'Add a note (optional)'

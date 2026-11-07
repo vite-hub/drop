@@ -1,5 +1,6 @@
 import type { DropComment } from "#shared/types"
 import { suggestionLine } from "#shared/suggestion"
+import { writtenBy } from "#shared/agents"
 
 /** The sandbox drops render in by default: scripts run, but with an opaque origin, so they can't reach Drop's session. */
 export const PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
@@ -55,7 +56,7 @@ const images = (item: Pick<DropComment, "attachments">, url: string, indent = " 
 export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
   const open = comments.filter((comment) => !comment.resolved).sort((a, b) => a.n - b.n)
   const lines = open.map((comment) =>
-    `${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${comment.authorName}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${reply.authorName}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`.replace(
+    `${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`.replace(
       /^/,
       `${comment.n}. `,
     ),
