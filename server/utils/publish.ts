@@ -18,7 +18,7 @@ import { problemLine } from "./markdown-document"
 import { createSiteDrop } from "./review"
 import { unpackApp } from "./app-archive"
 import { perDropOrigins } from "./content-origin"
-import { addedResources, resourceList, ResourcesInput, saveResources } from "./resources"
+import { addedResources, frontmatterResources, resourceList, ResourcesInput, saveResources } from "./resources"
 import { signUpload } from "./uploads"
 
 // No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
@@ -162,7 +162,7 @@ export const PublishInput = v.object({
     v.pipe(
       ResourcesInput,
       v.description(
-        "Links the drop belongs with, shown with their sites' icons at the top of its page: the pull request it documents, that PR's preview deploy, the issue. Every version shows the same ones. With previous, these are added to the drop's links; one already there keeps its place, so pass them again freely. Replace or clear them with update_drop.",
+        "Links the drop belongs with, shown with their sites' icons at the top of its page: the pull request it documents, that PR's preview deploy, the issue. Every version shows the same ones. With previous, these are added to the drop's links; one already there keeps its place, so pass them again freely. Replace or clear them with update_drop. A Markdown doc can also list them under resources in its front matter, the only way a .md file sent to an upload URL carries them.",
       ),
     ),
   ),
@@ -205,7 +205,8 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (links && input.file && input.file.base64 === undefined && !upload)
     throw new HTTPError({
       status: 400,
-      message: "Put resources on the doc that embeds the file, or set them with update_drop once it's uploaded.",
+      message:
+        "An upload URL has no room for resources. List them under resources in a .md file's front matter, put them on the doc that embeds the file, or set them with update_drop once it's uploaded.",
     })
   if (input.site) {
     if (input.previous || input.resolves || input.removes)
@@ -252,7 +253,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     })
   // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest.
   if (previous?.head) previous = await findDrop(previous.id, event)
-  const resources = links && addedResources(previous, links)
+  let resources = links && addedResources(previous, links)
   const share = input.share ? { share: input.share } : {}
   const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent: input.agent }
 
@@ -336,6 +337,9 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       filename = input.html ? "doc.html" : "doc.md"
       bytes = new TextEncoder().encode(source)
     }
+    // Checked before the drop exists, so a bad list publishes nothing, the same as bad resources in the input.
+    const listed = /\.(?:md|markdown)$/i.test(filename) ? frontmatterResources(new TextDecoder().decode(bytes)) : []
+    if (listed.length) resources = addedResources(previous, [...(links ?? []), ...listed])
     // Markdown and HTML sent as text are named after the link's slug; a file keeps its own name.
     row = await createDocDrop(
       who,

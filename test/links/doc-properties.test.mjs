@@ -95,3 +95,12 @@ test("the doc the viewer gets carries them; its source and cached render don't",
   )
   assert.doesNotMatch((await renderMarkdownCached(row.blobKey, async () => "")).html, /data-key="links"/)
 })
+
+test("a front matter resources list feeds the doc's links and isn't a row of its own", async () => {
+  const source = `---\nstatus: Ready\nresources:\n  - ${PR}\n---\n\n# Plan\n`
+  const { html } = await renderMarkdownCached("props-resources.md", async () => source)
+  const merged = strip(await withDocProperties(html, { resources: [{ url: PR }], updatedAt: at }))
+  assert.match(merged, /data-key="status".*data-key="links".*data-key="updated"/)
+  assert.doesNotMatch(merged, /data-key="resources"/)
+  assert.equal(merged.match(/github\.com\/acme\/portal\/pull\/42/g).length, 1)
+})
