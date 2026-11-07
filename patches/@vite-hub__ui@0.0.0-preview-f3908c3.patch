@@ -1,8 +1,8 @@
-diff --git a/dist/comment-panel-HGFrdLYq.js b/dist/comment-panel-HGFrdLYq.js
-index 00922e013685b5efdf701bb776f8990fc17f196e..861cd97edcc0bd4a463be0918009e7519ba8ef01 100644
---- a/dist/comment-panel-HGFrdLYq.js
-+++ b/dist/comment-panel-HGFrdLYq.js
-@@ -229,6 +229,9 @@ const CommentComposer = defineComponent({
+diff --git a/dist/comment-panel-DPB6kWYs.js b/dist/comment-panel-DPB6kWYs.js
+index ea946cee9606bd95191b5bc60a25dee29c2e48df..188b4469ec78266c53ddcb2c4f45ae0de9dcc6d7 100644
+--- a/dist/comment-panel-DPB6kWYs.js
++++ b/dist/comment-panel-DPB6kWYs.js
+@@ -237,6 +237,9 @@ const CommentComposer = defineComponent({
  		const menuId = useId();
  		const optionId = (index) => `${menuId}-option-${index}`;
  		let timer;
@@ -12,7 +12,7 @@ index 00922e013685b5efdf701bb776f8990fc17f196e..861cd97edcc0bd4a463be0918009e751
  		let lookup = 0;
  		let mentionCaret;
  		let dismissed;
-@@ -300,7 +303,10 @@ const CommentComposer = defineComponent({
+@@ -308,7 +311,10 @@ const CommentComposer = defineComponent({
  			timer = setTimeout(() => shaking.value = null, 450);
  			focus();
  		}
@@ -24,7 +24,7 @@ index 00922e013685b5efdf701bb776f8990fc17f196e..861cd97edcc0bd4a463be0918009e751
  		onMounted(() => {
  			root.value?.addEventListener(shakeEventName, onShake);
  			if (props.autofocus) nextTick(focus);
-@@ -432,8 +438,23 @@ const CommentComposer = defineComponent({
+@@ -440,8 +446,23 @@ const CommentComposer = defineComponent({
  				lookup++;
  				dismissed = open.start;
  				menu.value = null;
