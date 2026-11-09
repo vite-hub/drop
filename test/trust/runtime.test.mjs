@@ -127,8 +127,9 @@ test.skipIf(!origin || !state)(
     for (const path of ["/terms", "/acceptable-use", "/abuse", "/report"])
       assert.equal((await request(path)).status, 200, path)
     const robots = await request("/robots.txt")
-    assert.match(robots.text, /Disallow: \/f\//)
-    assert.match(robots.text, /Disallow: \/d\//)
+    assert.doesNotMatch(robots.text, /Disallow: \/f\//, "share links must be crawlable so crawlers see noindex")
+    assert.doesNotMatch(robots.text, /Disallow: \/d\//, "share links must be crawlable so crawlers see noindex")
+    assert.match(robots.text, /Disallow: \/api\//)
     assert.doesNotMatch(robots.text, /Disallow: \/docs/)
     for (const redirect of [
       "http://localhost:1455/callback",

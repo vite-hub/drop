@@ -1,5 +1,5 @@
 import type { DocWidth } from "#shared/documents"
-import type { DeviceSize } from "~/utils/devices"
+import type { DeviceFrameSize } from "@vite-hub/ui/device-frame"
 
 const year = 60 * 60 * 24 * 365
 
@@ -33,7 +33,7 @@ export const useCommentsShown = () =>
 
 /** Device mode for HTML docs, apps, and reviewed sites (ViewerDevice), for every drop. */
 export const useDeviceSize = () =>
-  useCookie<DeviceSize>("drop-device-mode", {
+  useCookie<DeviceFrameSize>("drop-device-mode", {
     default: () => ({ on: false, id: "iphone", width: 393, height: 852, zoom: null }),
     maxAge: year,
     sameSite: "lax",
