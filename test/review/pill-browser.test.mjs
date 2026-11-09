@@ -120,3 +120,18 @@ test("the pill steps aside while a spot is picked and comes back after", async (
     await browser.close()
   }
 })
+
+test("the toolbar's Copy link opens Drop's copy page with the token, so the site never sees the review's link", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { context, pill } = await open(browser)
+    const [popup] = await Promise.all([
+      context.waitForEvent("page"),
+      pill.getByRole("button", { name: "Copy the review's link" }).click(),
+    ])
+    assert.equal(popup.url(), DROP + "/review/open?copy#t")
+    await context.close()
+  } finally {
+    await browser.close()
+  }
+})
