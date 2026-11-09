@@ -23,7 +23,13 @@ beforeEach(() => {
 
 const ada = { ...who, userId: "ada", name: "Ada", email: "ada@example.com", actorName: "Ada" }
 const site = (id = "site", overrides = {}) =>
-  insertDrop(id, { kind: "site", blob_key: null, filename: "pr12-acme.preview.quiver.dk", site_url: SITE, ...overrides })
+  insertDrop(id, {
+    kind: "site",
+    blob_key: null,
+    filename: "pr12-acme.preview.quiver.dk",
+    site_url: SITE,
+    ...overrides,
+  })
 
 function event(url, { method = "GET", headers = {}, id } = {}) {
   const made = new H3Event(new Request(url.startsWith("http") ? url : DROP + url, { method, headers }))
@@ -129,6 +135,7 @@ test("review.js trades its token for a short ticket, only for people the review 
   assert.equal(issued.status, 200)
   assert.equal(issued.cors, SITE)
   assert.equal(issued.body.room, await presenceRoom(event("/"), { id: "site" }))
+  assert.deepEqual(issued.body.you, { id: "ada", name: "Ada" }, "who the reviewer is, as the room shows them")
   assert.ok(issued.body.expiresAt > now && issued.body.expiresAt <= now + 3_600_000 + 1000, "an hour at most")
   assert.doesNotMatch(JSON.stringify(issued.body), /"site"/, "nothing names the drop")
 

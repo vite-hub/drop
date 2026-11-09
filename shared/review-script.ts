@@ -112,6 +112,9 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 .people .face img { width: 100%; height: 100%; object-fit: cover; }
 .people .face.idle { opacity: .45; filter: grayscale(1); box-shadow: 0 0 0 1.5px var(--vitehub-pill-line); }
 .people .more { margin-left: 4px; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* Not a mode the pill has on: pressed only says the cursors show, which the faces' rings already say. */
+.seg .people[aria-pressed] { background: none; color: inherit; }
+.seg .people:hover { background: var(--vitehub-pill-hover); }
 .people[aria-pressed=false] .face { box-shadow: 0 0 0 1.5px var(--vitehub-pill-line); }
 @media (prefers-reduced-motion: reduce) { .people .face { transition: none; } }
 ` + PRESENCE_CURSOR_STYLE
@@ -1049,10 +1052,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       const answer = await (await call(drop + "/api/review/presence", { method: "POST" })).json();
       const client = await import(drop + "/review-presence.js");
       if (!token || presence) return;
-      const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket } });
+      const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket }, identity: answer.you });
       room.setLocal("active", active);
       room.setLocal("at", herePage());
-      presence = { room, expiresAt: Number(answer.expiresAt) || 0, comments: "" };
+      presence = { room, you: answer.you && answer.you.id, expiresAt: Number(answer.expiresAt) || 0, comments: "" };
       room.onUpdate(onPresence);
     } catch (e) {
       // Not shared with this reviewer, no Realtime on this Drop, or a page whose CSP blocks the client: no faces.
@@ -1078,7 +1081,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
     const states = current.room.states();
     const people = current.room.people();
-    const me = (people.find((person) => person.clientId === current.room.clientId) || {}).id;
+    const me = current.you;
     const others = new Map();
     for (const person of people) {
       if (person.id === me) continue;

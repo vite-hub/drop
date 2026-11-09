@@ -15,5 +15,7 @@ export default reviewApi(async (event) => {
   await requireRateLimit(event, "review-presence", { key: who.userId, limit: 30, window: "1m" })
   const issued = await presenceTicket(event, claims)
   if (!issued) throw new HTTPError({ status: 404, statusText: "Guests don't see who else is here." })
-  return { room: await presenceRoom(event, site), ...issued }
+  // Who the reviewer is, as the room shows them, so review.js can tell their other tabs from other people.
+  const you = { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}) }
+  return { room: await presenceRoom(event, site), you, ...issued }
 })

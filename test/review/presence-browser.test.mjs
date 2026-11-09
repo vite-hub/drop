@@ -66,7 +66,12 @@ async function open(browser, { presence = true } = {}) {
         ? route.fulfill({
             contentType: "application/json",
             headers: CORS,
-            body: JSON.stringify({ room: "r0", ticket: "tk", expiresAt: Date.now() + 3600_000 }),
+            body: JSON.stringify({
+              room: "r0",
+              ticket: "tk",
+              you: { id: "ada", name: "Ada" },
+              expiresAt: Date.now() + 3600_000,
+            }),
           })
         : route.fulfill({
             status: 404,
@@ -96,14 +101,26 @@ test("review.js shows who else is on the review and their cursors on this page",
     const joined = await page.evaluate(() => ({ ...window.__presence, set: undefined, leave: undefined }))
     assert.equal(joined.definition, "presence")
     assert.equal(joined.room, "r0")
-    assert.deepEqual(joined.options, { origin: DROP, params: { ticket: "tk" } })
+    assert.deepEqual(joined.options, { origin: DROP, params: { ticket: "tk" }, identity: { id: "ada", name: "Ada" } })
     assert.deepEqual(joined.local, { active: true, at: SITE + "/" })
     assert.deepEqual(seen.tickets, ["Bearer t"], "the ticket is asked for with the review token")
     assert.equal(await people.isHidden(), true, "nobody else here: no faces")
 
+    // Ada's own other tab, in Drop, is no one else.
+    await page.evaluate(() =>
+      window.__presence.set(3, { id: "ada", name: "Ada", color: "#2563EB" }, { active: true, at: null }),
+    )
+    await page.waitForTimeout(50)
+    assert.equal(await people.isHidden(), true, "Ada's other tab shows no face")
+
     // Ben comes, pointing at the middle of the heading.
     await page.evaluate(
-      (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", cursor: { selector: "body > h1", x: 500, y: 500 } }),
+      (ben) =>
+        window.__presence.set(2, ben, {
+          active: true,
+          at: "https://site.test/",
+          cursor: { selector: "body > h1", x: 500, y: 500 },
+        }),
       BEN,
     )
     await people.waitFor()
@@ -113,13 +130,20 @@ test("review.js shows who else is on the review and their cursors on this page",
     await cursor.waitFor()
     assert.equal(await cursor.textContent(), "Ben")
     const at = await cursor.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform))
-    assert.ok(Math.abs(at.m41 - 300) < 2 && Math.abs(at.m42 - 250) < 2, `cursor at the heading's middle, got ${at.m41},${at.m42}`)
+    assert.ok(
+      Math.abs(at.m41 - 300) < 2 && Math.abs(at.m42 - 250) < 2,
+      `cursor at the heading's middle, got ${at.m41},${at.m42}`,
+    )
     assert.equal(await cursor.evaluate((node) => getComputedStyle(node).pointerEvents), "none")
 
     // Ada's pointer goes up as the element under it and the spot inside it.
     await page.mouse.move(150, 225)
     await page.waitForFunction(() => window.__presence.local.cursor)
-    assert.deepEqual(await page.evaluate(() => window.__presence.local.cursor), { selector: "body > h1", x: 125, y: 250 })
+    assert.deepEqual(await page.evaluate(() => window.__presence.local.cursor), {
+      selector: "body > h1",
+      x: 125,
+      y: 250,
+    })
 
     // Ben goes away: his face dims and says so.
     await page.evaluate((ben) => window.__presence.set(2, ben, { active: false, at: "https://site.test/" }), BEN)
@@ -130,7 +154,12 @@ test("review.js shows who else is on the review and their cursors on this page",
 
     // Pressing the faces hides the cursors, and the browser remembers.
     await page.evaluate(
-      (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", cursor: { selector: "body > h1", x: 0, y: 0 } }),
+      (ben) =>
+        window.__presence.set(2, ben, {
+          active: true,
+          at: "https://site.test/",
+          cursor: { selector: "body > h1", x: 0, y: 0 },
+        }),
       BEN,
     )
     await cursor.waitFor()
@@ -143,17 +172,28 @@ test("review.js shows who else is on the review and their cursors on this page",
 
     // A cursor on another page of the site doesn't show here.
     await page.evaluate(
-      (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/other", cursor: { selector: "body > h1", x: 0, y: 0 } }),
+      (ben) =>
+        window.__presence.set(2, ben, {
+          active: true,
+          at: "https://site.test/other",
+          cursor: { selector: "body > h1", x: 0, y: 0 },
+        }),
       BEN,
     )
     await page.waitForFunction(() => !document.querySelector("drop-review").shadowRoot.querySelector(".pc"))
 
     // Someone writes a comment, here or in Drop: the page's threads load at once.
     const before = seen.threads
-    await page.evaluate((ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", comments: "a" }), BEN)
+    await page.evaluate(
+      (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", comments: "a" }),
+      BEN,
+    )
     await page.waitForTimeout(100)
     const afterFirst = seen.threads
-    await page.evaluate((ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", comments: "b" }), BEN)
+    await page.evaluate(
+      (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", comments: "b" }),
+      BEN,
+    )
     for (let tries = 0; seen.threads === afterFirst && tries < 20; tries++) await page.waitForTimeout(50)
     assert.ok(seen.threads > afterFirst, "a new comment elsewhere loads this page's threads")
     assert.ok(afterFirst >= before)
