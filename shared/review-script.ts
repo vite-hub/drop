@@ -590,7 +590,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     let answer;
     try { answer = await (await call(relatedApi)).json(); }
     catch (error) { throw new Error(token ? "Couldn't reach Drop." : error.message); }
-    return (answer.groups || []).map((group) => [
+    // One list: each drop, then the links of its not listed yet.
+    return (answer.groups || []).flatMap((group) => [
       { url: drop + "/review/open#doc=" + encodeURIComponent(group.open), label: group.title, detail: "Drop", icons: [drop + "/favicon.svg", drop + "/favicon.ico"] },
       ...group.links,
     ]);
