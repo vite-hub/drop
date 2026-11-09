@@ -130,6 +130,7 @@ Set `title` when the first heading isn't the doc's title. Add `supersedes`, the 
 | Written | Shows as | Write instead |
 | --- | --- | --- |
 | `$x^2$` math | its TeX source, in monospace | a code span or a `text` block |
+| `:time[2026-11-02]` | the date as written, never "2 days ago" | the date itself, such as `Nov 2, 2026` |
 | `:rocket:` | an "Unsupported component" box | the emoji itself, when it carries meaning |
 | `#123` | plain text | `owner/repo#123`, or a full link: `[#123](https://github.com/owner/repo/pull/123)` |
 | `<script>`, `<style>`, `<iframe>`, or a tag GitHub doesn't allow | nothing | Markdown, a [block](blocks.md), an [interactive drop](#interactive-drops), or publish `html` |

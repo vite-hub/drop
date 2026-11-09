@@ -12,7 +12,9 @@ const render = async (source) => (await renderMarkdownCached("mermaid.md", async
 test("comark-ui draws Mermaid with its source, copy buttons, and zoom, from scripts the CSP allows", async () => {
   const source = 'graph TD\n A["A & B"] --> B["Copy <text>"]\n'
   const html = await render(("```mermaid\n" + source + "```\n\n").repeat(2))
-  const sources = [...html.matchAll(/<div class="cmm" data-wide style="--cmm-svg:(\d+)px" data-source="([^"]*)">/g)]
+  const sources = [
+    ...html.matchAll(/<div class="cmm"[^>]* data-wide style="--cmm-svg:(\d+)px" data-source="([^"]*)">/g),
+  ]
   assert.equal(sources.length, 2)
   for (const [, width, escaped] of sources) {
     assert.equal(decodeHTML(escaped), source)
