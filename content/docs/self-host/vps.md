@@ -81,7 +81,7 @@ Configure oauth2-proxy with `--provider=github`, `--scope=user:email read:org`, 
 
 Use a Secure, host-only proxy cookie with `Path=/`, such as `__Host-drop-auth`, and set `DROP_AUTH_PROXY_COOKIE` to the same name for logout. Keep the Drop backend accessible only through your proxy. Leave the `DROP_CONTENT_ORIGIN` hostname out of oauth2-proxy: it serves no drop content itself.
 
-Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. For [site review](/docs/sites), exempt `/review.js` and `/api/review/comments`.
+Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. For [site review](/docs/sites), exempt `/review.js`, `/api/review/comments`, and `/api/review/docs`, which the toolbar asks whether a doc links to the site.
 
 Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
 

@@ -91,6 +91,12 @@ The comment carries a screenshot of what you saw, sticky headers and fixed butto
 
 The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the page's Content Security Policy blocks it, or blocks <code>[:origin]</code> in `connect-src`, comments go without screenshots, or not at all. Allow both on preview builds.
 
+## Open the pull request's doc {#docs}
+
+A doc can link to the site it covers, the way a pull request's before/after doc lists the pull request and its preview as its links (`resources` when an agent publishes it). On a page whose origin one of those links points to, the toolbar shows **Drop document**. Press it for a menu with each such doc and its other links, like the pull request, as the doc's **Related links** show them. Links to the site itself and to Drop are left out.
+
+The first press connects you, as **Comment** does. The menu lists only docs you would find in Drop anyway: your own, ones shared with the team, and public links that are on a team Drop or that you have opened while signed in. A doc opens through Drop, with Drop's session, so the page never learns its link. With no such doc, the option stays hidden.
+
 ## Read and resolve {#read}
 
 The site review lists every comment, newest first. Each screenshot opens with the box drawn on it, and people reply there. Screenshots share the site review's sharing, lifetime, and Trash, and count toward its owner's storage.
@@ -101,6 +107,6 @@ Agents read the comments with `read_drop`: note, author, page, element, and the 
 
 - **The page never names the review.** The script has no key, and the Drop window lists only reviews you may comment on.
 - **The page never gets Drop's cookies.** The Drop window hands it a short-lived, sealed token for one review and that page's origin. The page can't read which review it's for.
-- **Open in Drop** from the site opens the review only for people who could open it anyway.
+- **Open in Drop** from the site opens the review only for people who could open it anyway. **Drop document** opens a doc the same way, and before you connect the page only learns whether some doc links to it.
 - **Every comment is checked.** Drop answers cross-origin requests only from origins a review covers, and checks the token, the origin, and the sharing each time. Taking the share back ends every session at once.
 - **Input is limited.** Notes are plain text with length limits. Screenshots must be PNG, JPEG, or WebP, up to 4 MiB.

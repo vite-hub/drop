@@ -9,6 +9,9 @@ const { readReviewToken, sealChoice, signReviewToken } = await import("../../ser
 const { default: sitesPost } = await import("../../server/api/review/sites.post.ts")
 const { default: tokenPost } = await import("../../server/api/review/token.post.ts")
 const { default: openPost } = await import("../../server/api/review/open.post.ts")
+const { default: docsGet } = await import("../../server/api/review/docs.get.ts")
+const { default: docsPreflight } = await import("../../server/api/review/docs.options.ts")
+const { default: membersOnly } = await import("../../server/middleware/0.2.members-only.ts")
 const { default: commentsPost } = await import("../../server/api/review/comments.post.ts")
 const { default: commentsGet } = await import("../../server/api/review/comments.get.ts")
 const { default: preflight } = await import("../../server/api/review/comments.options.ts")
@@ -891,6 +894,134 @@ test("Open in Drop opens the review only for people who could open it without it
   assert.equal((await answer(openPost, post("/api/review/open", { token: link }))).status, 401)
   state.who = ada
   assert.equal((await answer(openPost, post("/api/review/open", { token: "00:nonsense" }))).status, 404)
+})
+
+test("the Drop document menu lists the docs that link to the page, only ones the reviewer finds in Drop anyway", async () => {
+  site("site", { site_url: PATTERN })
+  const links = (...resources) => JSON.stringify(resources)
+  const doc = (id, overrides) => insertDrop(id, { access: "view", ...overrides })
+  doc("evidence", {
+    title: "Before/after: pricing",
+    updated_at: 3,
+    resources: links(
+      { url: `${SITE}/pricing`, title: "Preview" },
+      { url: "https://github.com/acme/app/pull/12", title: "PR #12" },
+      { url: "https://drop.example/drops/site", title: "Review" },
+      { url: "https://linear.app/acme/issue/ACM-7" },
+    ),
+  })
+  doc("mine", {
+    owner_id: "ada",
+    title: "Ada's notes",
+    visibility: "private",
+    updated_at: 2,
+    resources: links({ url: `${SITE}/` }),
+  })
+  doc("secret", { title: "Owner's plan", visibility: "private", resources: links({ url: `${SITE}/` }) })
+  doc("pr13", { title: "PR 13", resources: links({ url: "https://pr13-acme.preview.quiver.dk/" }) })
+  doc("quoted", {
+    title: "Quoted",
+    resources: links({ url: "https://example.com/", title: '"https://pr14-acme.preview.quiver.dk/ lookalike' }),
+  })
+  doc("trashed", { title: "Trashed", trashed_at: Date.now(), resources: links({ url: `${SITE}/` }) })
+  const docs = (bearer, origin = SITE) =>
+    answer(
+      docsGet,
+      request("/api/review/docs", { headers: { origin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) } }),
+    )
+
+  // Before connecting, the page learns only whether a doc links here, and only where a review covers it.
+  const before = await docs()
+  assert.equal(before.status, 200)
+  assert.equal(before.headers.get("access-control-allow-origin"), SITE)
+  assert.deepEqual(await json(before), { linked: true })
+  assert.deepEqual(await json(await docs(undefined, "https://pr13-acme.preview.quiver.dk")), { linked: true })
+  assert.deepEqual(
+    await json(await docs(undefined, "https://pr14-acme.preview.quiver.dk")),
+    { linked: false },
+    "a title quoting the address doesn't count",
+  )
+  const elsewhere = await docs(undefined, "https://evil.com")
+  assert.equal(elsewhere.status, 404)
+  assert.equal(elsewhere.headers.get("access-control-allow-origin"), null)
+  const preflight = await answer(
+    docsPreflight,
+    request("/api/review/docs", { method: "OPTIONS", headers: { origin: SITE } }),
+  )
+  assert.equal(preflight.status, 204)
+  assert.match(preflight.headers.get("access-control-allow-headers"), /authorization/)
+
+  // Connected: Ada's own doc, and a public link only once she has opened it, as Shared with me lists it.
+  state.who = ada
+  const bearer = (await token()).body.token
+  const titles = async () => (await json(await docs(bearer))).docs.map((item) => item.title)
+  assert.deepEqual(await titles(), ["Ada's notes"])
+  sql.prepare("INSERT INTO drop_visits (user_id, drop_id, at) VALUES ('ada', 'evidence', 1)").run()
+  const found = await json(await docs(bearer))
+  assert.deepEqual(
+    found.docs.map((item) => item.title),
+    ["Before/after: pricing", "Ada's notes"],
+  )
+  assert.deepEqual(
+    found.docs[0].links.map(({ url, label, host }) => ({ url, label, host })),
+    [
+      { url: "https://github.com/acme/app/pull/12", label: "PR #12", host: "github.com" },
+      { url: "https://linear.app/acme/issue/ACM-7", label: "linear.app", host: "" },
+    ],
+    "the preview it's on and Drop's own links stay out",
+  )
+  assert.deepEqual(found.docs[0].links[0].icons, ["https://github.com/favicon.ico"])
+  assert.doesNotMatch(JSON.stringify(found), /evidence|"mine"|drops\//, "no id, no link")
+
+  // Each doc opens from its handle, with Drop's session, for people who'd find it anyway.
+  const handle = found.docs[0].open
+  assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: "/drops/evidence" })
+  state.who = null
+  assert.equal((await answer(openPost, post("/api/review/open", { doc: handle }))).status, 401)
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('bob', 'Bob', 'bob@example.com')").run()
+  state.who = { ...ada, userId: "bob", name: "Bob", email: "bob@example.com" }
+  assert.equal(
+    (await answer(openPost, post("/api/review/open", { doc: handle }))).status,
+    404,
+    "Bob never got its link",
+  )
+  state.who = ada
+  assert.equal(
+    (await answer(openPost, post("/api/review/open", { doc: bearer }))).status,
+    404,
+    "a token isn't a handle",
+  )
+  assert.equal(
+    (await answer(openPost, post("/api/review/open", { token: handle }))).status,
+    404,
+    "nor a handle a token",
+  )
+
+  // On a team Drop, the team finds public links without opening them first; private ones stay their owner's.
+  state.mode = "team"
+  sql.prepare("DELETE FROM drop_visits").run()
+  assert.deepEqual(await titles(), ["Before/after: pricing", "Ada's notes"])
+  // Admins open every drop, but find no one's private ones here, as in Drop's search.
+  sql.prepare("UPDATE user SET email_verified = 1 WHERE id = 'ada'").run()
+  state.admins = "ada@example.com"
+  sql.prepare("UPDATE drops SET owner_id = 'owner' WHERE id = 'mine'").run()
+  assert.deepEqual(await titles(), ["Before/after: pricing"])
+  state.mode = "personal"
+  assert.deepEqual(await titles(), [])
+  sql.prepare("UPDATE drops SET owner_id = 'ada' WHERE id = 'mine'").run()
+  state.admins = ""
+
+  // Guests find none, and a session that ended gets the 401 the script reconnects on.
+  state.who = null
+  assert.deepEqual((await json(await docs((await token(SITE, { name: "Ole" })).body.token))).docs, [])
+  const ended = await docs("00:forged")
+  assert.equal(ended.status, 401)
+  assert.equal(ended.headers.get("access-control-allow-origin"), SITE)
+  // A members-only Drop lets the script's request through without a session, as it does its comments.
+  state.members = "ada@example.com"
+  assert.equal(await membersOnly(request("/api/review/docs")), undefined)
+  await assert.rejects(Promise.resolve(membersOnly(request("/api/review/sites"))))
+  state.members = undefined
 })
 
 test("what the page sends is checked: the token, the image's bytes, and the fields", async () => {
