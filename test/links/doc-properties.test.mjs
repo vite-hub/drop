@@ -42,7 +42,7 @@ test("a doc's links and its version's day join its front matter rows, once each,
       updatedAt: at,
     }),
   )
-  assert.equal(merged.match(/<dl class="cfm">/g).length, 1, "one box")
+  assert.equal(merged.match(/<dl class="cfm"[^>]*>/g).length, 1, "one box")
   assert.match(
     merged,
     /data-key="status".*data-key="pr".*data-key="links".*data-key="updated"/,

@@ -11,7 +11,7 @@ You work through Drop's MCP server at `https://drop.vitehub.dev/mcp`. There is n
 
 ## Comark UI skills
 
-Drop bundles Comark UI's upstream skills during its build: `comark-ui` for block syntax, `before-after-evidence` for screenshot comparisons, `review-document` for review findings, `visual-explanation` for explaining a system, and `concept-lesson` for teaching a concept. Read the matching skill through this server's discovery, or `/.well-known/skills/<name>/SKILL.md`, and follow its relative reference links there. Use Drop's publishing and access instructions below.
+Drop bundles Comark UI's upstream skills during its build: `comark-ui` for block syntax, `before-after-evidence` for screenshot comparisons, `review-document` for review findings, `report` for research, a shortlist, or a plan someone decides from, `visual-explanation` for explaining a system, and `teach-lesson` for teaching a concept. Read the matching skill through this server's discovery, or `/.well-known/skills/<name>/SKILL.md`, and follow its relative reference links there. Use Drop's publishing and access instructions below.
 
 ## Publish
 
