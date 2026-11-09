@@ -97,22 +97,8 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 .seg .count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--vitehub-pill-hover); font: 500 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; }
 .seg .go { background: var(--vitehub-pill-on); color: var(--vitehub-pill-on-text); }
 .seg .go:disabled { opacity: .5; cursor: default; }
-/* The "Drop document" menu: the docs that link to this site, each with its own links, like a doc's Related links. */
-.docs { width: min(320px, calc(100vw - 16px)); max-height: min(420px, calc(100vh - 96px)); overflow-y: auto; overscroll-behavior: contain; padding: 4px; }
-.docs .label { margin: 0; padding: 6px 8px 4px; color: var(--muted); font-size: 12px; font-weight: 500; }
-.docs ul { margin: 0; padding: 0; list-style: none; }
-.docs ul + ul { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
-.docs a { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 6px 8px; border-radius: 6px; color: var(--fg); font-size: 14px; line-height: 20px; text-decoration: none; }
-.docs a:hover, .docs a:focus-visible { background: var(--soft); outline: none; }
-.docs a:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
-.docs .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.docs .doc .name { font-weight: 500; }
-.docs .host { min-width: 0; max-width: 40%; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.docs .fav, .docs a > svg { width: 16px; height: 16px; flex: none; }
-.docs .fav { border-radius: 2px; object-fit: contain; }
-.docs a > svg { fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
-.docs a > svg.out { width: 14px; height: 14px; }
-.docs a > svg.gh { fill: currentColor; stroke: none; }
+/* Related links goes away with the review buttons while someone draws. */
+.bar[hidden] ~ .related { display: none !important; }
 .paint { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -137,13 +123,6 @@ const ICONS = {
   marker: svg(`<path d="M164 44l48 48-96 96-56 8 8-56z"/><path d="M140 68l48 48"/><path d="M40 220h88"/>`),
   pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
   arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
-  doc: svg(`<path d="M64 32h88l48 48v144H64z"/><path d="M152 32v48h48"/><path d="M96 136h64M96 176h64"/>`),
-  link: svg(
-    `<path d="M112 144a40 40 0 0 0 56 0l40-40a40 40 0 0 0-56-56l-12 12"/><path d="M144 112a40 40 0 0 0-56 0l-40 40a40 40 0 0 0 56 56l12-12"/>`,
-  ),
-  // GitHub's favicon is a black mark, lost on the dark theme: its Simple Icons mark takes the text colour instead.
-  github: `<svg class="gh" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>`,
-  out: `<svg class="out" viewBox="0 0 256 256" aria-hidden="true"><path d="M80 176 176 80"/><path d="M96 80h80v80"/></svg>`,
 }
 
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
@@ -183,7 +162,7 @@ const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="docs" hidden aria-expanded="false" title="The Drop documents that link to this site">${ICONS.doc}Drop document</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
@@ -191,7 +170,6 @@ ${TOOLS}
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
 <div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
-<nav class="card docs" aria-label="Drop documents" hidden></nav>
 <div class="toast" role="status" hidden></div>
 </div>`
 
@@ -209,10 +187,12 @@ ${TOOLS}
  *
  * Once connected, the page shows its threads the way Figma does: a pin with the author's picture on the element each
  * was left on, found again by its CSS path, that opens the thread to read, reply (with images too), and resolve. A
- * thread whose element isn't on the page any more still shows in the list, with the screenshot it came with. *
- * When a drop links to the site, like a pull request's before/after doc listing its preview, the pill shows "Drop
- * document": a menu with that doc and its other links (the pull request), as the doc's Related links show them. The
- * page learns whether one exists before anyone connects; which ones, only for a reviewer who'd find them in Drop.
+ * thread whose element isn't on the page any more still shows in the list, with the screenshot it came with.
+ *
+ * When a drop links to the site, like a pull request's before/after doc listing its preview, the pill shows Related
+ * links: ViteHub's links segment (vite-hub/page/pill.js), with that doc, its links (the pull request), and the drops
+ * that link to those, two links deep. The page learns whether one exists before anyone connects; which ones, only for
+ * a reviewer who'd find them in Drop.
  */
 export const REVIEW_SCRIPT = String.raw`(() => {
   // A bookmarklet adds this script with a plain script element, where currentScript works too.
@@ -237,20 +217,31 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   host.style.cssText = "all:initial;position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;";
   const root = host.attachShadow({ mode: "closed" });
   // The segments' buttons look like the pill's own, from the same styles.
-  root.innerHTML = "<style>" + ${JSON.stringify(STYLE)} + ".seg{" + ViteHubPagePill.viteHubPillButtonStyles + "}</style>" + ${JSON.stringify(MARKUP)};
+  root.innerHTML = "<style>" + ${JSON.stringify(STYLE)} + ".seg{" + ViteHubPagePill.viteHubPillButtonStyles + "}" + ViteHubPagePill.viteHubPageLinksStyles + "</style>" + ${JSON.stringify(MARKUP)};
   const $ = (selector, from) => (from || root).querySelector(selector);
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
-  const docsButton = $("[data-act=docs]", bar), docsMenu = $(".docs");
+
+  // Related links, a segment of its own: ViteHub draws the button and the menu, and Drop finds the links.
+  const related = ViteHubPagePill.mountViteHubPageLinks({
+    slot: "related",
+    resolve: resolveRelated,
+    empty: "No drop related to this site is shared with you.",
+    onOpen: () => { cancel(); closeThread(); list.hidden = true; },
+    signal: new AbortController().signal,
+  });
+  related.segment.className = "seg related";
+  $(".ui").appendChild(related.menu);
 
   // The comment list and the notes open beside the pill, on its edge, at the end of the edge it is nearer to.
   function dockCards(place) {
     const side = place.edge === "left" || place.edge === "right";
     const off = (place.collapsed ? 2 : 16) + place.thickness + 8 + "px";
-    for (const card of [list, toast, docsMenu]) {
+    related.place(place);
+    for (const card of [list, toast]) {
       const style = card.style;
       style.left = style.right = style.top = style.bottom = style.translate = "";
       style[place.edge] = off;
@@ -267,7 +258,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     name: "drop-review-pill",
     label: "Drop review tools",
     mark: document.importNode(dropMark, true),
-    slots: ["review", "highlight"],
+    slots: ["review", "related", "highlight"],
     storage: { collapsed: "drop-review-collapsed", dock: "drop-review-dock" },
     initial: {
       dock: ViteHubPagePill.readViteHubPageDock({ edge: script.dataset.edge || "bottom", at: Number(script.dataset.at || 50) }),
@@ -277,18 +268,16 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     parent: $(".ui"),
     signal: new AbortController().signal,
   });
-  pill.append(bar, tools);
+  pill.append(bar, related.segment, tools);
   let area = null, start = null, busy = false, toastTimer = 0;
   let threads = [], openN = null, pinsShown = true, here = "";
-  // The docs that link to this site, once connected; before that, only whether any does.
-  let docs = null, linked = false, docsLoad = null;
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
   const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map();
 
   function save(value) {
     token = value ? value.token : null;
     try { value ? sessionStorage.setItem(stored, JSON.stringify(value)) : sessionStorage.removeItem(stored); } catch (e) {}
-    if (!token) { threads = []; docs = null; render(); }
+    if (!token) { threads = []; related.forget(); render(); }
   }
 
   function say(text, link) {
@@ -584,92 +573,28 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
   }
 
-  // ---- Drop documents: the docs that link to this site, like a pull request's before/after doc ----
+  // ---- Related links: the drops related to this site, like a pull request's before/after doc, with their links ----
 
-  // Before someone connects, Drop only says whether any doc links here. Once connected, it lists the ones this person
-  // would find in Drop anyway, each with a handle that /review/open takes in place of its link, and the doc's links.
-  const docsApi = drop + "/api/review/docs";
-  async function loadDocs() {
+  // Before someone connects, Drop only says whether any drop links here, which shows the button. The first press
+  // connects, as Comment does, then lists the drops this person would find in Drop anyway (server/utils/related.ts),
+  // each with a handle that /review/open takes in place of its link, and their links, like the pull request.
+  const relatedApi = drop + "/api/review/related";
+  async function probeRelated() {
     try {
-      if (token) {
-        const answer = await (await call(docsApi)).json();
-        docs = Array.isArray(answer.docs) ? answer.docs : [];
-      } else {
-        const response = await fetch(docsApi, { credentials: "omit" });
-        linked = response.ok && (await response.json()).linked === true;
-      }
+      const response = await fetch(relatedApi, { credentials: "omit" });
+      related.show(response.ok && (await response.json()).linked === true);
     } catch (e) {}
-    docsButton.hidden = !(docs ? docs.length : linked);
-    if (docsButton.hidden) closeDocs();
   }
-
-  function closeDocs() {
-    docsMenu.hidden = true;
-    docsButton.setAttribute("aria-expanded", "false");
+  async function resolveRelated() {
+    await ensureToken();
+    let answer;
+    try { answer = await (await call(relatedApi)).json(); }
+    catch (error) { throw new Error(token ? "Couldn't reach Drop." : error.message); }
+    return (answer.groups || []).map((group) => [
+      { url: drop + "/review/open#doc=" + encodeURIComponent(group.open), label: group.title, detail: "Drop", icons: [drop + "/favicon.svg", drop + "/favicon.ico"] },
+      ...group.links,
+    ]);
   }
-
-  // A link's site icon, straight from the site with no referrer: the addresses Drop lists in turn, then a plain link.
-  // GitHub's is its mark, in the text's colour.
-  function favicon(url, tries) {
-    if (/^(www\.)?github\.com$/.test(new URL(url).hostname)) return ${JSON.stringify(ICONS.github)};
-    if (!tries.length) return ${JSON.stringify(ICONS.link)};
-    const img = el("img", "fav");
-    img.alt = ""; img.referrerPolicy = "no-referrer"; img.decoding = "async";
-    let index = 0;
-    const next = () => {
-      if (index < tries.length) img.src = tries[index++];
-      else { const t = document.createElement("template"); t.innerHTML = ${JSON.stringify(ICONS.link)}; img.replaceWith(t.content.firstChild); }
-    };
-    img.addEventListener("error", next);
-    next();
-    return img;
-  }
-
-  function docLink(href, label, where, icon, title) {
-    const item = el("li");
-    const a = el("a");
-    a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.title = title;
-    if (typeof icon === "string") a.insertAdjacentHTML("beforeend", icon); else a.appendChild(icon);
-    a.appendChild(el("span", "name", label));
-    if (where) a.appendChild(el("span", "host", where));
-    a.insertAdjacentHTML("beforeend", ${JSON.stringify(ICONS.out)});
-    a.setAttribute("aria-label", label + (where ? ", " + where : "") + " (opens in a new tab)");
-    a.addEventListener("click", closeDocs);
-    item.appendChild(a);
-    return item;
-  }
-
-  function renderDocs() {
-    docsMenu.textContent = "";
-    docsMenu.appendChild(el("p", "label", docs.length === 1 ? "Drop document" : "Drop documents"));
-    for (const doc of docs) {
-      const group = el("ul");
-      const first = docLink(drop + "/review/open#doc=" + encodeURIComponent(doc.open), doc.title, "Drop", ${JSON.stringify(ICONS.doc)}, doc.title);
-      first.className = "doc";
-      group.appendChild(first);
-      for (const link of doc.links) group.appendChild(docLink(link.url, link.label, link.host, favicon(link.url, link.icons || []), link.label + "\n" + link.url));
-      docsMenu.appendChild(group);
-    }
-  }
-
-  docsButton.addEventListener("click", async () => {
-    if (!docsMenu.hidden) return closeDocs();
-    if (!docs && token) await loadDocs();
-    else if (!docs) {
-      try { await ensureToken(); }
-      catch (error) { if (error.message) say(error.message); return; }
-      await docsLoad;
-    }
-    if (!docs) return say("Couldn't reach Drop.");
-    if (!docs.length) return say("No Drop document that links here is shared with you.");
-    cancel();
-    closeThread();
-    list.hidden = true;
-    renderDocs();
-    docsMenu.hidden = false;
-    docsButton.setAttribute("aria-expanded", "true");
-    $("a", docsMenu).focus({ preventScroll: true });
-  });
 
   // ---- Writing: a box with images from a button, a paste, or a drop ----
 
@@ -732,7 +657,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     cancel();
     closeThread();
     list.hidden = true;
-    closeDocs();
+    related.close();
     loadScreenshot().catch(() => { screenshotModule = null; });
     pill.hidden = true;
     draw.hidden = false;
@@ -832,7 +757,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     cancel();
     closeThread();
     list.hidden = true;
-    closeDocs();
+    related.close();
     // The screenshot starts now, with the page as the reviewer marks it; it holds still until Done.
     still = capture().catch(() => null);
     inkAt = { x: scrollX, y: scrollY };
@@ -928,7 +853,6 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }
     else if (!list.hidden) { e.stopPropagation(); list.hidden = true; }
-    else if (!docsMenu.hidden) { e.stopPropagation(); closeDocs(); docsButton.focus({ preventScroll: true }); }
   }, true);
 
   ${CAPTURE}
@@ -938,7 +862,6 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (token) return;
     await connect();
     void refresh();
-    docsLoad = loadDocs();
   }
 
   $("[data-act=comment]", bar).addEventListener("click", async () => {
@@ -948,14 +871,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   listButton.addEventListener("click", () => {
     list.hidden = !list.hidden;
-    if (!list.hidden) { closeThread(); closeDocs(); renderList(); }
+    if (!list.hidden) { closeThread(); related.close(); renderList(); }
   });
   // A press anywhere else on the page closes the thread or the list, as in Figma.
   addEventListener("pointerdown", (e) => {
     if (e.composedPath().includes(host)) return;
     if (!thread.hidden) closeThread();
     list.hidden = true;
-    closeDocs();
   }, true);
   pinsButton.addEventListener("click", () => {
     pinsShown = !pinsShown;
@@ -1105,5 +1027,5 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     host.addEventListener(type, (e) => e.stopPropagation());
   document.documentElement.appendChild(host);
   void refresh();
-  void loadDocs();
+  void probeRelated();
 })();`

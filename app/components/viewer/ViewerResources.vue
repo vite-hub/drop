@@ -1,22 +1,42 @@
 <script setup lang="ts">
 import { resourceLabel } from "#shared/resources"
-import type { DropResource } from "#shared/types"
+import type { DropResource, RelatedDrop } from "#shared/types"
 
-const props = defineProps<{ resources: DropResource[] }>()
-const shown = computed(() => props.resources.slice(0, 3))
-const more = computed(() => Math.max(0, props.resources.length - shown.value.length))
-const links = computed(() =>
-  props.resources.map((resource) => {
-    const label = resourceLabel(resource)
-    const host = new URL(resource.url).hostname.replace(/^www\./, "")
-    return { ...resource, label, host: label === host ? "" : host }
-  }),
+// A drop's own links, and with `relatedTo` the drops related to it through the pages they link to
+// (server/utils/related.ts), like a site review's before/after doc, each with the links of its not listed above.
+const props = defineProps<{ resources: DropResource[]; relatedTo?: string }>()
+const related = ref<RelatedDrop[]>([])
+watch(
+  () => props.relatedTo,
+  async (id) => {
+    related.value = []
+    if (!id) return
+    const found = await $fetch<RelatedDrop[]>(`/api/drops/${id}/related`).catch(() => [])
+    if (props.relatedTo === id) related.value = found
+  },
+  { immediate: true },
 )
+
+// The host goes after a title. Without one, the label is the host or `owner/repo#n`, which already says where it goes.
+const label = (resource: DropResource) => {
+  const host = new URL(resource.url).hostname.replace(/^www\./, "")
+  return { ...resource, label: resourceLabel(resource), host: resource.title ? host : "" }
+}
+const links = computed(() => props.resources.map(label))
+const sections = computed(() => [
+  ...(links.value.length ? [{ drop: undefined, links: links.value }] : []),
+  ...related.value.map((drop) => ({ drop, links: drop.links.map(label) })),
+])
+const count = computed(() => props.resources.length + related.value.length)
+// The chips: the drop's own links first, then the related drops' links, then a related drop's kind.
+const chipUrls = computed(() => [...props.resources, ...related.value.flatMap((drop) => drop.links)].map((r) => r.url))
+const shown = computed(() => chipUrls.value.slice(0, 3))
+const more = computed(() => Math.max(0, chipUrls.value.length - shown.value.length))
 </script>
 
 <template>
   <UPopover
-    v-if="resources.length"
+    v-if="count"
     :content="{ align: 'start', sideOffset: 6 }"
     :ui="{
       content:
@@ -28,7 +48,7 @@ const links = computed(() =>
         <!-- Same height as Share (size sm). Each chip is cut out of the button's own fill by a ring of that fill,
              so the overlap reads on every state, and a hairline keeps a white favicon from melting into the bar. -->
         <UButton
-          :aria-label="`Related links (${resources.length})`"
+          :aria-label="`Related links (${count})`"
           class="group/links shrink-0 px-1 data-open:bg-elevated pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center"
           color="neutral"
           :data-open="open || undefined"
@@ -37,11 +57,17 @@ const links = computed(() =>
         >
           <span aria-hidden="true" class="flex -space-x-1">
             <span
-              v-for="resource in shown"
-              :key="resource.url"
+              v-if="!shown.length && related[0]"
+              class="grid size-5 place-items-center rounded-full bg-default ring-2 ring-(--ui-bg) inset-ring inset-ring-black/10 group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-data-open/links:ring-(--ui-bg-elevated) dark:bg-elevated dark:inset-ring-white/10"
+            >
+              <UIcon class="size-3.5 text-muted" :name="KIND_ICONS[related[0].kind]" />
+            </span>
+            <span
+              v-for="url in shown"
+              :key="url"
               class="grid size-5 place-items-center rounded-full *:size-3.5! bg-default ring-2 ring-(--ui-bg) inset-ring inset-ring-black/10 transition-[box-shadow] group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-data-open/links:ring-(--ui-bg-elevated) dark:bg-elevated dark:inset-ring-white/10"
             >
-              <ViewerResourceIcon :url="resource.url" />
+              <ViewerResourceIcon :url="url" />
             </span>
             <span
               v-if="more"
@@ -55,8 +81,27 @@ const links = computed(() =>
     <template #content="{ close }">
       <nav aria-label="Related links" class="p-1">
         <p class="px-2 pt-1.5 pb-1 text-xs font-medium text-muted">Related links</p>
-        <ul>
-          <li v-for="link in links" :key="link.url">
+        <!-- The drop's own links, then each related drop, opening here, with its links. -->
+        <ul
+          v-for="(section, index) in sections"
+          :key="section.drop?.id ?? ''"
+          :class="{ 'mt-1 border-t border-default pt-1': index }"
+        >
+          <li v-if="section.drop">
+            <NuxtLink
+              class="flex min-h-8 items-start gap-2 rounded-md px-2 py-1.5 text-sm/5 font-medium text-highlighted transition-colors hover:bg-elevated focus-visible:bg-elevated focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ui-border-inverted) pointer-coarse:min-h-11"
+              :to="`/drops/${section.drop.id}`"
+              @click="close"
+            >
+              <UIcon
+                aria-hidden="true"
+                class="mt-0.5 size-4 shrink-0 text-muted"
+                :name="KIND_ICONS[section.drop.kind]"
+              />
+              <span class="min-w-0 flex-1 truncate">{{ section.drop.title }}</span>
+            </NuxtLink>
+          </li>
+          <li v-for="link in section.links" :key="link.url">
             <a
               class="flex min-h-8 items-start gap-2 rounded-md px-2 py-1.5 text-sm/5 text-highlighted transition-colors hover:bg-elevated focus-visible:bg-elevated focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ui-border-inverted) pointer-coarse:min-h-11"
               :href="link.url"

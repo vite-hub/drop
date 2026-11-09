@@ -1,5 +1,5 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { sha256 } from "#shared/utils/bytes"
@@ -23,7 +23,7 @@ import {
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
-import { drops, dropVisits, reviewSubmissions, user } from "../databases/config"
+import { drops, reviewSubmissions, user } from "../databases/config"
 import { type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
 import { addThread, authorOf, findThread, removeThread, siteCommentList, threadsFor, toComment } from "./comments"
 import { siteCoversDrop } from "./content-origin"
@@ -36,17 +36,15 @@ import {
   type LifetimeInput,
   lifetimeFields,
   permissions,
-  reaches,
   storageFailure,
 } from "./drops"
 import { type Identity, roleOf } from "./identity"
 import { isMember, membersOnly } from "./members"
 import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
-import { modeFor, shareFields, sharePolicy } from "./share"
+import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
-import { d1Chunks } from "./d1"
-import { listedNode, touchFolder, uniqueSlug } from "./nodes"
-import { resourcesOf } from "./resources"
+import { touchFolder, uniqueSlug } from "./nodes"
+import { findableBy } from "./related"
 
 /**
  * Site review. A site drop names a website by its origin, or by a pattern that covers every preview deploy (`siteUrl`,
@@ -183,80 +181,6 @@ export async function covered(origin: string) {
 export function openable(site: DropRow, who: Identity | null) {
   const grants = (site.grants ?? [{ share: site.share }]).filter((grant) => !isPublic(grant.share))
   return permissions({ ...site, grants }, who).view
-}
-
-/**
- * Drops that link to a page on `origin` (their resources, #shared/resources): a pull request's doc lists its preview
- * there. A cheap match on the stored JSON finds them; `linksTo` then checks each link's origin, so a title that quotes the
- * address doesn't count. Sites and the files a doc embeds don't count.
- */
-const linkingTo = (origin: string) =>
-  and(
-    isNotNull(drops.resources),
-    // instr, not LIKE: D1 refuses LIKE patterns over 50 bytes, and an origin can be longer.
-    sql`instr(${drops.resources}, ${`"${origin}/`}) > 0`,
-    ne(drops.kind, "site"),
-    listedNode,
-    isNull(drops.trashedAt),
-    isNull(drops.quarantinedAt),
-  )
-
-const linksTo = (doc: Pick<DropRow, "resources">, origin: string) =>
-  resourcesOf(doc).some((resource) => new URL(resource.url).origin === origin)
-
-/** Whether any drop links to `origin`. That much is all a page learns before it has a token. */
-export async function linkedFrom(origin: string) {
-  const rows = await db.select({ resources: drops.resources }).from(drops).where(linkingTo(origin)).limit(20)
-  return rows.some((row) => linksTo(row, origin))
-}
-
-/**
- * The drops that link to `origin` and that `who` would find in Drop anyway, newest first: their own, ones a team share
- * reaches, and public links on a team Drop, or on a personal Drop the ones they opened while signed in, as Shared with
- * me lists them. A public link nobody gave them stays hidden, since finding a drop by the site it links to is not
- * having its link. Guests find none.
- */
-export async function docsLinkingTo(origin: string, who: Identity | null, event?: H3Event) {
-  if (!who) return []
-  const rows = await db
-    .select({ id: drops.id })
-    .from(drops)
-    .where(linkingTo(origin))
-    .orderBy(desc(drops.updatedAt))
-    .limit(20)
-  const found = (await Promise.all(rows.map((row) => findDrop(row.id, event)))).filter(
-    (doc): doc is DropRow => doc !== null && linksTo(doc, origin),
-  )
-  return findableBy(who, found, event)
-}
-
-/** A drop's id and its folders', any of which may be the public link someone opened. */
-const pathOf = (doc: DropRow) => [doc.id, ...(doc.ancestors ?? []).map((node) => node.id)]
-const grantsOf = (doc: DropRow) => doc.grants ?? [{ share: doc.share }]
-
-/** The ones of `docs` that `who` would find in Drop: see `docsLinkingTo`. */
-async function findableBy(who: Identity, docs: DropRow[], event?: H3Event) {
-  const viewable = docs.filter((doc) => permissions(doc, who).view)
-  const shared = new Set(
-    viewable.filter(
-      (doc) =>
-        doc.ownerId === who.userId ||
-        reaches({ ...doc, grants: grantsOf(doc).filter((grant) => !isPublic(grant.share)) }, who),
-    ),
-  )
-  // A public link: a team Drop lists it for the team, a personal one once they opened it, or the folder it's in.
-  const linked = new Set(
-    viewable.filter((doc) => !shared.has(doc) && grantsOf(doc).some((grant) => isPublic(grant.share))),
-  )
-  if (sharePolicy(event).mode === "team") return viewable.filter((doc) => shared.has(doc) || linked.has(doc))
-  const visited = new Set<string>()
-  for (const ids of d1Chunks([...new Set([...linked].flatMap(pathOf))]))
-    for (const row of await db
-      .select({ id: dropVisits.dropId })
-      .from(dropVisits)
-      .where(and(eq(dropVisits.userId, who.userId), inArray(dropVisits.dropId, ids))))
-      visited.add(row.id)
-  return viewable.filter((doc) => shared.has(doc) || (linked.has(doc) && pathOf(doc).some((id) => visited.has(id))))
 }
 
 /** What a doc's handle says: which drop, until when. Sealed, so the page shows the doc without learning its link. */

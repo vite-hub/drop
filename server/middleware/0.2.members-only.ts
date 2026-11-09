@@ -16,8 +16,8 @@ export default defineHandler(async (event) => {
   if (path.startsWith("/api/auth/") && !path.startsWith("/api/auth/admin/")) return
   if (path === "/api/health" || path === "/api/mcp" || path === "/api/sign-in") return
   // A site's review script sends no session, only a review token, which carries a member and is checked there. Before
-  // it has one, the docs route tells the page only whether a drop links to it.
-  if (path === "/api/review/comments" || path === "/api/review/docs") return
+  // it has one, the related route tells the page only whether a drop links to it.
+  if (path === "/api/review/comments" || path === "/api/review/related") return
   // An upload URL sends no session either: its ticket carries the member, who must still be one (readUpload).
   if (/^\/api\/uploads\/[^/]+$/.test(path)) return
   if (/^\/(?:api|[dfi])(?:\/|$)/.test(path)) {

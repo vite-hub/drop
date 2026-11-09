@@ -6,16 +6,16 @@ import { REVIEW_SCRIPT } from "../../shared/review-script.ts"
 const SITE = "https://site.test"
 const DROP = "https://drop.test"
 const CORS = { "access-control-allow-origin": SITE, "access-control-allow-headers": "authorization, content-type" }
-const DOCS = [
+const GROUPS = [
   {
     open: "handle-1",
     title: "Before/after: pricing",
     links: [
-      { url: "https://github.com/acme/app/pull/12", label: "PR #12", host: "github.com", icons: [] },
+      { url: "https://github.com/acme/app/pull/12", label: "PR #12", detail: "github.com", icons: [] },
       {
         url: "https://linear.app/acme/issue/ACM-7",
         label: "linear.app",
-        host: "",
+        detail: "",
         icons: ["https://linear.app/favicon.ico"],
       },
     ],
@@ -24,11 +24,11 @@ const DOCS = [
 ]
 
 /**
- * The site with review.js, and a Drop that answers whether a doc links to it (`linked`) and, with a token, which ones
- * (`docs`). Its connect popup hands the page a token, as Drop's does. The toolbar's closed shadow root is opened here
+ * The site with review.js, and a Drop that answers whether a drop links to it (`linked`) and, with a token, the
+ * related drops (`groups`). Its connect popup hands the page a token, as Drop's does. The toolbar's closed shadow root is opened here
  * so the test can reach it.
  */
-async function open(browser, { linked = true, docs = DOCS, connected = false } = {}) {
+async function open(browser, { linked = true, groups = GROUPS, connected = false } = {}) {
   const context = await browser.newContext({ viewport: { width: 900, height: 600 } })
   await context.addInitScript(
     ({ drop, connected }) => {
@@ -62,12 +62,12 @@ async function open(browser, { linked = true, docs = DOCS, connected = false } =
       })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
     const token = request.headers().authorization
-    if (url.pathname === "/api/review/docs") {
+    if (url.pathname === "/api/review/related") {
       asked.push(token ?? "none")
       return route.fulfill({
         contentType: "application/json",
         headers: CORS,
-        body: JSON.stringify(token ? { linked: docs.length > 0, docs } : { linked }),
+        body: JSON.stringify(token ? { linked: groups.length > 0, groups } : { linked }),
       })
     }
     return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ threads: [] }) })
@@ -81,40 +81,47 @@ async function open(browser, { linked = true, docs = DOCS, connected = false } =
     page,
     pill,
     asked,
-    button: pill.locator("[data-act=docs]"),
-    menu: page.locator("drop-review .docs"),
+    button: pill.locator(".related button"),
+    menu: page.locator("drop-review .vitehub-links"),
   }
 }
 
-test("Drop document shows on a site a doc links to, connects on the first press, and lists each doc with its links", async () => {
+test("Related links shows on a site a drop links to, connects on the first press, and lists each drop with its links", async () => {
   const browser = await chromium.launch()
   try {
     const { context, page, pill, asked, button, menu } = await open(browser)
-    // Before connecting, the page only knows a doc links here.
+    // Before connecting, the page only knows a drop links here.
     await button.waitFor()
     assert.deepEqual(asked, ["none"])
-    assert.equal(await button.textContent(), "Drop document")
+    assert.equal(await button.textContent(), "Related links")
     assert.equal(await button.getAttribute("aria-expanded"), "false")
 
-    // The first press connects through Drop's popup, then opens the menu with the docs this reviewer may see.
+    // The first press connects through Drop's popup, then opens the menu with the drops this reviewer may see.
     await button.click()
     await menu.waitFor()
     assert.deepEqual(asked.slice(-1), ["Bearer t"])
     assert.equal(await button.getAttribute("aria-expanded"), "true")
-    assert.equal(await menu.locator(".label").textContent(), "Drop documents")
-    const links = await menu
-      .locator("a")
-      .evaluateAll((anchors) =>
-        anchors.map((a) => [a.querySelector(".name").textContent, a.getAttribute("href"), a.target]),
+    assert.equal(await menu.locator("p").first().textContent(), "Related links")
+    const rows = await menu
+      .locator("ul")
+      .evaluateAll((lists) =>
+        lists.map((list) =>
+          [...list.querySelectorAll("a")].map((a) => [
+            a.querySelector(".vitehub-links-name").textContent,
+            a.getAttribute("href"),
+            a.querySelector(".vitehub-links-detail")?.textContent ?? "",
+            a.target,
+          ]),
+        ),
       )
-    assert.deepEqual(links, [
-      ["Before/after: pricing", `${DROP}/review/open#doc=handle-1`, "_blank"],
-      ["PR #12", "https://github.com/acme/app/pull/12", "_blank"],
-      ["linear.app", "https://linear.app/acme/issue/ACM-7", "_blank"],
-      ["Pricing plan", `${DROP}/review/open#doc=handle-2`, "_blank"],
+    assert.deepEqual(rows, [
+      [
+        ["Before/after: pricing", `${DROP}/review/open#doc=handle-1`, "Drop", "_blank"],
+        ["PR #12", "https://github.com/acme/app/pull/12", "github.com", "_blank"],
+        ["linear.app", "https://linear.app/acme/issue/ACM-7", "", "_blank"],
+      ],
+      [["Pricing plan", `${DROP}/review/open#doc=handle-2`, "Drop", "_blank"]],
     ])
-    // A link opens the doc in Drop, never a link to it: the doc's row says Drop, its links their hosts.
-    assert.deepEqual(await menu.locator(".host").allTextContents(), ["Drop", "github.com", "Drop"])
     assert.equal(
       await menu
         .locator("a")
@@ -124,7 +131,7 @@ test("Drop document shows on a site a doc links to, connects on the first press,
     )
     // A favicon the site can't load falls back to a plain link icon; GitHub gets its mark.
     await menu.locator("a").nth(2).locator("svg").first().waitFor()
-    assert.equal(await menu.locator("a").nth(1).locator("svg.gh").count(), 1)
+    assert.equal(await menu.locator("a").nth(1).locator("svg.vitehub-links-github").count(), 1)
 
     // It opens beside the pill, on its edge: above a pill at the bottom.
     const [menuBox, pillBox] = [await menu.boundingBox(), await pill.locator("[slot=review]").boundingBox()]
@@ -137,42 +144,47 @@ test("Drop document shows on a site a doc links to, connects on the first press,
     await menu.waitFor()
     await page.mouse.click(450, 100)
     await menu.waitFor({ state: "hidden" })
-    // Comment closes it too.
+    // Comment closes it too, and the button goes with the review buttons while someone draws.
     await button.click()
     await menu.waitFor()
     await pill.getByRole("button", { name: "Comment", exact: true }).click()
     await menu.waitFor({ state: "hidden" })
+    await page.keyboard.press("Escape")
+    await pill.getByRole("button", { name: "Highlight", exact: true }).click()
+    await button.waitFor({ state: "hidden" })
+    await page.keyboard.press("Escape")
+    await button.waitFor()
+    // The links stay until the session ends: a second open asks Drop nothing.
+    const before = asked.length
+    await button.click()
+    await menu.waitFor()
+    assert.equal(asked.length, before)
     await context.close()
   } finally {
     await browser.close()
   }
 })
 
-test("Drop document stays hidden where no doc links to the site, or none is shared with the reviewer", async () => {
+test("Related links stays hidden where no drop links to the site, and says so when none is shared with the reviewer", async () => {
   const browser = await chromium.launch()
   try {
     const none = await open(browser, { linked: false })
-    await none.page.waitForFunction(() => true)
     await none.page.waitForTimeout(300)
     assert.deepEqual(none.asked, ["none"])
     assert.equal(await none.button.isVisible(), false)
     await none.context.close()
 
-    // Connected, the list decides: a doc this reviewer can't see leaves the option hidden.
-    const hidden = await open(browser, { connected: true, docs: [] })
-    await hidden.page.waitForTimeout(300)
-    assert.deepEqual(hidden.asked, ["Bearer t"])
-    assert.equal(await hidden.button.isVisible(), false)
-    await hidden.context.close()
+    // Connected or not, the page asks only whether a drop links here before anyone presses the button.
+    const connected = await open(browser, { linked: false, connected: true })
+    await connected.page.waitForTimeout(300)
+    assert.deepEqual(connected.asked, ["none"])
+    assert.equal(await connected.button.isVisible(), false)
+    await connected.context.close()
 
-    // Linked but not shared: connecting says so and hides the option.
-    const unshared = await open(browser, { docs: [] })
+    // Linked but not shared: the menu says so.
+    const unshared = await open(browser, { groups: [] })
     await unshared.button.click()
-    await unshared.page
-      .locator("drop-review .toast")
-      .getByText("No Drop document that links here is shared with you.")
-      .waitFor()
-    assert.equal(await unshared.button.isVisible(), false)
+    await unshared.menu.getByText("No drop related to this site is shared with you.").waitFor()
     await unshared.context.close()
   } finally {
     await browser.close()
