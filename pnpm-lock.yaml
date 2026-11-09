@@ -269,7 +269,7 @@ importers:
         version: 1.5.0(typescript@6.0.3)
       vite-hub:
         specifier: https://pkg.pr.new/vite-hub/vitehub/vite-hub@03e8d1b57b7edc7c03924971902d13948df72216
-        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@03e8d1b57b7edc7c03924971902d13948df72216(patch_hash=6638f5cd08f3507ffab9315b3a3ab07ba847ae8b87e54f86d9d3b82145c3a503)(a675d52914a717d8cd5430baf4ee0573)
+        version: https://pkg.pr.new/vite-hub/vitehub/vite-hub@03e8d1b57b7edc7c03924971902d13948df72216(patch_hash=6638f5cd08f3507ffab9315b3a3ab07ba847ae8b87e54f86d9d3b82145c3a503)(c98aeb8f32d6fc45405cf4e84a3889ab)
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -5218,7 +5218,7 @@ packages:
 
   '@vite-hub/ui@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@da7f5b1a507e0b8bd72e187c4c774f24d326c16d':
     resolution: {integrity: sha512-W4YrAseAV7FXzTjA6Q8V1nAn1J9cO4oWkfw8aR3kHEvYjHGMERGsAWcqottPG2GibkAu1Kn9dJDMMHU7NEs4lA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@da7f5b1a507e0b8bd72e187c4c774f24d326c16d}
-    version: 0.0.0-preview-03e8d1b
+    version: 0.0.0-preview-da7f5b1
     engines: {node: '>=22.22.0'}
     peerDependencies:
       '@iconify-json/ph': ^1.2.2
@@ -25291,7 +25291,7 @@ snapshots:
       - magicast
       - supports-color
 
-  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@03e8d1b57b7edc7c03924971902d13948df72216(patch_hash=6638f5cd08f3507ffab9315b3a3ab07ba847ae8b87e54f86d9d3b82145c3a503)(a675d52914a717d8cd5430baf4ee0573):
+  vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@03e8d1b57b7edc7c03924971902d13948df72216(patch_hash=6638f5cd08f3507ffab9315b3a3ab07ba847ae8b87e54f86d9d3b82145c3a503)(c98aeb8f32d6fc45405cf4e84a3889ab):
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@cloudflare/workers-types': 5.20261023.1
