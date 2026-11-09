@@ -118,6 +118,9 @@ const ICONS = {
   check: svg(`<path d="M52 136l44 44 108-108"/>`),
   reopen: svg(`<path d="M88 152 40 104l48-48"/><path d="M40 104h112a64 64 0 0 1 0 128h-40"/>`),
   close: svg(`<path d="M68 68l120 120M188 68 68 188"/>`),
+  link: svg(
+    `<path d="M116 140a44 44 0 0 0 62 0l36-36a44 44 0 0 0-62-62l-14 14"/><path d="M140 116a44 44 0 0 0-62 0l-36 36a44 44 0 0 0 62 62l14-14"/>`,
+  ),
   marker: svg(`<path d="M164 44l48 48-96 96-56 8 8-56z"/><path d="M140 68l48 48"/><path d="M40 220h88"/>`),
   pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
   arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
@@ -167,7 +170,7 @@ const MARKUP = `<div class="ui">
 ${TOOLS}
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
-<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
+<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="copy" aria-label="Copy the review's link" title="Copy the review's link">${ICONS.link}</button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
 <div class="toast" role="status" hidden></div>
 </div>`
 
@@ -301,6 +304,11 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
   const reviewUrl = () => drop + "/review/open#" + encodeURIComponent(token || "");
+  // Copy link goes through Drop the same way: a small Drop window copies the link there and closes.
+  function copyReviewLink() {
+    const url = drop + "/review/open?copy#" + encodeURIComponent(token || "");
+    if (!window.open(url, "drop-review-copy", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
+  }
 
   function authorName() {
     try { return (JSON.parse(sessionStorage.getItem(stored) || "null") || {}).name || ""; } catch (e) { return ""; }
@@ -845,6 +853,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   showResolved.addEventListener("change", render);
   $("[data-act=close]", list).addEventListener("click", () => { list.hidden = true; });
+  $("[data-act=copy]", list).addEventListener("click", copyReviewLink);
   $("[data-act=close]", thread).addEventListener("click", closeThread);
   $("[data-act=cancel]", pop).addEventListener("click", cancel);
 

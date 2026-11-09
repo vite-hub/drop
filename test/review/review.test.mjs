@@ -868,25 +868,23 @@ test("the embedded review needs comment access to the site", async () => {
   assert.equal(threads().length, 0)
 })
 
-test("Open in Drop opens the review only for people who could open it without its link", async () => {
+test("Open in Drop and Copy link reach the review only for people who could open it without its link", async () => {
   state.mode = "team"
   site("pr12", { visibility: "team" })
   site("previews", { site_url: PATTERN, title: "Acme previews" })
   state.who = ada
   const team = (await token(SITE, { pick: 0 })).body.token
   const link = (await token(SITE, { pick: 1 })).body.token
-  assert.deepEqual(await openPost(post("/api/review/open", { token: team })), { to: "/drops/pr12" })
+  const opened = await openPost(post("/api/review/open", { token: team }))
+  assert.equal(opened.to, "/drops/pr12")
+  assert.match(opened.link, /^https:\/\/drop\.example\/d\/pr12(\/|$)/, "Copy link gets the review's page on Drop")
   assert.equal(
     (await answer(openPost, post("/api/review/open", { token: link }))).status,
     404,
     "a link share found by origin isn't the link",
   )
   state.who = who
-  assert.deepEqual(
-    await openPost(post("/api/review/open", { token: link })),
-    { to: "/drops/previews" },
-    "the owner opens it",
-  )
+  assert.equal((await openPost(post("/api/review/open", { token: link }))).to, "/drops/previews", "the owner opens it")
   state.who = null
   assert.equal((await answer(openPost, post("/api/review/open", { token: link }))).status, 401)
   state.who = ada
