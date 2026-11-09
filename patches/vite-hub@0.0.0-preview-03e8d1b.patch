@@ -1,5 +1,5 @@
 diff --git a/dist/page/pill.iife.js b/dist/page/pill.iife.js
-index 7b50ec086db43c037d50d127c1836fdfee09c0eb..0896bec1c9929f8e9110119745fe01a05263c3da 100644
+index 7b50ec086db43c037d50d127c1836fdfee09c0eb..6ed0a10f54a57d4f1a8a39784f4d6f59506d433a 100644
 --- a/dist/page/pill.iife.js
 +++ b/dist/page/pill.iife.js
 @@ -58,4 +58,19 @@ button{flex-shrink:0;padding:0}
@@ -24,3 +24,35 @@ index 7b50ec086db43c037d50d127c1836fdfee09c0eb..0896bec1c9929f8e9110119745fe01a0
 +.vitehub-links svg{flex:none;color:#a3a3a3}
 +.vitehub-links .vitehub-links-github{color:inherit}
 +@media(any-pointer:coarse){.vitehub-links a{min-height:44px}}`,e.viteHubPagePillStyles=i,e.viteHubPageSvgIcon=a,e.viteHubPillButtonStyles=t,e})({});
+diff --git a/dist/realtime/client.d.ts b/dist/realtime/client.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac351753b0a9d8a880f1a4aedee1db217456c03c
+--- /dev/null
++++ b/dist/realtime/client.d.ts
+@@ -0,0 +1 @@
++export * from "@vite-hub/realtime/client";
+\ No newline at end of file
+diff --git a/dist/realtime/client.js b/dist/realtime/client.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..c504b9af2f5d90490424003e934c0e32bd120283
+--- /dev/null
++++ b/dist/realtime/client.js
+@@ -0,0 +1,2 @@
++export * from "@vite-hub/realtime/client";
++export {};
+diff --git a/package.json b/package.json
+index 6ceebcf79cad582f310cd59f6a05824ba6c04a82..e39aba82dc702f742e5fe9d69e50796e8066992e 100644
+--- a/package.json
++++ b/package.json
+@@ -818,6 +818,11 @@
+       "import": "./dist/realtime.js",
+       "default": "./dist/realtime.js"
+     },
++    "./realtime/client": {
++      "types": "./dist/realtime/client.d.ts",
++      "import": "./dist/realtime/client.js",
++      "default": "./dist/realtime/client.js"
++    },
+     "./realtime/server": {
+       "types": "./dist/realtime/server.d.ts",
+       "import": "./dist/realtime/server.js",

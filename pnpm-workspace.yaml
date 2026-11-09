@@ -72,7 +72,8 @@ patchedDependencies:
   # people marked `idle`, after the ones who are here; that part goes with vite-hub/vitehub feat/ui-avatar-idle.
   "@vite-hub/ui@0.0.0-preview-da7f5b1": patches/@vite-hub__ui@0.0.0-preview-da7f5b1.patch
   # vite-hub/page/pill.js gets the Related links button and menu (mountViteHubPageLinks) that review.js puts in its
-  # pill. Remove when Drop moves to a ViteHub build with vite-hub/vitehub#3772.
+  # pill. Remove when Drop moves to a ViteHub build with vite-hub/vitehub#3772. It also adds the
+  # vite-hub/realtime/client facade for presence, which vite-hub/vitehub#3781 adds.
   vite-hub@0.0.0-preview-03e8d1b: patches/vite-hub@0.0.0-preview-03e8d1b.patch
   # Presence rooms take review.js from a reviewed site: connectRealtimeRoom gets `origin`, and a definition `origins`.
   # Remove when Drop moves to a ViteHub build with vite-hub/vitehub feat/realtime-cross-origin.
