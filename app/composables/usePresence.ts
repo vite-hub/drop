@@ -1,5 +1,5 @@
 import type { DropDetail } from "#shared/types"
-import type { RealtimeRoom } from "vite-hub/realtime/client"
+import type { RealtimeRoom } from "@vite-hub/realtime/client"
 
 /** Someone else with the drop open: who, in their presence color, whether they're away, and where they are. */
 export interface PresencePerson {
@@ -62,7 +62,7 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
       if (!id || !me.value) return
       const found = await $fetch<{ room: string }>(`/api/drops/${id}/presence`).catch(() => null)
       if (!found || current !== generation) return
-      const { connectRealtimeRoom } = await import("vite-hub/realtime/client")
+      const { connectRealtimeRoom } = await import("@vite-hub/realtime/client")
       if (current !== generation) return
       const joined = connectRealtimeRoom("presence", found.room, {
         params: { drop: id },

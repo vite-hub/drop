@@ -120,6 +120,14 @@ Team and Team can edit exist only on team Drops. New drops start Only me on a pe
 
 A public link closes after 7 days on a team Drop and never on a personal one, unless the operator changes it. The drop then falls back to Team, or to Only me on a personal Drop. Picking Public again restarts the window. A drop in a folder takes the widest share on its path.
 
+## Who's here {#presence}
+
+When others have the same drop open, their faces show next to **Share**, ringed in the color of their cursor. Someone away for a minute, or whose tab is hidden, dims. Press the faces for a list of who's here, and, on a site review, which page each person is on.
+
+On a doc or an app, you see the cursors of the people on the same version and page, with their names. Turn **Show cursors** off in that list to hide them; the browser remembers.
+
+Only people who could open the drop without its link join: its owner, admins, and the people a team share reaches. Someone reading a public link doesn't show up and doesn't see who else is reading. Agents never show.
+
 ## Edit together {#edit}
 
 Anyone who may edit a Markdown doc opens it with **Edit**, a Notion-like editor where everyone sees each other's avatars, cursors, and keystrokes as they happen. Type `/` for blocks, `@` to mention someone on this Drop, and `:` for an emoji.

@@ -41,6 +41,10 @@ Everyone who may edit a Markdown doc opens it with **Edit** and works in the sam
 
 More in [Edit together](/docs/review#edit).
 
+## See who's here {#presence}
+
+The people a drop is shared with see each other while they have it open: their faces next to **Share**, dimmed while away, and their cursors on the doc, the app, or the reviewed site. A public link's readers stay out of it. More in [Who's here](/docs/review#presence) and, for sites, [See who's here](/docs/sites#presence).
+
 ## Version history {#versions}
 
 Every version of a doc gets a number and a note on what changed. History lists them, and a click shows what a version changed against the one before. Open comments carry over to the next version, and the doc keeps one link that always opens the latest.
