@@ -32,6 +32,10 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     default: () => [],
   })
 
+  // Each comment this reader writes, once it went through: the presence room tells the others to load them now
+  // (usePresence's `commented`). Loading them again never fires it, so two viewers can't keep waking each other.
+  const wrote = createEventHook<void>()
+
   // No toast either way: the new pin shows it went through, and a failure shows under the box that sent it.
   async function addComment(
     input: Omit<CommentInput, "body" | "mentions">,
@@ -46,6 +50,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
         body: withImages({ ...input, body, mentions }, files),
       })
       comments.data.value = [...comments.data.value, comment]
+      void wrote.trigger()
       return { value: comment }
     } catch (error) {
       return { error: notify.problem(error) }
@@ -60,6 +65,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     comments.data.value = before.map((comment) => (comment.id === commentId ? { ...comment, resolved } : comment))
     try {
       await $fetch(`/api/comments/${commentId}`, { method: "PATCH", body: { resolved } })
+      void wrote.trigger()
     } catch (error) {
       comments.data.value = before
       notify.fail("Couldn't update the comment", error)
@@ -70,6 +76,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     try {
       await $fetch(`/api/comments/${commentId}`, { method: "DELETE" })
       comments.data.value = comments.data.value.filter((comment) => comment.id !== commentId)
+      void wrote.trigger()
     } catch (error) {
       notify.fail("Couldn't delete the comment", error)
     }
@@ -92,6 +99,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
         body: withImages({ body, mentions }, files),
       })
       setReplies(commentId, (replies) => [...replies, reply])
+      void wrote.trigger()
       return { value: reply }
     } catch (error) {
       return { error: notify.problem(error) }
@@ -116,6 +124,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
           ),
         }
       })
+      void wrote.trigger()
       return { value: edited } satisfies Sent<CommentReply>
     } catch (error) {
       return { error: notify.problem(error) } satisfies Sent<CommentReply>
@@ -126,6 +135,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     try {
       await $fetch(`/api/replies/${replyId}`, { method: "DELETE" })
       setReplies(commentId, (replies) => replies.filter((reply) => reply.id !== replyId))
+      void wrote.trigger()
     } catch (error) {
       notify.fail("Couldn't delete the reply", error)
     }
@@ -175,6 +185,10 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   return {
     drop,
     comments,
+    /** Runs after each comment write of this reader's, for whoever else should hear of it. */
+    onWrote: wrote.on,
+    /** For a comment written outside these actions, such as a site review's screenshot comment. */
+    wrote: () => void wrote.trigger(),
     findComment,
     addComment,
     resolveComment,

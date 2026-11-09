@@ -14,8 +14,10 @@ import DROP_MARK from "./drop-mark.svg?raw"
 import { ELEMENT_NAMING, INK } from "./plan-runtime"
 import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
 import { CAPTURE } from "./viewport-capture"
+import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
 
-const STYLE = `
+const STYLE =
+  `
 :host { all: initial; --bg: #fff; --fg: #0a0a0a; --muted: #737373; --border: #e5e5e5; --primary: #171717; --primary-fg: #fafafa; --ring: #a3a3a3; --error: #dc2626; --soft: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
 @media (prefers-color-scheme: dark) { :host { --bg: #171717; --fg: #fafafa; --muted: #a3a3a3; --border: rgb(255 255 255 / .12); --primary: #e5e5e5; --primary-fg: #171717; --ring: #737373; --error: #f87171; } }
 * { box-sizing: border-box; }
@@ -103,7 +105,16 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .ink .mk { stroke-opacity: .4; stroke-linecap: butt; }
-`
+/* Who else is on the review (the people button): their faces, ringed in their cursor's color, dimmed while away. */
+.seg .people { gap: 0; padding: 0 6px; }
+.people .face { display: grid; place-items: center; width: 20px; height: 20px; margin-left: -4px; overflow: hidden; border-radius: 50%; background: var(--vitehub-pill-hover); color: inherit; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 0 0 1.5px var(--face, transparent); transition: opacity 200ms ease, filter 200ms ease; }
+.people .face:first-child { margin-left: 0; }
+.people .face img { width: 100%; height: 100%; object-fit: cover; }
+.people .face.idle { opacity: .45; filter: grayscale(1); box-shadow: 0 0 0 1.5px var(--vitehub-pill-line); }
+.people .more { margin-left: 4px; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.people[aria-pressed=false] .face { box-shadow: 0 0 0 1.5px var(--vitehub-pill-line); }
+@media (prefers-reduced-motion: reduce) { .people .face { transition: none; } }
+` + PRESENCE_CURSOR_STYLE
 
 // Line icons, drawn with the stroke in STYLE. The bubble is Comment, the stack is the list of threads, and the marker,
 // pen, and arrow are Highlight's tips.
@@ -165,7 +176,7 @@ const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button><button type="button" class="people" data-act="people" hidden aria-pressed="true"></button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
@@ -214,6 +225,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   ${ELEMENT_NAMING}
 
+  ${PRESENCE_CURSORS}
+
   ${PAGE_PILL}
 
   const host = document.createElement("drop-review");
@@ -225,7 +238,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
-  const copyButton = $("[data-act=copy]", bar);
+  const copyButton = $("[data-act=copy]", bar), peopleButton = $("[data-act=people]", bar);
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
 
@@ -281,7 +294,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function save(value) {
     token = value ? value.token : null;
     try { value ? sessionStorage.setItem(stored, JSON.stringify(value)) : sessionStorage.removeItem(stored); } catch (e) {}
-    if (!token) { threads = []; related.forget(); render(); }
+    if (!token) { threads = []; related.forget(); leavePresence(); render(); }
   }
 
   function say(text, link) {
@@ -364,6 +377,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       if (here !== pageKey()) return;
       threads = Array.isArray(answer.threads) ? answer.threads : [];
       render();
+      void joinPresence();
     } catch (e) {}
   }
 
@@ -909,6 +923,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     try {
       await call(api + "/" + item.n, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ resolved: !item.resolved }) });
       item.resolved = !item.resolved;
+      commented();
       if (item.resolved && !showResolved.checked) { closeThread(); say("Resolved #" + item.n + "."); }
       render();
       void refresh();
@@ -926,6 +941,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       await ensureToken();
       await call(api + "/" + item.n + "/replies", Object.assign({ method: "POST" }, bodyOf({ body: body.slice(0, 4000) }, replyBox.files())));
       replyBox.reset();
+      commented();
       await refresh();
       const items = $(".items", thread);
       items.scrollTop = items.scrollHeight;
@@ -1002,6 +1018,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       if (shot) form.append("screenshot", shot, "screenshot");
       newBox.files().forEach((file) => form.append("image", file, file.name || "image"));
       const answer = await postComment(form, data);
+      commented();
       newBox.reset();
       cancel();
       say("Sent as #" + answer.n + ". ", reviewUrl());
@@ -1013,6 +1030,142 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
   });
 
+  // ---- Who's here ----
+  // The people the review is shared with who are on it now, here or in Drop: their faces in the bar, and their cursors
+  // on this page. Drop trades the token for a short ticket (/api/review/presence) and the client loads from Drop only
+  // then (/review-presence.js), so a page nobody connected on loads neither. Anyone the review isn't shared with, guests
+  // included, gets no ticket and comments without it. Pressing the faces hides or shows the cursors.
+  const PRESENCE_IDLE_MS = 60000;
+  let presence = null, joining = false, lastInput = Date.now(), active = true;
+  let pointerSent = 0, pointerTimer = 0, pointerAt = null, cursorsShown = true;
+  try { cursorsShown = localStorage.getItem("drop-review-cursors") !== "off"; } catch (e) {}
+  const cursors = mountCursors(root, (x, y) => document.elementsFromPoint(x, y).find((node) => node !== host && node !== document.documentElement) || null);
+  const herePage = () => location.origin + pageKey();
+
+  async function joinPresence() {
+    if (!token || presence || joining) return;
+    joining = true;
+    try {
+      const answer = await (await call(drop + "/api/review/presence", { method: "POST" })).json();
+      const client = await import(drop + "/review-presence.js");
+      if (!token || presence) return;
+      const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket } });
+      room.setLocal("active", active);
+      room.setLocal("at", herePage());
+      presence = { room, expiresAt: Number(answer.expiresAt) || 0, comments: "" };
+      room.onUpdate(onPresence);
+    } catch (e) {
+      // Not shared with this reviewer, no Realtime on this Drop, or a page whose CSP blocks the client: no faces.
+    } finally {
+      joining = false;
+    }
+  }
+  function leavePresence() {
+    if (!presence) return;
+    presence.room.destroy();
+    presence = null;
+    cursors.set([]);
+    peopleButton.hidden = true;
+  }
+  // A dropped socket comes back on its own while its ticket holds; after that, a new ticket.
+  function onPresence() {
+    const current = presence;
+    if (!current) return;
+    if (current.room.status() === "disconnected" && Date.now() > current.expiresAt - 60000) {
+      leavePresence();
+      setTimeout(joinPresence, 1000);
+      return;
+    }
+    const states = current.room.states();
+    const people = current.room.people();
+    const me = (people.find((person) => person.clientId === current.room.clientId) || {}).id;
+    const others = new Map();
+    for (const person of people) {
+      if (person.id === me) continue;
+      const state = states.get(person.clientId) || {};
+      const entry = Object.assign({}, person, { idle: state.active === false, at: typeof state.at === "string" ? state.at : null });
+      const seen = others.get(person.id);
+      if (!seen || (seen.idle && !entry.idle)) others.set(person.id, entry);
+    }
+    renderPeople([...others.values()].sort((a, b) => a.idle - b.idle));
+    const here = herePage(), shown = [];
+    if (cursorsShown) {
+      for (const [clientId, state] of states) {
+        const person = people.find((p) => p.clientId === clientId), spot = state.cursor;
+        if (!person || person.id === me || state.at !== here || !spot || typeof spot.selector !== "string" || !Number.isFinite(spot.x) || !Number.isFinite(spot.y)) continue;
+        shown.push({ key: String(clientId), name: person.name, color: person.color, selector: spot.selector.slice(0, 1000), x: spot.x, y: spot.y });
+      }
+    }
+    cursors.set(shown);
+    // Someone wrote a comment, here or in Drop: this page's threads load now, not at the next poll.
+    const change = [...states.values()].map((state) => (typeof state.comments === "string" ? state.comments : "")).join();
+    if (change !== current.comments) {
+      const first = current.comments === "";
+      current.comments = change;
+      if (!first) void refresh();
+    }
+  }
+  function renderPeople(people) {
+    peopleButton.hidden = !people.length;
+    if (!people.length) { peopleButton.textContent = ""; return; }
+    const names = people.map((person) => person.name + (person.idle ? " (away)" : "")).join(", ");
+    peopleButton.title = names + ". " + (cursorsShown ? "Hide cursors" : "Show cursors");
+    peopleButton.setAttribute("aria-label", "Here now: " + peopleButton.title);
+    peopleButton.setAttribute("aria-pressed", String(cursorsShown));
+    peopleButton.textContent = "";
+    for (const person of people.slice(0, people.length > 3 ? 2 : 3)) {
+      const face = avatar(person, el("span", "face" + (person.idle ? " idle" : "")));
+      face.style.setProperty("--face", person.color);
+      peopleButton.appendChild(face);
+    }
+    if (people.length > 3) peopleButton.appendChild(el("span", "more", "+" + (people.length - 2)));
+  }
+  peopleButton.addEventListener("click", () => {
+    cursorsShown = !cursorsShown;
+    try { localStorage.setItem("drop-review-cursors", cursorsShown ? "on" : "off"); } catch (e) {}
+    onPresence();
+  });
+  // Tells the others the comments changed (Drop's viewers too), so they load them now.
+  function commented() {
+    if (presence) presence.room.setLocal("comments", crypto.randomUUID());
+  }
+
+  // The reviewer's pointer, at most every 50 ms, only while someone else is here to see it.
+  function pointerMoved(e) {
+    lastInput = Date.now();
+    if (!presence || peopleButton.hidden || e.pointerType === "touch") return;
+    pointerAt = { x: e.clientX, y: e.clientY };
+    const wait = 50 - (Date.now() - pointerSent);
+    if (wait <= 0) sendPointer();
+    else if (!pointerTimer) pointerTimer = setTimeout(sendPointer, wait);
+  }
+  function sendPointer() {
+    pointerTimer = 0;
+    if (!presence || !pointerAt) return;
+    pointerSent = Date.now();
+    presence.room.setLocal("cursor", cursors.anchorAt(pointerAt.x, pointerAt.y));
+    pointerAt = null;
+  }
+  function pointerLeft() {
+    clearTimeout(pointerTimer);
+    pointerTimer = 0;
+    pointerAt = null;
+    if (presence) presence.room.setLocal("cursor", null);
+  }
+  addEventListener("pointermove", pointerMoved, { capture: true, passive: true });
+  document.documentElement.addEventListener("pointerleave", pointerLeft);
+  addEventListener("blur", pointerLeft);
+  for (const type of ["keydown", "scroll", "pointerdown"]) addEventListener(type, () => { lastInput = Date.now(); }, { capture: true, passive: true });
+  // Away after a minute without input, or while the tab is hidden.
+  function checkActive() {
+    const now = document.visibilityState === "visible" && Date.now() - lastInput < PRESENCE_IDLE_MS;
+    if (now === active) return;
+    active = now;
+    if (presence) presence.room.setLocal("active", active);
+  }
+  setInterval(checkActive, 5000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") lastInput = Date.now(); checkActive(); });
+
   // Pins follow their elements: on scroll anywhere, on resize, and when the page changes under them.
   addEventListener("scroll", schedule, { capture: true, passive: true });
   addEventListener("resize", schedule, { passive: true });
@@ -1023,7 +1176,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }).observe(document.documentElement, { childList: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
   setInterval(() => {
-    if (token && pageKey() !== here) { closeThread(); elementFor.clear(); void refresh(); }
+    if (token && pageKey() !== here) {
+      closeThread(); elementFor.clear(); void refresh();
+      if (presence) { presence.room.setLocal("at", herePage()); presence.room.setLocal("cursor", null); onPresence(); }
+    }
     else schedule();
   }, 1000);
   // Other reviewers' new threads and replies show up while someone looks.

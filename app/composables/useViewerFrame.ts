@@ -5,6 +5,7 @@ import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
+import type { Presence } from "~/composables/usePresence"
 
 type RuntimeReport = {
   kind: Extract<FrameMessage, { type: "runtime-error" }>["kind"]
@@ -47,6 +48,8 @@ export function useViewerFrame(options: {
   variantBar?: boolean
   /** ← or → on an image's page, while the page has focus: the viewer moves along the image's folder. */
   arrow?: (key: "ArrowLeft" | "ArrowRight") => void
+  /** Who else has the drop open (usePresence): the reader's pointer goes up to them, and their cursors come down. */
+  presence?: Presence
 }) {
   const {
     drop,
@@ -266,6 +269,8 @@ export function useViewerFrame(options: {
         return
       case "copy":
         return void copy(message.text)
+      case "pointer":
+        return options.presence?.point(message.at)
       case "files":
         // Each as soon as it's read, so the first one on screen doesn't wait for the rest.
         for (const path of message.paths)
@@ -390,6 +395,16 @@ export function useViewerFrame(options: {
       }),
   )
   watch(annotations.penStyle, (pen) => ready.value && send({ type: "pen", ...pen }))
+  // Fresh objects: postMessage can't copy a reactive proxy.
+  if (options.presence) {
+    const { cursors, sharing } = options.presence
+    watch(
+      [ready, cursors, sharing],
+      () =>
+        ready.value &&
+        send({ type: "cursors", cursors: cursors.value.map((cursor) => ({ ...cursor })), share: sharing.value }),
+    )
+  }
   watch(
     [ready, () => ({ ...annotations.overlays }), () => options.comments?.value],
     () => ready.value && send({ type: "view", ...annotations.overlays, ...options.comments?.value }),

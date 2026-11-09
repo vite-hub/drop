@@ -20,6 +20,18 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
   v.object({ type: v.literal("copy"), text: v.string() }),
+  // Where the reader's pointer is, for the people in the drop's presence room (PRESENCE_CURSORS in ./presence-cursors):
+  // the element under it and the spot inside it in thousandths. null once it leaves the page.
+  v.object({
+    type: v.literal("pointer"),
+    at: v.nullable(
+      v.object({
+        selector: v.pipe(v.string(), v.maxLength(1000)),
+        x: v.pipe(v.number(), v.integer(), v.minValue(-1000), v.maxValue(2000)),
+        y: v.pipe(v.number(), v.integer(), v.minValue(-1000), v.maxValue(2000)),
+      }),
+    ),
+  }),
   // The /f/ paths of a Markdown doc's images, videos, and audio that came near the screen (DEFERRED_FILES_SCRIPT in
   // ./documents).
   v.object({ type: v.literal("files"), paths: v.pipe(v.array(v.string()), v.maxLength(100)) }),

@@ -4,6 +4,7 @@
 import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { CAPTURE } from "./viewport-capture"
+import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
 import COMMENTS_CSS from "comark-comments/style.css?raw"
 
 const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
@@ -237,6 +238,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.sw{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:3px;vertical-align:-1px;box-shadow:inset 0 0 0 1px rgb(128 128 128/.35)}' +
     '.ru{position:fixed;z-index:1;display:block;background:var(--sf);box-shadow:0 0 0 .5px rgb(128 128 128/.35)}.ru.x{left:18px;top:0;cursor:row-resize}.ru.y{left:0;top:18px;cursor:col-resize}.ru.c{left:0;top:0;width:18px;height:18px;cursor:default}' +
     '.gd{position:absolute;background:var(--gd)}.gd::before{content:"";position:absolute;inset:-3px}.gd.h{height:1px;left:0}.gd.h::before{cursor:row-resize}.gd.v{width:1px;top:0}.gd.v::before{cursor:col-resize}' +
+    ${JSON.stringify(PRESENCE_CURSOR_STYLE)} +
     '</style>';
   const LAYERS = '<div class="marks"></div><div class="draft"></div>';
   // comark-comments' own stylesheet for the cards of comments in the margin (see render), then where they go: each is
@@ -250,6 +252,35 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '</style>';
   shadow.innerHTML = STYLE + RAIL_STYLE + LAYERS;
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
+
+  // Live cursors: the people in the drop's presence room point here too. Drop says when this reader shares their pointer
+  // ("cursors" with share), and it goes up at most every 50 ms, as the element under it and the spot inside it.
+  const cursors = mountCursors(shadow, elementAt);
+  let sharePointer = false, pointerSent = 0, pointerTimer = 0, pointerAt = null;
+  function presenceMove(e) {
+    if (!sharePointer || e.pointerType === "touch") return;
+    pointerAt = { x: e.clientX, y: e.clientY };
+    const wait = 50 - (Date.now() - pointerSent);
+    if (wait <= 0) sendPointer();
+    else if (!pointerTimer) pointerTimer = setTimeout(sendPointer, wait);
+  }
+  function sendPointer() {
+    pointerTimer = 0;
+    if (!pointerAt || !sharePointer) return;
+    pointerSent = Date.now();
+    const at = cursors.anchorAt(pointerAt.x, pointerAt.y);
+    pointerAt = null;
+    post({ type: "pointer", at });
+  }
+  function presenceLeave() {
+    clearTimeout(pointerTimer);
+    pointerTimer = 0;
+    pointerAt = null;
+    if (sharePointer) post({ type: "pointer", at: null });
+  }
+  addEventListener("pointermove", presenceMove, { capture: true, passive: true });
+  document.documentElement.addEventListener("pointerleave", presenceLeave);
+  addEventListener("blur", presenceLeave);
   // MingCute's copy and check, at the 1.75 stroke of Drop's own buttons (app.config icon.customize).
   const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
@@ -288,6 +319,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const highlights = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
 
   ${ELEMENT_NAMING}
+  ${PRESENCE_CURSORS}
   const query = (selector) => { try { return (selector && document.querySelector(selector)) || null; } catch (e) { return null; } };
   const BLOCK = /^(p|li|td|th|h[1-6]|blockquote|pre|figcaption|dd|dt|label|section|article|main|div)$/i;
   function blockOf(node) {
@@ -1084,8 +1116,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (typeof handler === "function") handler.call(node, e);
     }
     if (dragging && /^pointer(move|up|cancel)$/.test(e.type)) dragging(e);
-    if (e.type === "pointermove") pointer = { x: e.clientX, y: e.clientY };
-    if (e.type === "pointerout" && !e.relatedTarget) pointer = "out";
+    if (e.type === "pointermove") { pointer = { x: e.clientX, y: e.clientY }; presenceMove(e); }
+    if (e.type === "pointerout" && !e.relatedTarget) { pointer = "out"; presenceLeave(); }
   }
   /**
    * The page missed the pointer leaving what it was over when the hold began. Once the hold ends, each element the
@@ -1538,6 +1570,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; clickComments = m.clickComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
     if (m.type === "pen") setPen(m);
+    // Other people's cursors on this page, from Drop's presence room, and whether this reader shares theirs.
+    if (m.type === "cursors" && Array.isArray(m.cursors)) {
+      const was = sharePointer;
+      sharePointer = m.share === true;
+      if (was && !sharePointer) presenceLeave();
+      cursors.set(m.cursors.filter((c) => c && typeof c.key === "string" && typeof c.name === "string" && typeof c.color === "string" && typeof c.selector === "string" && Number.isFinite(c.x) && Number.isFinite(c.y)).slice(0, 50));
+    }
     if (m.type === "mark" && m.do === "undo") undoMark();
     if (m.type === "mark" && m.do === "done") finishMark();
     if (m.type === "view") setView(m);

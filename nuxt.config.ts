@@ -9,6 +9,7 @@ import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
+import { reviewPresence } from "./scripts/review-presence.ts"
 
 declare module "nuxt/schema" {
   interface RouteRuleConfigExtensions {
@@ -350,6 +351,7 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    plugins: [reviewPresence()],
     env: {
       server: {
         auth: {
