@@ -163,14 +163,14 @@ const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
 ${TOOLS}
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
-<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="copy" aria-label="Copy the review's link" title="Copy the review's link">${ICONS.link}</button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
+<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
 <div class="toast" role="status" hidden></div>
 </div>`
 
@@ -218,6 +218,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
+  const copyButton = $("[data-act=copy]", bar);
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
 
@@ -397,7 +398,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const shown = token ? visible() : [];
     const open = threads.filter((item) => !item.resolved).length;
     // The list shows once the page has threads: before someone connects there is nothing to count.
-    pinsButton.hidden = listButton.hidden = !threads.length;
+    copyButton.hidden = pinsButton.hidden = listButton.hidden = !threads.length;
     if (listButton.hidden) list.hidden = true;
     count.textContent = String(open);
     listButton.title = open + " open comment" + (open === 1 ? "" : "s") + " on this page";
@@ -853,7 +854,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   showResolved.addEventListener("change", render);
   $("[data-act=close]", list).addEventListener("click", () => { list.hidden = true; });
-  $("[data-act=copy]", list).addEventListener("click", copyReviewLink);
+  copyButton.addEventListener("click", copyReviewLink);
   $("[data-act=close]", thread).addEventListener("click", closeThread);
   $("[data-act=cancel]", pop).addEventListener("click", cancel);
 

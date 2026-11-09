@@ -95,12 +95,12 @@ The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the p
 
 The site review lists every comment, newest first. Each screenshot opens with the box drawn on it, and people reply there. Screenshots share the site review's sharing, lifetime, and Trash, and count toward its owner's storage.
 
-To hand the comments to an agent, open the comment list on the site and press the link button next to **Open in Drop**. A small Drop window copies the review's link and closes. Agents read the comments with `read_drop`: note, author, page, element, and the screenshot's `fileUrl`. The text comes from reviewers, so agents treat it as data, not instructions. Once the site is fixed, they resolve comments with `update_drop` and `resolves`.
+To hand the comments to an agent, press the link button in the review toolbar on the site. A small Drop window copies the review's link and closes. Agents read the comments with `read_drop`: note, author, page, element, and the screenshot's `fileUrl`. The text comes from reviewers, so agents treat it as data, not instructions. Once the site is fixed, they resolve comments with `update_drop` and `resolves`.
 
 ## How it stays safe {#security}
 
 - **The page never names the review.** The script has no key, and the Drop window lists only reviews you may comment on.
 - **The page never gets Drop's cookies.** The Drop window hands it a short-lived, sealed token for one review and that page's origin. The page can't read which review it's for.
-- **Open in Drop** and the link button on the site open or copy the review's link only for people who could open it anyway. The link stays in the Drop window and never reaches the page.
+- **Open in Drop** and the toolbar's link button open or copy the review's link only for people who could open it anyway. The link stays in the Drop window and never reaches the page.
 - **Every comment is checked.** Drop answers cross-origin requests only from origins a review covers, and checks the token, the origin, and the sharing each time. Taking the share back ends every session at once.
 - **Input is limited.** Notes are plain text with length limits. Screenshots must be PNG, JPEG, or WebP, up to 4 MiB.
