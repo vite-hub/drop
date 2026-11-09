@@ -1,5 +1,6 @@
 import type { DropDetail } from "#shared/types"
 import type { RealtimeRoom } from "@vite-hub/realtime/client"
+import * as v from "valibot"
 
 /** Someone else with the drop open: who, in their presence color, whether they're away, and where they are. */
 export interface PresencePerson {
@@ -23,7 +24,22 @@ export interface PresenceCursor {
   y: number
 }
 
-type Spot = { selector: string; x: number; y: number }
+/**
+ * What one person shares in the room's awareness, as this app's clients set it: anyone in the room can send anything,
+ * so each state is parsed here, and a field that doesn't fit counts as unset.
+ */
+const Spot = v.object({ selector: v.pipe(v.string(), v.maxLength(1000)), x: v.number(), y: v.number() })
+type Spot = v.InferOutput<typeof Spot>
+const PresenceState = v.object({
+  active: v.fallback(v.optional(v.boolean()), undefined),
+  at: v.fallback(v.nullish(v.string()), undefined),
+  cursor: v.fallback(v.nullish(Spot), undefined),
+  comments: v.fallback(v.optional(v.string()), undefined),
+})
+const stateOf = (state: unknown) => {
+  const parsed = v.safeParse(PresenceState, state)
+  return parsed.success ? parsed.output : {}
+}
 
 const IDLE_MS = 60_000
 
@@ -91,14 +107,14 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     const byId = new Map<string, PresencePerson>()
     for (const person of current.people()) {
       if (person.clientId === current.clientId || person.id === me.value?.id) continue
-      const state = states.get(person.clientId) ?? {}
+      const state = stateOf(states.get(person.clientId))
       const entry: PresencePerson = {
         id: person.id,
         name: person.name,
         ...(person.image ? { image: person.image } : {}),
         color: person.color,
         idle: state.active === false,
-        at: typeof state.at === "string" ? state.at : null,
+        at: state.at ?? null,
       }
       const seen = byId.get(person.id)
       if (!seen || (seen.idle && !entry.idle)) byId.set(person.id, entry)
@@ -114,19 +130,11 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     const here = options.at()
     const list: PresenceCursor[] = []
     const byClient = new Map(current.people().map((person) => [person.clientId, person]))
-    for (const [clientId, state] of current.states()) {
+    for (const [clientId, raw] of current.states()) {
       const person = byClient.get(clientId)
-      const spot = state.cursor as Partial<Spot> | null | undefined
-      if (!person || person.id === me.value?.id || state.at !== here || !spot) continue
-      if (typeof spot.selector !== "string" || !Number.isFinite(spot.x) || !Number.isFinite(spot.y)) continue
-      list.push({
-        key: String(clientId),
-        name: person.name,
-        color: person.color,
-        selector: spot.selector.slice(0, 1000),
-        x: Number(spot.x),
-        y: Number(spot.y),
-      })
+      const { at, cursor } = stateOf(raw)
+      if (!person || person.id === me.value?.id || (at ?? null) !== here || !cursor) continue
+      list.push({ key: String(clientId), name: person.name, color: person.color, ...cursor })
     }
     return list
   })
@@ -149,9 +157,7 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     void tick.value
     const current = room.value
     if (!current) return ""
-    return [...current.states().values()]
-      .map((state) => (typeof state.comments === "string" ? state.comments : ""))
-      .join()
+    return [...current.states().values()].map((state) => stateOf(state).comments ?? "").join()
   })
 
   return { people, cursors, sharing, showCursors, point, commented, commentsChange }

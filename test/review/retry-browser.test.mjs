@@ -66,6 +66,9 @@ async function open(browser, { saved = [], hideUntilPost = false } = {}) {
     if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
     if (drop.down) return route.fulfill({ status: 503, contentType: "text/html", body: "<h1>503</h1>" })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
+    // Who's here isn't part of these tests: this Drop gives the reviewer no presence ticket.
+    if (url.pathname === "/api/review/presence")
+      return route.fulfill({ status: 404, contentType: "application/json", headers: CORS, body: "{}" })
     if (request.method() === "POST") {
       drop.posts++
       const data = JSON.parse(
