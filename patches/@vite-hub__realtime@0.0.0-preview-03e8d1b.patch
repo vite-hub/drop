@@ -1,0 +1,69 @@
+diff --git a/dist/client.d.ts b/dist/client.d.ts
+index 69833f218c06e28262756a88408ccdfc51ce8a4e..8bb1e169f2573fbdea3f08fbde66741f9ad0d821 100644
+--- a/dist/client.d.ts
++++ b/dist/client.d.ts
+@@ -5,6 +5,11 @@ export type RealtimeRoomStatus = "connected" | "connecting" | "disconnected";
+ export interface RealtimeRoomOptions {
+   /** The app base path for a prebuilt client, such as `/portal/`. Defaults to the app's build-time base. */
+   baseURL?: string;
++  /**
++   * The app's origin, such as `https://app.example.com`, for a client running on another site's page. Defaults to the
++   * page's own origin. The definition must let that page's origin in with `origins`.
++   */
++  origin?: string;
+   /** Query parameters sent to the definition's authorization on presence and workspace connections. */
+   params?: Record<string, string>;
+   /**
+diff --git a/dist/client.js b/dist/client.js
+index 6db3ce0a0f0342895a67143679ed9dc10c3e2cbe..a88b5f9cd525a17174c84e581ca8fa805905c2f1 100644
+--- a/dist/client.js
++++ b/dist/client.js
+@@ -24,7 +24,8 @@ function connectRealtimeRoom(definition, documentId, options = {}) {
+ 		for (const listener of updateListeners) listener();
+ 	};
+ 	const url = () => {
+-		return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${resolveRealtimeApplicationPath(`/api/_vitehub/realtime/${encodeURIComponent(definition)}`, options.baseURL)}`;
++		const app = options.origin ? new URL(options.origin) : window.location;
++		return `${app.protocol === "https:" ? "wss:" : "ws:"}//${app.host}${resolveRealtimeApplicationPath(`/api/_vitehub/realtime/${encodeURIComponent(definition)}`, options.baseURL)}`;
+ 	};
+ 	const room = documentId.split("/").map(encodeURIComponent).join("/");
+ 	const localState = {};
+diff --git a/dist/server.js b/dist/server.js
+index 385eb66e17ff88bae4d2d9c2e8d9f6f97e28004c..adb558c3e2398f414058bfaa639cf19179ead145 100644
+--- a/dist/server.js
++++ b/dist/server.js
+@@ -955,7 +955,12 @@ function toRealtimeUser(value) {
+ async function identify(request, event, definitionName, definition) {
+ 	if (definition.identify) {
+ 		const origin = request.headers.get("origin");
+-		if (origin && origin !== forwardedRequestOrigin(request)) throw new HTTPError({
++		if (origin && origin !== forwardedRequestOrigin(request) && !await definition.origins?.({
++			definition: definitionName,
++			event,
++			origin,
++			request
++		})) throw new HTTPError({
+ 			status: 403,
+ 			message: "Realtime requests must come from the application origin."
+ 		});
+diff --git a/dist/types-CdzPWMcs.d.ts b/dist/types-CdzPWMcs.d.ts
+index fdd56fbab31ab062ad3f71ae83539a4162b568be..4c18078792dbb3befe4c697a202f010353a62620 100644
+--- a/dist/types-CdzPWMcs.d.ts
++++ b/dist/types-CdzPWMcs.d.ts
+@@ -146,6 +146,16 @@ interface RealtimeDefinition {
+   auth?: boolean;
+   /** Resolve the user for a request, replacing the ViteHub Auth session. Return `null` for anonymous. */
+   identify?: (context: RealtimeRequestContext) => RealtimeUser | null | undefined | Promise<RealtimeUser | null | undefined>;
++  /**
++   * Let a page on another origin connect to a definition with `identify`, such as a script that sites load from the
++   * app. Return `true` to accept `origin`. Without it, only the app's own origin connects. The browser sends cookies
++   * with a cross-site handshake too, so `identify` must then trust only what the page sends on purpose, such as a
++   * ticket in `params`, never the session cookie.
++   */
++  origins?: (context: RealtimeRequestContext & {
++    /** The `Origin` header of a request from another origin than the app's. */
++    origin: string;
++  }) => boolean | Promise<boolean>;
+   /** Allow or deny one access mode. Return `false` to deny. Write denial makes a connection read-only. */
+   authorize?: (context: RealtimeAuthorizeContext) => boolean | void | Promise<boolean | void>;
+   document: RealtimeWorkspaceDocumentOptions | RealtimeDocumentAdapter;
