@@ -27,7 +27,7 @@ overrides:
   "@vite-hub/schedule": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/shell": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/source": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@03e8d1b57b7edc7c03924971902d13948df72216
-  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@03e8d1b57b7edc7c03924971902d13948df72216
+  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@da7f5b1a507e0b8bd72e187c4c774f24d326c16d
   "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@03e8d1b57b7edc7c03924971902d13948df72216
@@ -69,7 +69,7 @@ patchedDependencies:
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
   # A comment box with text shakes on Esc, and a second Esc discards the text and closes it, instead of shaking again
   # forever. Remove when Drop moves to a ViteHub build with vite-hub/vitehub console-drop-comments.
-  "@vite-hub/ui@0.0.0-preview-03e8d1b": patches/@vite-hub__ui@0.0.0-preview-03e8d1b.patch
+  "@vite-hub/ui@0.0.0-preview-da7f5b1": patches/@vite-hub__ui@0.0.0-preview-da7f5b1.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
