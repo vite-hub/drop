@@ -331,20 +331,25 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   const pageKey = () => location.pathname + location.search;
 
+  // Each read takes a number, and only the latest one may draw: a read that started before a sent comment was saved
+  // would erase its pin.
+  let reads = 0;
   async function refresh() {
     if (!token) return;
     here = pageKey();
+    const read = ++reads;
     try {
       const response = await call(api + "?page=" + encodeURIComponent(here));
       const answer = await response.json();
-      if (here !== pageKey()) return;
+      if (read !== reads || here !== pageKey()) return;
       threads = Array.isArray(answer.threads) ? answer.threads : [];
-      if (sending && !threads.some((item) => item.requestId === sending.requestId)) threads.unshift(sending);
+      // The pending pin belongs to the page it was sent from.
+      if (sending && sending.page === here && !threads.some((item) => item.requestId === sending.requestId)) threads.unshift(sending);
       render();
     } catch (e) {}
   }
 
-  const visible = () => threads.filter((item) => !item.resolved || showResolved.checked);
+  const visible = () => threads.filter((item) => (item !== sending || item.page === pageKey()) && (!item.resolved || showResolved.checked));
 
   function avatar(person, into) {
     into.textContent = initials(person.name);
@@ -939,7 +944,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function showSending(data) {
     sending = {
       n: 0, requestId: data.requestId, body: data.body, author: { name: authorName() || "You", image: null },
-      createdAt: Date.now(), resolved: false, mine: true, canResolve: false, page: here,
+      createdAt: Date.now(), resolved: false, mine: true, canResolve: false, page: pageKey(),
       element: { selector: data.selector, label: data.label || null }, spot: data.spot,
       box: { ox: data.ox, oy: data.oy, ow: data.ow, oh: data.oh }, screenshot: null, images: [], replies: [],
     };
@@ -994,7 +999,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       const answer = await postComment(form, data);
       const saved = answer.thread && answer.thread.n === answer.n ? answer.thread : null;
       forgetSending();
-      if (saved && from === pageKey()) threads = [saved].concat(threads.filter((item) => item.n !== saved.n));
+      if (saved && from === pageKey()) { reads++; threads = [saved].concat(threads.filter((item) => item.n !== saved.n)); }
       newBox.reset();
       cancel();
       say("Sent as #" + answer.n + ". ", reviewUrl());

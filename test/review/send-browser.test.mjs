@@ -28,7 +28,8 @@ const CORS = {
 
 /** A fake Drop that holds each POST until the test answers it with `reply(status, body)`. */
 async function open(browser) {
-  const drop = { gets: 0, posts: [], answer: null }
+  // With `holdGets` on, each GET waits in `held` until the test calls its `release(threads)`.
+  const drop = { gets: 0, pages: [], posts: [], holdGets: false, held: [] }
   const context = await browser.newContext({ viewport: { width: 900, height: 600 } })
   await context.addInitScript(
     ({ drop }) => {
@@ -67,7 +68,9 @@ async function open(browser) {
       return route.fulfill({ status, contentType: "application/json", headers: CORS, body: JSON.stringify(body) })
     }
     drop.gets++
-    return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ threads: [] }) })
+    drop.pages.push(url.searchParams.get("page"))
+    const threads = drop.holdGets ? await new Promise((release) => drop.held.push({ release })) : []
+    return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ threads }) })
   })
   const page = await context.newPage()
   await page.goto(SITE + "/pricing")
@@ -148,6 +151,70 @@ test("a send Drop refuses takes its pin away and opens the composer again with t
     while (drop.posts.length < 2) await page.waitForTimeout(10)
     drop.posts[1].reply({ status: 200, body: { n: 4, thread: thread(4, drop.posts[1].data) } })
     await ui.getByRole("button", { name: "Comment #4 by Ada" }).waitFor({ state: "attached" })
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("a read that started before the send was saved doesn't take the sent comment's pin away", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { drop, page, ui } = await open(browser)
+    await comment(page, ui, "Should be 10 €")
+    await page.evaluate(() => window.finishShot())
+    while (!drop.posts.length) await page.waitForTimeout(10)
+
+    // The window gets focus while the POST is on its way: its read starts before Drop saves the comment.
+    drop.holdGets = true
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")))
+    while (!drop.held.length) await page.waitForTimeout(10)
+
+    const [post] = drop.posts
+    post.reply({ status: 200, body: { n: 1, thread: thread(1, post.data) } })
+    const pin = ui.getByRole("button", { name: "Comment #1 by Ada" })
+    await pin.waitFor({ state: "attached" })
+
+    const answered = page.waitForResponse(
+      (response) => response.request().method() === "GET" && response.url().startsWith(DROP + "/api/"),
+    )
+    drop.held[0].release([])
+    await answered
+    await page.waitForTimeout(100)
+    assert.equal(await pin.count(), 1)
+    assert.equal(await ui.locator(".count").textContent(), "1")
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("a comment on its way shows its pin only on the page it was sent from", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { drop, page, ui } = await open(browser)
+    await comment(page, ui, "Should be 10 €")
+    const sending = ui.getByRole("button", { name: "Sending your comment" })
+    await sending.waitFor({ state: "attached" })
+
+    // The app moves to another view and keeps the heading the comment was left on.
+    let reads = drop.pages.length
+    await page.evaluate(() => history.pushState(null, "", "/pricing?plan=team"))
+    while (!drop.pages.slice(reads).includes("/pricing?plan=team")) await page.waitForTimeout(10)
+    await page.waitForTimeout(100)
+    assert.equal(await sending.count(), 0)
+
+    // Back on its page, the pin is there again.
+    reads = drop.pages.length
+    await page.evaluate(() => history.pushState(null, "", "/pricing"))
+    await sending.waitFor({ state: "attached" })
+    assert.ok(drop.pages.slice(reads).includes("/pricing"))
+
+    // The send went on the whole time, and a refusal still brings the note back.
+    await page.evaluate(() => window.finishShot())
+    while (!drop.posts.length) await page.waitForTimeout(10)
+    assert.equal(drop.posts[0].data.page, "/pricing")
+    drop.posts[0].reply({ status: 429, body: { message: "Too many comments. Try again in a minute." } })
+    await ui.getByText("Too many comments. Try again in a minute.").waitFor()
+    assert.equal(await ui.getByRole("textbox", { name: "Comment" }).inputValue(), "Should be 10 €")
   } finally {
     await browser.close()
   }
