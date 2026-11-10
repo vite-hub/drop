@@ -1212,9 +1212,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     // Someone wrote a comment, here or in Drop: this page's threads load now, not at the next poll.
     const change = [...states.values()].map((state) => (typeof state.comments === "string" ? state.comments : "")).join();
     if (change !== current.comments) {
-      const first = current.comments === "";
       current.comments = change;
-      if (!first) void refresh();
+      void refresh();
     }
   }
   function renderPeople(people) {

@@ -93,6 +93,35 @@ async function open(browser, { presence = true } = {}) {
 
 const BEN = { id: "ben", name: "Ben", color: "#E11D48" }
 
+test("review.js loads the first comment from its only other reviewer", { timeout: 30_000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const { context, page, seen, people } = await open(browser)
+    await page.waitForFunction(() => window.__presence)
+    await page.evaluate((ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/" }), BEN)
+    await people.waitFor({ state: "visible" })
+    const before = seen.threads
+    await page.evaluate(
+      (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", comments: "first" }),
+      BEN,
+    )
+    for (let tries = 0; seen.threads === before && tries < 20; tries++) await page.waitForTimeout(50)
+    assert.ok(seen.threads > before, "the first comment loads this page's threads immediately")
+
+    // Further awareness updates with the same notification do not load the threads again.
+    const after = seen.threads
+    await page.evaluate(
+      (ben) => window.__presence.set(2, ben, { active: false, at: "https://site.test/", comments: "first" }),
+      BEN,
+    )
+    await page.waitForTimeout(100)
+    assert.equal(seen.threads, after)
+    await context.close()
+  } finally {
+    await browser.close()
+  }
+})
+
 test(
   "a site's popover stays open while commenting with presence, and its saved comment stays reachable",
   { timeout: 30_000 },
