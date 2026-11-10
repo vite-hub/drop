@@ -173,7 +173,7 @@ export async function sitesFor(origin: string, who: Identity | null, event?: H3E
  * site drop covering its origin that `who` may comment on, and the page as its comments name it, path only. Null for
  * anything that isn't an http(s) address or that no review of theirs covers.
  */
-export async function siteForPage(address: string, who: Identity, event?: H3Event) {
+async function siteForPage(address: string, who: Identity, event?: H3Event) {
   let url: URL
   try {
     url = new URL(address.trim())
