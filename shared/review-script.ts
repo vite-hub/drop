@@ -253,7 +253,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   let area = null, start = null, busy = false, toastTimer = 0;
   let threads = [], openN = null, pinsShown = true, here = "";
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
-  const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map();
+  const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map(), shownImages = new Set();
 
   function save(value) {
     token = value ? value.token : null;
@@ -454,6 +454,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     a.target = "_blank"; a.rel = "noopener"; a.title = name || "Image";
     const img = el("img"); img.alt = name || "Image";
     a.appendChild(img);
+    shownImages.add(id);
     const known = imageUrls.get(id);
     const show = (url) => { img.src = url; a.href = url; };
     if (known) known.then(show, () => {});
@@ -495,8 +496,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
     $("textarea", thread).focus({ preventScroll: true });
   }
+  // The open thread's pictures stay loaded while it re-renders; the others' object URLs are let go.
+  function keepShownImages() {
+    imageUrls.forEach((loading, id) => {
+      if (shownImages.has(id)) return;
+      imageUrls.delete(id);
+      loading.then((url) => URL.revokeObjectURL(url), () => {});
+    });
+  }
   function closeThread() {
     openN = null; thread.hidden = true; mark.hidden = true;
+    shownImages.clear(); keepShownImages();
     replyBox.reset();
     layout();
   }
@@ -511,6 +521,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const items = $(".items", thread);
     const scrolled = items.scrollTop;
     items.textContent = "";
+    shownImages.clear();
     const first = entry(item.author, item.createdAt, item.body, item.images);
     const placed = pointOf(item);
     if (!placed && item.element && item.element.label) first.insertBefore(el("p", "where", "Was on " + item.element.label), first.children[1]);
@@ -518,6 +529,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!placed && item.screenshot) images([{ id: item.screenshot, filename: "Screenshot" }], first, true);
     items.appendChild(first);
     item.replies.forEach((reply) => items.appendChild(entry(reply.author, reply.createdAt, reply.body, reply.images)));
+    keepShownImages();
     items.scrollTop = scrolled;
     $(".who", thread).textContent = authorName() ? "As " + authorName() : "";
   }
@@ -634,7 +646,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     draw.hidden = true; box.hidden = true; pop.hidden = true; pill.hidden = bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
     newBox.show("");
-    area = null; start = null; strokes = []; still = null;
+    area = null; start = null; strokes = []; still = null; captureRun++;
     forgetStroke();
     layout();
     if (wasOpen) $("[data-act=comment]", bar).focus({ preventScroll: true });
@@ -755,12 +767,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     canvas.width = image.width; canvas.height = image.height;
     const g = canvas.getContext("2d");
     g.drawImage(image, 0, 0);
+    image.close();
     g.scale(k, k);
     inkOn(g, list);
     const blob = (type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
-    let out = await blob("image/webp", 0.9);
-    if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
-    return out && out.size <= MAX_BYTES ? out : picture;
+    try {
+      let out = await blob("image/webp", 0.9);
+      if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
+      return out && out.size <= MAX_BYTES ? out : picture;
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
   }
 
   function finishMark() {
@@ -821,7 +838,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }, true);
 
   ${CAPTURE}
-  const capture = () => captureViewport(host);
+  // Each comment's screenshot; cancel() stops the one still being drawn for a comment that's gone.
+  let captureRun = 0;
+  const capture = () => { const run = ++captureRun; return captureViewport(host, () => run !== captureRun); };
 
   async function ensureToken() {
     if (token) return;

@@ -69,7 +69,7 @@ async function open(browser, body, threads = []) {
       return route.fulfill({
         contentType: "text/javascript",
         headers: { "access-control-allow-origin": "*" },
-        body: "export async function createContext() { return {} }\nexport async function domToBlob() { return new Blob(['x'], { type: 'image/png' }) }",
+        body: "export async function createContext() { return {} }\nexport async function domToCanvas() { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 10; return canvas }",
       })
     if (url.origin === SITE)
       return route.fulfill({
