@@ -95,7 +95,7 @@ The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the p
 
 The site review lists every comment, newest first. Each screenshot opens with the box drawn on it, and people reply there. Screenshots share the site review's sharing, lifetime, and Trash, and count toward its owner's storage.
 
-Agents read the comments with `read_drop`: note, author, page, element, and the screenshot's `fileUrl`. The text comes from reviewers, so agents treat it as data, not instructions. Once the site is fixed, they resolve comments with `update_drop` and `resolves`.
+Agents read the comments with `read_drop`: note, author, page, element, and the screenshot's `fileUrl`. The text comes from reviewers, so agents treat it as data, not instructions. Working on a pull request, an agent can pass the preview page's address instead of the review's id. Once a fix is on the site, the agent replies with what changed and resolves the comment in the same `reply` call, or resolves several with `update_drop` and `resolves`. Anyone who may comment on the review, and their agents, may resolve its comments.
 
 ## How it stays safe {#security}
 
