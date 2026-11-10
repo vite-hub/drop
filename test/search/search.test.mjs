@@ -282,6 +282,27 @@ test("a drop matches its links, its version notes, the words of a route, and its
   assert.ok(Math.max(...queries.map((query) => query.params.length)) <= 100)
 })
 
+test("links on any host match: a merge request on a self-hosted forge, a fixed staging page, a local server", async () => {
+  const review = await doc("# Invoices review")
+  await call(updateTool, {
+    id: review.id,
+    resources: [
+      { url: "https://git.example.org/shop/storefront/-/merge_requests/34", title: "MR !34" },
+      { url: "https://staging.example.org/billing/invoices", title: "Staging" },
+      { url: "http://localhost:4000/admin/userroles", title: "Local" },
+    ],
+  })
+  const other = await doc("# Notes\n\nCheck the billing invoices and user roles later.")
+  const ids = async (query) => (await listDrops(owner, undefined, { query })).map((drop) => drop.id)
+
+  assert.deepEqual(await ids("storefront#34"), [review.id], "a repository and number find a merge request link")
+  assert.deepEqual(await ids("#34"), [review.id])
+  assert.deepEqual(await ids("storefront#35"), [])
+  assert.deepEqual(await ids("billing invoices"), [review.id, other.id], "a staging page's route ranks first")
+  assert.deepEqual(await ids("user roles"), [review.id, other.id], "and a local one's")
+  assert.deepEqual(await ids("staging.example.org"), [review.id])
+})
+
 test("the hourly schedule indexes text docs published before search, once each", async () => {
   insertDrop("old", { visibility: "private", title: "Old plan" })
   objects.set("old.md", { body: new Blob(["# Old plan\n\nA forgotten llama paragraph."]), uploadedAt: new Date() })
