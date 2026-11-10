@@ -79,6 +79,39 @@ async function open(browser) {
 
 const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
 
+test("cached pins become outdated when their element's words change in place", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, ui } = await open(browser)
+    // Frameworks update text nodes without replacing the element or its children.
+    await page.getByRole("button", { name: "Save changes" }).evaluate((button) => {
+      button.firstChild.data = "Saved"
+    })
+    await page.waitForFunction(
+      () => document.querySelector("drop-review").shadowRoot.querySelector(".count").textContent === "1",
+      null,
+      { timeout: 3000 },
+    )
+    assert.deepEqual(await ui.locator(".pin:not([hidden])").allTextContents(), ["AL"])
+    await ui.locator("[data-act=list]").click()
+    await ui.getByText("4 outdated").click()
+    assert.equal(await ui.locator(".list .row-item").count(), 5)
+
+    // Returning the original words makes the comments reachable at their element again.
+    await page.getByRole("button", { name: "Saved", exact: true }).evaluate((button) => {
+      button.textContent = "Save changes"
+    })
+    await page.waitForFunction(
+      () => document.querySelector("drop-review").shadowRoot.querySelector(".count").textContent === "3",
+      null,
+      { timeout: 3000 },
+    )
+    assert.deepEqual((await ui.locator(".pin:not([hidden])").allTextContents()).sort(), ["2", "AL"])
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
 test("pins of comments whose element changed or is gone don't land elsewhere on the page", async () => {
   const browser = await chromium.launch()
   try {

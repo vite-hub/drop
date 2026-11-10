@@ -391,7 +391,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // The element a thread was left on, found again by its CSS path, as long as it still has the tag and the words the
   // comment was left on; otherwise the one element with those words. A path counts children by position, so once the
   // page changes it can name another element, and the pin went there: into the middle of a table, onto a button. Null
-  // when the page has no such element. A found element stays the thread's while it's on the page. One that isn't there
+  // when the page has no such element. A found element stays the thread's while it's on the page with the same words.
+  // Changes to its text or alt label invalidate it without discarding anchors elsewhere on a busy page. One that isn't there
   // is looked for again once the page has changed, at most every MISS_MS: on a large page each lookup costs up to half
   // a millisecond, and a page that re-renders every frame paid it for every thread on every frame (drop#163).
   const MISS_MS = 500;
@@ -1145,10 +1146,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("scroll", schedule, { capture: true, passive: true });
   addEventListener("resize", schedule, { passive: true });
   new MutationObserver((records) => {
-    if (records.every((record) => host === record.target || host.contains(record.target))) return;
+    const changes = records.filter((record) => host !== record.target && !host.contains(record.target));
+    if (!changes.length) return;
+    for (const [n, known] of elementFor)
+      if (known.el && changes.some((record) => known.el.contains(record.target))) elementFor.delete(n);
     changedAt = performance.now();
     schedule();
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  }).observe(document.documentElement, { childList: true, characterData: true, attributes: true, attributeFilter: ["alt"], subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
   setInterval(() => {
     if (token && pageKey() !== here) { closeThread(); elementFor.clear(); void refresh(); }
