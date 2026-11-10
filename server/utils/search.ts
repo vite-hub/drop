@@ -90,10 +90,12 @@ export function likePattern(...parts: string[]) {
   // Parts after the first match anywhere after the one before.
   let escaped = ""
   for (const [index, part] of parts.entries()) {
-    for (const [at, char] of [...part].entries()) {
-      const next = `${escaped}${index && !at ? "%" : ""}${char.replace(/[\\%_]/, "\\$&")}`
+    let gap = index ? "%" : ""
+    for (const char of part) {
+      const next = escaped + gap + char.replace(/[\\%_]/, "\\$&")
       if (encoder.encode(next).length > 48) return `%${escaped}%`
       escaped = next
+      gap = ""
     }
   }
   return `%${escaped}%`
