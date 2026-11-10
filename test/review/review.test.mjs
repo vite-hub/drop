@@ -1029,6 +1029,42 @@ test("an agent on a pull request finds the review by its preview's address, says
   assert.match(siteCommentTools[0].description, /^Drop's own pages, for Drop admins/)
 })
 
+test("an agent finds the review by a page's address on a fixed staging host and on localhost too", async () => {
+  state.mode = "team"
+  for (const [id, origin] of [
+    ["staging", "https://staging.example.org"],
+    ["local", "http://localhost:4173"],
+  ]) {
+    site(id, { site_url: origin, filename: new URL(origin).host, visibility: "team" })
+    state.who = who
+    const bearer = (await token(origin)).body.token
+    assert.equal(
+      (await comment(bearer, { body: `Billing on ${id}`, page: "/settings/billing" }, { origin })).status,
+      200,
+    )
+    assert.equal((await comment(bearer, { body: `Docs on ${id}`, page: "/d/getting-started" }, { origin })).status, 200)
+
+    state.who = { ...ada, actorKind: "agent", actorName: "Claude Code" }
+    const billing = await call(readDrop, { id: `${origin}/settings/billing?tab=invoices` })
+    assert.equal(billing.isError, undefined, billing.message)
+    assert.equal(billing.structuredContent.id, id)
+    assert.deepEqual(
+      billing.structuredContent.comments.map((item) => item.body),
+      [`Billing on ${id}`],
+    )
+    assert.deepEqual(
+      (await call(readDrop, { id: `${origin}/d/getting-started` })).structuredContent.comments.map((item) => item.body),
+      [`Docs on ${id}`],
+      "a page whose path looks like a drop link still finds the site",
+    )
+  }
+  assert.match(
+    (await call(readDrop, { id: "https://staging.example.org.evil.com/settings/billing" })).message,
+    /No drop/,
+  )
+  assert.match((await call(readDrop, { id: "http://staging.example.org/settings/billing" })).message, /No drop/)
+})
+
 test("on a site review, people signed in who may comment resolve each other's comments; guests only their own", async () => {
   state.mode = "team"
   site()
