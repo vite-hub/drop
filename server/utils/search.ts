@@ -105,7 +105,7 @@ export function likePattern(...parts: string[]) {
  * A word as a pattern for a drop's name and links. An `app#12` there also finds the link
  * `github.com/acme/app/pull/12`: anything may come between the repository and the number.
  */
-export function namePattern(word: string) {
+function namePattern(word: string) {
   const ref = word.match(/^([^#]+)#(\d+)$/)
   return ref ? likePattern(ref[1]!, ref[2]!) : likePattern(word)
 }

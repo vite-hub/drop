@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { sql, state, migrate, reset, insertDrop, who, objects } from "../cost/harness.mjs"
+import { sql, state, migrate, reset, insertDrop, who, objects, queries } from "../cost/harness.mjs"
 const { findDrop, listDrops, recordSharedVisit, searchEverything } = await import("../../server/utils/drops.ts")
 const { updateDrop } = await import("../../server/utils/drop-update.ts")
 const { indexMissingTexts, likePattern, MAX_SEARCH_TEXT, searchableText } = await import("../../server/utils/search.ts")
@@ -274,6 +274,12 @@ test("a drop matches its links, its version notes, the words of a route, and its
   )
   assert.equal(listed.drops[0].match, undefined, "a link match needs no snippet")
   assert.deepEqual(titles(await searchHandler(request("/api/search?q=12"))), ["Account page against main"])
+
+  // D1 binds at most 100 parameters a query, and a search takes ten words.
+  state.mode = "team"
+  queries.length = 0
+  await searchEverything(mate, Array.from({ length: 12 }, (_, n) => `app#${n}`).join(" "))
+  assert.ok(Math.max(...queries.map((query) => query.params.length)) <= 100)
 })
 
 test("the hourly schedule indexes text docs published before search, once each", async () => {
