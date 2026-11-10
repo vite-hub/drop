@@ -365,15 +365,21 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     return node;
   }
 
-  // The element a thread was left on, found again by its CSS path. Null when the page no longer has it.
+  // The element a thread was left on, found again by its CSS path. Null when the page no longer has it. A found element
+  // stays the thread's while it's on the page. One that isn't there is looked for again once the page has changed, at
+  // most every MISS_MS: on a large page each lookup costs up to half a millisecond, and a page that re-renders every
+  // frame paid it for every thread on every frame (drop#163).
+  const MISS_MS = 500;
+  let changedAt = 0;
   function elementOf(item) {
     if (!item.element) return null;
-    const known = elementFor.get(item.n);
-    if (known && known.isConnected) return known;
+    const known = elementFor.get(item.n), now = performance.now();
+    if (known && known.el && known.el.isConnected) return known.el;
+    if (known && !known.el && (known.at > changedAt || now - known.at < MISS_MS)) return null;
     let found = null;
     try { found = document.querySelector(item.element.selector); } catch (e) {}
     if (found && host.contains(found)) found = null;
-    elementFor.set(item.n, found);
+    elementFor.set(item.n, { el: found, at: now });
     return found;
   }
   function pointOf(item) {
@@ -420,20 +426,23 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   let frame = 0;
   const schedule = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; layout(); }); };
   function layout() {
+    // Every element is measured before any pin moves: a move between two measurements made the browser recompute
+    // styles once per pin, on every frame the page changed.
+    const placed = [];
+    for (const item of threads) if (pinFor.has(item.n)) placed.push([item, pointOf(item)]);
+    const item = openN !== null && threads.find((t) => t.n === openN);
+    const open = item && placed.find(([shown]) => shown === item);
+    const at = open ? open[1] : item && pointOf(item);
     pinLayer.hidden = !pinsShown || !draw.hidden || !paint.hidden;
     if (!inked.hidden) inked.style.translate = inkAt.x - scrollX + "px " + (inkAt.y - scrollY) + "px";
-    for (const item of threads) {
-      const pin = pinFor.get(item.n);
-      if (!pin) continue;
-      const at = pointOf(item);
+    for (const [shown, at] of placed) {
+      const pin = pinFor.get(shown.n);
       const inView = at && at.x >= -4 && at.y >= 0 && at.x <= innerWidth + 4 && at.y <= innerHeight + 28;
       pin.hidden = !inView;
       // The translate property, not transform: it applies after the open pin's scale, so the pin grows in place.
       if (inView) pin.style.translate = Math.round(at.x) + "px " + Math.round(at.y) + "px";
-      pin.classList.toggle("open", item.n === openN);
+      pin.classList.toggle("open", shown.n === openN);
     }
-    const item = openN !== null && threads.find((t) => t.n === openN);
-    const at = item && pointOf(item);
     mark.hidden = !at;
     if (at) place(mark, { left: at.rect.left - 3, top: at.rect.top - 3, width: at.rect.width + 6, height: at.rect.height + 6 });
     if (item && !thread.hidden) placeThread(at);
@@ -964,7 +973,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("resize", schedule, { passive: true });
   new MutationObserver((records) => {
     if (records.every((record) => host === record.target || host.contains(record.target))) return;
-    elementFor.clear();
+    changedAt = performance.now();
     schedule();
   }).observe(document.documentElement, { childList: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
@@ -981,6 +990,11 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // typing a note doesn't run the page's shortcuts.
   for (const type of ["pointerdown", "mousedown", "touchstart", "click", "focusin", "focusout", "keydown", "keyup"])
     host.addEventListener(type, (e) => e.stopPropagation());
+  // A modal on the page, such as a slideover, keeps focus inside it: when its element loses focus to something outside,
+  // it takes focus back (Reka UI and Radix listen for focusout on the document). That focusout starts on the page's
+  // element, not here, so it's stopped on its way down when focus is moving into the toolbar. Otherwise the note's box
+  // loses focus as it opens and the words go into the slideover (drop#164).
+  addEventListener("focusout", (e) => { if (e.relatedTarget === host) e.stopPropagation(); }, true);
   document.documentElement.appendChild(host);
   void refresh();
 })();`
