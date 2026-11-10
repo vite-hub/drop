@@ -70,9 +70,6 @@ patchedDependencies:
   # A comment box with text shakes on Esc, and a second Esc discards the text and closes it, instead of shaking again
   # forever. Remove when Drop moves to a ViteHub build with vite-hub/vitehub console-drop-comments.
   "@vite-hub/ui@0.0.0-preview-da7f5b1": patches/@vite-hub__ui@0.0.0-preview-da7f5b1.patch
-  # vite-hub/page/pill.js gets the Related links button and menu (mountViteHubPageLinks) that review.js puts in its
-  # pill. Remove when Drop moves to a ViteHub build with vite-hub/vitehub#3772.
-  vite-hub@0.0.0-preview-03e8d1b: patches/vite-hub@0.0.0-preview-03e8d1b.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:

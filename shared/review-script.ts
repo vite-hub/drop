@@ -99,6 +99,21 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 .seg .go:disabled { opacity: .5; cursor: default; }
 /* Related links goes away with the review buttons while someone draws. */
 .bar[hidden] ~ .related { display: none !important; }
+/* Its menu, in the pill's dark glass, opens beside the pill like the cards. */
+.links { position: fixed; width: min(320px, calc(100vw - 16px)); max-height: min(420px, calc(100dvh - 96px)); overflow-y: auto; overscroll-behavior: contain; padding: 4px; border: 1px solid rgb(255 255 255 / .12); border-radius: 12px; background: rgb(17 17 17 / .96); box-shadow: 0 8px 24px rgb(0 0 0 / .25); color-scheme: dark; color: #d4d4d4; font: 500 13px/18px ui-sans-serif, system-ui, sans-serif; }
+.links p { margin: 0; padding: 6px 8px 4px; color: #a3a3a3; font-size: 12px; }
+.links p[role=status] { padding: 6px 8px; color: #d4d4d4; font-size: 13px; }
+.links ul { margin: 0; padding: 0; list-style: none; }
+.links a { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 6px 8px; border-radius: 8px; color: #d4d4d4; font-weight: 400; text-decoration: none; outline: none; }
+@media (hover: hover) { .links a:hover { background: rgb(255 255 255 / .08); color: #fafafa; } }
+.links a:focus-visible { background: rgb(255 255 255 / .08); box-shadow: inset 0 0 0 2px #fafafa; }
+@media (any-pointer: coarse) { .links a { min-height: 44px; } }
+.links .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.links .detail { min-width: 0; max-width: 40%; overflow: hidden; color: #a3a3a3; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.links img { width: 16px; height: 16px; flex: none; border-radius: 3px; object-fit: contain; }
+.links svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; color: #a3a3a3; }
+.links .out { width: 14px; height: 14px; }
+.links .github { fill: currentColor; stroke: none; color: inherit; }
 .paint { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -123,7 +138,12 @@ const ICONS = {
   marker: svg(`<path d="M164 44l48 48-96 96-56 8 8-56z"/><path d="M140 68l48 48"/><path d="M40 220h88"/>`),
   pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
   arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
+  link: svg(
+    `<path d="M107 139a53 53 0 0 0 80 6l32-32a53 53 0 0 0-75-75l-18 18"/><path d="M149 117a53 53 0 0 0-80-6l-32 32a53 53 0 0 0 75 75l18-18"/>`,
+  ),
 }
+// GitHub's favicon is a black mark that the dark menu would hide, so its Simple Icons mark takes the text color.
+const GITHUB_MARK = `<svg class="github" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .32.21.69.82.57A12 12 0 0 0 12 .3"/></svg>`
 
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
   `<div class="compose"><textarea aria-label="${label}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
@@ -163,6 +183,7 @@ const MARKUP = `<div class="ui">
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
 <div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg related" slot="related" hidden><button type="button" data-act="related" aria-haspopup="true" aria-expanded="false" aria-controls="related-links">${ICONS.link}Related links</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
@@ -170,6 +191,7 @@ ${TOOLS}
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
 <div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
+<nav class="links" id="related-links" aria-label="Related links" hidden></nav>
 <div class="toast" role="status" hidden></div>
 </div>`
 
@@ -190,9 +212,9 @@ ${TOOLS}
  * thread whose element isn't on the page any more still shows in the list, with the screenshot it came with.
  *
  * When a drop links to the site, like a pull request's before/after doc listing its preview, the pill shows Related
- * links: ViteHub's links segment (vite-hub/page/pill.js), with that doc, its links (the pull request), and the drops
- * that link to those, two links deep. The page learns whether one exists before anyone connects; which ones, only for
- * a reviewer who'd find them in Drop.
+ * links, a segment of its own with a menu of that doc, its links (the pull request), and the drops that link to those,
+ * two links deep. The page learns whether one exists before anyone connects; which ones, only for a reviewer who'd
+ * find them in Drop.
  */
 export const REVIEW_SCRIPT = String.raw`(() => {
   // A bookmarklet adds this script with a plain script element, where currentScript works too.
@@ -217,7 +239,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   host.style.cssText = "all:initial;position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;";
   const root = host.attachShadow({ mode: "closed" });
   // The segments' buttons look like the pill's own, from the same styles.
-  root.innerHTML = "<style>" + ${JSON.stringify(STYLE)} + ".seg{" + ViteHubPagePill.viteHubPillButtonStyles + "}" + ViteHubPagePill.viteHubPageLinksStyles + "</style>" + ${JSON.stringify(MARKUP)};
+  root.innerHTML = "<style>" + ${JSON.stringify(STYLE)} + ".seg{" + ViteHubPagePill.viteHubPillButtonStyles + "}</style>" + ${JSON.stringify(MARKUP)};
   const $ = (selector, from) => (from || root).querySelector(selector);
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
@@ -225,23 +247,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
 
-  // Related links, a segment of its own: ViteHub draws the button and the menu, and Drop finds the links.
-  const related = ViteHubPagePill.mountViteHubPageLinks({
-    slot: "related",
-    resolve: resolveRelated,
-    empty: "No drop related to this site is shared with you.",
-    onOpen: () => { cancel(); closeThread(); list.hidden = true; },
-    signal: new AbortController().signal,
-  });
-  related.segment.className = "seg related";
-  $(".ui").appendChild(related.menu);
+  const related = $(".related"), relatedButton = $("button", related), links = $(".links");
 
-  // The comment list and the notes open beside the pill, on its edge, at the end of the edge it is nearer to.
+  // The comment list, Related links, and the notes open beside the pill, on its edge, at the end of the edge it is nearer to.
   function dockCards(place) {
     const side = place.edge === "left" || place.edge === "right";
     const off = (place.collapsed ? 2 : 16) + place.thickness + 8 + "px";
-    related.place(place);
-    for (const card of [list, toast]) {
+    for (const card of [list, links, toast]) {
       const style = card.style;
       style.left = style.right = style.top = style.bottom = style.translate = "";
       style[place.edge] = off;
@@ -268,7 +280,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     parent: $(".ui"),
     signal: new AbortController().signal,
   });
-  pill.append(bar, related.segment, tools);
+  pill.append(bar, related, tools);
   let area = null, start = null, busy = false, toastTimer = 0;
   let threads = [], openN = null, pinsShown = true, here = "";
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
@@ -277,7 +289,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function save(value) {
     token = value ? value.token : null;
     try { value ? sessionStorage.setItem(stored, JSON.stringify(value)) : sessionStorage.removeItem(stored); } catch (e) {}
-    if (!token) { threads = []; related.forget(); render(); }
+    if (!token) { threads = []; forgetRelated(); render(); }
   }
 
   function say(text, link) {
@@ -579,13 +591,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // connects, as Comment does, then lists the drops this person would find in Drop anyway (server/utils/related.ts),
   // each with a handle that /review/open takes in place of its link, and their links, like the pull request.
   const relatedApi = drop + "/api/review/related";
+  let relatedLinks = null, relatedAsk = null;
   async function probeRelated() {
     try {
       const response = await fetch(relatedApi, { credentials: "omit" });
-      related.show(response.ok && (await response.json()).linked === true);
+      related.hidden = !(response.ok && (await response.json()).linked === true);
     } catch (e) {}
   }
-  async function resolveRelated() {
+  async function findRelated() {
     await ensureToken();
     let answer;
     try { answer = await (await call(relatedApi)).json(); }
@@ -596,6 +609,97 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       ...group.links,
     ]);
   }
+
+  const iconFrom = (html) => {
+    const holder = document.createElement("template");
+    holder.innerHTML = html;
+    return holder.content.firstChild;
+  };
+  // A row's icon: GitHub's mark, the first of the link's favicons that loads, asked with no referrer, or a link icon.
+  function relatedIcon(link) {
+    if (/^https:\/\/(?:www\.)?github\.com\//.test(link.url)) return iconFrom(${JSON.stringify(GITHUB_MARK)});
+    const tries = (link.icons || []).slice();
+    if (!tries.length) return iconFrom(${JSON.stringify(ICONS.link)});
+    const image = document.createElement("img");
+    image.alt = ""; image.referrerPolicy = "no-referrer"; image.decoding = "async";
+    const next = () => {
+      const url = tries.shift();
+      if (url) image.src = url;
+      else image.replaceWith(iconFrom(${JSON.stringify(ICONS.link)}));
+    };
+    image.addEventListener("error", next);
+    next();
+    return image;
+  }
+  function relatedRow(link) {
+    const item = document.createElement("li"), anchor = document.createElement("a"), name = document.createElement("span");
+    anchor.href = link.url; anchor.target = "_blank"; anchor.rel = "noopener noreferrer";
+    anchor.title = link.label + "\n" + link.url;
+    anchor.setAttribute("aria-label", link.label + (link.detail ? ", " + link.detail : "") + " (opens in a new tab)");
+    name.className = "name"; name.textContent = link.label;
+    anchor.append(relatedIcon(link), name);
+    if (link.detail) {
+      const detail = document.createElement("span");
+      detail.className = "detail"; detail.textContent = link.detail;
+      anchor.appendChild(detail);
+    }
+    const out = iconFrom(${JSON.stringify(ICONS.arrow)});
+    out.setAttribute("class", "out");
+    anchor.appendChild(out);
+    anchor.addEventListener("click", closeRelated);
+    item.appendChild(anchor);
+    return item;
+  }
+
+  function closeRelated() {
+    links.hidden = true;
+    relatedButton.setAttribute("aria-expanded", "false");
+  }
+  // After the session ends, the next press asks Drop again.
+  function forgetRelated() {
+    relatedLinks = relatedAsk = null;
+    relatedButton.removeAttribute("aria-busy");
+    closeRelated();
+  }
+  async function openRelated() {
+    if (!relatedLinks) {
+      // The request starts in the press, before any await, so it may still open the connect popup.
+      const ask = relatedAsk || (relatedAsk = findRelated());
+      relatedButton.setAttribute("aria-busy", "true");
+      try {
+        const found = await ask;
+        if (ask !== relatedAsk) return;
+        relatedLinks = found;
+      } catch (error) {
+        if (error.message) say(error.message);
+        return;
+      } finally {
+        if (ask === relatedAsk) { relatedAsk = null; relatedButton.removeAttribute("aria-busy"); }
+      }
+    }
+    cancel();
+    closeThread();
+    list.hidden = true;
+    const heading = document.createElement("p");
+    heading.textContent = "Related links";
+    const body = document.createElement(relatedLinks.length ? "ul" : "p");
+    if (relatedLinks.length) body.append(...relatedLinks.map(relatedRow));
+    else { body.setAttribute("role", "status"); body.textContent = "No drop related to this site is shared with you."; }
+    links.replaceChildren(heading, body);
+    links.hidden = false;
+    relatedButton.setAttribute("aria-expanded", "true");
+    const first = $("a", links);
+    if (first) first.focus({ preventScroll: true });
+  }
+  relatedButton.addEventListener("click", () => {
+    if (links.hidden) void openRelated();
+    else closeRelated();
+  });
+  // A press on the toolbar outside the menu closes it. A press on the page does too, with the thread and the list.
+  root.addEventListener("pointerdown", (e) => {
+    const path = e.composedPath();
+    if (!path.includes(links) && !path.includes(related)) closeRelated();
+  }, true);
 
   // ---- Writing: a box with images from a button, a paste, or a drop ----
 
@@ -658,7 +762,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     cancel();
     closeThread();
     list.hidden = true;
-    related.close();
+    closeRelated();
     loadScreenshot().catch(() => { screenshotModule = null; });
     pill.hidden = true;
     draw.hidden = false;
@@ -758,7 +862,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     cancel();
     closeThread();
     list.hidden = true;
-    related.close();
+    closeRelated();
     // The screenshot starts now, with the page as the reviewer marks it; it holds still until Done.
     still = capture().catch(() => null);
     inkAt = { x: scrollX, y: scrollY };
@@ -854,6 +958,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }
     else if (!list.hidden) { e.stopPropagation(); list.hidden = true; }
+    else if (!links.hidden) {
+      e.stopPropagation();
+      // The focus goes back to the button when it was in the menu.
+      if (root.activeElement && links.contains(root.activeElement)) relatedButton.focus({ preventScroll: true });
+      closeRelated();
+    }
   }, true);
 
   ${CAPTURE}
@@ -872,13 +982,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   listButton.addEventListener("click", () => {
     list.hidden = !list.hidden;
-    if (!list.hidden) { closeThread(); related.close(); renderList(); }
+    if (!list.hidden) { closeThread(); closeRelated(); renderList(); }
   });
-  // A press anywhere else on the page closes the thread or the list, as in Figma.
+  // A press anywhere else on the page closes the thread, the list, or Related links, as in Figma.
   addEventListener("pointerdown", (e) => {
     if (e.composedPath().includes(host)) return;
     if (!thread.hidden) closeThread();
     list.hidden = true;
+    closeRelated();
   }, true);
   pinsButton.addEventListener("click", () => {
     pinsShown = !pinsShown;
