@@ -22,9 +22,12 @@ export default defineMcpTool({
   inputSchema: toStandardJsonSchema(
     v.object({
       query: v.optional(
-        v.pipe(v.string(), v.description(
+        v.pipe(
+          v.string(),
+          v.description(
             "Words to find in the title, file name, slug, links, version notes, or a doc's text. A PR number like 12 finds a drop linking that PR.",
-          )),
+          ),
+        ),
       ),
       folder: v.optional(
         v.pipe(

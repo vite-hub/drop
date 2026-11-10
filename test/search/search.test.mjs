@@ -246,11 +246,18 @@ test("a drop matches its links, its version notes, the words of a route, and its
       { url: "https://pr-12.preview.example.com/accountsettings", title: "Preview" },
     ],
   })
-  await doc("# Account page against main\n\nUnchanged screenshots.", { previous: pr.id, note: "Fresh captures at 7c0e930" })
+  await doc("# Account page against main\n\nUnchanged screenshots.", {
+    previous: pr.id,
+    note: "Fresh captures at 7c0e930",
+  })
   const other = await doc("# Weekly notes\n\nWe should tidy up the account settings.")
   const ids = async (query) => (await listDrops(owner, undefined, { query })).map((drop) => drop.id)
 
-  assert.deepEqual(await ids("account settings"), [pr.id, other.id], "a link's /accountsettings ranks above words in a text")
+  assert.deepEqual(
+    await ids("account settings"),
+    [pr.id, other.id],
+    "a link's /accountsettings ranks above words in a text",
+  )
   assert.deepEqual(await ids("accountsettings"), [pr.id])
   assert.deepEqual(await ids("pr-12.preview"), [pr.id], "the preview link")
   assert.deepEqual(await ids("12"), [pr.id], "a bare PR number finds the PR link")
