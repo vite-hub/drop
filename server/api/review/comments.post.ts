@@ -1,24 +1,38 @@
 import { useLogger } from "evlog/nitro/v3"
 import { requireRateLimit } from "vite-hub/rate-limit"
-import { addReviewComment, readReviewComment, reviewApi, reviewSession } from "../../utils/review"
+import {
+  addReviewComment,
+  readReviewComment,
+  reviewApi,
+  reviewSession,
+  reviewThreadOf,
+  reviewTiming,
+} from "../../utils/review"
 
 /**
  * A comment from a site under review: `data` (JSON, ReviewCommentSchema), an optional `screenshot` of the viewport,
  * and the `image`s the reviewer added, as multipart. The token decides the site drop. Everything here comes from someone else's page, so it's checked like
  * any upload: the screenshot by its bytes, not its claimed type, and at most 4 MiB. The answer is the comment's number
- * only, nothing that would open the review.
+ * and its thread as the page lists it (ReviewThread), so the script draws the pin without asking again: nothing that
+ * would open the review. A resend that finds the earlier submission answers the number only.
  */
 export default reviewApi(async (event) => {
+  const timing = reviewTiming(event)
   const { site, claims, who } = await reviewSession(event).catch(async (error) => {
     await event.req.body?.cancel().catch(() => {})
     throw error
   })
+  timing.step("session")
   await requireRateLimit(event, "review-comment", { key: claims.u ?? undefined, limit: 20, window: "1m" })
+  timing.step("limit")
   const { input, shot, images } = await readReviewComment(event)
+  timing.step("form")
 
-  const comment = await addReviewComment(site, { who, name: claims.n }, input, shot, claims.o, images)
+  const { row, attachments } = await addReviewComment(site, { who, name: claims.n }, input, shot, claims.o, images)
+  timing.step("save")
   useLogger(event).set({
-    review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), images: images.length },
+    review: { site: site.id, comment: row.n, screenshot: Boolean(shot), images: images.length },
   })
-  return { n: comment.n }
+  timing.send()
+  return attachments ? { n: row.n, thread: reviewThreadOf(site, who, row, attachments) } : { n: row.n }
 })
