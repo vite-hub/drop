@@ -994,7 +994,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (records.every((record) => host === record.target || host.contains(record.target))) return;
     changedAt = performance.now();
     schedule();
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  }).observe(document.documentElement, { childList: true, attributes: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
   setInterval(() => {
     if (token && pageKey() !== here) { closeThread(); elementFor.clear(); void refresh(); }

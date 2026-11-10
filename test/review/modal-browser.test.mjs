@@ -81,7 +81,12 @@ async function open(browser, body, threads = []) {
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors })
     if (request.method() === "POST") {
       posts.push(request.postDataBuffer().toString("utf8"))
-      return route.fulfill({ contentType: "application/json", headers: cors, body: JSON.stringify({ n: 1 }) })
+      const data = JSON.parse(posts.at(-1).match(/name="data"\r\n\r\n(.*?)\r\n/s)[1])
+      const saved = thread(threads.length + 1, data.selector)
+      saved.body = data.body
+      saved.spot = data.spot
+      threads.push(saved)
+      return route.fulfill({ contentType: "application/json", headers: cors, body: JSON.stringify({ n: saved.n }) })
     }
     return route.fulfill({ contentType: "application/json", headers: cors, body: JSON.stringify({ threads }) })
   })
@@ -113,6 +118,47 @@ test("a comment on an open slideover keeps its words when the slideover keeps fo
     await page.click("#reason")
     await page.keyboard.type("typo")
     assert.equal(await page.locator("#reason").inputValue(), "typo")
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("a reviewed-site popover stays open while writing and its comment is reachable after it closes", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, ui, posts } = await open(
+      browser,
+      `<button id="trigger">Details</button>
+<div id="popover" role="dialog" hidden style="position:absolute;left:80px;top:60px;padding:20px;background:#eee">
+  <p id="detail">A detail to review</p>
+</div>
+<script>
+  const trigger = document.getElementById("trigger"), popover = document.getElementById("popover");
+  trigger.addEventListener("click", () => { popover.hidden = !popover.hidden; });
+  document.addEventListener("focusout", (e) => {
+    if (e.target === trigger && !popover.contains(e.relatedTarget)) popover.hidden = true;
+  });
+  document.addEventListener("click", (e) => {
+    if (e.target !== trigger && !popover.contains(e.target)) popover.hidden = true;
+  });
+</script>`,
+    )
+    await page.click("#trigger")
+    await ui.getByRole("button", { name: "Comment", exact: true }).click()
+    const detail = await page.locator("#detail").boundingBox()
+    await page.mouse.click(detail.x + 20, detail.y + detail.height / 2)
+    await ui.getByRole("textbox", { name: "Comment", exact: true }).fill("Check this detail")
+    assert.equal(await page.locator("#popover").isVisible(), true)
+    await ui.getByRole("button", { name: "Send" }).click()
+    await ui.getByText("Sent as #1.").waitFor()
+    assert.match(posts[0], /#detail/)
+    assert.equal(await page.locator("#popover").isVisible(), true)
+    await ui.locator(".pin:not([hidden])").waitFor()
+    await page.click("#trigger")
+    assert.equal(await page.locator("#popover").isVisible(), false)
+    await ui.locator("[data-act=list]").click()
+    await ui.locator(".row-item").filter({ hasText: "Check this detail" }).click()
+    await ui.locator(".thread").getByText("Check this detail", { exact: true }).waitFor()
   } finally {
     await browser.close()
   }
@@ -158,3 +204,28 @@ test("pins on a page that re-renders every frame don't look for their elements e
     await browser.close()
   }
 }, 20_000)
+
+test("missing pins recover when only selector attributes change", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, ui } = await open(
+      browser,
+      '<button id="before">ID target</button><button class="before">Class target</button><button data-anchor="before">Attribute target</button>',
+      [thread(1, "#late"), thread(2, ".late"), thread(3, '[data-anchor="late"]')],
+    )
+    await ui.locator(".pin").first().waitFor({ state: "attached" })
+    assert.equal(await ui.locator(".pin:not([hidden])").count(), 0)
+    await page.evaluate(() => {
+      document.getElementById("before").id = "late"
+      document.querySelector(".before").className = "late"
+      document.querySelector("[data-anchor]").setAttribute("data-anchor", "late")
+    })
+    await page.waitForFunction(
+      () => document.querySelector("drop-review").shadowRoot.querySelectorAll(".pin:not([hidden])").length === 3,
+      null,
+      { polling: 100, timeout: 3000 },
+    )
+  } finally {
+    await browser.close()
+  }
+}, 10_000)

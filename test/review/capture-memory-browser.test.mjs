@@ -20,7 +20,7 @@ const CORS = {
   "access-control-allow-methods": "GET, POST, PATCH",
 }
 
-async function open(browser, body, threads = []) {
+async function open(browser, body, threads = [], script = REVIEW_SCRIPT) {
   const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
   await context.addInitScript(
     ({ drop }) => {
@@ -80,7 +80,7 @@ async function open(browser, body, threads = []) {
         body: `<!doctype html><html><body>${body}<script src="${DROP}/review.js" defer></script></body></html>`,
       })
     if (url.origin !== DROP) return route.abort()
-    if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
+    if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: script })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
     if (url.pathname.startsWith("/api/review/images/"))
       return route.fulfill({ contentType: "image/png", headers: CORS, body: Buffer.alloc(16) })
@@ -112,6 +112,42 @@ async function rendererMB(browser, page) {
   }
   return kb / 1024
 }
+
+test("sharing styles preserves an SVG symbol's important inline override", async () => {
+  const browser = await chromium.launch()
+  try {
+    const pixels = []
+    const body = `<style>body { margin: 0 }</style>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120">
+  <defs><symbol id="icon">
+    <style>#square { fill: blue !important }</style>
+    <rect id="square" width="100" height="100" style="fill: red !important" />
+  </symbol></defs>
+  <use href="#icon" />
+</svg>`
+    // Compare the real capture with and without style sharing, before the lossy WebP encoding.
+    for (const script of [REVIEW_SCRIPT.replace("shareStyles(svg);", ""), REVIEW_SCRIPT]) {
+      const { page, ui } = await open(browser, body, [], script)
+      await page.evaluate(() => {
+        const { value: encode } = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "toBlob")
+        HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+          if (type === "image/webp")
+            window.capturePixel = Array.from(this.getContext("2d").getImageData(50, 50, 1, 1).data)
+          return Reflect.apply(encode, this, [callback, type, quality])
+        }
+      })
+      await ui.getByRole("button", { name: "Comment", exact: true }).click()
+      await page.mouse.click(50, 50)
+      await page.waitForFunction(() => window.capturePixel, null, { timeout: 10_000 })
+      pixels.push(await page.evaluate(() => window.capturePixel))
+      await page.context().close()
+    }
+    assert.deepEqual(pixels[0], [255, 0, 0, 255], "the original capture is red")
+    assert.deepEqual(pixels[1], pixels[0], "sharing styles preserves the captured pixel")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
 
 test("comments on a long table each decode a small screenshot, and the tab's memory stays flat", async () => {
   const browser = await chromium.launch()
