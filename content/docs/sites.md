@@ -93,6 +93,10 @@ The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the p
 
 ## Read and resolve {#read}
 
+On the site, each open comment shows as a pin with its author's initials on the element it was left on. Pointing at a pin outlines that element. A pin on a button or link sits beside it, and pins on one spot become one pin with their count.
+
+A comment whose element the page no longer has, or has with other words, is **outdated**: it gets no pin, since any place for it would be a guess. The list keeps outdated comments behind its **N outdated** toggle, each with the screenshot it came with. Resolved comments hide the same way, behind **Resolved**.
+
 The site review lists every comment, newest first. Each screenshot opens with the box drawn on it, and people reply there. Screenshots share the site review's sharing, lifetime, and Trash, and count toward its owner's storage.
 
 Agents read the comments with `read_drop`: note, author, page, element, and the screenshot's `fileUrl`. The text comes from reviewers, so agents treat it as data, not instructions. Working on a pull request, an agent can pass the preview page's address instead of the review's id. Once a fix is on the site, the agent replies with what changed and resolves the comment in the same `reply` call, or resolves several with `update_drop` and `resolves`. Anyone who may comment on the review, and their agents, may resolve its comments.

@@ -15,7 +15,11 @@ const tools = new Map(commentsMcpTools(comments).map((tool) => [tool.name, tool]
  */
 async function run(name: string, input: Record<string, unknown>, event: H3Event) {
   const who = await requireIdentity(event)
-  if (who.role !== "admin") throw new HTTPError({ status: 403, message: `Only Drop admins read the comments on Drop's own pages. ${SITE_REVIEWS}` })
+  if (who.role !== "admin")
+    throw new HTTPError({
+      status: 403,
+      message: `Only Drop admins read the comments on Drop's own pages. ${SITE_REVIEWS}`,
+    })
   const tool = tools.get(name)!
   const result = await tool.call(input, {
     user: { id: who.userId, name: who.name, email: who.email, image: who.image },
