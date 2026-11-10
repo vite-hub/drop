@@ -111,10 +111,16 @@ function namePattern(word: string) {
 }
 
 /**
- * What a drop is called and points to, as one line: its title, file name, slug, latest version's note, and its links
- * (the JSON of `resources`). Words in a link's path match too: `account` and `settings` both match `/accountsettings`.
+ * A drop's links as plain words: each link's URL and title, decoded, never the JSON around them. Matching the raw
+ * JSON would find `url` and `title` in every drop with links, and miss a title's `"quoted"` words behind their escapes.
  */
-const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coalesce(${drops.slug}, '') || ' ' || coalesce(${drops.note}, '') || ' ' || coalesce(${drops.resources}, ''))`
+const links = sql`(SELECT group_concat(coalesce(json_extract(value, '$.url'), '') || ' ' || coalesce(json_extract(value, '$.title'), ''), ' ') FROM json_each(CASE WHEN json_valid(${drops.resources}) THEN ${drops.resources} ELSE '[]' END))`
+
+/**
+ * What a drop is called and points to, as one line: its title, file name, slug, latest version's note, and its links.
+ * Words in a link's path match too: `account` and `settings` both match `/accountsettings`.
+ */
+const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coalesce(${drops.slug}, '') || ' ' || coalesce(${drops.note}, '') || ' ' || coalesce(${links}, ''))`
 
 const inName = (word: string) => sql`${named} LIKE ${namePattern(word)} ESCAPE '\\'`
 

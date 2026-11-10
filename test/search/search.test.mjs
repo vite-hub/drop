@@ -303,6 +303,33 @@ test("links on any host match: a merge request on a self-hosted forge, a fixed s
   assert.deepEqual(await ids("staging.example.org"), [review.id])
 })
 
+test("a drop matches its links' URLs and titles, not the JSON that stores them", async () => {
+  const guide = await doc("# Writing guide\n\nEvery page needs a title and a short url.")
+  for (let n = 0; n < 31; n++)
+    insertDrop(`linked${n}`, {
+      visibility: "private",
+      title: `Review ${n}`,
+      resources: JSON.stringify([{ url: `https://github.com/acme/app/pull/${n}`, title: `PR #${n}` }]),
+    })
+  const ids = async (query) => (await listDrops(owner, undefined, { query })).map((drop) => drop.id)
+
+  assert.deepEqual(await ids("title"), [guide.id], "the key `title` is in every drop with links")
+  assert.deepEqual(await ids("url"), [guide.id], "and so is `url`")
+  assert.deepEqual(
+    (await searchEverything(owner, "title")).map((drop) => drop.id),
+    [guide.id],
+  )
+  assert.equal((await ids("acme/app/pull")).length, 31, "the URLs still match")
+
+  const quoted = await doc("# Account page")
+  await call(updateTool, {
+    id: quoted.id,
+    resources: [{ url: "https://pr-3.preview.example.com/", title: 'Before/after: "accountsettings"' }],
+  })
+  assert.deepEqual(await ids('"accountsettings"'), [quoted.id], "a quoted title matches without its JSON escapes")
+  assert.deepEqual(await ids('after: "accountsettings"'), [quoted.id])
+})
+
 test("the hourly schedule indexes text docs published before search, once each", async () => {
   insertDrop("old", { visibility: "private", title: "Old plan" })
   objects.set("old.md", { body: new Blob(["# Old plan\n\nA forgotten llama paragraph."]), uploadedAt: new Date() })
