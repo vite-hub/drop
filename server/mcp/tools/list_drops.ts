@@ -6,6 +6,7 @@ import { MIB } from "#shared/quotas"
 import { findDropByRef, listDrops, listFolder, listSharedWithMe, permissions } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
 import { getUsage } from "../../utils/quotas"
+import { searchWords } from "../../utils/search"
 import { dropLine, mcpDrop } from "../format"
 
 const quota = (name: string, used: number, max: number | null, unit = (n: number) => String(n)) =>
@@ -21,7 +22,12 @@ export default defineMcpTool({
   inputSchema: toStandardJsonSchema(
     v.object({
       query: v.optional(
-        v.pipe(v.string(), v.description("Words to find in the title, file name, slug, or a doc's text.")),
+        v.pipe(
+          v.string(),
+          v.description(
+            "Words to find in the title, file name, slug, links, version notes, or a doc's text. A PR number like 12 finds a drop linking that PR.",
+          ),
+        ),
       ),
       folder: v.optional(
         v.pipe(
@@ -47,7 +53,7 @@ export default defineMcpTool({
   ),
   handler: async ({ query, folder, kind, shared, trash, sharedWithMe, limit }, event) => {
     const who = await requireIdentity(event)
-    const words = query?.toLowerCase().split(/\s+/).filter(Boolean) ?? []
+    const words = searchWords(query)
     const inside = folder ? await findDropByRef(folder, event) : null
     if (folder && (!inside || inside.kind !== "folder" || !permissions(inside, who).view))
       throw new HTTPError({ status: 404, message: `No folder with id ${folder}.` })
@@ -64,7 +70,9 @@ export default defineMcpTool({
         // Your drops and a folder's searched on the server, text included; the Trash and Shared with me filter here.
         (inside ||
           !(trash || sharedWithMe) ||
-          words.every((word) => `${drop.title} ${drop.filename} ${drop.slug}`.toLowerCase().includes(word))),
+          words.every((word) =>
+            `${drop.title} ${drop.filename} ${drop.slug} ${drop.note ?? ""}`.toLowerCase().includes(word),
+          )),
     )
     const drops = matched.slice(0, limit).map((drop) => mcpDrop(drop, event.url.origin))
     const usageLine = usage.enabled

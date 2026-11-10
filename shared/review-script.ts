@@ -86,6 +86,7 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .pin:hover, .pin.open { scale: 1.12; }
 .pin img { width: 100%; height: 100%; object-fit: cover; }
 .pin.done { opacity: .6; filter: grayscale(1); }
+.pin.sending { opacity: .7; cursor: progress; }
 .toast { position: fixed; display: flex; gap: 8px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .toast a { color: var(--fg); font-weight: 500; }
 .icon[aria-pressed=true] { background: var(--soft); color: var(--fg); }
@@ -251,6 +252,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   pill.append(bar, tools);
   let area = null, start = null, busy = false, toastTimer = 0;
+  // The comment on its way to Drop. Its pin shows at once while the composer waits hidden, so a failed send can open
+  // it again with the note.
+  let sending = null, sendingBox = false;
   let threads = [], openN = null, pinsShown = true, here = "";
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
   const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map(), shownImages = new Set();
@@ -327,19 +331,25 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   const pageKey = () => location.pathname + location.search;
 
+  // Each read takes a number, and only the latest one may draw: a read that started before a sent comment was saved
+  // would erase its pin.
+  let reads = 0;
   async function refresh() {
     if (!token) return;
     here = pageKey();
+    const read = ++reads;
     try {
       const response = await call(api + "?page=" + encodeURIComponent(here));
       const answer = await response.json();
-      if (here !== pageKey()) return;
+      if (read !== reads || here !== pageKey()) return;
       threads = Array.isArray(answer.threads) ? answer.threads : [];
+      // The pending pin belongs to the page it was sent from.
+      if (sending && sending.page === here && !threads.some((item) => item.requestId === sending.requestId)) threads.unshift(sending);
       render();
     } catch (e) {}
   }
 
-  const visible = () => threads.filter((item) => !item.resolved || showResolved.checked);
+  const visible = () => threads.filter((item) => (item !== sending || item.page === pageKey()) && (!item.resolved || showResolved.checked));
 
   function avatar(person, into) {
     into.textContent = initials(person.name);
@@ -411,8 +421,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
         pinFor.set(item.n, pin);
       }
       pin.classList.toggle("done", item.resolved);
-      pin.setAttribute("aria-label", "Comment #" + item.n + " by " + item.author.name);
-      pin.title = "#" + item.n + " " + item.author.name + ": " + item.body.slice(0, 80);
+      pin.classList.toggle("sending", item === sending);
+      pin.disabled = item === sending;
+      pin.setAttribute("aria-label", item === sending ? "Sending your comment" : "Comment #" + item.n + " by " + item.author.name);
+      pin.title = (item === sending ? "Sending: " : "#" + item.n + " " + item.author.name + ": ") + item.body.slice(0, 80);
       if (pin.dataset.who !== item.author.name) { pin.dataset.who = item.author.name; pin.textContent = ""; avatar(item.author, pin); }
     }
     if (!list.hidden) renderList();
@@ -487,7 +499,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   function openThread(n) {
     const item = threads.find((t) => t.n === n);
-    if (!item) return;
+    // While a comment is on its way, its composer keeps the note in case the send fails, so nothing else opens.
+    if (!item || sending) return;
     cancel();
     list.hidden = true;
     openN = n;
@@ -552,7 +565,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function renderList() {
     $("a", list).href = reviewUrl();
     listItems.textContent = "";
-    const shown = visible().slice().sort((a, b) => a.n - b.n);
+    const shown = visible().filter((item) => item !== sending).sort((a, b) => a.n - b.n);
     if (!shown.length) listItems.appendChild(el("p", "empty", threads.length ? "Every comment here is resolved." : "No comments on this page yet."));
     for (const item of shown) {
       const row = el("button", "row-item" + (item.resolved ? " done" : ""));
@@ -633,6 +646,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const clamp = (value) => Math.min(1000, Math.max(0, Math.round(value)));
 
   function startDrawing() {
+    if (sending) return say("Sending your comment…");
     cancel();
     closeThread();
     list.hidden = true;
@@ -732,6 +746,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   function startMarking() {
+    if (sending) return say("Sending your comment…");
     cancel();
     closeThread();
     list.hidden = true;
@@ -925,6 +940,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     let response = await attempt();
     for (let wait = 2000; unreachable(response); wait = Math.min(wait * 2, 15000)) {
       if (Date.now() + wait > until) throw new Error("Couldn't reach Drop. Your comment is still here: press Send to try again.");
+      unsend();
       newBox.show("Can't reach Drop. Trying again…");
       await pause(wait);
       const n = await landed(data.page, data.requestId);
@@ -952,6 +968,36 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
   }
 
+  // The note's pin, drawn as soon as it's sent. Keyed 0 until Drop gives it a number; it takes no clicks meanwhile.
+  function showSending(data) {
+    sending = {
+      n: 0, requestId: data.requestId, body: data.body, author: { name: authorName() || "You", image: null },
+      createdAt: Date.now(), resolved: false, mine: true, canResolve: false, page: pageKey(),
+      element: { selector: data.selector, label: data.label || null }, spot: data.spot,
+      box: { ox: data.ox, oy: data.oy, ow: data.ow, oh: data.oh }, screenshot: null, images: [], replies: [],
+    };
+    elementFor.delete(0);
+    sendingBox = !box.hidden;
+    pop.hidden = true; box.hidden = true; pill.hidden = bar.hidden = false;
+    threads = [sending].concat(threads);
+    render();
+    $("[data-act=comment]", bar).focus({ preventScroll: true });
+  }
+  function forgetSending() {
+    if (!sending) return false;
+    threads = threads.filter((item) => item !== sending);
+    elementFor.delete(sending.n);
+    sending = null;
+    return true;
+  }
+  // The send didn't go through: the pin goes and the composer comes back with the note, to show why.
+  function unsend() {
+    if (!forgetSending()) return;
+    pop.hidden = false; box.hidden = !sendingBox; pill.hidden = true;
+    render();
+    newBox.note.focus({ preventScroll: true });
+  }
+
   pop.addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = newBox.note.value.trim();
@@ -970,17 +1016,25 @@ export const REVIEW_SCRIPT = String.raw`(() => {
         ox, oy, ow: Math.max(1, Math.min(1000 - ox, at(r.right, w) - ox)), oh: Math.max(1, Math.min(1000 - oy, at(r.bottom, h) - oy)),
         viewport: { width: w, height: h },
       };
+      // The screenshot may still be drawing; the pin doesn't wait for it, or for Drop.
+      const from = pageKey();
+      showSending(data);
       const form = new FormData();
       form.append("data", JSON.stringify(data));
       const shot = await area.shot;
       if (shot) form.append("screenshot", shot, "screenshot");
       newBox.files().forEach((file) => form.append("image", file, file.name || "image"));
       const answer = await postComment(form, data);
+      const saved = answer.thread && answer.thread.n === answer.n ? answer.thread : null;
+      forgetSending();
+      if (saved && from === pageKey()) { reads++; threads = [saved].concat(threads.filter((item) => item.n !== saved.n)); }
       newBox.reset();
       cancel();
       say("Sent as #" + answer.n + ". ", reviewUrl());
-      void refresh();
+      // A resend that found the earlier submission answers its number only.
+      if (saved) render(); else void refresh();
     } catch (error) {
+      unsend();
       newBox.show((error && error.message) || "Couldn't reach Drop.");
     } finally {
       busy = false; send.disabled = false; send.textContent = "Send";
