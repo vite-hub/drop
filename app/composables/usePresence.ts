@@ -56,7 +56,7 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
   const { data: me } = useMe()
   const mounted = useMounted()
   const showCursors = useLocalStorage("drop-presence-cursors", true)
-  const { idle } = useIdle(IDLE_MS)
+  const { idle, reset: activity } = useIdle(IDLE_MS)
   const visibility = useDocumentVisibility()
   const active = computed(() => !idle.value && visibility.value === "visible")
 
@@ -160,7 +160,8 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     return [...current.states().values()].map((state) => stateOf(state).comments ?? "").join()
   })
 
-  return { people, cursors, sharing, showCursors, point, commented, commentsChange }
+  // Input in the cross-origin frame never reaches useIdle's window listeners (useViewerFrame forwards it).
+  return { people, cursors, sharing, showCursors, point, activity, commented, commentsChange }
 }
 
 export type Presence = ReturnType<typeof usePresence>

@@ -45,6 +45,55 @@ const cursors = (frame) =>
   )
 
 test(
+  "frame input reports activity without sharing a cursor, including while a comment tool holds events",
+  { timeout: 30_000 },
+  async () => {
+    const browser = await chromium.launch()
+    try {
+      const { context, page, frame } = await open(browser)
+      // Input inside the frame does not reach the outer window's idle listeners.
+      await page.evaluate(() => {
+        window.outerInputs = 0
+        for (const type of ["pointermove", "pointerdown", "keydown", "scroll"])
+          addEventListener(type, () => window.outerInputs++)
+      })
+      await page.clock.install()
+      await page.mouse.click(150, 150)
+      await page.waitForFunction(() => posts.some((m) => m.type === "activity"), null, { timeout: 3000 })
+      assert.deepEqual(parseFrameMessage({ __drop: true, type: "activity" }), { type: "activity" })
+
+      // A burst of input sends only one message per second.
+      for (let x = 160; x < 200; x += 5) await page.mouse.move(x, 150)
+      assert.equal(await page.evaluate(() => posts.filter((m) => m.type === "activity").length), 1)
+
+      for (const input of [
+        () => page.keyboard.press("ArrowDown"),
+        () => frame.evaluate(() => scrollTo(0, 100)),
+        () => page.mouse.click(200, 150),
+        () => frame.evaluate(() => document.body.dispatchEvent(new Event("touchstart", { bubbles: true }))),
+      ]) {
+        await page.clock.fastForward(1100)
+        const before = await page.evaluate(() => posts.filter((m) => m.type === "activity").length)
+        await input()
+        await page.waitForFunction((n) => posts.filter((m) => m.type === "activity").length > n, before)
+      }
+      assert.equal(await page.evaluate(() => window.outerInputs), 0)
+      assert.equal(await page.evaluate(() => posts.filter((m) => m.type === "pointer").length), 0)
+
+      await page.evaluate(() => send({ type: "tool", tool: "comment" }))
+      await page.waitForFunction(() => posts.some((m) => m.type === "tool" && m.tool === "comment"))
+      await page.clock.fastForward(1100)
+      const before = await page.evaluate(() => posts.filter((m) => m.type === "activity").length)
+      await page.mouse.move(220, 160)
+      await page.waitForFunction((n) => posts.filter((m) => m.type === "activity").length > n, before)
+      await context.close()
+    } finally {
+      await browser.close()
+    }
+  },
+)
+
+test(
   "a doc's frame draws the others' cursors on their elements, and shares the reader's only when asked",
   { timeout: 30_000 },
   async () => {

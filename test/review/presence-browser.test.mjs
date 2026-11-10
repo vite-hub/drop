@@ -93,6 +93,82 @@ async function open(browser, { presence = true } = {}) {
 
 const BEN = { id: "ben", name: "Ben", color: "#E11D48" }
 
+test(
+  "a site's popover stays open while commenting with presence, and its saved comment stays reachable",
+  { timeout: 30_000 },
+  async () => {
+    const browser = await chromium.launch()
+    try {
+      const { context, page } = await open(browser)
+      await page.waitForFunction(() => window.__presence)
+      const saved = []
+      await page.route(DROP + "/api/review/comments*", async (route) => {
+        const request = route.request()
+        if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
+        let body = { threads: saved }
+        if (request.method() === "POST") {
+          const form = await new Response(request.postDataBuffer(), {
+            headers: { "content-type": request.headers()["content-type"] },
+          }).formData()
+          const data = JSON.parse(form.get("data"))
+          saved.push({
+            n: 1,
+            body: data.body,
+            element: { selector: data.selector, label: data.label },
+            spot: data.spot,
+            author: { name: "Ada" },
+            resolved: false,
+            replies: [],
+            images: [],
+            createdAt: Date.now(),
+          })
+          body = { n: 1 }
+        }
+        return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify(body) })
+      })
+      await page.evaluate(() => {
+        // A page-owned menu, dismissed by a click outside it, like a portal-mounted application popover.
+        document.body.insertAdjacentHTML(
+          "beforeend",
+          `<button id="details-trigger">Details</button>
+        <div id="details" hidden style="position:fixed;left:100px;top:100px;background:white;padding:20px">
+          <p id="detail-note">The details in this popover.</p>
+        </div>`,
+        )
+        const trigger = document.getElementById("details-trigger"),
+          details = document.getElementById("details")
+        trigger.addEventListener("click", () => {
+          details.hidden = false
+        })
+        document.addEventListener("click", (event) => {
+          if (!details.contains(event.target) && event.target !== trigger) details.hidden = true
+        })
+      })
+      await page.locator("#details-trigger").click()
+      const ui = page.locator("drop-review")
+      await ui.getByRole("button", { name: "Comment", exact: true }).click()
+      assert.equal(await page.locator("#details").isVisible(), true)
+      const box = await page.locator("#detail-note").boundingBox()
+      await page.mouse.click(box.x + 20, box.y + 10)
+      await ui.getByRole("textbox", { name: "Comment", exact: true }).fill("Keep these details")
+      assert.equal(await page.locator("#details").isVisible(), true)
+      await ui.getByRole("button", { name: "Send", exact: true }).click()
+      await ui.locator("[data-act=list]").waitFor()
+      assert.equal(saved[0].element.selector, "#detail-note")
+      assert.equal(await page.locator("#details").isVisible(), true)
+      // Close it through the page's own outside-click handler, then reach the comment through the review's list.
+      await page.locator("h1").click()
+      assert.equal(await page.locator("#details").isVisible(), false)
+      await ui.locator("[data-act=list]").click()
+      await ui.locator(".row-item").filter({ hasText: "Keep these details" }).click()
+      assert.equal(await ui.locator(".thread").getByText("Keep these details", { exact: true }).isVisible(), true)
+      await context.close()
+    } finally {
+      await browser.close()
+    }
+  },
+)
+
 test("review.js shows who else is on the review and their cursors on this page", { timeout: 30_000 }, async () => {
   const browser = await chromium.launch()
   try {

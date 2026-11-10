@@ -271,6 +271,8 @@ export function useViewerFrame(options: {
         return void copy(message.text)
       case "pointer":
         return options.presence?.point(message.at)
+      case "activity":
+        return options.presence?.activity()
       case "files":
         // Each as soon as it's read, so the first one on screen doesn't wait for the rest.
         for (const path of message.paths)

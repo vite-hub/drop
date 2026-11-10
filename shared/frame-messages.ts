@@ -20,6 +20,8 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
   v.object({ type: v.literal("copy"), text: v.string() }),
+  // Input inside the frame keeps the reader active, even when no cursor is being shared.
+  v.object({ type: v.literal("activity") }),
   // Where the reader's pointer is, for the people in the drop's presence room (PRESENCE_CURSORS in ./presence-cursors):
   // the element under it and the spot inside it in thousandths. null once it leaves the page.
   v.object({

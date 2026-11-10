@@ -256,6 +256,16 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // Live cursors: the people in the drop's presence room point here too. Drop says when this reader shares their pointer
   // ("cursors" with share), and it goes up at most every 50 ms, as the element under it and the spot inside it.
   const cursors = mountCursors(shadow, elementAt);
+  // Input in this frame never bubbles to Drop's idle timer. Keep it active even while alone or hiding cursors.
+  let activitySent = -Infinity;
+  function presenceActivity() {
+    const now = Date.now();
+    if (now - activitySent < 1000) return;
+    activitySent = now;
+    post({ type: "activity" });
+  }
+  for (const type of ["pointermove", "pointerdown", "keydown", "scroll", "wheel", "touchstart", "touchmove"])
+    addEventListener(type, presenceActivity, { capture: true, passive: true });
   let sharePointer = false, pointerSent = 0, pointerTimer = 0, pointerAt = null;
   function presenceMove(e) {
     if (!sharePointer || e.pointerType === "touch") return;
@@ -1110,6 +1120,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // left the page.
   let heldHover = [], pointer = null;
   function held(e) {
+    if (/^(pointermove|pointerdown|touchstart|touchmove)$/.test(e.type)) presenceActivity();
     const path = e.composedPath(), root = path.findIndex((node) => node.localName === "drop-comments");
     for (const node of path.slice(0, Math.max(0, root))) {
       const handler = node["on" + e.type];
