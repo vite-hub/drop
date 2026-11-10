@@ -9,6 +9,7 @@ const { indexMissingTexts, likePattern, MAX_SEARCH_TEXT, searchableText } = awai
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: createFolder } = await import("../../server/mcp/tools/create_folder.ts")
 const { default: listTool } = await import("../../server/mcp/tools/list_drops.ts")
+const { default: updateTool } = await import("../../server/mcp/tools/update_drop.ts")
 const { default: listHandler } = await import("../../server/api/drops/index.get.ts")
 const { default: searchHandler } = await import("../../server/api/search.get.ts")
 
@@ -32,7 +33,7 @@ const server = createMcpHandler({
   name: "drop-test",
   version: "1",
   origin: false,
-  tools: [publish, createFolder, listTool],
+  tools: [publish, createFolder, listTool, updateTool],
 })
 async function call(tool, input) {
   const request = new H3Event(
@@ -234,6 +235,40 @@ test("agents find docs by their text too", async () => {
   assert.match(listed.drops[0].match, /giraffe migration/)
 })
 
+test("a drop matches its links, its version notes, the words of a route, and its PR's number", async () => {
+  const pr = await doc("# Account page against main\n\n![Before](https://drop.example/f/a.png)", {
+    note: "First captures",
+  })
+  await call(updateTool, {
+    id: pr.id,
+    resources: [
+      { url: "https://github.com/acme/app/pull/12", title: "PR #12" },
+      { url: "https://pr-12.preview.example.com/accountsettings", title: "Preview" },
+    ],
+  })
+  await doc("# Account page against main\n\nUnchanged screenshots.", { previous: pr.id, note: "Fresh captures at 7c0e930" })
+  const other = await doc("# Weekly notes\n\nWe should tidy up the account settings.")
+  const ids = async (query) => (await listDrops(owner, undefined, { query })).map((drop) => drop.id)
+
+  assert.deepEqual(await ids("account settings"), [pr.id, other.id], "a link's /accountsettings ranks above words in a text")
+  assert.deepEqual(await ids("accountsettings"), [pr.id])
+  assert.deepEqual(await ids("pr-12.preview"), [pr.id], "the preview link")
+  assert.deepEqual(await ids("12"), [pr.id], "a bare PR number finds the PR link")
+  assert.deepEqual(await ids("#12"), [pr.id])
+  assert.deepEqual(await ids("app#12"), [pr.id])
+  assert.deepEqual(await ids("app#15"), [])
+  assert.deepEqual(await ids("7c0e930"), [pr.id], "the latest version's note")
+  assert.deepEqual(await ids("first captures"), [pr.id], "an earlier version's note")
+
+  const listed = await call(listTool, { query: "account settings" })
+  assert.deepEqual(
+    listed.drops.map((drop) => drop.id),
+    [pr.id, other.id],
+  )
+  assert.equal(listed.drops[0].match, undefined, "a link match needs no snippet")
+  assert.deepEqual(titles(await searchHandler(request("/api/search?q=12"))), ["Account page against main"])
+})
+
 test("the hourly schedule indexes text docs published before search, once each", async () => {
   insertDrop("old", { visibility: "private", title: "Old plan" })
   objects.set("old.md", { body: new Blob(["# Old plan\n\nA forgotten llama paragraph."]), uploadedAt: new Date() })
@@ -261,4 +296,6 @@ test("a long search word becomes a LIKE pattern D1 accepts, at most 50 bytes, cu
     assert.doesNotMatch(pattern, /\\%$/)
   }
   assert.equal(likePattern("a".repeat(300)), `%${"a".repeat(48)}%`)
+  assert.equal(likePattern("app", "12"), "%app%12%", "later parts may come anywhere after")
+  assert.equal(likePattern("a".repeat(47), "12"), `%${"a".repeat(47)}%`, "never ends on a lone separator")
 })

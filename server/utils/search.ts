@@ -2,12 +2,12 @@ import { and, eq, inArray, isNotNull, isNull, type SQL, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database/drizzle"
-import { drops, dropTexts } from "../databases/config"
+import { drops, dropTexts, dropVersions } from "../databases/config"
 import { boardText, parseBoard } from "#shared/board"
 import { splitFrontmatter } from "#shared/frontmatter"
 import { DROP_KINDS } from "#shared/types"
 
-// Search matches a drop's title, file name and slug, and the words of a text doc's latest version, kept in `drop_texts`. Plain LIKE scans, no FTS5: D1's export breaks on virtual tables, and a person's docs scan in milliseconds.
+// Search matches a drop's title, file name, slug, links and version notes, and the words of a text doc's latest version, kept in `drop_texts`. Plain LIKE scans, no FTS5: D1's export breaks on virtual tables, and a person's docs scan in milliseconds.
 
 /** Text docs keep this many characters for search; the rest of a long doc isn't searchable. */
 export const MAX_SEARCH_TEXT = 64_000
@@ -65,8 +65,17 @@ export function searchableText(kind: string, source: string) {
   return text.slice(0, MAX_SEARCH_TEXT).replace(/[\uD800-\uDBFF]$/, "")
 }
 
-/** Search words: lower case, at most ten, each matched anywhere in the title, file name, slug, or a doc's text. */
-export const searchWords = (query?: string) => query?.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 10) ?? []
+/**
+ * Search words: lower case, at most ten, each matched anywhere in a drop's name, links, version notes, or text. A
+ * `#12` is the number alone, so it finds the PR link `…/pull/12` as well as a title's `app#12`.
+ */
+export const searchWords = (query?: string) =>
+  query
+    ?.toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.replace(/^#(?=\d+$)/, ""))
+    .filter(Boolean)
+    .slice(0, 10) ?? []
 
 /** `?kind=image,file`: the kinds a search keeps, the unknown ones left out. */
 export const searchKinds = (param?: string | null) => DROP_KINDS.filter((kind) => param?.split(",").includes(kind))
@@ -77,26 +86,50 @@ const encoder = new TextEncoder()
  * A word as a LIKE pattern. D1 refuses patterns over 50 bytes, so a long word keeps the escaped characters that fit in
  * 48 bytes; the two `%` take the rest. A prefix of the word still finds what the whole word would.
  */
-export function likePattern(word: string) {
+export function likePattern(...parts: string[]) {
+  // Parts after the first match anywhere after the one before.
   let escaped = ""
-  for (const char of word) {
-    const next = escaped + char.replace(/[\\%_]/, "\\$&")
-    if (encoder.encode(next).length > 48) break
-    escaped = next
+  for (const [index, part] of parts.entries()) {
+    for (const [at, char] of [...part].entries()) {
+      const next = `${escaped}${index && !at ? "%" : ""}${char.replace(/[\\%_]/, "\\$&")}`
+      if (encoder.encode(next).length > 48) return `%${escaped}%`
+      escaped = next
+    }
   }
   return `%${escaped}%`
 }
-const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coalesce(${drops.slug}, ''))`
 
 /**
- * One condition per word: the word is in the drop's name, or in its text. SQLite's LIKE ignores ASCII case already, so
- * the text isn't lowered row by row. Needs `drop_texts` left-joined (see `searchDrops`).
+ * A word as a pattern for a drop's name and links. An `app#12` there also finds the link
+ * `github.com/acme/app/pull/12`: anything may come between the repository and the number.
+ */
+export function namePattern(word: string) {
+  const ref = word.match(/^([^#]+)#(\d+)$/)
+  return ref ? likePattern(ref[1]!, ref[2]!) : likePattern(word)
+}
+
+/**
+ * What a drop is called and points to, as one line: its title, file name, slug, latest version's note, and its links
+ * (the JSON of `resources`). Words in a link's path match too: `account` and `settings` both match `/accountsettings`.
+ */
+const named = sql`lower(${drops.title} || ' ' || ${drops.filename} || ' ' || coalesce(${drops.slug}, '') || ' ' || coalesce(${drops.note}, '') || ' ' || coalesce(${drops.resources}, ''))`
+
+const inName = (word: string) => sql`${named} LIKE ${namePattern(word)} ESCAPE '\\'`
+
+/**
+ * One condition per word: the word is in the drop's name or links, its text, or an earlier version's note. SQLite's
+ * LIKE ignores ASCII case already, so the text isn't lowered row by row. Needs `drop_texts` left-joined (see
+ * `searchDrops`).
  */
 export const matching = (words: string[]) =>
   words.map(
     (word) =>
-      sql`(${named} LIKE ${likePattern(word)} ESCAPE '\\' OR ${dropTexts.text} LIKE ${likePattern(word)} ESCAPE '\\')`,
+      sql`(${inName(word)} OR ${dropTexts.text} LIKE ${likePattern(word)} ESCAPE '\\' OR EXISTS (SELECT 1 FROM ${dropVersions} WHERE ${dropVersions.dropId} = ${drops.id} AND ${dropVersions.note} LIKE ${likePattern(word)} ESCAPE '\\'))`,
   )
+
+/** 1 when every word is in the drop's name or links, which rank above matches in its text alone. */
+const namedMatch = (words: string[]) =>
+  words.length ? sql<number>`(CASE WHEN ${sql.join(words.map(inName), sql` AND `)} THEN 1 ELSE 0 END)` : sql<number>`0`
 
 /**
  * Words around the first word found in the doc's text, or null when the name alone matches every word. Worked out in
@@ -109,11 +142,7 @@ function snippetOf(words: string[]): SQL<string | null> {
     sql`, `,
   )
   const position = words.length > 1 ? sql`coalesce(${at})` : at
-  const nameOnly = sql.join(
-    words.map((word) => sql`${named} LIKE ${likePattern(word)} ESCAPE '\\'`),
-    sql` AND `,
-  )
-  return sql<string | null>`CASE WHEN ${dropTexts.text} IS NULL OR (${nameOnly}) THEN NULL
+  return sql<string | null>`CASE WHEN ${dropTexts.text} IS NULL OR ${namedMatch(words)} = 1 THEN NULL
     ELSE (SELECT CASE WHEN p IS NULL THEN NULL ELSE (CASE WHEN p > 61 THEN '…' ELSE '' END) || substr(${dropTexts.text}, max(1, p - 60), 180) END FROM (SELECT ${position} AS p)) END`
 }
 
@@ -128,16 +157,17 @@ function cleanSnippet(snippet: string | null) {
 }
 
 /**
- * Drops matching `words` (every word, in the name or the text), newest first, with a snippet when only the text has
- * them. `where` scopes the rows on `drops`.
+ * Drops matching `words` (every word, in the name, links, notes, or text): the ones whose name or links hold every
+ * word first, then the rest, newest first in each, with a snippet when the name doesn't hold them. `where` scopes the
+ * rows on `drops`.
  */
 export async function searchDrops(where: SQL | undefined, words: string[], limit: number) {
   const rows = await db
-    .select({ drop: drops, snippet: snippetOf(words) })
+    .select({ drop: drops, snippet: snippetOf(words), named: namedMatch(words).as("named_match") })
     .from(drops)
     .leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
     .where(and(where, ...matching(words)))
-    .orderBy(sql`${drops.updatedAt} DESC`)
+    .orderBy(sql`named_match DESC`, sql`${drops.updatedAt} DESC`)
     .limit(limit)
   return rows.map((row) => ({ drop: row.drop, snippet: cleanSnippet(row.snippet) }))
 }
