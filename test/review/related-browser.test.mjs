@@ -82,11 +82,11 @@ async function open(browser, { linked = true, groups = GROUPS, connected = false
     pill,
     asked,
     button: pill.locator(".related button"),
-    menu: page.locator("drop-review .vitehub-links"),
+    menu: page.locator("drop-review .links"),
   }
 }
 
-test("Related links shows on a site a drop links to, connects on the first press, and lists each drop with its links", async () => {
+test("Related links shows on a site a drop links to, connects on the first press, and lists each drop and its links in one list", async () => {
   const browser = await chromium.launch()
   try {
     const { context, page, pill, asked, button, menu } = await open(browser)
@@ -102,25 +102,23 @@ test("Related links shows on a site a drop links to, connects on the first press
     assert.deepEqual(asked.slice(-1), ["Bearer t"])
     assert.equal(await button.getAttribute("aria-expanded"), "true")
     assert.equal(await menu.locator("p").first().textContent(), "Related links")
+    // One list, every row alike: each drop, then its links.
+    assert.equal(await menu.locator("ul").count(), 1)
     const rows = await menu
-      .locator("ul")
-      .evaluateAll((lists) =>
-        lists.map((list) =>
-          [...list.querySelectorAll("a")].map((a) => [
-            a.querySelector(".vitehub-links-name").textContent,
-            a.getAttribute("href"),
-            a.querySelector(".vitehub-links-detail")?.textContent ?? "",
-            a.target,
-          ]),
-        ),
+      .locator("a")
+      .evaluateAll((anchors) =>
+        anchors.map((a) => [
+          a.querySelector(".name").textContent,
+          a.getAttribute("href"),
+          a.querySelector(".detail")?.textContent ?? "",
+          a.target,
+        ]),
       )
     assert.deepEqual(rows, [
-      [
-        ["Before/after: pricing", `${DROP}/review/open#doc=handle-1`, "Drop", "_blank"],
-        ["PR #12", "https://github.com/acme/app/pull/12", "github.com", "_blank"],
-        ["linear.app", "https://linear.app/acme/issue/ACM-7", "", "_blank"],
-      ],
-      [["Pricing plan", `${DROP}/review/open#doc=handle-2`, "Drop", "_blank"]],
+      ["Before/after: pricing", `${DROP}/review/open#doc=handle-1`, "Drop", "_blank"],
+      ["PR #12", "https://github.com/acme/app/pull/12", "github.com", "_blank"],
+      ["linear.app", "https://linear.app/acme/issue/ACM-7", "", "_blank"],
+      ["Pricing plan", `${DROP}/review/open#doc=handle-2`, "Drop", "_blank"],
     ])
     assert.equal(
       await menu
@@ -130,8 +128,8 @@ test("Related links shows on a site a drop links to, connects on the first press
       true,
     )
     // A favicon the site can't load falls back to a plain link icon; GitHub gets its mark.
-    await menu.locator("a").nth(2).locator("svg").first().waitFor()
-    assert.equal(await menu.locator("a").nth(1).locator("svg.vitehub-links-github").count(), 1)
+    await menu.locator("a").nth(2).locator("svg:not(.out)").waitFor()
+    assert.equal(await menu.locator("a").nth(1).locator("svg.github").count(), 1)
 
     // It opens beside the pill, on its edge: above a pill at the bottom.
     const [menuBox, pillBox] = [await menu.boundingBox(), await pill.locator("[slot=review]").boundingBox()]
@@ -159,6 +157,9 @@ test("Related links shows on a site a drop links to, connects on the first press
     await button.click()
     await menu.waitFor()
     assert.equal(asked.length, before)
+    // A press elsewhere on the toolbar closes it too, like the mark that folds the pill.
+    await pill.locator("button.mark").click()
+    await menu.waitFor({ state: "hidden" })
     await context.close()
   } finally {
     await browser.close()

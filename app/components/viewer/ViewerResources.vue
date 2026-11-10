@@ -3,7 +3,8 @@ import { resourceLabel } from "#shared/resources"
 import type { DropResource, RelatedDrop } from "#shared/types"
 
 // A drop's own links, and with `relatedTo` the drops related to it through the pages they link to
-// (server/utils/related.ts), like a site review's before/after doc, each with the links of its not listed above.
+// (server/utils/related.ts), like a site review's before/after doc, with the links of theirs not listed yet. One list,
+// every row alike: a related drop opens here, a link in a new tab.
 const props = defineProps<{ resources: DropResource[]; relatedTo?: string }>()
 const related = ref<RelatedDrop[]>([])
 watch(
@@ -22,12 +23,15 @@ const label = (resource: DropResource) => {
   const host = new URL(resource.url).hostname.replace(/^www\./, "")
   return { ...resource, label: resourceLabel(resource), host: resource.title ? host : "" }
 }
-const links = computed(() => props.resources.map(label))
-const sections = computed(() => [
-  ...(links.value.length ? [{ drop: undefined, links: links.value }] : []),
-  ...related.value.map((drop) => ({ drop, links: drop.links.map(label) })),
+type Row = { key: string; drop?: RelatedDrop; link?: ReturnType<typeof label> }
+const rows = computed<Row[]>(() => [
+  ...props.resources.map((resource) => ({ key: resource.url, link: label(resource) })),
+  ...related.value.flatMap((drop) => [
+    { key: drop.id, drop },
+    ...drop.links.map((resource) => ({ key: resource.url, link: label(resource) })),
+  ]),
 ])
-const count = computed(() => props.resources.length + related.value.length)
+const count = computed(() => rows.value.length)
 // The chips: the drop's own links first, then the related drops' links, then a related drop's kind.
 const chipUrls = computed(() => [...props.resources, ...related.value.flatMap((drop) => drop.links)].map((r) => r.url))
 const shown = computed(() => chipUrls.value.slice(0, 3))
@@ -81,43 +85,34 @@ const more = computed(() => Math.max(0, chipUrls.value.length - shown.value.leng
     <template #content="{ close }">
       <nav aria-label="Related links" class="p-1">
         <p class="px-2 pt-1.5 pb-1 text-xs font-medium text-muted">Related links</p>
-        <!-- The drop's own links, then each related drop, opening here, with its links. -->
-        <ul
-          v-for="(section, index) in sections"
-          :key="section.drop?.id ?? ''"
-          :class="{ 'mt-1 border-t border-default pt-1': index }"
-        >
-          <li v-if="section.drop">
+        <ul>
+          <li v-for="row in rows" :key="row.key">
             <NuxtLink
-              class="flex min-h-8 items-start gap-2 rounded-md px-2 py-1.5 text-sm/5 font-medium text-highlighted transition-colors hover:bg-elevated focus-visible:bg-elevated focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ui-border-inverted) pointer-coarse:min-h-11"
-              :to="`/drops/${section.drop.id}`"
+              v-if="row.drop"
+              class="flex min-h-8 items-start gap-2 rounded-md px-2 py-1.5 text-sm/5 text-highlighted transition-colors hover:bg-elevated focus-visible:bg-elevated focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ui-border-inverted) pointer-coarse:min-h-11"
+              :to="`/drops/${row.drop.id}`"
               @click="close"
             >
-              <UIcon
-                aria-hidden="true"
-                class="mt-0.5 size-4 shrink-0 text-muted"
-                :name="KIND_ICONS[section.drop.kind]"
-              />
-              <span class="min-w-0 flex-1 truncate">{{ section.drop.title }}</span>
+              <UIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-muted" :name="KIND_ICONS[row.drop.kind]" />
+              <span class="min-w-0 flex-1 truncate">{{ row.drop.title }}</span>
             </NuxtLink>
-          </li>
-          <li v-for="link in section.links" :key="link.url">
             <a
+              v-else-if="row.link"
               class="flex min-h-8 items-start gap-2 rounded-md px-2 py-1.5 text-sm/5 text-highlighted transition-colors hover:bg-elevated focus-visible:bg-elevated focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ui-border-inverted) pointer-coarse:min-h-11"
-              :href="link.url"
+              :href="row.link.url"
               rel="noopener noreferrer"
               target="_blank"
-              :title="`${link.label}\n${link.url}`"
+              :title="`${row.link.label}\n${row.link.url}`"
               @click="close"
             >
-              <ViewerResourceIcon class="mt-0.5" :url="link.url" />
-              <span class="min-w-0 flex-1 truncate">{{ link.label }}</span>
-              <span v-if="link.host" class="ml-auto min-w-0 max-w-2/5 truncate pl-2 text-xs/5 text-muted">{{
-                link.host
+              <ViewerResourceIcon class="mt-0.5" :url="row.link.url" />
+              <span class="min-w-0 flex-1 truncate">{{ row.link.label }}</span>
+              <span v-if="row.link.host" class="ml-auto min-w-0 max-w-2/5 truncate pl-2 text-xs/5 text-muted">{{
+                row.link.host
               }}</span>
               <UIcon
                 aria-hidden="true"
-                :class="['mt-0.75 size-3.5 shrink-0 text-dimmed', { 'ml-auto': !link.host }]"
+                :class="['mt-0.75 size-3.5 shrink-0 text-dimmed', { 'ml-auto': !row.link.host }]"
                 name="i-mingcute-arrow-right-up-line"
               />
               <span class="sr-only">(opens in a new tab)</span>
