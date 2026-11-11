@@ -29,13 +29,20 @@ export function useAppFiles(drop: Ref<DropDetail>) {
     const file = textValue(route.query.file)
     location.value = appLocation(path, route.hash) ?? (file && pages.value.includes(file) ? pageUrl(file) : null) ?? "/"
   }
-  watch([() => route.query.path, () => route.query.file, () => drop.value.id], openFromQuery, { immediate: true })
-  watch(location, (value) => {
+  watch([() => route.query.path, () => route.query.file, () => route.hash, () => drop.value.id], openFromQuery, {
+    immediate: true,
+  })
+  watch(location, async (value) => {
     if (drop.value.kind !== "app") return
     const path = value === "/" ? undefined : value
     if (path !== undefined && path !== textValue(route.query.path)) written.add(path)
     // The app's own hash is in `?path=` now: one left after it would land on the next page too.
-    void setQuery({ path, file: undefined }, { hash: "" })
+    try {
+      await setQuery({ path, file: undefined }, { hash: "" })
+    } finally {
+      // Canceled navigations never reach openFromQuery; they must not hide a later visit to that address.
+      if (path !== undefined) written.delete(path)
+    }
   })
 
   return { files, pages, page, location }
