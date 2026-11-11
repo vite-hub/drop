@@ -46,10 +46,18 @@ test("every comark-ui package Drop renders has a section in the Markdown referen
   const preset = createRequire(import.meta.url)("comark-ui/package.json")
   // include reads files, which Drop turns off, reading-time only measures, pele draws the ```mermaid fences markdown.md documents, and
   // the security plugin drops mathml's MathML, so markdown.md lists math under what Drop doesn't render. magic-move's
-  // animation needs its script, which /f/ pages block, so blocks.md (a stopgap that doesn't grow) leaves it out.
+  // animation needs its script, which /f/ pages block, so blocks.md (a stopgap that doesn't grow) leaves it out. Drop turns
+  // time off, since a cached render would keep "2 days ago" for weeks, so markdown.md lists it under what Drop doesn't render.
   const packages = Object.keys(preset.dependencies).filter(
     (name) =>
-      !["comark-include", "comark-magic-move", "comark-mathml", "comark-pele", "comark-reading-time"].includes(name),
+      ![
+        "comark-include",
+        "comark-magic-move",
+        "comark-mathml",
+        "comark-pele",
+        "comark-reading-time",
+        "comark-time",
+      ].includes(name),
   )
   const missing = packages.filter(
     (name) => !(reference + blocks).includes(`https://comark-ui.onmax.me/${name.replace(/^comark-/, "")}/`),
@@ -88,7 +96,7 @@ test("all five GitHub alert kinds keep their label", async () => {
   const { html } = await renderMarkdownCached("alerts.md", async () => markdown)
   for (const kind of kinds) {
     const label = kind[0].toUpperCase() + kind.slice(1)
-    assert.match(html, new RegExp(`<div class="cgc" data-type="${kind}">.*?<p class="cgc-title">${label}</p>`))
+    assert.match(html, new RegExp(`<div class="cgc"[^>]* data-type="${kind}">.*?<p class="cgc-title">${label}</p>`))
   }
 })
 

@@ -50,6 +50,6 @@ export default defineHandler(async (event) => {
   return {
     ...detail,
     contentOrigin: frameOrigin,
-    ...(served ? { contentGrant: await appFilesGrant(event, drop.id) } : {}),
+    ...(served ? { contentGrant: await appFilesGrant(event, drop.id, who) } : {}),
   }
 })

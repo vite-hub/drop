@@ -49,3 +49,22 @@ export function mergeResources(current: DropResource[], next: DropResource[]): D
   }
   return merged
 }
+
+/**
+ * A preview deploy of the change, which stays in a doc's header: something to open and try, not a fact about the doc.
+ * Agents title it exactly "Preview" (pr-evidence); a host with a `preview` label counts too. "Design preview" doesn't.
+ */
+export const isPreviewLink = (resource: DropResource) =>
+  resource.title?.trim().toLowerCase() === "preview" || new URL(resource.url).hostname.split(".").includes("preview")
+
+const REFERENCE =
+  /^https:\/\/(?:www\.)?(?:github\.com|gitlab\.com)\/([\w.-]+\/[\w.-]+)\/(?:-\/)?(?:pull|issues|merge_requests)\/(\d+)\/?(?:[?#].*)?$/
+
+/** A link's words in a doc's properties: its title, `owner/repo#123` for a pull request or issue, or its address. */
+export function linkText(resource: DropResource) {
+  if (resource.title) return resource.title
+  const reference = REFERENCE.exec(resource.url)
+  if (reference) return `${reference[1]}#${reference[2]}`
+  const url = new URL(resource.url)
+  return `${url.host.replace(/^www\./, "")}${url.pathname === "/" ? "" : url.pathname}`
+}

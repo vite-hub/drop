@@ -1,5 +1,5 @@
-// Better Auth tables (user, session, account, verification), its OAuth provider's (./oauth.ts), its teams and billing
-// (./teams.ts), and Drop's own (./drops.ts).
+// Better Auth tables (user, session, account, verification, rate_limit), its OAuth provider's (./oauth.ts), its teams
+// and billing (./teams.ts), and Drop's own (./drops.ts).
 import { defineDatabase } from "vite-hub/database"
 import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
@@ -123,6 +123,15 @@ export const verification = sqliteTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 )
 
+// Better Auth's rate limits (`rateLimit.storage: "database"`, server/auth.ts): Drop builds its Auth per request, so a
+// counter in memory would start empty every time.
+export const rateLimit = sqliteTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: integer("last_request").notNull(),
+})
+
 export {
   invitation,
   member,
@@ -185,6 +194,7 @@ export default defineDatabase({
     oauthRefreshToken,
     oauthResource,
     organization,
+    rateLimit,
     session,
     subscription,
     user,

@@ -125,6 +125,18 @@ test("a team's folders and what's in them reach its members, and nobody else sig
   await assert.rejects(requireFolder(folder.id, stranger), (error) => error.status === 404)
 })
 
+test("a team's owner and admins keep its folders in the browser, not through their agents", async () => {
+  const folder = await findDrop((await acmeFolder()).id)
+  for (const role of ["owner", "admin"]) {
+    const agent = { ...owner, teams: { acme: role }, actorKind: "agent", actorName: "Claude Code" }
+    const can = permissions(folder, agent)
+    assert.deepEqual([can.manage, can.trash, can.view], [false, false, true], role)
+    await assert.rejects(updateDrop(folder, agent, { share: "public" }), (error) => error.status === 404, role)
+  }
+  await updateDrop(folder, owner, { share: "public" })
+  assert.equal((await findDrop(folder.id)).share, "public", "the owner still shares it, in the browser")
+})
+
 test("team shares work only inside a team's folders", async () => {
   const outside = await call(publish, { markdown: "# Mine", note: "x", lifetime: "review", share: "team" })
   assert.match(outside.message, /Only drops in a team's folders share with a team/)
@@ -183,6 +195,13 @@ test("a team that pays puts its members on Pro and keeps boards; a free team sto
   assert.deepEqual([usage.plan, usage.paid, usage.kept.limit], ["pro", true, null])
   assert.ok(!(await call(publish, { board: { items: [] }, note: "x", lifetime: "review" })).isError)
   assert.equal((await getUsage("stranger")).plan, "free", "only the paying team's members")
+
+  // Stripe couldn't charge the card: Free while it retries and after retries stop.
+  for (const status of ["past_due", "unpaid"]) {
+    sql.prepare("UPDATE subscription SET status = ?").run(status)
+    assert.equal((await getUsage("mate")).plan, "free", status)
+    assert.equal(await memberLimit("acme"), 3, status)
+  }
 
   sql.prepare("UPDATE subscription SET status = 'canceled'").run()
   assert.equal((await getUsage("mate")).plan, "free")

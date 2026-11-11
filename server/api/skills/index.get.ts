@@ -1,7 +1,7 @@
 import { defineHandler } from "h3"
 import type { SkillSummary } from "#shared/types"
 import { requireIdentity } from "../../utils/identity"
-import { disabledSkills, SKILLS } from "../../utils/skills"
+import { disabledSkills, SKILLS, sourceOf } from "../../utils/skills"
 
 /** The skills catalog: what agents get over MCP. Admins also see the ones they switched off. */
 export default defineHandler(async (event): Promise<SkillSummary[]> => {
@@ -11,6 +11,6 @@ export default defineHandler(async (event): Promise<SkillSummary[]> => {
     name: skill.name,
     description: skill.description,
     enabled: !disabled.has(skill.name),
-    source: skill.source,
+    source: sourceOf(skill),
   }))
 })

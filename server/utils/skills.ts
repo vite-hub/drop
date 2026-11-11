@@ -1,154 +1,71 @@
-import { parseYAML } from "confbox/yaml"
 import { eq } from "drizzle-orm"
 import { db } from "vite-hub/database/drizzle"
-import { createTarGzip } from "nanotar"
+import { defineSkill, defineSkills, type Skill } from "vite-hub/skills"
 import comarkUiSkill from "comark-ui/skills/comark-ui/SKILL.md?raw"
 import { skills as comarkSkills } from "comark-ui/skills"
-import { hex, sha256 } from "#shared/utils/bytes"
-import { skillSettings } from "../databases/config"
-import handoffMd from "../../skills/handoff/SKILL.md?raw"
-import learningGrading from "../../skills/learning/references/grading.md?raw"
-import learningModel from "../../skills/learning/references/model.md?raw"
-import learningQuiz from "../../skills/learning/references/quiz.md?raw"
-import learningMd from "../../skills/learning/SKILL.md?raw"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
-import prototypePicker from "../../skills/prototype/assets/picker.js?raw"
-import prototypeCanvas from "../../skills/prototype/references/canvas.md?raw"
-import prototypeMd from "../../skills/prototype/SKILL.md?raw"
-import showMeMd from "../../skills/show-me/SKILL.md?raw"
-import skillHubMd from "../../skills/skill-hub/SKILL.md?raw"
-import blocksGuide from "../../skills/vitehub-drop/references/blocks.md?raw"
-import boardGuide from "../../skills/vitehub-drop/references/board.md?raw"
-import documentsGuide from "../../skills/vitehub-drop/references/documents.md?raw"
-import markdownGuide from "../../skills/vitehub-drop/references/markdown.md?raw"
-import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
+import { skillSettings } from "../databases/config"
 
-// Slidev's own skill, copied from slidevjs/slidev by scripts/sync-slidev-skill.mjs: its SKILL.md and every reference.
-const slidevFiles = import.meta.glob<string>("../../skills/slidev/**/*.md", {
+/**
+ * Drop's local and bundled upstream Agent Skills. `vite-hub/skills` serves them three ways: MCP (the Skills extension,
+ * server/mcp), Agent Skills Discovery v0.2.0 at /.well-known/agent-skills/, and v0.1.0 at /.well-known/skills/, which
+ * `npx skills add` reads (server/middleware/0.3.well-known.ts). `slidev` is Slidev's own, copied as it is by
+ * scripts/sync-slidev-skill.mjs, so vitehub-drop can send deck work there.
+ *
+ * Admins switch them on and off for the whole deployment (`skill_settings`); every surface serves only `enabledSkills`.
+ */
+// pr-evidence is built on its own below: its bundled comark-ui/SKILL.md would otherwise start a nested skill.
+const localFiles = import.meta.glob<string>(["../../skills/**", "!../../skills/pr-evidence/**"], {
   query: "?raw",
   import: "default",
   eager: true,
 })
 
-/**
- * Drop's local and bundled upstream Agent Skills, served three ways. `slidev` is Slidev's own,
- * copied as it is, so vitehub-drop can send deck work there:
- * - MCP: the Skills extension (SEP-2640), as `skill://` resources (server/mcp, server/utils/mcp-skills.ts)
- * - Agent Skills Discovery v0.2.0 at /.well-known/agent-skills/ (index with digests, archive for multi-file skills)
- * - Discovery v0.1.0 at /.well-known/skills/, which `npx skills add` still reads
- *
- * Admins switch them on and off for the whole deployment (`skill_settings`); every surface serves only the enabled set.
- */
-export interface SkillFile {
-  path: string
-  text: string
-  bytes: Uint8Array<ArrayBuffer>
-  mimeType: string
-}
-export interface Skill {
-  name: string
-  description: string
-  source: string
-  frontmatter: Record<string, unknown>
-  files: SkillFile[]
-}
-
-const encoder = new TextEncoder()
-const file = (path: string, text: string): SkillFile => ({
-  path,
-  text,
-  bytes: encoder.encode(text),
-  mimeType: /\.ya?ml$/.test(path) ? "application/yaml" : path.endsWith(".js") ? "text/javascript" : "text/markdown",
-})
-
-function frontmatterOf(markdown: string): Record<string, unknown> {
-  const block = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]
-  return block ? (parseYAML<Record<string, unknown>>(block) ?? {}) : {}
-}
-
-function skill(files: SkillFile[], source?: string): Skill {
-  const frontmatter = frontmatterOf(files.find((item) => item.path === "SKILL.md")!.text)
-  return {
-    name: String(frontmatter.name),
-    description: String(frontmatter.description),
-    source: source ?? `https://github.com/vite-hub/drop/blob/main/skills/${String(frontmatter.name)}/SKILL.md`,
-    frontmatter,
-    files,
-  }
-}
-
-// Bundle the renderer package's skill and references, keeping their relative links intact.
+// pr-evidence bundles the renderer package's skill and references, keeping their relative links intact. Its
+// references/annotations.md stays the entry point to the complete comark-ui guide.
 const comarkUiReferences = import.meta.glob<string>(
   "../../node_modules/comark-ui/dist/skills/comark-ui/references/*.md",
-  {
-    query: "?raw",
-    import: "default",
-    eager: true,
-  },
+  { query: "?raw", import: "default", eager: true },
 )
-// Keep the existing annotation URL as the entry point to the complete comark-ui guide.
-const prEvidenceAnnotations = comarkUiSkill
-  .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "")
-  .replaceAll("](references/", "](comark-ui/references/")
-
-/** Every built-in skill, enabled or not. Only the admin UI should see the disabled ones. */
-const LOCAL_SKILLS: Skill[] = [
-  skill([
-    file("SKILL.md", dropMd),
-    file("references/documents.md", documentsGuide),
-    file("references/markdown.md", markdownGuide),
-    file("references/blocks.md", blocksGuide),
-    file("references/board.md", boardGuide),
-  ]),
-  skill([file("SKILL.md", handoffMd)]),
-  skill([
-    file("SKILL.md", prEvidenceMd),
-    file("references/annotations.md", prEvidenceAnnotations),
-    file("references/comark-ui/SKILL.md", comarkUiSkill),
-    ...Object.entries(comarkUiReferences)
-      .map(([path, text]) => file(path.replace("../../node_modules/comark-ui/dist/skills/", "references/"), text))
-      .sort((a, b) => a.path.localeCompare(b.path)),
-  ]),
-  skill([
-    file("SKILL.md", prototypeMd),
-    file("assets/picker.js", prototypePicker),
-    file("references/canvas.md", prototypeCanvas),
-  ]),
-  skill([file("SKILL.md", showMeMd)]),
-  skill([
-    file("SKILL.md", learningMd),
-    file("references/model.md", learningModel),
-    file("references/grading.md", learningGrading),
-    file("references/quiz.md", learningQuiz),
-  ]),
-  skill([file("SKILL.md", skillHubMd)]),
-  skill(
-    Object.entries(slidevFiles)
-      .map(([path, text]) => file(path.replace("../../skills/slidev/", ""), text))
-      .sort((a, b) => Number(b.path === "SKILL.md") - Number(a.path === "SKILL.md") || a.path.localeCompare(b.path)),
+const prEvidence = defineSkill({
+  "SKILL.md": prEvidenceMd,
+  "references/annotations.md": comarkUiSkill
+    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "")
+    .replaceAll("](references/", "](comark-ui/references/"),
+  "references/comark-ui/SKILL.md": comarkUiSkill,
+  ...Object.fromEntries(
+    Object.entries(comarkUiReferences).map(([path, text]) => [
+      path.replace("../../node_modules/comark-ui/dist/skills/", "references/"),
+      text,
+    ]),
   ),
-]
+})
+
+// vitehub-drop, Drop's own skill, comes first in every list; the others follow by name.
+const LOCAL_SKILLS = [...defineSkills(localFiles), prEvidence].sort(
+  (a, b) => Number(b.name === "vitehub-drop") - Number(a.name === "vitehub-drop") || a.name.localeCompare(b.name),
+)
 
 // comark-ui's own skills, from the installed release, so they describe the renderer Drop runs. Their source links
 // point at comark-ui's skill index, which serves the same files.
 const COMARK_SKILLS = "https://comark-ui.onmax.me/.well-known/skills/"
+const BUNDLED_SKILLS = comarkSkills
+  .filter((entry) => !LOCAL_SKILLS.some((local) => local.name === entry.name))
+  .map((entry) => defineSkill(Object.fromEntries(entry.files.map((file) => [file.path, file.text]))))
 
-export const SKILLS: Skill[] = [
-  ...LOCAL_SKILLS,
-  ...comarkSkills
-    .filter((entry) => !LOCAL_SKILLS.some((local) => local.name === entry.name))
-    .map((entry) =>
-      skill(
-        entry.files.map((item) => file(item.path, item.text)),
-        `${COMARK_SKILLS}${entry.name}/SKILL.md`,
-      ),
-    ),
-]
+/** Every built-in skill, enabled or not. Only the admin UI should see the disabled ones. */
+export const SKILLS: Skill[] = [...LOCAL_SKILLS, ...BUNDLED_SKILLS]
+
+/** Where a skill's source lives, for the catalog. */
+export const sourceOf = (skill: Skill) =>
+  BUNDLED_SKILLS.includes(skill)
+    ? `${COMARK_SKILLS}${skill.name}/SKILL.md`
+    : `https://github.com/vite-hub/drop/blob/main/skills/${skill.name}/SKILL.md`
 
 export const findSkill = (name: string) => SKILLS.find((item) => item.name === name)
 
 // A toggle shows up on this isolate at once; other isolates pick it up within a minute, the same window as the
-// MCP and discovery cache hints.
+// discovery cache hint.
 const SETTINGS_TTL_MS = 60_000
 let settings: { at: number; disabled: Promise<Set<string>> } | undefined
 
@@ -166,14 +83,10 @@ export function disabledSkills(): Promise<Set<string>> {
   return disabled
 }
 
+/** The skills every surface serves: the list function `serveSkills` and `skillsMcp` read on each request. */
 export async function enabledSkills(): Promise<Skill[]> {
   const disabled = await disabledSkills()
   return SKILLS.filter((item) => !disabled.has(item.name))
-}
-
-export async function findEnabledSkill(name: string): Promise<Skill | undefined> {
-  const found = findSkill(name)
-  return found && !(await disabledSkills()).has(found.name) ? found : undefined
 }
 
 export async function setSkillEnabled(name: string, enabled: boolean, userId: string) {
@@ -182,25 +95,4 @@ export async function setSkillEnabled(name: string, enabled: boolean, userId: st
     .values({ name, enabled, updatedAt: Date.now(), updatedBy: userId })
     .onConflictDoUpdate({ target: skillSettings.name, set: { enabled, updatedAt: Date.now(), updatedBy: userId } })
   settings = undefined
-}
-
-/** `sha256:<hex>`, the digest format both the MCP Skills extension and Discovery v0.2.0 use. */
-export const digest = async (bytes: Uint8Array<ArrayBuffer>) => `sha256:${hex(await sha256(bytes))}`
-
-/**
- * A multi-file skill as one .tar.gz (Discovery v0.2.0 `archive`): the skill directory itself, `SKILL.md` at the
- * archive's root with no wrapper folder, as the spec asks. Fixed mtimes keep the bytes, and so the digest, the same
- * on every isolate; built once per isolate.
- */
-const archives = new Map<string, Promise<Uint8Array<ArrayBuffer>>>()
-export function skillArchive(item: Skill) {
-  let archive = archives.get(item.name)
-  if (!archive) {
-    // Copied once into a plain ArrayBuffer, which Response and crypto.subtle take.
-    archive = createTarGzip(
-      item.files.map((entry) => ({ name: entry.path, data: entry.bytes, attrs: { mtime: 0, mode: "644" } })),
-    ).then((bytes) => new Uint8Array(bytes))
-    archives.set(item.name, archive)
-  }
-  return archive
 }

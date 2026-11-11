@@ -134,7 +134,7 @@ More in [Lifetime and Trash](/docs/review#expiry).
 
 ### Links {#links}
 
-A drop can link to the pages it belongs with, such as the pull request it documents and that pull request's preview. They sit next to its title, each with its site's icon, and Details lists them all. Everyone who can open the drop sees them, on every version.
+A drop can link to the pages it belongs with, such as the pull request it documents and that pull request's preview. On a Markdown doc they sit with its front matter at the top of the doc, next to its status and the day the version was published, while a preview stays next to the title, where you open it. On other drops they all sit next to the title, each with its site's icon. Details lists them all. Everyone who can open the drop sees them, on every version.
 
 Agents set them when they publish. Pull request evidence links its pull request and preview on its own, and comments its own link on the pull request, so each leads to the other. The icons load from each site's own `/favicon.ico`, or its parent domain's when the address is behind a sign-in, never through an icon service.
 

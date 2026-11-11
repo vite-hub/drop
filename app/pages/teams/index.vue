@@ -55,7 +55,8 @@ async function submit() {
           <NuxtLink :to="`/teams/${team.id}`" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-elevated/50">
             <UIcon name="i-mingcute-group-2-line" class="size-4 text-muted" />
             <span class="min-w-0 flex-1 truncate font-medium text-highlighted">{{ team.name }}</span>
-            <UBadge v-if="team.paid" color="neutral" label="Team plan" size="sm" variant="subtle" />
+            <UBadge v-if="team.pastDue" color="error" label="Payment failed" size="sm" variant="subtle" />
+            <UBadge v-else-if="team.paid" color="neutral" label="Team plan" size="sm" variant="subtle" />
             <span class="text-xs text-muted capitalize">{{ team.role }}</span>
           </NuxtLink>
         </li>

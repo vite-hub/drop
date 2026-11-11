@@ -35,8 +35,6 @@ export const FrameMessage = v.variant("type", [
       selector: v.string(),
       label: v.string(),
       rect: Rect,
-      // The mouse let go: the reader is done selecting, and the Pin style opens its composer.
-      settled: v.optional(v.literal(true)),
     }),
   ]),
   // Where the composer for a held selection goes, in the frame's viewport: its card's place in the margin (`rail`), or

@@ -69,14 +69,14 @@ export function useTeams() {
     await reload()
   }
 
-  /** Stripe Checkout for the Team plan, one seat per member; Stripe sends them back to the team's page. */
+  /** Stripe Checkout for the Team plan, one seat per member, monthly or yearly; Stripe sends them back to the team's page. */
   const upgrade = async (id: string, annual = false) => {
     const team = await full(id)
     const seats = team.members.length
     return unwrap(
       $auth.subscription.upgrade({
-        plan: "team",
-        annual,
+        // Each interval is its own plan (server/utils/teams.ts `teamPlans`).
+        plan: annual ? "team-annual" : "team",
         referenceId: id,
         customerType: "organization",
         seats,

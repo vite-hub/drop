@@ -619,10 +619,13 @@ async function bodyOf(
     // The Markdown renderer (Comark, Shiki, charts) and the spreadsheet readers load with the first drop that needs
     // them, not with every route that lists drops: on a fresh Worker that's most of the first request's code.
     if (row.kind === "markdown") {
-      const { renderMarkdownCached } = await import("../markdown-document")
+      const { renderMarkdownCached, withDocProperties } = await import("../markdown-document")
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
-      detail.html = rendered.html
+      detail.html = await withDocProperties(rendered.html, {
+        resources: isAttachment(row) ? [] : resourcesOf(row),
+        updatedAt: row.createdAt,
+      })
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     else if (row.kind === "file") {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.

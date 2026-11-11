@@ -3,7 +3,6 @@ import { readFileSync, readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "vite-plus/test"
 import { needsShareReview, reportTarget } from "../../shared/trust.ts"
-import { registrationProblem } from "../../shared/oauth-registration.ts"
 
 // The harness loads the production permission function with its storage stubbed (and the CSS imports pages use).
 import { state } from "../cost/harness.mjs"
@@ -48,20 +47,6 @@ test("Team can edit lets teammates edit in the browser, not guests or their agen
   assert.equal(permissions(drop, { userId: "owner", role: "member", actorKind: "agent" }).edit, true)
 })
 
-test("OAuth bounds preserve desktop MCP redirects", () => {
-  for (const redirect of [
-    "http://localhost:1234/callback",
-    "http://127.0.0.1:8765/callback",
-    "com.cursor:/callback",
-    "com.microsoft.vscode:/callback",
-    "https://claude.ai/api/mcp/auth_callback",
-  ])
-    assert.equal(registrationProblem({ client_name: "MCP", redirect_uris: [redirect] }), null)
-  assert.ok(registrationProblem({ redirect_uris: Array(6).fill("http://localhost/cb") }))
-  assert.ok(registrationProblem({ redirect_uris: ["http://localhost"], client_name: "x".repeat(161) }))
-  assert.ok(registrationProblem({ redirect_uris: ["http://localhost"], metadata: { text: "x".repeat(17000) } }))
-})
-
 test("report paths cannot navigate to another origin or use traversal", () => {
   assert.equal(reportTarget("/d/id"), "/d/id")
   assert.equal(reportTarget("/f/code-images/image.svg"), "/f/code-images/image.svg")
@@ -96,66 +81,6 @@ test("reports keep their own status check and outlive the drops they name", () =
       .some((column) => column.name === "quarantined_at"),
   )
   db.close()
-})
-
-test("the hourly cleanup removes only old clients with no authorization evidence", async () => {
-  const { drizzle } = await import("drizzle-orm/sqlite-proxy")
-  const orm = await import("drizzle-orm")
-  const { sqliteTable, text, integer } = await import("drizzle-orm/sqlite-core")
-  const sqlDb = new DatabaseSync(":memory:")
-  sqlDb.exec(
-    "CREATE TABLE oauth_client(id text, client_id text, user_id text, created_at integer); CREATE TABLE oauth_consent(id text, client_id text); CREATE TABLE oauth_access_token(id text, client_id text); CREATE TABLE oauth_refresh_token(id text, client_id text)",
-  )
-  const table = (name) => sqliteTable(name, { id: text("id"), clientId: text("client_id") })
-  const oauthClient = sqliteTable("oauth_client", {
-    id: text("id"),
-    clientId: text("client_id"),
-    userId: text("user_id"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }),
-  })
-  const tables = {
-    oauthClient,
-    oauthConsent: table("oauth_consent"),
-    oauthAccessToken: table("oauth_access_token"),
-    oauthRefreshToken: table("oauth_refresh_token"),
-  }
-  const db = drizzle(async (query, params, method) => {
-    const statement = sqlDb.prepare(query)
-    if (method === "run") {
-      statement.run(...params)
-      return { rows: [] }
-    }
-    return { rows: statement.all(...params).map((row) => Object.values(row)) }
-  })
-  const now = new Date()
-  const old = now.getTime() - 25 * 60 * 60 * 1000
-  for (const id of ["unused", "consented", "token", "refresh", "owned", "recent"])
-    sqlDb
-      .prepare("INSERT INTO oauth_client VALUES(?,?,?,?)")
-      .run(id, id, id === "owned" ? "owner" : null, id === "recent" ? now.getTime() : old)
-  for (const [name, id] of [
-    ["oauth_consent", "consented"],
-    ["oauth_access_token", "token"],
-    ["oauth_refresh_token", "refresh"],
-  ])
-    sqlDb.prepare(`INSERT INTO ${name} VALUES(?,?)`).run(id, id)
-  const source = readFileSync(new URL("../../server/utils/oauth-cleanup.ts", import.meta.url), "utf8")
-  const implementation = source
-    .slice(source.indexOf("export async function"))
-    .replace("export ", "")
-    .replace("now: Date", "now")
-  const keys = ["db", ...Object.keys(tables), "and", "eq", "lt", "notExists"]
-  const load = new Function(...keys, implementation + "; return cleanupUnusedOAuthClients")
-  const cleanup = load(db, ...Object.values(tables), orm.and, orm.eq, orm.lt, orm.notExists)
-  await cleanup(now)
-  assert.deepEqual(
-    sqlDb
-      .prepare("SELECT id FROM oauth_client ORDER BY id")
-      .all()
-      .map((row) => row.id),
-    ["consented", "recent", "refresh", "token"],
-  )
-  sqlDb.close()
 })
 
 test("publishing burst protection counts by owner across calls", async () => {

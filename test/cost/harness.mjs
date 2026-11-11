@@ -204,7 +204,7 @@ export const threads = () =>
         })),
     }))
 export function event(path, method = "GET") {
-  const request = new H3Event(new Request(`https://drop.example${path}`, { method }))
+  const request = new H3Event(new Request(`https://drop.example${path}`, { method, headers: { accept: "text/html" } }))
   request.context.log = { set() {}, error() {} }
   return request
 }

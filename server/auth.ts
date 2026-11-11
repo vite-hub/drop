@@ -1,22 +1,31 @@
-import { oauthProvider } from "@better-auth/oauth-provider"
 import { stripe } from "@better-auth/stripe"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { github } from "better-auth/social-providers"
-import { admin, jwt, organization as teamsPlugin } from "better-auth/plugins"
-import { and, eq, inArray } from "drizzle-orm"
+import { admin, organization as teamsPlugin } from "better-auth/plugins"
+import { eq } from "drizzle-orm"
 import { Stripe } from "stripe"
+import { useRuntimeConfig } from "nitro/runtime-config"
 import * as v from "valibot"
 import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
+import { mcpOAuth } from "vite-hub/auth/mcp"
 import { db, schema } from "vite-hub/database/drizzle"
-import { member, user as users } from "./databases/config"
+import { user as users } from "./databases/config"
 import { ac, roles } from "./utils/access"
-import { clientRegistrationLimits } from "./utils/oauth-clients"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
-import { billingConfig, memberLimit, teamSeats, teamsEnabled } from "./utils/teams"
+import {
+  authorizeBilling,
+  billingConfig,
+  checkoutParams,
+  leaveTeams,
+  teamOptions,
+  teamPlans,
+  teamsEnabled,
+} from "./utils/teams"
+import { teamLimitAdapter } from "./utils/team-limit-adapter"
 import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
@@ -53,9 +62,16 @@ export default defineAuth(({ env, requestOrigin }) => {
   const proxied = authProxy().enabled
   const teams = teamsEnabled()
   const billing = billingConfig()
+  const teamBilling = billing.enabled
+    ? {
+        stripeClient: new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
+        plans: teamPlans(billing),
+      }
+    : undefined
   const organization = env.drop.githubOrg.trim()
   const password = import.meta.dev === true || env.drop.testSignin
   const quotas = env.drop.quotas.enabled
+  const { clientIpHeader } = useRuntimeConfig()
   const githubOptions = {
     clientId: proxied ? "" : env.auth.github.clientId.unseal(),
     clientSecret: proxied ? "" : env.auth.github.clientSecret.unseal(),
@@ -64,16 +80,25 @@ export default defineAuth(({ env, requestOrigin }) => {
   return {
     appName: "Drop",
     baseURL: requestOrigin,
-    database: drizzleAdapter(db, { provider: "sqlite", schema }),
+    database: teamLimitAdapter(drizzleAdapter(db, { provider: "sqlite", schema })),
     // Default retention: 90 days / 100,000 events. ViteHub strips IPs and secrets and isolates write failures.
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
+    // Better Auth's limits: 5 client registrations a minute per IP, 3 sign-in attempts in 10 seconds, and more. It turns
+    // them on only when NODE_ENV is production, which a Worker doesn't set, so they're on here outside `nuxt dev`. Each
+    // request builds its own Auth (`requestOrigin`), so the default memory store would start every counter at zero:
+    // they count in the database (rate_limit).
+    rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
     route: false,
-    // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
-    // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
-    advanced: requestOrigin.startsWith("https://")
-      ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
-      : {},
+    advanced: {
+      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For.
+      ipAddress: { ipAddressHeaders: [clientIpHeader] },
+      // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
+      // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
+      ...(requestOrigin.startsWith("https://")
+        ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
+        : {}),
+    },
     disabledPaths: [
       "/token",
       "/admin/set-role",
@@ -117,7 +142,6 @@ export default defineAuth(({ env, requestOrigin }) => {
       actions: { impersonate: { editable: false, reason: "Drop does not allow signing in as another person." } },
       access: authAccessLines({ members: Boolean(env.drop.members.unseal().trim()), organization, proxied, password }),
     },
-    hooks: { before: clientRegistrationLimits },
     databaseHooks: {
       account: {
         create: {
@@ -143,6 +167,8 @@ export default defineAuth(({ env, requestOrigin }) => {
           before: async (user) =>
             isListedMember(user) ? { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } } : false,
         },
+        // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
+        delete: { before: (user, context) => leaveTeams(user, context, teamBilling) },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
@@ -165,74 +191,32 @@ export default defineAuth(({ env, requestOrigin }) => {
     plugins: [
       proxyAuth(),
       admin({ ac, roles, defaultRole: "member" }),
-      jwt(),
-      ...(teams
-        ? [
-            teamsPlugin({
-              creatorRole: "owner",
-              invitationExpiresIn: 7 * 24 * 60 * 60,
-              cancelPendingInvitationsOnReInvite: true,
-              membershipLimit: (_user: unknown, team: { id: string }) => memberLimit(team.id),
-              // Pending invitations count as seats, so a free team can't invite past its free members.
-              invitationLimit: async ({ organization: team }: { organization: { id: string } }) =>
-                Math.max(0, (await memberLimit(team.id)) - (await teamSeats(team.id)).members),
-            }),
-          ]
-        : []),
-      ...(billing.enabled
+      ...(teams ? [teamsPlugin(teamOptions)] : []),
+      ...(teamBilling
         ? [
             stripe({
-              stripeClient: new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
+              stripeClient: teamBilling.stripeClient,
               stripeWebhookSecret: billing.webhookSecret,
               organization: { enabled: true },
               subscription: {
                 enabled: true,
-                // One price per member: the plugin sets the quantity to the team's members and keeps it there.
-                plans: [
-                  {
-                    name: "team",
-                    priceId: billing.priceId,
-                    seatPriceId: billing.priceId,
-                    annualDiscountPriceId: billing.annualPriceId,
-                    freeTrial: { days: 14 },
-                  },
-                ],
+                plans: teamBilling.plans,
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
-                authorizeReference: async ({ user, referenceId }) => {
-                  const [row] = await db
-                    .select({ role: member.role })
-                    .from(member)
-                    .where(
-                      and(
-                        eq(member.userId, user.id),
-                        eq(member.organizationId, referenceId),
-                        inArray(member.role, ["owner", "admin"]),
-                      ),
-                    )
-                    .limit(1)
-                  return Boolean(row)
-                },
-                // Managed Payments makes Stripe the merchant of record, which files sales tax and VAT.
-                getCheckoutSessionParams: () => ({
-                  params: billing.managedPayments ? { managed_payments: { enabled: true } } : {},
-                }),
+                authorizeReference: authorizeBilling,
+                getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
               },
             }),
           ]
         : []),
-      oauthProvider({
+      ...mcpOAuth({
+        resource: `${requestOrigin}/mcp`,
         loginPage: "/oauth",
-        consentPage: "/oauth",
-        // The browser approval can involve a GitHub sign-in and a separate executor redirect.
-        // Keep the signed handoff alive long enough for that round trip to finish.
-        codeExpiresIn: 30 * 60,
-        scopes: ["openid", "profile", "email", "offline_access"],
-        resources: [`${requestOrigin}/mcp`],
-        enforcePerClientResources: false,
-        allowDynamicClientRegistration: true,
-        allowUnauthenticatedClientRegistration: true,
-        // MCP clients register loopback or private-use redirects without `application_type`; register them as native.
-        clientRegistrationDefaultApplicationType: "infer",
+        provider: {
+          // The browser approval can involve a GitHub sign-in and a separate executor redirect.
+          // Keep the signed handoff alive long enough for that round trip to finish.
+          codeExpiresIn: 30 * 60,
+          enforcePerClientResources: false,
+        },
       }),
     ],
   }

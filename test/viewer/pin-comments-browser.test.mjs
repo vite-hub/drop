@@ -168,7 +168,7 @@ test("pins sit in the gutter level with their quote's last line, and the eye hid
   }
 }, 30_000)
 
-test("a mouse selection settles, and the held draft gets the reader's pin where Drop floats the composer", async () => {
+test("a mouse selection is reported, and the held draft gets the reader's pin where Drop floats the composer", async () => {
   const browser = await chromium.launch()
   try {
     const { page, frame } = await open(browser, 1440)
@@ -178,7 +178,7 @@ test("a mouse selection settles, and the held draft gets the reader's pin where 
     await page.mouse.down()
     await page.mouse.move(box.x + 200, box.y + 10, { steps: 6 })
     await page.mouse.up()
-    await page.waitForFunction(() => window.posts.some((m) => m.type === "selection" && m.settled === true))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "selection" && m.quote))
     await page.evaluate(() => window.toFrame({ type: "hold-selection" }))
     await page.waitForFunction(() => window.posts.some((m) => m.type === "draft-place" && m.pin && !m.id))
     // Measured once its pop-in is over: the place Drop hears is where it's laid out, unscaled.

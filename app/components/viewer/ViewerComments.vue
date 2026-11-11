@@ -35,7 +35,7 @@ function select(thread: { id: string }) {
 </script>
 
 <template>
-  <div ref="root" class="drop-comment-panel flex min-h-0 flex-1 flex-col">
+  <div ref="root" class="flex min-h-0 flex-1 flex-col">
     <CommentPanel
       :accept="COMMENT_IMAGE_TYPES.join(',')"
       :attachment-url="attachmentUrl"
@@ -49,6 +49,7 @@ function select(thread: { id: string }) {
       variant="docked"
       @select="select"
     >
+      <template #list-actions><slot name="actions" /></template>
       <template #preview="{ thread, text }">
         <ViewerSuggestion v-if="!text && suggestions.has(thread.id)" v-bind="suggestions.get(thread.id)!" inline />
         <template v-else>{{ text }}</template>
@@ -56,20 +57,3 @@ function select(thread: { id: string }) {
     </CommentPanel>
   </div>
 </template>
-
-<style scoped>
-/* The pill's All comments names the list, and the dock's buttons sit on the right of this row. */
-.drop-comment-panel :deep([data-slot="comment-panel-header"]) {
-  min-height: 2.75rem;
-  padding-inline-end: 5.5rem;
-}
-/* Named for screen readers only. */
-.drop-comment-panel :deep([data-slot="comment-panel-title"]) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-</style>

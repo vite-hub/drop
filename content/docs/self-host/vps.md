@@ -27,7 +27,7 @@ ${EDITOR:-nano} .env
 docker compose up -d --build
 ```
 
-Compose builds for `DROP_HOST=vps` and starts Drop, which applies pending migrations before it listens. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. If migrations fail, the server does not start.
+Compose builds for `DROP_HOST=vps` and starts Drop, which applies pending migrations before it listens. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. If migrations fail, the server does not start. A fresh SQLite database needs no data-loss override. If an upgrade refuses an intentional removal, back up the database and review `DROP_HOST=vps pnpm db:migrate --dry-run` before running `DROP_HOST=vps pnpm db:migrate --allow-data-loss` once against that database.
 
 ## Serve HTTPS {#proxy}
 
@@ -36,11 +36,25 @@ With [Caddy](https://caddyserver.com), add this to your Caddyfile and reload it:
 ```caddy
 drop.example.com {
   header /f/* Cache-Control "private, no-store"
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy 127.0.0.1:3000 {
+    header_up X-Forwarded-For {remote_host}
+  }
 }
 ```
 
-Caddy forwards the host and HTTPS scheme. With nginx, set `proxy_set_header Host $host`, `proxy_set_header X-Forwarded-Proto $scheme`, and `client_max_body_size 32m`. nginx's default of 1m answers 413 to any upload over 1 MB; Drop takes files up to 4 MiB and app archives up to about 27 MiB. Keep the OAuth app's homepage and callback on that HTTPS domain.
+Caddy forwards the host and HTTPS scheme and overwrites `X-Forwarded-For` with the connecting client's address. With nginx, use these settings in the location that proxies to Drop:
+
+```nginx
+proxy_pass http://127.0.0.1:3000;
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-For $remote_addr;
+client_max_body_size 32m;
+```
+
+Drop uses only `X-Forwarded-For` for authentication rate limits on a VPS. The proxy must overwrite it, and the backend must be accessible only through that proxy: keep Compose's localhost port binding, or bind a non-Docker server to `127.0.0.1` and block external access to port 3000. Never pass through a client-supplied IP header or use `$proxy_add_x_forwarded_for`. These recipes assume the proxy accepts client connections directly.
+
+nginx's default body limit of 1m answers 413 to any upload over 1 MB; Drop takes files up to 4 MiB and app archives up to about 27 MiB. Keep the OAuth app's homepage and callback on that HTTPS domain.
 
 To [give apps their own domain](/docs/self-host#content-origin), proxy a wildcard hostname (with a wildcard certificate) to the same port, with the same headers, and set `DROP_CONTENT_ORIGIN` to it, such as `https://*.drop-usercontent.example.com`, and `VITEHUB_SECRET` to the output of `openssl rand -base64 32`.
 
@@ -67,7 +81,7 @@ Configure oauth2-proxy with `--provider=github`, `--scope=user:email read:org`, 
 
 Use a Secure, host-only proxy cookie with `Path=/`, such as `__Host-drop-auth`, and set `DROP_AUTH_PROXY_COOKIE` to the same name for logout. Keep the Drop backend accessible only through your proxy. Leave the `DROP_CONTENT_ORIGIN` hostname out of oauth2-proxy: it serves no drop content itself.
 
-Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. For [site review](/docs/sites), exempt `/review.js` and `/api/review/comments`.
+Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. For [site review](/docs/sites), exempt `/review.js`, `/api/review/comments` and the paths under it (resolving and replies), and `/api/review/images/`. The review script sends a review token, not a sign-in, so a proxy redirect breaks its CORS preflight.
 
 Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
 
