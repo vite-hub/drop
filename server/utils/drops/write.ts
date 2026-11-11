@@ -708,7 +708,7 @@ export async function publishApp(
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
           await refreshLatest(next.id)
         }
-        return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths) })
+        return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths), paths })
       } catch (error) {
         if (!committedPublish) {
           await deleteBlobKeys(stagedKeys)

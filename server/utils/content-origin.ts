@@ -140,7 +140,7 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
  */
 export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Drop</title></head><body><script>(() => {
   if (parent === window) { document.body.textContent = "This domain shows previews inside Drop."; return; }
-  const ask = () => parent.postMessage({ __drop: true, type: "host", path: location.pathname }, "*");
+  const ask = () => parent.postMessage({ __drop: true, type: "host", path: location.pathname + location.search + location.hash }, "*");
   addEventListener("message", (event) => {
     const message = event.data;
     if (event.source !== parent || !message || message.__drop !== true) return;

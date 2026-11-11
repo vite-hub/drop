@@ -17,8 +17,12 @@ export const issueReviewToken = (body: { origin: string; choice: string; name?: 
 
 export type ReviewToken = Awaited<ReturnType<typeof issueReviewToken>>
 
-/** Where a review token's review opens, for people who could open it without the token. */
-export const openReview = (token: string) => $fetch("/api/review/open", { method: "POST", body: { token } })
+/**
+ * Where a review token's review opens, or a doc from the site's "Drop document" menu by its handle, for people who
+ * could open it without them.
+ */
+export const openReview = (body: { token: string } | { doc: string }) =>
+  $fetch("/api/review/open", { method: "POST", body })
 
 /** A comment drawn on a site inside Drop: `form` holds its `data` and the `screenshot` of the box, taken on `origin`. */
 export const sendSiteComment = (dropId: string, origin: string, form: FormData) =>

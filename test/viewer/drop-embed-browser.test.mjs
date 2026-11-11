@@ -17,10 +17,12 @@ const WIDGET = `<!doctype html><html><head><title>Steps</title></head><body><p i
   document.getElementById("out").textContent = "ran on " + location.origin + ", step " + localStorage.getItem("step");
 </script></body></html>`
 
-test("a ::drop box asks the viewer for its drop and runs it in a sandbox of its own, or shows why it can't", async () => {
+test("a drop's box asks the viewer for its drop and runs it in a sandbox of its own, or shows why it can't", async () => {
+  // `::drop` is how docs published before `::embed` showed drops.
   const { html } = await renderMarkdownCached(
     "embed-browser.md",
-    async () => "# Doc\n\n::drop{link=k7f2q9m4x8wd height=300}\n::\n\n::drop{link=a1b2c3d4e5f6}\n::\n",
+    async () =>
+      '# Doc\n\n::embed{url="https://drop.vitehub.dev/d/k7f2q9m4x8wd" height=300}\n::\n\n::drop{link=a1b2c3d4e5f6}\n::\n',
   )
   const srcdoc = planDocument("markdown", "", true, html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   const answers = {
