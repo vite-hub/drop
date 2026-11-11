@@ -339,6 +339,9 @@ const pinDraft = computed(
  * (`rail`), else beside its pin, as the frame reports it while the page scrolls. The lightbox's pins aren't in the frame,
  * so a thread opened there sits beside the pin that was clicked. A thread opened from the list waits for its place.
  */
+// A thread that opened in the dock, because its place came too late or never, stays there until it closes: moving it
+// later would mount a new reply box and drop what the reader typed.
+const dockedThread = ref<string | null>(null)
 const threadSpot = computed(() => {
   const open = popover.value
   if (open?.type !== "thread" || editing.value || trashed.value) return undefined
@@ -346,6 +349,7 @@ const threadSpot = computed(() => {
     return open.x || open.y
       ? { rail: false, rect: { left: open.x - 12, top: open.y - 12, right: open.x + 12, bottom: open.y + 12 } }
       : undefined
+  if (dockedThread.value === open.id) return undefined
   return commentsOpen.value && threadPlace.value?.id === open.id ? threadPlace.value : undefined
 })
 const pinThread = computed(() => Boolean(threadSpot.value))
@@ -357,25 +361,34 @@ function dropPinDraft() {
 }
 const PIN_BUBBLE_WIDTH = 300
 const THREAD_WIDTH = 340
-// Right of the pin, level with it; past the page's right edge, under it instead. The bubble grows from the pin. A thread
-// on a card in the margin covers the card, its right edge on the card's, and grows from the card's top.
+const pinRef = useTemplateRef<HTMLElement>("pinRef")
+const { height: bubbleHeight } = useElementSize(pinRef, undefined, { box: "border-box" })
+// Right of the pin, level with it; past the page's right edge, under it instead, else above it. The bubble grows from
+// the pin. A thread on a card in the margin covers the card, its right edge on the card's, and grows from the card's
+// top. Wherever it goes, it stays inside the window, over the pin or its area if nothing else fits, so the reply box
+// can always be reached.
 const pinBubbleStyle = computed(() => {
   const spot = pinDraft.value ? undefined : threadSpot.value
   const rect = pinDraft.value ? draftPlace.value?.rect : spot?.rect
   if (!rect) return undefined
+  // Until it's measured, the bubble counts as tall as it may grow (max-h-[min(28rem,60dvh)]).
+  const height = bubbleHeight.value || Math.min(448, windowHeight.value * 0.6)
+  const inWindow = (top: number) => Math.max(56, Math.min(top, windowHeight.value - 12 - height))
   if (spot?.rail) {
     const width = Math.min(Math.max(THREAD_WIDTH, rect.right - rect.left), windowWidth.value - 24)
     const left = Math.max(12, Math.min(rect.right - width, windowWidth.value - 12 - width))
-    return { width: `${width}px`, left: `${left}px`, top: `${Math.max(56, rect.top)}px`, transformOrigin: "100% 0" }
+    return { width: `${width}px`, left: `${left}px`, top: `${inWindow(rect.top)}px`, transformOrigin: "100% 0" }
   }
   const width = Math.min(pinDraft.value ? PIN_BUBBLE_WIDTH : THREAD_WIDTH, windowWidth.value - 24)
   let left = rect.right + 8
-  let top = rect.top
+  let top = inWindow(rect.top)
   let origin = "0 14px"
   if (left + width > windowWidth.value - 12) {
     left = Math.max(12, windowWidth.value - 12 - width)
-    top = rect.bottom + 8
-    origin = `${rect.left + 14 - left}px -8px`
+    const below = rect.bottom + 8
+    const above = rect.top - 8 - height
+    top = below + height <= windowHeight.value - 12 ? below : above >= 56 ? above : inWindow(below)
+    origin = top === below ? `${rect.left + 14 - left}px -8px` : `${rect.left + 14 - left}px ${height + 8}px`
   }
   return { width: `${width}px`, left: `${left}px`, top: `${top}px`, transformOrigin: origin }
 })
@@ -423,7 +436,6 @@ watch(floatShown, async (open) => {
   await whenHeld()
   if (floatShown.value) floatRef.value?.querySelector<HTMLElement>("[data-comment-editor] textarea")?.focus()
 })
-const pinRef = useTemplateRef<HTMLElement>("pinRef")
 // A bubble that opens below the fold scrolls the page until it shows, above the dock; the frame then moves the pin
 // and the bubble follows.
 watch(
@@ -991,11 +1003,19 @@ const threadComment = computed(() => {
 // A thread opened on the page waits a moment for the frame to say where its pin or card is, so the dock doesn't flash
 // open under it. A comment on the whole page, or one the frame can't place, then opens in the dock.
 const awaitingSpot = ref(false)
-const spotWait = useTimeoutFn(() => (awaitingSpot.value = false), 300, { immediate: false })
+const spotWait = useTimeoutFn(
+  () => {
+    awaitingSpot.value = false
+    if (!pinThread.value && popover.value?.type === "thread") dockedThread.value = popover.value.id
+  },
+  300,
+  { immediate: false },
+)
 watch(
   () => (popover.value?.type === "thread" ? popover.value.id : null),
   (id) => {
     spotWait.stop()
+    dockedThread.value = null
     awaitingSpot.value = Boolean(id && !lightbox.value && !siteRef.value && threadComment.value?.kind !== "page")
     if (awaitingSpot.value) spotWait.start()
   },
