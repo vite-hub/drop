@@ -388,6 +388,16 @@ test("only files named after their content count as hashed, so the browser never
     "assets/index-BdJJ9uks.js",
     "static/js/main.3f2a9c1b.js",
     "_fonts/HgJel4iAS5mDVqJaDUYKmxaMJg4zKHTGmyD1FQkOsTM-2hVuuQIZ4GSGMgNv6dvlqz7cfD6lr7xLohUph7OCgFg.woff2",
+    // Rollup hashes with no digit, or with a dash or underscore in them.
+    "_nuxt/CWeqyEg_.js",
+    "_nuxt/BPFKiSqj.js",
+    "_nuxt/lXm2UH6-.js",
+    "_nuxt/zHU-kgrs.js",
+    "_nuxt/-Hou_zz6.js",
+    "assets/index-lXm2UH6-.js",
+    "assets/logo-CWeqyEg_.svg",
+    "docs/_astro/Layout.BfZOTgis.css",
+    "_app/immutable/chunks/BAKrPsxf.js",
   ])
     assert.equal(isHashedAsset(path), true, path)
   for (const path of [
@@ -399,6 +409,13 @@ test("only files named after their content count as hashed, so the browser never
     "fonts/InterVariable.woff2",
     "BkRpwUQU.js",
     "deadbeefcafe.js",
+    "src/MyWidget.js",
+    "_nuxt/settings.js",
+    "_nuxt/Settings.js",
+    "assets/Overview.md",
+    "assets/MyWidget.js",
+    "_nuxt/TodoList.js",
+    "assets/vendor-lowercase.js",
   ])
     assert.equal(isHashedAsset(path), false, path)
 })

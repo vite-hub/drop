@@ -82,21 +82,38 @@ async function lookUpAppFiles(event: H3Event, grant: v.InferOutput<typeof Grant>
  * Build tools name what they emit after its content (`entry.2pJuYtgD.css`, `index-BdJJ9uks.js`, `B0nDsZtt.js`), so a
  * file with such a name never changes, and the browser keeps it. Any other file may change with the next version,
  * which the app's origin serves at the same address, so the browser asks again each time.
+ *
+ * Rollup and Vite hash with 8 base64url characters, which may hold no digit (`CWeqyEg_`) or a dash (`lXm2UH6-`). Out
+ * of context such a name could be a word someone typed (`BkRpwUQU.js`), so it counts only inside a folder that build
+ * tools keep for their output, and never when it reads as words (`MyWidget`): a hash shaped like one is only a cache
+ * miss, a typed name kept for a year would hide the next version.
  */
 export function isHashedAsset(path: string): boolean {
-  const name = path.slice(path.lastIndexOf("/") + 1)
-  return name
+  const slash = path.lastIndexOf("/")
+  const parts = path
+    .slice(slash + 1)
     .split(".")
     .slice(0, -1)
-    .flatMap((part) => part.split("-"))
-    .some(
-      (token) =>
-        token.length >= 8 &&
-        /^\w+$/.test(token) &&
-        /\d/.test(token) &&
-        (/^[\da-f]+$/.test(token) ? /[a-f]/.test(token) : /[a-z]/.test(token) && /[A-Z]/.test(token)),
-    )
+  return (
+    parts
+      .flatMap((part) => part.split("-"))
+      .some(
+        (token) =>
+          token.length >= 8 &&
+          /^\w+$/.test(token) &&
+          /\d/.test(token) &&
+          (/^[\da-f]+$/.test(token) ? /[a-f]/.test(token) : /[a-z]/.test(token) && /[A-Z]/.test(token)),
+      ) ||
+    (BUILD_FOLDER.test(path.slice(0, slash + 1)) &&
+      parts.some((part) => {
+        const hash = /(?:^|[-.])([\w-]{8})$/.exec(part)?.[1]
+        return !!hash && /[a-z]/.test(hash) && /[A-Z]/.test(hash) && !/^(?:[A-Z][a-z]+)+$/.test(hash)
+      }))
+  )
 }
+
+/** Folders where build tools put the files they name after their content: Nuxt, Vite, Astro, SvelteKit, Next. */
+const BUILD_FOLDER = /(?:^|\/)(?:_nuxt|assets|_astro|immutable|_next\/static)\/(?:.*\/)?$/
 
 /** The file this request on a content origin asks for, or null when it carries no valid grant for this origin's app. */
 export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Response | null> {
