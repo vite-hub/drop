@@ -44,10 +44,11 @@ const html = `<!doctype html><html><head><style>
 
 // modern-screenshot, as the frame loads it from esm.sh: a plain grey viewport, so the test needs no network.
 const SCREENSHOT_STUB = `export async function createContext(node, options) { return { ...options, drawImageCount: 0 } }
-export async function domToBlob(context) {
-  const canvas = new OffscreenCanvas(context.width, context.height), g = canvas.getContext("2d");
-  g.fillStyle = "#888"; g.fillRect(0, 0, canvas.width, canvas.height);
-  return canvas.convertToBlob({ type: "image/png" });
+export async function domToCanvas(context) {
+  const canvas = document.createElement("canvas");
+  canvas.width = context.width; canvas.height = context.height;
+  const g = canvas.getContext("2d"); g.fillStyle = "#888"; g.fillRect(0, 0, canvas.width, canvas.height);
+  return canvas;
 }`
 
 const marker = (id, selector, extra = {}) => ({
