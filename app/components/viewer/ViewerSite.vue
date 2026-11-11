@@ -90,7 +90,8 @@ function openHere(event: SubmitEvent) {
     @close="framed = null"
   />
   <div v-else class="min-h-0 flex-1 overflow-y-auto">
-    <div class="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
+    <!-- The review dock floats over this page, so its end clears it. -->
+    <div class="mx-auto max-w-3xl space-y-8 px-4 pt-10 pb-36 sm:px-6 sm:pb-28">
       <section class="space-y-3">
         <form v-if="drop.canComment" class="flex items-center gap-2" novalidate @submit.prevent="openHere">
           <UInput

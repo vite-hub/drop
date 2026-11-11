@@ -237,7 +237,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
     </p>
 
     <div class="relative flex min-h-0 flex-1 flex-col bg-muted">
-      <ViewerDevice :bottom="24" on>
+      <ViewerDevice on>
         <div ref="stage" class="relative min-h-0 flex-1">
           <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
                dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
