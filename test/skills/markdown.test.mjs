@@ -100,6 +100,12 @@ test("all five GitHub alert kinds keep their label", async () => {
   }
 })
 
+// markdown.md promises it, and comark 0.9 stopped doing it for a parser without its defaults.
+test("a bare URL renders as a link", async () => {
+  const { html } = await renderMarkdownCached("bare-url.md", async () => "See https://example.com/ledger today.\n")
+  assert.match(html, /<a [^>]*href="https:\/\/example\.com\/ledger"/)
+})
+
 test("footnotes link to their definition and back", async () => {
   const { html } = await renderMarkdownCached("footnotes.md", async () => "A claim.[^src]\n\n[^src]: The source.\n")
   assert.match(

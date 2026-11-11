@@ -1,7 +1,7 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
-import { buildProjectDocument, pageAt, pageUrl } from "#shared/project-bundle"
+import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
 import type { DropComment, DropDetail } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
@@ -50,7 +50,7 @@ export function useViewerFrame(options: {
 }) {
   const {
     drop,
-    app: { files, pages, page },
+    app: { files, pages, page, location },
     annotations,
   } = options
   const { copy } = useCopy()
@@ -111,17 +111,19 @@ export function useViewerFrame(options: {
     )
   }
 
-  // With a content origin, apps and HTML docs load its frame host at the page's own URL, and the document follows over
-  // postMessage (see server/utils/content-origin.ts). Otherwise the document is the iframe's srcdoc, in an opaque origin.
+  // With a content origin, apps and HTML docs load its frame host at the app's own address, and the document follows
+  // over postMessage (see server/utils/content-origin.ts). Otherwise the document is the iframe's srcdoc, in an opaque
+  // origin.
   const contentOrigin = computed(() => drop.value.contentOrigin)
-  const hostUrl = () =>
-    contentOrigin.value ? contentOrigin.value + (isApp.value ? pageUrl(page.value) : "/") : undefined
+  const hostUrl = () => (contentOrigin.value ? contentOrigin.value + (isApp.value ? location.value : "/") : undefined)
   // Rendered with the page, so the frame host loads while the viewer's own script does. It asks for its document when
   // it loads; if the viewer wasn't listening yet, the hello once mounted (below) has it ask again.
   const frameSrc = ref(hostUrl())
   const frameKey = ref(0)
   /** The document the content frame shows. When the frame moves on its own, the viewer follows without a reload. */
   let frameDocument = ""
+  /** The app address the content frame is at, as it last said. */
+  let frameLocation = ""
   /** Whether this frame load asked for its document yet. Until it does, a changed document needs no reload. */
   let asked = false
   function reloadFrame() {
@@ -137,23 +139,16 @@ export function useViewerFrame(options: {
     asked = false
   }
 
-  function pageFor(path: string) {
-    let decoded = path
-    try {
-      decoded = decodeURIComponent(path)
-    } catch {}
-    return pageAt(pages.value, decoded)
-  }
-
-  /** A path no page matches gets 404.html, or index.html for single-page apps, like a static host. */
-  const fallbackDocument = () => appDocument("404.html" in files.value ? "404.html" : "index.html")
-
-  /** The content frame navigated by itself (a link, history.pushState, a reload): show the page it landed on. */
+  /**
+   * The content frame navigated by itself (a link, history.pushState, a reload): its address becomes the app's, and
+   * the page a static host answers it with shows, its 404.html or 200.html where no page matches (appPageFor).
+   */
   function followFrame(path: string) {
-    if (!isApp.value) return true
-    const target = pageFor(path)
-    if (target) page.value = target
-    return target !== null
+    if (!isApp.value) return
+    const at = appLocation(path)
+    if (at === null) return
+    frameLocation = at
+    location.value = at
   }
 
   const variants = shallowRef<ViewerVariants | null>(null)
@@ -250,16 +245,17 @@ export function useViewerFrame(options: {
         return
       case "host":
         asked = true
-        frameDocument = followFrame(message.path) ? srcdoc.value : variantBar(fallbackDocument())
+        followFrame(message.path)
+        frameDocument = srcdoc.value
         // The grant lets this app's origin serve it its other files (server/utils/app-files.ts).
         return send({ type: "document", html: frameDocument, grant: drop.value.contentGrant })
       case "frame-request": {
         if (!isApp.value) return
-        const target = pageFor(message.path)
-        return send({ type: "document", id: message.id, html: target ? appDocument(target) : fallbackDocument() })
+        return send({ type: "document", id: message.id, html: appDocument(appPageFor(pages.value, message.path)) })
       }
       case "location":
-        if (followFrame(message.path)) frameDocument = srcdoc.value
+        followFrame(message.path)
+        frameDocument = srcdoc.value
         return
       case "navigate":
         if (isApp.value) page.value = message.path
@@ -317,9 +313,16 @@ export function useViewerFrame(options: {
     }
   })
   onMounted(() => contentOrigin.value && send({ type: "hello" }))
-  watch(srcdoc, (value) => {
+  // A new document, or an app address the frame didn't go to itself (a link with `?path=`, a comment on another page).
+  watch([srcdoc, () => isApp.value && location.value], ([value, at], [before]) => {
+    // In the opaque sandbox the address is only the page's: a new hash or query on the same page changes nothing.
+    if (!contentOrigin.value && value === before) return
     // A frame that hasn't asked yet gets the document as it is then, unless it's loading another page's address.
-    if (contentOrigin.value && (asked ? value === frameDocument : frameSrc.value === hostUrl())) return
+    if (
+      contentOrigin.value &&
+      (asked ? value === frameDocument && (at === false || at === frameLocation) : frameSrc.value === hostUrl())
+    )
+      return
     ready.value = false
     variants.value = null
     if (contentOrigin.value) reloadFrame()
