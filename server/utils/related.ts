@@ -196,11 +196,14 @@ export async function relatedDrops(
 
 /** Only a currently open, approved public link on the path can grant discovery from a recorded visit. */
 const publicPathOf = (drop: DropRow, now: number) =>
-  [drop.raw ?? drop, ...(drop.ancestors ?? [])]
-    .filter(
-      (node) => isPublic(node.share) && !node.shareReview && (node.publicUntil === null || node.publicUntil > now),
-    )
-    .map((node) => node.id)
+  [drop.raw ?? drop, ...(drop.ancestors ?? [])].flatMap((node) =>
+    isPublic(node.share) &&
+    // findDrop clears the resolved review when current policy waives it; raw nodes keep their stored flags.
+    (!node.shareReview || !drop.shareReview) &&
+    (node.publicUntil === null || node.publicUntil > now)
+      ? [node.id]
+      : [],
+  )
 const grantsOf = (drop: DropRow) => drop.grants ?? [{ share: drop.share }]
 
 /**

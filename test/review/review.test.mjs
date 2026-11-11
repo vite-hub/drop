@@ -12,6 +12,7 @@ const { default: openPost } = await import("../../server/api/review/open.post.ts
 const { default: relatedGet } = await import("../../server/api/review/related.get.ts")
 const { default: relatedPreflight } = await import("../../server/api/review/related.options.ts")
 const { default: dropRelated } = await import("../../server/api/drops/[id]/related.get.ts")
+const { default: dropGet } = await import("../../server/api/drops/[id].get.ts")
 const { default: membersOnly } = await import("../../server/middleware/0.2.members-only.ts")
 const { default: commentsPost } = await import("../../server/api/review/comments.post.ts")
 const { default: commentsGet } = await import("../../server/api/review/comments.get.ts")
@@ -1148,6 +1149,64 @@ for (const [name, change] of [
     assert.deepEqual(titles(await onPage()), ["child", "inherited", "new-child"])
     assert.deepEqual(titles(await inDrop()), ["child", "inherited", "new-child"])
   })
+}
+
+for (const source of ["document", "folder"]) {
+  for (const policy of ["approval disabled", "owner promoted"]) {
+    test(`visited ${source} stays related with ${policy} despite its stored review flag`, async () => {
+      state.shareApproval = true
+      site("site", { owner_id: "ada" })
+      const resources = JSON.stringify([{ url: `${SITE}/` }])
+      insertDrop("source", {
+        share: "public",
+        share_review: "pending",
+        ...(source === "folder" ? { kind: "folder", blob_key: null } : { resources }),
+      })
+      const docId = source === "folder" ? "child" : "source"
+      if (source === "folder") insertDrop("child", { parent_id: "source", share: "private", resources })
+      state.who = ada
+      const visit = () => answer(dropGet, request("/api/drops/source", { id: "source" }))
+      assert.equal((await visit()).status, 403, "the source initially requires approval")
+
+      if (policy === "approval disabled") state.shareApproval = false
+      else sql.prepare("UPDATE user SET role = 'admin' WHERE id = 'owner'").run()
+      assert.equal((await visit()).status, 200, "a normal signed-in visit records the now-effective public link")
+      assert.ok(sql.prepare("SELECT 1 FROM drop_visits WHERE user_id = 'ada' AND drop_id = 'source'").get())
+      assert.equal(sql.prepare("SELECT share_review FROM drops WHERE id = 'source'").get().share_review, "pending")
+
+      const bearer = (await token()).body.token
+      const onPage = async () =>
+        (
+          await json(
+            await answer(
+              relatedGet,
+              request("/api/review/related", {
+                headers: { origin: SITE, authorization: `Bearer ${bearer}` },
+              }),
+            ),
+          )
+        ).groups
+      const inDrop = () => dropRelated(request("/api/drops/site/related"))
+      const groups = await onPage()
+      assert.deepEqual(
+        groups.map((group) => group.title),
+        [docId],
+      )
+      assert.deepEqual(
+        (await inDrop()).map((group) => group.id),
+        [docId],
+      )
+      const handle = groups[0].open
+      assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: `/drops/${docId}` })
+
+      if (policy === "approval disabled") state.shareApproval = true
+      else sql.prepare("UPDATE user SET role = 'member' WHERE id = 'owner'").run()
+      assert.equal((await visit()).status, 403)
+      assert.deepEqual(await onPage(), [], "a prior visit does not bypass a current approval requirement")
+      assert.deepEqual(await inDrop(), [])
+      assert.equal((await answer(openPost, post("/api/review/open", { doc: handle }))).status, 404)
+    })
+  }
 }
 
 test("ineligible, already seen, and inexact candidates do not consume the related result budget", async () => {
