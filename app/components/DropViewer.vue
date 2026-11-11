@@ -448,8 +448,12 @@ watch(
   () => (popover.value?.type === "new" && popover.value.pending.kind === "text" ? popover.value.pending : null),
   (pending, before) => (pending || before) && send({ type: pending ? "hold-selection" : "clear-selection" }),
 )
+// Mark area turns on Comments mode where the page has it, so the reader drags on the page with nothing over it; the
+// Comments panel would cover what they draw on. Elsewhere the open panel is what lets the page take the drag.
 function toggleCommentArea() {
-  if (canMarkArea.value) showComments()
+  if (!canMarkArea.value) return
+  if (canUseCommentMode.value && !editing.value && !trashed.value) commentMode.value = true
+  else showComments()
 }
 // A `?changes=` link opens with History over the diff, as if the version had been picked there.
 if (route.query.changes && hasHistory.value) showDetails("history")
