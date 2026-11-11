@@ -164,14 +164,16 @@ const shownDraft = computed(() => drag.value?.area ?? props.draft)
         />
         <div
           v-if="shownDraft"
-          class="pointer-events-none absolute rounded-[3px] border-[1.5px] border-inverted bg-inverted/10"
+          class="pointer-events-none absolute rounded-[3px] border-2 border-tool bg-tool/15"
           :style="areaStyle(shownDraft)"
         />
         <template v-for="comment in comments" :key="comment.id">
           <div
             v-if="comment.ow || comment.oh"
-            class="pointer-events-none absolute rounded-[3px] border-[1.5px]"
-            :class="comment.resolved ? 'border-dashed border-accented' : 'border-inverted bg-inverted/5'"
+            class="pointer-events-none absolute rounded-[3px]"
+            :class="
+              comment.resolved ? 'border-[1.5px] border-dashed border-accented' : 'border-2 border-tool bg-tool/15'
+            "
             :style="areaStyle(comment)"
           />
           <button

@@ -2,14 +2,16 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext, Script } from "node:vm"
 import { H3Event } from "h3"
-import { calls, migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
+import { calls, migrate, reset, insertDrop, objects, queries, sql, state, who } from "../cost/harness.mjs"
 const { contentHost, contentOrigin, FRAME_HOST_HTML } = await import("../../server/utils/content-origin.ts")
 const isContentRequest = (event) => contentHost(event) === "content"
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
 const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
-const { isHashedAsset } = await import("../../server/utils/app-files.ts")
-const { buildProjectDocument, pageAt, pageUrl } = await import("../../shared/project-bundle.ts")
+const { isHashedAsset, serveAppFile } = await import("../../server/utils/app-files.ts")
+const { publishApp } = await import("../../server/utils/drops.ts")
+const { appLocation, appPageFor, buildProjectDocument, pageAt, pageUrl } =
+  await import("../../shared/project-bundle.ts")
 const { injectRuntime, OPAQUE_ORIGIN_SHIM, prependToHead } = await import("../../shared/plan-runtime.ts")
 
 migrate()
@@ -223,7 +225,11 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     assert.equal(await script.text(), "export default 1")
     assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8")
     assert.equal(script.headers.get("x-content-type-options"), "nosniff")
-    assert.equal(script.headers.get("cache-control"), "private, no-cache", "a name the next version may reuse")
+    assert.equal(
+      script.headers.get("cache-control"),
+      "private, max-age=0, must-revalidate",
+      "a name the next version may reuse",
+    )
     const etag = script.headers.get("etag")
     assert.equal((await load("/_nuxt/entry.js", { headers: { "if-none-match": etag } })).status, 304)
     const chunk = await load("/_nuxt/B0nDsZtt.js")
@@ -291,6 +297,269 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
       Date.now = now
     }
   } finally {
+    state.authSecret = undefined
+  }
+})
+
+/** Workers evaluates ranges and validators; a standard Cache API returns the stored response unchanged. */
+function edgeCache({ cloudflare = true } = {}) {
+  const kept = new Map()
+  const puts = []
+  const cache = {
+    async match(request) {
+      const response = kept.get(request.url)
+      if (!response) return undefined
+      if (!cloudflare) return response.clone()
+      const etag = response.headers.get("etag")
+      if (etag && request.headers.get("if-none-match") === etag)
+        return new Response(null, { status: 304, headers: { etag } })
+      const range = /^bytes=(\d+)-$/.exec(request.headers.get("range") ?? "")
+      if (range) {
+        const body = await response.clone().arrayBuffer()
+        const start = Number(range[1])
+        const headers = new Headers(response.headers)
+        headers.set("Content-Range", `bytes ${start}-${body.byteLength - 1}/${body.byteLength}`)
+        headers.set("Content-Length", String(body.byteLength - start))
+        return new Response(body.slice(start), { status: 206, headers })
+      }
+      return response.clone()
+    },
+    put(request, response) {
+      const put = (async () => {
+        const body = await response.arrayBuffer()
+        kept.set(request.url, new Response(body, { status: response.status, headers: response.headers }))
+      })()
+      puts.push(put)
+      return put
+    },
+  }
+  return {
+    kept,
+    cache,
+    settled: () => Promise.all(puts),
+    caches: { ...(cloudflare ? { default: cache } : {}), open: async () => cache },
+  }
+}
+
+test("an app's files are read from storage once per location, and each read from the cache checks the grant", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  const edge = edgeCache()
+  globalThis.caches = edge.caches
+  try {
+    insertDrop("cached-app", { kind: "app", filename: "cached-app/", blob_key: null })
+    for (const [path, body] of [
+      ["_nuxt/B0nDsZtt.js", "export default 3"],
+      ["_nuxt/entry.js", "export default 4"],
+    ]) {
+      objects.set(`apps/cached-app/u1/${path}`, { body: new Blob([body]), uploadedAt: new Date() })
+      sql
+        .prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, ?, ?, ?)")
+        .run("cached-app", path, `apps/cached-app/u1/${path}`, body.length)
+    }
+    const detailEvent = request("https://drop.example/api/drops/cached-app")
+    detailEvent.context.params = { id: "cached-app" }
+    const detail = await detailHandler(detailEvent)
+    const load = (path, { grant = detail.contentGrant, method = "GET", headers = {} } = {}) =>
+      contentMiddleware(
+        request(`${detail.contentOrigin}${path}`, {
+          method,
+          headers: { "sec-fetch-dest": "script", ...(grant ? { cookie: `drop_grant=${grant}` } : {}), ...headers },
+        }),
+      )
+
+    const reads = calls.serve
+    const first = await load("/_nuxt/B0nDsZtt.js")
+    assert.equal(await first.text(), "export default 3")
+    await edge.settled()
+    assert.equal(edge.kept.size, 1)
+    assert.equal(
+      [...edge.kept.values()][0].headers.get("cache-control"),
+      "public, max-age=31536000, immutable",
+      "the cache may keep it; the browser still gets a private answer",
+    )
+
+    const again = await load("/_nuxt/B0nDsZtt.js")
+    assert.equal(calls.serve, reads + 1, "the second load leaves storage alone")
+    assert.equal(again.status, 200)
+    assert.equal(await again.text(), "export default 3")
+    assert.equal(again.headers.get("cache-control"), "private, max-age=31536000, immutable")
+    assert.equal(again.headers.get("content-type"), "text/javascript; charset=utf-8")
+    assert.equal(again.headers.get("x-robots-tag"), "noindex, nofollow")
+    const etag = again.headers.get("etag")
+    assert.ok(etag)
+    assert.equal((await load("/_nuxt/B0nDsZtt.js", { headers: { "if-none-match": etag } })).status, 304)
+
+    // A name the next version may reuse is still kept: its blob key changes with every upload.
+    const read = await load("/_nuxt/entry.js")
+    await read.text()
+    await edge.settled()
+    const entry = await load("/_nuxt/entry.js")
+    assert.equal(await entry.text(), "export default 4")
+    assert.equal(entry.headers.get("cache-control"), read.headers.get("cache-control"), "the browser's rule stays")
+    assert.notEqual(entry.headers.get("cache-control"), "private, max-age=31536000, immutable")
+    assert.equal(calls.serve, reads + 2)
+
+    assert.equal((await load("/_nuxt/B0nDsZtt.js", { grant: null })).status, 404, "kept, but no grant, no file")
+    assert.equal((await load("/_nuxt/B0nDsZtt.js", { grant: `${detail.contentGrant}x` })).status, 404)
+    await load("/_nuxt/B0nDsZtt.js", { method: "HEAD" })
+    await edge.settled()
+    assert.equal(edge.kept.size, 2, "HEAD keeps nothing")
+  } finally {
+    delete globalThis.caches
+    state.authSecret = undefined
+  }
+})
+
+async function cachedAppFor(id, paths) {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  insertDrop(id, { kind: "app", filename: `${id}/`, blob_key: null })
+  for (const path of paths) {
+    const blobKey = `apps/${id}/u1/${path}`
+    objects.set(blobKey, { body: new Blob(["0123456789"]), uploadedAt: new Date() })
+    sql.prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, ?, ?, 10)").run(id, path, blobKey)
+  }
+  const event = request(`https://drop.example/api/drops/${id}`)
+  event.context.params = { id }
+  const detail = await detailHandler(event)
+  return {
+    origin: detail.contentOrigin,
+    load: (path, headers = {}, now = Date.now()) =>
+      serveAppFile(
+        request(`${detail.contentOrigin}/${path}`, {
+          headers: { cookie: `drop_grant=${detail.contentGrant}`, ...headers },
+        }),
+        now,
+      ),
+  }
+}
+
+test("hashes without digits keep their browser policy on storage reads and cache hits", async () => {
+  const edge = edgeCache()
+  globalThis.caches = edge.caches
+  try {
+    const paths = ["_nuxt/CWeqyEg_.js", "_nuxt/BPFKiSqj.js", "_nuxt/zHU-kgrs.js"]
+    const { load } = await cachedAppFor("digit-free-hashes", paths)
+    const reads = calls.serve
+    for (const path of paths) {
+      for (let pass = 0; pass < 2; pass++) {
+        const response = await load(path)
+        assert.equal(response.headers.get("cache-control"), "private, max-age=31536000, immutable", path)
+        assert.equal(await response.text(), "0123456789")
+        await edge.settled()
+      }
+    }
+    assert.equal(calls.serve, reads + paths.length, "the second load of each hash uses the edge cache")
+  } finally {
+    delete globalThis.caches
+    state.authSecret = undefined
+  }
+})
+
+test("mutable asset names revalidate on storage reads, cache hits, and after republishing", async () => {
+  const edge = edgeCache()
+  globalThis.caches = edge.caches
+  try {
+    const paths = [
+      "assets/darkMode.js",
+      "assets/siteLogo.svg",
+      "assets/logoIcon.svg",
+      "assets/logoDark.svg",
+      "assets/readFile.js",
+      "assets/CSSReset.css",
+    ]
+    const { load } = await cachedAppFor("mutable-assets", paths)
+    const check = async (path, body, now) => {
+      const response = await load(path, {}, now)
+      assert.equal(response.headers.get("cache-control"), "private, max-age=0, must-revalidate", path)
+      assert.equal(await response.text(), body)
+      await edge.settled()
+    }
+    for (const path of paths) await check(path, "0123456789")
+    const reads = calls.serve
+    for (const path of paths) await check(path, "0123456789")
+    assert.equal(calls.serve, reads, "warm reads use immutable blob keys without an immutable browser policy")
+
+    for (const path of paths) {
+      const blobKey = `apps/mutable-assets/u2/${path}`
+      objects.set(blobKey, { body: new Blob(["abcdefghij"]), uploadedAt: new Date() })
+      sql
+        .prepare("UPDATE drop_files SET blob_key = ? WHERE drop_id = ? AND path = ?")
+        .run(blobKey, "mutable-assets", path)
+    }
+    const later = Date.now() + 10_000
+    for (const path of paths) await check(path, "abcdefghij", later)
+    for (const path of paths) await check(path, "abcdefghij", later)
+    assert.equal(calls.serve, reads + paths.length, "each new publication has its own cache entry")
+  } finally {
+    delete globalThis.caches
+    state.authSecret = undefined
+  }
+})
+
+test("a warmed cache preserves stale and matching If-Range validators after republishing", async () => {
+  const edge = edgeCache()
+  globalThis.caches = edge.caches
+  try {
+    const { load } = await cachedAppFor("conditional-range", ["video.mp4"])
+    const first = await load("video.mp4")
+    const oldEtag = first.headers.get("etag")
+    await first.text()
+    await edge.settled()
+    const blobKey = "apps/conditional-range/u2/video.mp4"
+    objects.set(blobKey, { body: new Blob(["abcdefghij"]), uploadedAt: new Date() })
+    sql.prepare("UPDATE drop_files SET blob_key = ? WHERE drop_id = ?").run(blobKey, "conditional-range")
+    const later = Date.now() + 10_000
+    const current = await load("video.mp4", {}, later)
+    const etag = current.headers.get("etag")
+    assert.notEqual(etag, oldEtag)
+    await current.text()
+    await edge.settled()
+
+    const tail = await load("video.mp4", { range: "bytes=4-" }, later)
+    assert.equal(tail.status, 206)
+    assert.equal(await tail.text(), "efghij")
+    const stale = await load("video.mp4", { range: "bytes=4-", "if-range": oldEtag }, later)
+    assert.equal(stale.status, 200)
+    assert.equal(stale.headers.get("content-range"), null)
+    assert.equal(await stale.text(), "abcdefghij")
+    const matching = await load("video.mp4", { range: "bytes=4-", "if-range": etag }, later)
+    assert.equal(matching.status, 206)
+    assert.equal(matching.headers.get("content-range"), "bytes 4-9/10")
+    assert.equal(await matching.text(), "efghij")
+  } finally {
+    delete globalThis.caches
+    state.authSecret = undefined
+  }
+})
+
+test("a standard Cache API cannot replace storage's range and conditional handling", async () => {
+  const edge = edgeCache({ cloudflare: false })
+  globalThis.caches = edge.caches
+  try {
+    const { load, origin } = await cachedAppFor("standard-cache", ["video.mp4"])
+    const blobKey = "apps/standard-cache/u1/video.mp4"
+    const etag = `"${blobKey}"`
+    const url = `${origin}/_drop-app-files/${encodeURIComponent(blobKey)}`
+    await edge.cache.put(new Request(url), new Response("0123456789", { headers: { etag, "content-length": "10" } }))
+    for (const headers of [{ range: "bytes=4-" }, { "if-none-match": etag }]) {
+      const stored = await edge.cache.match(new Request(url, { headers }))
+      assert.equal(stored.status, 200, "a standard cache ignores ranges and validators")
+      assert.equal(await stored.text(), "0123456789")
+    }
+    const tail = await load("video.mp4", { range: "bytes=4-" })
+    assert.equal(tail.status, 206)
+    assert.equal(tail.headers.get("content-range"), "bytes 4-9/10")
+    assert.equal(await tail.text(), "456789")
+    assert.equal((await load("video.mp4", { "if-none-match": etag })).status, 304)
+    assert.equal(await (await load("video.mp4")).text(), "0123456789")
+    assert.equal(await (await load("video.mp4")).text(), "0123456789")
+    await edge.settled()
+    assert.equal(calls.serve, 4, "standard-cache runtimes keep the existing storage path")
+    assert.equal(edge.kept.size, 1, "standard-cache runtimes do not populate this cache")
+  } finally {
+    delete globalThis.caches
     state.authSecret = undefined
   }
 })
@@ -381,6 +650,42 @@ test("on a team Drop, an app's files stop for someone whose account is gone", as
   }
 })
 
+test("lowerCamelCase app assets revalidate when republished at the same path", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  const now = Date.now
+  try {
+    const path = "assets/logoDark.svg"
+    const app = await publishApp(who, {
+      files: { "index.html": "<p>App</p>", [path]: "<svg>v1</svg>" },
+    })
+    const detailEvent = request(`https://drop.example/api/drops/${app.id}`)
+    detailEvent.context.params = { id: app.id }
+    const detail = await detailHandler(detailEvent)
+    const load = () =>
+      contentMiddleware(
+        request(`${detail.contentOrigin}/${path}`, {
+          headers: { "sec-fetch-dest": "image", cookie: `drop_grant=${detail.contentGrant}` },
+        }),
+      )
+    const before = await load()
+    assert.equal(await before.text(), "<svg>v1</svg>")
+
+    await publishApp(who, { id: app.id, files: { [path]: "<svg>v2</svg>" } })
+    // Expire the isolate's file lookup while keeping the same URL and viewer grant.
+    Date.now = () => now() + 10_000
+    const after = await load()
+    assert.equal(await after.text(), "<svg>v2</svg>")
+    for (const response of [before, after]) {
+      assert.equal(response.status, 200)
+      assert.equal(response.headers.get("cache-control"), "private, max-age=0, must-revalidate")
+    }
+  } finally {
+    Date.now = now
+    state.authSecret = undefined
+  }
+})
+
 test("only files named after their content count as hashed, so the browser never keeps one that may change", () => {
   for (const path of [
     "_nuxt/B0nDsZtt.js",
@@ -388,6 +693,16 @@ test("only files named after their content count as hashed, so the browser never
     "assets/index-BdJJ9uks.js",
     "static/js/main.3f2a9c1b.js",
     "_fonts/HgJel4iAS5mDVqJaDUYKmxaMJg4zKHTGmyD1FQkOsTM-2hVuuQIZ4GSGMgNv6dvlqz7cfD6lr7xLohUph7OCgFg.woff2",
+    // Rollup hashes with no digit, or with a dash or underscore in them.
+    "_nuxt/CWeqyEg_.js",
+    "_nuxt/BPFKiSqj.js",
+    "_nuxt/lXm2UH6-.js",
+    "_nuxt/zHU-kgrs.js",
+    "_nuxt/-Hou_zz6.js",
+    "assets/index-lXm2UH6-.js",
+    "assets/logo-CWeqyEg_.svg",
+    "docs/_astro/Layout.BfZOTgis.css",
+    "_app/immutable/chunks/BAKrPsxf.js",
   ])
     assert.equal(isHashedAsset(path), true, path)
   for (const path of [
@@ -399,6 +714,19 @@ test("only files named after their content count as hashed, so the browser never
     "fonts/InterVariable.woff2",
     "BkRpwUQU.js",
     "deadbeefcafe.js",
+    "src/MyWidget.js",
+    "_nuxt/settings.js",
+    "_nuxt/Settings.js",
+    "assets/Overview.md",
+    "assets/MyWidget.js",
+    "assets/logoDark.svg",
+    "assets/siteLogo.svg",
+    "assets/readFile.js",
+    "assets/darkMode.js",
+    "assets/logoIcon.svg",
+    "assets/CSSReset.css",
+    "_nuxt/TodoList.js",
+    "assets/vendor-lowercase.js",
   ])
     assert.equal(isHashedAsset(path), false, path)
 })
@@ -447,15 +775,16 @@ test("the frame host asks for its page on load, and again when the viewer says h
   runInNewContext(script, {
     parent,
     window: {},
-    location: { pathname: "/docs/" },
+    location: { pathname: "/docs/", search: "?tab=vue", hash: "#install" },
     addEventListener: (_type, handler) => (onMessage = handler),
     document: { body: {} },
   })
   onMessage({ source: parent, data: { __drop: true, type: "hello" } })
   onMessage({ source: {}, data: { __drop: true, type: "hello" } })
+  // The whole address, query and hash included, so a deep link's page opens as it was linked.
   assert.deepEqual(asked, [
-    { __drop: true, type: "host", path: "/docs/" },
-    { __drop: true, type: "host", path: "/docs/" },
+    { __drop: true, type: "host", path: "/docs/?tab=vue#install" },
+    { __drop: true, type: "host", path: "/docs/?tab=vue#install" },
   ])
 })
 
@@ -594,9 +923,49 @@ test("app pages map to the URLs a static host serves them at", () => {
     assert.equal(pageAt(pages, path), page, path)
   assert.equal(pageUrl("index.html"), "/")
   assert.equal(pageUrl("product/index.html"), "/product/")
-  assert.equal(pageUrl("about.html"), "/about.html")
+  // Clean URLs, as Cloudflare Pages, Netlify and Vercel serve them and a built site's router expects.
+  assert.equal(pageUrl("about.html"), "/about")
+  assert.equal(pageUrl("integrations/components.html"), "/integrations/components")
   assert.equal(pageUrl("docs/a b/index.html"), "/docs/a%20b/")
   for (const page of pages) assert.equal(pageAt(pages, decodeURI(pageUrl(page))), page)
+})
+
+test("an app address answers with its page, or the 404.html, 200.html or index.html a static host falls back to", () => {
+  const pages = ["index.html", "200.html", "404.html", "integrations/components.html", "docs/a b/index.html"]
+  assert.equal(appPageFor(pages, "/integrations/components?tab=vue#props"), "integrations/components.html")
+  assert.equal(appPageFor(pages, "/docs/a%20b/#top"), "docs/a b/index.html")
+  // A path without its slash or .html, as a deep link is typed, opens foo.html or foo/index.html.
+  assert.equal(appPageFor(pages, "/docs/a%20b"), "docs/a b/index.html")
+  assert.equal(appPageFor(pages, "/integrations/components/"), "404.html")
+  assert.equal(appPageFor(pages, "/missing"), "404.html")
+  assert.equal(appPageFor(["index.html", "200.html"], "/missing"), "200.html")
+  assert.equal(appPageFor(["index.html"], "/missing"), "index.html")
+})
+
+test("a drop link's ?path= is an address on the app's own origin, and nothing that leaves it", () => {
+  assert.equal(appLocation("/integrations/components"), "/integrations/components")
+  assert.equal(appLocation("integrations/components"), "/integrations/components")
+  assert.equal(appLocation("/search?q=a b#results"), "/search?q=a%20b#results")
+  // A hand-written link's hash comes after its query, outside ?path=.
+  assert.equal(appLocation("/guide", "#install"), "/guide#install")
+  assert.equal(appLocation("/guide#setup", "#install"), "/guide#setup")
+  assert.equal(appLocation("/guide", "#"), "/guide")
+  // The viewer puts it after the app's origin: it may never name another host there.
+  const origin = "https://abc-drop.vitehub.dev"
+  for (const away of [
+    "//evil.example/x",
+    "/\\evil.example",
+    "\\\\evil.example",
+    "https://evil.example/",
+    "@evil.example",
+    "/%2F%2Fevil.example",
+  ]) {
+    const at = appLocation(away)
+    if (at !== null) assert.equal(new URL(origin + at).origin, origin, away)
+  }
+  assert.equal(appLocation("//evil.example/x"), null)
+  assert.equal(appLocation(undefined), null)
+  assert.equal(appLocation(""), null)
 })
 
 test("Drop's scripts go first in the head without dropping the page out of standards mode", () => {
