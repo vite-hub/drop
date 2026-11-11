@@ -183,7 +183,7 @@ const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
 <div class="seg related" slot="related" hidden><button type="button" data-act="related" aria-haspopup="true" aria-expanded="false" aria-controls="related-links">${ICONS.link}Related links</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
@@ -245,6 +245,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
+  const copyButton = $("[data-act=copy]", bar);
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
 
@@ -336,6 +337,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
   const reviewUrl = () => drop + "/review/open#" + encodeURIComponent(token || "");
+  // Copy link goes through Drop the same way: a small Drop window copies the link there and closes.
+  // Each request gets a fresh document: an earlier window may still be waiting for a manual copy of another review.
+  function copyReviewLink() {
+    const url = drop + "/review/open?copy#" + encodeURIComponent(token || "");
+    if (!window.open(url, "_blank", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
+  }
 
   function authorName() {
     try { return (JSON.parse(sessionStorage.getItem(stored) || "null") || {}).name || ""; } catch (e) { return ""; }
@@ -436,7 +443,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const shown = token ? visible() : [];
     const open = threads.filter((item) => !item.resolved).length;
     // The list shows once the page has threads: before someone connects there is nothing to count.
-    pinsButton.hidden = listButton.hidden = !threads.length;
+    copyButton.hidden = pinsButton.hidden = listButton.hidden = !threads.length;
     if (listButton.hidden) list.hidden = true;
     count.textContent = String(open);
     listButton.title = open + " open comment" + (open === 1 ? "" : "s") + " on this page";
@@ -1044,6 +1051,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   showResolved.addEventListener("change", render);
   $("[data-act=close]", list).addEventListener("click", () => { list.hidden = true; });
+  copyButton.addEventListener("click", copyReviewLink);
   $("[data-act=close]", thread).addEventListener("click", closeThread);
   $("[data-act=cancel]", pop).addEventListener("click", cancel);
 
