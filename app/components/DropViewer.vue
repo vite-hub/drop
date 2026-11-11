@@ -108,7 +108,7 @@ const siteRef = useTemplateRef<{
   pending: boolean
 }>("siteRef")
 const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
-const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
+const reviewDock = useTemplateRef<{ focusTrigger: () => void; top: number }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
   shareOpen.value = false
@@ -235,14 +235,12 @@ const framed = computed(
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
-/** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. A
- * video clears the dock inside its own stage, so the stage's color runs under the dock. */
+/** Whether the viewer stops above the review dock: boards, apps and files have controls along their bottom edge. A
+ * video clears the dock inside its own stage, so the stage's color runs under the dock. A site runs under the dock like
+ * an HTML doc, and its setup page keeps its own trailing room (ViewerSite). */
 const dockClearance = computed(
   () =>
-    !editing.value &&
-    !trashed.value &&
-    !video.value &&
-    ["board", "site", "app", "file", "folder"].includes(drop.value.kind),
+    !editing.value && !trashed.value && !video.value && ["board", "app", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null
@@ -306,8 +304,9 @@ function startComment() {
   showComments()
 }
 watch(popover, (value, before) => {
-  // A pin's thread floats beside it too, so the list comes back after it only if it was open before.
-  if (!before && (value?.type === "new" || (value?.type === "thread" && pinStyle.value))) startComment()
+  // A thread floats beside its pin or over its card in the margin, so the list comes back after it only if it was open
+  // before.
+  if (!before && (value?.type === "new" || value?.type === "thread")) startComment()
   else if (value) showComments()
   // Writing a comment or opening one brings hidden comments back.
   if (value) overlays.pins = true
@@ -333,14 +332,25 @@ const pinOpen = computed(() => commentsOpen.value && !editing.value && !trashed.
 const pinDraft = computed(
   () => pinStyle.value && pinOpen.value && popover.value?.type === "new" && popover.value.pending.kind === "text",
 )
-const pinThread = computed(
-  () =>
-    pinStyle.value &&
-    pinOpen.value &&
-    popover.value?.type === "thread" &&
-    threadComment.value?.kind === "text" &&
-    threadPlace.value?.id === popover.value.id,
-)
+/**
+ * Where the open thread is written in, so a reply never sends the reader to the dock: over its card in the margin
+ * (`rail`), else beside its pin, as the frame reports it while the page scrolls. The lightbox's pins aren't in the frame,
+ * so a thread opened there sits beside the pin that was clicked. A thread opened from the list waits for its place.
+ */
+// A thread that opened in the dock, because its place came too late or never, stays there until it closes: moving it
+// later would mount a new reply box and drop what the reader typed.
+const dockedThread = ref<string | null>(null)
+const threadSpot = computed(() => {
+  const open = popover.value
+  if (open?.type !== "thread" || editing.value || trashed.value) return undefined
+  if (lightbox.value)
+    return open.x || open.y
+      ? { rail: false, rect: { left: open.x - 12, top: open.y - 12, right: open.x + 12, bottom: open.y + 12 } }
+      : undefined
+  if (dockedThread.value === open.id) return undefined
+  return commentsOpen.value && threadPlace.value?.id === open.id ? threadPlace.value : undefined
+})
+const pinThread = computed(() => Boolean(threadSpot.value))
 // Escape in the compact composer drops the draft, words and pictures.
 function dropPinDraft() {
   reviewDraft.body.value = ""
@@ -348,18 +358,35 @@ function dropPinDraft() {
   popover.value = null
 }
 const PIN_BUBBLE_WIDTH = 300
-// Right of the pin, level with it; past the page's right edge, under it instead. The bubble grows from the pin.
+const THREAD_WIDTH = 340
+const pinRef = useTemplateRef<HTMLElement>("pinRef")
+const { height: bubbleHeight } = useElementSize(pinRef, undefined, { box: "border-box" })
+// Right of the pin, level with it; past the page's right edge, under it instead, else above it. The bubble grows from
+// the pin. A thread on a card in the margin covers the card, its right edge on the card's, and grows from the card's
+// top. Wherever it goes, it stays inside the window, over the pin or its area if nothing else fits, so the reply box
+// can always be reached.
 const pinBubbleStyle = computed(() => {
-  const rect = pinDraft.value ? draftPlace.value?.rect : threadPlace.value?.rect
+  const spot = pinDraft.value ? undefined : threadSpot.value
+  const rect = pinDraft.value ? draftPlace.value?.rect : spot?.rect
   if (!rect) return undefined
-  const width = Math.min(PIN_BUBBLE_WIDTH, windowWidth.value - 24)
+  // Until it's measured, the bubble counts as tall as it may grow (max-h-[min(28rem,60dvh)]).
+  const height = bubbleHeight.value || Math.min(448, windowHeight.value * 0.6)
+  const inWindow = (top: number) => Math.max(56, Math.min(top, windowHeight.value - 12 - height))
+  if (spot?.rail) {
+    const width = Math.min(Math.max(THREAD_WIDTH, rect.right - rect.left), windowWidth.value - 24)
+    const left = Math.max(12, Math.min(rect.right - width, windowWidth.value - 12 - width))
+    return { width: `${width}px`, left: `${left}px`, top: `${inWindow(rect.top)}px`, transformOrigin: "100% 0" }
+  }
+  const width = Math.min(pinDraft.value ? PIN_BUBBLE_WIDTH : THREAD_WIDTH, windowWidth.value - 24)
   let left = rect.right + 8
-  let top = rect.top
+  let top = inWindow(rect.top)
   let origin = "0 14px"
   if (left + width > windowWidth.value - 12) {
     left = Math.max(12, windowWidth.value - 12 - width)
-    top = rect.bottom + 8
-    origin = `${rect.left + 14 - left}px -8px`
+    const below = rect.bottom + 8
+    const above = rect.top - 8 - height
+    top = below + height <= windowHeight.value - 12 ? below : above >= 56 ? above : inWindow(below)
+    origin = top === below ? `${rect.left + 14 - left}px -8px` : `${rect.left + 14 - left}px ${height + 8}px`
   }
   return { width: `${width}px`, left: `${left}px`, top: `${top}px`, transformOrigin: origin }
 })
@@ -381,6 +408,7 @@ const floating = computed(
 const floatShown = computed(
   () =>
     !pinStyle.value &&
+    !pinThread.value &&
     floating.value &&
     (popover.value?.type !== "new" || popover.value.pending.kind !== "text" || !!draftPlace.value),
 )
@@ -406,7 +434,6 @@ watch(floatShown, async (open) => {
   await whenHeld()
   if (floatShown.value) floatRef.value?.querySelector<HTMLElement>("[data-comment-editor] textarea")?.focus()
 })
-const pinRef = useTemplateRef<HTMLElement>("pinRef")
 // A bubble that opens below the fold scrolls the page until it shows, above the dock; the frame then moves the pin
 // and the bubble follows.
 watch(
@@ -431,8 +458,12 @@ watch(
   () => (popover.value?.type === "new" && popover.value.pending.kind === "text" ? popover.value.pending : null),
   (pending, before) => (pending || before) && send({ type: pending ? "hold-selection" : "clear-selection" }),
 )
+// Mark area turns on Comments mode where the page has it, so the reader drags on the page with nothing over it; the
+// Comments panel would cover what they draw on. Elsewhere the open panel is what lets the page take the drag.
 function toggleCommentArea() {
-  if (canMarkArea.value) showComments()
+  if (!canMarkArea.value) return
+  if (canUseCommentMode.value && !editing.value && !trashed.value) commentMode.value = true
+  else showComments()
 }
 // A `?changes=` link opens with History over the diff, as if the version had been picked there.
 if (route.query.changes && hasHistory.value) showDetails("history")
@@ -972,6 +1003,27 @@ const threadComment = computed(() => {
   const open = popover.value
   return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
 })
+// A thread opened on the page waits a moment for the frame to say where its pin or card is, so the dock doesn't flash
+// open under it. A comment on the whole page, or one the frame can't place, then opens in the dock.
+const awaitingSpot = ref(false)
+const spotWait = useTimeoutFn(
+  () => {
+    awaitingSpot.value = false
+    if (!pinThread.value && popover.value?.type === "thread") dockedThread.value = popover.value.id
+  },
+  300,
+  { immediate: false },
+)
+watch(
+  () => (popover.value?.type === "thread" ? popover.value.id : null),
+  (id) => {
+    spotWait.stop()
+    dockedThread.value = null
+    awaitingSpot.value = Boolean(id && !lightbox.value && !siteRef.value && threadComment.value?.kind !== "page")
+    if (awaitingSpot.value) spotWait.start()
+  },
+)
+watch(pinThread, (shown) => shown && (awaitingSpot.value = false))
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => (commentsOpen.value ? threadComment.value?.n : undefined),
@@ -1003,6 +1055,7 @@ watch(
       :pending="popover.type === 'new' ? popover.pending : undefined"
       :draft="popover.type === 'new' ? popover.body : undefined"
       :draft-error="popover.type === 'new' ? popover.error : undefined"
+      :floating="pinThread"
       :can-accept="canAccept"
       :accepting="Boolean(accepting) && accepting === threadComment?.id"
       :version="drop.version"
@@ -1139,6 +1192,7 @@ watch(
             v-else-if="drop.kind === 'site'"
             ref="siteRef"
             :comments="comments"
+            :dock-top="reviewDock?.top"
             :drop="drop"
             :reviewing="commentsOpen && drop.canComment && annotationsEnabled && !editing"
             :screenshots="screenshots"
@@ -1229,7 +1283,7 @@ watch(
         <ViewerReviewDock
           ref="reviewDock"
           :class="{ invisible: siteRef?.capturing }"
-          :open="commentsOpen && !editing && !trashed && !floating"
+          :open="commentsOpen && !editing && !trashed && !floating && !awaitingSpot"
           :overlay="Boolean(lightbox)"
           :settle="whenHeld"
           :heading="popover?.type === 'new' || siteRef?.pending ? 'row' : 'none'"
@@ -1446,7 +1500,13 @@ watch(
         ref="pinRef"
         :aria-label="pinDraft ? 'Comment on selected text' : 'Comment thread'"
         class="fixed z-40 flex max-h-[min(28rem,60dvh)] flex-col overflow-y-auto overscroll-contain border border-default bg-default shadow-lg"
-        :class="pinDraft ? 'rounded-[6px_18px_18px_18px]' : 'rounded-[6px_16px_16px_16px] p-1.5'"
+        :class="
+          pinDraft
+            ? 'rounded-[6px_18px_18px_18px]'
+            : threadSpot?.rail
+              ? 'rounded-xl p-1.5'
+              : 'rounded-[6px_16px_16px_16px] p-1.5'
+        "
         role="dialog"
         :style="pinBubbleStyle"
         @keydown.esc="popover = null"

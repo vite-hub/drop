@@ -55,8 +55,11 @@ export function useViewerAnnotations(options: {
   const popover = ref<Popover | null>(null)
   /** Where the frame keeps the place of the comment being written on a selection, in page coordinates (draft-place). */
   const draftPlace = ref<{ rail: boolean; pin?: boolean; rect: Rect } | null>(null)
-  /** Pin style: where the pin of the thread on show is, in page coordinates, as the page scrolls (draft-place with an id). */
-  const threadPlace = ref<{ id: string; rect: Rect } | null>(null)
+  /**
+   * Where the open thread is written in, in page coordinates, as the page scrolls (draft-place with an id): beside its
+   * pin, or over its card in the margin (`rail`).
+   */
+  const threadPlace = ref<{ id: string; rail: boolean; rect: Rect } | null>(null)
   watch(
     () => (popover.value?.type === "thread" ? popover.value.id : null),
     (id) => threadPlace.value?.id !== id && (threadPlace.value = null),
@@ -235,7 +238,7 @@ export function useViewerAnnotations(options: {
       }
       if (message.id) {
         if (popover.value?.type === "thread" && popover.value.id === message.id)
-          threadPlace.value = { id: message.id, rect }
+          threadPlace.value = { id: message.id, rail: message.rail, rect }
       } else if (popover.value?.type === "new") draftPlace.value = { rail: message.rail, pin: message.pin, rect }
     }
     if (message.type === "area") {
