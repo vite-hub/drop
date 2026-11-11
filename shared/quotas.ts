@@ -106,7 +106,7 @@ export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retry
     drops: "drops",
     bytes: "storage",
     writes: "monthly file writes",
-    kept: "drops kept forever",
+    kept: "drops set to Never delete (keep)",
     appFiles: "app files",
     appBytes: "app size",
   }[unit]

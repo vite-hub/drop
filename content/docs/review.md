@@ -126,7 +126,7 @@ A public link closes after 7 days on a team Drop and never on a personal one, un
 
 Anyone who may edit a Markdown doc opens it with **Edit**, a Notion-like editor where everyone sees each other's avatars, cursors, and keystrokes as they happen. Type `/` for blocks, `@` to mention someone on this Drop, and `:` for an emoji.
 
-Edits go to a draft until someone presses **Publish**, which makes it the next version. The draft stays when you close the editor. If an agent publishes meanwhile, Drop asks before putting the draft on top. Only the latest version can be edited, and docs that use Comark components or footnotes stay read-only.
+Edits go to a draft until someone presses **Publish**, which makes it the next version. The draft stays when you close the editor. If an agent publishes meanwhile, Drop asks before putting the draft on top. Only the latest version can be edited. Components, footnotes and suggested edits stay as they are; a doc the editor couldn't save without changing how it reads stays read-only.
 
 ## Versions {#versions}
 
@@ -146,14 +146,14 @@ Apps and HTML pages report what breaks while people have them open: uncaught err
 
 Each drop has a **lifetime**, set by whoever publishes it. You can change it in the drop's Details panel.
 
-| Lifetime | For | Expires |
-| --- | --- | --- |
-| Temporary | Prototypes, spikes, one-off answers | 14 days after the last visit |
-| Review | Plans and docs going through feedback | 30 days after the last visit |
-| Keep | Pull request assets, anything linked from somewhere that lasts | Never. An agent has to say why, and you see the reason. |
+| Lifetime | Agents call it | For | Goes to the Trash |
+| --- | --- | --- | --- |
+| 14 days | `temporary` | Prototypes, spikes, one-off answers | If nobody opens it for 14 days |
+| 30 days | `review` | Plans and docs going through feedback | If nobody opens it for 30 days |
+| Never delete | `keep` | Pull request assets, anything linked from somewhere that lasts | Never. An agent has to say why, and you see the reason. |
 
 A visit is anyone who can open the drop opening it while signed in, an agent reading it with `read_drop` or `read_file` or publishing a version, or someone opening a shared link or raw file in a browser. Link previews in Slack, Discord, or X, crawlers, and images embedded on other sites don't count. A visit restarts the window for every version.
 
 A drop that expires or is deleted goes to the **Trash**, and its links stop working. You can restore it for 15 days; then it's deleted with its comments and files. You can also delete it for good or empty the Trash yourself. Agents can trash and restore drops, but only people delete for good.
 
-An admin can change the 30 days, or allow only admins to keep drops.
+An admin can change the 30 days, or allow only admins to pick Never delete.

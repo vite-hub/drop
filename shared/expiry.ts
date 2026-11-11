@@ -18,7 +18,7 @@ interface ExpiryRow {
 }
 
 /** Days a drop with this lifetime lives after its last visit; 0 means it never expires. `days` of 0 turns expiry off. */
-export function lifetimeDays(lifetime: Lifetime, days: number) {
+function lifetimeDays(lifetime: Lifetime, days: number) {
   if (lifetime === "keep" || days <= 0) return 0
   return lifetime === "temporary" ? Math.min(TEMPORARY_DAYS, days) : days
 }
@@ -36,14 +36,30 @@ export const daysUntil = (at: number, now: number) => Math.max(0, Math.ceil((at 
 
 const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`
 
-/** One status line for people and agents alike: "Expires in 6 days", "Kept", "In the Trash, deleting in 2 days". */
-export function expiryLabel(
-  drop: { expiresAt: number | null; lifetime: Lifetime; trashedAt: number | null },
-  now: number,
-) {
+/**
+ * What people call a lifetime: how long it lasts, never its API value. `days` is this Drop's window, as for
+ * `lifetimeDays`. "14 days", "30 days", "Never delete".
+ */
+export function lifetimeLabel(lifetime: Lifetime, days: number) {
+  const window = lifetimeDays(lifetime, days)
+  return window ? plural(window, "day") : "Never delete"
+}
+
+/** What happens to a drop with this lifetime, in one sentence. */
+export function lifetimeHint(lifetime: Lifetime, days: number) {
+  const window = lifetimeDays(lifetime, days)
+  return window
+    ? `Goes to the Trash if nobody opens it for ${plural(window, "day")}.`
+    : "Stays until someone deletes it."
+}
+
+/**
+ * One status line for people and agents alike: "Goes to the Trash in 6 days", "Never deleted",
+ * "In the Trash. Deleted for good in 2 days".
+ */
+export function expiryLabel(drop: { expiresAt: number | null; trashedAt: number | null }, now: number) {
   if (drop.trashedAt !== null)
-    return `In the Trash, deleting in ${plural(daysUntil(purgesAt(drop.trashedAt), now), "day")}`
-  if (drop.lifetime === "keep") return "Kept"
-  if (drop.expiresAt === null) return "Doesn't expire"
-  return `Expires in ${plural(daysUntil(drop.expiresAt, now), "day")}`
+    return `In the Trash. Deleted for good in ${plural(daysUntil(purgesAt(drop.trashedAt), now), "day")}`
+  if (drop.expiresAt === null) return "Never deleted"
+  return `Goes to the Trash in ${plural(daysUntil(drop.expiresAt, now), "day")}`
 }

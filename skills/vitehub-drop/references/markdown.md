@@ -18,7 +18,7 @@ Headings, lists, tables, links, `~~strikethrough~~`, and `![alt](https://…)` i
 
 ## Live editing
 
-People can edit a doc together in the browser (`share: team_edit`), but only if it has no components (`::name` blocks or inline ones such as `:badge[beta]`), no footnotes, and no [suggested edits](blocks.md#suggested-edits). A doc with any of them is read-only in the editor. For a doc the team will edit, use plain Markdown, alerts, Mermaid, and code blocks.
+People can edit a doc together in the browser (`share: team_edit`), components, footnotes and [suggested edits](blocks.md#suggested-edits) included. The first save from the editor may reformat the source, such as padding table cells, without changing what readers see. A doc the editor can't save unchanged stays read-only there, and the edit button says so; publish a new version instead.
 
 ## Alerts
 
