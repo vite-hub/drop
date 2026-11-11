@@ -160,7 +160,7 @@ async function backToComments() {
   else commentsRef.value?.focusComposer()
 }
 const app = useAppFiles(drop)
-const { pages, page } = app
+const { pages, page, location: appAt } = app
 
 const live = useLiveEditor(drop, { publicView: publicView })
 const editing = live.editing
@@ -527,7 +527,7 @@ const presents = computed(() => isApp.value || drop.value.kind === "html")
 function openWindow() {
   const query = new URLSearchParams({ present: "" })
   if (older.value) query.set("v", String(drop.value.version))
-  if (isApp.value && page.value !== "index.html") query.set("file", page.value)
+  if (isApp.value && appAt.value !== "/") query.set("path", appAt.value)
   window.open(`${dropPath(drop.value)}?${query}`, "_blank", "popup")
 }
 // A Slidev build (its runtime under assets/slidev/) presents in one step: the deck alone in a new window for the
@@ -681,10 +681,13 @@ const copyMarkdown = (announce?: string) =>
   )
 const copyFeedback = () =>
   copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
-// A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies.
+// A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
+// opens the page showing (`?path=`).
 function copyLink(announce?: string) {
-  if (owner.value && drop.value.share === "private") shareOpen.value = true
-  else void copy(link.value, { key: "link", announce })
+  if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
+  const url = new URL(link.value)
+  if (isApp.value && appAt.value !== "/") url.searchParams.set("path", appAt.value)
+  void copy(url.href, { key: "link", announce })
 }
 const canMarkArea = computed(
   () =>
@@ -1111,7 +1114,7 @@ watch(
           class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted"
         >
           <UIcon :name="SHARE_ICONS[drop.share]" class="size-3 shrink-0" />
-          <span class="truncate">{{ drop.slug || drop.link }}/{{ page === "index.html" ? "" : page }}</span>
+          <span class="truncate">{{ drop.slug || drop.link }}{{ appAt }}</span>
         </span>
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>

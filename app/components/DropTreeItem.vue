@@ -3,13 +3,19 @@
 // app to its pages; either is open on its own page unless toggled shut. Hovering a drop you may change shows its menu:
 // rename it, or move it to the Trash.
 import * as v from "valibot"
+import { appLocation, appPageFor, pageUrl } from "#shared/project-bundle"
 import type { DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: DropSummary }>()
 const emit = defineEmits<{ navigate: [] }>()
 const route = useRoute()
 const open = useTreeOpen()
-const file = computed(() => textValue(route.query.file) ?? null)
+const pages = computed(() => appPages(props.drop.paths ?? []))
+// The app page open in the viewer: the one its `?path=` (or an older link's `?file=`) shows.
+const file = computed(() => {
+  const at = appLocation(textValue(route.query.path))
+  return at ? appPageFor(pages.value, at) : (textValue(route.query.file) ?? "index.html")
+})
 const here = computed(() => route.path === `/drops/${props.drop.id}`)
 const expandable = computed(
   () => props.drop.kind === "app" || (props.drop.kind === "folder" && Boolean(props.drop.items)),
@@ -87,13 +93,13 @@ const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open
     <ul v-if="expandable && expanded" class="ml-3.5 flex flex-col gap-px border-l border-default py-0.5 pl-2">
       <DropTreeChildren v-if="drop.kind === 'folder'" :id="drop.id" @navigate="emit('navigate')" />
       <template v-else>
-        <li v-for="path in appPages(drop.paths ?? [])" :key="path">
+        <li v-for="path in pages" :key="path">
           <NuxtLink
             :class="[
               'flex h-7 min-w-0 items-center gap-2 rounded-md px-2 font-mono text-xs transition-colors',
               here && file === path ? active : idle,
             ]"
-            :to="{ path: `/drops/${drop.id}`, query: { file: path } }"
+            :to="{ path: `/drops/${drop.id}`, query: path === 'index.html' ? {} : { path: pageUrl(path) } }"
             @click="emit('navigate')"
           >
             <span class="truncate">{{ path }}</span>

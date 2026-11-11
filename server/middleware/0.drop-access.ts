@@ -23,8 +23,9 @@ export default defineHandler(async (event) => {
     event.context.dropAccessChecked = true
     return
   }
-  // `/d/<link>` and the address the page settles on, `/d/<link>/<slug>`.
-  const page = event.url.pathname.match(/^\/d\/([^/]+)(?:\/[^/]*)?$/)
+  // `/d/<link>`, the address the page settles on, `/d/<link>/<slug>`, and a page of an app under it,
+  // `/d/<link>/<slug>/guide/setup`.
+  const page = event.url.pathname.match(/^\/d\/([^/]+)(?:\/[^/]*(\/.*)?)?$/)
   if (!page) return
   const [{ expiredLink, findDrop, permissions, waitingForReview }, { identify }] = await Promise.all([
     import("../utils/drops"),
@@ -59,12 +60,25 @@ export default defineHandler(async (event) => {
     throw notFound()
   }
   event.res.headers.set("Cache-Control", "private, no-store")
+  const { dropPath, slugify } = await import("../../shared/links")
+  const to = dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
+  // A path under the link is a page of the app: the link opens it as `?path=`, where the viewer keeps an app's address
+  // (useAppFiles). The query keys Drop's page reads stay its own, and the rest go with the path to the app. The browser
+  // keeps the #hash across the redirect. A doc has no pages, so the path goes.
+  if (page[2]) {
+    if (!["GET", "HEAD"].includes(event.req.method)) throw notFound()
+    const { DROP_PAGE_PARAMS } = await import("../../shared/links")
+    const ours = new URLSearchParams()
+    const app = new URLSearchParams()
+    for (const [key, value] of event.url.searchParams)
+      if (key !== "path" && key !== "file") (DROP_PAGE_PARAMS.includes(key) ? ours : app).append(key, value)
+    if (drop.kind === "app") ours.set("path", `${page[2]}${app.size ? `?${app}` : ""}`)
+    return redirect(`${to}${ours.size ? `?${ours}` : ""}`)
+  }
   // A pinned `?v=` renders: the page checks that the version exists.
   if (!["GET", "HEAD"].includes(event.req.method) || event.url.searchParams.has("v")) return
-  const { dropPath, slugify } = await import("../../shared/links")
   // The page moves to the doc's own address (pages/d/[id]/[[slug]].vue). Redirecting here saves rendering a page only
   // to send that redirect, as `/d/<link>` without its slug did.
-  const to = dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
   if (event.url.pathname !== to) return redirect(to + event.url.search)
   // HEAD wants the status, not the page (a full render, ~0.9 s).
   if (event.req.method === "HEAD")
