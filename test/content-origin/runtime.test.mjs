@@ -371,11 +371,13 @@ test("an app's files are read from storage once per location, and each read from
     assert.equal((await load("/_nuxt/B0nDsZtt.js", { headers: { "if-none-match": etag } })).status, 304)
 
     // A name the next version may reuse is still kept: its blob key changes with every upload.
-    await (await load("/_nuxt/entry.js")).text()
+    const read = await load("/_nuxt/entry.js")
+    await read.text()
     await edge.settled()
     const entry = await load("/_nuxt/entry.js")
     assert.equal(await entry.text(), "export default 4")
-    assert.equal(entry.headers.get("cache-control"), "private, no-cache")
+    assert.equal(entry.headers.get("cache-control"), read.headers.get("cache-control"), "the browser's rule stays")
+    assert.notEqual(entry.headers.get("cache-control"), "private, max-age=31536000, immutable")
     assert.equal(calls.serve, reads + 2)
 
     assert.equal((await load("/_nuxt/B0nDsZtt.js", { grant: null })).status, 404, "kept, but no grant, no file")
