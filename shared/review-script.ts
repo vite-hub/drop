@@ -119,6 +119,9 @@ const ICONS = {
   check: svg(`<path d="M52 136l44 44 108-108"/>`),
   reopen: svg(`<path d="M88 152 40 104l48-48"/><path d="M40 104h112a64 64 0 0 1 0 128h-40"/>`),
   close: svg(`<path d="M68 68l120 120M188 68 68 188"/>`),
+  link: svg(
+    `<path d="M116 140a44 44 0 0 0 62 0l36-36a44 44 0 0 0-62-62l-14 14"/><path d="M140 116a44 44 0 0 0-62 0l-36 36a44 44 0 0 0 62 62l14-14"/>`,
+  ),
   marker: svg(`<path d="M164 44l48 48-96 96-56 8 8-56z"/><path d="M140 68l48 48"/><path d="M40 220h88"/>`),
   pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
   arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
@@ -161,7 +164,7 @@ const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
@@ -216,6 +219,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
+  const copyButton = $("[data-act=copy]", bar);
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
 
@@ -305,6 +309,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
   const reviewUrl = () => drop + "/review/open#" + encodeURIComponent(token || "");
+  // Copy link goes through Drop the same way: a small Drop window copies the link there and closes.
+  // Each request gets a fresh document: an earlier window may still be waiting for a manual copy of another review.
+  function copyReviewLink() {
+    const url = drop + "/review/open?copy#" + encodeURIComponent(token || "");
+    if (!window.open(url, "_blank", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
+  }
 
   function authorName() {
     try { return (JSON.parse(sessionStorage.getItem(stored) || "null") || {}).name || ""; } catch (e) { return ""; }
@@ -405,7 +415,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const shown = token ? visible() : [];
     const open = threads.filter((item) => !item.resolved).length;
     // The list shows once the page has threads: before someone connects there is nothing to count.
-    pinsButton.hidden = listButton.hidden = !threads.length;
+    copyButton.hidden = pinsButton.hidden = listButton.hidden = !threads.length;
     if (listButton.hidden) list.hidden = true;
     count.textContent = String(open);
     listButton.title = open + " open comment" + (open === 1 ? "" : "s") + " on this page";
@@ -888,6 +898,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   showResolved.addEventListener("change", render);
   $("[data-act=close]", list).addEventListener("click", () => { list.hidden = true; });
+  copyButton.addEventListener("click", copyReviewLink);
   $("[data-act=close]", thread).addEventListener("click", closeThread);
   $("[data-act=cancel]", pop).addEventListener("click", cancel);
 

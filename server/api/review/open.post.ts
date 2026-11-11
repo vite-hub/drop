@@ -1,12 +1,13 @@
 import { defineValidatedHandler, HTTPError } from "h3"
 import { ReviewOpenSchema } from "#shared/schemas"
-import { findDrop } from "../../utils/drops"
+import { dropPageUrl, findDrop } from "../../utils/drops"
 import { identify } from "../../utils/identity"
 import { openable, readReviewToken } from "../../utils/review"
 
 /**
- * Where "Open in Drop" on a reviewed site goes (/review/open). The page holds a review token, so the token alone
- * can't be enough: this opens the review only for people who could open it without its link, with Drop's session.
+ * Where "Open in Drop" and "Copy link" on a reviewed site go (/review/open). The page holds a review token, so the token
+ * alone can't be enough: this opens the review, or hands over its link, only for people who could open it without the
+ * link, with Drop's session. The answer reaches Drop's own page, never the reviewed site.
  */
 export default defineValidatedHandler({
   validate: { body: ReviewOpenSchema },
@@ -22,6 +23,6 @@ export default defineValidatedHandler({
         statusText: "Only people the review is shared with can open it. Your comments still reach its owner.",
       })
     event.res.headers.set("Cache-Control", "no-store")
-    return { to: `/drops/${site.id}` }
+    return { to: `/drops/${site.id}`, link: dropPageUrl(event.url.origin, site) }
   },
 })
