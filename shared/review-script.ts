@@ -257,7 +257,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   let sending = null, sendingBox = false;
   let threads = [], openN = null, pinsShown = true, here = "";
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
-  const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map();
+  const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map(), shownImages = new Set();
 
   function save(value) {
     token = value ? value.token : null;
@@ -375,15 +375,21 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     return node;
   }
 
-  // The element a thread was left on, found again by its CSS path. Null when the page no longer has it.
+  // The element a thread was left on, found again by its CSS path. Null when the page no longer has it. A found element
+  // stays the thread's while it's on the page. One that isn't there is looked for again once the page has changed, at
+  // most every MISS_MS: on a large page each lookup costs up to half a millisecond, and a page that re-renders every
+  // frame paid it for every thread on every frame (drop#163).
+  const MISS_MS = 500;
+  let changedAt = 0;
   function elementOf(item) {
     if (!item.element) return null;
-    const known = elementFor.get(item.n);
-    if (known && known.isConnected) return known;
+    const known = elementFor.get(item.n), now = performance.now();
+    if (known && known.el && known.el.isConnected) return known.el;
+    if (known && !known.el && (known.at > changedAt || now - known.at < MISS_MS)) return null;
     let found = null;
     try { found = document.querySelector(item.element.selector); } catch (e) {}
     if (found && host.contains(found)) found = null;
-    elementFor.set(item.n, found);
+    elementFor.set(item.n, { el: found, at: now });
     return found;
   }
   function pointOf(item) {
@@ -432,20 +438,23 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   let frame = 0;
   const schedule = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; layout(); }); };
   function layout() {
+    // Every element is measured before any pin moves: a move between two measurements made the browser recompute
+    // styles once per pin, on every frame the page changed.
+    const placed = [];
+    for (const item of threads) if (pinFor.has(item.n)) placed.push([item, pointOf(item)]);
+    const item = openN !== null && threads.find((t) => t.n === openN);
+    const open = item && placed.find(([shown]) => shown === item);
+    const at = open ? open[1] : item && pointOf(item);
     pinLayer.hidden = !pinsShown || !draw.hidden || !paint.hidden;
     if (!inked.hidden) inked.style.translate = inkAt.x - scrollX + "px " + (inkAt.y - scrollY) + "px";
-    for (const item of threads) {
-      const pin = pinFor.get(item.n);
-      if (!pin) continue;
-      const at = pointOf(item);
+    for (const [shown, at] of placed) {
+      const pin = pinFor.get(shown.n);
       const inView = at && at.x >= -4 && at.y >= 0 && at.x <= innerWidth + 4 && at.y <= innerHeight + 28;
       pin.hidden = !inView;
       // The translate property, not transform: it applies after the open pin's scale, so the pin grows in place.
       if (inView) pin.style.translate = Math.round(at.x) + "px " + Math.round(at.y) + "px";
-      pin.classList.toggle("open", item.n === openN);
+      pin.classList.toggle("open", shown.n === openN);
     }
-    const item = openN !== null && threads.find((t) => t.n === openN);
-    const at = item && pointOf(item);
     mark.hidden = !at;
     if (at) place(mark, { left: at.rect.left - 3, top: at.rect.top - 3, width: at.rect.width + 6, height: at.rect.height + 6 });
     if (item && !thread.hidden) placeThread(at);
@@ -457,6 +466,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     a.target = "_blank"; a.rel = "noopener"; a.title = name || "Image";
     const img = el("img"); img.alt = name || "Image";
     a.appendChild(img);
+    shownImages.add(id);
     const known = imageUrls.get(id);
     const show = (url) => { img.src = url; a.href = url; };
     if (known) known.then(show, () => {});
@@ -499,8 +509,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
     $("textarea", thread).focus({ preventScroll: true });
   }
+  // The open thread's pictures stay loaded while it re-renders; the others' object URLs are let go.
+  function keepShownImages() {
+    imageUrls.forEach((loading, id) => {
+      if (shownImages.has(id)) return;
+      imageUrls.delete(id);
+      loading.then((url) => URL.revokeObjectURL(url), () => {});
+    });
+  }
   function closeThread() {
     openN = null; thread.hidden = true; mark.hidden = true;
+    shownImages.clear(); keepShownImages();
     replyBox.reset();
     layout();
   }
@@ -515,6 +534,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const items = $(".items", thread);
     const scrolled = items.scrollTop;
     items.textContent = "";
+    shownImages.clear();
     const first = entry(item.author, item.createdAt, item.body, item.images);
     const placed = pointOf(item);
     if (!placed && item.element && item.element.label) first.insertBefore(el("p", "where", "Was on " + item.element.label), first.children[1]);
@@ -522,6 +542,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!placed && item.screenshot) images([{ id: item.screenshot, filename: "Screenshot" }], first, true);
     items.appendChild(first);
     item.replies.forEach((reply) => items.appendChild(entry(reply.author, reply.createdAt, reply.body, reply.images)));
+    keepShownImages();
     items.scrollTop = scrolled;
     $(".who", thread).textContent = authorName() ? "As " + authorName() : "";
   }
@@ -639,7 +660,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     draw.hidden = true; box.hidden = true; pop.hidden = true; pill.hidden = bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
     newBox.show("");
-    area = null; start = null; strokes = []; still = null;
+    area = null; start = null; strokes = []; still = null; captureRun++;
     forgetStroke();
     layout();
     if (wasOpen) $("[data-act=comment]", bar).focus({ preventScroll: true });
@@ -761,12 +782,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     canvas.width = image.width; canvas.height = image.height;
     const g = canvas.getContext("2d");
     g.drawImage(image, 0, 0);
+    image.close();
     g.scale(k, k);
     inkOn(g, list);
     const blob = (type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
-    let out = await blob("image/webp", 0.9);
-    if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
-    return out && out.size <= MAX_BYTES ? out : picture;
+    try {
+      let out = await blob("image/webp", 0.9);
+      if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
+      return out && out.size <= MAX_BYTES ? out : picture;
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
   }
 
   function finishMark() {
@@ -827,7 +853,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }, true);
 
   ${CAPTURE}
-  const capture = () => captureViewport(host);
+  // Each comment's screenshot; cancel() stops the one still being drawn for a comment that's gone.
+  let captureRun = 0;
+  const capture = () => { const run = ++captureRun; return captureViewport(host, () => run !== captureRun); };
 
   async function ensureToken() {
     if (token) return;
@@ -1018,9 +1046,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("resize", schedule, { passive: true });
   new MutationObserver((records) => {
     if (records.every((record) => host === record.target || host.contains(record.target))) return;
-    elementFor.clear();
+    changedAt = performance.now();
     schedule();
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  }).observe(document.documentElement, { childList: true, attributes: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
   setInterval(() => {
     if (token && pageKey() !== here) { closeThread(); elementFor.clear(); void refresh(); }
@@ -1035,6 +1063,11 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // typing a note doesn't run the page's shortcuts.
   for (const type of ["pointerdown", "mousedown", "touchstart", "click", "focusin", "focusout", "keydown", "keyup"])
     host.addEventListener(type, (e) => e.stopPropagation());
+  // A modal on the page, such as a slideover, keeps focus inside it: when its element loses focus to something outside,
+  // it takes focus back (Reka UI and Radix listen for focusout on the document). That focusout starts on the page's
+  // element, not here, so it's stopped on its way down when focus is moving into the toolbar. Otherwise the note's box
+  // loses focus as it opens and the words go into the slideover (drop#164).
+  addEventListener("focusout", (e) => { if (e.relatedTarget === host) e.stopPropagation(); }, true);
   document.documentElement.appendChild(host);
   void refresh();
 })();`

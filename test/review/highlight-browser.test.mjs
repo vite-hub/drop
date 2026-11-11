@@ -16,11 +16,11 @@ const html = `<!doctype html><html><head><style>
 
 // The screenshot module, stubbed: a white viewport, so the test needs no network and the strokes are all that's drawn.
 const SCREENSHOT_STUB = `export async function createContext() { return {}; }
-export async function domToBlob() {
+export async function domToCanvas() {
   const canvas = document.createElement("canvas");
   canvas.width = innerWidth; canvas.height = innerHeight;
   const g = canvas.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, canvas.width, canvas.height);
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return canvas;
 }`
 
 const CORS = {
