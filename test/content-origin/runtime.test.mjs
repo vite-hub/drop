@@ -223,7 +223,11 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     assert.equal(await script.text(), "export default 1")
     assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8")
     assert.equal(script.headers.get("x-content-type-options"), "nosniff")
-    assert.equal(script.headers.get("cache-control"), "private, no-cache", "a name the next version may reuse")
+    assert.equal(
+      script.headers.get("cache-control"),
+      "private, max-age=0, must-revalidate",
+      "a name the next version may reuse",
+    )
     const etag = script.headers.get("etag")
     assert.equal((await load("/_nuxt/entry.js", { headers: { "if-none-match": etag } })).status, 304)
     const chunk = await load("/_nuxt/B0nDsZtt.js")
@@ -484,6 +488,16 @@ test("only files named after their content count as hashed, so the browser never
     "assets/index-BdJJ9uks.js",
     "static/js/main.3f2a9c1b.js",
     "_fonts/HgJel4iAS5mDVqJaDUYKmxaMJg4zKHTGmyD1FQkOsTM-2hVuuQIZ4GSGMgNv6dvlqz7cfD6lr7xLohUph7OCgFg.woff2",
+    // Rollup hashes with no digit, or with a dash or underscore in them.
+    "_nuxt/CWeqyEg_.js",
+    "_nuxt/BPFKiSqj.js",
+    "_nuxt/lXm2UH6-.js",
+    "_nuxt/zHU-kgrs.js",
+    "_nuxt/-Hou_zz6.js",
+    "assets/index-lXm2UH6-.js",
+    "assets/logo-CWeqyEg_.svg",
+    "docs/_astro/Layout.BfZOTgis.css",
+    "_app/immutable/chunks/BAKrPsxf.js",
   ])
     assert.equal(isHashedAsset(path), true, path)
   for (const path of [
@@ -495,6 +509,13 @@ test("only files named after their content count as hashed, so the browser never
     "fonts/InterVariable.woff2",
     "BkRpwUQU.js",
     "deadbeefcafe.js",
+    "src/MyWidget.js",
+    "_nuxt/settings.js",
+    "_nuxt/Settings.js",
+    "assets/Overview.md",
+    "assets/MyWidget.js",
+    "_nuxt/TodoList.js",
+    "assets/vendor-lowercase.js",
   ])
     assert.equal(isHashedAsset(path), false, path)
 })
