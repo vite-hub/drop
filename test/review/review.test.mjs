@@ -9,6 +9,11 @@ const { readReviewToken, sealChoice, signReviewToken } = await import("../../ser
 const { default: sitesPost } = await import("../../server/api/review/sites.post.ts")
 const { default: tokenPost } = await import("../../server/api/review/token.post.ts")
 const { default: openPost } = await import("../../server/api/review/open.post.ts")
+const { default: relatedGet } = await import("../../server/api/review/related.get.ts")
+const { default: relatedPreflight } = await import("../../server/api/review/related.options.ts")
+const { default: dropRelated } = await import("../../server/api/drops/[id]/related.get.ts")
+const { default: dropGet } = await import("../../server/api/drops/[id].get.ts")
+const { default: membersOnly } = await import("../../server/middleware/0.2.members-only.ts")
 const { default: commentsPost } = await import("../../server/api/review/comments.post.ts")
 const { default: commentsGet } = await import("../../server/api/review/comments.get.ts")
 const { default: preflight } = await import("../../server/api/review/comments.options.ts")
@@ -878,29 +883,377 @@ test("the embedded review needs comment access to the site", async () => {
   assert.equal(threads().length, 0)
 })
 
-test("Open in Drop opens the review only for people who could open it without its link", async () => {
+test("Open in Drop and Copy link reach the review only for people who could open it without its link", async () => {
   state.mode = "team"
   site("pr12", { visibility: "team" })
   site("previews", { site_url: PATTERN, title: "Acme previews" })
   state.who = ada
   const team = (await token(SITE, { pick: 0 })).body.token
   const link = (await token(SITE, { pick: 1 })).body.token
-  assert.deepEqual(await openPost(post("/api/review/open", { token: team })), { to: "/drops/pr12" })
+  const opened = await openPost(post("/api/review/open", { token: team }))
+  assert.equal(opened.to, "/drops/pr12")
+  assert.match(opened.link, /^https:\/\/drop\.example\/d\/pr12(\/|$)/, "Copy link gets the review's page on Drop")
   assert.equal(
     (await answer(openPost, post("/api/review/open", { token: link }))).status,
     404,
     "a link share found by origin isn't the link",
   )
   state.who = who
-  assert.deepEqual(
-    await openPost(post("/api/review/open", { token: link })),
-    { to: "/drops/previews" },
-    "the owner opens it",
-  )
+  assert.equal((await openPost(post("/api/review/open", { token: link }))).to, "/drops/previews", "the owner opens it")
   state.who = null
   assert.equal((await answer(openPost, post("/api/review/open", { token: link }))).status, 401)
   state.who = ada
   assert.equal((await answer(openPost, post("/api/review/open", { token: "00:nonsense" }))).status, 404)
+})
+
+test("Related links on the page lists the docs that link to it, only ones the reviewer finds in Drop anyway", async () => {
+  site("site", { site_url: PATTERN })
+  const links = (...resources) => JSON.stringify(resources)
+  const doc = (id, overrides) => insertDrop(id, { access: "view", ...overrides })
+  doc("evidence", {
+    title: "Before/after: pricing",
+    updated_at: 3,
+    resources: links(
+      { url: `${SITE}/pricing`, title: "Preview" },
+      { url: "https://github.com/acme/app/pull/12", title: "PR #12" },
+      { url: "https://drop.example/drops/site", title: "Review" },
+      { url: "https://linear.app/acme/issue/ACM-7" },
+    ),
+  })
+  doc("mine", {
+    owner_id: "ada",
+    title: "Ada's notes",
+    visibility: "private",
+    updated_at: 2,
+    resources: links({ url: `${SITE}/` }),
+  })
+  doc("secret", { title: "Owner's plan", visibility: "private", resources: links({ url: `${SITE}/` }) })
+  doc("pr13", { title: "PR 13", resources: links({ url: "https://pr13-acme.preview.quiver.dk/" }) })
+  doc("quoted", {
+    title: "Quoted",
+    resources: links({ url: "https://example.com/", title: '"https://pr14-acme.preview.quiver.dk/ lookalike' }),
+  })
+  doc("trashed", { title: "Trashed", trashed_at: Date.now(), resources: links({ url: `${SITE}/` }) })
+  const docs = (bearer, origin = SITE) =>
+    answer(
+      relatedGet,
+      request("/api/review/related", { headers: { origin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) } }),
+    )
+
+  // Before connecting, the page learns only whether a doc links here, and only where a review covers it.
+  const before = await docs()
+  assert.equal(before.status, 200)
+  assert.equal(before.headers.get("access-control-allow-origin"), SITE)
+  assert.deepEqual(await json(before), { linked: true })
+  assert.deepEqual(await json(await docs(undefined, "https://pr13-acme.preview.quiver.dk")), { linked: true })
+  assert.deepEqual(
+    await json(await docs(undefined, "https://pr14-acme.preview.quiver.dk")),
+    { linked: false },
+    "a title quoting the address doesn't count",
+  )
+  const elsewhere = await docs(undefined, "https://evil.com")
+  assert.equal(elsewhere.status, 404)
+  assert.equal(elsewhere.headers.get("access-control-allow-origin"), null)
+  const preflight = await answer(
+    relatedPreflight,
+    request("/api/review/related", { method: "OPTIONS", headers: { origin: SITE } }),
+  )
+  assert.equal(preflight.status, 204)
+  assert.match(preflight.headers.get("access-control-allow-headers"), /authorization/)
+
+  // Connected: Ada's own doc, and a public link only once she has opened it, as Shared with me lists it.
+  state.who = ada
+  const bearer = (await token()).body.token
+  const titles = async () => (await json(await docs(bearer))).groups.map((item) => item.title)
+  assert.deepEqual(await titles(), ["Ada's notes"])
+  sql.prepare("INSERT INTO drop_visits (user_id, drop_id, at) VALUES ('ada', 'evidence', 1)").run()
+  const found = await json(await docs(bearer))
+  assert.deepEqual(
+    found.groups.map((item) => item.title),
+    ["Before/after: pricing", "Ada's notes"],
+  )
+  assert.deepEqual(
+    found.groups[0].links.map(({ url, label, detail }) => ({ url, label, detail })),
+    [
+      { url: "https://github.com/acme/app/pull/12", label: "PR #12", detail: "github.com" },
+      { url: "https://linear.app/acme/issue/ACM-7", label: "linear.app", detail: "" },
+    ],
+    "the preview it's on and Drop's own links stay out",
+  )
+  assert.deepEqual(found.groups[0].links[0].icons, ["https://github.com/favicon.ico"])
+  assert.doesNotMatch(JSON.stringify(found), /evidence|"mine"|drops\//, "no id, no link")
+
+  // Each doc opens from its handle, with Drop's session, for people who'd find it anyway.
+  const handle = found.groups[0].open
+  assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: "/drops/evidence" })
+  state.who = null
+  assert.equal((await answer(openPost, post("/api/review/open", { doc: handle }))).status, 401)
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('bob', 'Bob', 'bob@example.com')").run()
+  state.who = { ...ada, userId: "bob", name: "Bob", email: "bob@example.com" }
+  assert.equal(
+    (await answer(openPost, post("/api/review/open", { doc: handle }))).status,
+    404,
+    "Bob never got its link",
+  )
+  state.who = ada
+  assert.equal(
+    (await answer(openPost, post("/api/review/open", { doc: bearer }))).status,
+    404,
+    "a token isn't a handle",
+  )
+  assert.equal(
+    (await answer(openPost, post("/api/review/open", { token: handle }))).status,
+    404,
+    "nor a handle a token",
+  )
+
+  // On a team Drop, the team finds public links without opening them first; private ones stay their owner's.
+  state.mode = "team"
+  sql.prepare("DELETE FROM drop_visits").run()
+  assert.deepEqual(await titles(), ["Before/after: pricing", "Ada's notes"])
+  // Admins open every drop, but find no one's private ones here, as in Drop's search.
+  sql.prepare("UPDATE user SET email_verified = 1 WHERE id = 'ada'").run()
+  state.admins = "ada@example.com"
+  sql.prepare("UPDATE drops SET owner_id = 'owner' WHERE id = 'mine'").run()
+  assert.deepEqual(await titles(), ["Before/after: pricing"])
+  state.mode = "personal"
+  assert.deepEqual(await titles(), [])
+  sql.prepare("UPDATE drops SET owner_id = 'ada' WHERE id = 'mine'").run()
+  state.admins = ""
+
+  // Guests find none, and a session that ended gets the 401 the script reconnects on.
+  state.who = null
+  assert.deepEqual((await json(await docs((await token(SITE, { name: "Ole" })).body.token))).groups, [])
+  const ended = await docs("00:forged")
+  assert.equal(ended.status, 401)
+  assert.equal(ended.headers.get("access-control-allow-origin"), SITE)
+  // A members-only Drop lets the script's request through without a session, as it does its comments.
+  state.members = "ada@example.com"
+  assert.equal(await membersOnly(request("/api/review/related")), undefined)
+  await assert.rejects(Promise.resolve(membersOnly(request("/api/review/sites"))))
+  state.members = undefined
+})
+
+test("related drops go two links deep, never through a drop the person can't find, and show in Drop too", async () => {
+  site("site", { owner_id: "ada" })
+  const links = (...urls) => JSON.stringify(urls.map((url) => ({ url })))
+  const doc = (id, overrides) => insertDrop(id, { owner_id: "ada", visibility: "private", ...overrides })
+  const PR = "https://github.com/acme/app/pull/12"
+  const ISSUE = "https://github.com/acme/app/issues/3"
+  doc("evidence", { title: "Before/after", updated_at: 4, resources: links(`${SITE}/pricing`, PR) })
+  // One hop further: a plan that lists the same pull request, and its issue.
+  doc("plan", { title: "Plan", updated_at: 3, resources: links(PR, ISSUE) })
+  // Three hops from the site: only through the plan's issue.
+  doc("followup", { title: "Follow-up", updated_at: 2, resources: links(ISSUE) })
+  // Someone else's private doc links the site too, and to a pull request that one of Ada's docs lists.
+  doc("hidden", {
+    owner_id: "owner",
+    title: "Hidden",
+    resources: links(`${SITE}/`, "https://github.com/acme/app/pull/99"),
+  })
+  doc("behind", { title: "Behind", resources: links("https://github.com/acme/app/pull/99") })
+  state.who = ada
+  const bearer = (await token()).body.token
+  const onPage = await json(
+    await answer(
+      relatedGet,
+      request("/api/review/related", { headers: { origin: SITE, authorization: `Bearer ${bearer}` } }),
+    ),
+  )
+  // The doc that links here, then the plan through the pull request, with only its link not listed yet. The follow-up
+  // is a third hop, and the hidden doc leads nowhere.
+  assert.deepEqual(
+    onPage.groups.map((group) => [group.title, group.links.map((link) => link.url)]),
+    [
+      ["Before/after", [PR]],
+      ["Plan", [ISSUE]],
+    ],
+  )
+
+  // In Drop, the site review lists the same drops, opening in Drop.
+  const inDrop = async (id) =>
+    (await dropRelated(request(`/api/drops/${id}/related`, { id }))).map((group) => [
+      group.id,
+      group.kind,
+      group.links.map((link) => link.url),
+    ])
+  assert.deepEqual(await inDrop("site"), [
+    ["evidence", "markdown", [PR]],
+    ["plan", "markdown", [ISSUE]],
+  ])
+  // A doc lists the drops that share a page with it and the site review of its preview; its own links stay in its list.
+  assert.deepEqual(await inDrop("evidence"), [
+    ["plan", "markdown", [ISSUE]],
+    ["site", "site", []],
+    ["followup", "markdown", []],
+  ])
+  // A review of every preview starts from its pattern.
+  site("previews", { owner_id: "ada", site_url: PATTERN, updated_at: 5 })
+  assert.deepEqual(
+    (await inDrop("previews")).map(([id]) => id),
+    ["evidence", "plan"],
+  )
+  // Bob finds none of Ada's private drops, and a drop he can't open answers 404.
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('bob', 'Bob', 'bob@example.com')").run()
+  state.who = { ...ada, userId: "bob", name: "Bob", email: "bob@example.com" }
+  sql.prepare("UPDATE drops SET share = 'public' WHERE id = 'site'").run()
+  assert.deepEqual(await inDrop("site"), [])
+  assert.equal((await answer(dropRelated, request("/api/drops/plan/related", { id: "plan" }))).status, 404)
+})
+
+for (const [name, change] of [
+  ["made private", "share = 'private'"],
+  ["closed", "public_until = 1"],
+]) {
+  test(`a visited folder ${name} no longer discovers independently public children`, async () => {
+    site("site", { owner_id: "ada" })
+    insertDrop("folder", { kind: "folder", blob_key: null, share: "public" })
+    const child = (id, share = "public") =>
+      insertDrop(id, { parent_id: "folder", share, resources: JSON.stringify([{ url: `${SITE}/` }]) })
+    child("child")
+    child("inherited", "private")
+    sql.prepare("INSERT INTO drop_visits (user_id, drop_id, at) VALUES ('ada', 'folder', 1)").run()
+    state.who = ada
+    const bearer = (await token()).body.token
+    const onPage = async () =>
+      (
+        await json(
+          await answer(
+            relatedGet,
+            request("/api/review/related", {
+              headers: { origin: SITE, authorization: `Bearer ${bearer}` },
+            }),
+          ),
+        )
+      ).groups
+    const inDrop = async () => dropRelated(request("/api/drops/site/related"))
+    const titles = (groups) => groups.map((group) => group.title).sort()
+    const initial = await onPage()
+    assert.deepEqual(titles(initial), ["child", "inherited"])
+    assert.deepEqual(titles(await inDrop()), ["child", "inherited"])
+    const handle = initial.find((group) => group.title === "child").open
+    assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: "/drops/child" })
+
+    sql.prepare(`UPDATE drops SET ${change} WHERE id = 'folder'`).run()
+    child("new-child")
+    assert.deepEqual(await onPage(), [], "a historical folder visit cannot reveal a new public link")
+    assert.deepEqual(await inDrop(), [])
+    assert.equal((await answer(openPost, post("/api/review/open", { doc: handle }))).status, 404)
+
+    sql.prepare("INSERT INTO drop_visits (user_id, drop_id, at) VALUES ('ada', 'child', 1)").run()
+    assert.deepEqual(titles(await onPage()), ["child"], "an independently visited child still opens")
+    assert.deepEqual(titles(await inDrop()), ["child"])
+    assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: "/drops/child" })
+
+    sql.prepare("UPDATE drops SET share = 'public', public_until = NULL WHERE id = 'folder'").run()
+    assert.deepEqual(titles(await onPage()), ["child", "inherited", "new-child"])
+    assert.deepEqual(titles(await inDrop()), ["child", "inherited", "new-child"])
+  })
+}
+
+for (const source of ["document", "folder"]) {
+  for (const policy of ["approval disabled", "owner promoted"]) {
+    test(`visited ${source} stays related with ${policy} despite its stored review flag`, async () => {
+      state.shareApproval = true
+      site("site", { owner_id: "ada" })
+      const resources = JSON.stringify([{ url: `${SITE}/` }])
+      insertDrop("source", {
+        share: "public",
+        share_review: "pending",
+        ...(source === "folder" ? { kind: "folder", blob_key: null } : { resources }),
+      })
+      const docId = source === "folder" ? "child" : "source"
+      if (source === "folder") insertDrop("child", { parent_id: "source", share: "private", resources })
+      state.who = ada
+      const visit = () => answer(dropGet, request("/api/drops/source", { id: "source" }))
+      assert.equal((await visit()).status, 403, "the source initially requires approval")
+
+      if (policy === "approval disabled") state.shareApproval = false
+      else sql.prepare("UPDATE user SET role = 'admin' WHERE id = 'owner'").run()
+      assert.equal((await visit()).status, 200, "a normal signed-in visit records the now-effective public link")
+      assert.ok(sql.prepare("SELECT 1 FROM drop_visits WHERE user_id = 'ada' AND drop_id = 'source'").get())
+      assert.equal(sql.prepare("SELECT share_review FROM drops WHERE id = 'source'").get().share_review, "pending")
+
+      const bearer = (await token()).body.token
+      const onPage = async () =>
+        (
+          await json(
+            await answer(
+              relatedGet,
+              request("/api/review/related", {
+                headers: { origin: SITE, authorization: `Bearer ${bearer}` },
+              }),
+            ),
+          )
+        ).groups
+      const inDrop = () => dropRelated(request("/api/drops/site/related"))
+      const groups = await onPage()
+      assert.deepEqual(
+        groups.map((group) => group.title),
+        [docId],
+      )
+      assert.deepEqual(
+        (await inDrop()).map((group) => group.id),
+        [docId],
+      )
+      const handle = groups[0].open
+      assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: `/drops/${docId}` })
+
+      if (policy === "approval disabled") state.shareApproval = true
+      else sql.prepare("UPDATE user SET role = 'member' WHERE id = 'owner'").run()
+      assert.equal((await visit()).status, 403)
+      assert.deepEqual(await onPage(), [], "a prior visit does not bypass a current approval requirement")
+      assert.deepEqual(await inDrop(), [])
+      assert.equal((await answer(openPost, post("/api/review/open", { doc: handle }))).status, 404)
+    })
+  }
+}
+
+test("ineligible, already seen, and inexact candidates do not consume the related result budget", async () => {
+  const PR = "https://github.com/acme/app/pull/12"
+  const links = (...urls) => JSON.stringify(urls.map((url) => ({ url })))
+  insertDrop("seed", { owner_id: "ada", resources: links(`${SITE}/`), updated_at: 200 })
+  insertDrop("older-doc", { owner_id: "ada", updated_at: 3, resources: links(`${SITE}/`, PR) })
+  insertDrop("second-hop", { owner_id: "ada", updated_at: 2, resources: links(PR) })
+  site("older-site", { owner_id: "ada", updated_at: 1 })
+  for (let i = 0; i < 25; i++) {
+    insertDrop(`hidden-${i}`, { visibility: "private", updated_at: 100 + i, resources: links(`${SITE}/`) })
+    site(`hidden-site-${i}`, { visibility: "private", updated_at: 100 + i })
+    insertDrop(`quoted-${i}`, {
+      owner_id: "ada",
+      updated_at: 100 + i,
+      resources: JSON.stringify([{ url: "https://elsewhere.test/", title: `${SITE}/` }]),
+    })
+  }
+  state.who = ada
+  const result = await dropRelated(request("/api/drops/seed/related", { id: "seed" }))
+  assert.deepEqual(
+    result.map((group) => group.id),
+    ["older-doc", "older-site", "second-hop"],
+  )
+
+  // The cap still applies when more than one page of eligible drops matches.
+  for (let i = 0; i < 25; i++)
+    insertDrop(`mine-${i}`, { owner_id: "ada", updated_at: 300 + i, resources: links(`${SITE}/`) })
+  const capped = await dropRelated(request("/api/drops/seed/related", { id: "seed" }))
+  assert.equal(capped.length, 20)
+  assert.deepEqual(
+    capped.map((group) => group.id),
+    Array.from({ length: 20 }, (_, i) => `mine-${24 - i}`),
+  )
+})
+
+test("the related probe refills past inexact JSON matches before deciding no drop links here", async () => {
+  site()
+  for (let i = 0; i < 25; i++)
+    insertDrop(`quoted-${i}`, {
+      updated_at: 100 + i,
+      resources: JSON.stringify([{ url: "https://elsewhere.test/", title: `${SITE}/` }]),
+    })
+  const probe = () => answer(relatedGet, request("/api/review/related", { headers: { origin: SITE } }))
+  assert.deepEqual(await json(await probe()), { linked: false })
+  insertDrop("older-doc", { resources: JSON.stringify([{ url: `${SITE}/` }]) })
+  assert.deepEqual(await json(await probe()), { linked: true })
 })
 
 test("what the page sends is checked: the token, the image's bytes, and the fields", async () => {

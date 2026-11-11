@@ -26,6 +26,13 @@ export function slugify(text: string) {
   return (cut.includes("-") ? cut.slice(0, cut.lastIndexOf("-")) : cut.slice(0, MAX_SLUG)).replace(/-+$/, "")
 }
 
+/**
+ * The query keys a drop's page reads itself: a pinned version, an open thread, a diff, the present window, the version an
+ * old link pointed at, the editor, and an app page (`path`, or `file` from older links). Any other key in a path under an
+ * app's link is the app's own (`/d/<link>/<slug>/search?q=x`).
+ */
+export const DROP_PAGE_PARAMS = ["v", "comment", "changes", "present", "from", "edit", "path", "file"]
+
 /** The doc's page: its latest version, or `version` pinned. */
 export const dropPath = (drop: { link: string; slug: string }, version?: number) =>
   `/d/${drop.link}${drop.slug ? `/${drop.slug}` : ""}${version ? `?v=${version}` : ""}`

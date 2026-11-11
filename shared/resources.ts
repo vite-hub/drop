@@ -20,9 +20,15 @@ export function resourceUrl(url: string): string | null {
   return parsed.href
 }
 
-/** Its title, or the host it's on without `www.`. */
-export const resourceLabel = (resource: DropResource) =>
-  resource.title || new URL(resource.url).hostname.replace(/^www\./, "")
+const REFERENCE =
+  /^https:\/\/(?:www\.)?(?:github\.com|gitlab\.com)\/([\w.-]+\/[\w.-]+)\/(?:-\/)?(?:pull|issues|merge_requests)\/(\d+)\/?(?:[?#].*)?$/
+
+/** Its title, `owner/repo#123` for a pull request or issue, or the host it's on without `www.`. */
+export function resourceLabel(resource: DropResource) {
+  if (resource.title) return resource.title
+  const reference = REFERENCE.exec(resource.url)
+  return reference ? `${reference[1]}#${reference[2]}` : new URL(resource.url).hostname.replace(/^www\./, "")
+}
 
 /**
  * Where its site's icon may be: `/favicon.ico` on its host, then on each domain above it, down to two labels. A
@@ -69,9 +75,6 @@ export function linkSource(url: string) {
  */
 export const isPreviewLink = (resource: DropResource) =>
   resource.title?.trim().toLowerCase() === "preview" || new URL(resource.url).hostname.split(".").includes("preview")
-
-const REFERENCE =
-  /^https:\/\/(?:www\.)?(?:github\.com|gitlab\.com)\/([\w.-]+\/[\w.-]+)\/(?:-\/)?(?:pull|issues|merge_requests)\/(\d+)\/?(?:[?#].*)?$/
 
 /** A link's words in a doc's properties: its title, `owner/repo#123` for a pull request or issue, or its address. */
 export function linkText(resource: DropResource) {

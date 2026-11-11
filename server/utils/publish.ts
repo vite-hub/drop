@@ -3,11 +3,11 @@ import * as v from "valibot"
 import { AgentMetadataSchema } from "#shared/agent"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
-import { appLinkIssues } from "#shared/project-bundle"
+import { appLinkIssues, appPageLinks, MAX_LISTED_PAGES } from "#shared/project-bundle"
 import { reviewBookmarklet, reviewSnippet } from "#shared/review"
 import { SHARES } from "#shared/share"
 import { BoardInput } from "../mcp/board"
-import { dropLine, folderLife, mcpDrop, SHARE_INPUT } from "../mcp/format"
+import { dropLine, folderLife, mcpDrop, pagesSection, SHARE_INPUT } from "../mcp/format"
 import { applyChanges, boardChanges, emptyBoard, serializeBoard } from "#shared/board"
 import { resolveComments } from "./comments"
 import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary } from "./drops"
@@ -301,6 +301,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
 
   let row
   let warnings: string[] = []
+  let appPaths: string[] | undefined
   if (input.files || input.archive) {
     if (previous && previous.kind !== "app")
       throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
@@ -339,6 +340,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       event,
     )
     warnings = row.warnings
+    appPaths = row.paths
   } else {
     if (previous?.kind === "app")
       throw new HTTPError({ status: 400, message: "previous is an app; publish its next version with files." })
@@ -422,7 +424,13 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const fresh = (await findDrop(row.id, event)) ?? row
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
-  const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
+  const pages = appPaths ? appPageLinks(drop.url, appPaths) : []
+  const result = {
+    ...drop,
+    ...(pages.length ? { pages: pages.slice(0, MAX_LISTED_PAGES) } : {}),
+    ...(resolved.length ? { resolved } : {}),
+    ...(warnings.length ? { warnings } : {}),
+  }
   const lead =
     fresh.kind === "markdown"
       ? "It published with these Comark lint warnings."
@@ -431,7 +439,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
     : ""
   return {
-    text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}${check}`,
+    text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}${pages.length > 1 ? `\n\n${pagesSection(pages)}` : ""}${check}`,
     result,
   }
 }

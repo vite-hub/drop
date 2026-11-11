@@ -124,6 +124,14 @@ export interface DropResource {
   title?: string
 }
 
+/** A drop related to another through the pages they link to (server/utils/related.ts), with its links not listed yet. */
+export interface RelatedDrop {
+  id: string
+  title: string
+  kind: DropKind
+  links: DropResource[]
+}
+
 /** A file a doc embeds from this Drop (an image, usually). It belongs to the doc. */
 export interface DropAttachment {
   id: string

@@ -160,10 +160,14 @@ export const ReviewTokenSchema = v.object({
   name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
 })
 
-/** Opening the review in Drop from the site, by the review token the page holds. */
-export const ReviewOpenSchema = v.object({
-  token: v.pipe(v.string(), v.maxLength(2048)),
-})
+/**
+ * Opening the review in Drop from the site, by the review token the page holds, or a doc that links to the site, by the
+ * handle its "Drop document" menu got.
+ */
+export const ReviewOpenSchema = v.union([
+  v.object({ token: v.pipe(v.string(), v.maxLength(2048)) }),
+  v.object({ doc: v.pipe(v.string(), v.maxLength(2048)) }),
+])
 
 /** A site review created in the app: the address it covers (an origin or a `*.` pattern) and its name. */
 export const SiteSchema = v.object({

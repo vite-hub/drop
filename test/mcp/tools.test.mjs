@@ -1103,6 +1103,32 @@ test("publish into a folder says the folder's lifetime wins; update_drop on a fo
   )
 })
 
+test("an app in a folder reports both its inherited lifetime and links to its pages", async () => {
+  const folder = (await call(createFolder, { title: "Review", lifetime: "review" })).structuredContent
+  const published = await call(publish, {
+    files: { "index.html": "<p>Home</p>", "guide.html": "<p>Guide</p>" },
+    title: "Preview",
+    note: "Two pages",
+    folder: folder.id,
+    lifetime: "keep",
+    keepReason: "Reference",
+  })
+  const app = published.structuredContent
+  const pages = [
+    { page: "index.html", url: app.url },
+    { page: "guide.html", url: `${app.url}?path=%2Fguide` },
+  ]
+  assert.equal(app.lifetime, "review")
+  assert.deepEqual(app.pages, pages)
+  assert.match(published.content[0].text, /It lives as long as its folder, which is review, not keep\./)
+  const read = await call(readDrop, { id: app.id })
+  assert.deepEqual(read.structuredContent.pages, pages)
+  for (const response of [published, read]) {
+    assert.match(response.content[0].text, /## Pages\n/)
+    for (const { page, url } of pages) assert.ok(response.content[0].text.includes(`- ${page} ${url}`))
+  }
+})
+
 test("an agent links a drop to its pull request and preview; publishing again adds without doubling", async () => {
   const pr = "https://github.com/acme/portal/pull/42"
   const bad = await call(publish, {
