@@ -223,7 +223,11 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     assert.equal(await script.text(), "export default 1")
     assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8")
     assert.equal(script.headers.get("x-content-type-options"), "nosniff")
-    assert.equal(script.headers.get("cache-control"), "private, no-cache", "a name the next version may reuse")
+    assert.equal(
+      script.headers.get("cache-control"),
+      "private, max-age=0, must-revalidate",
+      "a name the next version may reuse",
+    )
     const etag = script.headers.get("etag")
     assert.equal((await load("/_nuxt/entry.js", { headers: { "if-none-match": etag } })).status, 304)
     const chunk = await load("/_nuxt/B0nDsZtt.js")

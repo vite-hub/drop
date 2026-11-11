@@ -143,8 +143,11 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
     // ViteHub streams the file from storage, or just the range a video asks for: Firefox resumes one mid-file and gives
     // up with a network error unless the answer starts where it asked, and Safari won't play one without ranges.
     const [error, body] = await blob.serve(event, blobKey, {
-      // Private: the grant decides who gets a file, so no shared cache may keep one.
-      cacheControl: isHashedAsset(file) ? "private, max-age=31536000, immutable" : "private, no-cache",
+      // Private: the grant decides who gets a file, so no shared cache may keep one. `max-age=0, must-revalidate` asks
+      // again each time like `no-cache`, but Firefox fails a `<link rel="prefetch">` of a `no-cache` answer.
+      cacheControl: isHashedAsset(file)
+        ? "private, max-age=31536000, immutable"
+        : "private, max-age=0, must-revalidate",
     })
     if (error?.code === "BLOB_NOT_FOUND") {
       if (!wasKept) return null
