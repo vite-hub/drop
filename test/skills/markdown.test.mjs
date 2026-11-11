@@ -211,3 +211,18 @@ test("::drop, from docs published before ::embed showed drops, still leaves the 
   assert.match(html, /<code>::drop<\/code> needs the link/)
   assert.doesNotMatch(html, /<iframe|unsupported-component/)
 })
+
+test("local HTTP Drop addresses use ::drop as the documented fallback for HTTPS-only ::embed", async () => {
+  const url = "http://localhost:3000/d/k7f2q9m4x8wd"
+  const embed = `::embed{url="${url}" height=420 title="Demo"}\n::`
+  assert.ok((await lintMarkdown(embed)).some(({ rule }) => rule === "comark/embed/insecure-url"))
+  const rejected = await renderMarkdownCached("local-embed.md", async () => embed)
+  assert.doesNotMatch(rejected.html, /data-drop-embed|<iframe/)
+
+  const fallback = `::drop{link="${url}" height=420 title="Demo"}\n::`
+  assert.deepEqual(await lintMarkdown(fallback), [])
+  const { html } = await renderMarkdownCached("local-drop.md", async () => fallback)
+  assert.match(html, /data-drop-embed="k7f2q9m4x8wd" data-title="Demo" style="--drop-embed-height: 420px"/)
+  assert.match(html, /<a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Demo<\/a>/)
+  assert.doesNotMatch(html, /<iframe|unsupported-component|render-error/)
+})
