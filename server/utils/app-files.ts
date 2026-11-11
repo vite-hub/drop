@@ -98,6 +98,50 @@ export function isHashedAsset(path: string): boolean {
     )
 }
 
+/**
+ * An app's files kept in the cache of the Cloudflare location the Worker runs in, by blob key. Each upload stores its
+ * files under keys of their own and never writes to one again, so a kept file is never stale; a file the store holds
+ * far from the Worker costs a few hundred milliseconds to read, and a page waits on dozens in a row. A file goes in
+ * after a grant check and comes out only after another. Runtimes without a Cache API, such as
+ * Node, read the store each time.
+ */
+const KEEP_MAX_BYTES = 25 * 1024 * 1024
+
+function fileCache() {
+  return "caches" in globalThis ? caches.open("drop-app-files") : undefined
+}
+
+function cacheKey(event: H3Event, blobKey: string, headers?: HeadersInit) {
+  return new Request(`${event.url.origin}/_drop-app-files/${encodeURIComponent(blobKey)}`, { headers })
+}
+
+/** The kept answer to this request, with its range and validators: the cache answers those itself. */
+async function keptFile(event: H3Event, blobKey: string): Promise<Response | undefined> {
+  if (event.req.method !== "GET") return
+  const cache = await fileCache()
+  if (!cache) return
+  const headers = new Headers()
+  for (const name of ["range", "if-none-match", "if-modified-since"]) {
+    const value = event.req.headers.get(name)
+    if (value) headers.set(name, value)
+  }
+  return cache.match(cacheKey(event, blobKey, headers)).catch(() => undefined)
+}
+
+/** The body for this response, keeping a copy of a whole file once it has been read. */
+function keepFile(event: H3Event, blobKey: string, status: number, body: ReadableStream | null | undefined) {
+  const size = Number(event.res.headers.get("Content-Length"))
+  const cache = event.req.method === "GET" && status === 200 && size <= KEEP_MAX_BYTES ? fileCache() : undefined
+  if (!cache || !body) return body
+  const [sent, copy] = body.tee()
+  const headers = new Headers(event.res.headers)
+  headers.set("Cache-Control", "public, max-age=31536000, immutable")
+  event.waitUntil(
+    (async () => (await cache).put(cacheKey(event, blobKey), new Response(copy, { headers })))().catch(() => {}),
+  )
+  return sent
+}
+
 /** The file this request on a content origin asks for, or null when it carries no valid grant for this origin's app. */
 export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Response | null> {
   const sealed = getCookie(event, "drop_grant")
@@ -122,13 +166,21 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
       return null
     }
     const blobKey = files.get(file)!
+    const type = contentTypeOf(file)
+    // Private: the grant decides who gets a file, so no shared cache may keep one.
+    const cacheControl = isHashedAsset(file) ? "private, max-age=31536000, immutable" : "private, no-cache"
+    const cached = await keptFile(event, blobKey)
+    if (cached) {
+      const headers = new Headers(cached.headers)
+      headers.set("Cache-Control", cacheControl)
+      headers.set("X-Robots-Tag", "noindex, nofollow")
+      if (cached.status !== 304) headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
+      return new Response(cached.body, { status: cached.status, headers })
+    }
     event.res.headers.set("X-Robots-Tag", "noindex, nofollow")
     // ViteHub streams the file from storage, or just the range a video asks for: Firefox resumes one mid-file and gives
     // up with a network error unless the answer starts where it asked, and Safari won't play one without ranges.
-    const [error, body] = await blob.serve(event, blobKey, {
-      // Private: the grant decides who gets a file, so no shared cache may keep one.
-      cacheControl: isHashedAsset(file) ? "private, max-age=31536000, immutable" : "private, no-cache",
-    })
+    const [error, body] = await blob.serve(event, blobKey, { cacheControl })
     if (error?.code === "BLOB_NOT_FOUND") {
       if (!wasKept) return null
       continue
@@ -141,10 +193,10 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
         headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5" },
       })
     }
-    const type = contentTypeOf(file)
     if (body) event.res.headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
-    return new Response(event.req.method === "HEAD" ? null : body, {
-      status: event.res.status || 200,
+    const status = event.res.status || 200
+    return new Response(event.req.method === "HEAD" ? null : keepFile(event, blobKey, status, body), {
+      status,
       headers: event.res.headers,
     })
   }

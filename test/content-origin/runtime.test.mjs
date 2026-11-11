@@ -295,6 +295,100 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
   }
 })
 
+/** A Cache API like Workers' for one test: keeps whole answers, and answers If-None-Match from them. */
+function edgeCache() {
+  const kept = new Map()
+  const puts = []
+  const cache = {
+    async match(request) {
+      const response = kept.get(request.url)
+      if (!response) return undefined
+      if (request.headers.get("range")) throw new Error("ranges aren't faked here")
+      const etag = response.headers.get("etag")
+      if (etag && request.headers.get("if-none-match") === etag)
+        return new Response(null, { status: 304, headers: { etag } })
+      return response.clone()
+    },
+    put(request, response) {
+      const put = (async () => {
+        const body = await response.arrayBuffer()
+        kept.set(request.url, new Response(body, { status: response.status, headers: response.headers }))
+      })()
+      puts.push(put)
+      return put
+    },
+  }
+  return { kept, settled: () => Promise.all(puts), caches: { open: async () => cache } }
+}
+
+test("an app's files are read from storage once per location, and each read from the cache checks the grant", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  const edge = edgeCache()
+  globalThis.caches = edge.caches
+  try {
+    insertDrop("cached-app", { kind: "app", filename: "cached-app/", blob_key: null })
+    for (const [path, body] of [
+      ["_nuxt/B0nDsZtt.js", "export default 3"],
+      ["_nuxt/entry.js", "export default 4"],
+    ]) {
+      objects.set(`apps/cached-app/u1/${path}`, { body: new Blob([body]), uploadedAt: new Date() })
+      sql
+        .prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, ?, ?, ?)")
+        .run("cached-app", path, `apps/cached-app/u1/${path}`, body.length)
+    }
+    const detailEvent = request("https://drop.example/api/drops/cached-app")
+    detailEvent.context.params = { id: "cached-app" }
+    const detail = await detailHandler(detailEvent)
+    const load = (path, { grant = detail.contentGrant, method = "GET", headers = {} } = {}) =>
+      contentMiddleware(
+        request(`${detail.contentOrigin}${path}`, {
+          method,
+          headers: { "sec-fetch-dest": "script", ...(grant ? { cookie: `drop_grant=${grant}` } : {}), ...headers },
+        }),
+      )
+
+    const reads = calls.serve
+    const first = await load("/_nuxt/B0nDsZtt.js")
+    assert.equal(await first.text(), "export default 3")
+    await edge.settled()
+    assert.equal(edge.kept.size, 1)
+    assert.equal(
+      [...edge.kept.values()][0].headers.get("cache-control"),
+      "public, max-age=31536000, immutable",
+      "the cache may keep it; the browser still gets a private answer",
+    )
+
+    const again = await load("/_nuxt/B0nDsZtt.js")
+    assert.equal(calls.serve, reads + 1, "the second load leaves storage alone")
+    assert.equal(again.status, 200)
+    assert.equal(await again.text(), "export default 3")
+    assert.equal(again.headers.get("cache-control"), "private, max-age=31536000, immutable")
+    assert.equal(again.headers.get("content-type"), "text/javascript; charset=utf-8")
+    assert.equal(again.headers.get("x-robots-tag"), "noindex, nofollow")
+    const etag = again.headers.get("etag")
+    assert.ok(etag)
+    assert.equal((await load("/_nuxt/B0nDsZtt.js", { headers: { "if-none-match": etag } })).status, 304)
+
+    // A name the next version may reuse is still kept: its blob key changes with every upload.
+    await (await load("/_nuxt/entry.js")).text()
+    await edge.settled()
+    const entry = await load("/_nuxt/entry.js")
+    assert.equal(await entry.text(), "export default 4")
+    assert.equal(entry.headers.get("cache-control"), "private, no-cache")
+    assert.equal(calls.serve, reads + 2)
+
+    assert.equal((await load("/_nuxt/B0nDsZtt.js", { grant: null })).status, 404, "kept, but no grant, no file")
+    assert.equal((await load("/_nuxt/B0nDsZtt.js", { grant: `${detail.contentGrant}x` })).status, 404)
+    await load("/_nuxt/B0nDsZtt.js", { method: "HEAD" })
+    await edge.settled()
+    assert.equal(edge.kept.size, 2, "HEAD keeps nothing")
+  } finally {
+    delete globalThis.caches
+    state.authSecret = undefined
+  }
+})
+
 /**
  * App `id`, with one file, and a load of that file on the app's own origin with the grant `state.who` got opening it.
  * Each test names its own app: an isolate keeps an app's files for each grant, across tests.
