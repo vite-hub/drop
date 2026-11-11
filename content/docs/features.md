@@ -128,7 +128,7 @@ More in [the Markdown reference](/.well-known/skills/vitehub-drop/references/mar
 
 ### Lifetimes and the Trash {#lifetime}
 
-Each drop says how long it lives: Temporary for 14 days after anyone last opened it, Review for 30, or Keep for good. A drop that expires goes to the Trash, where you can restore it for 15 days.
+Each drop says how long it lives: 14 days or 30 days after anyone last opened it, or Never delete. A drop that expires goes to the Trash, where you can restore it for 15 days.
 
 More in [Lifetime and Trash](/docs/review#expiry).
 

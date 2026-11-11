@@ -176,7 +176,7 @@ test("the Free plan keeps a few drops forever; new versions of a kept one don't 
   const first = await keep("One")
   assert.ok(!first.isError, first.message)
   assert.ok(!(await keep("Two")).isError)
-  assert.match((await keep("Three")).message, /Plan limit for drops kept forever: 2\/2/)
+  assert.match((await keep("Three")).message, /Plan limit for drops set to Never delete \(keep\): 2\/2/)
   const next = await call(publish, { markdown: "# One again", note: "v2", previous: first.id })
   assert.ok(!next.isError, next.message)
   assert.equal((await getUsage("owner")).kept.used, 2)

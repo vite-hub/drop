@@ -138,7 +138,7 @@ test("an expired drop is in the Trash: gone for its link, read-only for its owne
   assert.equal(detail.trashReason, "expired")
   assert.equal(permissions(await findDropByBlob("old.md"), who).edit, false)
   assert.equal(lastAccess("old"), visitedDaysAgo(31))
-  assert.match(expiryLabel(detail, now), /^In the Trash, deleting in 14 days$/)
+  assert.match(expiryLabel(detail, now), /^In the Trash\. Deleted for good in 14 days$/)
   const can = permissions(await findDropByBlob("old.md"), { ...who, userId: "someone", role: "member" })
   assert.equal(can.view, false)
   assert.deepEqual(
