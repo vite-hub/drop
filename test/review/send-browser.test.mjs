@@ -13,11 +13,11 @@ const html = `<!doctype html><html><body style="margin:0;padding:40px;font:16px 
 
 // A screenshot that takes as long as the test says: it finishes when the page calls window.finishShot().
 const SLOW_SCREENSHOT = `export async function createContext() { return {}; }
-export async function domToBlob() {
+export async function domToCanvas() {
   await new Promise((resolve) => { window.finishShot = resolve; });
   const canvas = document.createElement("canvas");
   canvas.width = 10; canvas.height = 10;
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return canvas;
 }`
 
 const CORS = {
