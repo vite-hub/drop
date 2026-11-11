@@ -82,20 +82,82 @@ async function lookUpAppFiles(event: H3Event, grant: v.InferOutput<typeof Grant>
  * Build tools name what they emit after its content (`entry.2pJuYtgD.css`, `index-BdJJ9uks.js`, `B0nDsZtt.js`), so a
  * file with such a name never changes, and the browser keeps it. Any other file may change with the next version,
  * which the app's origin serves at the same address, so the browser asks again each time.
+ *
+ * Rollup and Vite hash with 8 base64url characters, which may include a dash (`lXm2UH6-`). Names without digits
+ * are ambiguous, even inside build-output folders (`assets/darkMode.js` may come from Vite's public directory), so
+ * they revalidate. A hash missed here still uses the edge cache; a typed name kept for a year would hide updates.
  */
 export function isHashedAsset(path: string): boolean {
-  const name = path.slice(path.lastIndexOf("/") + 1)
-  return name
+  const slash = path.lastIndexOf("/")
+  const parts = path
+    .slice(slash + 1)
     .split(".")
     .slice(0, -1)
-    .flatMap((part) => part.split("-"))
-    .some(
-      (token) =>
-        token.length >= 8 &&
-        /^\w+$/.test(token) &&
-        /\d/.test(token) &&
-        (/^[\da-f]+$/.test(token) ? /[a-f]/.test(token) : /[a-z]/.test(token) && /[A-Z]/.test(token)),
-    )
+  return (
+    parts
+      .flatMap((part) => part.split("-"))
+      .some(
+        (token) =>
+          token.length >= 8 &&
+          /^\w+$/.test(token) &&
+          /\d/.test(token) &&
+          (/^[\da-f]+$/.test(token) ? /[a-f]/.test(token) : /[a-z]/.test(token) && /[A-Z]/.test(token)),
+      ) ||
+    (BUILD_FOLDER.test(path.slice(0, slash + 1)) &&
+      parts.some((part) => {
+        const hash = /(?:^|[-.])([\w-]{8})$/.exec(part)?.[1]
+        return !!hash && /\d/.test(hash) && /[a-z]/.test(hash) && /[A-Z]/.test(hash)
+      }))
+  )
+}
+
+/** Folders where build tools put the files they name after their content: Nuxt, Vite, Astro, SvelteKit, Next. */
+const BUILD_FOLDER = /(?:^|\/)(?:_nuxt|assets|_astro|immutable|_next\/static)\/(?:.*\/)?$/
+
+/**
+ * An app's files kept in the cache of the Cloudflare location the Worker runs in, by blob key. Each upload stores its
+ * files under keys of their own and never writes to one again, so a kept file is never stale; a file the store holds
+ * far from the Worker costs a few hundred milliseconds to read, and a page waits on dozens in a row. A file goes in
+ * after a grant check and comes out only after another. Other runtimes read the store each time: a standard Cache
+ * API, such as Deno's, does not evaluate the ranges and validators that Cloudflare's does.
+ */
+const KEEP_MAX_BYTES = 25 * 1024 * 1024
+
+function fileCache() {
+  // `default` is Cloudflare's extension to CacheStorage; the presence of `caches` alone also admits Deno.
+  return "caches" in globalThis && "default" in caches ? caches.open("drop-app-files") : undefined
+}
+
+function cacheKey(event: H3Event, blobKey: string, headers?: HeadersInit) {
+  return new Request(`${event.url.origin}/_drop-app-files/${encodeURIComponent(blobKey)}`, { headers })
+}
+
+/** The kept answer to this request, with its range and validators: the cache answers those itself. */
+async function keptFile(event: H3Event, blobKey: string): Promise<Response | undefined> {
+  // Cloudflare handles Range but not If-Range. Let storage evaluate that guard before selecting bytes.
+  if (event.req.method !== "GET" || event.req.headers.has("if-range")) return
+  const cache = await fileCache()
+  if (!cache) return
+  const headers = new Headers()
+  for (const name of ["range", "if-none-match", "if-modified-since"]) {
+    const value = event.req.headers.get(name)
+    if (value) headers.set(name, value)
+  }
+  return cache.match(cacheKey(event, blobKey, headers)).catch(() => undefined)
+}
+
+/** The body for this response, keeping a copy of a whole file once it has been read. */
+function keepFile(event: H3Event, blobKey: string, status: number, body: ReadableStream | null | undefined) {
+  const size = Number(event.res.headers.get("Content-Length"))
+  const cache = event.req.method === "GET" && status === 200 && size <= KEEP_MAX_BYTES ? fileCache() : undefined
+  if (!cache || !body) return body
+  const [sent, copy] = body.tee()
+  const headers = new Headers(event.res.headers)
+  headers.set("Cache-Control", "public, max-age=31536000, immutable")
+  event.waitUntil(
+    (async () => (await cache).put(cacheKey(event, blobKey), new Response(copy, { headers })))().catch(() => {}),
+  )
+  return sent
 }
 
 /** The file this request on a content origin asks for, or null when it carries no valid grant for this origin's app. */
@@ -122,13 +184,24 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
       return null
     }
     const blobKey = files.get(file)!
+    const type = contentTypeOf(file)
+    // Private: the grant decides who gets a file, so no shared cache may keep one. `max-age=0, must-revalidate` asks
+    // again each time like `no-cache`, but Firefox fails a `<link rel="prefetch">` of a `no-cache` answer.
+    const cacheControl = isHashedAsset(file)
+      ? "private, max-age=31536000, immutable"
+      : "private, max-age=0, must-revalidate"
+    const cached = await keptFile(event, blobKey)
+    if (cached) {
+      const headers = new Headers(cached.headers)
+      headers.set("Cache-Control", cacheControl)
+      headers.set("X-Robots-Tag", "noindex, nofollow")
+      if (cached.status !== 304) headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
+      return new Response(cached.body, { status: cached.status, headers })
+    }
     event.res.headers.set("X-Robots-Tag", "noindex, nofollow")
     // ViteHub streams the file from storage, or just the range a video asks for: Firefox resumes one mid-file and gives
     // up with a network error unless the answer starts where it asked, and Safari won't play one without ranges.
-    const [error, body] = await blob.serve(event, blobKey, {
-      // Private: the grant decides who gets a file, so no shared cache may keep one.
-      cacheControl: isHashedAsset(file) ? "private, max-age=31536000, immutable" : "private, no-cache",
-    })
+    const [error, body] = await blob.serve(event, blobKey, { cacheControl })
     if (error?.code === "BLOB_NOT_FOUND") {
       if (!wasKept) return null
       continue
@@ -141,10 +214,10 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
         headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5" },
       })
     }
-    const type = contentTypeOf(file)
     if (body) event.res.headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
-    return new Response(event.req.method === "HEAD" ? null : body, {
-      status: event.res.status || 200,
+    const status = event.res.status || 200
+    return new Response(event.req.method === "HEAD" ? null : keepFile(event, blobKey, status, body), {
+      status,
       headers: event.res.headers,
     })
   }
