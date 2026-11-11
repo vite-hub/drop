@@ -656,6 +656,11 @@ const headerLinks = computed(() => {
   return drop.value.kind === "markdown" ? links.filter(isPreviewLink) : links
 })
 
+// Drops are related through the pages they link to, so only a drop with links, or a site, can have related drops.
+const relatesTo = computed(() =>
+  drop.value.kind === "site" || drop.value.resources?.length ? drop.value.id : undefined,
+)
+
 // The segment's chip: the size (a folder's item count) and, for its owner, the views.
 const detailsMeta = computed(() => {
   const d = drop.value
@@ -1100,7 +1105,7 @@ watch(
         </template>
         <template #trailing>
           <!-- A Markdown doc shows its other links in its properties, at the top of the doc. -->
-          <ViewerResources v-if="headerLinks.length" :resources="headerLinks" />
+          <ViewerResources :related-to="relatesTo" :resources="headerLinks" />
         </template>
       </UDashboardNavbar>
     </template>

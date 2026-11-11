@@ -150,45 +150,74 @@ test("the toolbar's Copy link opens Drop's copy page with the token, so the site
   }
 })
 
+async function serveOpenPage(context) {
+  await context.route(DROP + "/**", (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === "/vue.js" || path === "/copy-page.js")
+      return route.fulfill({ contentType: "text/javascript", body: path === "/vue.js" ? vue : copyPage })
+    if (path === "/api/review/open") {
+      const { token, doc } = route.request().postDataJSON()
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(
+          doc ? { to: "/drops/document" } : { to: "/drops/" + token, link: DROP + "/d/" + token + "/review" },
+        ),
+      })
+    }
+    if (path !== "/review/open") return route.fallback()
+    return route.fulfill({
+      contentType: "text/html",
+      body: `<div id="app"></div><script type="importmap">{"imports":{"vue":"/vue.js"}}</script>
+        <script type="module">
+          import * as Vue from "vue"
+          import CopyPage from "/copy-page.js"
+          Object.assign(window, Vue)
+          window.useSeoMeta = () => {}
+          window.useRoute = () => ({ query: Object.fromEntries(new URLSearchParams(location.search)), get hash() { return decodeURIComponent(location.hash) } })
+          window.useMe = async () => ({ data: Vue.ref({ name: "Ada" }) })
+          window.useMounted = () => { const ready = Vue.ref(false); Vue.onMounted(() => ready.value = true); return ready }
+          window.openReview = body => fetch("/api/review/open", { method: "POST", body: JSON.stringify(body) }).then(r => r.json())
+          window.navigateTo = to => location.replace(to)
+          window.errorText = error => error.message
+          const app = Vue.createApp({ render: () => Vue.h(Vue.Suspense, null, { default: () => Vue.h(CopyPage) }) })
+          app.component("UButton", {
+            props: ["label"],
+            setup: (props, { attrs }) => () => Vue.h("button", attrs, props.label),
+          })
+          app.mount("#app")
+        </script>`,
+    })
+  })
+}
+
+test("Open in Drop opens reviews by token and related documents by handle", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { context } = await open(browser)
+    await serveOpenPage(context)
+    for (const [hash, body, target] of [
+      ["#t", { token: "t" }, "/drops/t"],
+      ["#doc=" + encodeURIComponent("sealed/handle+="), { doc: "sealed/handle+=" }, "/drops/document"],
+    ]) {
+      const popup = await context.newPage()
+      const request = popup.waitForRequest(DROP + "/api/review/open")
+      await popup.goto(DROP + "/review/open" + hash)
+      assert.deepEqual((await request).postDataJSON(), body)
+      await popup.waitForURL(DROP + target)
+      await popup.close()
+    }
+    await context.close()
+  } finally {
+    await browser.close()
+  }
+})
+
 test("Copy link copies the requested review while an earlier fallback window stays open", async () => {
   const browser = await chromium.launch()
   try {
     const { context, page, pill } = await open(browser)
     await context.grantPermissions([], { origin: DROP })
-    await context.route(DROP + "/**", (route) => {
-      const path = new URL(route.request().url()).pathname
-      if (path === "/vue.js" || path === "/copy-page.js")
-        return route.fulfill({ contentType: "text/javascript", body: path === "/vue.js" ? vue : copyPage })
-      if (path === "/api/review/open") {
-        const { token } = route.request().postDataJSON()
-        return route.fulfill({
-          contentType: "application/json",
-          body: JSON.stringify({ to: "/drops/" + token, link: DROP + "/d/" + token + "/review" }),
-        })
-      }
-      if (path !== "/review/open") return route.fallback()
-      return route.fulfill({
-        contentType: "text/html",
-        body: `<div id="app"></div><script type="importmap">{"imports":{"vue":"/vue.js"}}</script>
-          <script type="module">
-            import * as Vue from "vue"
-            import CopyPage from "/copy-page.js"
-            Object.assign(window, Vue)
-            window.useSeoMeta = () => {}
-            window.useRoute = () => ({ query: { copy: "" }, get hash() { return decodeURIComponent(location.hash) } })
-            window.useMe = async () => ({ data: Vue.ref({ name: "Ada" }) })
-            window.useMounted = () => { const ready = Vue.ref(false); Vue.onMounted(() => ready.value = true); return ready }
-            window.openReview = token => fetch("/api/review/open", { method: "POST", body: JSON.stringify({ token }) }).then(r => r.json())
-            window.errorText = error => error.message
-            const app = Vue.createApp({ render: () => Vue.h(Vue.Suspense, null, { default: () => Vue.h(CopyPage) }) })
-            app.component("UButton", {
-              props: ["label"],
-              setup: (props, { attrs }) => () => Vue.h("button", attrs, props.label),
-            })
-            app.mount("#app")
-          </script>`,
-      })
-    })
+    await serveOpenPage(context)
     const [first] = await Promise.all([
       context.waitForEvent("page"),
       pill.getByRole("button", { name: "Copy the review's link" }).click(),
