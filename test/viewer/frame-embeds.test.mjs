@@ -61,7 +61,12 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
     useViewerFrame({
       drop,
       frame: ref(null),
-      app: { files: ref({ "index.html": PRIVATE_HTML }), pages: ref(["index.html"]), page: ref("index.html") },
+      app: {
+        files: ref({ "index.html": PRIVATE_HTML }),
+        pages: ref(["index.html"]),
+        page: ref("index.html"),
+        location: ref("/"),
+      },
       pinned: ref([]),
       inset: ref(0),
       bottom: ref(0),

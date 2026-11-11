@@ -16,10 +16,13 @@ const emit = defineEmits<{ close: [] }>()
 useHead({ htmlAttrs: { "data-vitehub-pill": "mark" } })
 const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
+const toolbar = useTemplateRef<HTMLElement>("toolbar")
+// Its top follows wrapped touch controls and the dock's safe-area offset, without counting an open comments panel.
+const { top } = useElementBounding(toolbar)
 function focusTrigger() {
   root.value?.querySelector<HTMLButtonElement>("[data-review-trigger]")?.focus({ preventScroll: true })
 }
-defineExpose({ focusTrigger })
+defineExpose({ focusTrigger, top })
 // A press on the bar leaves focus in the drop's frame. The page there would hear it go and close what it has open, such
 // as the tooltip someone is about to comment on. Keys and the composer still move focus.
 function keepFrameFocus(event: MouseEvent) {
@@ -85,6 +88,7 @@ watch(
         </section>
       </Transition>
       <div
+        ref="toolbar"
         role="group"
         aria-label="Document tools"
         @mousedown="keepFrameFocus"

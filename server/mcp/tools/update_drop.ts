@@ -12,13 +12,14 @@ import { type DropChange, updateDrop } from "../../utils/drop-update"
 import { requireIdentity } from "../../utils/identity"
 import { isAttachment } from "../../utils/nodes"
 import { resourceList, ResourcesInput, saveResources } from "../../utils/resources"
+import { MAX_RESOURCE_URL } from "#shared/resources"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../format"
 
 export default defineMcpTool({
   name: "update_drop",
   title: "Update a drop",
   description:
-    "Change who can open a drop, its title, its link's slug, a folder's description, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; replace the links it shows at the top; resolve a site's review comments once you've fixed them on the site (reply with resolve does it while saying what changed). A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
+    "Change who can open a drop, its title, its link's slug, a folder's description, a link item's address or note, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; replace the links it shows at the top; resolve a site's review comments once you've fixed them on the site (reply with resolve does it while saying what changed). A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
   annotations: { idempotentHint: true },
   inputSchema: toStandardJsonSchema(
     v.object({
@@ -73,8 +74,15 @@ export default defineMcpTool({
           v.string(),
           v.maxLength(2000),
           v.description(
-            "Folders the user owns: what goes in it and how (naming, format), which agents read with list_folders to pick it. Empty clears it.",
+            "Folders the user owns: what goes in it and how (naming, format), which agents read with list_folders to pick it. Links: the note on what the page is. Empty clears it.",
           ),
+        ),
+      ),
+      url: v.optional(
+        v.pipe(
+          v.string(),
+          v.maxLength(MAX_RESOURCE_URL),
+          v.description("Links only: the page it opens, https or http on localhost. Its title stays as it is."),
         ),
       ),
       resources: v.optional(

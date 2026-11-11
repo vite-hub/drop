@@ -1,4 +1,5 @@
-import { expiryLabel } from "#shared/expiry"
+import { expiryLabel, type Lifetime } from "#shared/expiry"
+import { MAX_LISTED_PAGES } from "#shared/project-bundle"
 import { suggestionLine } from "#shared/suggestion"
 import type { DropComment, DropResource, DropSummary, QuizAnswer, ViewerKind } from "#shared/types"
 import type { QuizTally, StoredAnswer } from "../utils/answers"
@@ -24,6 +25,8 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     // A doc found by its text: the words around the match.
     ...(drop.snippet ? { match: drop.snippet } : {}),
     ...(drop.items !== undefined ? { items: drop.items } : {}),
+    // A link item: the page it opens.
+    ...(drop.href ? { href: drop.href } : {}),
     share: drop.share,
     ...(drop.publicUntil ? { publicUntil: new Date(drop.publicUntil).toISOString() } : {}),
     ...(drop.teamFolder ? { teamFolder: true } : {}),
@@ -40,6 +43,15 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
 }
 
 type McpDrop = ReturnType<typeof mcpDrop>
+
+/**
+ * A drop in a folder lives as long as the folder, so a `lifetime` passed with it isn't the one it got. Said out loud, or
+ * an agent that asked to keep a drop reads "review" and thinks the call went wrong.
+ */
+export function folderLife(drop: Pick<McpDrop, "lifetime">, asked: Lifetime | undefined) {
+  if (!asked || asked === drop.lifetime) return ""
+  return `\nIt lives as long as its folder, which is ${drop.lifetime}, not ${asked}. To change that, pass lifetime to update_drop on the top-most folder.`
+}
 
 /** A drop's views for its owner's agents, split the way Details shows them. */
 export const mcpViews = (views: Record<ViewerKind, number>) => ({
@@ -58,7 +70,7 @@ export const viewsLine = (views: ReturnType<typeof mcpViews>) =>
 
 /** One line per drop for clients that only read text. */
 export const dropLine = (drop: McpDrop) =>
-  `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : `${drop.kind} v${drop.version}`}${drop.teamFolder ? ", the team's" : ""}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.publicUntil ? ` until ${drop.publicUntil.slice(0, 10)}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
+  `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : drop.href ? `link to ${drop.href}` : `${drop.kind} v${drop.version}`}${drop.teamFolder ? ", the team's" : ""}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.publicUntil ? ` until ${drop.publicUntil.slice(0, 10)}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
 
 const pct = (n: number) => `${Math.round(n / 10)}%`
 
@@ -163,3 +175,13 @@ export const answersLines = (answers: McpAnswer[]) =>
       return `- ${id} (${kind}${people === undefined ? "" : `, ${people} ${people === 1 ? "person" : "people"}`})${tally}${user}`
     })
     .join("\n")}`
+
+/** An app's pages with their links, so an agent can send the one a reviewer should open. */
+export function pagesSection(pages: { page: string; url: string }[]) {
+  const shown = pages.slice(0, MAX_LISTED_PAGES)
+  return [
+    "## Pages\nEach link opens the app at that page. Any other address in the app opens the same way: ?path=/some/page, with an #anchor at the end of the link.",
+    ...shown.map(({ page, url }) => `- ${page} ${url}`),
+    ...(pages.length > shown.length ? [`And ${pages.length - shown.length} more.`] : []),
+  ].join("\n")
+}

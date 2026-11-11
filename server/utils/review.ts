@@ -54,6 +54,7 @@ import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
 import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
+import { findableBy } from "./related"
 
 /**
  * Site review. A site drop names a website by its origin, or by a pattern that covers every preview deploy (`siteUrl`,
@@ -91,7 +92,7 @@ async function sealKey(event: H3Event) {
 }
 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
-type SealPurpose = "token" | "choice" | "upload" | "app-files"
+type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files"
 
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
@@ -220,7 +221,7 @@ export const mayResolveSite = (site: DropRow, who: Identity | null, wrote: boole
   wrote || permissions(site, who).manage || (who !== null && permissions(site, who).comment)
 
 /** Whether any site drop covers `origin`. That much is all a page learns before it has a token. */
-async function covered(origin: string) {
+export async function covered(origin: string) {
   const where = sitesCovering(origin)
   return Boolean(where && (await db.select({ id: drops.id }).from(drops).where(where).limit(1)).length)
 }
@@ -232,6 +233,20 @@ async function covered(origin: string) {
 export function openable(site: DropRow, who: Identity | null) {
   const grants = (site.grants ?? [{ share: site.share }]).filter((grant) => !isPublic(grant.share))
   return permissions({ ...site, grants }, who).view
+}
+
+/** What a doc's handle says: which drop, until when. Sealed, so the page shows the doc without learning its link. */
+const DocHandle = v.object({ d: v.string(), e: v.number() })
+
+/** The handle the review script opens a doc by, good as long as the review token it came with. */
+export const sealDoc = (event: H3Event, doc: Pick<DropRow, "id">, until: number) =>
+  seal(event, "doc", { d: doc.id, e: until } satisfies v.InferOutput<typeof DocHandle>)
+
+/** The doc behind a handle, when `who` would find it in Drop anyway. Null for anything else. */
+export async function openDoc(event: H3Event, handle: string, who: Identity, now = Date.now()) {
+  const claims = await unseal(event, "doc", DocHandle, handle)
+  const doc = claims && claims.e > now ? await findDrop(claims.d, event) : null
+  return doc && (await findableBy(who, [doc], event)).length ? doc : null
 }
 
 /**

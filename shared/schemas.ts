@@ -25,8 +25,10 @@ export const NewDocSchema = v.object({
 export const DropPatchSchema = v.object({
   /** Who can open it, as one state (#shared/share). */
   share: v.optional(v.picklist(SHARES)),
-  /** Folders: what goes in them and how, which agents read to pick the folder. Empty clears it. */
+  /** Folders: what goes in them and how, which agents read to pick the folder. Links: what the page is. Empty clears it. */
   description: v.optional(v.pipe(v.string(), v.maxLength(2000, "Keep the description under 2,000 characters."))),
+  /** Links: the page it opens. */
+  url: v.optional(v.pipe(v.string(), v.maxLength(2000))),
   title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
   /** The readable part of the link, for every version. The link keeps working with the old one. */
   slug: v.optional(
@@ -158,10 +160,14 @@ export const ReviewTokenSchema = v.object({
   name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
 })
 
-/** Opening the review in Drop from the site, by the review token the page holds. */
-export const ReviewOpenSchema = v.object({
-  token: v.pipe(v.string(), v.maxLength(2048)),
-})
+/**
+ * Opening the review in Drop from the site, by the review token the page holds, or a doc that links to the site, by the
+ * handle its "Drop document" menu got.
+ */
+export const ReviewOpenSchema = v.union([
+  v.object({ token: v.pipe(v.string(), v.maxLength(2048)) }),
+  v.object({ doc: v.pipe(v.string(), v.maxLength(2048)) }),
+])
 
 /** A site review created in the app: the address it covers (an origin or a `*.` pattern) and its name. */
 export const SiteSchema = v.object({

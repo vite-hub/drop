@@ -1,6 +1,6 @@
 import type { H3Event, HTTPError } from "h3"
 import { escapeUTF8 as escapeHtml } from "entities"
-import { contentUnavailable, contentUnavailableIcon } from "../../shared/content-unavailable.ts"
+import { contentUnavailable, contentUnavailableIcon, missingInDrop } from "../../shared/content-unavailable.ts"
 import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
 import DROP_MARK from "../../shared/drop-mark.svg?raw"
@@ -15,6 +15,27 @@ async function signedIn(event: H3Event) {
   return identify(event)
 }
 
+/**
+ * The link of the drop a `/d/<link>/…` address names, when this person may open it, so its 404 is about the address
+ * and not about access. Null when they can't, so nothing tells them a drop is there.
+ */
+async function openableDrop(event: H3Event, path: string, identity: Awaited<ReturnType<typeof signedIn>>) {
+  const key = path.match(/^\/d\/([^/]+)/)?.[1]
+  if (!key) return null
+  try {
+    const [{ expiredLink, findDrop, permissions, waitingForReview }, { dropPath, slugify }] = await Promise.all([
+      import("../utils/drops"),
+      import("../../shared/links"),
+    ])
+    const drop = await findDrop(decodeURIComponent(key), event)
+    if (!drop || waitingForReview(drop, identity) || expiredLink(drop, identity) || !permissions(drop, identity).view)
+      return null
+    return dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
+  } catch {
+    return null
+  }
+}
+
 /** Raw file errors need trusted chrome too. Returning nothing keeps Nitro's normal API error handler. */
 export default async function contentError(error: HTTPError<{ shareReview?: string }>, event: H3Event) {
   const path = event.url.pathname
@@ -25,13 +46,16 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
   try {
     identity = await signedIn(event)
   } catch {}
-  const message = contentUnavailable(
-    status,
-    `${path}${event.url.search}`,
-    identity?.email,
-    error.data?.shareReview === "pending",
-    authProxy().enabled,
-  )
+  const drop = status === 404 ? await openableDrop(event, path, identity) : null
+  const message = drop
+    ? missingInDrop(drop, identity?.email)
+    : contentUnavailable(
+        status,
+        `${path}${event.url.search}`,
+        identity?.email,
+        error.data?.shareReview === "pending",
+        authProxy().enabled,
+      )
   // A pasted link to a drop a stranger can't open still unfurls as Drop's card (app.vue), not as this error.
   const card = path.startsWith("/d/")
     ? `<meta property="og:site_name" content="Drop"><meta property="og:title" content="Shared on Drop"><meta property="og:image" content="${escapeHtml(event.url.origin)}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">`
