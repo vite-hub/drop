@@ -31,6 +31,11 @@ overrides:
   "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@03e8d1b57b7edc7c03924971902d13948df72216
+  # `::embed`'s `height` and `player` (onmax/comark-ui#403), until a comark-ui release has them. Only Drop's own
+  # 0.10.1 moves: @vite-hub/content keeps its comark-ui 0.9.
+  "comark-comments@0.10.1": https://pkg.pr.new/onmax/comark-ui/comark-comments@dc8e796c45e4950d961e0155ee9ba8d24f738498
+  "comark-linter@0.10.1": https://pkg.pr.new/onmax/comark-ui/comark-linter@dc8e796c45e4950d961e0155ee9ba8d24f738498
+  "comark-ui@0.10.1": https://pkg.pr.new/onmax/comark-ui/comark-ui@dc8e796c45e4950d961e0155ee9ba8d24f738498
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.15
   "@better-auth/oauth-provider": 1.7.15
