@@ -91,6 +91,21 @@ The comment carries a screenshot of what you saw, sticky headers and fixed butto
 
 The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the page's Content Security Policy blocks it, or blocks <code>[:origin]</code> in `connect-src`, comments go without screenshots, or not at all. Allow both on preview builds.
 
+## Related links {#related}
+
+A doc can link to the site it covers, the way a pull request's before/after doc lists the pull request and its preview as its links (`resources` when an agent publishes it). On a page whose origin one of those links points to, the toolbar shows **Related links**. Press it for a menu with each such doc and its links, like the pull request. Links to the site itself and to Drop are left out.
+
+The menu goes two links deep. A plan doc that lists the same pull request as the before/after doc shows too, with its own links. Each link shows once.
+
+| Related | Because |
+|---|---|
+| A doc that links to this site | It lists the site as one of its links. |
+| A doc that links to one of those links | It shares a page with a doc above, like the pull request. |
+
+The first press connects you, as **Comment** does. The menu lists only docs you would find in Drop anyway: your own, ones shared with the team, and public links that are on a team Drop or that you have opened while signed in. A doc you can't see doesn't lead to others. A doc opens through Drop, with Drop's session, so the page never learns its link. With no doc linking to the site, the button stays hidden.
+
+In Drop, the same relations show under a drop's **Related links**: a site review lists the docs that link to its site, and a doc lists the other drops that link to its pages, with the site reviews of its previews.
+
 ## Read and resolve {#read}
 
 The site review lists every comment, newest first. Each screenshot opens with the box drawn on it, and people reply there. Screenshots share the site review's sharing, lifetime, and Trash, and count toward its owner's storage.
@@ -101,6 +116,6 @@ To hand the comments to an agent, press the link button in the review toolbar on
 
 - **The page never names the review.** The script has no key, and the Drop window lists only reviews you may comment on.
 - **The page never gets Drop's cookies.** The Drop window hands it a short-lived, sealed token for one review and that page's origin. The page can't read which review it's for.
-- **Open in Drop** and the toolbar's link button open or copy the review's link only for people who could open it anyway. The link stays in the Drop window and never reaches the page.
+- **Open in Drop** and the toolbar's link button open or copy the review's link only for people who could open it anyway. The link stays in the Drop window and never reaches the page. **Related links** opens a doc the same way, and before you connect the page only learns whether some doc links to it.
 - **Every comment is checked.** Drop answers cross-origin requests only from origins a review covers, and checks the token, the origin, and the sharing each time. Taking the share back ends every session at once.
 - **Input is limited.** Notes are plain text with length limits. Screenshots must be PNG, JPEG, or WebP, up to 4 MiB.

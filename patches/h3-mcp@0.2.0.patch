@@ -1,8 +1,45 @@
 diff --git a/dist/index.mjs b/dist/index.mjs
-index 7031e13e10e1b5cb18bb6852470b24b2dc3f22bd..93b2e5d17607ef83d4ce1313334cf9f2ab10f1a5 100644
+index 7031e13e10e1b5cb18bb6852470b24b2dc3f22bd..7d8f7afde333346651693cf976eb2c315b377466 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -386,6 +386,8 @@ function normalizeModernError(error) {
+@@ -161,12 +161,14 @@ async function checkAuth(event) {
+ 		message: "Unauthorized",
+ 		wwwAuthenticate: challenge
+ 	};
++	// Patched (drop): RFC 6750 §3.1 names a presented credential that was refused, as h3js/mcp@998d52a does.
++	const refused = _toWwwAuthenticate(options, "invalid_token");
+ 	const token = credentials.token.trim();
+ 	if (!_isValidToken(token)) return {
+ 		ok: false,
+ 		status: 401,
+ 		message: "Unauthorized",
+-		wwwAuthenticate: challenge
++		wwwAuthenticate: refused
+ 	};
+ 	if (options.tokens?.some((knownToken) => _constantTimeEqual(knownToken, token))) return { ok: true };
+ 	if (options.validate && await options.validate({
+@@ -177,7 +179,7 @@ async function checkAuth(event) {
+ 		ok: false,
+ 		status: 401,
+ 		message: "Unauthorized",
+-		wwwAuthenticate: challenge
++		wwwAuthenticate: refused
+ 	};
+ }
+ function _extractCredentials(event, options) {
+@@ -202,9 +204,9 @@ function _parseBearerToken(authorization) {
+ 	if (!match) return;
+ 	return match[1]?.trim() || void 0;
+ }
+-function _toWwwAuthenticate(options) {
++function _toWwwAuthenticate(options, error) {
+ 	const challenges = [];
+-	if (options.schemes.has("bearer")) challenges.push(options.resourceMetadataUrl ? `Bearer realm="mcp", resource_metadata="${options.resourceMetadataUrl}"` : "Bearer realm=\"mcp\"");
++	if (options.schemes.has("bearer")) challenges.push((options.resourceMetadataUrl ? `Bearer realm="mcp", resource_metadata="${options.resourceMetadataUrl}"` : "Bearer realm=\"mcp\"") + (error ? `, error="${error}"` : ""));
+ 	if (options.schemes.has("api-key")) challenges.push(`ApiKey realm="mcp", header="${options.header}"`);
+ 	return challenges.join(", ");
+ }
+@@ -386,6 +388,8 @@ function normalizeModernError(error) {
  			status: 500
  		};
  	}
@@ -11,7 +48,7 @@ index 7031e13e10e1b5cb18bb6852470b24b2dc3f22bd..93b2e5d17607ef83d4ce1313334cf9f2
  	return {
  		code: JSON_RPC_INTERNAL_ERROR,
  		message: "Internal error",
-@@ -2010,6 +2012,10 @@ function toServerInfoMeta(options) {
+@@ -2010,6 +2014,10 @@ function toServerInfoMeta(options) {
  		version: options.version
  	};
  	if (options.title !== void 0) info.title = options.title;
@@ -22,11 +59,89 @@ index 7031e13e10e1b5cb18bb6852470b24b2dc3f22bd..93b2e5d17607ef83d4ce1313334cf9f2
  	return info;
  }
  function _asObject(value) {
+diff --git a/dist/legacy/index.mjs b/dist/legacy/index.mjs
+index 0d676864357eb3942236425924002e3ba0ec466c..af2ccdb8a160c3784f9d0ce4e85b1450622a5247 100644
+--- a/dist/legacy/index.mjs
++++ b/dist/legacy/index.mjs
+@@ -161,12 +161,14 @@ async function checkAuth(event) {
+ 		message: "Unauthorized",
+ 		wwwAuthenticate: challenge
+ 	};
++	// Patched (drop): RFC 6750 §3.1 names a presented credential that was refused, as h3js/mcp@998d52a does.
++	const refused = _toWwwAuthenticate(options, "invalid_token");
+ 	const token = credentials.token.trim();
+ 	if (!_isValidToken(token)) return {
+ 		ok: false,
+ 		status: 401,
+ 		message: "Unauthorized",
+-		wwwAuthenticate: challenge
++		wwwAuthenticate: refused
+ 	};
+ 	if (options.tokens?.some((knownToken) => _constantTimeEqual(knownToken, token))) return { ok: true };
+ 	if (options.validate && await options.validate({
+@@ -177,7 +179,7 @@ async function checkAuth(event) {
+ 		ok: false,
+ 		status: 401,
+ 		message: "Unauthorized",
+-		wwwAuthenticate: challenge
++		wwwAuthenticate: refused
+ 	};
+ }
+ function _extractCredentials(event, options) {
+@@ -202,9 +204,9 @@ function _parseBearerToken(authorization) {
+ 	if (!match) return;
+ 	return match[1]?.trim() || void 0;
+ }
+-function _toWwwAuthenticate(options) {
++function _toWwwAuthenticate(options, error) {
+ 	const challenges = [];
+-	if (options.schemes.has("bearer")) challenges.push(options.resourceMetadataUrl ? `Bearer realm="mcp", resource_metadata="${options.resourceMetadataUrl}"` : "Bearer realm=\"mcp\"");
++	if (options.schemes.has("bearer")) challenges.push((options.resourceMetadataUrl ? `Bearer realm="mcp", resource_metadata="${options.resourceMetadataUrl}"` : "Bearer realm=\"mcp\"") + (error ? `, error="${error}"` : ""));
+ 	if (options.schemes.has("api-key")) challenges.push(`ApiKey realm="mcp", header="${options.header}"`);
+ 	return challenges.join(", ");
+ }
 diff --git a/dist/modern/index.mjs b/dist/modern/index.mjs
-index 1fa1fcde46c3ea00bfca517ec7872db4a258eace..09ae7f23ed790865bf258de470d7a19af91efa37 100644
+index 1fa1fcde46c3ea00bfca517ec7872db4a258eace..05b8e14d862149a448dbcb9da594b685c5ef81b1 100644
 --- a/dist/modern/index.mjs
 +++ b/dist/modern/index.mjs
-@@ -374,6 +374,8 @@ function normalizeModernError(error) {
+@@ -149,12 +149,14 @@ async function checkAuth(event) {
+ 		message: "Unauthorized",
+ 		wwwAuthenticate: challenge
+ 	};
++	// Patched (drop): RFC 6750 §3.1 names a presented credential that was refused, as h3js/mcp@998d52a does.
++	const refused = _toWwwAuthenticate(options, "invalid_token");
+ 	const token = credentials.token.trim();
+ 	if (!_isValidToken(token)) return {
+ 		ok: false,
+ 		status: 401,
+ 		message: "Unauthorized",
+-		wwwAuthenticate: challenge
++		wwwAuthenticate: refused
+ 	};
+ 	if (options.tokens?.some((knownToken) => _constantTimeEqual(knownToken, token))) return { ok: true };
+ 	if (options.validate && await options.validate({
+@@ -165,7 +167,7 @@ async function checkAuth(event) {
+ 		ok: false,
+ 		status: 401,
+ 		message: "Unauthorized",
+-		wwwAuthenticate: challenge
++		wwwAuthenticate: refused
+ 	};
+ }
+ function _extractCredentials(event, options) {
+@@ -190,9 +192,9 @@ function _parseBearerToken(authorization) {
+ 	if (!match) return;
+ 	return match[1]?.trim() || void 0;
+ }
+-function _toWwwAuthenticate(options) {
++function _toWwwAuthenticate(options, error) {
+ 	const challenges = [];
+-	if (options.schemes.has("bearer")) challenges.push(options.resourceMetadataUrl ? `Bearer realm="mcp", resource_metadata="${options.resourceMetadataUrl}"` : "Bearer realm=\"mcp\"");
++	if (options.schemes.has("bearer")) challenges.push((options.resourceMetadataUrl ? `Bearer realm="mcp", resource_metadata="${options.resourceMetadataUrl}"` : "Bearer realm=\"mcp\"") + (error ? `, error="${error}"` : ""));
+ 	if (options.schemes.has("api-key")) challenges.push(`ApiKey realm="mcp", header="${options.header}"`);
+ 	return challenges.join(", ");
+ }
+@@ -374,6 +376,8 @@ function normalizeModernError(error) {
  			status: 500
  		};
  	}
@@ -35,7 +150,7 @@ index 1fa1fcde46c3ea00bfca517ec7872db4a258eace..09ae7f23ed790865bf258de470d7a19a
  	return {
  		code: JSON_RPC_INTERNAL_ERROR,
  		message: "Internal error",
-@@ -1512,6 +1514,10 @@ function toServerInfoMeta(options) {
+@@ -1512,6 +1516,10 @@ function toServerInfoMeta(options) {
  		version: options.version
  	};
  	if (options.title !== void 0) info.title = options.title;

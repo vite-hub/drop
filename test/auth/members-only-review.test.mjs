@@ -22,6 +22,8 @@ afterEach(() => {
 // review.js on a site sends no Drop session, only its review token, which each route checks (server/utils/review.ts).
 test("a members-only Drop lets every review.js route through to its token check", async () => {
   for (const [method, path] of [
+    ["OPTIONS", "/api/review/related"],
+    ["GET", "/api/review/related"],
     ["OPTIONS", "/api/review/comments"],
     ["GET", "/api/review/comments"],
     ["POST", "/api/review/comments"],
@@ -42,6 +44,7 @@ test("the rest of /api/review still needs a member", async () => {
     ["POST", "/api/review/token"],
     ["POST", "/api/review/sites"],
     ["POST", "/api/review/open"],
+    ["GET", "/api/review/related/x"],
     ["GET", "/api/review/comments/1/replies/x"],
   ]) {
     const response = await request(path, method)

@@ -10,7 +10,8 @@ const { default: writesMiddleware } = await import("../../server/middleware/0.06
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
 const { isHashedAsset, serveAppFile } = await import("../../server/utils/app-files.ts")
 const { publishApp } = await import("../../server/utils/drops.ts")
-const { buildProjectDocument, pageAt, pageUrl } = await import("../../shared/project-bundle.ts")
+const { appLocation, appPageFor, buildProjectDocument, pageAt, pageUrl } =
+  await import("../../shared/project-bundle.ts")
 const { injectRuntime, OPAQUE_ORIGIN_SHIM, prependToHead } = await import("../../shared/plan-runtime.ts")
 
 migrate()
@@ -774,15 +775,16 @@ test("the frame host asks for its page on load, and again when the viewer says h
   runInNewContext(script, {
     parent,
     window: {},
-    location: { pathname: "/docs/" },
+    location: { pathname: "/docs/", search: "?tab=vue", hash: "#install" },
     addEventListener: (_type, handler) => (onMessage = handler),
     document: { body: {} },
   })
   onMessage({ source: parent, data: { __drop: true, type: "hello" } })
   onMessage({ source: {}, data: { __drop: true, type: "hello" } })
+  // The whole address, query and hash included, so a deep link's page opens as it was linked.
   assert.deepEqual(asked, [
-    { __drop: true, type: "host", path: "/docs/" },
-    { __drop: true, type: "host", path: "/docs/" },
+    { __drop: true, type: "host", path: "/docs/?tab=vue#install" },
+    { __drop: true, type: "host", path: "/docs/?tab=vue#install" },
   ])
 })
 
@@ -921,9 +923,49 @@ test("app pages map to the URLs a static host serves them at", () => {
     assert.equal(pageAt(pages, path), page, path)
   assert.equal(pageUrl("index.html"), "/")
   assert.equal(pageUrl("product/index.html"), "/product/")
-  assert.equal(pageUrl("about.html"), "/about.html")
+  // Clean URLs, as Cloudflare Pages, Netlify and Vercel serve them and a built site's router expects.
+  assert.equal(pageUrl("about.html"), "/about")
+  assert.equal(pageUrl("integrations/components.html"), "/integrations/components")
   assert.equal(pageUrl("docs/a b/index.html"), "/docs/a%20b/")
   for (const page of pages) assert.equal(pageAt(pages, decodeURI(pageUrl(page))), page)
+})
+
+test("an app address answers with its page, or the 404.html, 200.html or index.html a static host falls back to", () => {
+  const pages = ["index.html", "200.html", "404.html", "integrations/components.html", "docs/a b/index.html"]
+  assert.equal(appPageFor(pages, "/integrations/components?tab=vue#props"), "integrations/components.html")
+  assert.equal(appPageFor(pages, "/docs/a%20b/#top"), "docs/a b/index.html")
+  // A path without its slash or .html, as a deep link is typed, opens foo.html or foo/index.html.
+  assert.equal(appPageFor(pages, "/docs/a%20b"), "docs/a b/index.html")
+  assert.equal(appPageFor(pages, "/integrations/components/"), "404.html")
+  assert.equal(appPageFor(pages, "/missing"), "404.html")
+  assert.equal(appPageFor(["index.html", "200.html"], "/missing"), "200.html")
+  assert.equal(appPageFor(["index.html"], "/missing"), "index.html")
+})
+
+test("a drop link's ?path= is an address on the app's own origin, and nothing that leaves it", () => {
+  assert.equal(appLocation("/integrations/components"), "/integrations/components")
+  assert.equal(appLocation("integrations/components"), "/integrations/components")
+  assert.equal(appLocation("/search?q=a b#results"), "/search?q=a%20b#results")
+  // A hand-written link's hash comes after its query, outside ?path=.
+  assert.equal(appLocation("/guide", "#install"), "/guide#install")
+  assert.equal(appLocation("/guide#setup", "#install"), "/guide#setup")
+  assert.equal(appLocation("/guide", "#"), "/guide")
+  // The viewer puts it after the app's origin: it may never name another host there.
+  const origin = "https://abc-drop.vitehub.dev"
+  for (const away of [
+    "//evil.example/x",
+    "/\\evil.example",
+    "\\\\evil.example",
+    "https://evil.example/",
+    "@evil.example",
+    "/%2F%2Fevil.example",
+  ]) {
+    const at = appLocation(away)
+    if (at !== null) assert.equal(new URL(origin + at).origin, origin, away)
+  }
+  assert.equal(appLocation("//evil.example/x"), null)
+  assert.equal(appLocation(undefined), null)
+  assert.equal(appLocation(""), null)
 })
 
 test("Drop's scripts go first in the head without dropping the page out of standards mode", () => {

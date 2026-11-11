@@ -181,7 +181,8 @@ async function save() {
     <!-- The team's folders never expire, so there's nothing to choose. -->
     <section v-if="drop.teamFolder" aria-labelledby="details-lifetime" class="space-y-1 p-4 text-sm">
       <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
-      <p class="text-highlighted">Kept: the team's folders never expire</p>
+      <p class="text-highlighted">Never deleted</p>
+      <p class="text-xs text-pretty text-muted">Team folders stay until an admin deletes them.</p>
     </section>
     <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
     <section
@@ -190,7 +191,10 @@ async function save() {
       class="space-y-1 p-4 text-sm"
     >
       <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
-      <p class="text-highlighted tabular-nums">{{ expiryLabel(drop, now) }}, with {{ drop.ancestors[0]!.title }}</p>
+      <p class="text-highlighted tabular-nums">{{ expiryLabel(drop, now) }}</p>
+      <p class="text-xs text-pretty text-muted">
+        It lives as long as its folder, {{ drop.ancestors[0]!.title }}. Change that folder's lifetime instead.
+      </p>
     </section>
     <!-- A drop at the top chooses its own lifetime. -->
     <ViewerLifetime v-else-if="drop.isOwner && !drop.parentId" class="p-4" :drop="drop" />

@@ -301,8 +301,8 @@ if (import.meta.client && route.query.billing === "done") {
                 {{ runs ? "Update the card to get the Team plan back." : "Ask the team's owner to update its card." }}
               </template>
               <template v-else-if="team.paid"
-                >Billed per member. Everyone on the team gets the Pro plan: any number of drops, more storage, and drops
-                kept forever.</template
+                >Billed per member. Everyone on the team gets the Pro plan: any number of drops, more storage, and no
+                limit on drops set to Never delete.</template
               >
               <template v-else
                 >{{ seats }} of {{ billing.freeMembers }} free members, invitations included. The Team plan adds more

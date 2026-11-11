@@ -160,7 +160,7 @@ async function backToComments() {
   else commentsRef.value?.focusComposer()
 }
 const app = useAppFiles(drop)
-const { pages, page } = app
+const { pages, page, location: appAt } = app
 
 const live = useLiveEditor(drop, { publicView: publicView })
 const editing = live.editing
@@ -224,11 +224,11 @@ watch(
   () => overlays.pins,
   (pins) => (commentsShown.value = pins),
 )
-/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a video. */
+/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a link, a video. */
 const framed = computed(
   () =>
     !editing.value &&
-    !["folder", "site", "board"].includes(drop.value.kind) &&
+    !["folder", "site", "board", "link"].includes(drop.value.kind) &&
     !video.value &&
     !(drop.value.kind === "file" && !drop.value.html),
 )
@@ -486,26 +486,38 @@ const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker, whenHeld } =
-  useViewerFrame({
-    drop,
-    frame,
-    app,
-    pinned,
-    // The panel sits beside the frame, not over it: the doc has nothing to make room for.
-    inset: ref(0),
-    // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
-    bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
-    width: docWidth,
-    annotations,
-    clickComments: commentMode,
-    comments: computed(() => ({
-      style: pinStyle.value ? "pin" : "card",
-      me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
-    })),
-    variantBar: true,
-    arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
-  })
+const {
+  srcdoc,
+  contentOrigin,
+  frameSrc,
+  frameKey,
+  frameScheme,
+  ready,
+  send,
+  unplaced,
+  openPath,
+  variants,
+  picker,
+  whenHeld,
+} = useViewerFrame({
+  drop,
+  frame,
+  app,
+  pinned,
+  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+  inset: ref(0),
+  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
+  width: docWidth,
+  annotations,
+  clickComments: commentMode,
+  comments: computed(() => ({
+    style: pinStyle.value ? "pin" : "card",
+    me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
+  })),
+  variantBar: true,
+  arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
+})
 
 const outdated = computed(
   () =>
@@ -560,7 +572,7 @@ const presents = computed(() => isApp.value || drop.value.kind === "html")
 function openWindow() {
   const query = new URLSearchParams({ present: "" })
   if (older.value) query.set("v", String(drop.value.version))
-  if (isApp.value && page.value !== "index.html") query.set("file", page.value)
+  if (isApp.value && appAt.value !== "/") query.set("path", appAt.value)
   window.open(`${dropPath(drop.value)}?${query}`, "_blank", "popup")
 }
 // A Slidev build (its runtime under assets/slidev/) presents in one step: the deck alone in a new window for the
@@ -656,10 +668,20 @@ const headerLinks = computed(() => {
   return drop.value.kind === "markdown" ? links.filter(isPreviewLink) : links
 })
 
+// Drops are related through the pages they link to, so only a drop with links, or a site, can have related drops.
+const relatesTo = computed(() =>
+  drop.value.kind === "site" || drop.value.resources?.length ? drop.value.id : undefined,
+)
+
 // The segment's chip: the size (a folder's item count) and, for its owner, the views.
 const detailsMeta = computed(() => {
   const d = drop.value
-  const size = d.kind === "folder" ? itemCount(d.items ?? 0) : d.kind === "site" ? "Site" : formatBytes(d.size)
+  const size =
+    d.kind === "folder"
+      ? itemCount(d.items ?? 0)
+      : d.kind === "site" || d.kind === "link"
+        ? KIND_LABELS[d.kind]
+        : formatBytes(d.size)
   const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
   return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
 })
@@ -714,10 +736,13 @@ const copyMarkdown = (announce?: string) =>
   )
 const copyFeedback = () =>
   copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
-// A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies.
+// A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
+// opens the page showing (`?path=`).
 function copyLink(announce?: string) {
-  if (owner.value && drop.value.share === "private") shareOpen.value = true
-  else void copy(link.value, { key: "link", announce })
+  if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
+  const url = new URL(link.value)
+  if (isApp.value && appAt.value !== "/") url.searchParams.set("path", appAt.value)
+  void copy(url.href, { key: "link", announce })
 }
 const canMarkArea = computed(
   () =>
@@ -1097,7 +1122,7 @@ watch(
         </template>
         <template #trailing>
           <!-- A Markdown doc shows its other links in its properties, at the top of the doc. -->
-          <ViewerResources v-if="headerLinks.length" :resources="headerLinks" />
+          <ViewerResources :related-to="relatesTo" :resources="headerLinks" />
         </template>
       </UDashboardNavbar>
     </template>
@@ -1166,7 +1191,7 @@ watch(
           class="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated px-2.5 py-1 font-mono text-xs text-muted"
         >
           <UIcon :name="SHARE_ICONS[drop.share]" class="size-3 shrink-0" />
-          <span class="truncate">{{ drop.slug || drop.link }}/{{ page === "index.html" ? "" : page }}</span>
+          <span class="truncate">{{ drop.slug || drop.link }}{{ appAt }}</span>
         </span>
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
@@ -1195,6 +1220,7 @@ watch(
             @resolve="resolve"
           />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
+          <LazyViewerLink v-else-if="drop.kind === 'link'" :drop="drop" />
           <LazyViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
           <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
           <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
@@ -1218,19 +1244,19 @@ watch(
               v-if="contentOrigin"
               :key="frameKey"
               ref="frame"
-              class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+              class="block min-h-0 w-full flex-1 bg-default"
+              :style="{ colorScheme: frameScheme }"
               :allow="frameAllow(drop.kind)"
               :sandbox="CONTENT_SANDBOX"
               :src="frameSrc"
               :title="drop.title"
             />
-            <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
-               backdrop behind it in dark mode. -->
             <!-- Hydration mismatch reason: SSR/client bundlers format the srcdoc resolver differently. -->
             <iframe
               v-else
               ref="frame"
-              class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+              class="block min-h-0 w-full flex-1 bg-default"
+              :style="{ colorScheme: frameScheme }"
               data-allow-mismatch="attribute"
               :allow="frameAllow(drop.kind)"
               :sandbox="previewSandbox(drop.kind)"

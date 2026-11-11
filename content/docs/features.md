@@ -128,7 +128,7 @@ More in [the Markdown reference](/.well-known/skills/vitehub-drop/references/mar
 
 ### Lifetimes and the Trash {#lifetime}
 
-Each drop says how long it lives: Temporary for 14 days after anyone last opened it, Review for 30, or Keep for good. A drop that expires goes to the Trash, where you can restore it for 15 days.
+Each drop says how long it lives: 14 days or 30 days after anyone last opened it, or Never delete. A drop that expires goes to the Trash, where you can restore it for 15 days.
 
 More in [Lifetime and Trash](/docs/review#expiry).
 
@@ -137,6 +137,8 @@ More in [Lifetime and Trash](/docs/review#expiry).
 A drop can link to the pages it belongs with, such as the pull request it documents and that pull request's preview. On a Markdown doc they sit with its front matter at the top of the doc, next to its status and the day the version was published, while a preview stays next to the title, where you open it. On other drops they all sit next to the title, each with its site's icon. Details lists them all. Everyone who can open the drop sees them, on every version.
 
 Agents set them when they publish. Pull request evidence links its pull request and preview on its own, and comments its own link on the pull request, so each leads to the other. The icons load from each site's own `/favicon.ico`, or its parent domain's when the address is behind a sign-in, never through an icon service.
+
+A folder can hold a link of its own, next to its docs and files: the pull request a folder's reports go with, say. It shows with its site's icon, and a pull request also shows its repository and number, like `quiverdk/website#33`. Clicking it opens the page; it shares, moves, and lives with the folder like any drop. Agents add one with `publish` and `link`.
 
 ### Views {#views}
 

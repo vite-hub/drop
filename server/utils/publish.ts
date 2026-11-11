@@ -3,11 +3,11 @@ import * as v from "valibot"
 import { AgentMetadataSchema } from "#shared/agent"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
-import { appLinkIssues } from "#shared/project-bundle"
+import { appLinkIssues, appPageLinks, MAX_LISTED_PAGES } from "#shared/project-bundle"
 import { reviewBookmarklet, reviewSnippet } from "#shared/review"
 import { SHARES } from "#shared/share"
 import { BoardInput } from "../mcp/board"
-import { dropLine, mcpDrop, SHARE_INPUT } from "../mcp/format"
+import { dropLine, folderLife, mcpDrop, pagesSection, SHARE_INPUT } from "../mcp/format"
 import { applyChanges, boardChanges, emptyBoard, serializeBoard } from "#shared/board"
 import { resolveComments } from "./comments"
 import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary } from "./drops"
@@ -16,9 +16,11 @@ import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
 import { problemLine } from "./markdown-document"
 import { createSiteDrop } from "./review"
+import { createLinkDrop } from "./link-items"
 import { unpackApp } from "./app-archive"
 import { perDropOrigins } from "./content-origin"
 import { addedResources, frontmatterResources, resourceList, ResourcesInput, saveResources } from "./resources"
+import { MAX_RESOURCE_URL } from "#shared/resources"
 import { signUpload } from "./uploads"
 
 // No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
@@ -106,6 +108,20 @@ export const PublishInput = v.object({
     ),
   ),
   board: v.optional(BoardInput),
+  link: v.optional(
+    v.pipe(
+      v.object({
+        url: v.pipe(
+          v.string(),
+          v.maxLength(MAX_RESOURCE_URL),
+          v.description("https, or http on localhost, like https://github.com/acme/app/pull/123."),
+        ),
+      }),
+      v.description(
+        "A link to a page outside Drop, such as a pull request, listed in its folder next to the docs and files that go with it, with the site's icon. It opens the page. Give it a title (a GitHub pull request without one takes its own title if its repository is public, else repo#number) and say in note what it is. It has no versions: change it with update_drop.",
+      ),
+    ),
+  ),
   title: v.optional(v.string()),
   slug: v.optional(
     v.pipe(
@@ -184,13 +200,13 @@ export type PublishInput = v.InferOutput<typeof PublishInput>
  * a drop, after the same checks.
  */
 export async function publishInput(who: Identity, input: PublishInput, event: H3Event, upload?: Uint8Array) {
-  const given = (["markdown", "html", "files", "archive", "file", "site", "board"] as const).filter(
+  const given = (["markdown", "html", "files", "archive", "file", "site", "board", "link"] as const).filter(
     (key) => input[key] !== undefined,
   )
   if (given.length !== 1)
     throw new HTTPError({
       status: 400,
-      message: "Pass exactly one of markdown, html, files, archive, file, site, or board.",
+      message: "Pass exactly one of markdown, html, files, archive, file, site, board, or link.",
     })
   if (!input.previous && !input.folder && !input.lifetime)
     throw new HTTPError({
@@ -208,6 +224,32 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       message:
         "An upload URL has no room for resources. List them under resources in a .md file's front matter, put them on the doc that embeds the file, or set them with update_drop once it's uploaded.",
     })
+  if (input.link) {
+    if (input.previous || input.resolves || input.removes)
+      throw new HTTPError({
+        status: 400,
+        message: "A link has no versions. Change its address, title, or note with update_drop.",
+      })
+    const resources = links && addedResources(null, links)
+    const row = await createLinkDrop(
+      who,
+      {
+        url: input.link.url,
+        title: input.title,
+        slug: input.slug,
+        folder,
+        share: input.share,
+        lifetime: input.lifetime,
+        keepReason: input.keepReason,
+        note: input.note,
+        agent: input.agent,
+      },
+      event,
+    )
+    if (resources) await saveResources(row, resources)
+    const drop = mcpDrop(toSummary((await findDrop(row.id, event)) ?? row), event.url.origin)
+    return { text: `Added a link:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}`, result: drop }
+  }
   if (input.site) {
     if (input.previous || input.resolves || input.removes)
       throw new HTTPError({
@@ -234,7 +276,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     const drop = mcpDrop(toSummary((await findDrop(row.id, event)) ?? row), event.url.origin)
     const script = reviewSnippet(event.url.origin)
     return {
-      text: `Created a site review:\n${dropLine(drop)}\n\nPeople review ${row.siteUrl} with the "Review with Drop" bookmarklet on the drop's page; the site needs no change. To show the Comment button without it, add this tag to the site's preview builds only, never production. It carries no key:\n${script}\n\nComments sent from ${row.siteUrl} land on the drop; read them with read_drop.`,
+      text: `Created a site review:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}\n\nPeople review ${row.siteUrl} with the "Review with Drop" bookmarklet on the drop's page; the site needs no change. To show the Comment button without it, add this tag to the site's preview builds only, never production. It carries no key:\n${script}\n\nComments sent from ${row.siteUrl} land on the drop; read them with read_drop.`,
       result: { ...drop, siteUrl: row.siteUrl!, script, bookmarklet: reviewBookmarklet(event.url.origin) },
     }
   }
@@ -246,10 +288,10 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     })
   if (input.previous && (!previous || !permissions(previous, who).edit))
     throw new HTTPError({ status: 404, message: `No drop you can publish to with id ${input.previous}.` })
-  if (previous?.kind === "site")
+  if (previous?.kind === "site" || previous?.kind === "link")
     throw new HTTPError({
       status: 400,
-      message: "previous is a site, which has no versions. Change it with update_drop.",
+      message: `previous is a ${previous.kind}, which has no versions. Change it with update_drop.`,
     })
   // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest.
   if (previous?.head) previous = await findDrop(previous.id, event)
@@ -259,6 +301,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
 
   let row
   let warnings: string[] = []
+  let appPaths: string[] | undefined
   if (input.files || input.archive) {
     if (previous && previous.kind !== "app")
       throw new HTTPError({ status: 400, message: "previous is a doc; publish files only to an app." })
@@ -297,6 +340,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       event,
     )
     warnings = row.warnings
+    appPaths = row.paths
   } else {
     if (previous?.kind === "app")
       throw new HTTPError({ status: 400, message: "previous is an app; publish its next version with files." })
@@ -380,7 +424,13 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const fresh = (await findDrop(row.id, event)) ?? row
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
-  const result = { ...drop, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
+  const pages = appPaths ? appPageLinks(drop.url, appPaths) : []
+  const result = {
+    ...drop,
+    ...(pages.length ? { pages: pages.slice(0, MAX_LISTED_PAGES) } : {}),
+    ...(resolved.length ? { resolved } : {}),
+    ...(warnings.length ? { warnings } : {}),
+  }
   const lead =
     fresh.kind === "markdown"
       ? "It published with these Comark lint warnings."
@@ -389,7 +439,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
     : ""
   return {
-    text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${check}`,
+    text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}${pages.length > 1 ? `\n\n${pagesSection(pages)}` : ""}${check}`,
     result,
   }
 }

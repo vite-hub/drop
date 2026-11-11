@@ -31,6 +31,8 @@ publish({
 
 A built app, such as a Vite `dist/` folder, a prerendered Nuxt site, or a Slidev deck, goes up as one archive. The agent calls `publish` with `archive: {}`, gets an upload URL, and runs `tar -czf - -C dist . | curl -T - '<uploadUrl>'`. Fonts, images, and wasm go in as they are. The app runs at the root of its own origin, which serves its files like a static host, so build it for `/`. Each archive replaces every file of the app.
 
+An app's link opens at any of its pages with `?path=`: `/d/<key>/<slug>?path=/guide/setup#install` opens the app at `/guide/setup`, scrolled to `#install`, and so does `/d/<key>/<slug>/guide/setup#install`. The address bar follows the app as you move through it, so **Copy link** and a copied address open the page you were on. An address the app doesn't have shows its own `404.html`, or its `index.html` for a single-page app. `publish` and `read_drop` give agents each page with its link.
+
 To present a Slidev deck, press **Present** in the drop's header. The deck opens alone in a new window for the projector, and the drop's page turns into Slidev's presenter view, with your notes, the next slide, and a timer; it drives the other window. Any other app or HTML page opens alone with **Open in new window** in **Details**.
 
 An app with server code, like API routes, sign-in, or a database, isn't a drop. Deploy it to a preview and review it as a [site](/docs/sites).
@@ -144,14 +146,14 @@ Apps and HTML pages report what breaks while people have them open: uncaught err
 
 Each drop has a **lifetime**, set by whoever publishes it. You can change it in the drop's Details panel.
 
-| Lifetime | For | Expires |
-| --- | --- | --- |
-| Temporary | Prototypes, spikes, one-off answers | 14 days after the last visit |
-| Review | Plans and docs going through feedback | 30 days after the last visit |
-| Keep | Pull request assets, anything linked from somewhere that lasts | Never. An agent has to say why, and you see the reason. |
+| Lifetime | Agents call it | For | Goes to the Trash |
+| --- | --- | --- | --- |
+| 14 days | `temporary` | Prototypes, spikes, one-off answers | If nobody opens it for 14 days |
+| 30 days | `review` | Plans and docs going through feedback | If nobody opens it for 30 days |
+| Never delete | `keep` | Pull request assets, anything linked from somewhere that lasts | Never. An agent has to say why, and you see the reason. |
 
 A visit is anyone who can open the drop opening it while signed in, an agent reading it with `read_drop` or `read_file` or publishing a version, or someone opening a shared link or raw file in a browser. Link previews in Slack, Discord, or X, crawlers, and images embedded on other sites don't count. A visit restarts the window for every version.
 
 A drop that expires or is deleted goes to the **Trash**, and its links stop working. You can restore it for 15 days; then it's deleted with its comments and files. You can also delete it for good or empty the Trash yourself. Agents can trash and restore drops, but only people delete for good.
 
-An admin can change the 30 days, or allow only admins to keep drops.
+An admin can change the 30 days, or allow only admins to pick Never delete.
