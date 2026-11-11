@@ -83,10 +83,9 @@ async function lookUpAppFiles(event: H3Event, grant: v.InferOutput<typeof Grant>
  * file with such a name never changes, and the browser keeps it. Any other file may change with the next version,
  * which the app's origin serves at the same address, so the browser asks again each time.
  *
- * Rollup and Vite hash with 8 base64url characters, which may hold no digit (`CWeqyEg_`) or a dash (`lXm2UH6-`). Out
- * of context such a name could be a word someone typed (`BkRpwUQU.js`), so it counts only inside a folder that build
- * tools keep for their output, and never when it reads as words (`MyWidget`): a hash shaped like one is only a cache
- * miss, a typed name kept for a year would hide the next version.
+ * Rollup and Vite hash with 8 base64url characters, which may include a dash (`lXm2UH6-`). Names without digits
+ * are ambiguous, even inside build-output folders (`assets/darkMode.js` may come from Vite's public directory), so
+ * they revalidate. A hash missed here still uses the edge cache; a typed name kept for a year would hide updates.
  */
 export function isHashedAsset(path: string): boolean {
   const slash = path.lastIndexOf("/")
@@ -107,7 +106,7 @@ export function isHashedAsset(path: string): boolean {
     (BUILD_FOLDER.test(path.slice(0, slash + 1)) &&
       parts.some((part) => {
         const hash = /(?:^|[-.])([\w-]{8})$/.exec(part)?.[1]
-        return !!hash && /[a-z]/.test(hash) && /[A-Z]/.test(hash) && !/^(?:[A-Z][a-z]+)+$/.test(hash)
+        return !!hash && /\d/.test(hash) && /[a-z]/.test(hash) && /[A-Z]/.test(hash)
       }))
   )
 }
@@ -119,13 +118,14 @@ const BUILD_FOLDER = /(?:^|\/)(?:_nuxt|assets|_astro|immutable|_next\/static)\/(
  * An app's files kept in the cache of the Cloudflare location the Worker runs in, by blob key. Each upload stores its
  * files under keys of their own and never writes to one again, so a kept file is never stale; a file the store holds
  * far from the Worker costs a few hundred milliseconds to read, and a page waits on dozens in a row. A file goes in
- * after a grant check and comes out only after another. Runtimes without a Cache API, such as
- * Node, read the store each time.
+ * after a grant check and comes out only after another. Other runtimes read the store each time: a standard Cache
+ * API, such as Deno's, does not evaluate the ranges and validators that Cloudflare's does.
  */
 const KEEP_MAX_BYTES = 25 * 1024 * 1024
 
 function fileCache() {
-  return "caches" in globalThis ? caches.open("drop-app-files") : undefined
+  // `default` is Cloudflare's extension to CacheStorage; the presence of `caches` alone also admits Deno.
+  return "caches" in globalThis && "default" in caches ? caches.open("drop-app-files") : undefined
 }
 
 function cacheKey(event: H3Event, blobKey: string, headers?: HeadersInit) {
@@ -134,7 +134,8 @@ function cacheKey(event: H3Event, blobKey: string, headers?: HeadersInit) {
 
 /** The kept answer to this request, with its range and validators: the cache answers those itself. */
 async function keptFile(event: H3Event, blobKey: string): Promise<Response | undefined> {
-  if (event.req.method !== "GET") return
+  // Cloudflare handles Range but not If-Range. Let storage evaluate that guard before selecting bytes.
+  if (event.req.method !== "GET" || event.req.headers.has("if-range")) return
   const cache = await fileCache()
   if (!cache) return
   const headers = new Headers()
