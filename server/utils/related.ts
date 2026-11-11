@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { db } from "vite-hub/database/drizzle"
 import { siteAddressesFor, siteMatches } from "#shared/review"
@@ -65,38 +65,68 @@ const linking = (targets: LinkTarget[]) =>
 
 /** Whether any drop links to a page on `origin`. That much is all a page learns before it has a token. */
 export async function linkedFrom(origin: string) {
-  const rows = await db
-    .select({ resources: drops.resources })
-    .from(drops)
-    .where(linking([{ origin }]))
-    .limit(PER_HOP)
-  return rows.some((row) => resourcesOf(row).some((resource) => hits(resource.url, { origin })))
+  for (let offset = 0; ; offset += PER_HOP) {
+    const rows = await db
+      .select({ resources: drops.resources })
+      .from(drops)
+      .where(linking([{ origin }]))
+      .orderBy(desc(drops.updatedAt), desc(drops.id))
+      .limit(PER_HOP)
+      .offset(offset)
+    if (rows.some((row) => resourcesOf(row).some((resource) => hits(resource.url, { origin })))) return true
+    if (rows.length < PER_HOP) return false
+  }
 }
 
 const newestFirst = (rows: DropRow[]) => rows.toSorted((a, b) => b.updatedAt - a.updatedAt).slice(0, PER_HOP)
 
-/** The drops, outside `skip`, whose links hit one of `targets`, checked link by link: a title quoting an address doesn't count. */
-async function linkingDrops(targets: LinkTarget[], skip: Set<string>, event?: H3Event) {
-  const ids = new Set<string>()
-  for (const chunk of d1Chunks(targets))
-    for (const row of await db
+/** Refill past skipped, inexact, and inaccessible matches: only eligible drops consume the per-hop budget. */
+async function findableMatches(
+  where: SQL | undefined,
+  matches: (drop: DropRow) => boolean,
+  skip: Set<string>,
+  who: Identity,
+  event?: H3Event,
+) {
+  const found: DropRow[] = []
+  for (let offset = 0; found.length < PER_HOP; offset += PER_HOP) {
+    const rows = await db
       .select({ id: drops.id })
       .from(drops)
-      .where(linking(chunk))
-      .orderBy(desc(drops.updatedAt))
-      .limit(PER_HOP))
-      if (!skip.has(row.id)) ids.add(row.id)
-  const found = await Promise.all([...ids].map((id) => findDrop(id, event)))
-  return newestFirst(
-    found.filter(
-      (drop): drop is DropRow =>
-        drop !== null && resourcesOf(drop).some((resource) => targets.some((target) => hits(resource.url, target))),
-    ),
-  )
+      .where(where)
+      .orderBy(desc(drops.updatedAt), desc(drops.id))
+      .limit(PER_HOP)
+      .offset(offset)
+    const candidates = await Promise.all(rows.filter((row) => !skip.has(row.id)).map((row) => findDrop(row.id, event)))
+    found.push(
+      ...(await findableBy(
+        who,
+        candidates.filter((drop): drop is DropRow => drop !== null && matches(drop)),
+        event,
+      )),
+    )
+    if (rows.length < PER_HOP) break
+  }
+  return newestFirst(found)
+}
+
+/** The drops, outside `skip`, whose links hit one of `targets`, checked link by link: a title quoting an address doesn't count. */
+async function linkingDrops(targets: LinkTarget[], skip: Set<string>, who: Identity, event?: H3Event) {
+  const found = new Map<string, DropRow>()
+  for (const chunk of d1Chunks(targets))
+    for (const drop of await findableMatches(
+      linking(chunk),
+      (candidate) => resourcesOf(candidate).some((resource) => targets.some((target) => hits(resource.url, target))),
+      skip,
+      who,
+      event,
+    ))
+      found.set(drop.id, drop)
+  return newestFirst([...found.values()])
 }
 
 /** The site drops, outside `skip`, that review a page `targets` point at, like the preview a doc links to. */
-async function reviewingSites(targets: LinkTarget[], skip: Set<string>, event?: H3Event) {
+async function reviewingSites(targets: LinkTarget[], skip: Set<string>, who: Identity, event?: H3Event) {
   const origins = [
     ...new Set(
       targets.flatMap((target) =>
@@ -105,30 +135,23 @@ async function reviewingSites(targets: LinkTarget[], skip: Set<string>, event?: 
     ),
   ]
   const addresses = [...new Set(origins.flatMap(siteAddressesFor))]
-  const ids = new Set<string>()
+  const found = new Map<string, DropRow>()
   for (const chunk of d1Chunks(addresses))
-    for (const row of await db
-      .select({ id: drops.id })
-      .from(drops)
-      .where(
-        and(
-          eq(drops.kind, "site"),
-          inArray(drops.siteUrl, chunk),
-          listedNode,
-          isNull(drops.trashedAt),
-          isNull(drops.quarantinedAt),
-        ),
-      )
-      .orderBy(desc(drops.updatedAt))
-      .limit(PER_HOP))
-      if (!skip.has(row.id)) ids.add(row.id)
-  const found = await Promise.all([...ids].map((id) => findDrop(id, event)))
-  return newestFirst(
-    found.filter(
-      (site): site is DropRow =>
-        site?.kind === "site" && !!site.siteUrl && origins.some((origin) => siteMatches(site.siteUrl!, origin)),
-    ),
-  )
+    for (const drop of await findableMatches(
+      and(
+        eq(drops.kind, "site"),
+        inArray(drops.siteUrl, chunk),
+        listedNode,
+        isNull(drops.trashedAt),
+        isNull(drops.quarantinedAt),
+      ),
+      (site) => site.kind === "site" && !!site.siteUrl && origins.some((origin) => siteMatches(site.siteUrl!, origin)),
+      skip,
+      who,
+      event,
+    ))
+      found.set(drop.id, drop)
+  return newestFirst([...found.values()])
 }
 
 /**
@@ -152,12 +175,12 @@ export async function relatedDrops(
   let targets = seeds
   for (let hop = 0; hop < HOPS && targets.length && groups.length < MAX_GROUPS; hop++) {
     const found = [
-      ...(await linkingDrops(targets, seen, event)),
-      ...(options.sites ? await reviewingSites(targets, seen, event) : []),
+      ...(await linkingDrops(targets, seen, who, event)),
+      ...(options.sites ? await reviewingSites(targets, seen, who, event) : []),
     ]
     for (const drop of found) seen.add(drop.id)
     const next: LinkTarget[] = []
-    for (const drop of await findableBy(who, found, event)) {
+    for (const drop of found) {
       const links = resourcesOf(drop).filter((resource) => !hidden(resource.url))
       groups.push({ drop, links: links.filter((resource) => !listed.has(resource.url)) })
       for (const { url } of links) {
@@ -171,8 +194,13 @@ export async function relatedDrops(
   return groups.slice(0, MAX_GROUPS)
 }
 
-/** A drop's id and its folders', any of which may be the public link someone opened. */
-const pathOf = (drop: DropRow) => [drop.id, ...(drop.ancestors ?? []).map((node) => node.id)]
+/** Only a currently open, approved public link on the path can grant discovery from a recorded visit. */
+const publicPathOf = (drop: DropRow, now: number) =>
+  [drop.raw ?? drop, ...(drop.ancestors ?? [])]
+    .filter(
+      (node) => isPublic(node.share) && !node.shareReview && (node.publicUntil === null || node.publicUntil > now),
+    )
+    .map((node) => node.id)
 const grantsOf = (drop: DropRow) => drop.grants ?? [{ share: drop.share }]
 
 /**
@@ -195,12 +223,15 @@ export async function findableBy(who: Identity, found: DropRow[], event?: H3Even
     viewable.filter((drop) => !shared.has(drop) && grantsOf(drop).some((grant) => isPublic(grant.share))),
   )
   if (sharePolicy(event).mode === "team") return viewable.filter((drop) => shared.has(drop) || linked.has(drop))
+  const now = Date.now()
   const visited = new Set<string>()
-  for (const ids of d1Chunks([...new Set([...linked].flatMap(pathOf))]))
+  for (const ids of d1Chunks([...new Set([...linked].flatMap((drop) => publicPathOf(drop, now)))]))
     for (const row of await db
       .select({ id: dropVisits.dropId })
       .from(dropVisits)
       .where(and(eq(dropVisits.userId, who.userId), inArray(dropVisits.dropId, ids))))
       visited.add(row.id)
-  return viewable.filter((drop) => shared.has(drop) || (linked.has(drop) && pathOf(drop).some((id) => visited.has(id))))
+  return viewable.filter(
+    (drop) => shared.has(drop) || (linked.has(drop) && publicPathOf(drop, now).some((id) => visited.has(id))),
+  )
 }

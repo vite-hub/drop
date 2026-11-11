@@ -632,7 +632,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // connects, as Comment does, then lists the drops this person would find in Drop anyway (server/utils/related.ts),
   // each with a handle that /review/open takes in place of its link, and their links, like the pull request.
   const relatedApi = drop + "/api/review/related";
-  let relatedLinks = null, relatedAsk = null;
+  let relatedLinks = null, relatedAsk = null, relatedOpening = false, relatedIntent = 0;
   async function probeRelated() {
     try {
       const response = await fetch(relatedApi, { credentials: "omit" });
@@ -693,6 +693,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   function closeRelated() {
+    relatedOpening = false;
+    relatedIntent++;
     links.hidden = true;
     relatedButton.setAttribute("aria-expanded", "false");
   }
@@ -703,21 +705,31 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     closeRelated();
   }
   async function openRelated() {
-    if (!relatedLinks) {
-      // The request starts in the press, before any await, so it may still open the connect popup.
-      const ask = relatedAsk || (relatedAsk = findRelated());
-      relatedButton.setAttribute("aria-busy", "true");
-      try {
-        const found = await ask;
-        if (ask !== relatedAsk) return;
-        relatedLinks = found;
-      } catch (error) {
-        if (error.message) say(error.message);
-        return;
-      } finally {
-        if (ask === relatedAsk) { relatedAsk = null; relatedButton.removeAttribute("aria-busy"); }
+    const intent = ++relatedIntent;
+    relatedOpening = true;
+    try {
+      if (!relatedLinks) {
+        // The request starts in the press, before any await, so it may still open the connect popup.
+        if (!relatedAsk) {
+          const ask = findRelated().then((found) => {
+            if (ask === relatedAsk) relatedLinks = found;
+          }).finally(() => {
+            if (ask === relatedAsk) { relatedAsk = null; relatedButton.removeAttribute("aria-busy"); }
+          });
+          relatedAsk = ask;
+          relatedButton.setAttribute("aria-busy", "true");
+        }
+        await relatedAsk;
       }
+    } catch (error) {
+      if (intent === relatedIntent) {
+        relatedOpening = false;
+        if (error.message) say(error.message);
+      }
+      return;
     }
+    // A dismissed request can fill the cache, but cannot cancel a newer tool or take its focus.
+    if (intent !== relatedIntent || !relatedLinks) return;
     cancel();
     closeThread();
     list.hidden = true;
@@ -733,7 +745,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (first) first.focus({ preventScroll: true });
   }
   relatedButton.addEventListener("click", () => {
-    if (links.hidden) void openRelated();
+    if (links.hidden && !relatedOpening) void openRelated();
     else closeRelated();
   });
   // A press on the toolbar outside the menu closes it. A press on the page does too, with the thread and the list.
@@ -811,6 +823,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
   }
   function cancel() {
+    closeRelated();
     const wasOpen = !draw.hidden || !pop.hidden;
     draw.hidden = true; box.hidden = true; pop.hidden = true; pill.hidden = bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
@@ -1006,7 +1019,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }
     else if (!list.hidden) { e.stopPropagation(); list.hidden = true; }
-    else if (!links.hidden) {
+    else if (!links.hidden || relatedOpening) {
       e.stopPropagation();
       // The focus goes back to the button when it was in the menu.
       if (root.activeElement && links.contains(root.activeElement)) relatedButton.focus({ preventScroll: true });
