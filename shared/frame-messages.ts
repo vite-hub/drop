@@ -52,8 +52,9 @@ export const FrameMessage = v.variant("type", [
     }),
   ]),
   // Where the composer for a held selection goes, in the frame's viewport: its card's place in the margin (`rail`), or
-  // the quote's box. In the Pin style (`pin`) it's the draft's pin, or, with `id`, the pin of the thread Drop shows.
-  // Pin style: a click on the page, away from the pins, with a composer or a thread open beside a pin.
+  // the quote's box. In the Pin style (`pin`) it's the draft's pin. With `id`, it's where the thread Drop shows is
+  // written in: its card in the margin (`rail`), else its pin.
+  // A click on the page, away from the pins, with a thread open, or in the Pin style a composer beside a pin.
   v.object({ type: v.literal("page-click") }),
   v.object({
     type: v.literal("draft-place"),

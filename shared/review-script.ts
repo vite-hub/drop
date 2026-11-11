@@ -18,7 +18,7 @@ import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
 
 const STYLE =
   `
-:host { all: initial; --bg: #fff; --fg: #0a0a0a; --muted: #737373; --border: #e5e5e5; --primary: #171717; --primary-fg: #fafafa; --ring: #a3a3a3; --error: #dc2626; --soft: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
+:host { all: initial; --mark: oklch(0.62 0.18 255); --bg: #fff; --fg: #0a0a0a; --muted: #737373; --border: #e5e5e5; --primary: #171717; --primary-fg: #fafafa; --ring: #a3a3a3; --error: #dc2626; --soft: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
 @media (prefers-color-scheme: dark) { :host { --bg: #171717; --fg: #fafafa; --muted: #a3a3a3; --border: rgb(255 255 255 / .12); --primary: #e5e5e5; --primary-fg: #171717; --ring: #737373; --error: #f87171; } }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -37,8 +37,8 @@ const STYLE =
 .count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--soft); font: 500 11px/18px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; }
 .draw { position: fixed; inset: 0; cursor: crosshair; touch-action: none; background: rgb(0 0 0 / .04); }
 .hint { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); white-space: nowrap; }
-.box { position: fixed; border: 2px solid var(--primary); border-radius: 4px; background: color-mix(in oklab, var(--primary) 10%, transparent); pointer-events: none; }
-.mark { position: fixed; border: 1.5px dashed var(--primary); border-radius: 4px; pointer-events: none; }
+.box { position: fixed; border: 2px solid var(--mark); border-radius: 4px; background: color-mix(in oklab, var(--mark) 16%, transparent); pointer-events: none; }
+.mark { position: fixed; border: 1.5px dashed var(--mark); border-radius: 4px; pointer-events: none; }
 .card { position: fixed; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); box-shadow: 0 8px 28px rgb(0 0 0 / .16); overflow: hidden; }
 .pop { width: 320px; padding: 10px; }
 .thread { width: 340px; max-height: min(480px, calc(100vh - 32px)); }
@@ -354,9 +354,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
   const reviewUrl = () => drop + "/review/open#" + encodeURIComponent(token || "");
   // Copy link goes through Drop the same way: a small Drop window copies the link there and closes.
+  // Each request gets a fresh document: an earlier window may still be waiting for a manual copy of another review.
   function copyReviewLink() {
     const url = drop + "/review/open?copy#" + encodeURIComponent(token || "");
-    if (!window.open(url, "drop-review-copy", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
+    if (!window.open(url, "_blank", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
   }
 
   function authorName() {
@@ -648,7 +649,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // connects, as Comment does, then lists the drops this person would find in Drop anyway (server/utils/related.ts),
   // each with a handle that /review/open takes in place of its link, and their links, like the pull request.
   const relatedApi = drop + "/api/review/related";
-  let relatedLinks = null, relatedAsk = null;
+  let relatedLinks = null, relatedAsk = null, relatedOpening = false, relatedIntent = 0;
   async function probeRelated() {
     try {
       const response = await fetch(relatedApi, { credentials: "omit" });
@@ -709,6 +710,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   function closeRelated() {
+    relatedOpening = false;
+    relatedIntent++;
     links.hidden = true;
     relatedButton.setAttribute("aria-expanded", "false");
   }
@@ -719,21 +722,31 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     closeRelated();
   }
   async function openRelated() {
-    if (!relatedLinks) {
-      // The request starts in the press, before any await, so it may still open the connect popup.
-      const ask = relatedAsk || (relatedAsk = findRelated());
-      relatedButton.setAttribute("aria-busy", "true");
-      try {
-        const found = await ask;
-        if (ask !== relatedAsk) return;
-        relatedLinks = found;
-      } catch (error) {
-        if (error.message) say(error.message);
-        return;
-      } finally {
-        if (ask === relatedAsk) { relatedAsk = null; relatedButton.removeAttribute("aria-busy"); }
+    const intent = ++relatedIntent;
+    relatedOpening = true;
+    try {
+      if (!relatedLinks) {
+        // The request starts in the press, before any await, so it may still open the connect popup.
+        if (!relatedAsk) {
+          const ask = findRelated().then((found) => {
+            if (ask === relatedAsk) relatedLinks = found;
+          }).finally(() => {
+            if (ask === relatedAsk) { relatedAsk = null; relatedButton.removeAttribute("aria-busy"); }
+          });
+          relatedAsk = ask;
+          relatedButton.setAttribute("aria-busy", "true");
+        }
+        await relatedAsk;
       }
+    } catch (error) {
+      if (intent === relatedIntent) {
+        relatedOpening = false;
+        if (error.message) say(error.message);
+      }
+      return;
     }
+    // A dismissed request can fill the cache, but cannot cancel a newer tool or take its focus.
+    if (intent !== relatedIntent || !relatedLinks) return;
     cancel();
     closeThread();
     list.hidden = true;
@@ -749,7 +762,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (first) first.focus({ preventScroll: true });
   }
   relatedButton.addEventListener("click", () => {
-    if (links.hidden) void openRelated();
+    if (links.hidden && !relatedOpening) void openRelated();
     else closeRelated();
   });
   // A press on the toolbar outside the menu closes it. A press on the page does too, with the thread and the list.
@@ -827,6 +840,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
   }
   function cancel() {
+    closeRelated();
     const wasOpen = !draw.hidden || !pop.hidden;
     draw.hidden = true; box.hidden = true; pop.hidden = true; pill.hidden = bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
@@ -1022,7 +1036,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }
     else if (!list.hidden) { e.stopPropagation(); list.hidden = true; }
-    else if (!links.hidden) {
+    else if (!links.hidden || relatedOpening) {
       e.stopPropagation();
       // The focus goes back to the button when it was in the menu.
       if (root.activeElement && links.contains(root.activeElement)) relatedButton.focus({ preventScroll: true });

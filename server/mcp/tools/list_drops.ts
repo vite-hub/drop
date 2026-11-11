@@ -3,6 +3,7 @@ import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
 import { MIB } from "#shared/quotas"
+import { DROP_KINDS } from "#shared/types"
 import { findDropByRef, listDrops, listFolder, listSharedWithMe, permissions } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
 import { getUsage } from "../../utils/quotas"
@@ -35,7 +36,7 @@ export default defineMcpTool({
           v.description("Id or link of a folder: list or search only what's inside it, subfolders included."),
         ),
       ),
-      kind: v.optional(v.picklist(["markdown", "html", "image", "file", "app", "folder", "site", "board"])),
+      kind: v.optional(v.picklist(DROP_KINDS)),
       shared: v.optional(
         v.pipe(v.boolean(), v.description("true for shared drops only, false for private ones only.")),
       ),

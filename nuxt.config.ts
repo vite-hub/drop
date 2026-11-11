@@ -46,7 +46,13 @@ const d1 = (fallback: string) => ({
 const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   cloudflare: {
     preset: "cloudflare",
-    blob: files,
+    // drop.vitehub.dev's files sit in Eastern Europe beside its D1 and Worker: from the WNAM bucket each file read
+    // cost 200-700 ms in Milan (measured 2026-11-11). Its own binding name, because wrangler.jsonc's BLOB keeps the
+    // Deploy button's bucket for self-hosted Drops.
+    blob:
+      process.env.CLOUDFLARE_D1_DATABASE_ID === HOSTED_D1
+        ? { ...files, binding: "BLOB_EEUR", bucketName: "vitehub-drop-eeur" }
+        : files,
     // Stateless Browser Run actions only (code-image screenshots): no Playwright, no page sessions.
     browser: true,
     database: {

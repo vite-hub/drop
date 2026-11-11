@@ -1,7 +1,20 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { chromium } from "playwright"
-import { test } from "vite-plus/test"
+import { expect, test } from "vite-plus/test"
+import { compileScript, parse } from "vue/compiler-sfc"
+import { transpileModule, ModuleKind } from "typescript"
 import { REVIEW_SCRIPT } from "../../shared/review-script.ts"
+
+// Mount the real copy page in Drop's popup, with only Nuxt's shell and API replaced.
+const require = createRequire(import.meta.url)
+const vue = readFileSync(require.resolve("vue/dist/vue.esm-browser.prod.js"), "utf8")
+const source = readFileSync(new URL("../../app/pages/review/open.vue", import.meta.url), "utf8")
+const { descriptor } = parse(source)
+const copyPage = transpileModule(compileScript(descriptor, { id: "review-open", inlineTemplate: true }).content, {
+  compilerOptions: { module: ModuleKind.ESNext },
+}).outputText
 
 const SITE = "https://site.test"
 const DROP = "https://drop.test"
@@ -27,10 +40,11 @@ async function open(browser, attributes = "") {
       Element.prototype.attachShadow = function (init) {
         return Reflect.apply(attach, this, [{ ...init, mode: "open" }])
       }
-      sessionStorage.setItem(
-        "drop-review:" + drop,
-        JSON.stringify({ token: "t", expiresAt: Date.now() + 3600_000, name: "Ada" }),
-      )
+      if (!sessionStorage.getItem("drop-review:" + drop))
+        sessionStorage.setItem(
+          "drop-review:" + drop,
+          JSON.stringify({ token: "t", expiresAt: Date.now() + 3600_000, name: "Ada" }),
+        )
     },
     { drop: DROP },
   )
@@ -130,6 +144,109 @@ test("the toolbar's Copy link opens Drop's copy page with the token, so the site
       pill.getByRole("button", { name: "Copy the review's link" }).click(),
     ])
     assert.equal(popup.url(), DROP + "/review/open?copy#t")
+    await context.close()
+  } finally {
+    await browser.close()
+  }
+})
+
+async function serveOpenPage(context) {
+  await context.route(DROP + "/**", (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === "/vue.js" || path === "/copy-page.js")
+      return route.fulfill({ contentType: "text/javascript", body: path === "/vue.js" ? vue : copyPage })
+    if (path === "/api/review/open") {
+      const { token, doc } = route.request().postDataJSON()
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(
+          doc ? { to: "/drops/document" } : { to: "/drops/" + token, link: DROP + "/d/" + token + "/review" },
+        ),
+      })
+    }
+    if (path !== "/review/open") return route.fallback()
+    return route.fulfill({
+      contentType: "text/html",
+      body: `<div id="app"></div><script type="importmap">{"imports":{"vue":"/vue.js"}}</script>
+        <script type="module">
+          import * as Vue from "vue"
+          import CopyPage from "/copy-page.js"
+          Object.assign(window, Vue)
+          window.useSeoMeta = () => {}
+          window.useRoute = () => ({ query: Object.fromEntries(new URLSearchParams(location.search)), get hash() { return decodeURIComponent(location.hash) } })
+          window.useMe = async () => ({ data: Vue.ref({ name: "Ada" }) })
+          window.useMounted = () => { const ready = Vue.ref(false); Vue.onMounted(() => ready.value = true); return ready }
+          window.openReview = body => fetch("/api/review/open", { method: "POST", body: JSON.stringify(body) }).then(r => r.json())
+          window.navigateTo = to => location.replace(to)
+          window.errorText = error => error.message
+          const app = Vue.createApp({ render: () => Vue.h(Vue.Suspense, null, { default: () => Vue.h(CopyPage) }) })
+          app.component("UButton", {
+            props: ["label"],
+            setup: (props, { attrs }) => () => Vue.h("button", attrs, props.label),
+          })
+          app.mount("#app")
+        </script>`,
+    })
+  })
+}
+
+test("Open in Drop opens reviews by token and related documents by handle", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { context } = await open(browser)
+    await serveOpenPage(context)
+    for (const [hash, body, target] of [
+      ["#t", { token: "t" }, "/drops/t"],
+      ["#doc=" + encodeURIComponent("sealed/handle+="), { doc: "sealed/handle+=" }, "/drops/document"],
+    ]) {
+      const popup = await context.newPage()
+      const request = popup.waitForRequest(DROP + "/api/review/open")
+      await popup.goto(DROP + "/review/open" + hash)
+      assert.deepEqual((await request).postDataJSON(), body)
+      await popup.waitForURL(DROP + target)
+      await popup.close()
+    }
+    await context.close()
+  } finally {
+    await browser.close()
+  }
+})
+
+test("Copy link copies the requested review while an earlier fallback window stays open", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { context, page, pill } = await open(browser)
+    await context.grantPermissions([], { origin: DROP })
+    await serveOpenPage(context)
+    const [first] = await Promise.all([
+      context.waitForEvent("page"),
+      pill.getByRole("button", { name: "Copy the review's link" }).click(),
+    ])
+    await first.getByRole("button", { name: "Copy link", exact: true }).waitFor()
+    assert.equal(await first.locator("p").textContent(), DROP + "/d/t/review")
+
+    // Reconnect the same site to another review, leaving the first manual-copy fallback open.
+    await page.evaluate((drop) => {
+      sessionStorage.setItem(
+        "drop-review:" + drop,
+        JSON.stringify({ token: "second", expiresAt: Date.now() + 3600_000, name: "Ada" }),
+      )
+    }, DROP)
+    await page.reload()
+    await pill.getByRole("button", { name: "Copy the review's link" }).click()
+    const secondUrl = DROP + "/review/open?copy#second"
+    await expect.poll(() => context.pages().some((popup) => popup.url() === secondUrl)).toBe(true)
+    const second = context.pages().find((popup) => popup.url() === secondUrl)
+    await second.getByRole("button", { name: "Copy link", exact: true }).waitFor()
+    assert.equal(await second.locator("p").textContent(), DROP + "/d/second/review")
+
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: DROP })
+    await second.getByRole("button", { name: "Copy link", exact: true }).click()
+    await second.getByRole("status").filter({ hasText: "Link copied" }).waitFor()
+    assert.equal(await second.evaluate(() => navigator.clipboard.readText()), DROP + "/d/second/review")
+    await second.waitForEvent("close")
+    assert.equal(first.isClosed(), false)
+    assert.equal(await first.locator("p").textContent(), DROP + "/d/t/review")
     await context.close()
   } finally {
     await browser.close()

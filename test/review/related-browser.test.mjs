@@ -28,7 +28,7 @@ const GROUPS = [
  * related drops (`groups`). Its connect popup hands the page a token, as Drop's does. The toolbar's closed shadow root is opened here
  * so the test can reach it.
  */
-async function open(browser, { linked = true, groups = GROUPS, connected = false } = {}) {
+async function open(browser, { linked = true, groups = GROUPS, connected = false, relatedGate } = {}) {
   const context = await browser.newContext({ viewport: { width: 900, height: 600 } })
   await context.addInitScript(
     ({ drop, connected }) => {
@@ -45,7 +45,8 @@ async function open(browser, { linked = true, groups = GROUPS, connected = false
     { drop: DROP, connected },
   )
   const asked = []
-  await context.route("**/*", (route) => {
+  const posts = []
+  await context.route("**/*", async (route) => {
     const request = route.request()
     const url = new URL(request.url())
     if (url.origin === SITE)
@@ -64,11 +65,16 @@ async function open(browser, { linked = true, groups = GROUPS, connected = false
     const token = request.headers().authorization
     if (url.pathname === "/api/review/related") {
       asked.push(token ?? "none")
+      if (token) await relatedGate
       return route.fulfill({
         contentType: "application/json",
         headers: CORS,
         body: JSON.stringify(token ? { linked: groups.length > 0, groups } : { linked }),
       })
+    }
+    if (url.pathname === "/api/review/comments" && request.method() === "POST") {
+      posts.push(request.postData())
+      return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ n: 1 }) })
     }
     return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ threads: [] }) })
   })
@@ -81,6 +87,7 @@ async function open(browser, { linked = true, groups = GROUPS, connected = false
     page,
     pill,
     asked,
+    posts,
     button: pill.locator(".related button"),
     menu: page.locator("drop-review .links"),
   }
@@ -188,6 +195,90 @@ test("Related links stays hidden where no drop links to the site, and says so wh
     await unshared.menu.getByText("No drop related to this site is shared with you.").waitFor()
     await unshared.context.close()
   } finally {
+    await browser.close()
+  }
+})
+
+test("a delayed Related links lookup preserves a newer comment and its selected anchor", async () => {
+  const browser = await chromium.launch()
+  let release
+  const relatedGate = new Promise((resolve) => {
+    release = resolve
+  })
+  try {
+    const { context, page, pill, button, menu, posts } = await open(browser, { connected: true, relatedGate })
+    await button.click()
+    await pill.locator(".related button[aria-busy=true]").waitFor()
+    await pill.getByRole("button", { name: "Comment", exact: true }).click()
+    const heading = await page.locator("h1").boundingBox()
+    await page.mouse.click(heading.x + 20, heading.y + heading.height / 2)
+    const note = page.locator("drop-review .pop textarea")
+    await note.fill("Keep this anchor")
+    release()
+    await pill.locator(".related button:not([aria-busy])").waitFor({ state: "attached" })
+    assert.equal(await menu.isVisible(), false)
+    assert.equal(await note.isVisible(), true)
+    assert.equal(await note.inputValue(), "Keep this anchor")
+    await page.locator("drop-review .pop").getByRole("button", { name: "Send", exact: true }).click()
+    await page.locator("drop-review").getByText("Sent as #1.").waitFor()
+    assert.match(posts[0], /Keep this anchor/)
+    assert.match(posts[0], /"selector":"body > h1"/)
+    await context.close()
+  } finally {
+    release()
+    await browser.close()
+  }
+})
+
+for (const dismissal of ["outside press", "Escape", "second press"]) {
+  test(`a delayed Related links lookup stays dismissed after ${dismissal} and caches its result`, async () => {
+    const browser = await chromium.launch()
+    let release
+    const relatedGate = new Promise((resolve) => {
+      release = resolve
+    })
+    try {
+      const { context, page, pill, button, menu, asked } = await open(browser, { connected: true, relatedGate })
+      await button.click()
+      await pill.locator(".related button[aria-busy=true]").waitFor()
+      if (dismissal === "outside press") await page.mouse.click(450, 100)
+      else if (dismissal === "Escape") await page.keyboard.press("Escape")
+      else await button.click()
+      release()
+      await pill.locator(".related button:not([aria-busy])").waitFor()
+      assert.equal(await menu.isVisible(), false)
+      assert.equal(await button.getAttribute("aria-expanded"), "false")
+      const before = asked.length
+      await button.click()
+      await menu.waitFor()
+      assert.equal(asked.length, before, "dismissed results can still fill the cache")
+      await context.close()
+    } finally {
+      release()
+      await browser.close()
+    }
+  })
+}
+
+test("reopening a pending Related links lookup uses the same request and the latest open intent", async () => {
+  const browser = await chromium.launch()
+  let release
+  const relatedGate = new Promise((resolve) => {
+    release = resolve
+  })
+  try {
+    const { context, page, pill, button, menu, asked } = await open(browser, { connected: true, relatedGate })
+    await button.click()
+    await pill.locator(".related button[aria-busy=true]").waitFor()
+    await page.keyboard.press("Escape")
+    await button.click()
+    release()
+    await menu.waitFor()
+    assert.equal(await button.getAttribute("aria-expanded"), "true")
+    assert.equal(asked.filter((token) => token === "Bearer t").length, 1)
+    await context.close()
+  } finally {
+    release()
     await browser.close()
   }
 })

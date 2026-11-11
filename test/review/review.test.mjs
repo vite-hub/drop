@@ -12,6 +12,7 @@ const { default: openPost } = await import("../../server/api/review/open.post.ts
 const { default: relatedGet } = await import("../../server/api/review/related.get.ts")
 const { default: relatedPreflight } = await import("../../server/api/review/related.options.ts")
 const { default: dropRelated } = await import("../../server/api/drops/[id]/related.get.ts")
+const { default: dropGet } = await import("../../server/api/drops/[id].get.ts")
 const { default: membersOnly } = await import("../../server/middleware/0.2.members-only.ts")
 const { default: commentsPost } = await import("../../server/api/review/comments.post.ts")
 const { default: commentsGet } = await import("../../server/api/review/comments.get.ts")
@@ -1098,6 +1099,161 @@ test("related drops go two links deep, never through a drop the person can't fin
   sql.prepare("UPDATE drops SET share = 'public' WHERE id = 'site'").run()
   assert.deepEqual(await inDrop("site"), [])
   assert.equal((await answer(dropRelated, request("/api/drops/plan/related", { id: "plan" }))).status, 404)
+})
+
+for (const [name, change] of [
+  ["made private", "share = 'private'"],
+  ["closed", "public_until = 1"],
+]) {
+  test(`a visited folder ${name} no longer discovers independently public children`, async () => {
+    site("site", { owner_id: "ada" })
+    insertDrop("folder", { kind: "folder", blob_key: null, share: "public" })
+    const child = (id, share = "public") =>
+      insertDrop(id, { parent_id: "folder", share, resources: JSON.stringify([{ url: `${SITE}/` }]) })
+    child("child")
+    child("inherited", "private")
+    sql.prepare("INSERT INTO drop_visits (user_id, drop_id, at) VALUES ('ada', 'folder', 1)").run()
+    state.who = ada
+    const bearer = (await token()).body.token
+    const onPage = async () =>
+      (
+        await json(
+          await answer(
+            relatedGet,
+            request("/api/review/related", {
+              headers: { origin: SITE, authorization: `Bearer ${bearer}` },
+            }),
+          ),
+        )
+      ).groups
+    const inDrop = async () => dropRelated(request("/api/drops/site/related"))
+    const titles = (groups) => groups.map((group) => group.title).sort()
+    const initial = await onPage()
+    assert.deepEqual(titles(initial), ["child", "inherited"])
+    assert.deepEqual(titles(await inDrop()), ["child", "inherited"])
+    const handle = initial.find((group) => group.title === "child").open
+    assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: "/drops/child" })
+
+    sql.prepare(`UPDATE drops SET ${change} WHERE id = 'folder'`).run()
+    child("new-child")
+    assert.deepEqual(await onPage(), [], "a historical folder visit cannot reveal a new public link")
+    assert.deepEqual(await inDrop(), [])
+    assert.equal((await answer(openPost, post("/api/review/open", { doc: handle }))).status, 404)
+
+    sql.prepare("INSERT INTO drop_visits (user_id, drop_id, at) VALUES ('ada', 'child', 1)").run()
+    assert.deepEqual(titles(await onPage()), ["child"], "an independently visited child still opens")
+    assert.deepEqual(titles(await inDrop()), ["child"])
+    assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: "/drops/child" })
+
+    sql.prepare("UPDATE drops SET share = 'public', public_until = NULL WHERE id = 'folder'").run()
+    assert.deepEqual(titles(await onPage()), ["child", "inherited", "new-child"])
+    assert.deepEqual(titles(await inDrop()), ["child", "inherited", "new-child"])
+  })
+}
+
+for (const source of ["document", "folder"]) {
+  for (const policy of ["approval disabled", "owner promoted"]) {
+    test(`visited ${source} stays related with ${policy} despite its stored review flag`, async () => {
+      state.shareApproval = true
+      site("site", { owner_id: "ada" })
+      const resources = JSON.stringify([{ url: `${SITE}/` }])
+      insertDrop("source", {
+        share: "public",
+        share_review: "pending",
+        ...(source === "folder" ? { kind: "folder", blob_key: null } : { resources }),
+      })
+      const docId = source === "folder" ? "child" : "source"
+      if (source === "folder") insertDrop("child", { parent_id: "source", share: "private", resources })
+      state.who = ada
+      const visit = () => answer(dropGet, request("/api/drops/source", { id: "source" }))
+      assert.equal((await visit()).status, 403, "the source initially requires approval")
+
+      if (policy === "approval disabled") state.shareApproval = false
+      else sql.prepare("UPDATE user SET role = 'admin' WHERE id = 'owner'").run()
+      assert.equal((await visit()).status, 200, "a normal signed-in visit records the now-effective public link")
+      assert.ok(sql.prepare("SELECT 1 FROM drop_visits WHERE user_id = 'ada' AND drop_id = 'source'").get())
+      assert.equal(sql.prepare("SELECT share_review FROM drops WHERE id = 'source'").get().share_review, "pending")
+
+      const bearer = (await token()).body.token
+      const onPage = async () =>
+        (
+          await json(
+            await answer(
+              relatedGet,
+              request("/api/review/related", {
+                headers: { origin: SITE, authorization: `Bearer ${bearer}` },
+              }),
+            ),
+          )
+        ).groups
+      const inDrop = () => dropRelated(request("/api/drops/site/related"))
+      const groups = await onPage()
+      assert.deepEqual(
+        groups.map((group) => group.title),
+        [docId],
+      )
+      assert.deepEqual(
+        (await inDrop()).map((group) => group.id),
+        [docId],
+      )
+      const handle = groups[0].open
+      assert.deepEqual(await openPost(post("/api/review/open", { doc: handle })), { to: `/drops/${docId}` })
+
+      if (policy === "approval disabled") state.shareApproval = true
+      else sql.prepare("UPDATE user SET role = 'member' WHERE id = 'owner'").run()
+      assert.equal((await visit()).status, 403)
+      assert.deepEqual(await onPage(), [], "a prior visit does not bypass a current approval requirement")
+      assert.deepEqual(await inDrop(), [])
+      assert.equal((await answer(openPost, post("/api/review/open", { doc: handle }))).status, 404)
+    })
+  }
+}
+
+test("ineligible, already seen, and inexact candidates do not consume the related result budget", async () => {
+  const PR = "https://github.com/acme/app/pull/12"
+  const links = (...urls) => JSON.stringify(urls.map((url) => ({ url })))
+  insertDrop("seed", { owner_id: "ada", resources: links(`${SITE}/`), updated_at: 200 })
+  insertDrop("older-doc", { owner_id: "ada", updated_at: 3, resources: links(`${SITE}/`, PR) })
+  insertDrop("second-hop", { owner_id: "ada", updated_at: 2, resources: links(PR) })
+  site("older-site", { owner_id: "ada", updated_at: 1 })
+  for (let i = 0; i < 25; i++) {
+    insertDrop(`hidden-${i}`, { visibility: "private", updated_at: 100 + i, resources: links(`${SITE}/`) })
+    site(`hidden-site-${i}`, { visibility: "private", updated_at: 100 + i })
+    insertDrop(`quoted-${i}`, {
+      owner_id: "ada",
+      updated_at: 100 + i,
+      resources: JSON.stringify([{ url: "https://elsewhere.test/", title: `${SITE}/` }]),
+    })
+  }
+  state.who = ada
+  const result = await dropRelated(request("/api/drops/seed/related", { id: "seed" }))
+  assert.deepEqual(
+    result.map((group) => group.id),
+    ["older-doc", "older-site", "second-hop"],
+  )
+
+  // The cap still applies when more than one page of eligible drops matches.
+  for (let i = 0; i < 25; i++)
+    insertDrop(`mine-${i}`, { owner_id: "ada", updated_at: 300 + i, resources: links(`${SITE}/`) })
+  const capped = await dropRelated(request("/api/drops/seed/related", { id: "seed" }))
+  assert.equal(capped.length, 20)
+  assert.deepEqual(
+    capped.map((group) => group.id),
+    Array.from({ length: 20 }, (_, i) => `mine-${24 - i}`),
+  )
+})
+
+test("the related probe refills past inexact JSON matches before deciding no drop links here", async () => {
+  site()
+  for (let i = 0; i < 25; i++)
+    insertDrop(`quoted-${i}`, {
+      updated_at: 100 + i,
+      resources: JSON.stringify([{ url: "https://elsewhere.test/", title: `${SITE}/` }]),
+    })
+  const probe = () => answer(relatedGet, request("/api/review/related", { headers: { origin: SITE } }))
+  assert.deepEqual(await json(await probe()), { linked: false })
+  insertDrop("older-doc", { resources: JSON.stringify([{ url: `${SITE}/` }]) })
+  assert.deepEqual(await json(await probe()), { linked: true })
 })
 
 test("what the page sends is checked: the token, the image's bytes, and the fields", async () => {

@@ -216,8 +216,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
     '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
     '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
-    '.a{position:absolute;box-sizing:border-box;border:calc(1.5px * var(--drop-z,1)) solid var(--foreground);border-radius:3px;background:color-mix(in oklab,var(--foreground) 6%,transparent);pointer-events:none;transition:background 120ms}' +
-    '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}.a.t{background:none}' +
+    // Areas take the tools' blue (--hi): a line in the text color vanished on a dark page over a white image. Text keeps
+    // its outline in the text color, and a resolved area turns gray. While dragging, corner handles and the size show.
+    '.a{position:absolute;box-sizing:border-box;border:calc(2px * var(--drop-z,1)) solid var(--hi);border-radius:3px;background:color-mix(in oklab,var(--hi) 16%,transparent);pointer-events:none;transition:background 120ms}' +
+    '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--hi) 32%,transparent)}' +
+    '.a.t{border-width:calc(1.5px * var(--drop-z,1));border-color:var(--foreground);background:none}.a.t.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
+    '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--hi);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
+    '.a .tag{position:absolute;left:-2px;top:calc(100% + 6px)}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
     // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
     '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
@@ -643,7 +648,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(copy.getBoundingClientRect()) : inLayer(copy.getBoundingClientRect());
         if (copy) into = beside ? asideMarks : zoomMarks;
         x = b.left + (m.ox / 1000) * b.width; y = b.top + (m.oy / 1000) * b.height;
-        if (m.ow || m.oh) areaBox(into, x, y, (m.ow / 1000) * b.width, (m.oh / 1000) * b.height, (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
+        if (m.ow || m.oh) areaBox(into, x, y, (m.ow / 1000) * b.width, (m.oh / 1000) * b.height, (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "")).dataset.for = m.id;
       } else {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
@@ -719,6 +724,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (draftPin) return post({ type: "draft-place", rail: false, pin: true, rect: pinBox(draftPin) });
       const open = opened && marks.querySelector('.gp[data-id="' + CSS.escape(opened) + '"]');
       if (open) return post({ type: "draft-place", rail: false, pin: true, id: opened, rect: pinBox(open) });
+    }
+    // Any other style: the open thread is written in beside its pin, or over its card in the margin.
+    if (opened && !drafted) {
+      const id = CSS.escape(opened), card = marks.querySelector('.rail .g[data-id="' + id + '"] > .cr-card');
+      if (card) return post({ type: "draft-place", rail: true, id: opened, rect: box(card.getBoundingClientRect()) });
+      const dot = marks.querySelector('.m[data-id="' + id + '"]');
+      if (!dot) return;
+      // A pin with an area: the thread goes beside both, so it never covers what the comment is about.
+      const r = dot.getBoundingClientRect(), area = marks.querySelector('.a[data-for="' + id + '"]');
+      const a = area ? area.getBoundingClientRect() : r;
+      return post({ type: "draft-place", rail: false, pin: true, id: opened, rect: { left: Math.min(r.left, a.left), top: Math.min(r.top, a.top), right: Math.max(r.right, a.right), bottom: Math.max(r.bottom, a.bottom) } });
+      return;
     }
     if (!drafted) return;
     const slot = marks.querySelector(".rail .slot > .cr-card"), r = (slot || drafted).getBoundingClientRect();
@@ -848,9 +865,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     post({ type: "selection", quote: lastQuote, selector: pathOf(block), label: labelOf(block), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }
   let selectionTimer = 0;
-  // Pin style: a click on the page away from its pins puts away what's open beside a pin (Drop keeps a draft with words).
+  // A click on the page away from its pins puts away the open thread, and in the Pin style the composer beside a pin
+  // (Drop keeps a draft with words).
   document.addEventListener("click", (e) => {
-    if (!pinMode() || e.target === host || (!drafted && !opened)) return;
+    if (e.target === host || (!opened && !(pinMode() && drafted))) return;
     const sel = getSelection();
     if (sel && !sel.isCollapsed) return;
     post({ type: "page-click" });
@@ -1199,8 +1217,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (!start || tool !== "comment") { hovered = elementAt(e.clientX, e.clientY); return redraw(); }
         const left = Math.min(start.x, e.clientX), top = Math.min(start.y, e.clientY), width = Math.abs(e.clientX - start.x), height = Math.abs(e.clientY - start.y);
         if (!box && Math.max(width, height) < 6) return;
-        if (!box) { box = areaBox(layer, 0, 0, 0, 0); layer.dragging = true; redraw(); }
+        if (!box) {
+          box = areaBox(layer, 0, 0, 0, 0);
+          box.innerHTML = '<i></i><i></i><i></i><i></i><span class="tag"></span>';
+          layer.dragging = true; redraw();
+        }
         box.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + width + "px;height:" + height + "px";
+        box.lastChild.textContent = Math.round(width) + " × " + Math.round(height);
       };
       layer.onpointerup = (e) => {
         if (!start) return;
@@ -1604,7 +1627,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
-    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; emphasise(); if (pinMode()) { render(); } }
+    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; emphasise(); if (pinMode()) render(); else placeDraft(); }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
     if (m.type === "scroll-by" && typeof m.y === "number") scrollBy({ top: m.y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     if (m.type === "focus") {

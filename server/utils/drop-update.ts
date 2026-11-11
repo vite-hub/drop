@@ -10,7 +10,8 @@ import { type DropRow, findDrop, lifetimeFields, permissions, restoreDrop, toSum
 import { expiryPolicy, renewDrop } from "./expiry"
 import { MAX_FOLDER_DESCRIPTION, moveNode } from "./folders"
 import type { Identity } from "./identity"
-import { isAttachment, parentNode, resolveNode, rootOf, uniqueSlug } from "./nodes"
+import { linkAddress } from "./link-items"
+import { isAttachment, itemCounts, parentNode, resolveNode, rootOf, uniqueSlug } from "./nodes"
 import { requireKeepSlot } from "./quotas"
 import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
@@ -31,13 +32,18 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
     throw new HTTPError({ status: 404, statusText: "No drop with that id." })
   if (body.trashed !== undefined && !can.owner && who.role !== "admin" && !(onlyTrash && can.trash))
     throw new HTTPError({ status: 403, statusText: "Only the drop's owner can move it to the Trash or restore it." })
-  // What a folder's description says steers every agent that publishes into it, so people write it, in the browser.
-  if (body.description !== undefined && (found.kind !== "folder" || (found.teamFolder && who.actorKind !== "browser")))
+  // What a folder's description says steers every agent that publishes into it, so people write it, in the browser. A
+  // link's is its note.
+  const described = found.kind === "folder" || found.kind === "link"
+  if (body.description !== undefined && (!described || (found.teamFolder && who.actorKind !== "browser")))
     throw new HTTPError({
       status: 400,
-      statusText:
-        found.kind === "folder" ? "People describe team folders, in the browser." : "Only folders have a description.",
+      statusText: described
+        ? "People describe team folders, in the browser."
+        : "Only folders and links have a description.",
     })
+  if (body.url !== undefined && found.kind !== "link")
+    throw new HTTPError({ status: 400, statusText: "Only links have an address to change." })
   const { days } = expiryPolicy(event)
   const now = Date.now()
   let drop = found
@@ -74,12 +80,13 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
     if (isPublic(body.share) !== isPublic(own.share))
       share.shareReview = isPublic(body.share) ? await shareReviewFor(drop.ownerId, event) : null
   }
-  // The name, and a folder's description, belong to this row alone.
+  // The name, a folder's description, and a link's address belong to this row alone.
   const title = {
     ...(body.title !== undefined ? { title: body.title } : {}),
     ...(body.description !== undefined
       ? { note: body.description.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null }
       : {}),
+    ...(body.url !== undefined ? { siteUrl: linkAddress(body.url) } : {}),
   }
   const life =
     body.lifetime !== undefined
@@ -102,7 +109,9 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   // In a folder, the share it ends up with depends on the folders above: read it back.
   if (drop.parentId && Object.keys(share).length) drop = (await findDrop(drop.id, event)) ?? drop
   else drop = { ...drop, ...change, raw: { ...own, ...change } }
-  return toSummary({ ...drop, ...title, ...renewed, ...trashed }, undefined, days)
+  const summary = toSummary({ ...drop, ...title, ...renewed, ...trashed }, undefined, days)
+  // A folder says how much it holds, as it does in lists.
+  return drop.kind === "folder" ? { ...summary, items: (await itemCounts([drop.id])).get(drop.id) ?? 0 } : summary
 }
 
 /** The top-most node above a drop that is in the Trash, or expired into it: restoring that one brings the drop back. */

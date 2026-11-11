@@ -8,7 +8,7 @@ const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const app = useAppFiles(drop)
 // Presenting takes no comments: as in the editor, the frame's comment layer stays off.
 const annotations = useViewerAnnotations({ drop, editing: ref(true) })
-const { srcdoc, contentOrigin, frameSrc, frameKey } = useViewerFrame({
+const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme } = useViewerFrame({
   drop,
   frame,
   app,
@@ -27,7 +27,8 @@ useSeoMeta({ title: () => drop.value.title })
       v-if="contentOrigin"
       :key="frameKey"
       ref="frame"
-      class="block size-full [color-scheme:light]"
+      class="block size-full"
+      :style="{ colorScheme: frameScheme }"
       :allow="frameAllow(drop.kind)"
       :sandbox="CONTENT_SANDBOX"
       :src="frameSrc"
@@ -37,7 +38,8 @@ useSeoMeta({ title: () => drop.value.title })
     <iframe
       v-else-if="srcdoc"
       ref="frame"
-      class="block size-full [color-scheme:light]"
+      class="block size-full"
+      :style="{ colorScheme: frameScheme }"
       data-allow-mismatch="attribute"
       :allow="frameAllow(drop.kind)"
       :sandbox="previewSandbox(drop.kind)"
