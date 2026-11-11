@@ -5,8 +5,8 @@ import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
- * file) stored as one blob, an app stored as a folder of blobs in `drop_files`, a folder of other drops, or a site:
- * a live website people review in place, whose comments arrive with screenshots. The row is the drop as it is now, its
+ * file) stored as one blob, an app stored as a folder of blobs in `drop_files`, a folder of other drops, a site:
+ * a live website people review in place, whose comments arrive with screenshots, or a link to a page outside Drop. The row is the drop as it is now, its
  * latest version included; `drop_versions` keeps the versions before it.
  */
 export const drops = sqliteTable(
@@ -60,7 +60,10 @@ export const drops = sqliteTable(
     trashReason: text("trash_reason", { enum: ["deleted", "expired"] }),
     /** The doc an image belongs to. Attachments share the doc's sharing, lifetime, and Trash, and don't count as drops. */
     parentId: text("parent_id"),
-    /** Sites only: the origin of the website under review, or a `*.` pattern of them; the only ones its review script may post from. */
+    /**
+     * Sites: the origin of the website under review, or a `*.` pattern of them; the only ones its review script may post
+     * from. Links: the page the link opens, like a pull request (../utils/link-items.ts).
+     */
     siteUrl: text("site_url"),
     /** CAS token used while replacing an app's file set. */
     publishToken: text("publish_token"),

@@ -115,6 +115,7 @@ export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().
     trashedAt: row.trashedAt ?? (row.expired && expires !== null ? expires : null),
     trashReason: row.trashReason ?? (row.expired ? "expired" : null),
     ...(row.kind === "folder" && row.teamFolder ? { teamFolder: true } : {}),
+    ...(row.kind === "link" && row.siteUrl ? { href: row.siteUrl } : {}),
     ...(teamOf(row) ? { team: teamOf(row)! } : {}),
     ...(row.sharedFrom && row.raw ? { sharedFrom: row.sharedFrom, ownShare: row.raw.share } : {}),
   }

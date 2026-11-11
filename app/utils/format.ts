@@ -12,6 +12,7 @@ export const KIND_ICONS: Record<DropKind, string> = {
   folder: "i-mingcute-folder-line",
   site: "i-mingcute-world-2-line",
   board: "i-mingcute-drawing-board-line",
+  link: "i-mingcute-link-line",
 }
 
 export const KIND_LABELS: Record<DropKind, string> = {
@@ -23,6 +24,7 @@ export const KIND_LABELS: Record<DropKind, string> = {
   folder: "Folder",
   site: "Site",
   board: "Board",
+  link: "Link",
 }
 
 export const VIA_LABELS: Record<ActorKind, string> = { agent: "MCP", browser: "the browser" }

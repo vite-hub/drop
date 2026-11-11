@@ -138,6 +138,8 @@ A drop can link to the pages it belongs with, such as the pull request it docume
 
 Agents set them when they publish. Pull request evidence links its pull request and preview on its own, and comments its own link on the pull request, so each leads to the other. The icons load from each site's own `/favicon.ico`, or its parent domain's when the address is behind a sign-in, never through an icon service.
 
+A folder can hold a link of its own, next to its docs and files: the pull request a folder's reports go with, say. It shows with its site's icon, and a pull request also shows its repository and number, like `quiverdk/website#33`. Clicking it opens the page; it shares, moves, and lives with the folder like any drop. Agents add one with `publish` and `link`.
+
 ### Views {#views}
 
 **Views** in a drop's Details count how often people and agents opened it, split into signed in, anonymous, and by agents. Only its owner and admins see them, and their agents get them from `read_drop`. Each viewer counts once a day, every version of a doc adds to the same count, and your own visits don't count.
