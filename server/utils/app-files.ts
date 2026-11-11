@@ -85,8 +85,8 @@ async function lookUpAppFiles(event: H3Event, grant: v.InferOutput<typeof Grant>
  *
  * Rollup and Vite hash with 8 base64url characters, which may hold no digit (`CWeqyEg_`) or a dash (`lXm2UH6-`). Out
  * of context such a name could be a word someone typed (`BkRpwUQU.js`), so it counts only inside a folder that build
- * tools keep for their output, and never when it reads as words (`MyWidget`): a hash shaped like one is only a cache
- * miss, a typed name kept for a year would hide the next version.
+ * tools keep for their output, and never when it reads as words (`MyWidget`, `logoDark`): a hash shaped like one is
+ * only a cache miss, a typed name kept for a year would hide the next version.
  */
 export function isHashedAsset(path: string): boolean {
   const slash = path.lastIndexOf("/")
@@ -107,7 +107,7 @@ export function isHashedAsset(path: string): boolean {
     (BUILD_FOLDER.test(path.slice(0, slash + 1)) &&
       parts.some((part) => {
         const hash = /(?:^|[-.])([\w-]{8})$/.exec(part)?.[1]
-        return !!hash && /[a-z]/.test(hash) && /[A-Z]/.test(hash) && !/^(?:[A-Z][a-z]+)+$/.test(hash)
+        return !!hash && /[a-z]/.test(hash) && /[A-Z]/.test(hash) && !/^(?:[a-z]+)?(?:[A-Z][a-z]+)+$/.test(hash)
       }))
   )
 }

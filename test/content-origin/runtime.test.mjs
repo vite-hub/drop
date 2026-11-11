@@ -2,13 +2,14 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext, Script } from "node:vm"
 import { H3Event } from "h3"
-import { calls, migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
+import { calls, migrate, reset, insertDrop, objects, queries, sql, state, who } from "../cost/harness.mjs"
 const { contentHost, contentOrigin, FRAME_HOST_HTML } = await import("../../server/utils/content-origin.ts")
 const isContentRequest = (event) => contentHost(event) === "content"
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
 const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
 const { isHashedAsset } = await import("../../server/utils/app-files.ts")
+const { publishApp } = await import("../../server/utils/drops.ts")
 const { buildProjectDocument, pageAt, pageUrl } = await import("../../shared/project-bundle.ts")
 const { injectRuntime, OPAQUE_ORIGIN_SHIM, prependToHead } = await import("../../shared/plan-runtime.ts")
 
@@ -385,6 +386,42 @@ test("on a team Drop, an app's files stop for someone whose account is gone", as
   }
 })
 
+test("lowerCamelCase app assets revalidate when republished at the same path", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  const now = Date.now
+  try {
+    const path = "assets/logoDark.svg"
+    const app = await publishApp(who, {
+      files: { "index.html": "<p>App</p>", [path]: "<svg>v1</svg>" },
+    })
+    const detailEvent = request(`https://drop.example/api/drops/${app.id}`)
+    detailEvent.context.params = { id: app.id }
+    const detail = await detailHandler(detailEvent)
+    const load = () =>
+      contentMiddleware(
+        request(`${detail.contentOrigin}/${path}`, {
+          headers: { "sec-fetch-dest": "image", cookie: `drop_grant=${detail.contentGrant}` },
+        }),
+      )
+    const before = await load()
+    assert.equal(await before.text(), "<svg>v1</svg>")
+
+    await publishApp(who, { id: app.id, files: { [path]: "<svg>v2</svg>" } })
+    // Expire the isolate's file lookup while keeping the same URL and viewer grant.
+    Date.now = () => now() + 10_000
+    const after = await load()
+    assert.equal(await after.text(), "<svg>v2</svg>")
+    for (const response of [before, after]) {
+      assert.equal(response.status, 200)
+      assert.equal(response.headers.get("cache-control"), "private, max-age=0, must-revalidate")
+    }
+  } finally {
+    Date.now = now
+    state.authSecret = undefined
+  }
+})
+
 test("only files named after their content count as hashed, so the browser never keeps one that may change", () => {
   for (const path of [
     "_nuxt/B0nDsZtt.js",
@@ -418,6 +455,9 @@ test("only files named after their content count as hashed, so the browser never
     "_nuxt/Settings.js",
     "assets/Overview.md",
     "assets/MyWidget.js",
+    "assets/logoDark.svg",
+    "assets/siteLogo.svg",
+    "assets/readFile.js",
     "_nuxt/TodoList.js",
     "assets/vendor-lowercase.js",
   ])
