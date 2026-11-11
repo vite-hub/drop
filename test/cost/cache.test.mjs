@@ -5,6 +5,7 @@ import { createRequire } from "node:module"
 import { pathToFileURL } from "node:url"
 import { state, calls } from "./harness.mjs"
 const { cachedMarkdown, deleteMarkdownCache, MARKDOWN_CACHE_TTL } = await import("../../server/utils/markdown-cache.ts")
+const { renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
 
 const [KEY] = await resolveCacheKeys({
   options: { base: "", group: "nitro/functions", name: "markdown", getKey: () => "doc.md" },
@@ -75,6 +76,32 @@ test("renders from an older release of Drop's renderer are refreshed on the next
     assert.equal(next.html, "<p>source</p>")
     assert.equal(calls.writes.length, 1)
   }
+})
+
+test("a warm embed card from before the Drop player is refreshed on the next read", async () => {
+  const source = '::embed{url="https://drop.vitehub.dev/d/k7f2q9m4x8wd" title="Demo"}\n::'
+  state.entries.set(KEY, {
+    integrity: "0.10.1+drop.18",
+    mtime: Date.now(),
+    value: {
+      title: "Untitled document",
+      html: '<a class="ce-card" href="https://drop.vitehub.dev/d/k7f2q9m4x8wd">Demo</a>',
+      source,
+    },
+  })
+  let reads = 0
+  const next = await renderMarkdownCached("doc.md", async () => {
+    reads++
+    return source
+  })
+  assert.match(next.html, /data-drop-embed="k7f2q9m4x8wd"/)
+  assert.doesNotMatch(next.html, /ce-card|render-error/)
+  assert.equal(reads, 1)
+  assert.equal(calls.writes.length, 1)
+  const hit = await renderMarkdownCached("doc.md", () => {
+    throw new Error("the refreshed render should be cached")
+  })
+  assert.equal(hit.html, next.html)
 })
 
 test("cache hits do not read source or render again, and deletion removes the render", async () => {

@@ -100,6 +100,12 @@ test("all five GitHub alert kinds keep their label", async () => {
   }
 })
 
+// markdown.md promises it, and comark 0.9 stopped doing it for a parser without its defaults.
+test("a bare URL renders as a link", async () => {
+  const { html } = await renderMarkdownCached("bare-url.md", async () => "See https://example.com/ledger today.\n")
+  assert.match(html, /<a [^>]*href="https:\/\/example\.com\/ledger"/)
+})
+
 test("footnotes link to their definition and back", async () => {
   const { html } = await renderMarkdownCached("footnotes.md", async () => "A claim.[^src]\n\n[^src]: The source.\n")
   assert.match(
@@ -182,7 +188,23 @@ test("a doc's problems open in a foldable box that counts them and shows the Mar
   assert.doesNotMatch(html, /<li>[^<]*`/)
 })
 
-test("::drop leaves a box with only the link, which the viewer fills for readers who may open it", async () => {
+test("::embed of a drop's page leaves a box with only the link, which the viewer fills for readers who may open it", async () => {
+  const markdown =
+    '::embed{url="https://drop.vitehub.dev/d/k7f2q9m4x8wd/steps" height=9999 title="Steps <b>"}\n::\n\n' +
+    '::embed{url="https://drop.example.com/d/a1b2c3d4e5f6"}\n::\n\n::embed{url="https://example.com/docs" title="Docs"}\n::'
+  const { html } = await renderMarkdownCached("embed-drop.md", async () => markdown)
+  assert.match(
+    html,
+    /<figure class="drop-embed" data-drop-embed="k7f2q9m4x8wd" data-title="Steps &lt;b&gt;" style="--drop-embed-height: 1600px"><a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Steps &lt;b&gt;<\/a><\/figure>/,
+  )
+  // A self-hosted Drop's address works too, and a drop needs no title, unlike a link card.
+  assert.match(html, /data-drop-embed="a1b2c3d4e5f6" data-title="Embedded drop" style="--drop-embed-height: 480px"/)
+  assert.match(html, /<a class="ce-card"[^>]* href="https:\/\/example.com\/docs">/)
+  assert.doesNotMatch(html, /<iframe|unsupported-component|render-error/)
+  assert.deepEqual(await lintMarkdown(markdown), [])
+})
+
+test("::drop, from docs published before ::embed showed drops, still leaves the same box", async () => {
   const { html } = await renderMarkdownCached(
     "embed.md",
     async () =>
@@ -194,4 +216,19 @@ test("::drop leaves a box with only the link, which the viewer fills for readers
   )
   assert.match(html, /<code>::drop<\/code> needs the link/)
   assert.doesNotMatch(html, /<iframe|unsupported-component/)
+})
+
+test("local HTTP Drop addresses use ::drop as the documented fallback for HTTPS-only ::embed", async () => {
+  const url = "http://localhost:3000/d/k7f2q9m4x8wd"
+  const embed = `::embed{url="${url}" height=420 title="Demo"}\n::`
+  assert.ok((await lintMarkdown(embed)).some(({ rule }) => rule === "comark/embed/insecure-url"))
+  const rejected = await renderMarkdownCached("local-embed.md", async () => embed)
+  assert.doesNotMatch(rejected.html, /data-drop-embed|<iframe/)
+
+  const fallback = `::drop{link="${url}" height=420 title="Demo"}\n::`
+  assert.deepEqual(await lintMarkdown(fallback), [])
+  const { html } = await renderMarkdownCached("local-drop.md", async () => fallback)
+  assert.match(html, /data-drop-embed="k7f2q9m4x8wd" data-title="Demo" style="--drop-embed-height: 420px"/)
+  assert.match(html, /<a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Demo<\/a>/)
+  assert.doesNotMatch(html, /<iframe|unsupported-component|render-error/)
 })

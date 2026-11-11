@@ -48,6 +48,17 @@ export function contentUnavailable(
   }
 }
 
+/**
+ * A 404 under a drop this person may open: the drop is there, only the address isn't, so nothing about access or
+ * accounts applies. `drop` is the drop's own link.
+ */
+export const missingInDrop = (drop: string, email?: string | null) => ({
+  title: "Nothing is at this address in the drop.",
+  description: "The drop is here, and you can open it, but it has no page at this address.",
+  email: email ?? null,
+  action: { label: "Open the drop", to: drop },
+})
+
 export function contentUnavailableIcon(status: number, waitingForReview = false) {
   if (status >= 500 || status === 429)
     return "m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0M12 9v4m0 4h.01"

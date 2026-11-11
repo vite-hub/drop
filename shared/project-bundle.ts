@@ -27,8 +27,61 @@ export function pageAt(pages: string[], path: string): string | null {
   return candidates.find((candidate) => candidate && pages.includes(candidate)) ?? null
 }
 
-/** The URL path a static host serves `page` at: an index.html at its folder. */
-export const pageUrl = (page: string): string => encodeURI(`/${page.replace(/(^|\/)index\.html$/, "$1")}`)
+/**
+ * The URL path a static host serves `page` at: an index.html at its folder, any other page without `.html`, the clean
+ * URL Cloudflare Pages, Netlify and Vercel serve and a built site's router expects (`/guide/setup` for
+ * guide/setup.html).
+ */
+export const pageUrl = (page: string): string =>
+  encodeURI(`/${page.replace(/(^|\/)index\.html$/, "$1").replace(/\.html$/, "")}`)
+
+/**
+ * The page a static host answers `location` with: the page at its path, else 404.html, a single-page app's 200.html,
+ * or its index.html. `location` is an app address, path with its query and hash.
+ */
+export function appPageFor(pages: string[], location: string): string {
+  let path = location.replace(/[?#].*$/s, "")
+  try {
+    path = decodeURIComponent(path)
+  } catch {}
+  return pageAt(pages, path) ?? ["404.html", "200.html"].find((page) => pages.includes(page)) ?? "index.html"
+}
+
+/** The most pages an agent's reply lists, each with its link. */
+export const MAX_LISTED_PAGES = 100
+
+/**
+ * The app's pages, each with the link that opens the drop at it: `index.html` at `dropUrl` itself, every other at
+ * `?path=` and its clean URL. 404.html and 200.html answer addresses the app lacks, so nobody links to them.
+ */
+export function appPageLinks(dropUrl: string, paths: string[]): { page: string; url: string }[] {
+  return paths
+    .filter((path) => path.endsWith(".html") && path !== "404.html" && path !== "200.html")
+    .sort((a, b) => (a === "index.html" ? -1 : b === "index.html" ? 1 : a.localeCompare(b)))
+    .map((page) => {
+      const url = new URL(dropUrl)
+      if (page !== "index.html") url.searchParams.set("path", decodeURI(pageUrl(page)))
+      return { page, url: url.href }
+    })
+}
+
+/**
+ * The app address in a drop link's `?path=` (`/guide/setup?tab=vue#install`), with a leading slash, or null for one
+ * that would leave the app's origin (`//other.example`, `https://…`). Hand-written links put the hash outside, after
+ * the query, so `hash` (the drop link's own) completes a path that has none.
+ */
+export function appLocation(path: string | null | undefined, hash = ""): string | null {
+  if (!path) return null
+  const base = "https://app.invalid"
+  let url: URL
+  try {
+    url = new URL(path.startsWith("/") ? path : `/${path}`, base)
+  } catch {
+    return null
+  }
+  if (url.origin !== base) return null
+  return `${url.pathname}${url.search}${url.hash || (hash.length > 1 ? hash : "")}`
+}
 
 export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain"
 
@@ -88,7 +141,7 @@ function pageRuntime(files: ProjectFiles, page: string): string {
     return native(input, init);
   };
   if (!opaque) {
-    const report = () => post({ type: "location", path: location.pathname });
+    const report = () => post({ type: "location", path: location.pathname + location.search + location.hash });
     for (const method of ["pushState", "replaceState"]) {
       const original = history[method];
       history[method] = function (...args) {
@@ -98,6 +151,7 @@ function pageRuntime(files: ProjectFiles, page: string): string {
       };
     }
     addEventListener("popstate", report);
+    addEventListener("hashchange", report);
     // Apps that frame their own pages load the frame host again, one level down. Pass its request up to Drop
     // and the document back down, as many levels as the app nests.
     const waiting = new Map();
