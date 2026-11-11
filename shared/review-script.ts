@@ -1148,11 +1148,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   new MutationObserver((records) => {
     const changes = records.filter((record) => host !== record.target && !host.contains(record.target));
     if (!changes.length) return;
+    const labels = changes.filter((record) => record.type !== "attributes" || record.attributeName === "alt");
     for (const [n, known] of elementFor)
-      if (known.el && changes.some((record) => known.el.contains(record.target))) elementFor.delete(n);
+      if (known.el && labels.some((record) => known.el.contains(record.target))) elementFor.delete(n);
     changedAt = performance.now();
     schedule();
-  }).observe(document.documentElement, { childList: true, characterData: true, attributes: true, attributeFilter: ["alt"], subtree: true });
+  }).observe(document.documentElement, { childList: true, characterData: true, attributes: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
   setInterval(() => {
     if (token && pageKey() !== here) { closeThread(); elementFor.clear(); void refresh(); }

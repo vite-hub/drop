@@ -68,12 +68,14 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
   }
   // modern-screenshot writes each cloned element's computed style inline, about a kilobyte each, and Chromium keeps
   // every SVG image it decodes until the tab closes: 34 MB of SVG and 65 MB of the tab per comment on a 3,000-row
-  // table (drop#163). Rows and cells share their styles, so each distinct one becomes a class instead. Its rules are
-  // !important, as an inline style beat whatever an SVG's own <style> on the page says.
+  // table (drop#163). Rows and cells share their styles, so each distinct HTML style becomes a class instead.
+  // SVG definitions retain authored CSS, whose important ID rules would beat a class but not an important inline
+  // override. Leave SVG styles and definition subtrees inline to keep their original cascade precedence.
   function shareStyles(svg) {
     const names = new Map();
     let rules = "";
     for (const node of svg.querySelectorAll("[style]")) {
+      if (node.namespaceURI !== "http://www.w3.org/1999/xhtml" || node.closest("defs, symbol")) continue;
       const text = node.getAttribute("style");
       let name = names.get(text);
       if (name === undefined) {

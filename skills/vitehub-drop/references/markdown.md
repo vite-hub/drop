@@ -109,6 +109,12 @@ A doc runs no scripts. To show something that does, publish it as its own `html`
 
 The drop runs in its own sandbox inside the doc, so it can't reach Drop, the reader's session, or the doc around it. Make it one self-contained HTML file: with no origin of its own, it can't load another drop's files or Drop's private images. Only HTML drops show; an app, a doc, or an image shows a note instead. Each reader sees the drop only if they may open it themselves, so share it at least as widely as the doc. On the doc's plain `/f/` page, which runs no scripts, the box is a link to the drop.
 
+To lint a doc that uses `::drop` with `comark-lint`, name the block in a `comark-lint.config.mjs` in the folder you run it from:
+
+```js
+export default { components: ["drop"] }
+```
+
 ## Front matter
 
 ```md
