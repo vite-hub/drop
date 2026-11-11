@@ -486,26 +486,38 @@ const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker, whenHeld } =
-  useViewerFrame({
-    drop,
-    frame,
-    app,
-    pinned,
-    // The panel sits beside the frame, not over it: the doc has nothing to make room for.
-    inset: ref(0),
-    // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
-    bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
-    width: docWidth,
-    annotations,
-    clickComments: commentMode,
-    comments: computed(() => ({
-      style: pinStyle.value ? "pin" : "card",
-      me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
-    })),
-    variantBar: true,
-    arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
-  })
+const {
+  srcdoc,
+  contentOrigin,
+  frameSrc,
+  frameKey,
+  frameScheme,
+  ready,
+  send,
+  unplaced,
+  openPath,
+  variants,
+  picker,
+  whenHeld,
+} = useViewerFrame({
+  drop,
+  frame,
+  app,
+  pinned,
+  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+  inset: ref(0),
+  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
+  width: docWidth,
+  annotations,
+  clickComments: commentMode,
+  comments: computed(() => ({
+    style: pinStyle.value ? "pin" : "card",
+    me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
+  })),
+  variantBar: true,
+  arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
+})
 
 const outdated = computed(
   () =>
@@ -1226,19 +1238,19 @@ watch(
               v-if="contentOrigin"
               :key="frameKey"
               ref="frame"
-              class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+              class="block min-h-0 w-full flex-1 bg-default"
+              :style="{ colorScheme: frameScheme }"
               :allow="frameAllow(drop.kind)"
               :sandbox="CONTENT_SANDBOX"
               :src="frameSrc"
               :title="drop.title"
             />
-            <!-- [color-scheme:light] on both frames matches a blank or light document, so the browser paints no opaque white
-               backdrop behind it in dark mode. -->
             <!-- Hydration mismatch reason: SSR/client bundlers format the srcdoc resolver differently. -->
             <iframe
               v-else
               ref="frame"
-              class="block min-h-0 w-full flex-1 bg-default [color-scheme:light]"
+              class="block min-h-0 w-full flex-1 bg-default"
+              :style="{ colorScheme: frameScheme }"
               data-allow-mismatch="attribute"
               :allow="frameAllow(drop.kind)"
               :sandbox="previewSandbox(drop.kind)"

@@ -404,5 +404,22 @@ export function useViewerFrame(options: {
   )
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
 
-  return { srcdoc, contentOrigin, frameSrc, frameKey, ready, send, unplaced, openPath, variants, picker, whenHeld }
+  // Safari reads prefers-color-scheme inside the frame from the frame's color-scheme, so the frame takes the reader's
+  // color mode, once its page runs: until then a dark frame would paint the empty frame host's light canvas white.
+  const frameScheme = computed(() => (dark.value && ready.value ? "dark" : "light"))
+
+  return {
+    srcdoc,
+    contentOrigin,
+    frameSrc,
+    frameKey,
+    frameScheme,
+    ready,
+    send,
+    unplaced,
+    openPath,
+    variants,
+    picker,
+    whenHeld,
+  }
 }
