@@ -2,13 +2,14 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { runInNewContext, Script } from "node:vm"
 import { H3Event } from "h3"
-import { calls, migrate, reset, insertDrop, objects, queries, sql, state } from "../cost/harness.mjs"
+import { calls, migrate, reset, insertDrop, objects, queries, sql, state, who } from "../cost/harness.mjs"
 const { contentHost, contentOrigin, FRAME_HOST_HTML } = await import("../../server/utils/content-origin.ts")
 const isContentRequest = (event) => contentHost(event) === "content"
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
 const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
 const { isHashedAsset, serveAppFile } = await import("../../server/utils/app-files.ts")
+const { publishApp } = await import("../../server/utils/drops.ts")
 const { buildProjectDocument, pageAt, pageUrl } = await import("../../shared/project-bundle.ts")
 const { injectRuntime, OPAQUE_ORIGIN_SHIM, prependToHead } = await import("../../shared/plan-runtime.ts")
 
@@ -433,11 +434,40 @@ async function cachedAppFor(id, paths) {
   }
 }
 
+test("hashes without digits keep their browser policy on storage reads and cache hits", async () => {
+  const edge = edgeCache()
+  globalThis.caches = edge.caches
+  try {
+    const paths = ["_nuxt/CWeqyEg_.js", "_nuxt/BPFKiSqj.js", "_nuxt/zHU-kgrs.js"]
+    const { load } = await cachedAppFor("digit-free-hashes", paths)
+    const reads = calls.serve
+    for (const path of paths) {
+      for (let pass = 0; pass < 2; pass++) {
+        const response = await load(path)
+        assert.equal(response.headers.get("cache-control"), "private, max-age=31536000, immutable", path)
+        assert.equal(await response.text(), "0123456789")
+        await edge.settled()
+      }
+    }
+    assert.equal(calls.serve, reads + paths.length, "the second load of each hash uses the edge cache")
+  } finally {
+    delete globalThis.caches
+    state.authSecret = undefined
+  }
+})
+
 test("mutable asset names revalidate on storage reads, cache hits, and after republishing", async () => {
   const edge = edgeCache()
   globalThis.caches = edge.caches
   try {
-    const paths = ["assets/darkMode.js", "assets/siteLogo.svg", "assets/logoIcon.svg", "assets/CSSReset.css"]
+    const paths = [
+      "assets/darkMode.js",
+      "assets/siteLogo.svg",
+      "assets/logoIcon.svg",
+      "assets/logoDark.svg",
+      "assets/readFile.js",
+      "assets/CSSReset.css",
+    ]
     const { load } = await cachedAppFor("mutable-assets", paths)
     const check = async (path, body, now) => {
       const response = await load(path, {}, now)
@@ -619,6 +649,42 @@ test("on a team Drop, an app's files stop for someone whose account is gone", as
   }
 })
 
+test("lowerCamelCase app assets revalidate when republished at the same path", async () => {
+  state.contentOrigin = "https://*-drop.example"
+  state.authSecret = "test-secret"
+  const now = Date.now
+  try {
+    const path = "assets/logoDark.svg"
+    const app = await publishApp(who, {
+      files: { "index.html": "<p>App</p>", [path]: "<svg>v1</svg>" },
+    })
+    const detailEvent = request(`https://drop.example/api/drops/${app.id}`)
+    detailEvent.context.params = { id: app.id }
+    const detail = await detailHandler(detailEvent)
+    const load = () =>
+      contentMiddleware(
+        request(`${detail.contentOrigin}/${path}`, {
+          headers: { "sec-fetch-dest": "image", cookie: `drop_grant=${detail.contentGrant}` },
+        }),
+      )
+    const before = await load()
+    assert.equal(await before.text(), "<svg>v1</svg>")
+
+    await publishApp(who, { id: app.id, files: { [path]: "<svg>v2</svg>" } })
+    // Expire the isolate's file lookup while keeping the same URL and viewer grant.
+    Date.now = () => now() + 10_000
+    const after = await load()
+    assert.equal(await after.text(), "<svg>v2</svg>")
+    for (const response of [before, after]) {
+      assert.equal(response.status, 200)
+      assert.equal(response.headers.get("cache-control"), "private, max-age=0, must-revalidate")
+    }
+  } finally {
+    Date.now = now
+    state.authSecret = undefined
+  }
+})
+
 test("only files named after their content count as hashed, so the browser never keeps one that may change", () => {
   for (const path of [
     "_nuxt/B0nDsZtt.js",
@@ -626,10 +692,16 @@ test("only files named after their content count as hashed, so the browser never
     "assets/index-BdJJ9uks.js",
     "static/js/main.3f2a9c1b.js",
     "_fonts/HgJel4iAS5mDVqJaDUYKmxaMJg4zKHTGmyD1FQkOsTM-2hVuuQIZ4GSGMgNv6dvlqz7cfD6lr7xLohUph7OCgFg.woff2",
-    // Rollup hashes with a dash or underscore in them.
+    // Rollup hashes with no digit, or with a dash or underscore in them.
+    "_nuxt/CWeqyEg_.js",
+    "_nuxt/BPFKiSqj.js",
     "_nuxt/lXm2UH6-.js",
+    "_nuxt/zHU-kgrs.js",
     "_nuxt/-Hou_zz6.js",
     "assets/index-lXm2UH6-.js",
+    "assets/logo-CWeqyEg_.svg",
+    "docs/_astro/Layout.BfZOTgis.css",
+    "_app/immutable/chunks/BAKrPsxf.js",
   ])
     assert.equal(isHashedAsset(path), true, path)
   for (const path of [
@@ -646,17 +718,12 @@ test("only files named after their content count as hashed, so the browser never
     "_nuxt/Settings.js",
     "assets/Overview.md",
     "assets/MyWidget.js",
-    "assets/darkMode.js",
+    "assets/logoDark.svg",
     "assets/siteLogo.svg",
+    "assets/readFile.js",
+    "assets/darkMode.js",
     "assets/logoIcon.svg",
     "assets/CSSReset.css",
-    // Digit-free hashes also revalidate: folder membership cannot distinguish them from reusable names.
-    "_nuxt/CWeqyEg_.js",
-    "_nuxt/BPFKiSqj.js",
-    "_nuxt/zHU-kgrs.js",
-    "assets/logo-CWeqyEg_.svg",
-    "docs/_astro/Layout.BfZOTgis.css",
-    "_app/immutable/chunks/BAKrPsxf.js",
     "_nuxt/TodoList.js",
     "assets/vendor-lowercase.js",
   ])

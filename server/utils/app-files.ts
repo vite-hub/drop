@@ -83,9 +83,10 @@ async function lookUpAppFiles(event: H3Event, grant: v.InferOutput<typeof Grant>
  * file with such a name never changes, and the browser keeps it. Any other file may change with the next version,
  * which the app's origin serves at the same address, so the browser asks again each time.
  *
- * Rollup and Vite hash with 8 base64url characters, which may include a dash (`lXm2UH6-`). Names without digits
- * are ambiguous, even inside build-output folders (`assets/darkMode.js` may come from Vite's public directory), so
- * they revalidate. A hash missed here still uses the edge cache; a typed name kept for a year would hide updates.
+ * Rollup and Vite hash with 8 base64url characters, which may hold no digit (`CWeqyEg_`) or a dash (`lXm2UH6-`). Out
+ * of context such a name could be a word someone typed (`BkRpwUQU.js`), so it counts only inside a folder that build
+ * tools keep for their output, and never when it reads as words (`MyWidget`, `logoDark`, `CSSReset`): a hash shaped
+ * like one is only a cache miss, a typed name kept for a year would hide the next version.
  */
 export function isHashedAsset(path: string): boolean {
   const slash = path.lastIndexOf("/")
@@ -106,7 +107,12 @@ export function isHashedAsset(path: string): boolean {
     (BUILD_FOLDER.test(path.slice(0, slash + 1)) &&
       parts.some((part) => {
         const hash = /(?:^|[-.])([\w-]{8})$/.exec(part)?.[1]
-        return !!hash && /\d/.test(hash) && /[a-z]/.test(hash) && /[A-Z]/.test(hash)
+        return (
+          !!hash &&
+          /[a-z]/.test(hash) &&
+          /[A-Z]/.test(hash) &&
+          !/^(?:(?:[a-z]+)?(?:[A-Z][a-z]+)+|[A-Z]{2,}[a-z]+)$/.test(hash)
+        )
       }))
   )
 }
