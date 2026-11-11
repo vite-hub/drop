@@ -6,7 +6,7 @@ import { draftPath } from "#shared/draft-paths"
 
 /**
  * Live drafts: the text people edit together, one Blob file per drop version (`drafts/<id>/v<n>.md`) holding the body
- * without front matter. Its Realtime room (server/realtime/drops.ts) loads from the file and saves back into it a
+ * without front matter. Its Realtime room (server/realtime/drafts.ts) loads from the file and saves back into it a
  * couple of seconds after people stop typing; publishing turns it into the next version and deletes it. Drafts have
  * no history of their own: the drop's versions are its history. `/f/` never serves them (utils/content-access.ts).
  * Only builds with Realtime rooms (Cloudflare, VPS) have a live editor, so only they have drafts.

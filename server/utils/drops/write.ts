@@ -207,6 +207,11 @@ export async function createDocDrop(
     if (found && can && can.edit) {
       if (found.kind === "app")
         throw new HTTPError({ status: 400, statusText: "That drop is an app; publish its next version with files." })
+      if (found.kind === "link")
+        throw new HTTPError({
+          status: 400,
+          statusText: "That drop is a link, which has no versions. Change it with update_drop.",
+        })
       if (!can.manage && kind !== found.kind)
         throw new HTTPError({ status: 403, statusText: "Only the drop's owner can change what kind of file it is." })
       // A file of an earlier version names the drop too; the next version goes on top of the latest.

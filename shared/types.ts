@@ -4,7 +4,7 @@ import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
 import type { DropMode, Share } from "./share"
 
-export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site", "board"] as const
+export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site", "board", "link"] as const
 export type DropKind = (typeof DROP_KINDS)[number]
 export const ACTOR_KINDS = ["agent", "browser"] as const
 export type ActorKind = (typeof ACTOR_KINDS)[number]
@@ -70,6 +70,8 @@ export interface DropSummary {
   team?: string
   /** Folders: how many drops are directly inside. */
   items?: number
+  /** Links: the page outside Drop it opens, like a pull request. */
+  href?: string
   /** Images in a folder or a search: where the file is served, for a thumbnail. */
   thumbnail?: string
   /** Search results: the folders it sits in, top-most first. */

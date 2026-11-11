@@ -115,9 +115,11 @@ const FAN = ["left-[24%] z-30", "left-[8%] top-[18%] z-20 -rotate-6", "left-[40%
       class="grid size-full place-content-center justify-items-center gap-[2cqw] bg-muted px-[6cqw] text-center"
     >
       <UIcon :name="KIND_ICONS[kind]" class="size-[10cqw] text-dimmed" />
-      <span v-if="kind === 'file' && address" class="max-w-full truncate font-mono text-[3.6cqw] text-muted">{{
-        address
-      }}</span>
+      <span
+        v-if="(kind === 'file' || kind === 'link') && address"
+        class="max-w-full truncate font-mono text-[3.6cqw] text-muted"
+        >{{ address }}</span
+      >
     </div>
   </div>
 </template>

@@ -50,6 +50,16 @@ test("POST /mcp still checks the token", async () => {
   assert.equal(identified, 1)
 })
 
+test("POST /mcp with a refused token names it invalid_token on the challenge (RFC 6750 §3.1)", async () => {
+  current = null
+  const refused = await mcp("POST", { authorization: "Bearer expired", "content-type": "application/json" })
+  assert.equal(refused.status, 401)
+  assert.match(refused.headers.get("www-authenticate"), /^Bearer .*resource_metadata="[^"]+", error="invalid_token"$/)
+  const missing = await mcp("POST", { "content-type": "application/json" })
+  assert.equal(missing.status, 401)
+  assert.doesNotMatch(missing.headers.get("www-authenticate"), /error=/)
+})
+
 const page = async (path, method) => {
   const request = event(path, method)
   const answer = await accessMiddleware(request)

@@ -52,6 +52,7 @@ overrides:
 patchedDependencies:
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
+  # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
   # Runs nuxt-security 2.7.0 on Nuxt 5 / Nitro v3 / h3 v2: Nitro v3 imports, headers set in render:html (Nuxt 5 has no
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,

@@ -56,6 +56,19 @@ export function mergeResources(current: DropResource[], next: DropResource[]): D
   return merged
 }
 
+/** A GitHub pull request's repository and number, from its address: `quiverdk/website` and 33. */
+export function pullRequestOf(url: string): { repo: string; number: number } | null {
+  const { hostname, pathname } = new URL(url)
+  const match = hostname === "github.com" ? pathname.match(/^\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)(?:\/|$)/) : null
+  return match ? { repo: match[1]!, number: Number(match[2]) } : null
+}
+
+/** What a link item says under its title: `quiverdk/website#33` for a pull request, its host for anything else. */
+export function linkSource(url: string) {
+  const pull = pullRequestOf(url)
+  return pull ? `${pull.repo}#${pull.number}` : new URL(url).hostname.replace(/^www\./, "")
+}
+
 /**
  * A preview deploy of the change, which stays in a doc's header: something to open and try, not a fact about the doc.
  * Agents title it exactly "Preview" (pr-evidence); a host with a `preview` label counts too. "Design preview" doesn't.

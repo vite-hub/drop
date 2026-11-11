@@ -18,6 +18,7 @@ const KIND_WORDS = new Map<string, DropKind>([
   ["folders", "folder"],
   ["sites", "site"],
   ["boards", "board"],
+  ["links", "link"],
 ])
 
 const kindOf = (word: string) =>

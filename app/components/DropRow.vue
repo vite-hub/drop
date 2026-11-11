@@ -2,6 +2,7 @@
 import { SHARE_ICONS } from "#shared/share"
 import type { DropSummary } from "#shared/types"
 import { daysUntil, purgesAt } from "#shared/expiry"
+import { linkSource } from "#shared/resources"
 
 // A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`). In a team
 // folder (`inTeam`) anyone may move a teammate's drop to the Trash.
@@ -24,6 +25,7 @@ const { shared, changeable, choices, status, pick, copyLink, copied, linkChoices
 const detail = computed(() => {
   const where = drop.path?.length ? ` · in ${drop.path.map((crumb) => crumb.title).join(" / ")}` : ""
   if (folder.value) return `${itemCount(drop.items ?? 0)}${where}`
+  if (drop.href) return `${linkSource(drop.href)}${where}`
   return `${drop.kind === "app" && drop.paths ? `${drop.filename} · ${drop.paths.length} files` : drop.filename}${where}`
 })
 </script>
@@ -68,8 +70,8 @@ const detail = computed(() => {
         <template v-if="folder"
           >{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
         ></template>
-        <!-- A site review holds no file: its address says more than "0 B". -->
-        <template v-else-if="drop.kind === 'site'"
+        <!-- A site review or a link holds no file: its address says more than "0 B". -->
+        <template v-else-if="drop.kind === 'site' || drop.kind === 'link'"
           >{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
         ></template>
         <template v-else
