@@ -182,7 +182,23 @@ test("a doc's problems open in a foldable box that counts them and shows the Mar
   assert.doesNotMatch(html, /<li>[^<]*`/)
 })
 
-test("::drop leaves a box with only the link, which the viewer fills for readers who may open it", async () => {
+test("::embed of a drop's page leaves a box with only the link, which the viewer fills for readers who may open it", async () => {
+  const markdown =
+    '::embed{url="https://drop.vitehub.dev/d/k7f2q9m4x8wd/steps" height=9999 title="Steps <b>"}\n::\n\n' +
+    '::embed{url="https://drop.example.com/d/a1b2c3d4e5f6"}\n::\n\n::embed{url="https://example.com/docs" title="Docs"}\n::'
+  const { html } = await renderMarkdownCached("embed-drop.md", async () => markdown)
+  assert.match(
+    html,
+    /<figure class="drop-embed" data-drop-embed="k7f2q9m4x8wd" data-title="Steps &lt;b&gt;" style="--drop-embed-height: 1600px"><a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Steps &lt;b&gt;<\/a><\/figure>/,
+  )
+  // A self-hosted Drop's address works too, and a drop needs no title, unlike a link card.
+  assert.match(html, /data-drop-embed="a1b2c3d4e5f6" data-title="Embedded drop" style="--drop-embed-height: 480px"/)
+  assert.match(html, /<a class="ce-card"[^>]* href="https:\/\/example.com\/docs">/)
+  assert.doesNotMatch(html, /<iframe|unsupported-component|render-error/)
+  assert.deepEqual(await lintMarkdown(markdown), [])
+})
+
+test("::drop, from docs published before ::embed showed drops, still leaves the same box", async () => {
   const { html } = await renderMarkdownCached(
     "embed.md",
     async () =>
