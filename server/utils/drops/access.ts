@@ -17,7 +17,7 @@ import type { DropRow } from "./types"
  * the drops in it. An expired drop is read-only for the people who can renew it and gone for everyone else.
  *
  * On a personal Drop with teams, "the team" is the team whose folders hold the drop (../teams.ts): only its members, and
- * its owner and admins keep its folders.
+ * its owner and admins keep its folders, in the browser.
  */
 export function permissions(drop: DropRow, who: Identity | null) {
   const admin = Boolean(who && who.role === "admin")
@@ -40,7 +40,9 @@ export function permissions(drop: DropRow, who: Identity | null) {
   const level = drop.expired ? -1 : Math.max(-1, ...grants.map((grant) => levelFor(grant, drop, who)))
   const available = !drop.ownerBanned
   const live = available && !drop.expired
-  const manage = drop.teamFolder ? admin || runsTeam(team, who) : owner || admin
+  // A team folder's owner and admins keep it in the browser, like they make it (../folders.ts): what their agents read could
+  // steer them to make the team's folders public.
+  const manage = drop.teamFolder ? admin || (who?.actorKind === "browser" && runsTeam(team, who)) : owner || admin
   return {
     owner,
     view: available && (owner || admin || level >= 0),

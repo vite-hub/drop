@@ -7,8 +7,7 @@ import type { FrameBox } from "~/composables/useDropFrame"
 type PendingComment = Omit<CommentInput, "body" | "mentions">
 type Area = { ox: number; oy: number; ow: number; oh: number }
 type Rect = { left: number; top: number; right: number; bottom: number }
-/** `settled`: the mouse let go, so the reader is done selecting. */
-type Selection = { quote: string; selector: string; label: string; rect: Rect; settled?: boolean }
+type Selection = { quote: string; selector: string; label: string; rect: Rect }
 type Lightbox = {
   src: string
   alt: string
@@ -208,7 +207,6 @@ export function useViewerAnnotations(options: {
             quote: message.quote,
             selector: message.selector,
             label: message.label,
-            settled: message.settled,
             rect: {
               left: x(message.rect.left),
               top: y(message.rect.top),

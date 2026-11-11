@@ -32,7 +32,7 @@ extra:
 
 ## Database {#database}
 
-Cloudflare D1 over HTTPS. `pnpm db:migrate --allow-data-loss` skips migrations already applied and permits Drop's intentional schema removals. The configured Vercel build runs it after building. Disable previews or give them a separate D1 database.
+Cloudflare D1 over HTTPS. `pnpm db:migrate` skips migrations already applied and refuses migrations that lose existing data. A fresh database needs no override. For an upgrade that reports an intentional removal, back up the database and run `pnpm db:migrate --allow-data-loss` once after reviewing `pnpm db:migrate --dry-run`. The configured Vercel build runs it after building. Disable previews or give them a separate D1 database.
 
 ## On Vercel {#different}
 

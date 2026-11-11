@@ -1,12 +1,9 @@
 import type { DropLink } from "#shared/links"
 import type { DropDetail } from "#shared/types"
 import { defineHandler } from "h3"
+import { AI_FETCHER } from "../utils/ai-fetcher"
 
 const DOC_PATH = /^\/d\/([^/]+?)(?:\/([^/]+?))?(\.md)?$/
-// Fetchers that read a page for a person's chat (ChatGPT, Claude, Perplexity). The doc renders in a frame once the
-// page's script runs, so its HTML alone carries only the title; they get the text instead.
-const AI_FETCHER =
-  /ChatGPT-User|OAI-SearchBot|GPTBot|Claude-User|Claude-SearchBot|ClaudeBot|Perplexity-User|PerplexityBot/i
 
 /**
  * A doc's share link as Markdown: `/d/<link>/<slug>.md`, or the link itself for a request that prefers

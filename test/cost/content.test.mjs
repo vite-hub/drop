@@ -387,7 +387,9 @@ test("cleanup releases image quota only after deleting its blob and retains OAut
   assert.ok((await getUsage(who.userId)).bytes.used > 0)
   assert.ok(sql.prepare("SELECT blob_key FROM code_images WHERE blob_key = ?").get(key))
   state.failDelete = false
+  const sweeps = state.mcpCleanups ?? 0
   await cleanup.handler({ scheduledAt })
+  assert.equal(state.mcpCleanups, sweeps + 1, "the cleanup deletes unused MCP clients")
   assert.equal((await getUsage(who.userId)).bytes.used, 0)
   assert.equal((await getUsage(who.userId)).writes.used, 1)
   assert.ok(!state.objects.has(key))

@@ -200,7 +200,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
                 v-model="suggestion"
                 aria-label="Suggested text"
                 autoresize
-                class="flex-1"
+                class="min-w-0 flex-1"
                 :maxrows="6"
                 placeholder="Leave empty to delete it"
                 :rows="1"

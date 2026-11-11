@@ -1,31 +1,44 @@
 import { eq } from "drizzle-orm"
+import { parseYAML } from "confbox"
 import { HTTPError } from "h3"
 import * as v from "valibot"
 import { db } from "vite-hub/database/drizzle"
+import { splitFrontmatter } from "#shared/frontmatter"
 import { MAX_RESOURCE_TITLE, MAX_RESOURCE_URL, MAX_RESOURCES, mergeResources, resourceUrl } from "#shared/resources"
 import type { DropResource } from "#shared/types"
 import { drops } from "../databases/config"
 import type { DropRow } from "./drops"
 
+/** One link of a drop, as `publish` and `update_drop` take it. */
+const ResourceItem = v.object({
+  url: v.pipe(
+    v.string(),
+    v.maxLength(MAX_RESOURCE_URL),
+    v.description("https, or http on localhost, like https://github.com/acme/app/pull/123."),
+  ),
+  title: v.optional(
+    v.pipe(
+      v.string(),
+      v.maxLength(MAX_RESOURCE_TITLE),
+      v.description('What it is, in a few words, like "PR #123" or "Preview". Without one, the page shows its host.'),
+    ),
+  ),
+})
+
 /** How `publish` and `update_drop` take a drop's links. */
-export const ResourcesInput = v.pipe(
+export const ResourcesInput = v.pipe(v.array(ResourceItem), v.maxLength(MAX_RESOURCES))
+
+/** `resources` in a Markdown doc's front matter: the input's list, where an address alone also stands for a link. */
+const FrontmatterResources = v.pipe(
   v.array(
-    v.object({
-      url: v.pipe(
+    v.union([
+      v.pipe(
         v.string(),
         v.maxLength(MAX_RESOURCE_URL),
-        v.description("https, or http on localhost, like https://github.com/acme/app/pull/123."),
+        v.transform((url) => ({ url })),
       ),
-      title: v.optional(
-        v.pipe(
-          v.string(),
-          v.maxLength(MAX_RESOURCE_TITLE),
-          v.description(
-            'What it is, in a few words, like "PR #123" or "Preview". Without one, the page shows its host.',
-          ),
-        ),
-      ),
-    }),
+      ResourceItem,
+    ]),
   ),
   v.maxLength(MAX_RESOURCES),
 )
@@ -41,6 +54,30 @@ export function resourceList(input: v.InferOutput<typeof ResourcesInput>): DropR
     list.push({ url, ...(title ? { title } : {}) })
   }
   return mergeResources([], list)
+}
+
+/**
+ * The links a Markdown doc lists under `resources` in its front matter: addresses, or `{ url, title }` as `publish`
+ * takes them. A `.md` file sent to an upload URL carries its links this way, since the URL has no room for them.
+ */
+export function frontmatterResources(markdown: string): DropResource[] {
+  const yaml = splitFrontmatter(markdown).frontmatter.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]
+  if (!yaml) return []
+  let data: unknown
+  try {
+    data = parseYAML(yaml)
+  } catch {
+    throw new HTTPError({ status: 400, message: "The front matter isn't valid YAML." })
+  }
+  const listed = v.safeParse(v.looseObject({ resources: v.optional(v.unknown()) }), data)
+  if (!listed.success || listed.output.resources === undefined) return []
+  const parsed = v.safeParse(FrontmatterResources, listed.output.resources)
+  if (!parsed.success)
+    throw new HTTPError({
+      status: 400,
+      message: "List resources in the front matter as addresses, or as url and title pairs, up to 8.",
+    })
+  return resourceList(parsed.output)
 }
 
 /** A drop's links, the same on every version. */

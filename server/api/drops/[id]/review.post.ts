@@ -28,7 +28,14 @@ export default defineHandler(async (event) => {
   await requireRateLimit(event, "review-comment", { key: who?.userId, limit: 20, window: "1m" })
   const { input, shot, images } = await readReviewComment(event)
 
-  const comment = await addReviewComment(site, { who, name: who?.name ?? "Guest" }, input, shot, origin, images)
+  const { row: comment } = await addReviewComment(
+    site,
+    { who, name: who?.name ?? "Guest" },
+    input,
+    shot,
+    origin,
+    images,
+  )
   useLogger(event).set({
     review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), embedded: true },
   })
