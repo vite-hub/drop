@@ -968,10 +968,10 @@ test("an agent adds a pull request to a kept folder as a link; it lists, changes
   assert.equal(link.kind, "link")
   assert.equal(link.href, pr)
   assert.equal(link.lifetime, "keep", "it lives with the kept folder")
-  assert.equal(link.status, "Kept")
+  assert.equal(link.status, "Never deleted")
   assert.match(
     added.content[0].text,
-    /^Added a link:\n- Get listed on Microsoft Marketplace \(link to https:\/\/github\.com\/quiverdk\/website\/pull\/33, team, keep, kept\)/,
+    /^Added a link:\n- Get listed on Microsoft Marketplace \(link to https:\/\/github\.com\/quiverdk\/website\/pull\/33, team, keep, never deleted\)/,
   )
 
   // A private repository (GitHub answers 404 without a token) goes by its repo and number.
@@ -1008,7 +1008,9 @@ test("an agent adds a pull request to a kept folder as a link; it lists, changes
   // A kept folder keeps everything in it, however long nobody opens it.
   sql.prepare("UPDATE drops SET last_accessed_at = 1, created_at = 1").run()
   assert.ok(
-    (await call(listDrops, { folder: folder.id })).structuredContent.drops.every((drop) => drop.status === "Kept"),
+    (await call(listDrops, { folder: folder.id })).structuredContent.drops.every(
+      (drop) => drop.status === "Never deleted",
+    ),
   )
   const read = await call(readDrop, { id: link.id })
   assert.match(
@@ -1037,7 +1039,10 @@ test("an agent adds a pull request to a kept folder as a link; it lists, changes
   const top = (await call(updateDrop, { id: named.id, folder: "" })).structuredContent
   assert.equal(top.lifetime, "review", "out at the top, it keeps the lifetime it lived by")
   assert.match((await call(updateDrop, { id: named.id, trash: true })).structuredContent.status, /^In the Trash/)
-  assert.equal((await call(updateDrop, { id: named.id, trash: false })).structuredContent.status, "Expires in 30 days")
+  assert.equal(
+    (await call(updateDrop, { id: named.id, trash: false })).structuredContent.status,
+    "Goes to the Trash in 30 days",
+  )
 })
 
 test("a link cannot be replaced with a document or file version", async () => {
@@ -1100,7 +1105,7 @@ test("publish into a folder says the folder's lifetime wins; update_drop on a fo
 
   const updated = await call(updateDrop, { id: folder.id, lifetime: "keep", keepReason: "Reference" })
   assert.equal(updated.structuredContent.items, 4)
-  assert.match(updated.content[0].text, /^Updated:\n- SEO \(folder, 4 items, team, keep, kept\)/)
+  assert.match(updated.content[0].text, /^Updated:\n- SEO \(folder, 4 items, team, keep, never deleted\)/)
   assert.ok(
     (await call(listDrops, { folder: folder.id })).structuredContent.drops.every((drop) => drop.lifetime === "keep"),
   )
