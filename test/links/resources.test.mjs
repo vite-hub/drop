@@ -25,6 +25,7 @@ test("a site's icon is looked up on its host, then on each domain above it", () 
 test("a link without a title shows its host; merging keeps places and takes new titles", () => {
   assert.equal(resourceLabel({ url: "https://www.figma.com/file/x" }), "figma.com")
   assert.equal(resourceLabel({ url: "https://github.com/a/b/pull/1", title: "PR #1" }), "PR #1")
+  assert.equal(resourceLabel({ url: "https://github.com/a/b/issues/7" }), "a/b#7")
   assert.deepEqual(
     mergeResources(
       [{ url: "https://a.dev/" }, { url: "https://b.dev/", title: "B" }],

@@ -53,6 +53,8 @@ Pass `resources` when the drop belongs with pages elsewhere, such as the pull re
 
 Drop lints a Markdown doc with the Comark plugins it renders with before it stores it, whether it comes from `publish`, an uploaded `.md` file, or an edited draft. A block that never closes, broken `{…}` attributes, a component Drop doesn't render, or a problem in an annotated screenshot stops the publish and stores nothing: the error lists each problem as `line:column rule message`, with how to fix it. Smaller problems, such as an image without alt text, come back as `warnings` on the published doc. The checks read the source, so they catch an annotation box outside its image, not one that misses the element you meant: open the rendered doc to check where the marks land.
 
+An app's link opens at any of its pages: add `?path=` with the address in the app, such as `/d/<key>/<slug>?path=/guide/setup`, and put a page's `#anchor` at the end of the link (`?path=/guide/setup#install`). A path under the link, `/d/<key>/<slug>/guide/setup`, opens the same page. An address the app lacks shows its own 404 page, or its `index.html` for a single-page app, as a static host would. `publish` and `read_drop` list an app's pages under `Pages` (`pages`), each with its link. When you point the user or a reviewer at one page, send that page's link instead of telling them where to click. The address bar follows the app as people move through it, so a link they copy opens the page they were on.
+
 For an app or HTML page, the answer can include `warnings`: scripts, stylesheets, images, imports, `fetch()` paths, or links that point at nothing in what you published. Fix them and publish the next version before you hand over the link.
 
 When you're done, tell the user the link, who can open it, how long it lives (`status` says when it expires), and what you checked: the warnings you fixed, and anything you couldn't.
@@ -63,7 +65,7 @@ If the call fails with `DROP_LIMIT_REACHED` and `retryable: true`, you hit the p
 
 Publish each image or screen recording with `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change. An embedded file belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the file. When people comment on it inside the doc, the comment lands on the doc.
 
-A doc runs no scripts. For something interactive in it, such as a demo or an animated figure, publish that as its own `html` drop, then show it in the doc with `::drop{link=…}` ([interactive drops](references/markdown.md#interactive-drops)). Share it at least as widely as the doc: each reader sees it only if they can open it.
+A doc runs no scripts. For something interactive in it, such as a demo or an animated figure, publish that as its own `html` drop, then show it in the doc with `::embed{url=…}` ([interactive drops](references/markdown.md#interactive-drops)). For an HTTP Drop, such as `http://localhost:3000`, use `::drop{link=…}` instead; the reference includes its local lint configuration. Share it at least as widely as the doc: each reader sees it only if they can open it.
 
 ## Folders
 
