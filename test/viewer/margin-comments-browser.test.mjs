@@ -353,7 +353,10 @@ test("an open thread is written in where it is: over its margin card, else besid
     await say({ type: "active", id: "c2" })
     const card = await placeOf("c2")
     const cardBox = await frame.evaluate(() => {
-      const r = document.querySelector("drop-comments").shadowRoot.querySelector('.rail .g[data-id="c2"] > .cr-card').getBoundingClientRect()
+      const r = document
+        .querySelector("drop-comments")
+        .shadowRoot.querySelector('.rail .g[data-id="c2"] > .cr-card')
+        .getBoundingClientRect()
       return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
     })
     assert.equal(card.rail, true)
