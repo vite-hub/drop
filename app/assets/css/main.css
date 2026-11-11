@@ -27,7 +27,8 @@
 /*
  * The review tools (ViewerToolbar, and what the frame draws in shared/plan-runtime.ts) take Mesurer's look: one blue for
  * the tool that's on, at the lightness where a white icon or label on it reads (4.7:1), and a borderless toolbar raised by
- * layered shadows. The rest of Drop stays grayscale.
+ * layered shadows. Areas drawn for a comment take the same blue, so they show on dark pages and white images alike. The
+ * rest of Drop stays grayscale.
  */
 @theme inline {
   --color-tool: oklch(0.56 0.18 255);

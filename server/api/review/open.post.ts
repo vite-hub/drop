@@ -2,19 +2,32 @@ import { defineValidatedHandler, HTTPError } from "h3"
 import { ReviewOpenSchema } from "#shared/schemas"
 import { dropPageUrl, findDrop } from "../../utils/drops"
 import { identify } from "../../utils/identity"
-import { openable, readReviewToken } from "../../utils/review"
+import { openable, openDoc, readReviewToken } from "../../utils/review"
 
 /**
- * Where "Open in Drop" and "Copy link" on a reviewed site go (/review/open). The page holds a review token, so the token
- * alone can't be enough: this opens the review, or hands over its link, only for people who could open it without the
- * link, with Drop's session. The answer reaches Drop's own page, never the reviewed site.
+ * Where "Open in Drop", "Copy link", and docs from "Related links" on a reviewed site go (/review/open). The page
+ * holds a review token or a doc's handle, so neither alone can be enough: this opens the review or the doc, or hands
+ * over the review's link, only for people who could open it without its link, with Drop's session. The answer reaches
+ * Drop's own page, never the reviewed site.
  */
 export default defineValidatedHandler({
   validate: { body: ReviewOpenSchema },
   async handler(event) {
     const who = await identify(event)
-    const { token } = await event.req.json()
-    const claims = await readReviewToken(event, token)
+    const body = await event.req.json()
+    if ("doc" in body) {
+      if (!who) throw new HTTPError({ status: 401, statusText: "Sign in to open the document." })
+      const doc = await openDoc(event, body.doc, who)
+      if (!doc)
+        throw new HTTPError({
+          status: 404,
+          statusText:
+            "Only people the document is shared with can open it. If it is shared with you, open it from the site again.",
+        })
+      event.res.headers.set("Cache-Control", "no-store")
+      return { to: `/drops/${doc.id}` }
+    }
+    const claims = await readReviewToken(event, body.token)
     const site = claims ? await findDrop(claims.d, event) : null
     if (!who) throw new HTTPError({ status: 401, statusText: "Sign in to open the review." })
     if (!site || site.kind !== "site" || !openable(site, who))

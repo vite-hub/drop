@@ -334,3 +334,83 @@ test("a margin card's avatar without a picture is tinted by its author's name", 
     await browser.close()
   }
 }, 30_000)
+
+test("an open thread is written in where it is: over its margin card, else beside its pin, and a page click puts it away", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    const say = (message) =>
+      page.evaluate(
+        (message) => document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, "*"),
+        message,
+      )
+    const placeOf = (id) =>
+      page
+        .waitForFunction((id) => window.posts.findLast((m) => m.type === "draft-place" && m.id === id), id)
+        .then((handle) => handle.jsonValue())
+
+    // A comment in the margin: Drop hears where its card is, so the thread covers the card.
+    await say({ type: "active", id: "c2" })
+    const card = await placeOf("c2")
+    const cardBox = await frame.evaluate(() => {
+      const r = document
+        .querySelector("drop-comments")
+        .shadowRoot.querySelector('.rail .g[data-id="c2"] > .cr-card')
+        .getBoundingClientRect()
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+    })
+    assert.equal(card.rail, true)
+    assert.deepEqual(card.rect, cardBox)
+
+    // An area keeps its pin: Drop hears where the pin and its area are, so the thread opens beside them.
+    await say({ type: "active", id: "c8" })
+    const pin = await placeOf("c8")
+    // With its area: the thread goes beside both, so it never covers what the comment is about.
+    const pinBox = await frame.evaluate(() => {
+      const root = document.querySelector("drop-comments").shadowRoot
+      const p = root.querySelector('.m[data-id="c8"]').getBoundingClientRect()
+      const a = root.querySelector('.a[data-for="c8"]').getBoundingClientRect()
+      return {
+        left: Math.min(p.left, a.left),
+        top: Math.min(p.top, a.top),
+        right: Math.max(p.right, a.right),
+        bottom: Math.max(p.bottom, a.bottom),
+      }
+    })
+    assert.equal(pin.rail, false)
+    assert.equal(pin.pin, true)
+    assert.deepEqual(pin.rect, pinBox)
+
+    // A click on the page away from the pins puts the thread away; with none open, a click says nothing.
+    await frame.locator("p").first().click()
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "page-click"))
+    await say({ type: "active", id: null })
+    const clicks = await page.evaluate(() => window.posts.filter((m) => m.type === "page-click").length)
+    await frame.locator("p").first().click()
+    await frame.evaluate(() => new Promise(requestAnimationFrame))
+    assert.equal(await page.evaluate(() => window.posts.filter((m) => m.type === "page-click").length), clicks)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("an area is drawn in the tools' blue, which shows on a dark page and on a white image alike", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { frame } = await open(browser, 1440)
+    const look = await frame.evaluate(() => {
+      const root = document.querySelector("drop-comments").shadowRoot
+      const area = getComputedStyle(root.querySelector(".a:not(.t)"))
+      const probe = document.createElement("i")
+      probe.style.color = "oklch(0.62 0.18 255)"
+      document.body.appendChild(probe)
+      const blue = getComputedStyle(probe).color
+      probe.remove()
+      return { border: area.borderTopColor, width: area.borderTopWidth, blue }
+    })
+    assert.equal(look.border, look.blue)
+    assert.equal(look.width, "2px")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

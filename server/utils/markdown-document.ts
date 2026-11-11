@@ -6,6 +6,7 @@ import { createMarkdownParser } from "@comark/html/parse"
 import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
 import frontmatter from "@comark/html/plugins/frontmatter"
+import linkify from "@comark/html/plugins/linkify"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { lint } from "comark-linter"
@@ -97,6 +98,8 @@ const LEGACY_TAGS = ["drop"]
 const ALLOWED_TAGS = [...preset.tags, ...Object.keys(preset.components), ...COMPONENT_TAGS, ...LEGACY_TAGS]
 
 const plugins = [
+  // A bare URL is a link, as on GitHub. Comark 0.9 moved it into the defaults Drop leaves out, so it's listed here.
+  linkify(),
   frontmatter(),
   taskList(),
   components(),

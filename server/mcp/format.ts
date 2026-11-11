@@ -1,4 +1,5 @@
 import { expiryLabel } from "#shared/expiry"
+import { MAX_LISTED_PAGES } from "#shared/project-bundle"
 import { suggestionLine } from "#shared/suggestion"
 import type { DropComment, DropResource, DropSummary, QuizAnswer, ViewerKind } from "#shared/types"
 import type { QuizTally, StoredAnswer } from "../utils/answers"
@@ -163,3 +164,13 @@ export const answersLines = (answers: McpAnswer[]) =>
       return `- ${id} (${kind}${people === undefined ? "" : `, ${people} ${people === 1 ? "person" : "people"}`})${tally}${user}`
     })
     .join("\n")}`
+
+/** An app's pages with their links, so an agent can send the one a reviewer should open. */
+export function pagesSection(pages: { page: string; url: string }[]) {
+  const shown = pages.slice(0, MAX_LISTED_PAGES)
+  return [
+    "## Pages\nEach link opens the app at that page. Any other address in the app opens the same way: ?path=/some/page, with an #anchor at the end of the link.",
+    ...shown.map(({ page, url }) => `- ${page} ${url}`),
+    ...(pages.length > shown.length ? [`And ${pages.length - shown.length} more.`] : []),
+  ].join("\n")
+}

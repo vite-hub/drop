@@ -267,7 +267,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           >
             <div
               v-if="box"
-              class="absolute rounded-sm border-2 border-inverted bg-inverted/10"
+              class="absolute rounded-sm border-2 border-tool bg-tool/15"
               :style="{
                 left: `${box.left}px`,
                 top: `${box.top}px`,
@@ -296,7 +296,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           <div class="relative overflow-hidden rounded-md border border-default">
             <img :alt="`Screenshot of ${pending.page}`" class="block w-full" :src="pending.url" />
             <span
-              class="absolute rounded-sm border-2 border-inverted"
+              class="absolute rounded-sm border-2 border-tool bg-tool/15"
               :style="{
                 left: percent(pending.box.left, pending.size.width),
                 top: percent(pending.box.top, pending.size.height),
