@@ -1,7 +1,8 @@
 import { Placeholder } from "@tiptap/extension-placeholder"
-import { Link } from "@tiptap/extension-link"
+import { createEditorCodec } from "comark-ui/editor"
 import { Editor } from "@tiptap/vue-3"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
+import { LIVE_EDITOR_KIT } from "#shared/live-editor"
 
 /**
  * The live editor's room and its Tiptap editor: Yjs, ProseMirror, and the code highlighter. useLiveEditor imports this
@@ -9,8 +10,10 @@ import { ySyncPluginKey } from "@tiptap/y-tiptap"
  * leaves the room.
  */
 export function useLiveRoom(documentId: Ref<string | undefined>) {
-  const realtime = useRealtimeTiptap("drops", documentId, {
+  const realtime = useRealtimeTiptap("drafts", documentId, {
     enabled: () => Boolean(documentId.value),
+    // The room's schema (server/utils/live-editor.ts).
+    editor: createEditorCodec({ kit: LIVE_EDITOR_KIT }),
     // A lighter selection tint than the default.
     carets: {
       selectionRender: (user) => ({
@@ -39,7 +42,6 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
       extensions: [
         ...extensions,
         CodeHighlight,
-        Link.configure({ openOnClick: false }),
         Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
       ],
       autofocus: "end",

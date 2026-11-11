@@ -16,7 +16,6 @@ import type {
 import { TREE_ROWS } from "#shared/types"
 import { isPublic } from "#shared/share"
 import { DAY_MS } from "#shared/expiry"
-import { editorlessSyntax } from "#shared/frontmatter"
 import { MAX_DEPTH } from "#shared/nodes"
 import { isTextFile } from "#shared/project-bundle"
 import { shareReviewFor } from "../trust"
@@ -44,6 +43,7 @@ import type { Identity } from "../identity"
 import type { DropRow } from "./types"
 import { permissions, toCrumb, toSummary } from "./access"
 import { d1Chunks } from "../d1"
+import { liveEditorKeeps } from "../live-editor"
 const TEXT_KINDS = new Set(["markdown", "html"])
 
 /**
@@ -574,10 +574,9 @@ export async function dropDetail(
     ancestors: openableAncestors(row, who, days),
     ...body,
   }
-  const blocking = detail.canEdit && row.kind === "markdown" ? editorlessSyntax(detail.content ?? "") : []
-  if (blocking.length) {
+  if (detail.canEdit && row.kind === "markdown" && !(await liveEditorKeeps(row.blobKey, detail.content ?? ""))) {
     detail.canEdit = false
-    detail.editNote = `It uses ${editNoteList(blocking)}, which the live editor can't keep yet.`
+    detail.editNote = "Saving it from the live editor would change how parts of it read."
   }
   if (attachments) detail.attachments = attachments
   if (row.kind === "site" && row.siteUrl) detail.siteUrl = row.siteUrl
@@ -645,12 +644,6 @@ async function bodyOf(
  * The nodes above a drop that the caller may open, top-most first. A share widens going down, so the ones the caller
  * can't open are always the top-most: someone sent one drop from a private folder sees no folder names.
  */
-/** `::question, ::poll and footnotes`: the first three by name, then how many more. */
-function editNoteList(syntax: string[]) {
-  const named = syntax.length > 3 ? [...syntax.slice(0, 3), `${syntax.length - 3} more`] : syntax
-  return new Intl.ListFormat("en", { type: "conjunction" }).format(named)
-}
-
 function openableAncestors(row: DropRow, who: Identity | null, days: number): DropCrumb[] {
   const above = row.ancestors ?? []
   return above

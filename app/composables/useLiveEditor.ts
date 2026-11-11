@@ -34,7 +34,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const editing = computed(() => Boolean(documentId.value))
   const people = computed(() => realtime.value?.people.value ?? [])
 
-  // The room admits only people who may edit, and only on the latest version's draft (server/realtime/drops.ts). A
+  // The room admits only people who may edit, and only on the latest version's draft (server/realtime/drafts.ts). A
   // version published from elsewhere (an agent, Accept on a suggestion) leaves this editor on an older draft, and once
   // its socket drops, y-websocket knocks on the refused room every couple of seconds for as long as the tab stays open:
   // browsers never say why a WebSocket failed. So when the room stays out of reach, ask the server whether this draft
@@ -83,6 +83,14 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       notify.say("You can't edit this drop anymore", { icon: "i-mingcute-lock-line" })
     }
   }
+
+  // The room opens read-only a draft the editor can't save without changing it. The edit button checks that first, so
+  // it's rare: a draft someone else's edit left that way.
+  watch([() => realtime.value?.readOnlyReason.value, editor], ([reason, current], [before]) => {
+    if (reason !== "document") return
+    current?.setEditable(false, false)
+    if (reason !== before) notify.say("This doc can't be edited in Drop", { icon: "i-mingcute-lock-line" })
+  })
 
   // A new version keeps the drop's id, so the page reloads the drop's data rather than finding a new address.
   async function openLatest(id: string, edit = false) {
