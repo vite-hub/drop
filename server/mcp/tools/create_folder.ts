@@ -9,7 +9,7 @@ import { SHARES } from "#shared/share"
 import { createFolder, MAX_FOLDER_DESCRIPTION, requireFolder } from "../../utils/folders"
 import { requireIdentity } from "../../utils/identity"
 import { quotaToolResult } from "../../utils/quotas"
-import { dropLine, mcpDrop, SHARE_INPUT } from "../format"
+import { dropLine, folderLife, mcpDrop, SHARE_INPUT } from "../format"
 
 // No v.trim() or other transformations: they can't become JSON Schema (see publish.ts).
 export default defineMcpTool({
@@ -77,6 +77,9 @@ export default defineMcpTool({
         event,
       )
       const drop = mcpDrop(toSummary((await findDrop(row.id, event)) ?? row), event.url.origin)
-      return { content: [{ type: "text" as const, text: `Created:\n${dropLine(drop)}` }], structuredContent: drop }
+      return {
+        content: [{ type: "text" as const, text: `Created:\n${dropLine(drop)}${folderLife(drop, lifetime)}` }],
+        structuredContent: drop,
+      }
     }),
 })

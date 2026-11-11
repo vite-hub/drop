@@ -126,7 +126,9 @@ export const state = (globalThis.dropTest = {
         event.res.status = 304
         return [null, null]
       }
-      const range = /^bytes=(\d+)-(\d*)$/.exec(event.req.headers.get("range") ?? "")
+      const ifRange = event.req.headers.get("if-range")
+      const range =
+        ifRange === null || ifRange === etag ? /^bytes=(\d+)-(\d*)$/.exec(event.req.headers.get("range") ?? "") : null
       const start = range ? Number(range[1]) : 0
       const end = range?.[2] ? Number(range[2]) : body.size - 1
       if (range) {

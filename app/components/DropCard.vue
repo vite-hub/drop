@@ -3,6 +3,7 @@
 // and a globe or a team when it's shared. Hovering, or focus inside, brings up Copy link and the ⋯ menu over the
 // preview's corner. The page decides what a click does (`pick`): one click previews, a double-click or Enter opens.
 import { SHARE_ICONS } from "#shared/share"
+import { linkSource } from "#shared/resources"
 import type { DropSummary } from "#shared/types"
 
 const {
@@ -21,7 +22,9 @@ const { shared, status, copyLink, copied, linkChoices, menu } = useDropItem(() =
   trash: () => emit("delete"),
 })
 const where = computed(() => drop.path?.map((crumb) => crumb.title).join(" / "))
-const address = computed(() => (drop.kind === "app" ? drop.filename.replace(/\/$/, "") : drop.filename))
+const address = computed(() =>
+  drop.href ? linkSource(drop.href) : drop.kind === "app" ? drop.filename.replace(/\/$/, "") : drop.filename,
+)
 </script>
 
 <template>

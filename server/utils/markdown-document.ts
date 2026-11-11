@@ -6,6 +6,7 @@ import { createMarkdownParser } from "@comark/html/parse"
 import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
 import frontmatter from "@comark/html/plugins/frontmatter"
+import linkify from "@comark/html/plugins/linkify"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
 import { lint } from "comark-linter"
@@ -19,6 +20,19 @@ import { cachedMarkdown } from "./markdown-cache"
 import { isPreviewLink, linkText } from "#shared/resources"
 import type { DropResource } from "#shared/types"
 
+/** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
+const DROP_LINK = /^(?:(?:https?:\/\/[^/]+)?\/d\/)?([0-9a-hjkmnp-tv-z]{12})(?:[/?#].*)?$/
+
+/**
+ * `::embed` plays a drop's page (`/d/<link>`) as another drop shown in the doc, on any host: a render is cached for
+ * every reader, so it can't know which address a self-hosted Drop's readers use. comark-linter, which runs without this,
+ * reads the same link as a card, so an agent's doc lints clean before it's published.
+ */
+const dropPlayer = (url: URL) => {
+  const link = url.pathname.match(DROP_LINK)?.[1]
+  return link ? { provider: "drop", src: `/d/${link}`, label: "Embedded drop", size: "app" as const } : undefined
+}
+
 /**
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
  * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
@@ -29,6 +43,7 @@ import type { DropResource } from "#shared/types"
  */
 const preset = comarkUi({
   chips: { download: false },
+  embed: { player: dropPlayer },
   mermaid: { maxDiagrams: 4, maxSource: 8_000 },
   shiki: {
     highlighter: async (language) => {
@@ -38,6 +53,9 @@ const preset = comarkUi({
     themes: { light: "github-light", dark: "github-dark" },
     maxSource: 200_000,
   },
+  // Drop keeps a render for up to 30 days and shares one preset across docs, so relative dates would stay at the
+  // words they had on the first read.
+  time: false,
   typeset: false,
   zoom: { images: false },
 })
@@ -70,14 +88,18 @@ export const RENDERER_SCRIPTS = [
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
- * kinds), `::drop` (another drop shown in the doc), and comark-annotate's screenshot, compare, and annotation
- * for PR evidence. Its blocks.md documents every other plugin.
+ * kinds), and comark-annotate's screenshot, compare, and annotation for PR evidence. Its blocks.md documents every
+ * other plugin.
  */
 export const COMPONENT_TAGS =
-  "alert annotation callout caution compare drop important info note screenshot tip warning".split(" ")
-const ALLOWED_TAGS = [...preset.tags, ...Object.keys(preset.components), ...COMPONENT_TAGS]
+  "alert annotation callout caution compare important info note screenshot tip warning".split(" ")
+/** `::drop{link=…}`, which showed another drop in a doc before `::embed` did. Published docs never change. */
+const LEGACY_TAGS = ["drop"]
+const ALLOWED_TAGS = [...preset.tags, ...Object.keys(preset.components), ...COMPONENT_TAGS, ...LEGACY_TAGS]
 
 const plugins = [
+  // A bare URL is a link, as on GitHub. Comark 0.9 moved it into the defaults Drop leaves out, so it's listed here.
+  linkify(),
   frontmatter(),
   taskList(),
   components(),
@@ -154,28 +176,38 @@ const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render })
   return `<aside class="callout" data-kind="${escapeHtml(kind)}">${await render(children)}</aside>`
 }
 
-/** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
-const EMBED_LINK = /^(?:(?:https?:\/\/[^/]+)?\/d\/)?([0-9a-hjkmnp-tv-z]{12})(?:[/?#].*)?$/
 const EMBED_HEIGHT = { min: 120, max: 1600, default: 480 }
 
 /**
- * `::drop{link=…}`: another drop, shown inside the doc. The render is cached for every reader, so it only holds the
- * link: the viewer fetches the drop as the reader, and only an HTML drop they may open fills the box (EMBEDS_SCRIPT in
+ * Another drop, shown inside the doc. The render is cached for every reader, so it only holds the link: the viewer
+ * fetches the drop as the reader, and only an HTML drop they may open fills the box (EMBEDS_SCRIPT in
  * #shared/documents), in a sandbox of its own. On the /f/ page, which runs no scripts, the box stays a link.
  */
-const renderDropEmbed: NodeHandler = ([, attrs]) => {
-  const link = textValue(attrs.link)?.trim().match(EMBED_LINK)?.[1]
-  if (!link)
-    return `<aside class="callout" data-kind="warning"><p><code>::drop</code> needs the link of the drop to show: <code>::drop{link=k7f2q9m4x8wd}</code>.</p></aside>`
-  const height = Math.round(Number(attrs.height ?? Number.NaN))
-  const clamped = Number.isFinite(height)
-    ? Math.min(EMBED_HEIGHT.max, Math.max(EMBED_HEIGHT.min, height))
+function dropBox(link: string, height: unknown, title: string) {
+  const pixels = Math.round(Number(height ?? Number.NaN))
+  const clamped = Number.isFinite(pixels)
+    ? Math.min(EMBED_HEIGHT.max, Math.max(EMBED_HEIGHT.min, pixels))
     : EMBED_HEIGHT.default
-  const title = textValue(attrs.title)?.trim() || "Embedded drop"
   return (
     `<figure class="drop-embed" data-drop-embed="${link}" data-title="${escapeHtml(title)}" style="--drop-embed-height: ${clamped}px">` +
     `<a class="drop-embed-link" href="/d/${link}">${escapeHtml(title)}</a></figure>`
   )
+}
+
+/** `::embed` with a drop's page draws its box, and comark-embed draws every other link. */
+const renderEmbed: NodeHandler = (node, state) => {
+  const [, attrs] = node
+  const link = attrs.provider === "drop" ? textValue(attrs.src)?.match(DROP_LINK)?.[1] : undefined
+  if (link) return dropBox(link, attrs.height, textValue(attrs.label) ?? "Embedded drop")
+  return preset.components.embed?.(node, state) ?? ""
+}
+
+/** `::drop{link=…}`, in docs published before `::embed` showed drops. */
+const renderDropEmbed: NodeHandler = ([, attrs]) => {
+  const link = textValue(attrs.link)?.trim().match(DROP_LINK)?.[1]
+  if (!link)
+    return `<aside class="callout" data-kind="warning"><p><code>::drop</code> needs the link of the drop to show: <code>::drop{link=k7f2q9m4x8wd}</code>.</p></aside>`
+  return dropBox(link, attrs.height, textValue(attrs.title)?.trim() || "Embedded drop")
 }
 
 const PROBLEM_ICON =
@@ -304,6 +336,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
         callout: renderCallout,
         caution: renderCallout,
         drop: renderDropEmbed,
+        embed: renderEmbed,
         important: renderCallout,
         info: renderCallout,
         note: renderCallout,
@@ -368,6 +401,10 @@ export async function renderMarkdownDocument(
 
 type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[]]
 
+// comark-properties' box opens with `<dl class="cfm"`, then whatever attributes its release adds, such as 0.10's
+// data-comark-frame.
+const PROPERTIES_BOX = /<dl class="cfm"[^>]*>/
+
 /**
  * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
  * pull request, its issue) and when this version was published. They read as more front matter rows, at the top of
@@ -377,7 +414,7 @@ type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[
  * Added to the cached render on each read, since a doc's links change without a new version.
  */
 export async function withDocProperties(html: string, doc: { resources: DropResource[]; updatedAt: number }) {
-  const open = html.indexOf('<dl class="cfm">')
+  const open = html.search(PROPERTIES_BOX)
   const close = open === -1 ? -1 : html.indexOf("</dl>", open)
   const box = open === -1 ? "" : html.slice(open, close)
   const links = doc.resources.filter(
@@ -420,6 +457,7 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   )
   if (open === -1) return rendered + html
   // The page already has the box's styles and date script: only its rows go in, after the front matter's.
-  const start = rendered.indexOf('<dl class="cfm">') + '<dl class="cfm">'.length
+  const opening = PROPERTIES_BOX.exec(rendered)!
+  const start = opening.index + opening[0].length
   return html.slice(0, close) + rendered.slice(start, rendered.lastIndexOf("</dl>")) + html.slice(close)
 }

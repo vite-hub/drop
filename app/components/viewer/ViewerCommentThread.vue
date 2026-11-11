@@ -22,6 +22,8 @@ const props = defineProps<{
   version?: number
   draft?: string
   draftError?: string
+  /** The thread floats beside its pin or over its card in the margin: it closes, rather than going back to the list. */
+  floating?: boolean
 }>()
 const emit = defineEmits<{
   submit: [body: string, files: File[], mentions: string[]]
@@ -233,7 +235,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
       :attachment-url="attachmentUrl"
       :can="can"
       :dismissible="false"
-      navigation="back"
+      :navigation="floating ? 'close' : 'back'"
       :people="people"
       :on-delete="remove"
       :on-edit="edit"

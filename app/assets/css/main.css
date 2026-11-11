@@ -27,7 +27,8 @@
 /*
  * The review tools (ViewerToolbar, and what the frame draws in shared/plan-runtime.ts) take Mesurer's look: one blue for
  * the tool that's on, at the lightness where a white icon or label on it reads (4.7:1), and a borderless toolbar raised by
- * layered shadows. The rest of Drop stays grayscale.
+ * layered shadows. Areas drawn for a comment take the same blue, so they show on dark pages and white images alike. The
+ * rest of Drop stays grayscale.
  */
 @theme inline {
   --color-tool: oklch(0.56 0.18 255);
@@ -434,6 +435,13 @@ body {
 .drop-doc .collaboration-carets__label {
   font: 500 11px/1.4 var(--font-mono);
   padding: 1px 5px;
+}
+
+/* Device mode's bar comes from vite-hub/ui (DeviceFrame). Drop marks the breakpoint the page is at in its tool blue. */
+.vh-device-frame__band[aria-pressed="true"] {
+  background: var(--color-tool);
+  border-color: var(--color-tool);
+  color: white;
 }
 
 /* The sidebar's panes (layouts/dashboard.vue), as a native drill-down. Forward: Docs slides in from the right over the

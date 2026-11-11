@@ -7,8 +7,16 @@
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; address: string; reviewing: boolean }>()
+const props = defineProps<{ drop: DropDetail; address: string; reviewing: boolean; dockTop?: number }>()
 const emit = defineEmits<{ close: [] }>()
+
+const devicePane = useTemplateRef<HTMLElement>("devicePane")
+const { bottom: paneBottom } = useElementBounding(devicePane)
+// Device mode clears the actual pill plus its bottom resize grip. Off, ViewerDevice ignores the inset so the site
+// still fills the viewer. Measure in the same viewport coordinates to include wrapping and safe-area placement.
+const deviceBottom = computed(() =>
+  props.dockTop && paneBottom.value ? Math.max(24, paneBottom.value - props.dockTop + 24) : 72,
+)
 
 const notify = useNotify()
 const capture = useTabCapture()
@@ -25,7 +33,14 @@ function go() {
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
 const capturing = ref(false)
-const drawing = computed(() => props.reviewing && !pending.value && !capturing.value)
+// While Comments is open the layer over the frame takes every press, so the site can't open a slideover or a menu to
+// comment on (drop#164). Use the site lifts the layer until it's pressed again or Comments opens again.
+const browsing = ref(false)
+watch(
+  () => props.reviewing,
+  (on) => on && (browsing.value = false),
+)
+const drawing = computed(() => props.reviewing && !browsing.value && !pending.value && !capturing.value)
 const box = ref<Box | null>(null)
 let from: { x: number; y: number } | null = null
 const pending = ref<{
@@ -207,6 +222,16 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           spellcheck="false"
         />
       </form>
+      <UButton
+        v-if="reviewing && !pending"
+        :aria-pressed="browsing"
+        color="neutral"
+        icon="i-mingcute-cursor-3-line"
+        label="Use the site"
+        size="sm"
+        :variant="browsing ? 'soft' : 'ghost'"
+        @click="browsing = !browsing"
+      />
     </div>
     <p v-if="!valid" class="border-b border-default px-3 py-1.5 text-xs text-error">
       That address isn't part of this site ({{ drop.siteUrl }}).
@@ -219,8 +244,8 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
       Check it before you send.
     </p>
 
-    <div class="relative flex min-h-0 flex-1 flex-col bg-muted">
-      <ViewerDevice :bottom="24" on>
+    <div ref="devicePane" class="relative flex min-h-0 flex-1 flex-col bg-muted">
+      <ViewerDevice :bottom="deviceBottom" on>
         <div ref="stage" class="relative min-h-0 flex-1">
           <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
                dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
@@ -242,7 +267,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           >
             <div
               v-if="box"
-              class="absolute rounded-sm border-2 border-inverted bg-inverted/10"
+              class="absolute rounded-sm border-2 border-tool bg-tool/15"
               :style="{
                 left: `${box.left}px`,
                 top: `${box.top}px`,
@@ -254,7 +279,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
               v-else
               class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
             >
-              Drag to include an area in your comment.
+              Drag to include an area in your comment, or press Use the site to click in it.
             </p>
           </div>
         </div>
@@ -271,7 +296,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           <div class="relative overflow-hidden rounded-md border border-default">
             <img :alt="`Screenshot of ${pending.page}`" class="block w-full" :src="pending.url" />
             <span
-              class="absolute rounded-sm border-2 border-inverted"
+              class="absolute rounded-sm border-2 border-tool bg-tool/15"
               :style="{
                 left: percent(pending.box.left, pending.size.width),
                 top: percent(pending.box.top, pending.size.height),

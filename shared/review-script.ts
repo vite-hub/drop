@@ -16,7 +16,7 @@ import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
 import { CAPTURE } from "./viewport-capture"
 
 const STYLE = `
-:host { all: initial; --bg: #fff; --fg: #0a0a0a; --muted: #737373; --border: #e5e5e5; --primary: #171717; --primary-fg: #fafafa; --ring: #a3a3a3; --error: #dc2626; --soft: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
+:host { all: initial; --mark: oklch(0.62 0.18 255); --bg: #fff; --fg: #0a0a0a; --muted: #737373; --border: #e5e5e5; --primary: #171717; --primary-fg: #fafafa; --ring: #a3a3a3; --error: #dc2626; --soft: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
 @media (prefers-color-scheme: dark) { :host { --bg: #171717; --fg: #fafafa; --muted: #a3a3a3; --border: rgb(255 255 255 / .12); --primary: #e5e5e5; --primary-fg: #171717; --ring: #737373; --error: #f87171; } }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -35,8 +35,8 @@ const STYLE = `
 .count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--soft); font: 500 11px/18px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; }
 .draw { position: fixed; inset: 0; cursor: crosshair; touch-action: none; background: rgb(0 0 0 / .04); }
 .hint { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); white-space: nowrap; }
-.box { position: fixed; border: 2px solid var(--primary); border-radius: 4px; background: color-mix(in oklab, var(--primary) 10%, transparent); pointer-events: none; }
-.mark { position: fixed; border: 1.5px dashed var(--primary); border-radius: 4px; pointer-events: none; }
+.box { position: fixed; border: 2px solid var(--mark); border-radius: 4px; background: color-mix(in oklab, var(--mark) 16%, transparent); pointer-events: none; }
+.mark { position: fixed; border: 1.5px dashed var(--mark); border-radius: 4px; pointer-events: none; }
 .card { position: fixed; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); box-shadow: 0 8px 28px rgb(0 0 0 / .16); overflow: hidden; }
 .pop { width: 320px; padding: 10px; }
 .thread { width: 340px; max-height: min(480px, calc(100vh - 32px)); }
@@ -86,6 +86,7 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .pin:hover, .pin.open { scale: 1.12; }
 .pin img { width: 100%; height: 100%; object-fit: cover; }
 .pin.done { opacity: .6; filter: grayscale(1); }
+.pin.sending { opacity: .7; cursor: progress; }
 .toast { position: fixed; display: flex; gap: 8px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .toast a { color: var(--fg); font-weight: 500; }
 .icon[aria-pressed=true] { background: var(--soft); color: var(--fg); }
@@ -97,6 +98,23 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 .seg .count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--vitehub-pill-hover); font: 500 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; }
 .seg .go { background: var(--vitehub-pill-on); color: var(--vitehub-pill-on-text); }
 .seg .go:disabled { opacity: .5; cursor: default; }
+/* Related links goes away with the review buttons while someone draws. */
+.bar[hidden] ~ .related { display: none !important; }
+/* Its menu, in the pill's dark glass, opens beside the pill like the cards. */
+.links { position: fixed; width: min(320px, calc(100vw - 16px)); max-height: min(420px, calc(100dvh - 96px)); overflow-y: auto; overscroll-behavior: contain; padding: 4px; border: 1px solid rgb(255 255 255 / .12); border-radius: 12px; background: rgb(17 17 17 / .96); box-shadow: 0 8px 24px rgb(0 0 0 / .25); color-scheme: dark; color: #d4d4d4; font: 500 13px/18px ui-sans-serif, system-ui, sans-serif; }
+.links p { margin: 0; padding: 6px 8px 4px; color: #a3a3a3; font-size: 12px; }
+.links p[role=status] { padding: 6px 8px; color: #d4d4d4; font-size: 13px; }
+.links ul { margin: 0; padding: 0; list-style: none; }
+.links a { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 6px 8px; border-radius: 8px; color: #d4d4d4; font-weight: 400; text-decoration: none; outline: none; }
+@media (hover: hover) { .links a:hover { background: rgb(255 255 255 / .08); color: #fafafa; } }
+.links a:focus-visible { background: rgb(255 255 255 / .08); box-shadow: inset 0 0 0 2px #fafafa; }
+@media (any-pointer: coarse) { .links a { min-height: 44px; } }
+.links .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.links .detail { min-width: 0; max-width: 40%; overflow: hidden; color: #a3a3a3; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.links img { width: 16px; height: 16px; flex: none; border-radius: 3px; object-fit: contain; }
+.links svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; color: #a3a3a3; }
+.links .out { width: 14px; height: 14px; }
+.links .github { fill: currentColor; stroke: none; color: inherit; }
 .paint { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -121,7 +139,12 @@ const ICONS = {
   marker: svg(`<path d="M164 44l48 48-96 96-56 8 8-56z"/><path d="M140 68l48 48"/><path d="M40 220h88"/>`),
   pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
   arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
+  link: svg(
+    `<path d="M107 139a53 53 0 0 0 80 6l32-32a53 53 0 0 0-75-75l-18 18"/><path d="M149 117a53 53 0 0 0-80-6l-32 32a53 53 0 0 0 75 75l18-18"/>`,
+  ),
 }
+// GitHub's favicon is a black mark that the dark menu would hide, so its Simple Icons mark takes the text color.
+const GITHUB_MARK = `<svg class="github" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .32.21.69.82.57A12 12 0 0 0 12 .3"/></svg>`
 
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
   `<div class="compose"><textarea aria-label="${label}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
@@ -160,7 +183,8 @@ const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button></div>
+<div class="seg related" slot="related" hidden><button type="button" data-act="related" aria-haspopup="true" aria-expanded="false" aria-controls="related-links">${ICONS.link}Related links</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
@@ -168,6 +192,7 @@ ${TOOLS}
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
 <div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
+<nav class="links" id="related-links" aria-label="Related links" hidden></nav>
 <div class="toast" role="status" hidden></div>
 </div>`
 
@@ -186,6 +211,11 @@ ${TOOLS}
  * Once connected, the page shows its threads the way Figma does: a pin with the author's picture on the element each
  * was left on, found again by its CSS path, that opens the thread to read, reply (with images too), and resolve. A
  * thread whose element isn't on the page any more still shows in the list, with the screenshot it came with.
+ *
+ * When a drop links to the site, like a pull request's before/after doc listing its preview, the pill shows Related
+ * links, a segment of its own with a menu of that doc, its links (the pull request), and the drops that link to those,
+ * two links deep. The page learns whether one exists before anyone connects; which ones, only for a reviewer who'd
+ * find them in Drop.
  */
 export const REVIEW_SCRIPT = String.raw`(() => {
   // A bookmarklet adds this script with a plain script element, where currentScript works too.
@@ -215,14 +245,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const bar = $(".bar"), draw = $(".draw"), box = $(".box"), pop = $(".pop"), toast = $(".toast"), mark = $(".mark");
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
+  const copyButton = $("[data-act=copy]", bar);
   const showResolved = $("[data-act=resolved]", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
 
-  // The comment list and the notes open beside the pill, on its edge, at the end of the edge it is nearer to.
+  const related = $(".related"), relatedButton = $("button", related), links = $(".links");
+
+  // The comment list, Related links, and the notes open beside the pill, on its edge, at the end of the edge it is nearer to.
   function dockCards(place) {
     const side = place.edge === "left" || place.edge === "right";
     const off = (place.collapsed ? 2 : 16) + place.thickness + 8 + "px";
-    for (const card of [list, toast]) {
+    for (const card of [list, links, toast]) {
       const style = card.style;
       style.left = style.right = style.top = style.bottom = style.translate = "";
       style[place.edge] = off;
@@ -239,7 +272,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     name: "drop-review-pill",
     label: "Drop review tools",
     mark: document.importNode(dropMark, true),
-    slots: ["review", "highlight"],
+    slots: ["review", "related", "highlight"],
     storage: { collapsed: "drop-review-collapsed", dock: "drop-review-dock" },
     initial: {
       dock: ViteHubPagePill.readViteHubPageDock({ edge: script.dataset.edge || "bottom", at: Number(script.dataset.at || 50) }),
@@ -249,16 +282,19 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     parent: $(".ui"),
     signal: new AbortController().signal,
   });
-  pill.append(bar, tools);
+  pill.append(bar, related, tools);
   let area = null, start = null, busy = false, toastTimer = 0;
+  // The comment on its way to Drop. Its pin shows at once while the composer waits hidden, so a failed send can open
+  // it again with the note.
+  let sending = null, sendingBox = false;
   let threads = [], openN = null, pinsShown = true, here = "";
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
-  const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map();
+  const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map(), shownImages = new Set();
 
   function save(value) {
     token = value ? value.token : null;
     try { value ? sessionStorage.setItem(stored, JSON.stringify(value)) : sessionStorage.removeItem(stored); } catch (e) {}
-    if (!token) { threads = []; render(); }
+    if (!token) { threads = []; forgetRelated(); render(); }
   }
 
   function say(text, link) {
@@ -301,6 +337,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
   const reviewUrl = () => drop + "/review/open#" + encodeURIComponent(token || "");
+  // Copy link goes through Drop the same way: a small Drop window copies the link there and closes.
+  // Each request gets a fresh document: an earlier window may still be waiting for a manual copy of another review.
+  function copyReviewLink() {
+    const url = drop + "/review/open?copy#" + encodeURIComponent(token || "");
+    if (!window.open(url, "_blank", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
+  }
 
   function authorName() {
     try { return (JSON.parse(sessionStorage.getItem(stored) || "null") || {}).name || ""; } catch (e) { return ""; }
@@ -327,19 +369,25 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   const pageKey = () => location.pathname + location.search;
 
+  // Each read takes a number, and only the latest one may draw: a read that started before a sent comment was saved
+  // would erase its pin.
+  let reads = 0;
   async function refresh() {
     if (!token) return;
     here = pageKey();
+    const read = ++reads;
     try {
       const response = await call(api + "?page=" + encodeURIComponent(here));
       const answer = await response.json();
-      if (here !== pageKey()) return;
+      if (read !== reads || here !== pageKey()) return;
       threads = Array.isArray(answer.threads) ? answer.threads : [];
+      // The pending pin belongs to the page it was sent from.
+      if (sending && sending.page === here && !threads.some((item) => item.requestId === sending.requestId)) threads.unshift(sending);
       render();
     } catch (e) {}
   }
 
-  const visible = () => threads.filter((item) => !item.resolved || showResolved.checked);
+  const visible = () => threads.filter((item) => (item !== sending || item.page === pageKey()) && (!item.resolved || showResolved.checked));
 
   function avatar(person, into) {
     into.textContent = initials(person.name);
@@ -365,15 +413,21 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     return node;
   }
 
-  // The element a thread was left on, found again by its CSS path. Null when the page no longer has it.
+  // The element a thread was left on, found again by its CSS path. Null when the page no longer has it. A found element
+  // stays the thread's while it's on the page. One that isn't there is looked for again once the page has changed, at
+  // most every MISS_MS: on a large page each lookup costs up to half a millisecond, and a page that re-renders every
+  // frame paid it for every thread on every frame (drop#163).
+  const MISS_MS = 500;
+  let changedAt = 0;
   function elementOf(item) {
     if (!item.element) return null;
-    const known = elementFor.get(item.n);
-    if (known && known.isConnected) return known;
+    const known = elementFor.get(item.n), now = performance.now();
+    if (known && known.el && known.el.isConnected) return known.el;
+    if (known && !known.el && (known.at > changedAt || now - known.at < MISS_MS)) return null;
     let found = null;
     try { found = document.querySelector(item.element.selector); } catch (e) {}
     if (found && host.contains(found)) found = null;
-    elementFor.set(item.n, found);
+    elementFor.set(item.n, { el: found, at: now });
     return found;
   }
   function pointOf(item) {
@@ -389,7 +443,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const shown = token ? visible() : [];
     const open = threads.filter((item) => !item.resolved).length;
     // The list shows once the page has threads: before someone connects there is nothing to count.
-    pinsButton.hidden = listButton.hidden = !threads.length;
+    copyButton.hidden = pinsButton.hidden = listButton.hidden = !threads.length;
     if (listButton.hidden) list.hidden = true;
     count.textContent = String(open);
     listButton.title = open + " open comment" + (open === 1 ? "" : "s") + " on this page";
@@ -405,8 +459,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
         pinFor.set(item.n, pin);
       }
       pin.classList.toggle("done", item.resolved);
-      pin.setAttribute("aria-label", "Comment #" + item.n + " by " + item.author.name);
-      pin.title = "#" + item.n + " " + item.author.name + ": " + item.body.slice(0, 80);
+      pin.classList.toggle("sending", item === sending);
+      pin.disabled = item === sending;
+      pin.setAttribute("aria-label", item === sending ? "Sending your comment" : "Comment #" + item.n + " by " + item.author.name);
+      pin.title = (item === sending ? "Sending: " : "#" + item.n + " " + item.author.name + ": ") + item.body.slice(0, 80);
       if (pin.dataset.who !== item.author.name) { pin.dataset.who = item.author.name; pin.textContent = ""; avatar(item.author, pin); }
     }
     if (!list.hidden) renderList();
@@ -420,20 +476,23 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   let frame = 0;
   const schedule = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; layout(); }); };
   function layout() {
+    // Every element is measured before any pin moves: a move between two measurements made the browser recompute
+    // styles once per pin, on every frame the page changed.
+    const placed = [];
+    for (const item of threads) if (pinFor.has(item.n)) placed.push([item, pointOf(item)]);
+    const item = openN !== null && threads.find((t) => t.n === openN);
+    const open = item && placed.find(([shown]) => shown === item);
+    const at = open ? open[1] : item && pointOf(item);
     pinLayer.hidden = !pinsShown || !draw.hidden || !paint.hidden;
     if (!inked.hidden) inked.style.translate = inkAt.x - scrollX + "px " + (inkAt.y - scrollY) + "px";
-    for (const item of threads) {
-      const pin = pinFor.get(item.n);
-      if (!pin) continue;
-      const at = pointOf(item);
+    for (const [shown, at] of placed) {
+      const pin = pinFor.get(shown.n);
       const inView = at && at.x >= -4 && at.y >= 0 && at.x <= innerWidth + 4 && at.y <= innerHeight + 28;
       pin.hidden = !inView;
       // The translate property, not transform: it applies after the open pin's scale, so the pin grows in place.
       if (inView) pin.style.translate = Math.round(at.x) + "px " + Math.round(at.y) + "px";
-      pin.classList.toggle("open", item.n === openN);
+      pin.classList.toggle("open", shown.n === openN);
     }
-    const item = openN !== null && threads.find((t) => t.n === openN);
-    const at = item && pointOf(item);
     mark.hidden = !at;
     if (at) place(mark, { left: at.rect.left - 3, top: at.rect.top - 3, width: at.rect.width + 6, height: at.rect.height + 6 });
     if (item && !thread.hidden) placeThread(at);
@@ -445,6 +504,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     a.target = "_blank"; a.rel = "noopener"; a.title = name || "Image";
     const img = el("img"); img.alt = name || "Image";
     a.appendChild(img);
+    shownImages.add(id);
     const known = imageUrls.get(id);
     const show = (url) => { img.src = url; a.href = url; };
     if (known) known.then(show, () => {});
@@ -477,7 +537,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   function openThread(n) {
     const item = threads.find((t) => t.n === n);
-    if (!item) return;
+    // While a comment is on its way, its composer keeps the note in case the send fails, so nothing else opens.
+    if (!item || sending) return;
     cancel();
     list.hidden = true;
     openN = n;
@@ -486,8 +547,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
     $("textarea", thread).focus({ preventScroll: true });
   }
+  // The open thread's pictures stay loaded while it re-renders; the others' object URLs are let go.
+  function keepShownImages() {
+    imageUrls.forEach((loading, id) => {
+      if (shownImages.has(id)) return;
+      imageUrls.delete(id);
+      loading.then((url) => URL.revokeObjectURL(url), () => {});
+    });
+  }
   function closeThread() {
     openN = null; thread.hidden = true; mark.hidden = true;
+    shownImages.clear(); keepShownImages();
     replyBox.reset();
     layout();
   }
@@ -502,6 +572,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const items = $(".items", thread);
     const scrolled = items.scrollTop;
     items.textContent = "";
+    shownImages.clear();
     const first = entry(item.author, item.createdAt, item.body, item.images);
     const placed = pointOf(item);
     if (!placed && item.element && item.element.label) first.insertBefore(el("p", "where", "Was on " + item.element.label), first.children[1]);
@@ -509,6 +580,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!placed && item.screenshot) images([{ id: item.screenshot, filename: "Screenshot" }], first, true);
     items.appendChild(first);
     item.replies.forEach((reply) => items.appendChild(entry(reply.author, reply.createdAt, reply.body, reply.images)));
+    keepShownImages();
     items.scrollTop = scrolled;
     $(".who", thread).textContent = authorName() ? "As " + authorName() : "";
   }
@@ -531,7 +603,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function renderList() {
     $("a", list).href = reviewUrl();
     listItems.textContent = "";
-    const shown = visible().slice().sort((a, b) => a.n - b.n);
+    const shown = visible().filter((item) => item !== sending).sort((a, b) => a.n - b.n);
     if (!shown.length) listItems.appendChild(el("p", "empty", threads.length ? "Every comment here is resolved." : "No comments on this page yet."));
     for (const item of shown) {
       const row = el("button", "row-item" + (item.resolved ? " done" : ""));
@@ -553,6 +625,134 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       listItems.appendChild(row);
     }
   }
+
+  // ---- Related links: the drops related to this site, like a pull request's before/after doc, with their links ----
+
+  // Before someone connects, Drop only says whether any drop links here, which shows the button. The first press
+  // connects, as Comment does, then lists the drops this person would find in Drop anyway (server/utils/related.ts),
+  // each with a handle that /review/open takes in place of its link, and their links, like the pull request.
+  const relatedApi = drop + "/api/review/related";
+  let relatedLinks = null, relatedAsk = null, relatedOpening = false, relatedIntent = 0;
+  async function probeRelated() {
+    try {
+      const response = await fetch(relatedApi, { credentials: "omit" });
+      related.hidden = !(response.ok && (await response.json()).linked === true);
+    } catch (e) {}
+  }
+  async function findRelated() {
+    await ensureToken();
+    let answer;
+    try { answer = await (await call(relatedApi)).json(); }
+    catch (error) { throw new Error(token ? "Couldn't reach Drop." : error.message); }
+    // One list: each drop, then the links of its not listed yet.
+    return (answer.groups || []).flatMap((group) => [
+      { url: drop + "/review/open#doc=" + encodeURIComponent(group.open), label: group.title, detail: "Drop", icons: [drop + "/favicon.svg", drop + "/favicon.ico"] },
+      ...group.links,
+    ]);
+  }
+
+  const iconFrom = (html) => {
+    const holder = document.createElement("template");
+    holder.innerHTML = html;
+    return holder.content.firstChild;
+  };
+  // A row's icon: GitHub's mark, the first of the link's favicons that loads, asked with no referrer, or a link icon.
+  function relatedIcon(link) {
+    if (/^https:\/\/(?:www\.)?github\.com\//.test(link.url)) return iconFrom(${JSON.stringify(GITHUB_MARK)});
+    const tries = (link.icons || []).slice();
+    if (!tries.length) return iconFrom(${JSON.stringify(ICONS.link)});
+    const image = document.createElement("img");
+    image.alt = ""; image.referrerPolicy = "no-referrer"; image.decoding = "async";
+    const next = () => {
+      const url = tries.shift();
+      if (url) image.src = url;
+      else image.replaceWith(iconFrom(${JSON.stringify(ICONS.link)}));
+    };
+    image.addEventListener("error", next);
+    next();
+    return image;
+  }
+  function relatedRow(link) {
+    const item = document.createElement("li"), anchor = document.createElement("a"), name = document.createElement("span");
+    anchor.href = link.url; anchor.target = "_blank"; anchor.rel = "noopener noreferrer";
+    anchor.title = link.label + "\n" + link.url;
+    anchor.setAttribute("aria-label", link.label + (link.detail ? ", " + link.detail : "") + " (opens in a new tab)");
+    name.className = "name"; name.textContent = link.label;
+    anchor.append(relatedIcon(link), name);
+    if (link.detail) {
+      const detail = document.createElement("span");
+      detail.className = "detail"; detail.textContent = link.detail;
+      anchor.appendChild(detail);
+    }
+    const out = iconFrom(${JSON.stringify(ICONS.arrow)});
+    out.setAttribute("class", "out");
+    anchor.appendChild(out);
+    anchor.addEventListener("click", closeRelated);
+    item.appendChild(anchor);
+    return item;
+  }
+
+  function closeRelated() {
+    relatedOpening = false;
+    relatedIntent++;
+    links.hidden = true;
+    relatedButton.setAttribute("aria-expanded", "false");
+  }
+  // After the session ends, the next press asks Drop again.
+  function forgetRelated() {
+    relatedLinks = relatedAsk = null;
+    relatedButton.removeAttribute("aria-busy");
+    closeRelated();
+  }
+  async function openRelated() {
+    const intent = ++relatedIntent;
+    relatedOpening = true;
+    try {
+      if (!relatedLinks) {
+        // The request starts in the press, before any await, so it may still open the connect popup.
+        if (!relatedAsk) {
+          const ask = findRelated().then((found) => {
+            if (ask === relatedAsk) relatedLinks = found;
+          }).finally(() => {
+            if (ask === relatedAsk) { relatedAsk = null; relatedButton.removeAttribute("aria-busy"); }
+          });
+          relatedAsk = ask;
+          relatedButton.setAttribute("aria-busy", "true");
+        }
+        await relatedAsk;
+      }
+    } catch (error) {
+      if (intent === relatedIntent) {
+        relatedOpening = false;
+        if (error.message) say(error.message);
+      }
+      return;
+    }
+    // A dismissed request can fill the cache, but cannot cancel a newer tool or take its focus.
+    if (intent !== relatedIntent || !relatedLinks) return;
+    cancel();
+    closeThread();
+    list.hidden = true;
+    const heading = document.createElement("p");
+    heading.textContent = "Related links";
+    const body = document.createElement(relatedLinks.length ? "ul" : "p");
+    if (relatedLinks.length) body.append(...relatedLinks.map(relatedRow));
+    else { body.setAttribute("role", "status"); body.textContent = "No drop related to this site is shared with you."; }
+    links.replaceChildren(heading, body);
+    links.hidden = false;
+    relatedButton.setAttribute("aria-expanded", "true");
+    const first = $("a", links);
+    if (first) first.focus({ preventScroll: true });
+  }
+  relatedButton.addEventListener("click", () => {
+    if (links.hidden && !relatedOpening) void openRelated();
+    else closeRelated();
+  });
+  // A press on the toolbar outside the menu closes it. A press on the page does too, with the thread and the list.
+  root.addEventListener("pointerdown", (e) => {
+    const path = e.composedPath();
+    if (!path.includes(links) && !path.includes(related)) closeRelated();
+  }, true);
 
   // ---- Writing: a box with images from a button, a paste, or a drop ----
 
@@ -612,20 +812,23 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const clamp = (value) => Math.min(1000, Math.max(0, Math.round(value)));
 
   function startDrawing() {
+    if (sending) return say("Sending your comment…");
     cancel();
     closeThread();
     list.hidden = true;
+    closeRelated();
     loadScreenshot().catch(() => { screenshotModule = null; });
     pill.hidden = true;
     draw.hidden = false;
     layout();
   }
   function cancel() {
+    closeRelated();
     const wasOpen = !draw.hidden || !pop.hidden;
     draw.hidden = true; box.hidden = true; pop.hidden = true; pill.hidden = bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
     newBox.show("");
-    area = null; start = null; strokes = []; still = null;
+    area = null; start = null; strokes = []; still = null; captureRun++;
     forgetStroke();
     layout();
     if (wasOpen) $("[data-act=comment]", bar).focus({ preventScroll: true });
@@ -711,9 +914,11 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   function startMarking() {
+    if (sending) return say("Sending your comment…");
     cancel();
     closeThread();
     list.hidden = true;
+    closeRelated();
     // The screenshot starts now, with the page as the reviewer marks it; it holds still until Done.
     still = capture().catch(() => null);
     inkAt = { x: scrollX, y: scrollY };
@@ -746,12 +951,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     canvas.width = image.width; canvas.height = image.height;
     const g = canvas.getContext("2d");
     g.drawImage(image, 0, 0);
+    image.close();
     g.scale(k, k);
     inkOn(g, list);
     const blob = (type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
-    let out = await blob("image/webp", 0.9);
-    if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
-    return out && out.size <= MAX_BYTES ? out : picture;
+    try {
+      let out = await blob("image/webp", 0.9);
+      if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
+      return out && out.size <= MAX_BYTES ? out : picture;
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
   }
 
   function finishMark() {
@@ -809,10 +1019,18 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }
     else if (!list.hidden) { e.stopPropagation(); list.hidden = true; }
+    else if (!links.hidden || relatedOpening) {
+      e.stopPropagation();
+      // The focus goes back to the button when it was in the menu.
+      if (root.activeElement && links.contains(root.activeElement)) relatedButton.focus({ preventScroll: true });
+      closeRelated();
+    }
   }, true);
 
   ${CAPTURE}
-  const capture = () => captureViewport(host);
+  // Each comment's screenshot; cancel() stops the one still being drawn for a comment that's gone.
+  let captureRun = 0;
+  const capture = () => { const run = ++captureRun; return captureViewport(host, () => run !== captureRun); };
 
   async function ensureToken() {
     if (token) return;
@@ -827,13 +1045,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   listButton.addEventListener("click", () => {
     list.hidden = !list.hidden;
-    if (!list.hidden) { closeThread(); renderList(); }
+    if (!list.hidden) { closeThread(); closeRelated(); renderList(); }
   });
-  // A press anywhere else on the page closes the thread or the list, as in Figma.
+  // A press anywhere else on the page closes the thread, the list, or Related links, as in Figma.
   addEventListener("pointerdown", (e) => {
     if (e.composedPath().includes(host)) return;
     if (!thread.hidden) closeThread();
     list.hidden = true;
+    closeRelated();
   }, true);
   pinsButton.addEventListener("click", () => {
     pinsShown = !pinsShown;
@@ -845,6 +1064,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   });
   showResolved.addEventListener("change", render);
   $("[data-act=close]", list).addEventListener("click", () => { list.hidden = true; });
+  copyButton.addEventListener("click", copyReviewLink);
   $("[data-act=close]", thread).addEventListener("click", closeThread);
   $("[data-act=cancel]", pop).addEventListener("click", cancel);
 
@@ -897,6 +1117,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     let response = await attempt();
     for (let wait = 2000; unreachable(response); wait = Math.min(wait * 2, 15000)) {
       if (Date.now() + wait > until) throw new Error("Couldn't reach Drop. Your comment is still here: press Send to try again.");
+      unsend();
       newBox.show("Can't reach Drop. Trying again…");
       await pause(wait);
       const n = await landed(data.page, data.requestId);
@@ -924,6 +1145,36 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     }
   }
 
+  // The note's pin, drawn as soon as it's sent. Keyed 0 until Drop gives it a number; it takes no clicks meanwhile.
+  function showSending(data) {
+    sending = {
+      n: 0, requestId: data.requestId, body: data.body, author: { name: authorName() || "You", image: null },
+      createdAt: Date.now(), resolved: false, mine: true, canResolve: false, page: pageKey(),
+      element: { selector: data.selector, label: data.label || null }, spot: data.spot,
+      box: { ox: data.ox, oy: data.oy, ow: data.ow, oh: data.oh }, screenshot: null, images: [], replies: [],
+    };
+    elementFor.delete(0);
+    sendingBox = !box.hidden;
+    pop.hidden = true; box.hidden = true; pill.hidden = bar.hidden = false;
+    threads = [sending].concat(threads);
+    render();
+    $("[data-act=comment]", bar).focus({ preventScroll: true });
+  }
+  function forgetSending() {
+    if (!sending) return false;
+    threads = threads.filter((item) => item !== sending);
+    elementFor.delete(sending.n);
+    sending = null;
+    return true;
+  }
+  // The send didn't go through: the pin goes and the composer comes back with the note, to show why.
+  function unsend() {
+    if (!forgetSending()) return;
+    pop.hidden = false; box.hidden = !sendingBox; pill.hidden = true;
+    render();
+    newBox.note.focus({ preventScroll: true });
+  }
+
   pop.addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = newBox.note.value.trim();
@@ -942,17 +1193,25 @@ export const REVIEW_SCRIPT = String.raw`(() => {
         ox, oy, ow: Math.max(1, Math.min(1000 - ox, at(r.right, w) - ox)), oh: Math.max(1, Math.min(1000 - oy, at(r.bottom, h) - oy)),
         viewport: { width: w, height: h },
       };
+      // The screenshot may still be drawing; the pin doesn't wait for it, or for Drop.
+      const from = pageKey();
+      showSending(data);
       const form = new FormData();
       form.append("data", JSON.stringify(data));
       const shot = await area.shot;
       if (shot) form.append("screenshot", shot, "screenshot");
       newBox.files().forEach((file) => form.append("image", file, file.name || "image"));
       const answer = await postComment(form, data);
+      const saved = answer.thread && answer.thread.n === answer.n ? answer.thread : null;
+      forgetSending();
+      if (saved && from === pageKey()) { reads++; threads = [saved].concat(threads.filter((item) => item.n !== saved.n)); }
       newBox.reset();
       cancel();
       say("Sent as #" + answer.n + ". ", reviewUrl());
-      void refresh();
+      // A resend that found the earlier submission answers its number only.
+      if (saved) render(); else void refresh();
     } catch (error) {
+      unsend();
       newBox.show((error && error.message) || "Couldn't reach Drop.");
     } finally {
       busy = false; send.disabled = false; send.textContent = "Send";
@@ -964,9 +1223,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("resize", schedule, { passive: true });
   new MutationObserver((records) => {
     if (records.every((record) => host === record.target || host.contains(record.target))) return;
-    elementFor.clear();
+    changedAt = performance.now();
     schedule();
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  }).observe(document.documentElement, { childList: true, attributes: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
   setInterval(() => {
     if (token && pageKey() !== here) { closeThread(); elementFor.clear(); void refresh(); }
@@ -981,6 +1240,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // typing a note doesn't run the page's shortcuts.
   for (const type of ["pointerdown", "mousedown", "touchstart", "click", "focusin", "focusout", "keydown", "keyup"])
     host.addEventListener(type, (e) => e.stopPropagation());
+  // A modal on the page, such as a slideover, keeps focus inside it: when its element loses focus to something outside,
+  // it takes focus back (Reka UI and Radix listen for focusout on the document). That focusout starts on the page's
+  // element, not here, so it's stopped on its way down when focus is moving into the toolbar. Otherwise the note's box
+  // loses focus as it opens and the words go into the slideover (drop#164).
+  addEventListener("focusout", (e) => { if (e.relatedTarget === host) e.stopPropagation(); }, true);
   document.documentElement.appendChild(host);
   void refresh();
+  void probeRelated();
 })();`

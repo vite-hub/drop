@@ -98,14 +98,23 @@ Save sits below the fold on a laptop screen.
 
 ## Interactive drops
 
-A doc runs no scripts. To show something that does, publish it as its own `html` drop first, then put that drop's link in the doc:
+A doc runs no scripts. To show something that does, publish it as its own `html` drop first, then embed that drop's link in the doc:
 
 ```md
-::drop{link=k7f2q9m4x8wd height=420 title="How a rebuild uses the snapshots"}
+::embed{url="https://drop.vitehub.dev/d/k7f2q9m4x8wd" height=420 title="How a rebuild uses the snapshots"}
 ::
 ```
 
-`link` is the drop's link key or its whole `/d/` address. `height` is the box's height in pixels, 120 to 1600 (default 480): set it to what the drop needs, since the box doesn't grow with it. `title` names the frame for screen readers and is the link text where the drop can't show.
+`url` is the drop's HTTPS `/d/` address, as `publish` returns it. `height` is the box's height in pixels, 120 to 1600 (default 480): set it to what the drop needs, since the box doesn't grow with it. `title` names the frame for screen readers and is the link text where the drop can't show. Outside Drop, such as in `comark-lint` or a local render, the block is a link card to the drop.
+
+For a Drop served over HTTP, such as `http://localhost:3000`, use Drop's legacy `::drop` block with the address returned by `publish`, since `::embed` accepts only HTTPS:
+
+```md
+::drop{link="http://localhost:3000/d/k7f2q9m4x8wd" height=420 title="How a rebuild uses the snapshots"}
+::
+```
+
+To lint this fallback with `comark-lint`, include `"drop"` in your `comark-lint.config.mjs` components, for example `export default { components: ["drop"] }`. HTTPS `::embed` needs no custom lint configuration.
 
 The drop runs in its own sandbox inside the doc, so it can't reach Drop, the reader's session, or the doc around it. Make it one self-contained HTML file: with no origin of its own, it can't load another drop's files or Drop's private images. Only HTML drops show; an app, a doc, or an image shows a note instead. Each reader sees the drop only if they may open it themselves, so share it at least as widely as the doc. On the doc's plain `/f/` page, which runs no scripts, the box is a link to the drop.
 
@@ -130,6 +139,7 @@ Set `title` when the first heading isn't the doc's title. Add `supersedes`, the 
 | Written | Shows as | Write instead |
 | --- | --- | --- |
 | `$x^2$` math | its TeX source, in monospace | a code span or a `text` block |
+| `:time[2026-11-02]` | the date as written, never "2 days ago" | the date itself, such as `Nov 2, 2026` |
 | `:rocket:` | an "Unsupported component" box | the emoji itself, when it carries meaning |
 | `#123` | plain text | `owner/repo#123`, or a full link: `[#123](https://github.com/owner/repo/pull/123)` |
 | `<script>`, `<style>`, `<iframe>`, or a tag GitHub doesn't allow | nothing | Markdown, a [block](blocks.md), an [interactive drop](#interactive-drops), or publish `html` |

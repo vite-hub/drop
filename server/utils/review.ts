@@ -22,11 +22,20 @@ import {
   siteMatches,
 } from "#shared/review"
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
-import type { ReviewThread, SiteReviewItem } from "#shared/types"
+import type { CommentAttachment, ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
 import { drops, reviewSubmissions, user } from "../databases/config"
 import { type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
-import { addThread, authorOf, findThread, removeThread, siteCommentList, threadsFor, toComment } from "./comments"
+import {
+  addThread,
+  authorOf,
+  type DropThread,
+  findThread,
+  removeThread,
+  siteCommentList,
+  threadsFor,
+  toComment,
+} from "./comments"
 import { siteCoversDrop } from "./content-origin"
 import { isExpired, expiryPolicy, renewDrop } from "./expiry"
 import { createFolder } from "./folders"
@@ -45,6 +54,7 @@ import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
 import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
+import { findableBy } from "./related"
 
 /**
  * Site review. A site drop names a website by its origin, or by a pattern that covers every preview deploy (`siteUrl`,
@@ -82,7 +92,7 @@ async function sealKey(event: H3Event) {
 }
 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
-type SealPurpose = "token" | "choice" | "upload" | "app-files"
+type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files"
 
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
@@ -169,7 +179,7 @@ export async function sitesFor(origin: string, who: Identity | null, event?: H3E
 }
 
 /** Whether any site drop covers `origin`. That much is all a page learns before it has a token. */
-async function covered(origin: string) {
+export async function covered(origin: string) {
   const where = sitesCovering(origin)
   return Boolean(where && (await db.select({ id: drops.id }).from(drops).where(where).limit(1)).length)
 }
@@ -181,6 +191,20 @@ async function covered(origin: string) {
 export function openable(site: DropRow, who: Identity | null) {
   const grants = (site.grants ?? [{ share: site.share }]).filter((grant) => !isPublic(grant.share))
   return permissions({ ...site, grants }, who).view
+}
+
+/** What a doc's handle says: which drop, until when. Sealed, so the page shows the doc without learning its link. */
+const DocHandle = v.object({ d: v.string(), e: v.number() })
+
+/** The handle the review script opens a doc by, good as long as the review token it came with. */
+export const sealDoc = (event: H3Event, doc: Pick<DropRow, "id">, until: number) =>
+  seal(event, "doc", { d: doc.id, e: until } satisfies v.InferOutput<typeof DocHandle>)
+
+/** The doc behind a handle, when `who` would find it in Drop anyway. Null for anything else. */
+export async function openDoc(event: H3Event, handle: string, who: Identity, now = Date.now()) {
+  const claims = await unseal(event, "doc", DocHandle, handle)
+  const doc = claims && claims.e > now ? await findDrop(claims.d, event) : null
+  return doc && (await findableBy(who, [doc], event)).length ? doc : null
 }
 
 /**
@@ -224,6 +248,31 @@ export async function reviewSession(event: H3Event) {
     if (who !== false && permissions(site, who).comment) return { site, claims, who }
   } else if (await covered(origin)) event.res.headers.set("Access-Control-Allow-Origin", origin)
   throw new HTTPError({ status: 401, statusText: "Your review session ended. Connect again to comment." })
+}
+
+/**
+ * Server-Timing for a review request: each step's time since the one before, then the whole. The page that sent the
+ * request may read it, from fetch and from its Resource Timing entries, so a slow Send says where its time went.
+ */
+export function reviewTiming(event: H3Event) {
+  const start = performance.now()
+  let last = start
+  const steps: string[] = []
+  return {
+    step(name: string) {
+      const now = performance.now()
+      steps.push(`${name};dur=${(now - last).toFixed(1)}`)
+      last = now
+    },
+    send() {
+      steps.push(`total;dur=${(performance.now() - start).toFixed(1)}`)
+      event.res.headers.set("Server-Timing", steps.join(", "))
+      const origin = event.res.headers.get("access-control-allow-origin")
+      if (!origin) return
+      event.res.headers.set("Access-Control-Expose-Headers", "Server-Timing")
+      event.res.headers.set("Timing-Allow-Origin", origin)
+    },
+  }
 }
 
 /** The preflight before a review request, which carries no token yet: allowed for origins some site drop covers. */
@@ -426,6 +475,9 @@ export async function readReviewComment(
  * image view), or the element itself on the site. `origin` is the page's, from its token. `spot` is where on the
  * element the pin goes, so the script can put it back on the live page. `images` are what the reviewer added, stored
  * under the site like its screenshots.
+ *
+ * Returns the thread with the images it stored, so the answer can carry the thread without reading it back.
+ * `attachments` is null when the request id names an earlier submission, whose images this request didn't store.
  */
 export async function addReviewComment(
   site: DropRow,
@@ -434,14 +486,14 @@ export async function addReviewComment(
   shot: Screenshot | null,
   origin: string,
   images: CommentImage[] = [],
-) {
+): Promise<{ row: DropThread; attachments: CommentAttachment[] | null }> {
   if (input.requestId) {
     const existing = await submittedReview(site, input.requestId)
-    if (existing) return existing
+    if (existing) return { row: existing, attachments: null }
   }
   let created: Awaited<ReturnType<typeof insertReviewComment>> | undefined
   try {
-    const { row } = await withImages(
+    const { row, attachments } = await withImages(
       site,
       images,
       author.name,
@@ -467,7 +519,7 @@ export async function addReviewComment(
         .set({ metadata: sql`json_remove(${threads.metadata}, '$.requestPending')` })
         .where(eq(threads.id, row.id))
     }
-    return row
+    return { row, attachments }
   } catch (error) {
     if (created) {
       const shotDrop = created.meta.dropId === site.id ? null : await findDrop(created.meta.dropId)
@@ -478,7 +530,7 @@ export async function addReviewComment(
     // batch, and insertReviewComment removes any extra screenshot before we reuse the winning thread.
     if (input.requestId) {
       const existing = await submittedReview(site, input.requestId)
-      if (existing) return existing
+      if (existing) return { row: existing, attachments: null }
     }
     throw error
   }
@@ -603,7 +655,7 @@ export async function siteItems(
       return {
         ...toComment(thread, who, attachments),
         requestId: meta.requestId,
-        spot: meta.elementX !== null && meta.elementY !== null ? { x: meta.elementX, y: meta.elementY } : null,
+        spot: spotOf(meta),
         screenshot: shot?.blobKey
           ? {
               id: shot.id,
@@ -616,7 +668,13 @@ export async function siteItems(
     })
 }
 
+const spotOf = (meta: DropThread["meta"]) =>
+  meta.elementX !== null && meta.elementY !== null ? { x: meta.elementX, y: meta.elementY } : null
+
 const reviewImages = (files: SiteReviewItem["attachments"]) => files.map(({ id, filename }) => ({ id, filename }))
+
+/** What `reviewThread` reads of a site's review item. The script names the screenshot by its id only. */
+type ReviewItem = Omit<SiteReviewItem, "screenshot"> & { screenshot: { id: string } | null }
 
 /**
  * A site's threads as the review script shows them on the page (ReviewThread): no ids or links that would open the
@@ -624,7 +682,34 @@ const reviewImages = (files: SiteReviewItem["attachments"]) => files.map(({ id, 
  */
 export function reviewThreads(site: DropRow, who: Identity | null, items: SiteReviewItem[]): ReviewThread[] {
   const manage = permissions(site, who).manage
-  return items.map((item) => ({
+  return items.map((item) => reviewThread(item, manage))
+}
+
+/**
+ * The thread a review POST just stored, as `reviewThreads` would list it, from what the POST holds: the script draws
+ * its pin from the answer instead of asking for the page's threads again.
+ */
+export function reviewThreadOf(
+  site: DropRow,
+  who: Identity | null,
+  thread: DropThread,
+  attachments: CommentAttachment[],
+): ReviewThread {
+  const files = new Map(attachments.map((file) => [file.id, file]))
+  const { meta } = thread
+  return reviewThread(
+    {
+      ...toComment(thread, who, files),
+      requestId: meta.requestId,
+      spot: spotOf(meta),
+      screenshot: meta.dropId === site.id ? null : { id: meta.dropId },
+    },
+    permissions(site, who).manage,
+  )
+}
+
+function reviewThread(item: ReviewItem, manage: boolean): ReviewThread {
+  return {
     n: item.n,
     requestId: item.requestId,
     body: item.body,
@@ -646,7 +731,7 @@ export function reviewThreads(site: DropRow, who: Identity | null, items: SiteRe
       createdAt: reply.createdAt,
       images: reviewImages(reply.attachments),
     })),
-  }))
+  }
 }
 
 /**
