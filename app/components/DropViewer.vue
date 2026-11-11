@@ -108,7 +108,7 @@ const siteRef = useTemplateRef<{
   pending: boolean
 }>("siteRef")
 const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
-const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
+const reviewDock = useTemplateRef<{ focusTrigger: () => void; top: number }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
   shareOpen.value = false
@@ -235,14 +235,12 @@ const framed = computed(
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
-/** Whether the viewer stops above the review dock: boards, sites, apps and files have controls along their bottom edge. A
- * video clears the dock inside its own stage, so the stage's color runs under the dock. */
+/** Whether the viewer stops above the review dock: boards, apps and files have controls along their bottom edge. A
+ * video clears the dock inside its own stage, so the stage's color runs under the dock. A site runs under the dock like
+ * an HTML doc, and its setup page keeps its own trailing room (ViewerSite). */
 const dockClearance = computed(
   () =>
-    !editing.value &&
-    !trashed.value &&
-    !video.value &&
-    ["board", "site", "app", "file", "folder"].includes(drop.value.kind),
+    !editing.value && !trashed.value && !video.value && ["board", "app", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null
@@ -1134,6 +1132,7 @@ watch(
             v-else-if="drop.kind === 'site'"
             ref="siteRef"
             :comments="comments"
+            :dock-top="reviewDock?.top"
             :drop="drop"
             :reviewing="commentsOpen && drop.canComment && annotationsEnabled && !editing"
             :screenshots="screenshots"
