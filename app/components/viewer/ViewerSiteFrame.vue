@@ -7,8 +7,16 @@
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; address: string; reviewing: boolean }>()
+const props = defineProps<{ drop: DropDetail; address: string; reviewing: boolean; dockTop?: number }>()
 const emit = defineEmits<{ close: [] }>()
+
+const devicePane = useTemplateRef<HTMLElement>("devicePane")
+const { bottom: paneBottom } = useElementBounding(devicePane)
+// Device mode clears the actual pill plus its bottom resize grip. Off, ViewerDevice ignores the inset so the site
+// still fills the viewer. Measure in the same viewport coordinates to include wrapping and safe-area placement.
+const deviceBottom = computed(() =>
+  props.dockTop && paneBottom.value ? Math.max(24, paneBottom.value - props.dockTop + 24) : 72,
+)
 
 const notify = useNotify()
 const capture = useTabCapture()
@@ -236,8 +244,8 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
       Check it before you send.
     </p>
 
-    <div class="relative flex min-h-0 flex-1 flex-col bg-muted">
-      <ViewerDevice on>
+    <div ref="devicePane" class="relative flex min-h-0 flex-1 flex-col bg-muted">
+      <ViewerDevice :bottom="deviceBottom" on>
         <div ref="stage" class="relative min-h-0 flex-1">
           <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
                dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->

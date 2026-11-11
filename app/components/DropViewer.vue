@@ -108,7 +108,7 @@ const siteRef = useTemplateRef<{
   pending: boolean
 }>("siteRef")
 const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
-const reviewDock = useTemplateRef<{ focusTrigger: () => void }>("reviewDock")
+const reviewDock = useTemplateRef<{ focusTrigger: () => void; top: number }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
   shareOpen.value = false
@@ -1132,6 +1132,7 @@ watch(
             v-else-if="drop.kind === 'site'"
             ref="siteRef"
             :comments="comments"
+            :dock-top="reviewDock?.top"
             :drop="drop"
             :reviewing="commentsOpen && drop.canComment && annotationsEnabled && !editing"
             :screenshots="screenshots"

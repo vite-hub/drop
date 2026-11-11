@@ -7,6 +7,7 @@ import type { DropComment, DropDetail, SiteReviewItem } from "#shared/types"
 
 const props = defineProps<{
   drop: DropDetail
+  dockTop?: number
   reviewing: boolean
   comments: DropComment[]
   screenshots: Map<string, SiteReviewItem["screenshot"]>
@@ -85,6 +86,7 @@ function openHere(event: SubmitEvent) {
     v-if="framed"
     ref="siteFrame"
     :address="framed"
+    :dock-top="dockTop"
     :drop="drop"
     :reviewing="reviewing"
     @close="framed = null"
