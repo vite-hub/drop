@@ -34,9 +34,11 @@ const { default: reviewScript } = await import("../../server/routes/review.js.ge
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: updateDrop } = await import("../../server/mcp/tools/update_drop.ts")
+const { default: replyTool } = await import("../../server/mcp/tools/reply.ts")
+const { siteCommentTools } = await import("../../server/mcp/site-comments.ts")
 
-const SITE = "https://pr12-acme.preview.quiver.dk"
-const PATTERN = "https://*.preview.quiver.dk"
+const SITE = "https://pr12-acme.preview.example.com"
+const PATTERN = "https://*.preview.example.com"
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
 
 migrate()
@@ -51,7 +53,7 @@ const site = (id = "site", overrides = {}) =>
   insertDrop(id, {
     kind: "site",
     blob_key: null,
-    filename: "pr12-acme.preview.quiver.dk",
+    filename: "pr12-acme.preview.example.com",
     site_url: SITE,
     ...overrides,
   })
@@ -126,7 +128,7 @@ const server = createMcpHandler({
   name: "drop-test",
   version: "1",
   origin: false,
-  tools: [publish, readDrop, updateDrop],
+  tools: [publish, readDrop, updateDrop, replyTool, ...siteCommentTools],
 })
 async function call(tool, input) {
   const event = new H3Event(
@@ -155,51 +157,51 @@ async function call(tool, input) {
 }
 
 test("a site's address is one origin, or a pattern of one label: https, or http on this computer", () => {
-  assert.equal(siteAddress("https://pr12-acme.preview.quiver.dk/pricing?x=1"), SITE)
+  assert.equal(siteAddress("https://pr12-acme.preview.example.com/pricing?x=1"), SITE)
   assert.equal(siteAddress("http://localhost:3000/"), "http://localhost:3000")
   assert.equal(siteAddress("http://127.0.0.1:5173"), "http://127.0.0.1:5173")
   assert.equal(siteAddress("http://app.localhost:8080"), "http://app.localhost:8080")
-  assert.equal(siteAddress("https://*.Preview.Quiver.dk/dashboard"), PATTERN)
-  assert.equal(siteAddress("https://*.preview.quiver.dk:8443"), `${PATTERN}:8443`)
+  assert.equal(siteAddress("https://*.Preview.Example.com/dashboard"), PATTERN)
+  assert.equal(siteAddress("https://*.preview.example.com:8443"), `${PATTERN}:8443`)
   assert.equal(siteAddress("http://*.localhost:3000"), "http://*.localhost:3000")
   for (const bad of [
-    "http://preview.quiver.dk",
-    "http://*.preview.quiver.dk",
-    "https://user:pass@quiver.dk",
+    "http://preview.example.com",
+    "http://*.preview.example.com",
+    "https://user:pass@example.com",
     "javascript:alert(1)",
     "not a url",
     "https://*.dk",
-    "https://*.*.quiver.dk",
-    "https://pr.*.quiver.dk",
+    "https://*.*.example.com",
+    "https://pr.*.example.com",
     "https://*.0.0.1",
-    "https://*.quiver.dk@evil.com",
-    "*.quiver.dk",
+    "https://*.example.com@evil.com",
+    "*.example.com",
   ])
     assert.equal(siteAddress(bad), null, bad)
 
   assert.ok(siteMatches(PATTERN, SITE))
-  assert.ok(siteMatches(PATTERN, "https://main.preview.quiver.dk"))
+  assert.ok(siteMatches(PATTERN, "https://main.preview.example.com"))
   assert.ok(siteMatches(SITE, SITE))
   assert.ok(siteMatches("http://*.localhost:3000", "http://app.localhost:3000"))
   for (const origin of [
     "https://evil.com",
-    "https://a.b.preview.quiver.dk",
-    "https://preview.quiver.dk",
-    "https://xpreview.quiver.dk",
-    "https://pr1.preview.quiver.dk.evil.com",
-    "http://pr1.preview.quiver.dk",
-    "https://pr1.preview.quiver.dk:8443",
-    "https://pr1.preview.quiver.dk/",
+    "https://a.b.preview.example.com",
+    "https://preview.example.com",
+    "https://xpreview.example.com",
+    "https://pr1.preview.example.com.evil.com",
+    "http://pr1.preview.example.com",
+    "https://pr1.preview.example.com:8443",
+    "https://pr1.preview.example.com/",
     "null",
     "",
   ])
     assert.equal(siteMatches(PATTERN, origin), false, origin)
-  assert.equal(siteMatches(SITE, "https://pr13-acme.preview.quiver.dk"), false)
+  assert.equal(siteMatches(SITE, "https://pr13-acme.preview.example.com"), false)
 
   assert.deepEqual(siteAddressesFor(SITE), [SITE, PATTERN])
   assert.deepEqual(
-    siteAddressesFor("https://quiver.dk"),
-    ["https://quiver.dk"],
+    siteAddressesFor("https://example.com"),
+    ["https://example.com"],
     "no pattern covers a whole top-level domain",
   )
   assert.deepEqual(siteAddressesFor("http://127.0.0.1:5173"), ["http://127.0.0.1:5173"])
@@ -233,7 +235,7 @@ test("an agent creates one site drop for every preview, and the tag it gets carr
   assert.match(created.content[0].text, /bookmarklet/)
 
   assert.match(
-    (await call(publish, { site: { url: "http://staging.quiver.dk" }, note: "x", lifetime: "review" })).message,
+    (await call(publish, { site: { url: "http://staging.example.com" }, note: "x", lifetime: "review" })).message,
     /https, or http on localhost/,
   )
   assert.match(
@@ -295,7 +297,7 @@ test("people create a site review in the app, in Site reviews or a folder they p
   assert.equal(inside.parentId, folder.id)
   assert.equal(inside.lifetime, "temporary", "it lives with the folder")
 
-  for (const url of ["http://staging.quiver.dk", "https://*.dk", "https://a.*.quiver.dk", ""]) {
+  for (const url of ["http://staging.example.com", "https://*.dk", "https://a.*.example.com", ""]) {
     const response = await answer(newSite, post("/api/sites", { url }))
     assert.equal(response.status, 400, url)
   }
@@ -370,7 +372,7 @@ test("the connect popup finds the reviews that cover the page, only the ones the
     ["Acme PR 12", "Acme previews", "View-only PR 12"],
   )
   assert.deepEqual(
-    (await sites("https://pr13-acme.preview.quiver.dk")).body.sites.map((item) => item.title),
+    (await sites("https://pr13-acme.preview.example.com")).body.sites.map((item) => item.title),
     ["Acme previews"],
   )
   state.who = who
@@ -382,9 +384,9 @@ test("the connect popup finds the reviews that cover the page, only the ones the
   ])
 
   // None: deeper levels, the bare domain, and other sites.
-  for (const origin of ["https://a.b.preview.quiver.dk", "https://preview.quiver.dk", "https://evil.com"])
+  for (const origin of ["https://a.b.preview.example.com", "https://preview.example.com", "https://evil.com"])
     assert.deepEqual((await sites(origin)).body.sites, [], origin)
-  assert.equal((await sites("http://preview.quiver.dk")).status, 400)
+  assert.equal((await sites("http://preview.example.com")).status, 400)
   assert.equal((await sites("null")).status, 400)
 })
 
@@ -413,7 +415,7 @@ test("a token is for the picked review and the page's origin only", async () => 
   const { body } = await sites(SITE)
   const choice = body.sites[0].choice
   assert.equal(
-    (await answer(tokenPost, post("/api/review/token", { origin: "https://pr13-acme.preview.quiver.dk", choice })))
+    (await answer(tokenPost, post("/api/review/token", { origin: "https://pr13-acme.preview.example.com", choice })))
       .status,
     404,
   )
@@ -451,7 +453,7 @@ test("tokens are sealed, bound to their review, and expire", async () => {
 
 test("CORS answers origins a review covers, and only the token's origin gets in", async () => {
   site("previews", { site_url: PATTERN })
-  for (const origin of [SITE, "https://pr13-acme.preview.quiver.dk"]) {
+  for (const origin of [SITE, "https://pr13-acme.preview.example.com"]) {
     const allowed = await answer(
       preflight,
       request("/api/review/comments", {
@@ -466,8 +468,8 @@ test("CORS answers origins a review covers, and only the token's origin gets in"
   }
   for (const origin of [
     "https://evil.example",
-    "https://a.b.preview.quiver.dk",
-    "https://preview.quiver.dk",
+    "https://a.b.preview.example.com",
+    "https://preview.example.com",
     "null",
     undefined,
   ]) {
@@ -485,9 +487,9 @@ test("CORS answers origins a review covers, and only the token's origin gets in"
   assert.equal(stray.status, 401)
   assert.equal(stray.headers.get("access-control-allow-origin"), null)
   // Another preview the pattern covers can read the answer, but the token was for PR 12's page.
-  const sibling = await comment(body.token, {}, { origin: "https://pr13-acme.preview.quiver.dk" })
+  const sibling = await comment(body.token, {}, { origin: "https://pr13-acme.preview.example.com" })
   assert.equal(sibling.status, 401)
-  assert.equal(sibling.headers.get("access-control-allow-origin"), "https://pr13-acme.preview.quiver.dk")
+  assert.equal(sibling.headers.get("access-control-allow-origin"), "https://pr13-acme.preview.example.com")
   assert.equal(threads().length, 0)
   const sent = await comment(body.token, {})
   assert.equal(sent.status, 200)
@@ -803,22 +805,22 @@ test("a failed Comments batch rolls back its request claim so a retry can save i
 test("comments on a pattern keep the origin of the preview they came from", async () => {
   site("previews", { site_url: PATTERN })
   const pr12 = (await token(SITE, { name: "Ole" })).body.token
-  const pr13 = (await token("https://pr13-acme.preview.quiver.dk", { name: "Ole" })).body.token
+  const pr13 = (await token("https://pr13-acme.preview.example.com", { name: "Ole" })).body.token
   assert.equal((await comment(pr12, {}, { screenshot: PNG })).status, 200)
   assert.equal(
-    (await comment(pr13, { page: "/pricing" }, { origin: "https://pr13-acme.preview.quiver.dk" })).status,
+    (await comment(pr13, { page: "/pricing" }, { origin: "https://pr13-acme.preview.example.com" })).status,
     200,
   )
   assert.deepEqual(
     threads().map((thread) => thread.metadata.page),
-    [`${SITE}/pricing?plan=pro#faq`, "https://pr13-acme.preview.quiver.dk/pricing"],
+    [`${SITE}/pricing?plan=pro#faq`, "https://pr13-acme.preview.example.com/pricing"],
   )
   assert.equal(
     sql.prepare("SELECT title FROM drops WHERE kind = 'image'").get().title,
-    "Screenshot of pr12-acme.preview.quiver.dk/pricing",
+    "Screenshot of pr12-acme.preview.example.com/pricing",
   )
   assert.equal((await json(await count(pr12, "/pricing?plan=pro"))).open, 1, "each preview counts its own")
-  assert.equal((await json(await count(pr13, "/pricing", "https://pr13-acme.preview.quiver.dk"))).open, 1)
+  assert.equal((await json(await count(pr13, "/pricing", "https://pr13-acme.preview.example.com"))).open, 1)
 })
 
 /** A comment from Drop's embedded review: the signed-in reviewer, the address open in the frame, and a capture. */
@@ -852,7 +854,7 @@ test("Drop's embedded review stores a box on a screen capture like the script's,
   assert.deepEqual(await json(sent), { n: 1 })
   const image = sql.prepare("SELECT * FROM drops WHERE kind = 'image'").get()
   assert.equal(image.parent_id, "previews")
-  assert.equal(image.title, "Screenshot of pr12-acme.preview.quiver.dk/pricing")
+  assert.equal(image.title, "Screenshot of pr12-acme.preview.example.com/pricing")
   const [row] = threads()
   assert.deepEqual(
     [row.metadata.dropId, row.metadata.kind, row.metadata.page, row.author.id, row.author.name, row.metadata.label],
@@ -928,10 +930,10 @@ test("Related links on the page lists the docs that link to it, only ones the re
     resources: links({ url: `${SITE}/` }),
   })
   doc("secret", { title: "Owner's plan", visibility: "private", resources: links({ url: `${SITE}/` }) })
-  doc("pr13", { title: "PR 13", resources: links({ url: "https://pr13-acme.preview.quiver.dk/" }) })
+  doc("pr13", { title: "PR 13", resources: links({ url: "https://pr13-acme.preview.example.com/" }) })
   doc("quoted", {
     title: "Quoted",
-    resources: links({ url: "https://example.com/", title: '"https://pr14-acme.preview.quiver.dk/ lookalike' }),
+    resources: links({ url: "https://example.com/", title: '"https://pr14-acme.preview.example.com/ lookalike' }),
   })
   doc("trashed", { title: "Trashed", trashed_at: Date.now(), resources: links({ url: `${SITE}/` }) })
   const docs = (bearer, origin = SITE) =>
@@ -945,9 +947,9 @@ test("Related links on the page lists the docs that link to it, only ones the re
   assert.equal(before.status, 200)
   assert.equal(before.headers.get("access-control-allow-origin"), SITE)
   assert.deepEqual(await json(before), { linked: true })
-  assert.deepEqual(await json(await docs(undefined, "https://pr13-acme.preview.quiver.dk")), { linked: true })
+  assert.deepEqual(await json(await docs(undefined, "https://pr13-acme.preview.example.com")), { linked: true })
   assert.deepEqual(
-    await json(await docs(undefined, "https://pr14-acme.preview.quiver.dk")),
+    await json(await docs(undefined, "https://pr14-acme.preview.example.com")),
     { linked: false },
     "a title quoting the address doesn't count",
   )
@@ -1336,6 +1338,125 @@ test("read_drop lists a site's comments as page content, and update_drop resolve
   // Only people who manage the site resolve through it.
   state.who = { ...ada, actorKind: "agent" }
   assert.match((await call(updateDrop, { id: "sitelink", resolves: [1] })).message, /No drop/)
+})
+
+test("an agent on a pull request finds the review by its preview's address, says what it fixed, and resolves", async () => {
+  state.mode = "team"
+  site("previews", { site_url: PATTERN, visibility: "team" })
+  state.who = who
+  const ole = (await token(SITE)).body.token
+  await comment(ole, { body: "Button covers the table" })
+  await comment(ole, { body: "Typo in the footer", page: "/about" })
+  const pr13 = "https://pr13-acme.preview.example.com"
+  await comment((await token(pr13)).body.token, { body: "Other PR", page: "/pricing" }, { origin: pr13 })
+
+  // Ada is on the team but doesn't own the review. Her agent works on PR 12 and knows only its preview's address.
+  state.who = { ...ada, actorKind: "agent", actorName: "Claude Code" }
+  const page = await call(readDrop, { id: `${SITE}/pricing` })
+  assert.equal(page.isError, undefined, page.message)
+  assert.deepEqual(
+    page.structuredContent.comments.map((item) => item.body),
+    ["Button covers the table"],
+    "that page's comments, not another page's or another preview's",
+  )
+  assert.match(page.content[0].text, /After you fix one, reply to it with what you changed and resolve: true/)
+  assert.deepEqual(
+    (await call(readDrop, { id: `${SITE}/` })).structuredContent.comments.map((item) => item.body),
+    ["Button covers the table", "Typo in the footer"],
+    "the preview's root covers every page of that preview",
+  )
+  assert.match((await call(readDrop, { id: "https://elsewhere.example/pricing" })).message, /No drop/)
+
+  const done = await call(replyTool, {
+    id: `${SITE}/pricing`,
+    comment: 1,
+    body: "Moved the pin out of the table header.",
+    resolve: true,
+  })
+  assert.equal(done.isError, undefined, done.message)
+  assert.match(done.content[0].text, /Replied to #1 and resolved it/)
+  assert.deepEqual((await call(updateDrop, { id: `${SITE}/about`, resolves: [2] })).structuredContent.resolved, [2])
+
+  // The reviewer sees both gone from the page, with the agent's words under the first.
+  const [first] = (await json(await count(ole, "/pricing?plan=pro"))).threads
+  assert.equal(first.resolved, true)
+  assert.deepEqual(
+    first.replies.map((reply) => reply.body),
+    ["Moved the pin out of the table header."],
+  )
+  assert.equal((await json(await count(ole, "/about"))).open, 0)
+
+  // The tools for Drop's own pages say where site comments are instead of only refusing.
+  const wrong = await call(siteCommentTools[0], {})
+  assert.match(wrong.message, /Only Drop admins.*call read_drop with the page's address/)
+  assert.match(siteCommentTools[0].description, /^Drop's own pages, for Drop admins/)
+})
+
+test("an agent finds the review by a page's address on a fixed staging host and on localhost too", async () => {
+  state.mode = "team"
+  for (const [id, origin] of [
+    ["staging", "https://staging.example.org"],
+    ["local", "http://localhost:4173"],
+  ]) {
+    site(id, { site_url: origin, filename: new URL(origin).host, visibility: "team" })
+    state.who = who
+    const bearer = (await token(origin)).body.token
+    assert.equal(
+      (await comment(bearer, { body: `Billing on ${id}`, page: "/settings/billing" }, { origin })).status,
+      200,
+    )
+    assert.equal((await comment(bearer, { body: `Docs on ${id}`, page: "/d/getting-started" }, { origin })).status, 200)
+
+    state.who = { ...ada, actorKind: "agent", actorName: "Claude Code" }
+    const billing = await call(readDrop, { id: `${origin}/settings/billing?tab=invoices` })
+    assert.equal(billing.isError, undefined, billing.message)
+    assert.equal(billing.structuredContent.id, id)
+    assert.deepEqual(
+      billing.structuredContent.comments.map((item) => item.body),
+      [`Billing on ${id}`],
+    )
+    assert.deepEqual(
+      (await call(readDrop, { id: `${origin}/d/getting-started` })).structuredContent.comments.map((item) => item.body),
+      [`Docs on ${id}`],
+      "a page whose path looks like a drop link still finds the site",
+    )
+  }
+  assert.match(
+    (await call(readDrop, { id: "https://staging.example.org.evil.com/settings/billing" })).message,
+    /No drop/,
+  )
+  assert.match((await call(readDrop, { id: "http://staging.example.org/settings/billing" })).message, /No drop/)
+})
+
+test("on a site review, people signed in who may comment resolve each other's comments; guests only their own", async () => {
+  state.mode = "team"
+  site()
+  state.who = null
+  const guest = (await token(SITE, { name: "Ole" })).body.token
+  state.who = ada
+  const ada_ = (await token(SITE)).body.token
+  await comment(guest, { body: "From a guest" })
+  const [thread] = (await json(await count(ada_, "/pricing?plan=pro"))).threads
+  assert.equal(thread.canResolve, true, "a teammate may resolve the guest's comment")
+  const resolve = (bearer) =>
+    answer(
+      threadPatch,
+      request("/api/review/comments/1", {
+        method: "PATCH",
+        headers: { origin: SITE, authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+        body: JSON.stringify({ resolved: true }),
+        params: { n: "1" },
+      }),
+    )
+  await comment(ada_, { body: "Ada's" })
+  const asGuest = (await json(await count(guest, "/pricing?plan=pro"))).threads
+  assert.deepEqual(
+    asGuest.map((item) => item.canResolve),
+    [false, false],
+    "a guest resolves nothing, since a guest's comments aren't tied to them",
+  )
+  assert.equal((await resolve(guest)).status, 403)
+  assert.equal((await resolve(ada_)).status, 200)
 })
 
 test("review.js is one cacheable script with no key, inert until someone presses Comment, safe to add twice", async () => {

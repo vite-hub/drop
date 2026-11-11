@@ -40,11 +40,11 @@ const STYLE = `
 .card { position: fixed; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); box-shadow: 0 8px 28px rgb(0 0 0 / .16); overflow: hidden; }
 .pop { width: 320px; padding: 10px; }
 .thread { width: 340px; max-height: min(480px, calc(100vh - 32px)); }
-.list { width: 320px; max-height: min(520px, calc(100vh - 96px)); }
+.list { width: 360px; max-height: min(520px, calc(100vh - 96px)); }
 .head { display: flex; align-items: center; gap: 4px; height: 40px; flex: none; padding: 0 6px 0 12px; border-bottom: 1px solid var(--border); }
 .head .title { margin-right: auto; font: 500 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
-.head label { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; cursor: pointer; }
-.head a { color: var(--muted); font-size: 12px; text-decoration: none; padding: 0 6px; }
+.head label { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; white-space: nowrap; cursor: pointer; }
+.head a { color: var(--muted); font-size: 12px; text-decoration: none; padding: 0 6px; white-space: nowrap; }
 .head a:hover { color: var(--fg); }
 .items { flex: 1; min-height: 0; overflow-y: auto; }
 .item { padding: 10px 12px; border-bottom: 1px solid var(--border); }
@@ -84,8 +84,9 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .pins { position: fixed; inset: 0; pointer-events: none; }
 .pin { position: fixed; left: 0; top: 0; display: grid; place-items: center; width: 28px; height: 28px; margin: -28px 0 0 0; padding: 0; overflow: hidden; border: 0; border-radius: 14px 14px 14px 3px; background: var(--primary); color: var(--primary-fg); font: 600 11px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; pointer-events: auto; box-shadow: 0 1px 4px rgb(0 0 0 / .3), 0 0 0 2px var(--bg); transition: scale 120ms; transform-origin: bottom left; }
 .pin:hover, .pin.open { scale: 1.12; }
-.pin img { width: 100%; height: 100%; object-fit: cover; }
 .pin.done { opacity: .6; filter: grayscale(1); }
+.pin.many { background: var(--primary); color: var(--primary-fg); font-size: 12px; }
+.head .away-toggle[hidden] { display: none; }
 .pin.sending { opacity: .7; cursor: progress; }
 .toast { position: fixed; display: flex; gap: 8px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .toast a { color: var(--fg); font-weight: 500; }
@@ -191,7 +192,7 @@ const MARKUP = `<div class="ui">
 ${TOOLS}
 <form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
-<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
+<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label class="away-toggle" hidden><input type="checkbox" data-act="outdated"><span></span></label><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
 <nav class="links" id="related-links" aria-label="Related links" hidden></nav>
 <div class="toast" role="status" hidden></div>
 </div>`
@@ -246,7 +247,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const pinLayer = $(".pins"), thread = $(".thread"), list = $(".list"), listItems = $(".items", list);
   const listButton = $("[data-act=list]", bar), pinsButton = $("[data-act=pins]", bar), count = $(".count", bar);
   const copyButton = $("[data-act=copy]", bar);
-  const showResolved = $("[data-act=resolved]", list);
+  const showResolved = $("[data-act=resolved]", list), showOutdated = $("[data-act=outdated]", list), awayToggle = $(".away-toggle", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
 
   const related = $(".related"), relatedButton = $("button", related), links = $(".links");
@@ -287,7 +288,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // The comment on its way to Drop. Its pin shows at once while the composer waits hidden, so a failed send can open
   // it again with the note.
   let sending = null, sendingBox = false;
-  let threads = [], openN = null, pinsShown = true, here = "";
+  let threads = [], openN = null, hoverN = null, listOnly = null, pinsShown = true, here = "", counted = "";
   let strokes = [], forgetStroke = () => {}, still = null, inkAt = { x: 0, y: 0 };
   const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map(), shownImages = new Set();
 
@@ -388,6 +389,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   const visible = () => threads.filter((item) => (item !== sending || item.page === pageKey()) && (!item.resolved || showResolved.checked));
+  // Outdated: left on an element the page no longer has, or has with other words. It gets no pin, since any place for
+  // it would be a guess on top of the page, and the list shows it only when asked, with the screenshot it came with.
+  const away = (item) => Boolean(item.element) && !elementOf(item);
 
   function avatar(person, into) {
     into.textContent = initials(person.name);
@@ -397,6 +401,15 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     img.onload = () => { into.textContent = ""; into.appendChild(img); };
     img.src = person.image;
     return into;
+  }
+  // A pin shows its author's initials on a colour of their own: pictures at this size were mostly GitHub's pixel
+  // identicons, which read as noise on top of the page.
+  function face(pin, person) {
+    let hash = 0;
+    for (const c of person.name) hash = (hash * 31 + c.charCodeAt(0)) | 0;
+    pin.textContent = initials(person.name);
+    pin.style.background = "oklch(.5 .13 " + (Math.abs(hash) % 360) + ")";
+    pin.style.color = "#fff";
   }
   function ago(at) {
     const s = Math.max(0, (Date.now() - at) / 1000);
@@ -413,10 +426,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     return node;
   }
 
-  // The element a thread was left on, found again by its CSS path. Null when the page no longer has it. A found element
-  // stays the thread's while it's on the page. One that isn't there is looked for again once the page has changed, at
-  // most every MISS_MS: on a large page each lookup costs up to half a millisecond, and a page that re-renders every
-  // frame paid it for every thread on every frame (drop#163).
+  // The element a thread was left on, found again by its CSS path, as long as it still has the tag and the words the
+  // comment was left on; otherwise the one element with those words. A path counts children by position, so once the
+  // page changes it can name another element, and the pin went there: into the middle of a table, onto a button. Null
+  // when the page has no such element. A found element stays the thread's while it's on the page with the same words.
+  // Changes to its text or alt label invalidate it without discarding anchors elsewhere on a busy page. One that isn't there
+  // is looked for again once the page has changed, at most every MISS_MS: on a large page each lookup costs up to half
+  // a millisecond, and a page that re-renders every frame paid it for every thread on every frame (drop#163).
   const MISS_MS = 500;
   let changedAt = 0;
   function elementOf(item) {
@@ -424,46 +440,78 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const known = elementFor.get(item.n), now = performance.now();
     if (known && known.el && known.el.isConnected) return known.el;
     if (known && !known.el && (known.at > changedAt || now - known.at < MISS_MS)) return null;
+    const label = item.element.label || "";
     let found = null;
     try { found = document.querySelector(item.element.selector); } catch (e) {}
-    if (found && host.contains(found)) found = null;
+    if (found && !isSame(found, label)) found = null;
+    if (!found) found = byWords(label);
     elementFor.set(item.n, { el: found, at: now });
     return found;
   }
+  // A label is the tag, then the first words in quotes (labelOf). Without words, the tag has to match.
+  const tagOf = (label) => label.split(" ", 1)[0];
+  const wordsOf = (label) => { const m = /^\S+ "([\s\S]*)"$/.exec(label); return m ? m[1].replace(/…$/, "") : ""; };
+  function isSame(el, label) {
+    if (!label) return true;
+    return wordsOf(label) ? labelOf(el) === label : el.tagName.toLowerCase() === tagOf(label);
+  }
+  // The one element of the label's tag with its words, or null when none or several have them.
+  function byWords(label) {
+    const words = wordsOf(label);
+    if (!words) return null;
+    const all = document.getElementsByTagName(tagOf(label)), first = words.split(" ", 1)[0];
+    if (all.length > 5000) return null;
+    let found = null;
+    for (const el of all) {
+      if (!(el.textContent || el.getAttribute("alt") || "").includes(first) || labelOf(el) !== label) continue;
+      if (found) return null;
+      found = el;
+    }
+    return found;
+  }
+  // A pin on a control would cover it, so it sits outside the control's top right corner, pointing at it.
+  const CONTROL = "a[href], button, input, select, textarea, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [role=switch], [role=combobox]";
   function pointOf(item) {
     const target = elementOf(item);
     if (!target) return null;
     const r = target.getBoundingClientRect();
     if (r.width < 1 && r.height < 1) return null;
+    const control = target.closest(CONTROL);
+    const c = control && control.getBoundingClientRect();
+    if (c && c.width <= 480 && c.height <= 120) return { x: c.right - 4, y: Math.floor(c.top) - 2, rect: c };
     const spot = item.spot || { x: 0, y: 0 };
     return { x: r.left + (spot.x / 1000) * r.width, y: r.top + (spot.y / 1000) * r.height, rect: r };
   }
 
   function render() {
     const shown = token ? visible() : [];
-    const open = threads.filter((item) => !item.resolved).length;
     // The list shows once the page has threads: before someone connects there is nothing to count.
     copyButton.hidden = pinsButton.hidden = listButton.hidden = !threads.length;
     if (listButton.hidden) list.hidden = true;
-    count.textContent = String(open);
-    listButton.title = open + " open comment" + (open === 1 ? "" : "s") + " on this page";
-    listButton.setAttribute("aria-label", listButton.title);
-    for (const [n, pin] of pinFor) if (!shown.some((item) => item.n === n)) { pin.remove(); pinFor.delete(n); }
+    for (const [n, pin] of pinFor) if (!shown.some((item) => item.n === n && item.element)) { pin.remove(); pinFor.delete(n); }
     for (const item of shown) {
+      if (!item.element) continue;
       let pin = pinFor.get(item.n);
       if (!pin) {
         pin = el("button", "pin");
         pin.type = "button";
-        pin.addEventListener("click", (e) => { e.stopPropagation(); openThread(item.n); });
+        pin.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (pin.dataset.many) openList(pin.dataset.many.split(",").map(Number));
+          else openThread(item.n);
+        });
+        // Pointing at a pin outlines the element it belongs to.
+        pin.addEventListener("pointerenter", () => { hoverN = item.n; layout(); });
+        pin.addEventListener("pointerleave", () => { if (hoverN === item.n) { hoverN = null; layout(); } });
         pinLayer.appendChild(pin);
         pinFor.set(item.n, pin);
       }
       pin.classList.toggle("done", item.resolved);
       pin.classList.toggle("sending", item === sending);
       pin.disabled = item === sending;
-      pin.setAttribute("aria-label", item === sending ? "Sending your comment" : "Comment #" + item.n + " by " + item.author.name);
-      pin.title = (item === sending ? "Sending: " : "#" + item.n + " " + item.author.name + ": ") + item.body.slice(0, 80);
-      if (pin.dataset.who !== item.author.name) { pin.dataset.who = item.author.name; pin.textContent = ""; avatar(item.author, pin); }
+      pin.dataset.title = (item === sending ? "Sending: " : "#" + item.n + " " + item.author.name + ": ") + item.body.slice(0, 80);
+      pin.dataset.label = item === sending ? "Sending your comment" : "Comment #" + item.n + " by " + item.author.name;
+      pin.dataset.who = item.author.name;
     }
     if (!list.hidden) renderList();
     if (openN !== null) {
@@ -473,29 +521,70 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
   }
 
+  // The count on the toolbar is of the open threads that are still on the page; outdated ones wait behind the list's toggle.
+  function paintCount() {
+    const outdated = threads.filter((item) => !item.resolved && away(item)).length;
+    const open = threads.filter((item) => !item.resolved).length - outdated;
+    const key = open + "/" + outdated;
+    if (key === counted) return;
+    counted = key;
+    count.textContent = String(open);
+    listButton.title = open + " open comment" + (open === 1 ? "" : "s") + " on this page" + (outdated ? ", " + outdated + " outdated" : "");
+    listButton.setAttribute("aria-label", listButton.title);
+    awayToggle.hidden = !outdated;
+    $("span", awayToggle).textContent = outdated + " outdated";
+    if (!list.hidden) renderList();
+  }
+
   let frame = 0;
   const schedule = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; layout(); }); };
+  // Pins closer than this to each other become one pin with their count, so none hides another or what's under it.
+  const NEAR = 24;
   function layout() {
     // Every element is measured before any pin moves: a move between two measurements made the browser recompute
     // styles once per pin, on every frame the page changed.
     const placed = [];
     for (const item of threads) if (pinFor.has(item.n)) placed.push([item, pointOf(item)]);
-    const item = openN !== null && threads.find((t) => t.n === openN);
-    const open = item && placed.find(([shown]) => shown === item);
-    const at = open ? open[1] : item && pointOf(item);
+    const focusN = openN !== null ? openN : hoverN;
+    const item = focusN !== null && threads.find((t) => t.n === focusN);
+    const focused = item && placed.find(([shown]) => shown === item);
+    const at = focused ? focused[1] : item && pointOf(item);
     pinLayer.hidden = !pinsShown || !draw.hidden || !paint.hidden;
     if (!inked.hidden) inked.style.translate = inkAt.x - scrollX + "px " + (inkAt.y - scrollY) + "px";
+    const groups = [];
     for (const [shown, at] of placed) {
-      const pin = pinFor.get(shown.n);
       const inView = at && at.x >= -4 && at.y >= 0 && at.x <= innerWidth + 4 && at.y <= innerHeight + 28;
-      pin.hidden = !inView;
+      if (!inView) { pinFor.get(shown.n).hidden = true; continue; }
+      const near = groups.find((group) => Math.abs(group.at.x - at.x) < NEAR && Math.abs(group.at.y - at.y) < NEAR);
+      if (near) near.items.push(shown); else groups.push({ at, items: [shown] });
+    }
+    for (const { at, items } of groups) {
+      const [first, ...rest] = items;
+      const pin = pinFor.get(first.n), many = rest.length ? items.map((shown) => shown.n).join(",") : "";
+      pin.hidden = false;
       // The translate property, not transform: it applies after the open pin's scale, so the pin grows in place.
-      if (inView) pin.style.translate = Math.round(at.x) + "px " + Math.round(at.y) + "px";
-      pin.classList.toggle("open", shown.n === openN);
+      pin.style.translate = Math.round(at.x) + "px " + Math.round(at.y) + "px";
+      pin.classList.toggle("open", items.some((shown) => shown.n === openN));
+      for (const shown of rest) pinFor.get(shown.n).hidden = true;
+      if (pin.dataset.many === many && pin.dataset.face === pin.dataset.who) continue;
+      pin.dataset.many = many;
+      pin.classList.toggle("many", Boolean(many));
+      if (many) {
+        pin.dataset.face = "";
+        pin.textContent = String(items.length);
+        pin.style.background = pin.style.color = "";
+        pin.title = items.length + " comments here";
+      } else {
+        pin.dataset.face = pin.dataset.who;
+        face(pin, first.author);
+        pin.title = pin.dataset.title;
+      }
+      pin.setAttribute("aria-label", many ? pin.title : pin.dataset.label);
     }
     mark.hidden = !at;
     if (at) place(mark, { left: at.rect.left - 3, top: at.rect.top - 3, width: at.rect.width + 6, height: at.rect.height + 6 });
-    if (item && !thread.hidden) placeThread(at);
+    if (openN !== null && item && !thread.hidden) placeThread(at);
+    paintCount();
   }
 
   // Pictures come with the token from /api/review/images, since the page can't send Drop's cookies to /f/.
@@ -575,7 +664,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     shownImages.clear();
     const first = entry(item.author, item.createdAt, item.body, item.images);
     const placed = pointOf(item);
-    if (!placed && item.element && item.element.label) first.insertBefore(el("p", "where", "Was on " + item.element.label), first.children[1]);
+    const gone = away(item) ? "Outdated: the page no longer has " : "Was on ";
+    if (!placed && item.element && item.element.label) first.insertBefore(el("p", "where", gone + item.element.label), first.children[1]);
     // Without its element on the page, the screenshot shows what it was about.
     if (!placed && item.screenshot) images([{ id: item.screenshot, filename: "Screenshot" }], first, true);
     items.appendChild(first);
@@ -600,13 +690,26 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     thread.style.top = Math.max(8, Math.min(top, innerHeight - height - 8)) + "px";
   }
 
+  // The list of the page's threads: the open ones that are still on the page, with the outdated and resolved ones
+  // behind their toggles. A press on a pin that stands for several lists only those.
+  function openList(only) {
+    closeThread();
+    closeRelated();
+    listOnly = only || null;
+    list.hidden = false;
+    renderList();
+  }
   function renderList() {
     $("a", list).href = reviewUrl();
+    $(".title", list).textContent = listOnly ? listOnly.length + " comments here" : "Comments";
     listItems.textContent = "";
-    const shown = visible().filter((item) => item !== sending).sort((a, b) => a.n - b.n);
-    if (!shown.length) listItems.appendChild(el("p", "empty", threads.length ? "Every comment here is resolved." : "No comments on this page yet."));
+    const shown = visible()
+      .filter((item) => item !== sending)
+      .filter((item) => (listOnly ? listOnly.includes(item.n) : showOutdated.checked || !away(item)))
+      .sort((a, b) => a.n - b.n);
+    if (!shown.length) listItems.appendChild(el("p", "empty", threads.length ? "Nothing open here." : "No comments on this page yet."));
     for (const item of shown) {
-      const row = el("button", "row-item" + (item.resolved ? " done" : ""));
+      const row = el("button", "row-item" + (item.resolved || away(item) ? " done" : ""));
       row.type = "button";
       row.appendChild(avatar(item.author, el("span", "avatar")));
       const text = el("span");
@@ -615,7 +718,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       meta.appendChild(el("time", "", "#" + item.n + " · " + ago(item.createdAt)));
       text.appendChild(meta);
       text.appendChild(el("span", "text", item.body));
-      if (!elementOf(item)) text.appendChild(el("span", "away", item.element ? "Not on the page now" : "No element"));
+      if (away(item)) text.appendChild(el("span", "away", "Outdated: " + (item.element.label ? item.element.label + " isn't" : "its element isn't") + " on the page now"));
+      else if (!item.element) text.appendChild(el("span", "away", "About the whole page"));
       row.appendChild(text);
       row.addEventListener("click", () => {
         const target = elementOf(item);
@@ -1043,10 +1147,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     catch (error) { if (error.message) say(error.message); return; }
     startDrawing();
   });
-  listButton.addEventListener("click", () => {
-    list.hidden = !list.hidden;
-    if (!list.hidden) { closeThread(); closeRelated(); renderList(); }
-  });
+  listButton.addEventListener("click", () => { if (list.hidden || listOnly) openList(); else list.hidden = true; });
   // A press anywhere else on the page closes the thread, the list, or Related links, as in Figma.
   addEventListener("pointerdown", (e) => {
     if (e.composedPath().includes(host)) return;
@@ -1063,6 +1164,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     layout();
   });
   showResolved.addEventListener("change", render);
+  showOutdated.addEventListener("change", renderList);
   $("[data-act=close]", list).addEventListener("click", () => { list.hidden = true; });
   copyButton.addEventListener("click", copyReviewLink);
   $("[data-act=close]", thread).addEventListener("click", closeThread);
@@ -1222,10 +1324,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("scroll", schedule, { capture: true, passive: true });
   addEventListener("resize", schedule, { passive: true });
   new MutationObserver((records) => {
-    if (records.every((record) => host === record.target || host.contains(record.target))) return;
+    const changes = records.filter((record) => host !== record.target && !host.contains(record.target));
+    if (!changes.length) return;
+    const labels = changes.filter((record) => record.type !== "attributes" || record.attributeName === "alt");
+    for (const [n, known] of elementFor)
+      if (known.el && labels.some((record) => known.el.contains(record.target))) elementFor.delete(n);
     changedAt = performance.now();
     schedule();
-  }).observe(document.documentElement, { childList: true, attributes: true, subtree: true });
+  }).observe(document.documentElement, { childList: true, characterData: true, attributes: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
   setInterval(() => {
     if (token && pageKey() !== here) { closeThread(); elementFor.clear(); void refresh(); }
