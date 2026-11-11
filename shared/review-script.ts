@@ -310,9 +310,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
   const reviewUrl = () => drop + "/review/open#" + encodeURIComponent(token || "");
   // Copy link goes through Drop the same way: a small Drop window copies the link there and closes.
+  // Each request gets a fresh document: an earlier window may still be waiting for a manual copy of another review.
   function copyReviewLink() {
     const url = drop + "/review/open?copy#" + encodeURIComponent(token || "");
-    if (!window.open(url, "drop-review-copy", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
+    if (!window.open(url, "_blank", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
   }
 
   function authorName() {
