@@ -24,13 +24,14 @@ const clip = (text: string, length: number) => {
 }
 
 /**
- * The line under a preview's title: a doc's first words, a folder's description, a site's address. `source` is a
+ * The line under a preview's title: a doc's first words, a folder's description, a site's address, a link's note. `source` is a
  * Markdown or HTML doc's text when the caller already read it; otherwise its search text answers, for latest versions.
  */
 export async function dropExcerpt(row: DropRow, source?: string) {
   let text: string | null | undefined
   if (row.kind === "folder") text = row.note
   else if (row.kind === "site") text = row.siteUrl
+  else if (row.kind === "link") text = row.note ?? row.siteUrl
   else if (source !== undefined && (row.kind === "markdown" || row.kind === "html"))
     text = searchableText(row.kind, source)
   else if (SEARCH_KINDS.some((kind) => kind === row.kind)) {
@@ -53,6 +54,7 @@ const CARD_KINDS: Record<DropKind, string> = {
   folder: "Folder",
   site: "Site review",
   board: "Board",
+  link: "Link",
 }
 
 interface OgCard {
