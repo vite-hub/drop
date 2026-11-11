@@ -38,6 +38,9 @@ const preset = comarkUi({
     themes: { light: "github-light", dark: "github-dark" },
     maxSource: 200_000,
   },
+  // Drop keeps a render for up to 30 days and shares one preset across docs, so relative dates would stay at the
+  // words they had on the first read.
+  time: false,
   typeset: false,
   zoom: { images: false },
 })
@@ -368,6 +371,10 @@ export async function renderMarkdownDocument(
 
 type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[]]
 
+// comark-properties' box opens with `<dl class="cfm"`, then whatever attributes its release adds, such as 0.10's
+// data-comark-frame.
+const PROPERTIES_BOX = /<dl class="cfm"[^>]*>/
+
 /**
  * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
  * pull request, its issue) and when this version was published. They read as more front matter rows, at the top of
@@ -377,7 +384,7 @@ type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[
  * Added to the cached render on each read, since a doc's links change without a new version.
  */
 export async function withDocProperties(html: string, doc: { resources: DropResource[]; updatedAt: number }) {
-  const open = html.indexOf('<dl class="cfm">')
+  const open = html.search(PROPERTIES_BOX)
   const close = open === -1 ? -1 : html.indexOf("</dl>", open)
   const box = open === -1 ? "" : html.slice(open, close)
   const links = doc.resources.filter(
@@ -420,6 +427,7 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   )
   if (open === -1) return rendered + html
   // The page already has the box's styles and date script: only its rows go in, after the front matter's.
-  const start = rendered.indexOf('<dl class="cfm">') + '<dl class="cfm">'.length
+  const opening = PROPERTIES_BOX.exec(rendered)!
+  const start = opening.index + opening[0].length
   return html.slice(0, close) + rendered.slice(start, rendered.lastIndexOf("</dl>")) + html.slice(close)
 }

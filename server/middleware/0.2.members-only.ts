@@ -9,6 +9,9 @@ import { membersOnly } from "../utils/members"
 const PUBLIC_LINK =
   /^\/(?:d\/[^/]+(?:\/[^/]*)?|f\/[^/]+|api\/me|api\/links\/[^/]+|api\/drops\/[^/]+(?:\/(?:comments|visit))?|api\/comments\/[^/]+\/replies|api\/_vitehub\/realtime\/latest\/[^/]+|api\/_vitehub\/comments\/attachments\/[^/]+)$/
 
+/** The routes review.js calls from a site (shared/review-script.ts): threads, resolving, replies, and their images. */
+const REVIEW_SCRIPT = /^\/api\/review\/(?:comments(?:\/[^/]+(?:\/replies)?)?|images\/[^/]+)$/
+
 /** Members-only Drops serve anonymous visitors only the drops shared publicly; the rest of the app needs a member. */
 export default defineHandler(async (event) => {
   if (!membersOnly()) return
@@ -16,7 +19,7 @@ export default defineHandler(async (event) => {
   if (path.startsWith("/api/auth/") && !path.startsWith("/api/auth/admin/")) return
   if (path === "/api/health" || path === "/api/mcp" || path === "/api/sign-in") return
   // A site's review script sends no session, only a review token, which carries a member and is checked there.
-  if (path === "/api/review/comments") return
+  if (REVIEW_SCRIPT.test(path)) return
   // An upload URL sends no session either: its ticket carries the member, who must still be one (readUpload).
   if (/^\/api\/uploads\/[^/]+$/.test(path)) return
   if (/^\/(?:api|[dfi])(?:\/|$)/.test(path)) {

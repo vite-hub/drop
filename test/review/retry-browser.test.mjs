@@ -12,10 +12,10 @@ const html = `<!doctype html><html><body style="margin:0;padding:40px;font:16px 
 </body></html>`
 
 const SCREENSHOT_STUB = `export async function createContext() { return {}; }
-export async function domToBlob() {
+export async function domToCanvas() {
   const canvas = document.createElement("canvas");
   canvas.width = 10; canvas.height = 10;
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return canvas;
 }`
 
 const CORS = {
