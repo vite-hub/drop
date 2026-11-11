@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { test, vi } from "vite-plus/test"
 import { computed, effectScope, ref, shallowRef, watch } from "vue"
+import { appPageFor } from "../../shared/project-bundle.ts"
 import { useViewerFrame } from "../../app/composables/useViewerFrame.ts"
 
 test("content-origin app frames keep their own picker unless they are the viewer's direct document", () => {
@@ -36,7 +37,11 @@ test("content-origin app frames keep their own picker unless they are the viewer
       useViewerFrame({
         drop: ref({ kind: "app", contentOrigin: "https://app.drop.test", contentGrant: "grant" }),
         frame: ref(null),
-        app: { files, pages: computed(() => Object.keys(files.value)), page: ref("index.html") },
+        app: (() => {
+          const pages = computed(() => Object.keys(files.value))
+          const location = ref("/")
+          return { files, pages, location, page: computed(() => appPageFor(pages.value, location.value)) }
+        })(),
         pinned: ref([]),
         inset: ref(0),
         bottom: ref(0),
