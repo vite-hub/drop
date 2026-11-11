@@ -66,15 +66,48 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
     const doc = { body: root, createElement: (name) => document.createElement(name), createElementNS: (ns, name) => document.createElementNS(ns, name) };
     return { contentWindow: { document: doc, getComputedStyle: (el, pseudo) => getComputedStyle(el, pseudo) }, remove: () => host.remove() };
   }
-  async function captureViewport(skip) {
+  // modern-screenshot writes each cloned element's computed style inline, about a kilobyte each, and Chromium keeps
+  // every SVG image it decodes until the tab closes: 34 MB of SVG and 65 MB of the tab per comment on a 3,000-row
+  // table (drop#163). Rows and cells share their styles, so each distinct HTML style becomes a class instead.
+  // SVG definitions retain authored CSS, whose important ID rules would beat a class but not an important inline
+  // override. Leave SVG styles and definition subtrees inline to keep their original cascade precedence.
+  function shareStyles(svg) {
+    const names = new Map();
+    let rules = "";
+    for (const node of svg.querySelectorAll("[style]")) {
+      if (node.namespaceURI !== "http://www.w3.org/1999/xhtml" || node.closest("defs, symbol")) continue;
+      const text = node.getAttribute("style");
+      let name = names.get(text);
+      if (name === undefined) {
+        const style = node.style;
+        let body = "";
+        for (let i = 0; i < style.length; i++) {
+          const value = style.getPropertyValue(style[i]);
+          // A longhand set through a shorthand with var() has no value of its own; that style stays inline.
+          if (!value) { body = null; break; }
+          body += style[i] + ":" + value + "!important;";
+        }
+        name = body === null ? null : "_s" + names.size.toString(36);
+        names.set(text, name);
+        if (name) rules += "." + name + "{" + body + "}\n";
+      }
+      if (!name) continue;
+      node.removeAttribute("style");
+      node.classList.add(name);
+    }
+    const sheet = svg.firstElementChild && svg.firstElementChild.localName === "style" ? svg.firstElementChild : svg.insertBefore(document.createElement("style"), svg.firstChild);
+    sheet.appendChild(document.createTextNode(rules));
+  }
+  // stale() says the comment the screenshot was for is gone, and the clone stops there.
+  async function captureViewport(skip, stale) {
     const pins = pinsNow(skip);
     const drawn = [scrollX, scrollY];
     try {
-      const { createContext, domToBlob } = await loadScreenshot();
+      const { createContext, domToCanvas } = await loadScreenshot();
       await painted();
       // If the page scrolled since the box was drawn, the clone is taken where it was drawn, and the page goes back
       // once it's cloned. That clone doesn't pause, so nobody sees the jump.
-      const take = async (scale, type, quality, sliced = true) => {
+      const take = async (scale, sliced = true) => {
         const frame = sliced ? await sandbox() : null;
         sliced = Boolean(frame);
         // The elements whose clones are still open, outermost first: the filter sees each one as its clone starts.
@@ -86,6 +119,7 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
           return true;
         };
         const each = async (cloned) => {
+          if (stale && stale()) throw new Error("No longer needed");
           pins.apply(cloned);
           const done = open.pop();
           if (!sliced || away || performance.now() - slice < SLICE_MS) return;
@@ -94,9 +128,9 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
           if ((done && !done.isConnected) || open.some((node) => !node.isConnected)) cut = true;
         };
         const context = await createContext(document.documentElement, {
-          width: pins.width, height: pins.height, backgroundColor: pins.background, scale, type, quality, timeout: LOAD_WAIT_MS,
+          width: pins.width, height: pins.height, backgroundColor: pins.background, scale, timeout: LOAD_WAIT_MS,
           filter, features: { restoreScrollPosition: true }, onCloneEachNode: each, onCloneNode: back,
-          onCreateForeignObjectSvg: () => { context.drawImageCount = Math.min(context.drawImageCount, MAX_REDRAWS); },
+          onCreateForeignObjectSvg: (svg) => { context.drawImageCount = Math.min(context.drawImageCount, MAX_REDRAWS); shareStyles(svg); },
           autoDestruct: true,
         });
         context.timeout = 15000;
@@ -106,16 +140,32 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
         function back() { if (away) { away = false; scrollTo(now[0], now[1]); } }
         if (away) scrollTo(drawn[0], drawn[1]);
         try {
-          const shot = await domToBlob(context);
-          return cut ? take(scale, type, quality, false) : shot;
+          const canvas = await domToCanvas(context);
+          if (!cut) return canvas;
+          canvas.width = canvas.height = 0;
         } finally {
           back();
           if (frame) frame.remove();
         }
+        return take(scale, false);
       };
-      let shot = await take(Math.min(window.devicePixelRatio || 1, 2), "image/webp", 0.85);
-      if (shot.size > MAX_BYTES) shot = await take(1, "image/jpeg", 0.75);
-      return shot.size <= MAX_BYTES ? shot : null;
+      // One clone and one canvas: a shot too big as WebP is encoded again from it, at one pixel per CSS pixel, as JPEG.
+      // Each canvas is emptied once encoded, so its pixels don't wait for garbage collection.
+      const encode = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+      const canvas = await take(Math.min(window.devicePixelRatio || 1, 2));
+      try {
+        let shot = await encode(canvas, "image/webp", 0.85);
+        if (!shot || shot.size > MAX_BYTES) {
+          const small = document.createElement("canvas");
+          small.width = pins.width; small.height = pins.height;
+          small.getContext("2d").drawImage(canvas, 0, 0, small.width, small.height);
+          shot = await encode(small, "image/jpeg", 0.75);
+          small.width = small.height = 0;
+        }
+        return shot && shot.size <= MAX_BYTES ? shot : null;
+      } finally {
+        canvas.width = canvas.height = 0;
+      }
     } finally {
       pins.release();
     }

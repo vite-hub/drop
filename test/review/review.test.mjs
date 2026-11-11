@@ -499,7 +499,17 @@ test("a comment with a screenshot becomes an image of the site with the box on i
   const sent = await comment(body.token, {}, { screenshot: PNG })
   assert.equal(sent.status, 200, await sent.clone().text())
   assert.equal(sent.headers.get("access-control-allow-origin"), SITE)
-  assert.deepEqual(await json(sent), { n: 1 }, "nothing that opens the review")
+  // The page can read where a slow Send spent its time on Drop.
+  assert.match(
+    sent.headers.get("server-timing"),
+    /^session;dur=[\d.]+, limit;dur=[\d.]+, form;dur=[\d.]+, save;dur=[\d.]+, total;dur=[\d.]+$/,
+  )
+  assert.equal(sent.headers.get("access-control-expose-headers"), "Server-Timing")
+  assert.equal(sent.headers.get("timing-allow-origin"), SITE)
+  const answer = await json(sent)
+  assert.equal(answer.n, 1)
+  const [shown] = (await json(await count(body.token, "/pricing?plan=pro"))).threads
+  assert.deepEqual(answer.thread, shown, "the thread as the page lists it: nothing that opens the review")
 
   const image = sql.prepare("SELECT * FROM drops WHERE parent_id = 'site'").get()
   assert.equal(image.kind, "image")
@@ -1385,7 +1395,7 @@ test("deleting a screenshot takes its own comments, and deleting the site takes 
     [[2, "site"]],
   )
   // The next comment still counts on from the site's list.
-  assert.deepEqual(await json(await comment(body.token, { body: "Again", page: "/" })), { n: 3 })
+  assert.equal((await json(await comment(body.token, { body: "Again", page: "/" }))).n, 3)
   await deleteDrop(await findDrop("site"))
   assert.deepEqual(threads(), [])
 })

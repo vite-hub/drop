@@ -151,7 +151,7 @@ test(
             images: [],
             createdAt: Date.now(),
           })
-          body = { n: 1 }
+          body = { n: 1, thread: saved[0] }
         }
         return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify(body) })
       })
@@ -182,7 +182,12 @@ test(
       await ui.getByRole("textbox", { name: "Comment", exact: true }).fill("Keep these details")
       assert.equal(await page.locator("#details").isVisible(), true)
       await ui.getByRole("button", { name: "Send", exact: true }).click()
-      await ui.locator("[data-act=list]").waitFor()
+      await ui.getByRole("button", { name: "Comment #1 by Ada", exact: true }).waitFor()
+      assert.equal(
+        typeof (await page.evaluate(() => window.__presence.local.comments)),
+        "string",
+        "saving the comment from the POST response still notifies other reviewers",
+      )
       assert.equal(saved[0].element.selector, "#detail-note")
       assert.equal(await page.locator("#details").isVisible(), true)
       // Close it through the page's own outside-click handler, then reach the comment through the review's list.

@@ -27,7 +27,14 @@ function go() {
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
 const capturing = ref(false)
-const drawing = computed(() => props.reviewing && !pending.value && !capturing.value)
+// While Comments is open the layer over the frame takes every press, so the site can't open a slideover or a menu to
+// comment on (drop#164). Use the site lifts the layer until it's pressed again or Comments opens again.
+const browsing = ref(false)
+watch(
+  () => props.reviewing,
+  (on) => on && (browsing.value = false),
+)
+const drawing = computed(() => props.reviewing && !browsing.value && !pending.value && !capturing.value)
 const box = ref<Box | null>(null)
 let from: { x: number; y: number } | null = null
 const pending = ref<{
@@ -210,6 +217,16 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           spellcheck="false"
         />
       </form>
+      <UButton
+        v-if="reviewing && !pending"
+        :aria-pressed="browsing"
+        color="neutral"
+        icon="i-mingcute-cursor-3-line"
+        label="Use the site"
+        size="sm"
+        :variant="browsing ? 'soft' : 'ghost'"
+        @click="browsing = !browsing"
+      />
     </div>
     <p v-if="!valid" class="border-b border-default px-3 py-1.5 text-xs text-error">
       That address isn't part of this site ({{ drop.siteUrl }}).
@@ -257,7 +274,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
               v-else
               class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border border-default bg-default px-3 py-1.5 text-sm shadow-sm"
             >
-              Drag to include an area in your comment.
+              Drag to include an area in your comment, or press Use the site to click in it.
             </p>
           </div>
         </div>
