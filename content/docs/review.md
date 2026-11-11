@@ -124,7 +124,7 @@ A public link closes after 7 days on a team Drop and never on a personal one, un
 
 Anyone who may edit a Markdown doc opens it with **Edit**, a Notion-like editor where everyone sees each other's avatars, cursors, and keystrokes as they happen. Type `/` for blocks, `@` to mention someone on this Drop, and `:` for an emoji.
 
-Edits go to a draft until someone presses **Publish**, which makes it the next version. The draft stays when you close the editor. If an agent publishes meanwhile, Drop asks before putting the draft on top. Only the latest version can be edited, and docs that use Comark components or footnotes stay read-only.
+Edits go to a draft until someone presses **Publish**, which makes it the next version. The draft stays when you close the editor. If an agent publishes meanwhile, Drop asks before putting the draft on top. Only the latest version can be edited. Components, footnotes and suggested edits stay as they are; a doc the editor couldn't save without changing how it reads stays read-only.
 
 ## Versions {#versions}
 

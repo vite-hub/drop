@@ -25,7 +25,7 @@ import { textStatements } from "./search"
 // version per stroke would bury its history. Publishing with `previous` still makes a new version to come back to.
 //
 // TODO(board-realtime): browsers send their changes here and poll for everyone else's. A Realtime room per board
-// (like server/realtime/drops.ts for Markdown) would show other people's cursors and strokes as they draw.
+// (like server/realtime/drafts.ts for Markdown) would show other people's cursors and strokes as they draw.
 
 export async function readBoard(drop: DropRow): Promise<Board> {
   if (drop.kind !== "board" || !drop.blobKey)

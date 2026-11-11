@@ -13,18 +13,3 @@ export function joinFrontmatter(frontmatter: string, body: string) {
   const meta = /^---\r?\n---/.test(kept) ? "" : kept
   return (meta ? `${meta.replace(/(?:\r?\n)*$/, "\n")}\n` : "") + body.replace(/^(?:\r?\n)+/, "")
 }
-
-/**
- * Comark components, block (`::name` … `::`) or inline (`:name[…]`, `:name{…}`), footnotes (`[^1]: …`), and
- * CriticMarkup (`{++ … ++}`) have no editor node; editing would lose them, so those docs stay read-only.
- * Returns what a doc uses, named as its author wrote it (`::question`, `:badge`, `footnotes`), in reading order.
- */
-export function editorlessSyntax(markdown: string) {
-  const found = new Set<string>()
-  const pattern =
-    /^\s*(?::{2,}([a-z][\w-]*)|(\[\^[^\]\s]+\]:))|(?:^|[^\w:]):([a-z][\w-]*)[[{]|(\{(?:\+\+|--|~~|==|>>))/gim
-  for (const [, block, footnote, inline, critic] of splitFrontmatter(markdown).body.matchAll(pattern)) {
-    found.add(block ? `::${block}` : inline ? `:${inline}` : footnote ? "footnotes" : critic ? "suggested edits" : "")
-  }
-  return [...found]
-}
