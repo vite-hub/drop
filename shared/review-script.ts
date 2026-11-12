@@ -2,8 +2,8 @@
 // preview builds or from the "Review with Drop" bookmarklet. It adds one element, a toolbar in a closed shadow root,
 // so the page's CSS can't reach it and it touches nothing else on the page. Presses, focus, and keys inside it stop at
 // that element, so the page doesn't take them for its own: a menu it has open stays open while someone comments on it.
-// It does nothing until someone presses Comment or Highlight. It carries no key: Drop finds the site drop from the
-// page's origin when someone connects.
+// Until someone presses Comment or Highlight, it only asks whether any drop links to the page, to show Related links.
+// It carries no key: Drop finds the site drop from the page's origin when someone connects.
 //
 // The toolbar is ViteHub's page pill, the same code as ViteHub's page tools (vite-hub/vitehub#3377): it docks to
 // any edge, its mark drags it there and collapses it to the hexagon, and the browser remembers both for the site. The
