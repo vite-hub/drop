@@ -11,7 +11,8 @@
 // `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live.
 // The page remembers the canvas camera and item positions (never content); the URL hash (#v-…) names the item in focus.
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
-// changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`.
+// changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`. `canvasmove` fires
+// on document each frame the camera or an item moves.
 // Inside Drop the page draws no bar: Drop's own bottom bar shows the mode and the camera. The page posts its state up
 // and takes Drop's commands over postMessage; everything else (keys, hash, memory, the canvas) stays here.
 (() => {
@@ -216,6 +217,8 @@
     const zoom = Math.round(cam.z * 100);
     zoomText.textContent = zoom + "%";
     if (zoom !== reportedZoom) report();
+    // Drop's comment pins and areas sit on these items: they move with them in this frame, not after the gesture.
+    document.dispatchEvent(new Event("canvasmove"));
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
   const bound = () => { cam.z = clamp(cam.z, MIN_Z, MAX_Z); cam.x = clamp(cam.x, -LIMIT, LIMIT); cam.y = clamp(cam.y, -LIMIT, LIMIT); };
