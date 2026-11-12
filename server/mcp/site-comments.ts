@@ -16,7 +16,10 @@ const tools = new Map(commentsMcpTools(comments).map((tool) => [tool.name, tool]
 async function run(name: string, input: Record<string, unknown>, event: H3Event) {
   const who = await requireIdentity(event)
   if (who.role !== "admin")
-    throw new HTTPError({ status: 403, message: "Only Drop admins read the comments on Drop's pages." })
+    throw new HTTPError({
+      status: 403,
+      message: `Only Drop admins read the comments on Drop's own pages. ${SITE_REVIEWS}`,
+    })
   const tool = tools.get(name)!
   const result = await tool.call(input, {
     user: { id: who.userId, name: who.name, email: who.email, image: who.image },
@@ -29,6 +32,13 @@ async function run(name: string, input: Record<string, unknown>, event: H3Event)
   }
 }
 
+/** Where agents find what they usually want instead: the comments people left on the site they're fixing. */
+const SITE_REVIEWS =
+  "For comments people left on a site under review, such as a pull request's preview, call read_drop with the page's address, then reply with resolve: true once you've fixed each one."
+
+/** The ViteHub description, said to be about Drop's own pages, so agents fixing a reviewed site don't pick it. */
+const describe = (name: string) => `Drop's own pages, for Drop admins: ${tools.get(name)!.description} ${SITE_REVIEWS}`
+
 const thread = v.pipe(v.string(), v.minLength(1), v.description("The thread id, from comments_list_threads."))
 
 /**
@@ -39,7 +49,7 @@ export const siteCommentTools = [
   defineMcpTool({
     name: "comments_list_threads",
     title: tools.get("comments_list_threads")!.title,
-    description: tools.get("comments_list_threads")!.description,
+    description: describe("comments_list_threads"),
     annotations: { readOnlyHint: true },
     inputSchema: toStandardJsonSchema(
       v.object({
@@ -56,7 +66,7 @@ export const siteCommentTools = [
   defineMcpTool({
     name: "comments_get_thread",
     title: tools.get("comments_get_thread")!.title,
-    description: tools.get("comments_get_thread")!.description,
+    description: describe("comments_get_thread"),
     annotations: { readOnlyHint: true },
     inputSchema: toStandardJsonSchema(v.object({ id: thread })),
     handler: (input, event) => run("comments_get_thread", input, event),
@@ -64,7 +74,7 @@ export const siteCommentTools = [
   defineMcpTool({
     name: "comments_reply",
     title: tools.get("comments_reply")!.title,
-    description: tools.get("comments_reply")!.description,
+    description: describe("comments_reply"),
     inputSchema: toStandardJsonSchema(
       v.object({
         id: thread,
@@ -77,7 +87,7 @@ export const siteCommentTools = [
   defineMcpTool({
     name: "comments_resolve_thread",
     title: tools.get("comments_resolve_thread")!.title,
-    description: tools.get("comments_resolve_thread")!.description,
+    description: describe("comments_resolve_thread"),
     annotations: { idempotentHint: true },
     inputSchema: toStandardJsonSchema(
       v.object({

@@ -67,10 +67,11 @@ test(
       assert.equal(await page.evaluate(() => posts.filter((m) => m.type === "activity").length), 1)
 
       for (const input of [
-        () => page.keyboard.press("ArrowDown"),
+        // An animated ArrowDown scroll can send activity during the next clock advance and throttle that input.
+        () => page.keyboard.press("Shift"),
         () => frame.evaluate(() => scrollTo(0, 100)),
         () => page.mouse.click(200, 150),
-        () => frame.evaluate(() => document.body.dispatchEvent(new Event("touchstart", { bubbles: true }))),
+        () => frame.evaluate(() => document.body.dispatchEvent(new TouchEvent("touchstart", { bubbles: true }))),
       ]) {
         await page.clock.fastForward(1100)
         const before = await page.evaluate(() => posts.filter((m) => m.type === "activity").length)

@@ -42,6 +42,7 @@ import {
   deleteDrop,
   type DropRow,
   findDrop,
+  findDropByRef,
   type LifetimeInput,
   lifetimeFields,
   permissions,
@@ -195,6 +196,48 @@ export async function sitesFor(origin: string, who: Identity | null, event?: H3E
       : [],
   )
 }
+
+/**
+ * The site review an agent means by the address of a page under review, such as a pull request's preview: the newest
+ * site drop covering its origin that `who` may comment on, and the page as its comments name it, path only. Null for
+ * anything that isn't an http(s) address or that no review of theirs covers.
+ */
+async function siteForPage(address: string, who: Identity, event?: H3Event) {
+  let url: URL
+  try {
+    url = new URL(address.trim())
+  } catch {
+    return null
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null
+  const [found] = await sitesFor(url.origin, who, event)
+  return found ? { site: found.site, page: reviewPage(found.site, url.origin, url.pathname) } : null
+}
+
+/** A drop by its id or link, or a site review by the address of one of its pages, with that page. */
+export async function findDropOrSite(ref: string, who: Identity, event: H3Event) {
+  const drop = await findDropByRef(ref, event)
+  if (drop) return { drop, page: null }
+  const found = await siteForPage(ref, who, event)
+  return { drop: found?.site ?? null, page: found?.page ?? null }
+}
+
+/**
+ * Whether a comment's page, as `reviewPage` keeps it, is `page` with or without a query or hash. A `page` ending in a
+ * slash covers every page under it, so a preview's root address covers that whole preview.
+ */
+export function onPage(commentPage: string | null, page: string) {
+  if (commentPage === null || !commentPage.startsWith(page)) return false
+  return page.endsWith("/") || /^(?:[?#]|$)/.test(commentPage.slice(page.length))
+}
+
+/**
+ * Who may resolve or reopen a thread on a site review: its author, guests included, and anyone signed in who may
+ * comment on the site, with their agents. The people reviewing a site and the agents fixing it close each other's
+ * comments once they're fixed; otherwise fixed comments stay pinned to the page until the site's owner comes by.
+ */
+export const mayResolveSite = (site: DropRow, who: Identity | null, wrote: boolean) =>
+  wrote || permissions(site, who).manage || (who !== null && permissions(site, who).comment)
 
 /** Whether any site drop covers `origin`. That much is all a page learns before it has a token. */
 export async function covered(origin: string) {
@@ -699,8 +742,8 @@ type ReviewItem = Omit<SiteReviewItem, "screenshot"> & { screenshot: { id: strin
  * review in Drop, and images by the ids /api/review/images serves with the token.
  */
 export function reviewThreads(site: DropRow, who: Identity | null, items: SiteReviewItem[]): ReviewThread[] {
-  const manage = permissions(site, who).manage
-  return items.map((item) => reviewThread(item, manage))
+  const others = mayResolveSite(site, who, false)
+  return items.map((item) => reviewThread(item, others))
 }
 
 /**
@@ -722,11 +765,11 @@ export function reviewThreadOf(
       spot: spotOf(meta),
       screenshot: meta.dropId === site.id ? null : { id: meta.dropId },
     },
-    permissions(site, who).manage,
+    mayResolveSite(site, who, false),
   )
 }
 
-function reviewThread(item: ReviewItem, manage: boolean): ReviewThread {
+function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
   return {
     n: item.n,
     requestId: item.requestId,
@@ -735,7 +778,7 @@ function reviewThread(item: ReviewItem, manage: boolean): ReviewThread {
     createdAt: item.createdAt,
     resolved: item.resolved,
     mine: item.mine,
-    canResolve: manage || item.mine,
+    canResolve: others || item.mine,
     page: item.page,
     element: item.label ? { selector: item.label, label: item.quote } : null,
     spot: item.spot,

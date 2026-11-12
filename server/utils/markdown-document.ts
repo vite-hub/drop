@@ -97,7 +97,7 @@ export const COMPONENT_TAGS =
 const LEGACY_TAGS = ["drop"]
 const ALLOWED_TAGS = [...preset.tags, ...Object.keys(preset.components), ...COMPONENT_TAGS, ...LEGACY_TAGS]
 
-const plugins = [
+export const renderPlugins = [
   // A bare URL is a link, as on GitHub. Comark 0.9 moved it into the defaults Drop leaves out, so it's listed here.
   linkify(),
   frontmatter(),
@@ -118,7 +118,7 @@ const plugins = [
   }),
 ]
 
-const parse = createMarkdownParser({ plugins, registerDefaultPlugins: false })
+const parse = createMarkdownParser({ plugins: renderPlugins, registerDefaultPlugins: false })
 
 /**
  * comark-annotate 0.2 renamed two props that Drop's pr-evidence skill taught agents before it: a screenshot's `url` is
@@ -279,7 +279,7 @@ const LINT_COMPONENTS = [...ALLOWED_TAGS, ...preset.blocks]
  * an annotation's box is outside its image, not that it points at the button it means.
  */
 export async function lintMarkdown(markdown: string): Promise<MarkdownProblem[]> {
-  const found = await lint(renameLegacyProps(markdown), { plugins, components: LINT_COMPONENTS })
+  const found = await lint(renameLegacyProps(markdown), { plugins: renderPlugins, components: LINT_COMPONENTS })
   return found.flatMap(({ rule, severity, line, column, message, fix, cause }) => {
     // A rule that threw is comark-linter's bug, not the doc's, and its message says so; Comark failing to parse the doc
     // is the doc's.
