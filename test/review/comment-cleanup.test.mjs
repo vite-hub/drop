@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
-import { installComments } from "vite-hub/comments"
+import { installComments } from "vite-hub/comments/server"
 import { insertDrop, migrate, reset, sql, state, threads } from "../cost/harness.mjs"
 
 const { default: comments } = await import("../../server/comments.ts")

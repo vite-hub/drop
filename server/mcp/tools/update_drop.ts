@@ -5,7 +5,8 @@ import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
 import { resolveComments } from "../../utils/comments"
-import { findDropByRef, permissions, toSummary } from "../../utils/drops"
+import { permissions, toSummary } from "../../utils/drops"
+import { findDropOrSite, mayResolveSite } from "../../utils/review"
 import { SHARES } from "#shared/share"
 import { type DropChange, updateDrop } from "../../utils/drop-update"
 import { requireIdentity } from "../../utils/identity"
@@ -18,11 +19,16 @@ export default defineMcpTool({
   name: "update_drop",
   title: "Update a drop",
   description:
-    "Change who can open a drop, its title, its link's slug, a folder's description, a link item's address or note, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; replace the links it shows at the top; resolve a site's review comments once the site is fixed. A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
+    "Change who can open a drop, its title, its link's slug, a folder's description, a link item's address or note, or its lifetime; renew its window; move it into a folder or out of one; move it to the Trash (restorable for 15 days) or restore it; replace the links it shows at the top; resolve a site's review comments once you've fixed them on the site (reply with resolve does it while saying what changed). A folder's share, lifetime, and Trash apply to everything in it. Only people delete drops for good, and only people describe the team's folders.",
   annotations: { idempotentHint: true },
   inputSchema: toStandardJsonSchema(
     v.object({
-      id: v.pipe(v.string(), v.description("Drop id, or its link.")),
+      id: v.pipe(
+        v.string(),
+        v.description(
+          "Drop id, its link, or the address of a page under site review, such as a pull request's preview: that finds the site drop covering it.",
+        ),
+      ),
       share: v.optional(v.pipe(v.picklist(SHARES), v.description(SHARE_INPUT))),
       title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
       slug: v.optional(
@@ -92,7 +98,7 @@ export default defineMcpTool({
           v.array(v.pipe(v.number(), v.integer())),
           v.maxLength(90),
           v.description(
-            "Numbers of open comments you addressed, from read_drop. For sites, which have no versions; docs and apps resolve when you publish the next version.",
+            "Numbers of open comments you fixed, from read_drop. For sites, which have no versions: resolve each comment once your fix is on the site, so its pin leaves the page. Docs and apps resolve when you publish the next version.",
           ),
         ),
       ),
@@ -102,7 +108,7 @@ export default defineMcpTool({
     const who = await requireIdentity(event)
     if (rest.slug !== undefined && !slugify(rest.slug))
       throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
-    const drop = await findDropByRef(id, event)
+    const { drop } = await findDropOrSite(id, who, event)
     if (!drop) throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
     const change: DropChange = {
       ...rest,
@@ -111,7 +117,9 @@ export default defineMcpTool({
     }
     if (!Object.keys(change).length && !resolves?.length && !resources)
       throw new HTTPError({ status: 400, message: "Nothing to change." })
-    if (resolves?.length && (isAttachment(drop) || !permissions(drop, who).manage))
+    // A site's reviewers and their agents resolve each other's comments; anything else is its managers'.
+    const mayResolve = drop.kind === "site" ? mayResolveSite(drop, who, false) : permissions(drop, who).manage
+    if (resolves?.length && (isAttachment(drop) || !mayResolve))
       throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
     // Whoever may publish its next version may set its links, as publish does.
     const links = resources && resourceList(resources)

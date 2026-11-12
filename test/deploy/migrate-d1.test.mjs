@@ -6,6 +6,7 @@ import { test } from "vite-plus/test"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { migrate } from "drizzle-orm/sqlite-proxy/migrator"
 import { readMigrationFiles } from "drizzle-orm/migrator"
+import { createCommentsStore } from "vite-hub/comments/server"
 import { migrateD1 } from "../../scripts/migrate-d1.mjs"
 
 const settings = {
@@ -137,6 +138,12 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
           VALUES ('legacy-image', 'legacy-comment', 'legacy-reply', 1);
         `)
       }
+      if (appliedMigrations.includes(oneModel))
+        database.exec(`
+          INSERT INTO vitehub_comment_threads
+            (id, scope, n, subject_kind, subject_id, anchor, status, author_id, author_name, created_at, updated_at)
+          VALUES ('upgrade-thread', 'upgrade', 1, 'page', '/', '{"kind":"page"}', 'open', 'admin', 'Admin', 1, 1);
+        `)
       // Live-site rows, while the database still has the live-site tables.
       const seeded = appliedMigrations.includes(comments) && !appliedMigrations.includes(oneModel)
       if (seeded) {
@@ -160,15 +167,19 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
       const latest = Math.max(0, ...appliedTimestamps)
       const expectedMigrations =
         appliedTimestamps.length + migrations.filter((migration) => migration.folderMillis > latest).length
-      const db = drizzle(async (query, params, method) => {
+      const runQuery = async (query, params, method) => {
         const statement = database.prepare(query)
         if (method === "run") {
           statement.run(...params)
           return { rows: [] }
         }
         statement.setReturnArrays(true)
-        return { rows: statement.all(...params) }
-      })
+        const rows = statement.all(...params)
+        return { rows: method === "get" ? rows[0] : rows }
+      }
+      const db = drizzle(runQuery, async (batch) =>
+        Promise.all(batch.map((item) => runQuery(item.sql, item.params, item.method))),
+      )
       const apply = async (statements) => database.exec(`BEGIN; ${statements.join(";\n")}; COMMIT;`)
       await migrate(db, apply, config)
       assert.ok(
@@ -233,8 +244,24 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
           .some((column) => column.name === "agent"),
       )
       const threadColumns = database.prepare("PRAGMA table_info(vitehub_comment_threads)").all()
-      for (const name of ["scope", "n", "subject_kind", "metadata", "revision"])
+      for (const name of ["scope", "n", "subject_kind", "metadata", "revision", "request_id"])
         assert.ok(threadColumns.some((column) => column.name === name))
+      if (appliedMigrations.includes(oneModel)) {
+        const store = createCommentsStore(db)
+        assert.equal((await store.getById("upgrade-thread")).author.name, "Admin")
+        assert.equal(await store.getByRequestId("upgrade", "retry"), null)
+        database.exec("UPDATE vitehub_comment_threads SET request_id = 'retry' WHERE id = 'upgrade-thread'")
+        assert.equal((await store.getByRequestId("upgrade", "retry")).id, "upgrade-thread")
+        assert.throws(
+          () =>
+            database.exec(`
+              INSERT INTO vitehub_comment_threads
+                (id, scope, n, subject_kind, subject_id, anchor, status, author_id, request_id, created_at, updated_at)
+              VALUES ('duplicate-retry', 'upgrade', 2, 'page', '/', '{"kind":"page"}', 'open', 'admin', 'retry', 1, 1);
+            `),
+          /UNIQUE/,
+        )
+      }
       for (const table of ["comments", "comment_replies"])
         assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table), undefined)
       assert.equal(

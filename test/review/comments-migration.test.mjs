@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "vite-plus/test"
 import { readMigrationFiles } from "drizzle-orm/migrator"
-import { migrationFile } from "../../scripts/comments-migration.mjs"
+import { dropBackfills } from "../../scripts/comments-migration.mjs"
 
 const directory = new URL("../../server/databases/migrations/", import.meta.url)
 const file = "0011_comments_one_model.sql"
@@ -149,8 +149,10 @@ function seed(database) {
   `)
 }
 
-test("the migration file is ViteHub's live-site move followed by Drop's backfills", () => {
-  assert.equal(readFileSync(new URL(file, directory), "utf8"), migrationFile())
+test("the shipped migration keeps Drop's backfills", () => {
+  // Upstream's generator follows its current schema. Later schema changes belong in new migrations.
+  const shipped = readFileSync(new URL(file, directory), "utf8")
+  for (const statement of dropBackfills) assert.ok(shipped.includes(`${statement};`))
 })
 
 test("Drop's comments move to the one comment model with their numbers, versions, images, and anchors", () => {

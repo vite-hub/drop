@@ -23,11 +23,16 @@ const SLIDEOVER = `<button id="open">Save change</button>
   document.getElementById("open").addEventListener("click", () => { dialog.hidden = false; reason.focus() })
 </script>`
 
-// A page that re-renders every frame, with a row for each thread that has an element.
+// A page that changes text and row styles every frame, with a row for each thread that has an element.
 const BUSY = `<p id="clock"></p><ul id="rows">${Array.from({ length: 40 }, (_, i) => `<li>Row ${i}</li>`).join("")}</ul>
-<script>(function tick() { document.getElementById("clock").textContent = String(performance.now()); requestAnimationFrame(tick) })()</script>`
+<script>(function tick() {
+  const now = String(performance.now());
+  document.getElementById("clock").textContent = now;
+  for (const row of document.querySelectorAll("#rows > li")) row.style.setProperty("--frame", now);
+  requestAnimationFrame(tick);
+})()</script>`
 
-function thread(n, selector) {
+function thread(n, selector, label = "li") {
   return {
     n,
     body: "Note " + n,
@@ -35,7 +40,7 @@ function thread(n, selector) {
     replies: [],
     images: [],
     author: { name: "Ada" },
-    element: { selector, label: "li" },
+    element: { selector, label },
     spot: { x: 0, y: 0 },
     createdAt: 0,
   }
@@ -82,7 +87,7 @@ async function open(browser, body, threads = []) {
     if (request.method() === "POST") {
       posts.push(request.postDataBuffer().toString("utf8"))
       const data = JSON.parse(posts.at(-1).match(/name="data"\r\n\r\n(.*?)\r\n/s)[1])
-      const saved = thread(threads.length + 1, data.selector)
+      const saved = thread(threads.length + 1, data.selector, data.label)
       saved.body = data.body
       saved.spot = data.spot
       threads.push(saved)
@@ -211,7 +216,7 @@ test("missing pins recover when only selector attributes change", async () => {
     const { page, ui } = await open(
       browser,
       '<button id="before">ID target</button><button class="before">Class target</button><button data-anchor="before">Attribute target</button>',
-      [thread(1, "#late"), thread(2, ".late"), thread(3, '[data-anchor="late"]')],
+      [thread(1, "#late", "button"), thread(2, ".late", "button"), thread(3, '[data-anchor="late"]', "button")],
     )
     await ui.locator(".pin").first().waitFor({ state: "attached" })
     assert.equal(await ui.locator(".pin:not([hidden])").count(), 0)

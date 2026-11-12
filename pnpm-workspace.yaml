@@ -22,7 +22,8 @@ overrides:
   "@vite-hub/queue": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/rate-limit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/realtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@03e8d1b57b7edc7c03924971902d13948df72216
-  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@03e8d1b57b7edc7c03924971902d13948df72216
+  # Comments' merged build needs getStandardContext and installRequestStandardContext; this runtime also keeps the SDK's older exports.
+  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@16b007adc450ff5652e95e4bfa4b80228fca44f3
   "@vite-hub/sandbox": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/schedule": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/shell": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@03e8d1b57b7edc7c03924971902d13948df72216
