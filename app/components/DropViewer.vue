@@ -686,9 +686,9 @@ const exportPdf = () => send({ type: "print", title: drop.value.title })
 // The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
 
-// The header's links: a Markdown doc's preview deploys, which are for opening; its other links read with its front
+// The dock's links, beside Share: a Markdown doc's preview deploys, which are for opening; its other links read with its front
 // matter at the top of the doc (server/utils/markdown-document.ts withDocProperties). Every other drop shows them all.
-const headerLinks = computed(() => {
+const dockLinks = computed(() => {
   const links = drop.value.resources ?? []
   return drop.value.kind === "markdown" ? links.filter(isPreviewLink) : links
 })
@@ -1145,10 +1145,6 @@ watch(
         <template #title>
           <ViewerLocation :drop="drop" :public-view="publicView" />
         </template>
-        <template #trailing>
-          <!-- A Markdown doc shows its other links in its properties, at the top of the doc. -->
-          <ViewerResources :related-to="relatesTo" :resources="headerLinks" />
-        </template>
       </UDashboardNavbar>
     </template>
 
@@ -1443,13 +1439,9 @@ watch(
             </template>
             <template v-else-if="hasComments && !trashed">
               <ViewerToolbar
-                v-if="
-                  !lightbox &&
-                  !shownVersion &&
-                  (inspectable || canMark || sizable || (framed && pinned.length) || siteRef?.canDraw)
-                "
+                v-if="!lightbox && !shownVersion && (inspectable || canMark || sizable || siteRef?.canDraw)"
                 :tools="markTools"
-                :views="inspectable ? ['rulers', 'xray', 'pins'] : pinned.length ? ['pins'] : []"
+                :views="inspectable ? ['rulers', 'xray'] : []"
                 :overlays="overlays"
                 :sizable="sizable || Boolean(siteRef?.canDraw)"
                 :tool="tool"
@@ -1489,9 +1481,12 @@ watch(
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
                 :list-open="commentsOpen && !popover"
+                :pins="!lightbox && !shownVersion && framed && pinned.length > 0"
+                :pins-shown="overlays.pins"
                 @toggle="toggleCommentMode"
                 @list="toggleComments"
                 @page="commentOnPage"
+                @pins="toggleOverlay('pins')"
               />
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
@@ -1518,6 +1513,7 @@ watch(
               />
               <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
+            <ViewerResources :related-to="relatesTo" :resources="dockLinks" />
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
         </ViewerReviewDock>

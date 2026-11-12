@@ -2,10 +2,18 @@
 // Comments as a mode, not a panel over the page: pressing it (C) lets the reader click or drag on the page to comment
 // on that spot, and the button says so ("Click anywhere"). A segment grows beside it inside the pill, holding only
 // actions: Whole page (a comment on the page itself, in the dock), All comments with the open count (the dock's list),
-// and × to stop. On a phone the segment takes its own row above the pill's.
+// and × to stop. On a phone the segment takes its own row above the pill's. With `pins`, the eye that hides the
+// comments on the page sits against Comments, the thing it hides.
 const on = defineModel<boolean>("on", { required: true })
-defineProps<{ count: number; listOpen: boolean; canComment: boolean; canUseMode: boolean }>()
-const emit = defineEmits<{ page: []; list: []; toggle: [] }>()
+defineProps<{
+  count: number
+  listOpen: boolean
+  canComment: boolean
+  canUseMode: boolean
+  pins?: boolean
+  pinsShown?: boolean
+}>()
+const emit = defineEmits<{ page: []; list: []; toggle: []; pins: [] }>()
 
 const item =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted aria-expanded:bg-elevated aria-expanded:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
@@ -34,6 +42,18 @@ const item =
       <span v-if="count && !on" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
         count
       }}</span>
+    </button>
+  </UTooltip>
+  <!-- Pressed means hidden: pressed is the state that changes the page. -->
+  <UTooltip v-if="pins" text="Hide comments" :content="{ side: 'top', sideOffset: 8 }">
+    <button
+      aria-label="Hide comments"
+      :aria-pressed="!pinsShown"
+      class="-ml-1 grid size-7 shrink-0 place-items-center rounded-md text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100 pointer-coarse:ml-0"
+      type="button"
+      @click="emit('pins')"
+    >
+      <UIcon :name="pinsShown ? 'i-mingcute-eye-line' : 'i-mingcute-eye-close-line'" class="size-3.5" />
     </button>
   </UTooltip>
   <div

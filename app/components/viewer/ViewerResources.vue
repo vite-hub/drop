@@ -36,50 +36,45 @@ const count = computed(() => rows.value.length)
 const chipUrls = computed(() => [...props.resources, ...related.value.flatMap((drop) => drop.links)].map((r) => r.url))
 const shown = computed(() => chipUrls.value.slice(0, 3))
 const more = computed(() => Math.max(0, chipUrls.value.length - shown.value.length))
+// The ring takes the pill's fill: its surface, the hover's lighter grey, or white while the list is open. A site icon
+// sits on white, as sites draw them for, so a black mark like Airtable's stays visible on the dark pill.
+const rings =
+  "ring-2 ring-(--ui-bg) group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-aria-expanded/links:ring-(--ui-bg-inverted)"
+const chip = `${rings} grid size-5 place-items-center rounded-full bg-white inset-ring inset-ring-black/10 [--ui-text-muted:var(--color-neutral-500)]`
 </script>
 
 <template>
   <UPopover
     v-if="count"
-    :content="{ align: 'start', sideOffset: 6 }"
+    :content="{ align: 'end', side: 'top', sideOffset: 8 }"
     :ui="{
       content:
-        'w-64 max-w-[calc(100vw-1rem)] max-h-[min(24rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain motion-reduce:animate-none',
+        'w-80 max-w-[calc(100vw-1rem)] max-h-[min(24rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px] motion-reduce:animate-none',
     }"
   >
     <template #default="{ open }">
-      <UTooltip :disabled="open" text="Related links">
-        <!-- Same height as Share (size sm). Each chip is cut out of the button's own fill by a ring of that fill,
-             so the overlap reads on every state, and a hairline keeps a white favicon from melting into the bar. -->
-        <UButton
-          :aria-label="`Related links (${count})`"
-          class="group/links shrink-0 px-1 data-open:bg-elevated pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center"
-          color="neutral"
-          :data-open="open || undefined"
-          size="sm"
-          variant="ghost"
-        >
+      <UTooltip :disabled="open" text="Related links" :content="{ side: 'top', sideOffset: 8 }">
+        <!-- In the review dock, beside Share. Each chip is cut out of the pill's fill by a ring of that fill, so the
+             overlap reads on every state of the button; a hairline keeps a white favicon's edge. -->
+        <button :aria-label="`Related links (${count})`" class="group/links shrink-0 px-1.5!" type="button">
           <span aria-hidden="true" class="flex -space-x-1">
-            <span
-              v-if="!shown.length && related[0]"
-              class="grid size-5 place-items-center rounded-full bg-default ring-2 ring-(--ui-bg) inset-ring inset-ring-black/10 group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-data-open/links:ring-(--ui-bg-elevated) dark:bg-elevated dark:inset-ring-white/10"
-            >
+            <span v-if="!shown.length && related[0]" :class="chip">
               <UIcon class="size-3.5 text-muted" :name="KIND_ICONS[related[0].kind]" />
             </span>
-            <span
-              v-for="url in shown"
-              :key="url"
-              class="grid size-5 place-items-center rounded-full *:size-3.5! bg-default ring-2 ring-(--ui-bg) inset-ring inset-ring-black/10 transition-[box-shadow] group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-data-open/links:ring-(--ui-bg-elevated) dark:bg-elevated dark:inset-ring-white/10"
-            >
+            <span v-for="url in shown" :key="url" :class="[chip, '*:size-3.5!']">
               <ViewerResourceIcon :url="url" />
             </span>
             <span
               v-if="more"
-              class="grid h-5 min-w-5 place-items-center rounded-full bg-elevated px-1 text-[0.6875rem] font-medium text-muted tabular-nums ring-2 ring-(--ui-bg) group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-data-open/links:ring-(--ui-bg-elevated)"
+              :class="[
+                rings,
+                'h-5 min-w-5 rounded-full bg-elevated px-1 text-[0.6875rem] font-medium text-muted tabular-nums',
+              ]"
+              class="grid place-items-center"
               >+{{ more }}</span
             >
           </span>
-        </UButton>
+        </button>
       </UTooltip>
     </template>
     <template #content="{ close }">

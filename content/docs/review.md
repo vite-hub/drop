@@ -88,7 +88,7 @@ Docs and apps show a toolbar under the page. Each tool has a key, which also wor
 | Measure | :kbd[S] | Shows an element's size, padding, and margin, with its font, colors, gap, and corners. Click one to pick it, then point at another to see the distance between them. |
 | Rulers and guides | :kbd[U] | Pixel rulers along the top and left. Drag a guide out of a ruler. Drag it back, or double-click it, to remove it. |
 | X-ray | :kbd[X] | Outlines every element without moving anything. |
-| Hide comments | | Hides the pins and highlights while you look at the page. |
+| Hide comments | | The eye beside **Comments**. Hides the pins and highlights while you look at the page. |
 
 :kbd[Esc] unpicks the measured element, closes an open comment box, then returns to Browse.
 

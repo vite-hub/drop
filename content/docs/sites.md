@@ -104,7 +104,7 @@ The menu goes two links deep. A plan doc that lists the same pull request as the
 
 The first press connects you, as **Comment** does. The menu lists only docs you would find in Drop anyway: your own, ones shared with the team, and public links that are on a team Drop or that you have opened while signed in. A doc you can't see doesn't lead to others. A doc opens through Drop, with Drop's session, so the page never learns its link. With no doc linking to the site, the button stays hidden.
 
-In Drop, the same relations show under a drop's **Related links**: a site review lists the docs that link to its site, and a doc lists the other drops that link to its pages, with the site reviews of its previews.
+In Drop, the same relations show under **Related links**, the site icons beside **Share** in the drop's toolbar: a site review lists the docs that link to its site, and a doc lists the other drops that link to its pages, with the site reviews of its previews.
 
 ## See who's here {#presence}
 
