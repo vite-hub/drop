@@ -1,4 +1,5 @@
 import type { AgentMetadata } from "#shared/agent"
+import { writtenBy } from "#shared/agents"
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
@@ -774,7 +775,8 @@ function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
     n: item.n,
     requestId: item.requestId,
     body: item.body,
-    author: { name: item.authorName, image: item.authorImage },
+    // An agent's comment never shows the picture of the person it wrote for; the page has no logo to show instead.
+    author: { name: writtenBy(item), image: item.agent ? null : item.authorImage },
     createdAt: item.createdAt,
     resolved: item.resolved,
     mine: item.mine,
@@ -786,7 +788,7 @@ function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
     screenshot: item.screenshot?.id ?? null,
     images: reviewImages(item.attachments),
     replies: item.replies.map((reply) => ({
-      author: { name: reply.authorName, image: reply.authorImage },
+      author: { name: writtenBy(reply), image: reply.agent ? null : reply.authorImage },
       body: reply.body,
       createdAt: reply.createdAt,
       images: reviewImages(reply.attachments),

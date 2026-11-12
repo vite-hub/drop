@@ -49,7 +49,7 @@ const owner = computed(() => drop.value.isOwner)
 // Signed-in people read a public link inside the app, sidebar included (pages/d/[id]/[[slug]].vue); visitors see it alone.
 const { data: me } = useMe()
 const visitor = computed(() => publicView && !me.value)
-const openCount = computed(() => comments.value.filter((comment) => !comment.resolved).length)
+const openCount = computed(() => comments.value.filter(needsLook).length)
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)

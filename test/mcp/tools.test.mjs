@@ -466,6 +466,8 @@ test("a suggestion is a comment with the words that replace its quote, and read_
   const doc = (await call(publish, { markdown: "# Plan\n\nCount twelve pigeons.", note: "Draft", lifetime: "review" }))
     .structuredContent
   const anchor = { kind: "text", selector: "p", ox: 0, oy: 0, quote: "twelve" }
+  // People comment in the browser; the agent reads.
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
   const replaced = await commentsPost(route(doc.id, { ...anchor, suggestion: "fifteen" }))
   assert.equal(replaced.suggestion, "fifteen", "a suggestion needs no note")
   assert.equal(replaced.body, "")
@@ -477,6 +479,7 @@ test("a suggestion is a comment with the words that replace its quote, and read_
     statusText: "A suggestion replaces selected text.",
   })
 
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
   const read = await call(readDrop, { id: doc.id })
   assert.deepEqual(
     read.structuredContent.comments.map((comment) => comment.suggestion),
@@ -582,7 +585,10 @@ test("open comments follow a doc to its next versions, numbered across them, and
   }
   const v1 = (await call(publish, { markdown: "# Plan\n\nShip it on Friday.", note: "Draft", lifetime: "review" }))
     .structuredContent
+  // A person comments in the browser; an agent's comment would say whose agent it is.
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
   await commentsPost(route(v1.id, { kind: "text", selector: "p", ox: 0, oy: 0, quote: "Friday", body: "Too soon?" }))
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
   const v2 = (await call(publish, { previous: v1.id, markdown: "# Plan\n\nShip it on Monday.", note: "Move the date" }))
     .structuredContent
 
@@ -648,6 +654,8 @@ test("a comment on the whole page points at nothing in it, and agents read it as
   }
   const doc = (await call(publish, { markdown: "# Plan\n\nShip it on Friday.", note: "Draft", lifetime: "review" }))
     .structuredContent
+  // People comment in the browser; the agent reads.
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
   const added = await commentsPost(
     route(doc.id, { kind: "page", selector: "", ox: 0, oy: 0, body: "The whole plan reads too long." }),
   )
@@ -657,6 +665,7 @@ test("a comment on the whole page points at nothing in it, and agents read it as
     "a page comment can't carry an anchor",
   )
 
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
   const read = await call(readDrop, { id: doc.id })
   assert.match(read.content[0].text, /1\. \[the whole page\]\n {3}The whole plan reads too long\. \(Owner\)/)
 })
@@ -718,7 +727,10 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
   }
   const v1 = (await call(publish, { markdown: "# Plan\n\nShip it on Friday.", note: "Draft", lifetime: "review" }))
     .structuredContent
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
   await commentsPost(route(v1.id, { kind: "text", selector: "p", ox: 0, oy: 0, quote: "Friday", body: "Why Friday?" }))
+  // The agent comes through Claude Code's MCP client, which registered as "Claude Code (drop)".
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code (drop)" }
   const v2 = (
     await call(publish, { previous: v1.id, markdown: "# Plan\n\nShip it on Friday, after QA.", note: "QA first" })
   ).structuredContent
@@ -731,6 +743,7 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
   })
   assert.equal(answered.structuredContent.comment, 1)
   assert.equal(answered.structuredContent.reply.authorName, "Owner")
+  assert.deepEqual(answered.structuredContent.reply.agent, { name: "Claude", image: "/agents/claude.svg" })
   assert.equal((await call(reply, { id: v2.id, comment: 9, body: "Nope" })).isError, true, "a missing number fails")
 
   const [listed] = await commentsGet(route(v2.id))
@@ -739,13 +752,19 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
     ["QA signs off Thursday, so Friday is the first free day."],
   )
   const read = await call(readDrop, { id: v2.id })
-  assert.match(read.content[0].text, /Why Friday\? \(Owner, on v1\)\n {3}↳ Owner: QA signs off Thursday/)
+  assert.equal(listed.agent, null, "the person's own comment")
+  assert.deepEqual(listed.replies[0].agent, { name: "Claude", image: "/agents/claude.svg" })
+  assert.match(read.content[0].text, /Why Friday\? \(Owner, on v1\)\n {3}↳ Claude \(Owner\): QA signs off Thursday/)
   assert.equal(read.structuredContent.comments[0].replies.length, 1)
 
   // A resolved thread still takes a reply, and stays resolved.
   await call(publish, { previous: v2.id, markdown: "# Plan\n\nShip it on Friday.", note: "Same", resolves: [1] })
   assert.equal((await call(reply, { id: v2.id, comment: 1, body: "Done." })).structuredContent.comment, 1)
   assert.deepEqual([threads()[0].status, threads()[0].messages.length], ["resolved", 3])
+  // The reply came after the resolve, so the viewer lists the thread under Open again.
+  const [resolved] = await commentsGet(route(v2.id))
+  assert.equal(resolved.resolved, true)
+  assert.ok(resolved.resolvedAt && resolved.replies.at(-1).createdAt >= resolved.resolvedAt)
 
   // Deleting the comment takes its thread with it.
   const remove = new H3Event(new Request(`https://drop.example/api/comments/${listed.id}`, { method: "DELETE" }))

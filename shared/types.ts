@@ -241,9 +241,13 @@ export interface DropComment {
   authorName: string
   /** The author's picture, when they have one; pins and threads fall back to initials. */
   authorImage: string | null
+  /** The agent that wrote it for the author, through an MCP client. Threads show it: "Claude (Maxi)". */
+  agent: CommentAgent | null
   /** The ids of the people its `@`s name. */
   mentions: string[]
   resolved: boolean
+  /** When it was last resolved. A reply after it brings the comment back to Open, still resolved. */
+  resolvedAt: number | null
   createdAt: number
   editedAt: number | null
   /** The version it was written on. Open comments carry over to later versions until someone resolves them. */
@@ -264,11 +268,18 @@ export interface CommentReply {
   authorId: string
   authorName: string
   authorImage: string | null
+  agent: CommentAgent | null
   mentions: string[]
   createdAt: number
   editedAt: number | null
   mine: boolean
   attachments: CommentAttachment[]
+}
+
+/** An agent that wrote a comment or a reply for its author. `image` is its logo, when Drop knows the agent. */
+export interface CommentAgent {
+  name: string
+  image: string | null
 }
 
 /** An image someone sent with a comment or a reply. It's a drop of its own under the commented drop. */

@@ -1,6 +1,6 @@
 // Writes server/databases/migrations/0011_comments_one_model.sql: ViteHub's move of the live-site comment tables to
-// its one comment model (`commentsMigrationSql({ from: "live" })`), then Drop's own backfills. Run it again after a
-// ViteHub upgrade changes that SQL; test/review/comments-migration.test.mjs fails until the file matches.
+// its one comment model (`commentsMigrationSql({ from: "live" })`), then Drop's own backfills. This migration has
+// shipped: later ViteHub schema changes need a new migration from `pnpm db:generate`, not a rewrite of 0011.
 //
 //   node scripts/comments-migration.mjs
 import { writeFileSync } from "node:fs"

@@ -7,7 +7,7 @@ overrides:
   "@vite-hub/browser": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/channels": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/cli": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@03e8d1b57b7edc7c03924971902d13948df72216
-  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@03e8d1b57b7edc7c03924971902d13948df72216
+  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@16b007adc450ff5652e95e4bfa4b80228fca44f3
   "@vite-hub/connections": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/content": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/database": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@03e8d1b57b7edc7c03924971902d13948df72216
@@ -22,12 +22,13 @@ overrides:
   "@vite-hub/queue": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/rate-limit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/realtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@03e8d1b57b7edc7c03924971902d13948df72216
-  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@03e8d1b57b7edc7c03924971902d13948df72216
+  # Comments' merged build needs getStandardContext and installRequestStandardContext; this runtime also keeps the SDK's older exports.
+  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@16b007adc450ff5652e95e4bfa4b80228fca44f3
   "@vite-hub/sandbox": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/schedule": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/shell": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/source": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@03e8d1b57b7edc7c03924971902d13948df72216
-  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@da7f5b1a507e0b8bd72e187c4c774f24d326c16d
+  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@16b007adc450ff5652e95e4bfa4b80228fca44f3
   "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@03e8d1b57b7edc7c03924971902d13948df72216
@@ -68,6 +69,9 @@ patchedDependencies:
   # package chunk and everything it imports. That was about half the code of a cold /drops request.
   # Preserve registered virtual handler ids: resolving ViteHub's MCP discovery middleware as a file breaks the build.
   nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
+  # Keep Comments' Console records on a package export, as the app's ViteHub Console requires. The merged Comments
+  # build registers an absolute path for the newer hosted Console; Drop keeps its existing in-app Console.
+  "@vite-hub/comments@0.0.0-preview-16b007a": patches/@vite-hub__comments@0.0.0-preview-16b007a.patch
   # A refresh copied the approving browser session's id into the new access token even after that session expired,
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
@@ -75,13 +79,14 @@ patchedDependencies:
   # An MCP grant with offline_access outlives the browser session that approved it. Better Auth's refresh grant copies
   # that session's id into every new token, so verifyMcpRequest rejected all of them once it expired (vite-hub/vitehub#3562).
   "@vite-hub/auth@0.0.0-preview-03e8d1b": patches/@vite-hub__auth@0.0.0-preview-03e8d1b.patch
-  # A comment box with text shakes on Esc, and a second Esc discards the text and closes it, instead of shaking again
-  # forever. Remove when Drop moves to a ViteHub build with vite-hub/vitehub console-drop-comments. AvatarStack dims
-  # people marked `idle`, after the ones who are here; that part goes with vite-hub/vitehub feat/ui-avatar-idle.
-  "@vite-hub/ui@0.0.0-preview-da7f5b1": patches/@vite-hub__ui@0.0.0-preview-da7f5b1.patch
+  # AvatarStack dims people marked `idle`, after the ones who are here.
+  # Remove when Drop moves to a ViteHub build with vite-hub/vitehub feat/ui-avatar-idle.
+  "@vite-hub/ui@0.0.0-preview-16b007a": patches/@vite-hub__ui@0.0.0-preview-16b007a.patch
   # Presence rooms take review.js from a reviewed site: connectRealtimeRoom gets `origin`, and a definition `origins`.
   # Remove when Drop moves to a ViteHub build with vite-hub/vitehub feat/realtime-cross-origin.
   "@vite-hub/realtime@0.0.0-preview-03e8d1b": patches/@vite-hub__realtime@0.0.0-preview-03e8d1b.patch
+  # Nuxt replays Workspace config before Vite configResolved creates its assets registry. Create it with the alias.
+  "@vite-hub/workspace@0.0.0-preview-03e8d1b": patches/@vite-hub__workspace@0.0.0-preview-03e8d1b.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:

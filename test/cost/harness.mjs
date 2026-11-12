@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { H3Event } from "h3"
-import { installComments } from "vite-hub/comments"
+import { installComments } from "vite-hub/comments/server"
 
 const root = new URL("../../", import.meta.url)
 

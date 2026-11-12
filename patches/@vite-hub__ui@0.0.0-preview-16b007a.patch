@@ -1,0 +1,97 @@
+diff --git a/dist/avatar-stack-DIep9OnE.js b/dist/avatar-stack-DIep9OnE.js
+--- a/dist/avatar-stack-DIep9OnE.js
++++ b/dist/avatar-stack-DIep9OnE.js
+@@ -25,26 +25,37 @@
+ 	},
+ 	setup(props) {
+ 		const people = computed(() => {
+-			const seen = /* @__PURE__ */ new Set();
+-			return props.people.filter((person) => !seen.has(person.id) && seen.add(person.id));
++			const byId = /* @__PURE__ */ new Map();
++			for (const person of props.people) {
++				const seen = byId.get(person.id);
++				if (!seen) byId.set(person.id, person);
++				else if (seen.idle && !person.idle) byId.set(person.id, {
++					...seen,
++					idle: false
++				});
++			}
++			const all = [...byId.values()];
++			return [...all.filter((person) => !person.idle), ...all.filter((person) => person.idle)];
+ 		});
++		const label = (person) => person.idle ? `${person.name} (away)` : person.name;
+ 		const shown = computed(() => {
+ 			const max = props.max === null ? Number.POSITIVE_INFINITY : Math.max(2, props.max);
+ 			return people.value.length > max ? people.value.slice(0, max - 1) : people.value;
+ 		});
+ 		const hidden = computed(() => people.value.slice(shown.value.length));
+ 		return () => h("div", {
+-			"aria-label": `${people.value.length} ${people.value.length === 1 ? "person" : "people"}: ${people.value.map((person) => person.name).join(", ")}`,
++			"aria-label": `${people.value.length} ${people.value.length === 1 ? "person" : "people"}: ${people.value.map(label).join(", ")}`,
+ 			"data-size": props.size,
+ 			"data-slot": "avatar-stack",
+ 			"data-variant": props.variant,
+ 			role: "group"
+ 		}, [...shown.value.map((person) => h("span", {
+ 			"aria-hidden": "true",
++			"data-idle": person.idle ? "true" : void 0,
+ 			"data-slot": "avatar-stack-item",
+ 			key: person.id,
+ 			style: person.color ? { "--vh-avatar-color": person.color } : void 0,
+-			title: person.name
++			title: label(person)
+ 		}, person.image ? h("img", {
+ 			alt: "",
+ 			"data-slot": "avatar-stack-image",
+@@ -52,7 +63,7 @@
+ 		}) : h("span", { "data-slot": "avatar-stack-fallback" }, initials(person.name)))), hidden.value.length ? h("span", {
+ 			"aria-hidden": "true",
+ 			"data-slot": "avatar-stack-count",
+-			title: hidden.value.map((person) => person.name).join(", ")
++			title: hidden.value.map(label).join(", ")
+ 		}, `+${hidden.value.length}`) : null]);
+ 	}
+ });
+diff --git a/dist/avatar-stack-BCM1zmBU.d.ts b/dist/avatar-stack-BCM1zmBU.d.ts
+--- a/dist/avatar-stack-BCM1zmBU.d.ts
++++ b/dist/avatar-stack-BCM1zmBU.d.ts
+@@ -7,6 +7,8 @@
+   image?: string;
+   /** The person's presence color, `#RRGGBB`. The `outline` variant rings the avatar with it, to match their caret. */
+   color?: string;
++  /** Away: the person is in the room but hasn't done anything for a while, or their tab is hidden. Their avatar dims. */
++  idle?: boolean;
+ }
+ type AvatarStackSize = "sm" | "default" | "lg";
+ type AvatarStackVariant = "default" | "outline";
+diff --git a/dist/styles.css b/dist/styles.css
+--- a/dist/styles.css
++++ b/dist/styles.css
+@@ -1728,6 +1728,27 @@
+     width: 100%;
+   }
+ 
++  /* Away: the face fades into the avatar's own background, so it never shows the avatar behind it, and an outline
++     ring loses the person's color. */
++  [data-slot="avatar-stack-item"] > * {
++    transition: filter 200ms ease, opacity 200ms ease;
++  }
++
++  [data-slot="avatar-stack-item"][data-idle="true"] > * {
++    filter: grayscale(1);
++    opacity: 0.45;
++  }
++
++  [data-slot="avatar-stack"][data-variant="outline"] [data-slot="avatar-stack-item"][data-idle="true"] {
++    box-shadow: 0 0 0 2px var(--vh-bg), 0 0 0 4px var(--vh-border);
++  }
++
++  @media (prefers-reduced-motion: reduce) {
++    [data-slot="avatar-stack-item"] > * {
++      transition: none;
++    }
++  }
++
+   :is([data-slot="connection-status"], [data-slot="sync-status"]) {
+     align-items: center;
+     color: var(--vh-muted);

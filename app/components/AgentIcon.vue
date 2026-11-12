@@ -10,6 +10,8 @@ const fallback = computed(
 </script>
 
 <template>
-  <UIcon v-if="logo" :name="logo.icon" class="shrink-0" :style="logo.color ? { color: logo.color } : undefined" />
+  <UIcon v-if="logo?.icon" :name="logo.icon" class="shrink-0" :style="logo.color ? { color: logo.color } : undefined" />
+  <!-- A mark Simple Icons doesn't have (Executor) is its round logo file. -->
+  <img v-else-if="logo" alt="" class="inline-block shrink-0 rounded-full" :src="logo.logo" />
   <UIcon v-else :name="fallback" class="shrink-0 text-muted" />
 </template>
