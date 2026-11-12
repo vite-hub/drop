@@ -125,12 +125,11 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .ink .mk { stroke-opacity: .4; stroke-linecap: butt; }
-/* Who else is on the review (the people button): their faces, ringed in their cursor's color, dimmed while away. */
+/* Who else is on the review now (the people button): their faces, ringed in their cursor's color. */
 .seg .people { gap: 0; padding: 0 6px; }
 .people .face { display: grid; place-items: center; width: 20px; height: 20px; margin-left: -4px; overflow: hidden; border-radius: 50%; background: var(--vitehub-pill-hover); color: inherit; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 0 0 1.5px var(--face, transparent); transition: opacity 200ms ease, filter 200ms ease; }
 .people .face:first-child { margin-left: 0; }
 .people .face img { width: 100%; height: 100%; object-fit: cover; }
-.people .face.idle { opacity: .45; filter: grayscale(1); box-shadow: 0 0 0 1.5px var(--vitehub-pill-line); }
 .people .more { margin-left: 4px; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 /* Not a mode the pill has on: pressed only says the cursors show, which the faces' rings already say. */
 .seg .people[aria-pressed] { background: none; color: inherit; }
@@ -1392,12 +1391,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const others = new Map();
     for (const person of people) {
       if (person.id === me) continue;
+      // Someone whose every tab is hidden or idle isn't here: no grayed faces for people who already left.
       const state = states.get(person.clientId) || {};
-      const entry = Object.assign({}, person, { idle: state.active === false, at: typeof state.at === "string" ? state.at : null });
-      const seen = others.get(person.id);
-      if (!seen || (seen.idle && !entry.idle)) others.set(person.id, entry);
+      if (state.active === false || others.has(person.id)) continue;
+      others.set(person.id, person);
     }
-    renderPeople([...others.values()].sort((a, b) => a.idle - b.idle));
+    renderPeople([...others.values()]);
     const here = herePage(), shown = [];
     if (cursorsShown) {
       for (const [clientId, state] of states) {
@@ -1417,13 +1416,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function renderPeople(people) {
     peopleButton.hidden = !people.length;
     if (!people.length) { peopleButton.textContent = ""; return; }
-    const names = people.map((person) => person.name + (person.idle ? " (away)" : "")).join(", ");
+    const names = people.map((person) => person.name).join(", ");
     peopleButton.title = names + ". " + (cursorsShown ? "Hide cursors" : "Show cursors");
     peopleButton.setAttribute("aria-label", "Here now: " + peopleButton.title);
     peopleButton.setAttribute("aria-pressed", String(cursorsShown));
     peopleButton.textContent = "";
     for (const person of people.slice(0, people.length > 3 ? 2 : 3)) {
-      const face = avatar(person, el("span", "face" + (person.idle ? " idle" : "")));
+      const face = avatar(person, el("span", "face"));
       face.style.setProperty("--face", person.color);
       peopleButton.appendChild(face);
     }
@@ -1465,7 +1464,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   document.documentElement.addEventListener("pointerleave", pointerLeft);
   addEventListener("blur", pointerLeft);
   for (const type of ["keydown", "scroll", "pointerdown"]) addEventListener(type, () => { lastInput = Date.now(); }, { capture: true, passive: true });
-  // Away after a minute without input, or while the tab is hidden.
+  // Gone from the others' faces after a minute without input, or while the tab is hidden.
   function checkActive() {
     const now = document.visibilityState === "visible" && Date.now() - lastInput < PRESENCE_IDLE_MS;
     if (now === active) return;
