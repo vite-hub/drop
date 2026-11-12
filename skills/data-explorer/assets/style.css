@@ -608,7 +608,8 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.rp-matrix tbody th.is-click {
+.rp-matrix th.is-click,
+.rp-matrix td.is-click {
   cursor: pointer;
 }
 .rp-matrix td {

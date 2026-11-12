@@ -232,11 +232,14 @@ const resolve = (value) => {
   return (AGG[value.agg ?? "sum"] ?? AGG.sum)(xs);
 };
 
-const setFilter = (field, value) => {
-  state.filters[field] = state.filters[field] === value ? null : value;
+// Sets every pair at once, as a matrix cell does both of its fields; when they're all set already, clears them.
+const setFilters = (pairs) => {
+  const on = pairs.every(([f, v]) => state.filters[f] === v);
+  for (const [f, v] of pairs) state.filters[f] = on ? null : v;
   writeHash();
   void render();
 };
+const setFilter = (field, value) => setFilters([[field, value]]);
 const clickable = (field) => filters.some((f) => f.field === field && kindOf(f) === "list");
 
 // ---------- theme
@@ -825,6 +828,107 @@ function scatterClick(block) {
   };
 }
 
+// The list filters a click on a bar, line or area chart sets: its series, and its category.
+function chartTargets(block) {
+  if (block.type === "vega" || block.chart === "scatter" || block.chart === "histogram") return null;
+  const series = clickable(block.series) ? block.series : null;
+  const x = clickable(block.x) ? block.x : null;
+  return series || x ? { series, x } : null;
+}
+
+// Vega leaves axes and legends out of picking, so the compiled spec turns on the category's labels and the series'
+// legend, and every mark takes clicks and shows a pointer.
+function clickableSpec(spec, block, { series, x }) {
+  const pointer = (encode = {}, part) => ({
+    ...encode,
+    [part]: {
+      ...encode[part],
+      interactive: true,
+      update: { ...encode[part]?.update, cursor: { value: "pointer" } },
+    },
+  });
+  const axis = block.horizontal ? "y" : "x";
+  if (x) for (const a of spec.axes ?? []) if (a.scale === axis) a.encode = pointer(a.encode, "labels");
+  if (series)
+    for (const l of spec.legends ?? []) l.encode = pointer(pointer(l.encode, "symbols"), "labels");
+  const marks = (list = []) => {
+    for (const m of list) {
+      if (m.type === "group") marks(m.marks);
+      else {
+        // Vega-Lite turns picking off for marks without a tooltip, such as a line's name at its end.
+        m.interactive = true;
+        m.encode = { ...m.encode, update: { ...m.encode?.update, cursor: { value: "pointer" } } };
+      }
+    }
+  };
+  marks(spec.marks);
+}
+
+// What a click on a chart does. A bar, line, area or legend entry filters by its series when that's a list filter's
+// field, and otherwise by its category, as does the category's axis label. Scatter points have their own rule.
+function chartClick(block, spec, view, host) {
+  if (block.chart === "scatter") {
+    const click = scatterClick(block);
+    return click
+      ? (_, item) => {
+          if (item?.mark?.marktype === "symbol" && item.datum) click(item.datum);
+        }
+      : null;
+  }
+  const targets = chartTargets(block);
+  if (!targets) return null;
+  const { series, x } = targets;
+  return (event, item) => {
+    const role = item?.mark?.role;
+    if (role === "legend-symbol" || role === "legend-label") {
+      if (series) setFilter(series, item.datum.value);
+      return;
+    }
+    if (role === "axis-label") {
+      if (x) setFilter(x, item.datum.value);
+      return;
+    }
+    // A line chart's hover layer covers the plot, and its datum is the row of the x under the pointer, so the series
+    // comes from where the pointer is.
+    const d = item?.datum?.datum ?? item?.datum;
+    if (!d) return;
+    const hover = item.mark.name?.endsWith("_voronoi");
+    const hit = !series
+      ? null
+      : hover
+        ? seriesAt(spec, view, host, event, block, d[block.x])
+        : d[series];
+    if (hit != null) setFilter(series, hit);
+    else if (x && d[x] != null) setFilter(x, d[x]);
+  };
+}
+
+// The series drawn nearest the pointer at x: the band it falls in on a stacked chart, else the closest line. It reads
+// the rows Vega drew, which carry the stack's bounds and the same parsed x as the hover layer.
+function seriesAt(spec, view, host, event, block, at) {
+  const svg = host.querySelector("svg");
+  if (!svg || at == null) return null;
+  const key = (v) => (v instanceof Date ? +v : v);
+  const v = view.scale("y").invert(event.clientY - svg.getBoundingClientRect().top - view.origin()[1]);
+  const { series, y } = block;
+  let best = null;
+  let gap = Infinity;
+  for (const { name } of spec.data ?? []) {
+    for (const t of view.data(name) ?? []) {
+      if (t[series] == null || key(t[block.x]) !== key(at)) continue;
+      const lo = t[`${y}_start`];
+      const hi = t[`${y}_end`];
+      if (lo != null && hi != null) {
+        if (v >= Math.min(lo, hi) && v <= Math.max(lo, hi)) return t[series];
+      } else if (typeof t[y] === "number" && Math.abs(t[y] - v) < gap) {
+        gap = Math.abs(t[y] - v);
+        best = t[series];
+      }
+    }
+  }
+  return best;
+}
+
 // Names the top points, largest first, each just past its circle at the first spot 12 px up or down that clears the
 // names already placed. A name that would run past the right edge goes on the point's left.
 async function placeLabels(view, block, rows) {
@@ -939,6 +1043,8 @@ async function drawChart(entry) {
     lite.autosize = { type: "fit-x", contains: "padding" };
     lite.config = { ...config(vars()), ...lite.config };
     const compiled = compile(lite).spec;
+    const targets = chartTargets(block);
+    if (targets) clickableSpec(compiled, block, targets);
     entry.view?.finalize();
     const host = h("div", { class: "rp-chart-svg" });
     el.replaceChildren(host);
@@ -949,14 +1055,9 @@ async function drawChart(entry) {
       tooltip: tip,
     });
     await entry.view.runAsync();
-    if (block.chart === "scatter") {
-      if (block.label) await placeLabels(entry.view, block, rows);
-      const click = scatterClick(block);
-      if (click)
-        entry.view.addEventListener("click", (_, item) => {
-          if (item?.mark?.marktype === "symbol" && item.datum) click(item.datum);
-        });
-    }
+    if (block.chart === "scatter" && block.label) await placeLabels(entry.view, block, rows);
+    const click = chartClick(block, compiled, entry.view, host);
+    if (click) entry.view.addEventListener("click", click);
     el.dataset.state = "ok";
   } catch (error) {
     el.dataset.state = "error";
@@ -1150,7 +1251,15 @@ function matrixBlock(block) {
           "tr",
           {},
           h("th", {}),
-          xs.map((x) => h("th", {}, h("span", {}, x))),
+          xs.map((x) =>
+            h(
+              "th",
+              clickable(block.x)
+                ? { class: "is-click", onclick: () => setFilter(block.x, x) }
+                : {},
+              h("span", {}, x),
+            ),
+          ),
         ),
       ),
       h(
@@ -1170,6 +1279,10 @@ function matrixBlock(block) {
             ),
             xs.map((x, i) => {
               const v = cell.get(`${y}\u0000${x}`);
+              const pairs = [
+                [block.y, y],
+                [block.x, x],
+              ].filter(([f]) => clickable(f));
               const base = block.tint === "rows" ? (colorOf(block.y, y) ?? PALETTE[0]) : tint(x, i);
               const t =
                 typeof v === "number" && v > 0
@@ -1184,6 +1297,8 @@ function matrixBlock(block) {
                         color: t > 0.82 ? "#fff" : null,
                       }
                     : null,
+                  class: pairs.length && v != null ? "is-click" : null,
+                  onclick: pairs.length && v != null ? () => setFilters(pairs) : null,
                   onmousemove: v != null ? (e) => showTip(e, y, [[x, fmt(v, block.format)]]) : null,
                   onmouseleave: hideTip,
                 },

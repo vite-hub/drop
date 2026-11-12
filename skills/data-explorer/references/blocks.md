@@ -90,7 +90,7 @@ Every block takes `title` and `note` (a `note` needs a `title`), and every block
 
 **bars**: horizontal bars in HTML, one row per `label`. Either `value` (one number) or `segments` (fields that add up to the bar, with `names` and `tones`, and a legend). `end` is a field printed after the bar, like `"55 · 47% today"`, built in the prep script; without it the total prints. `percent: true` makes every bar full width. Sorted by total unless `"sort": "data"`; `limit` keeps the top N. Rows click to filter when `label` is a list filter's field.
 
-**matrix**: `x`, `y`, `value`. Cells tint by their share of the largest value (`"scale": "row"` compares within a row). `tint`: `single` (default), `columns` (each column in its entity color), `rows`. Long column names rotate. Rows and columns keep the data's order, or list `columns`.
+**matrix**: `x`, `y`, `value`. Cells tint by their share of the largest value (`"scale": "row"` compares within a row). A row or column name filters by it when its field is a list filter's, and a cell filters by both. `tint`: `single` (default), `columns` (each column in its entity color), `rows`. Long column names rotate. Rows and columns keep the data's order, or list `columns`.
 
 **chart**: `chart` is one of:
 
@@ -98,6 +98,8 @@ Every block takes `title` and `note` (a `note` needs a `title`), and every block
 - `bar`, `stacked`, `grouped`: `x` the category, `y` the value, optional `series`. `horizontal: true` sorts by value; `limit` keeps the top N; `"stack": "percent"` turns stacked bars (`stacked`, or `bar` with a `series`) into shares.
 - `scatter`: `x`, `y`, optional `size`, `series`, `label` (names the top `labelTop` points, moved apart so they don't overlap). `logX`/`logY` keep points at 0 on the axis. A click on a point filters by its `label` or `series` when that field is a list filter's, and otherwise, when the report has `search`, searches for its `label`, which narrows every table to that row.
 - `histogram`: `x` only; `bins` (default 30). With `logToggle` on log, values at or below 0 are left out.
+
+A click on a `line`, `area` or bar chart filters by its `series` when that's a list filter's field: on a bar or segment, on the line or band under the pointer, on a line's name, or on the legend. Otherwise, and on the category's axis labels, it filters by `x` when that's a list filter's field. So give a chart the filter's field as `series` or `x` when it shows that entity. A second click clears the filter.
 
 Options for any chart: `format` (`number`, `integer`, `compact`, `percent` for 0–1 values, `money` in US dollars), `height` (default 240), `highlight` (one series in color, the rest gray), `tones`, `logToggle`, `xTitle`, `yTitle`.
 
