@@ -133,6 +133,44 @@ test("the content origin serves only the frame host, at any path, and nothing of
   assert.equal(await contentMiddleware(request("https://drop-usercontent.example/")), undefined)
 })
 
+// The page tools helpers aren't a public export of vite-hub, so find them by name in its build.
+async function viteHubPageTools() {
+  const { readdir } = await import("node:fs/promises")
+  const dist = new URL("../../node_modules/vite-hub/dist/", import.meta.url)
+  for (const file of await readdir(dist)) {
+    if (!file.startsWith("page-tools-") || !file.endsWith(".js")) continue
+    const exports = Object.values(await import(new URL(file, dist).href))
+    const install = exports.find((value) => value.name === "installViteHubPageTools")
+    const register = exports.find((value) => value.name === "registerViteHubPageTool")
+    if (install && register) return { install, register }
+  }
+  throw new Error("vite-hub's page tools build moved")
+}
+
+test("ViteHub adds no page tools to the frame host, so Firefox keeps an app's import map", async () => {
+  const { install, register } = await viteHubPageTools()
+  const respond = async (request) => {
+    const event = new H3Event(request)
+    event.context.log = { set() {}, error() {} }
+    return (
+      (await contentMiddleware(event)) ??
+      new Response("<!doctype html><html><body></body></html>", {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      })
+    )
+  }
+  const nitroApp = { fetch: respond }
+  register(nitroApp, { id: "console", label: "Console", script: "/_vitehub/assets/tool.js", allowed: () => true })
+  install(nitroApp)
+  const page = (url) =>
+    nitroApp.fetch(new Request(url, { headers: { accept: "text/html", "sec-fetch-dest": "iframe" } }))
+  // The same wrapper still adds its loader to a page without the mark, so the check below can fail.
+  assert.match(await (await page("https://drop.example/")).text(), /<script type="module"[^>]*data-vitehub-page-tools/)
+  const host = await (await page("https://drop-usercontent.example/")).text()
+  assert.doesNotMatch(host, /type="module"/)
+  assert.equal(host, FRAME_HOST_HTML)
+})
+
 test("cookie-carrying API writes must come from Drop's own origin", () => {
   const cookie = { cookie: "__Host-drop.session_token=abc" }
   const blocked = [
@@ -732,7 +770,7 @@ test("only files named after their content count as hashed, so the browser never
 })
 
 test("the frame host keeps the viewer's grant as a cookie before it writes the page, and only a well-formed one", () => {
-  const script = FRAME_HOST_HTML.match(/<script>([\s\S]*)<\/script>/)[1]
+  const script = FRAME_HOST_HTML.match(/<script\b[^>]*>([\s\S]*)<\/script>/)[1]
   const run = (grant) => {
     const cookies = []
     const written = []
@@ -767,7 +805,7 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
 })
 
 test("the frame host asks for its page on load, and again when the viewer says hello after missing that", () => {
-  const script = FRAME_HOST_HTML.match(/<script>([\s\S]*)<\/script>/)[1]
+  const script = FRAME_HOST_HTML.match(/<script\b[^>]*>([\s\S]*)<\/script>/)[1]
   const asked = []
   let onMessage
   // Copied out of the sandbox, whose objects have its own prototypes.
@@ -789,7 +827,7 @@ test("the frame host asks for its page on load, and again when the viewer says h
 })
 
 test("the frame host keeps a written page hidden until its stylesheets load, fail, or take 3 seconds", () => {
-  const script = FRAME_HOST_HTML.match(/<script>([\s\S]*)<\/script>/)[1]
+  const script = FRAME_HOST_HTML.match(/<script\b[^>]*>([\s\S]*)<\/script>/)[1]
   const run = (html, links = [], initialStyle = {}) => {
     let written = ""
     let held = false
