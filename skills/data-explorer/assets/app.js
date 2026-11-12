@@ -187,10 +187,10 @@ function countsFor(f, ignoreFilters = false) {
   return counts;
 }
 
-function rowsOf(name, skip) {
+function rowsOf(name, skip = []) {
   let rows = data[name] ?? [];
   for (const f of filters) {
-    if (f.field === skip) continue;
+    if ([skip].flat().includes(f.field)) continue;
     const value = state.filters[f.field];
     if (kindOf(f) === "toggle") {
       if (!value) rows = rows.filter((row) => !row[f.field]);
@@ -241,6 +241,13 @@ const setFilters = (pairs) => {
 };
 const setFilter = (field, value) => setFilters([[field, value]]);
 const clickable = (field) => filters.some((f) => f.field === field && kindOf(f) === "list");
+
+// A block keeps every value of a list filter it draws, and fades the ones the filter leaves out, so a click on one bar
+// or series doesn't redraw the chart around it. Every other block still narrows to the filter.
+const shown = (...fields) => fields.filter((f) => f && clickable(f));
+const selected = (field) => state.filters[field] != null && state.filters[field] !== "*";
+const dimmed = (row, fields) =>
+  fields.some((f) => selected(f) && row[f] != null && row[f] !== state.filters[f]);
 
 // ---------- theme
 
@@ -836,6 +843,50 @@ function chartTargets(block) {
   return series || x ? { series, x } : null;
 }
 
+// The list filters a chart draws whole and fades: a scatter's label and series, any other chart's series and category.
+function chartFields(block) {
+  if (block.type === "vega" || block.chart === "histogram") return [];
+  return block.chart === "scatter" ? shown(block.label, block.series) : shown(block.series, block.x);
+}
+
+const FADE = 0.2;
+// Multiplies a mark's opacity, whatever Vega-Lite set it to, by FADE where `test` holds. Axis labels fade their fill:
+// Vega sets their opacity itself, to hide labels that overlap.
+const fade = (encode = {}, part, test, key = "opacity") => {
+  const target = part ? (encode[part] ??= {}) : encode;
+  const update = (target.update ??= {});
+  const mult = { signal: `(${test}) ? ${FADE} : 1` };
+  const scale = (ref) => ({ ...ref, mult: ref.mult == null ? mult : { ...mult, mult: ref.mult } });
+  const base = update[key] ?? target.enter?.[key] ?? { value: 1 };
+  update[key] = Array.isArray(base) ? base.map(scale) : scale(base);
+  return encode;
+};
+
+function fadeSpec(spec, block, fields) {
+  const on = fields.filter(selected);
+  if (!on.length) return;
+  const value = (f) => JSON.stringify(state.filters[f]);
+  const rows = on
+    .map((f) => `(datum[${JSON.stringify(f)}] != null && datum[${JSON.stringify(f)}] !== ${value(f)})`)
+    .join(" || ");
+  const marks = (list = []) => {
+    for (const m of list) {
+      if (m.type === "group") marks(m.marks);
+      else if (!m.name?.endsWith("_voronoi")) m.encode = fade(m.encode, null, rows);
+    }
+  };
+  marks(spec.marks);
+  const axis = block.horizontal ? "y" : "x";
+  if (on.includes(block.x))
+    for (const a of spec.axes ?? [])
+      if (a.scale === axis) a.encode = fade(a.encode, "labels", `datum.value !== ${value(block.x)}`, "fillOpacity");
+  if (on.includes(block.series))
+    for (const l of spec.legends ?? []) {
+      const test = `datum.value !== ${value(block.series)}`;
+      l.encode = fade(fade(l.encode, "symbols", test), "labels", test);
+    }
+}
+
 // Vega leaves axes and legends out of picking, so the compiled spec turns on the category's labels and the series'
 // legend, and every mark takes clicks and shows a pointer.
 function clickableSpec(spec, block, { series, x }) {
@@ -1031,7 +1082,8 @@ async function drawChart(entry) {
   const { block, el } = entry;
   const width = Math.max(240, Math.floor(el.clientWidth));
   try {
-    const rows = block.type === "vega" ? null : rowsOf(block.data);
+    const fields = chartFields(block);
+    const rows = block.type === "vega" ? null : rowsOf(block.data, fields);
     if (rows && !rows.length) {
       el.replaceChildren(h("p", { class: "rp-empty" }, "No rows for this filter."));
       el.dataset.state = "ok";
@@ -1045,6 +1097,7 @@ async function drawChart(entry) {
     const compiled = compile(lite).spec;
     const targets = chartTargets(block);
     if (targets) clickableSpec(compiled, block, targets);
+    fadeSpec(compiled, block, fields);
     entry.view?.finalize();
     const host = h("div", { class: "rp-chart-svg" });
     el.replaceChildren(host);
@@ -1146,7 +1199,8 @@ function legend(names, colors) {
 
 // Rows of horizontal bars drawn in HTML: a label, the bar (one value or segments), and a short note after it.
 function barsBlock(block) {
-  let rows = rowsOf(block.data);
+  const fields = shown(block.label);
+  let rows = rowsOf(block.data, fields);
   const segments = block.segments ?? [block.value];
   const names = segments.map((s) => block.names?.[s] ?? s);
   const colors = segments.map((s, i) =>
@@ -1180,7 +1234,7 @@ function barsBlock(block) {
       return h(
         "div",
         {
-          class: `rp-bars-row${go ? " is-click" : ""}${state.filters[block.label] === r[block.label] ? " is-on" : ""}`,
+          class: `rp-bars-row${go ? " is-click" : ""}${state.filters[block.label] === r[block.label] ? " is-on" : ""}${dimmed(r, fields) ? " is-dim" : ""}`,
           onclick: go,
           onmousemove: (e) =>
             showTip(
@@ -1219,7 +1273,9 @@ function barsBlock(block) {
 
 // A matrix in HTML: rows and columns keep the data's order, cells tint by their share of the largest value.
 function matrixBlock(block) {
-  const rows = rowsOf(block.data);
+  const fields = shown(block.x, block.y);
+  const rows = rowsOf(block.data, fields);
+  const dim = (pairs) => (dimmed(Object.fromEntries(pairs), fields) ? "is-dim" : null);
   const xs = block.columns ?? [...new Set(rows.map((r) => r[block.x]))];
   const ys = [...new Set(rows.map((r) => r[block.y]))];
   const cell = new Map(rows.map((r) => [`${r[block.y]}\u0000${r[block.x]}`, r[block.value]]));
@@ -1255,7 +1311,10 @@ function matrixBlock(block) {
             h(
               "th",
               clickable(block.x)
-                ? { class: "is-click", onclick: () => setFilter(block.x, x) }
+                ? {
+                    class: ["is-click", dim([[block.x, x]])].filter(Boolean).join(" "),
+                    onclick: () => setFilter(block.x, x),
+                  }
                 : {},
               h("span", {}, x),
             ),
@@ -1272,7 +1331,9 @@ function matrixBlock(block) {
             h(
               "th",
               {
-                class: clickable(block.y) ? "is-click" : null,
+                class: clickable(block.y)
+                  ? ["is-click", dim([[block.y, y]])].filter(Boolean).join(" ")
+                  : null,
                 onclick: clickable(block.y) ? () => setFilter(block.y, y) : null,
               },
               entity(block.y, y),
@@ -1297,7 +1358,10 @@ function matrixBlock(block) {
                         color: t > 0.82 ? "#fff" : null,
                       }
                     : null,
-                  class: pairs.length && v != null ? "is-click" : null,
+                  class:
+                    [pairs.length && v != null ? "is-click" : null, dim(pairs)]
+                      .filter(Boolean)
+                      .join(" ") || null,
                   onclick: pairs.length && v != null ? () => setFilters(pairs) : null,
                   onmousemove: v != null ? (e) => showTip(e, y, [[x, fmt(v, block.format)]]) : null,
                   onmouseleave: hideTip,

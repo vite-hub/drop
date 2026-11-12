@@ -612,6 +612,10 @@ button {
 .rp-matrix td.is-click {
   cursor: pointer;
 }
+.rp-bars-row.is-dim,
+.rp-matrix .is-dim {
+  opacity: 0.3;
+}
 .rp-matrix td {
   min-width: 46px;
   height: 22px;
