@@ -942,7 +942,7 @@ test("Related links on the page lists the docs that link to it, only ones the re
       request("/api/review/related", { headers: { origin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) } }),
     )
 
-  // Before connecting, the page learns only whether a doc links here, and only where a review covers it.
+  // Before connecting, the page learns only whether a doc links here. Where no review covers it, the answer is no.
   const before = await docs()
   assert.equal(before.status, 200)
   assert.equal(before.headers.get("access-control-allow-origin"), SITE)
@@ -954,8 +954,9 @@ test("Related links on the page lists the docs that link to it, only ones the re
     "a title quoting the address doesn't count",
   )
   const elsewhere = await docs(undefined, "https://evil.com")
-  assert.equal(elsewhere.status, 404)
-  assert.equal(elsewhere.headers.get("access-control-allow-origin"), null)
+  assert.equal(elsewhere.status, 200, "an origin no review covers gets no CORS error in its console")
+  assert.equal(elsewhere.headers.get("access-control-allow-origin"), "https://evil.com")
+  assert.deepEqual(await json(elsewhere), { linked: false })
   const preflight = await answer(
     relatedPreflight,
     request("/api/review/related", { method: "OPTIONS", headers: { origin: SITE } }),

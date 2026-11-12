@@ -63,7 +63,7 @@ export default defineNuxtConfig({
 })
 ```
 
-The tag is the same for every site and carries no key. The button sits in its own shadow root, so your styles and its styles never mix, and it does nothing until someone presses it.
+The tag is the same for every site and carries no key. The button sits in its own shadow root, so your styles and its styles never mix, and until someone presses it, it only asks Drop whether any drop links to the page.
 
 The toolbar is the same pill as ViteHub's page tools. Drag its Drop mark to any edge of the page, or click the mark to shrink the toolbar to a small hexagon. Each reviewer's browser remembers both for the site. To choose where it starts, add these to the tag:
 
