@@ -293,8 +293,21 @@ test("Highlight's Text tip types a label, edits, moves, and deletes it, and send
     await label.waitFor()
     assert.equal(await label.inputValue(), "bpa [ too big")
     await label.fill("Too big")
+    // A size or colour picked while it's open restyles it, and the caret stays in it.
+    const small = await label.boundingBox()
+    await ui.locator("[data-size='3']").click()
+    await ui.getByRole("button", { name: "Blue ink" }).click()
+    assert.equal(await label.count(), 1, "the pick keeps the label open")
+    assert.ok((await label.boundingBox()).height > small.height * 1.5, "the label grew")
+    await page.keyboard.type("!")
     await page.keyboard.press("Enter")
-    assert.equal(await labels.locator("text").textContent(), "Too big")
+    assert.equal(await labels.locator("text").textContent(), "Too big!")
+    assert.match(await labels.locator("text").getAttribute("style"), /\b36px\b/)
+    assert.equal(await labels.locator("rect").getAttribute("fill"), "#2563eb")
+    // Back to the default tip for the labels below: 20px, pink.
+    await page.keyboard.press("[")
+    await page.keyboard.press("[")
+    await ui.getByRole("button", { name: "Pink ink" }).click()
 
     // A drag moves it.
     const before = await labels.boundingBox()

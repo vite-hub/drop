@@ -1034,7 +1034,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     $("[data-act=undo]", tools).disabled = $("[data-act=done]", tools).disabled = !strokes.length;
     paint.style.cursor = penCursor(penNow());
     $(".hint", paint).textContent = tip.name === "text"
-      ? "Click to add a label; Enter puts it down. Click a label to change it, or drag it to move it."
+      ? "Click to add a label; Enter puts it down. Click a label to edit, resize or recolour it; drag it to move it."
       : "Draw on what should change. Shift draws straight, Enter when done, Esc cancels.";
   }
 
@@ -1114,12 +1114,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     catch (error) { if (error.message) say(error.message); return; }
     startMarking();
   });
+  // A press on a size or colour keeps the label being typed open, so the pick goes to it.
+  tools.addEventListener("mousedown", (e) => { if (typingLabel() && e.target.closest("[data-size], [data-color]")) e.preventDefault(); });
   tools.addEventListener("click", (e) => {
     const button = e.target.closest("button");
     if (!button || button.disabled) return;
     if (button.dataset.tip) pickTip(button.dataset.tip);
-    else if (button.dataset.size) { tip.sizes[tip.name] = Number(button.dataset.size); paintTools(); }
-    else if (button.dataset.color) { tip.color = button.dataset.color; paintTools(); }
+    else if (button.dataset.size) { tip.sizes[tip.name] = Number(button.dataset.size); paintTools(); restyleLabel(penNow()); }
+    else if (button.dataset.color) { tip.color = button.dataset.color; paintTools(); restyleLabel(penNow()); }
     else if (button.dataset.act === "undo") undoMark();
     else if (button.dataset.act === "cancel") cancel();
     else if (button.dataset.act === "done") finishMark();

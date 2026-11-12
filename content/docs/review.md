@@ -101,7 +101,7 @@ The Marker draws on a snapshot of the page and sends it as one comment. Press :k
 | Marker | :kbd[B] | A see-through highlighter stroke. Hold :kbd[Shift] to keep it on its line. |
 | Pen | :kbd[P] | A thin line, to circle, underline, or cross out. Hold :kbd[Shift] for a straight one. |
 | Arrow | :kbd[A] | Drag from where it starts to what it points at. |
-| Text | :kbd[T] | Click and type a short label. :kbd[Enter], :kbd[Esc], or a click elsewhere puts it down. Click a label to change it, drag it to move it, or clear it to delete it. |
+| Text | :kbd[T] | Click and type a short label. :kbd[Enter], :kbd[Esc], or a click elsewhere puts it down. Click a label to change it, and pick a size or colour while it is open to restyle it. Drag a label to move it, or clear it to delete it. |
 | Size | :kbd[[] :kbd[]] | Four sizes for each tool. |
 | Undo | :kbd[⌘Z] | Takes back the last stroke or label. |
 

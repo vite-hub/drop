@@ -355,6 +355,25 @@ test("the Marker's Text tip types labels in the frame, keeps Drop's keys out of 
     // Done from Drop puts down the label being typed and sends it.
     await page.mouse.click(300, 300)
     await page.keyboard.type("Too big")
+    // A size picked in Drop's dock while the label is open restyles it. The dock's buttons don't take focus on press
+    // (mousedown.prevent), so the label stays open and keeps the caret.
+    const small = await label.boundingBox()
+    await page.evaluate(() => {
+      const button = document.createElement("button")
+      button.textContent = "36px"
+      button.style.cssText = "position: fixed; right: 8px; bottom: 8px; z-index: 9"
+      button.addEventListener("mousedown", (e) => e.preventDefault())
+      button.addEventListener("click", () => tell({ type: "pen", tool: "text", color: "#2563eb", width: 36 }))
+      document.body.append(button)
+    })
+    await page.getByRole("button", { name: "36px" }).click()
+    await frame.waitForFunction(
+      () =>
+        document.querySelector("drop-comments").shadowRoot.querySelector("input[aria-label=Label]")?.offsetHeight > 40,
+    )
+    assert.ok((await label.boundingBox()).height > small.height * 1.5)
+    await page.keyboard.type("!")
+    assert.equal(await label.inputValue(), "Too big!")
     await page.evaluate(() => tell({ type: "mark", do: "done" }))
     await page.waitForFunction(() => window.posts.some((m) => m.type === "area-shot"))
     const [area] = await posted(page, "area")

@@ -191,6 +191,8 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
   let labelEditor = null;
   const typingLabel = () => labelEditor !== null;
   const commitLabel = () => { if (labelEditor) labelEditor.commit(); };
+  // A size or colour picked while a label is open goes to that label.
+  const restyleLabel = (p) => { if (labelEditor && p.tool === "text") labelEditor.restyle(p); };
   function editLabel(layer, s, fresh, into, done, gone) {
     const input = document.createElement("input");
     input.type = "text"; input.maxLength = 200; input.value = s.text || ""; input.spellcheck = false;
@@ -222,6 +224,11 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
         s.text = text;
         paintLabel(s.el, s);
         s.el.style.visibility = "";
+      },
+      restyle(p) {
+        s.width = p.width; s.color = p.color;
+        fit();
+        input.focus({ preventScroll: true });
       },
       forget() {
         if (labelEditor !== editor) return;
@@ -1412,6 +1419,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (/^#[0-9a-f]{6}$/i.test(next.color)) pen.color = next.color;
     if (typeof next.width === "number" && next.width >= 1 && next.width <= 64) pen.width = next.width;
     if (layer && tool === "mark") layer.style.cursor = penCursor(pen);
+    restyleLabel(pen);
   }
   function freeze() {
     const roots = [document], hovering = [], styles = [];
