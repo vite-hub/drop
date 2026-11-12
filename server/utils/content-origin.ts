@@ -137,8 +137,12 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
  * on this origin and nothing else (server/utils/app-files.ts). Opened outside a frame it shows nothing: there is no
  * parent to take a document from. The viewer's page renders the frame on the server, so this page can load before the
  * viewer's script listens: it says hello once it does, and the host asks again.
+ *
+ * The `data-vitehub-page-tools` mark keeps ViteHub from adding its page tools loader to this page. That loader is a
+ * module script, and once a module has run, Firefox ignores the import map of the page written here, so a Nuxt app
+ * can't resolve `#entry`. The tools can't load on this origin anyway: `/_vitehub` is a 404 here.
  */
-export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Drop</title></head><body><script>(() => {
+export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Drop</title></head><body><script data-vitehub-page-tools>(() => {
   if (parent === window) { document.body.textContent = "This domain shows previews inside Drop."; return; }
   const ask = () => parent.postMessage({ __drop: true, type: "host", path: location.pathname + location.search + location.hash }, "*");
   addEventListener("message", (event) => {
