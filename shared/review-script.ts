@@ -114,10 +114,13 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 @media (any-pointer: coarse) { .links a { min-height: 44px; } }
 .links .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .links .detail { min-width: 0; max-width: 40%; overflow: hidden; color: #a3a3a3; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.links img { width: 16px; height: 16px; flex: none; border-radius: 3px; object-fit: contain; }
 .links svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; color: #a3a3a3; }
 .links .out { width: 14px; height: 14px; }
-.links .github { fill: currentColor; stroke: none; color: inherit; }
+/* Favicons are drawn for a light tab bar, and many (GitHub, Airtable, Vercel) are a black mark, so each sits on a
+   light plate, as the link icon does when a site has none. The ring grows the plate 2px past the icon. */
+.links img, .links .site { width: 16px; height: 16px; flex: none; border-radius: 2px; background: #fff; box-shadow: 0 0 0 2px #fff; object-fit: contain; }
+.links .site { display: grid; place-items: center; }
+.links .site svg { width: 14px; height: 14px; color: #737373; }
 .paint { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -158,9 +161,6 @@ const ICONS = {
     `<path d="M107 139a53 53 0 0 0 80 6l32-32a53 53 0 0 0-75-75l-18 18"/><path d="M149 117a53 53 0 0 0-80-6l-32 32a53 53 0 0 0 75 75l18-18"/>`,
   ),
 }
-// GitHub's favicon is a black mark that the dark menu would hide, so its Simple Icons mark takes the text color.
-const GITHUB_MARK = `<svg class="github" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .32.21.69.82.57A12 12 0 0 0 12 .3"/></svg>`
-
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
   `<div class="compose"><textarea aria-label="${label}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
   `<div class="row"><button class="icon" type="button" data-act="attach" title="Add images (or paste them)" aria-label="Add images">${ICONS.image}</button><span class="who"></span>` +
@@ -777,17 +777,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     holder.innerHTML = html;
     return holder.content.firstChild;
   };
-  // A row's icon: GitHub's mark, the first of the link's favicons that loads, asked with no referrer, or a link icon.
+  // A row's icon: the first of the link's favicons that loads, asked with no referrer, or a link icon.
+  const linkIcon = () => iconFrom(${JSON.stringify(`<span class="site">${ICONS.link}</span>`)});
   function relatedIcon(link) {
-    if (/^https:\/\/(?:www\.)?github\.com\//.test(link.url)) return iconFrom(${JSON.stringify(GITHUB_MARK)});
     const tries = (link.icons || []).slice();
-    if (!tries.length) return iconFrom(${JSON.stringify(ICONS.link)});
+    if (!tries.length) return linkIcon();
     const image = document.createElement("img");
     image.alt = ""; image.referrerPolicy = "no-referrer"; image.decoding = "async";
     const next = () => {
       const url = tries.shift();
       if (url) image.src = url;
-      else image.replaceWith(iconFrom(${JSON.stringify(ICONS.link)}));
+      else image.replaceWith(linkIcon());
     };
     image.addEventListener("error", next);
     next();
