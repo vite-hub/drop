@@ -72,6 +72,11 @@ patchedDependencies:
   # Keep Comments' Console records on a package export, as the app's ViteHub Console requires. The merged Comments
   # build registers an absolute path for the newer hosted Console; Drop keeps its existing in-app Console.
   "@vite-hub/comments@0.0.0-preview-16b007a": patches/@vite-hub__comments@0.0.0-preview-16b007a.patch
+  # An MCP grant with offline_access outlives the browser session that approved it. Better Auth's refresh grant copies
+  # that session's id into every new token, so verifyMcpRequest rejected all of them once it expired (vite-hub/vitehub#3562).
+  "@vite-hub/auth@0.0.0-preview-03e8d1b": patches/@vite-hub__auth@0.0.0-preview-03e8d1b.patch
+  # Nuxt replays Workspace config before Vite configResolved creates its assets registry. Create it with the alias.
+  "@vite-hub/workspace@0.0.0-preview-03e8d1b": patches/@vite-hub__workspace@0.0.0-preview-03e8d1b.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
