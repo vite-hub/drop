@@ -318,8 +318,19 @@ const edit = (messageId: string, text: string, ids: string[]) =>
   padding: 0.5rem 0.75rem;
 }
 
+/* The 14px name and the 12px time share a baseline. Centred, the smaller time sat a pixel high. The name's line is as
+   tall as the avatar, which stays centred on it. */
+.drop-comment-card :deep([data-slot="comment-reply-header"]) {
+  align-items: baseline;
+}
+
+.drop-comment-card :deep([data-slot="comment-reply-header"] > [data-slot="avatar-stack"]) {
+  align-self: center;
+}
+
 .drop-comment-card :deep([data-slot="comment-reply-author"]) {
   font-size: var(--text-sm);
+  line-height: 1.5rem;
 }
 
 .drop-comment-card :deep([data-slot="comment-reply-body"]) {
