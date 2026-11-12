@@ -2,7 +2,7 @@ import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentSchema } from "#shared/schemas"
 import { imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
-import { addThread, authorOf, mentionedIn, toComment } from "../../../utils/comments"
+import { actorOf, addThread, authorOf, mentionedIn, toComment } from "../../../utils/comments"
 import { findDropAt, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
@@ -41,6 +41,7 @@ export default defineHandler(async (event) => {
         },
         body,
         author,
+        actor: actorOf(who),
         mentions,
         attachments: ids,
       }),

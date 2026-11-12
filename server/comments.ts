@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, like, or } from "drizzle-orm"
+import { H3Event } from "h3"
 import type { CommentSubject, CommentsUser, CommentUser } from "vite-hub/comments"
 import { defineComments, defineCommentSubject } from "vite-hub/comments"
 import { blob } from "vite-hub/blob"
@@ -69,7 +70,9 @@ export default defineComments({
   subjects: [dropLink("drop"), dropLink("site")],
 
   async identify({ event }) {
-    const who = await identify(event)
+    // Comments also receives Fetch requests; keep their shared identity and logger context when adapting to H3.
+    const request = event instanceof H3Event ? event : new H3Event(event["~standard"].req, event.context)
+    const who = await identify(request)
     if (!who) return null
     return { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}), identity: who }
   },

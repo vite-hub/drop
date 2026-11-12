@@ -17,6 +17,7 @@ import { requireIdentity } from "../../utils/identity"
 import { findDropOrSite, onPage, siteItems } from "../../utils/review"
 import { countView } from "../../utils/views"
 import { runtimeErrors } from "../../utils/runtime-errors"
+import { writtenBy } from "#shared/agents"
 import {
   answersLines,
   commentLine,
@@ -93,7 +94,7 @@ export default defineMcpTool({
           comments: items.map((item) => ({
             n: item.n,
             body: item.body,
-            author: item.authorName,
+            author: writtenBy(item),
             page: item.page,
             resolved: item.resolved,
             at: new Date(item.createdAt).toISOString(),
@@ -171,7 +172,7 @@ export default defineMcpTool({
           // The words that would replace the quote; empty suggests deleting it.
           ...(comment.suggestion === null ? {} : { suggestion: comment.suggestion }),
           body: comment.body,
-          author: comment.authorName,
+          author: writtenBy(comment),
           page: comment.page,
           resolved: comment.resolved,
           version: comment.version,
@@ -213,7 +214,7 @@ const pct = (n: number) => `${Math.round(n / 10)}%`
 /** A site comment for agents: where it was sent from, what the box covers, and the screenshot and images to look at. */
 const siteLine = (item: SiteReviewItem, origin: string) =>
   [
-    `${item.n}. ${item.page ?? "/"} (${item.authorName})${item.resolved ? " [resolved]" : ""}`,
+    `${item.n}. ${item.page ?? "/"} (${writtenBy(item)})${item.resolved ? " [resolved]" : ""}`,
     `   ${item.body}${replyLines(item, origin)}`,
     `   Box ${pct(item.ox)}–${pct(item.ox + item.ow)} across, ${pct(item.oy)}–${pct(item.oy + item.oh)} down the ${item.screenshot ? "screenshot" : "viewport"}${item.quote ? `, over ${item.quote}` : ""}${item.label ? ` (${item.label})` : ""}`,
     ...(item.screenshot ? [`   Screenshot: ${item.screenshot.url}`] : []),

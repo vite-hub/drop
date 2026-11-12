@@ -1,5 +1,5 @@
-import type { CommentMessage, CommentSubject, CommentThread, CommentUser } from "vite-hub/comments/client"
-import type { CommentAttachment, CommentReply, DropComment, DropDetail } from "#shared/types"
+import type { CommentActor, CommentMessage, CommentSubject, CommentThread, CommentUser } from "vite-hub/comments/client"
+import type { CommentAgent, CommentAttachment, CommentReply, DropComment, DropDetail } from "#shared/types"
 
 // Drop's comments as ViteHub's comment model, for the comment parts of vite-hub/ui. Drop's routes answer DropComment,
 // which review.js and the agents read too, so the viewer reads the same and shows it as threads.
@@ -9,6 +9,13 @@ const person = (id: string, name: string, image: string | null): CommentUser => 
   name,
   ...(image ? { image } : {}),
   ...(id.startsWith("guest:") ? { guest: true } : {}),
+})
+
+/** The agent that wrote it, which the parts show in place of its author, with its logo. */
+const actor = (agent: CommentAgent): CommentActor => ({
+  id: agent.name,
+  name: agent.name,
+  ...(agent.image ? { image: agent.image } : {}),
 })
 
 /**
@@ -30,6 +37,7 @@ function message(thread: DropComment, item: DropComment | CommentReply, id: stri
     threadId: thread.id,
     body: item.body,
     author: person(item.authorId, item.authorName, item.authorImage),
+    ...(item.agent ? { actor: actor(item.agent) } : {}),
     mentions: item.mentions,
     // Each image is a drop of its own, and its id is the key the message keeps.
     attachments: item.attachments.map((file) => file.id),
@@ -55,12 +63,22 @@ export function toThread(comment: DropComment, subject: CommentSubject): Comment
     subject,
     anchor: { kind: "page" },
     status: comment.resolved ? "resolved" : "open",
+    ...(comment.resolved && comment.resolvedAt ? { resolvedAt: comment.resolvedAt } : {}),
     author: person(comment.authorId, comment.authorName, comment.authorImage),
+    ...(comment.agent ? { actor: actor(comment.agent) } : {}),
     messages,
     revision: comment.version,
     createdAt: comment.createdAt,
     updatedAt: Math.max(...messages.map((item) => item.editedAt ?? item.createdAt)),
   }
+}
+
+/**
+ * Whether a comment asks for a look: open, or resolved with a reply since, such as an agent saying what it changed. The
+ * panel lists both under Open (vite-hub/ui's `repliedSinceResolved`), and the pill counts both.
+ */
+export function needsLook({ resolved, resolvedAt, replies }: DropComment) {
+  return !resolved || (resolvedAt !== null && replies.some((reply) => reply.createdAt > resolvedAt))
 }
 
 /** The comments' images by their key, for the name and type the parts show. */
