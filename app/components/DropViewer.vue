@@ -627,6 +627,7 @@ defineShortcuts({
   b: () => canMark.value && annotations.mark("marker"),
   p: () => canMark.value && annotations.mark("pen"),
   a: () => canMark.value && annotations.mark("arrow"),
+  t: () => canMark.value && annotations.mark("text"),
   meta_z: () => undoMark(),
   u: () => framed.value && toggleOverlay("rulers"),
   x: () => framed.value && toggleOverlay("xray"),

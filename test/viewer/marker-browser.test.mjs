@@ -309,3 +309,66 @@ test("a canceled capture cannot post over or unlock a new Marker session", async
     await browser.close()
   }
 })
+
+test("the Marker's Text tip types labels in the frame, keeps Drop's keys out of them, and draws them on the snapshot", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser)
+    await page.evaluate(() => tell({ type: "tool", tool: "mark", pen: { tool: "text", color: "#f59e0b", width: 20 } }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw.mark"))
+    const label = frame.getByRole("textbox", { name: "Label" })
+    const marks = () => page.evaluate(() => window.posts.findLast((m) => m.type === "marks")?.count ?? 0)
+
+    await page.mouse.click(300, 300)
+    await label.waitFor()
+    // Drop's tool keys and the Marker's keys are the label's letters while it's typed.
+    const keysBefore = (await posted(page, "key")).length
+    await page.keyboard.type("bat [x]")
+    await page.keyboard.press(" ")
+    assert.equal(await label.inputValue(), "bat [x] ")
+    assert.equal((await posted(page, "key")).length, keysBefore)
+    await page.keyboard.press("Escape")
+    assert.equal((await posted(page, "key")).length, keysBefore, "Esc puts the label down, not the Marker")
+    assert.equal(await label.count(), 0)
+    await page.waitForFunction(() => window.posts.findLast((m) => m.type === "marks")?.count === 1)
+    // With the label down, T is Drop's key again.
+    await page.keyboard.press("t")
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "key" && m.key === "t"))
+    // Amber takes near-black words.
+    assert.equal(
+      await frame.evaluate(() =>
+        document.querySelector("drop-comments").shadowRoot.querySelector(".ink g text").getAttribute("fill"),
+      ),
+      "#0a0a0a",
+    )
+
+    // A label emptied goes, and Drop hears the count drop.
+    const box = await frame.evaluate(() => {
+      const r = document.querySelector("drop-comments").shadowRoot.querySelector(".ink g rect").getBoundingClientRect()
+      return { x: r.x, y: r.y, height: r.height }
+    })
+    await page.mouse.click(box.x + 8, box.y + box.height / 2)
+    await label.fill("")
+    await page.keyboard.press("Enter")
+    await page.waitForFunction(() => window.posts.findLast((m) => m.type === "marks")?.count === 0)
+
+    // Done from Drop puts down the label being typed and sends it.
+    await page.mouse.click(300, 300)
+    await page.keyboard.type("Too big")
+    await page.evaluate(() => tell({ type: "mark", do: "done" }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "area-shot"))
+    const [area] = await posted(page, "area")
+    assert.equal(area.quote, undefined, "a label quotes none of the page's words")
+    assert.ok(area.ow > 0 && area.oh > 0)
+    assert.equal(await marks(), 1)
+    assert.equal(
+      await frame.evaluate(
+        () => document.querySelector("drop-comments").shadowRoot.querySelectorAll(".draft .inkp g").length,
+      ),
+      1,
+      "the label stays on the page while the comment is written",
+    )
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

@@ -254,3 +254,99 @@ test("Esc and Undo take strokes back", async () => {
     await browser.close()
   }
 })
+
+test("Highlight's Text tip types a label, edits, moves, and deletes it, and sends it on the screenshot", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, ui } = await open(browser)
+    await ui.getByRole("button", { name: "Highlight" }).click()
+    const done = ui.getByRole("button", { name: "Done" })
+    const label = ui.getByRole("textbox", { name: "Label" })
+    const labels = ui.locator(".ink g")
+    await page.keyboard.press("t")
+    assert.equal(await ui.getByRole("button", { name: "Text" }).getAttribute("aria-pressed"), "true")
+
+    // A click opens a label with the caret in it. Its letters are the label's, not the tips' or the page's.
+    await page.mouse.click(300, 300)
+    await label.waitFor()
+    await page.keyboard.type("bpa [ too big")
+    assert.equal(await ui.getByRole("button", { name: "Text" }).getAttribute("aria-pressed"), "true")
+    assert.deepEqual(await page.evaluate(() => window.pageKeys), [])
+    // Esc puts the label down and keeps Highlight open.
+    await page.keyboard.press("Escape")
+    assert.equal(await label.count(), 0)
+    assert.equal(await labels.count(), 1)
+    assert.equal(await labels.locator("text").textContent(), "bpa [ too big")
+    assert.equal(await done.isDisabled(), false)
+    assert.equal(await ui.locator(".tools").isVisible(), true)
+
+    // An empty label leaves nothing, and a click elsewhere only puts the open one down.
+    await page.mouse.click(300, 450)
+    await label.waitFor()
+    await page.mouse.click(600, 450)
+    assert.equal(await label.count(), 0)
+    assert.equal(await labels.count(), 1)
+
+    // A click on the label edits it; Enter puts it down.
+    const at = await labels.boundingBox()
+    await page.mouse.click(at.x + 10, at.y + at.height / 2)
+    await label.waitFor()
+    assert.equal(await label.inputValue(), "bpa [ too big")
+    await label.fill("Too big")
+    await page.keyboard.press("Enter")
+    assert.equal(await labels.locator("text").textContent(), "Too big")
+
+    // A drag moves it.
+    const before = await labels.boundingBox()
+    await drag(page, [before.x + 10, before.y + before.height / 2], [before.x + 110, before.y + before.height / 2 + 50])
+    const after = await labels.boundingBox()
+    assert.ok(Math.abs(after.x - before.x - 100) < 2 && Math.abs(after.y - before.y - 50) < 2, "moved by the drag")
+    assert.equal(await label.count(), 0, "a drag doesn't open the label")
+
+    // Clearing a label deletes it; Undo takes back the newest one.
+    await page.mouse.click(100, 100)
+    await page.keyboard.type("Second")
+    await page.keyboard.press("Enter")
+    assert.equal(await labels.count(), 2)
+    await page.keyboard.press("Meta+z")
+    assert.equal(await labels.count(), 1)
+    const kept = await labels.boundingBox()
+    await page.mouse.click(kept.x + 10, kept.y + kept.height / 2)
+    await label.fill("")
+    await page.keyboard.press("Enter")
+    assert.equal(await labels.count(), 0)
+    assert.equal(await done.isDisabled(), true)
+
+    // ⌘Enter while typing puts the label down and sends; the pill is on the screenshot, in pink.
+    await page.mouse.click(200, 200)
+    await page.keyboard.type("Too big")
+    await page.keyboard.press("Meta+Enter")
+    const note = ui.getByRole("textbox", { name: "Comment" })
+    await note.waitFor()
+    assert.equal(await labels.count(), 1, "the label stays while the note is written")
+    const pill = await labels.locator("rect").boundingBox()
+    await note.fill("Smaller, please")
+    await ui.getByRole("button", { name: "Send" }).click()
+    await page.waitForFunction(() => window.sent.length === 1)
+    const color = await page.evaluate(
+      async ([x, y]) => {
+        const image = await createImageBitmap(window.sent[0].get("screenshot"))
+        const canvas = document.createElement("canvas")
+        canvas.width = image.width
+        canvas.height = image.height
+        const g = canvas.getContext("2d")
+        g.drawImage(image, 0, 0)
+        const k = image.width / innerWidth
+        return Array.from(g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data)
+      },
+      [pill.x + 3, pill.y + pill.height / 2],
+    )
+    // #ec4899
+    assert.ok(
+      Math.abs(color[0] - 0xec) < 12 && Math.abs(color[1] - 0x48) < 12 && Math.abs(color[2] - 0x99) < 12,
+      `pink pill, got ${color}`,
+    )
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

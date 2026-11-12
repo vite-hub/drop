@@ -109,7 +109,24 @@ export const FrameMessage = v.variant("type", [
   // An image's page sends ← and → too, for those keys or a sideways swipe: they move to the folder's other images.
   v.object({
     type: v.literal("key"),
-    key: v.picklist(["Escape", "c", "e", "v", "r", "s", "u", "x", "b", "p", "a", "[", "]", "ArrowLeft", "ArrowRight"]),
+    key: v.picklist([
+      "Escape",
+      "c",
+      "e",
+      "v",
+      "r",
+      "s",
+      "u",
+      "x",
+      "b",
+      "p",
+      "a",
+      "t",
+      "[",
+      "]",
+      "ArrowLeft",
+      "ArrowRight",
+    ]),
     tool: v.optional(v.picklist(["browse", "comment", "measure", "mark"])),
   }),
   v.object({

@@ -157,7 +157,7 @@ export function useViewerAnnotations(options: {
    * snapshot (shared/plan-runtime.ts). `marks` counts the strokes so far; `finishing` holds while the frame draws them
    * onto the snapshot.
    */
-  const pen = reactive<MarkPen>({ tip: "marker", color: "pink", sizes: { marker: 1, pen: 1, arrow: 1 } })
+  const pen = reactive<MarkPen>({ tip: "marker", color: "pink", sizes: { marker: 1, pen: 1, arrow: 1, text: 1 } })
   const penStyle = computed(() => ({
     tool: pen.tip,
     color: MARK_COLORS[pen.color],
@@ -298,6 +298,7 @@ export function useViewerAnnotations(options: {
     if (key === "b") mark("marker")
     if (key === "p") mark("pen")
     if (key === "a") mark("arrow")
+    if (key === "t") mark("text")
     if (key === "[" && tool.value === "mark") resize(-1)
     if (key === "]" && tool.value === "mark") resize(1)
   }

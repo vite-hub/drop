@@ -137,7 +137,7 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 ` + PRESENCE_CURSOR_STYLE
 
 // Line icons, drawn with the stroke in STYLE. The bubble is Comment, the stack is the list of threads, and the marker,
-// pen, and arrow are Highlight's tips.
+// pen, arrow, and T are Highlight's tips.
 const svg = (path: string) => `<svg viewBox="0 0 256 256" aria-hidden="true">${path}</svg>`
 const ICONS = {
   comment: svg(`<path d="M128 32a96 96 0 0 0-84 142l-12 42 42-12a96 96 0 1 0 54-172z"/>`),
@@ -154,6 +154,7 @@ const ICONS = {
   marker: svg(`<path d="M164 44l48 48-96 96-56 8 8-56z"/><path d="M140 68l48 48"/><path d="M40 220h88"/>`),
   pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
   arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
+  text: svg(`<path d="M56 72V56h144v16"/><path d="M128 56v144"/><path d="M100 200h56"/>`),
   link: svg(
     `<path d="M107 139a53 53 0 0 0 80 6l32-32a53 53 0 0 0-75-75l-18 18"/><path d="M149 117a53 53 0 0 0-80-6l-32 32a53 53 0 0 0 75 75l18-18"/>`,
   ),
@@ -198,7 +199,7 @@ const MARKUP = `<div class="ui">
 <div class="pins"></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button><button type="button" class="people" data-act="people" hidden aria-pressed="true"></button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows, or label it">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button><button type="button" class="people" data-act="people" hidden aria-pressed="true"></button></div>
 <div class="seg related" slot="related" hidden><button type="button" data-act="related" aria-haspopup="true" aria-expanded="false" aria-controls="related-links">${ICONS.link}Related links</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
@@ -219,8 +220,8 @@ ${TOOLS}
  * thousandths of the viewport. Requests carry the token and never cookies. The token is sealed: neither it nor
  * anything Drop answers tells the page which drop the comments go to.
  *
- * Highlight draws on the page instead: a marker, a pen, or arrows, on a screenshot taken as it opens, while the page
- * holds still. Done anchors the comment to the smallest element under the strokes and sends the screenshot with the
+ * Highlight draws on the page instead: a marker, a pen, arrows, or text labels, on a screenshot taken as it opens, while
+ * the page holds still. Done anchors the comment to the smallest element under the strokes and sends the screenshot with the
  * strokes on it; the strokes stay on the page, scrolling with it, while the note is written.
  *
  * Once connected, the page shows its threads the way Figma does: a pin with the author's picture on the element each
@@ -1013,7 +1014,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   ${INK}
   const TIPS = ${JSON.stringify(MARK_TIPS)}, COLORS = ${JSON.stringify(MARK_COLORS)}, DOTS = [5, 8, 11, 15];
-  const tip = { name: "marker", color: "pink", sizes: { marker: 1, pen: 1, arrow: 1 } };
+  const tip = { name: "marker", color: "pink", sizes: { marker: 1, pen: 1, arrow: 1, text: 1 } };
   const penNow = () => ({ tool: tip.name, color: COLORS[tip.color], width: TIPS[tip.name].sizes[tip.sizes[tip.name]] });
   tools.querySelectorAll("[data-color]").forEach((button) => { button.firstChild.style.background = COLORS[button.dataset.color]; });
 
@@ -1032,6 +1033,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     });
     $("[data-act=undo]", tools).disabled = $("[data-act=done]", tools).disabled = !strokes.length;
     paint.style.cursor = penCursor(penNow());
+    $(".hint", paint).textContent = tip.name === "text"
+      ? "Click to add a label; Enter puts it down. Click a label to change it, or drag it to move it."
+      : "Draw on what should change. Shift draws straight, Enter when done, Esc cancels.";
   }
 
   function startMarking() {
@@ -1052,9 +1056,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   forgetStroke = takeStrokes(paint, ink, penNow, (s) => {
     strokes.push(s);
     paintTools();
+  }, (s) => {
+    strokes = strokes.filter((other) => other !== s);
+    paintTools();
   });
 
   function undoMark() {
+    commitLabel();
     const s = strokes.pop();
     if (s) s.el.remove();
     paintTools();
@@ -1086,6 +1094,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   function finishMark() {
+    commitLabel();
     if (!strokes.length) return;
     const list = strokes.slice(), picture = still;
     let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
@@ -1119,6 +1128,11 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("keydown", (e) => {
     // While someone draws, the tips' keys, [ and ] for the size, Undo, Enter, and Esc are Highlight's, not the page's.
     if (!paint.hidden) {
+      // A label being typed takes the keys, but ⌘Enter puts it down and sends.
+      if (typingLabel()) {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.stopPropagation(); finishMark(); }
+        return;
+      }
       // The screenshot and strokes use viewport coordinates, so native scroll keys must also stay here.
       if (/^( |ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(e.key)) {
         e.preventDefault(); e.stopPropagation(); return;
