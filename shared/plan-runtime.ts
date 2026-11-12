@@ -298,6 +298,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   addEventListener("blur", presenceLeave);
   // MingCute's copy and check, at the 1.75 stroke of Drop's own buttons (app.config icon.customize).
   const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2M4 21h11a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1Z"/></svg>';
+  const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
   const pageStyle = document.createElement("style");
   pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent)}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active),::highlight(drop-draft){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
@@ -704,6 +705,35 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         setTimeout(() => { chip.innerHTML = COPY_ICON; chip.setAttribute("aria-label", "Copy code"); }, 1400);
       };
     });
+    // A link button in the corner of each image, shown while the pointer is over it: the viewer shows images from data:
+    // URLs, so the browser's own Copy image address gives that. Annotated screenshots and Comark's zoom have their own
+    // buttons.
+    if (!zoom && article) article.querySelectorAll("img").forEach((img) => {
+      if (img.closest("[data-zoom], .cz-dialog, [data-comark-frame]")) return;
+      const src = img.dataset.dropSrc || img.getAttribute("src") || "";
+      const r = img.getBoundingClientRect();
+      if (!src || src.startsWith("data:") || r.width < 64 || r.height < 40) return;
+      const label = "Copy image link";
+      const chip = document.createElement("button");
+      chip.className = "cp";
+      chip.setAttribute("aria-label", label);
+      chip.title = label;
+      chip.innerHTML = LINK_ICON;
+      marks.appendChild(chip);
+      chip.style.left = r.right + scrollX - chip.offsetWidth - 6 + "px";
+      chip.style.top = r.top + scrollY + 6 + "px";
+      img.onmouseenter = () => chip.classList.add("on");
+      img.onmouseleave = () => chip.classList.remove("on");
+      if (img.matches(":hover")) chip.classList.add("on");
+      chip.onclick = (e) => {
+        e.stopPropagation();
+        // A srcdoc document resolves addresses against Drop's page, so a /f/ path becomes Drop's own link.
+        post({ type: "copy", text: new URL(src, document.baseURI).href });
+        chip.innerHTML = CHECK_ICON;
+        chip.setAttribute("aria-label", "Copied");
+        setTimeout(() => { chip.innerHTML = LINK_ICON; chip.setAttribute("aria-label", label); }, 1400);
+      };
+    });
     // The viewer lists the comments it couldn't place; it only says so when that changes, since this runs on resize.
     if (unplaced.join() !== lastUnplaced) { lastUnplaced = unplaced.join(); post({ type: "unplaced", ids: unplaced }); }
     emphasise();
@@ -885,6 +915,20 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // through a comparison, which Drop's lightbox of the bare image can't. The area tool still comments on them.
     const zoomed = target && target.closest("[data-zoom], .cz-dialog");
     const img = !AUTHORED && !zoomed && target && !target.closest("a[href]") && target.closest("img");
+    // A heading's # (comark-links' .cl-anchor) points at Drop's address for its section once Drop sends it (page-link), so
+    // the browser's Copy link address gives the real link. A click copies that link, and Drop's address keeps the section.
+    const anchor = !img && target && target.closest("a.cl-anchor");
+    if (anchor && !host.contains(anchor) && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+      const hash = anchor.dataset.dropHash || anchor.getAttribute("href") || "";
+      if (hash.startsWith("#")) {
+        e.preventDefault();
+        const id = decodeURIComponent(hash.slice(1));
+        const to = document.getElementById(id);
+        if (to) to.scrollIntoView({ block: "start" });
+        post({ type: "heading", id, copy: true });
+        return;
+      }
+    }
     // A srcdoc document resolves "#id" against Drop's page, so the frame would load Drop and be refused. Scroll here.
     const link = !img && location.protocol === "about:" && target && target.closest('a[href^="#"]');
     if (link && !host.contains(link)) {
@@ -892,6 +936,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       const id = decodeURIComponent(link.getAttribute("href").slice(1));
       const to = id && document.getElementById(id);
       if (to) to.scrollIntoView({ block: "start" }); else if (!id) scrollTo(0, 0);
+      // Drop's address keeps the section, so it can be shared from the address bar.
+      if (to && to.matches("h1, h2, h3, h4, h5, h6")) post({ type: "heading", id });
       return;
     }
     // A link to another site would load it inside the frame, where most sites (GitHub among them) refuse to show.
@@ -1629,6 +1675,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
     if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; emphasise(); if (pinMode()) render(); else placeDraft(); }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
+    // The drop's own link: each heading's # points at it with the section's #id (see the click handler).
+    if (m.type === "page-link" && typeof m.href === "string" && /^https?:\/\//.test(m.href)) {
+      const base = m.href.split("#")[0];
+      document.querySelectorAll("a.cl-anchor").forEach((a) => {
+        const hash = a.dataset.dropHash || a.getAttribute("href") || "";
+        if (!hash.startsWith("#")) return;
+        a.dataset.dropHash = hash;
+        a.href = base + hash;
+      });
+    }
+    // A link to a section (Drop's address with #id): the page opens there.
+    if (m.type === "heading" && typeof m.id === "string") { const to = document.getElementById(m.id); if (to) to.scrollIntoView({ block: "start" }); }
     if (m.type === "scroll-by" && typeof m.y === "number") scrollBy({ top: m.y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     if (m.type === "focus") {
       active = m.id; render();

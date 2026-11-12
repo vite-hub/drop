@@ -37,7 +37,7 @@ const cached = defineCachedFunction(
     swr: false,
     // A comark-ui upgrade changes it by itself. Bump the Drop revision after it when Drop's own render changes, so
     // existing documents pick up the current preset on their next read.
-    integrity: `${comarkUiVersion}+drop.20`,
+    integrity: `${comarkUiVersion}+drop.21`,
     validate: (entry: { value?: MarkdownRender }) => entry.value !== undefined && !entry.value.retry,
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
