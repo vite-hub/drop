@@ -72,6 +72,9 @@ patchedDependencies:
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
   "@better-auth/oauth-provider@1.7.15": patches/@better-auth__oauth-provider@1.7.15.patch
+  # An MCP grant with offline_access outlives the browser session that approved it. Better Auth's refresh grant copies
+  # that session's id into every new token, so verifyMcpRequest rejected all of them once it expired (vite-hub/vitehub#3562).
+  "@vite-hub/auth@0.0.0-preview-03e8d1b": patches/@vite-hub__auth@0.0.0-preview-03e8d1b.patch
   # A comment box with text shakes on Esc, and a second Esc discards the text and closes it, instead of shaking again
   # forever. Remove when Drop moves to a ViteHub build with vite-hub/vitehub console-drop-comments.
   "@vite-hub/ui@0.0.0-preview-da7f5b1": patches/@vite-hub__ui@0.0.0-preview-da7f5b1.patch

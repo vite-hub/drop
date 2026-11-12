@@ -27,9 +27,9 @@ const CORS = {
 }
 
 /** A fake Drop that holds each POST until the test answers it with `reply(status, body)`. */
-async function open(browser) {
+async function open(browser, source = html) {
   // With `holdGets` on, each GET waits in `held` until the test calls its `release(threads)`.
-  const drop = { gets: 0, pages: [], posts: [], holdGets: false, held: [] }
+  const drop = { gets: 0, pages: [], posts: [], threads: [], holdGets: false, held: [] }
   const context = await browser.newContext({ viewport: { width: 900, height: 600 } })
   await context.addInitScript(
     ({ drop }) => {
@@ -53,7 +53,7 @@ async function open(browser) {
         headers: { "access-control-allow-origin": "*" },
         body: SLOW_SCREENSHOT,
       })
-    if (url.origin === SITE) return route.fulfill({ contentType: "text/html; charset=utf-8", body: html })
+    if (url.origin === SITE) return route.fulfill({ contentType: "text/html; charset=utf-8", body: source })
     if (url.origin !== DROP) return route.abort()
     if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
@@ -61,7 +61,7 @@ async function open(browser) {
       const data = JSON.parse(
         request
           .postDataBuffer()
-          .toString("latin1")
+          .toString("utf8")
           .match(/\{"body".*?\}(?=\r\n)/)[0],
       )
       const { status, body } = await new Promise((resolve) => drop.posts.push({ data, reply: resolve }))
@@ -69,7 +69,7 @@ async function open(browser) {
     }
     drop.gets++
     drop.pages.push(url.searchParams.get("page"))
-    const threads = drop.holdGets ? await new Promise((release) => drop.held.push({ release })) : []
+    const threads = drop.holdGets ? await new Promise((release) => drop.held.push({ release })) : drop.threads
     return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ threads }) })
   })
   const page = await context.newPage()
@@ -127,6 +127,73 @@ test("a sent comment's pin shows before its screenshot and Drop's answer, and th
     await ui.getByText("Sent as #3.").waitFor()
     assert.equal(await sending.count(), 0)
     assert.equal(drop.gets, gets, "the answer's thread draws the pin; no second request")
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("a sent comment joins an existing pin's group after Drop answers, with both comments reachable", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { drop, page, ui } = await open(browser)
+    await comment(page, ui, "Should be 10 €")
+    await page.evaluate(() => window.finishShot())
+    while (!drop.posts.length) await page.waitForTimeout(10)
+    const [post] = drop.posts
+    drop.threads = [thread(1, { ...post.data, body: "Earlier note", requestId: "earlier" })]
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")))
+    const group = ui.getByRole("button", { name: "2 comments here", exact: true })
+    await group.waitFor()
+    assert.equal(await group.isDisabled(), true, "the composer keeps the pending note until Drop answers")
+
+    post.reply({ status: 200, body: { n: 2, thread: thread(2, post.data) } })
+    await ui.getByText("Sent as #2.").waitFor()
+    assert.equal(await group.isDisabled(), false)
+    assert.equal(await ui.locator(".pin:not([hidden])").count(), 1)
+    assert.equal(await group.locator("img").count(), 0)
+    await group.click()
+    assert.deepEqual(await ui.locator(".list .row-item .text").allTextContents(), ["Earlier note", "Should be 10 €"])
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("a tooltip stays open while writing, and its saved comment stays reachable after it closes", async () => {
+  const browser = await chromium.launch()
+  try {
+    const source = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+      <button id="details">Price details</button>
+      <p id="tip" role="tooltip" hidden>The monthly price includes tax.</p>
+      <script>
+        const details = document.getElementById("details"), tip = document.getElementById("tip");
+        details.addEventListener("click", () => { tip.hidden = false; });
+        details.addEventListener("focusout", () => { tip.hidden = true; });
+        document.addEventListener("click", (e) => { if (!e.target.closest("#details, #tip")) tip.hidden = true; });
+      </script>
+      <script src="${DROP}/review.js" defer></script>
+    </body></html>`
+    const { drop, page, ui } = await open(browser, source)
+    await page.getByRole("button", { name: "Price details" }).click()
+    await ui.getByRole("button", { name: "Comment", exact: true }).click()
+    const tip = page.getByRole("tooltip")
+    const box = await tip.boundingBox()
+    await page.mouse.click(box.x + 20, box.y + box.height / 2)
+    await ui.getByRole("textbox", { name: "Comment" }).fill("Explain the tax rate")
+    assert.equal(await tip.isVisible(), true)
+    await ui.getByRole("button", { name: "Send" }).click()
+    await page.evaluate(() => window.finishShot())
+    while (!drop.posts.length) await page.waitForTimeout(10)
+    const [post] = drop.posts
+    assert.equal(post.data.selector, "#tip")
+    drop.threads = [thread(1, post.data)]
+    post.reply({ status: 200, body: { n: 1, thread: drop.threads[0] } })
+    await ui.getByText("Sent as #1.").waitFor()
+
+    await page.mouse.click(10, 10)
+    assert.equal(await tip.isHidden(), true)
+    await ui.getByRole("button", { name: "1 open comment on this page", exact: true }).click()
+    await ui.locator(".list .row-item").click()
+    await ui.locator(".thread").getByText("Explain the tax rate", { exact: true }).waitFor()
   } finally {
     await browser.close()
   }

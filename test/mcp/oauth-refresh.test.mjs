@@ -10,6 +10,7 @@ import { test } from "vite-plus/test"
 const origin = "https://drop.example"
 const resource = `${origin}/mcp`
 const redirectUri = "http://127.0.0.1:8080/callback"
+const claims = (token) => JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"))
 
 /** Drop's /mcp check (server/utils/identity.ts `fromAccessToken`) on a request carrying this access token. */
 const callMcp = (auth, token) =>
@@ -109,16 +110,28 @@ test("an MCP token refreshed after the approving browser session expired still o
       resource,
     })
     assert.ok(issued.refresh_token)
+    const sessionId = database.prepare("SELECT id FROM session").get().id
+    const refreshSessionId = () =>
+      database.prepare("SELECT sessionId FROM oauthRefreshToken WHERE revoked IS NULL").get().sessionId
+    assert.equal(claims(issued.access_token).sid, sessionId)
+    assert.equal(refreshSessionId(), sessionId)
     const [firstError] = await callMcp(auth, issued.access_token)
     assert.equal(firstError, undefined)
+
+    // Renewal preserves the approving session while it is alive.
+    const live = await token({ grant_type: "refresh_token", refresh_token: issued.refresh_token, resource })
+    assert.equal(claims(live.access_token).sid, sessionId)
+    assert.equal(refreshSessionId(), sessionId)
 
     // A browser session lasts days; the refresh token a month. The approving session runs out first.
     database.prepare("UPDATE session SET expiresAt = ?").run(Date.now() - 60_000)
     const [staleError] = await callMcp(auth, issued.access_token)
-    assert.equal(staleError?.code, "AUTH_MCP_TOKEN_INVALID", "The session's own access token ends with the session")
+    assert.equal(staleError, undefined, "An offline_access grant survives the browser session (drop#147)")
 
     // Executor renews the access, as it did on 2026-11-06, and calls /mcp with the new token.
-    const renewed = await token({ grant_type: "refresh_token", refresh_token: issued.refresh_token, resource })
+    const renewed = await token({ grant_type: "refresh_token", refresh_token: live.refresh_token, resource })
+    assert.equal(claims(renewed.access_token).sid, undefined, "A renewed access token drops the expired session")
+    assert.equal(refreshSessionId(), null, "The rotated refresh token drops the expired session")
     const [renewedError, caller] = await callMcp(auth, renewed.access_token)
     assert.equal(renewedError, undefined, renewedError?.message)
     assert.equal(caller.clientName, "Executor")
@@ -126,6 +139,8 @@ test("an MCP token refreshed after the approving browser session expired still o
 
     // The renewed refresh token no longer names the dead session, so the next renewal works too.
     const again = await token({ grant_type: "refresh_token", refresh_token: renewed.refresh_token, resource })
+    assert.equal(claims(again.access_token).sid, undefined)
+    assert.equal(refreshSessionId(), null)
     const [againError] = await callMcp(auth, again.access_token)
     assert.equal(againError, undefined, againError?.message)
   } finally {

@@ -122,7 +122,11 @@ async function fromAccessToken(event: H3Event): Promise<Identity | null> {
   // Only the URL and the Authorization header are read; a Request of its own leaves the body to the MCP handler.
   const request = new Request(event.url, { headers: event.req.headers })
   const [error, caller] = await verifyMcpRequest(request, { resource: `${event.url.origin}/mcp` })
-  if (error) return null
+  if (error) {
+    // The client only sees a 401, so the wide event keeps which check failed.
+    useLogger(event).set({ token: { rejected: error.message } })
+    return null
+  }
   const { user } = caller
   const email = user.email ?? ""
   return {
