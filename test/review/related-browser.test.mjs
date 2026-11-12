@@ -134,9 +134,18 @@ test("Related links shows on a site a drop links to, connects on the first press
         .evaluate((a) => a === a.getRootNode().activeElement),
       true,
     )
-    // A favicon the site can't load falls back to a plain link icon; GitHub gets its mark.
-    await menu.locator("a").nth(2).locator("svg:not(.out)").waitFor()
-    assert.equal(await menu.locator("a").nth(1).locator("svg.github").count(), 1)
+    // A favicon the site can't load, or none, falls back to a link icon, on the same light plate a favicon gets so a
+    // black mark still shows on the dark menu.
+    await menu.locator("a").nth(2).locator(".site svg").waitFor()
+    assert.equal(await menu.locator("a").nth(1).locator(".site svg").count(), 1)
+    assert.equal(
+      await menu
+        .locator("a")
+        .nth(2)
+        .locator(".site")
+        .evaluate((plate) => getComputedStyle(plate).backgroundColor),
+      "rgb(255, 255, 255)",
+    )
 
     // It opens beside the pill, on its edge: above a pill at the bottom.
     const [menuBox, pillBox] = [await menu.boundingBox(), await pill.locator("[slot=review]").boundingBox()]
