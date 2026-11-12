@@ -19,6 +19,8 @@ const deviceBottom = computed(() =>
 )
 
 const notify = useNotify()
+// The others in the review's presence room load the new comment at once (usePresence).
+const state = injectDrop()
 const capture = useTabCapture()
 
 // What's typed, and what the frame has open. Clicks inside the frame can't reach Drop, so the bar only changes when
@@ -182,6 +184,7 @@ async function send() {
     // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
     // events go nowhere.
     void refreshNuxtData([keys.review(props.drop.id), keys.comments(props.drop.id)])
+    state?.wrote()
   } catch (error) {
     notify.fail("Couldn't send the comment", error)
   } finally {

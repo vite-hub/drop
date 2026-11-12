@@ -45,6 +45,7 @@ const entry = `
   window.useDeviceSize = () => device
   window.useHead = () => {}
   window.useNotify = () => ({})
+  window.injectDrop = () => undefined
   window.useTabCapture = () => ({ active: Vue.ref(false), exact: Vue.ref(true) })
   window.injectReviewDraft = () => ({ body: Vue.ref(""), sending: Vue.ref(false), images: { picks: Vue.ref([]) } })
   const app = Vue.createApp({

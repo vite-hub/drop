@@ -106,6 +106,19 @@ The first press connects you, as **Comment** does. The menu lists only docs you 
 
 In Drop, the same relations show under a drop's **Related links**: a site review lists the docs that link to its site, and a doc lists the other drops that link to its pages, with the site reviews of its previews.
 
+## See who's here {#presence}
+
+Once you're connected, the toolbar shows the faces of the other people on the review: on the site, on any of its pages, or in Drop. Someone dims after a minute without moving or typing, or while their tab is hidden. Hover the faces for their names.
+
+People on the same page see each other's cursors, each with its name, in the color of its face. A name fades once its cursor stays still for 3 seconds. Press the faces to hide or show the cursors; the browser remembers.
+
+| Who | Sees who's here |
+|---|---|
+| The review's owner, admins, and people a team share reaches | Yes, and shows up for the others. |
+| People who only reach it through a public link, guests included | No, and nobody sees them. They still comment. |
+
+Presence needs a Drop with Realtime rooms, which Cloudflare and a VPS have. It loads after you connect, from <code>[:origin]/review-presence.js</code>, so the page's Content Security Policy must allow that script, and <code>wss://</code> to Drop in `connect-src`.
+
 ## Read and resolve {#read}
 
 On the site, each open comment shows as a pin with its author's initials on the element it was left on. Pointing at a pin outlines that element. A pin on a button or link sits beside it, and pins on one spot become one pin with their count.
@@ -122,4 +135,5 @@ To hand the comments to an agent, press the link button in the review toolbar on
 - **The page never gets Drop's cookies.** The Drop window hands it a short-lived, sealed token for one review and that page's origin. The page can't read which review it's for.
 - **Open in Drop** and the toolbar's link button open or copy the review's link only for people who could open it anyway. The link stays in the Drop window and never reaches the page. **Related links** opens a doc the same way, and before you connect the page only learns whether some doc links to it.
 - **Every comment is checked.** Drop answers cross-origin requests only from origins a review covers, and checks the token, the origin, and the sharing each time. Taking the share back ends every session at once.
+- **Presence takes a ticket, never a cookie.** The page trades its token for a ticket that lasts an hour at most, good for the review's presence room alone, from that page's origin alone. The room's name is a keyed hash, so it doesn't name the review either.
 - **Input is limited.** Notes are plain text with length limits. Screenshots must be PNG, JPEG, or WebP, up to 4 MiB.

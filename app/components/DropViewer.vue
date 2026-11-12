@@ -261,6 +261,19 @@ useLatestVersion(drop, {
   busy: () => Boolean(commentsOpen.value || selection.value || lightbox.value || shareOpen.value),
 })
 
+// Who else has the drop open, and their cursors on this version or app page (usePresence). The others load comments
+// the moment someone writes one, rather than on their next look.
+const presence = usePresence(drop, {
+  at: () => (drop.value.kind === "site" ? null : `v${drop.value.version}${isApp.value ? app.page.value : ""}`),
+  enabled: () => !visitor.value && !trashed.value,
+})
+state.onWrote(() => presence.commented())
+watch(presence.commentsChange, (change, before) => {
+  if (change === before) return
+  void state.comments.refresh()
+  void siteReview?.refresh()
+})
+
 function startEdit() {
   if (lightbox.value) return
   closeComments()
@@ -517,6 +530,7 @@ const {
   })),
   variantBar: true,
   arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
+  presence,
 })
 
 const outdated = computed(
@@ -1483,6 +1497,14 @@ watch(
                 <template #details><ReuseDetails /></template>
                 <template #history><ReuseHistory /></template>
               </ViewerDetailsSegment>
+              <span aria-hidden="true" class="w-1 shrink-0" />
+            </template>
+            <template v-if="!editing && presence.people.value.length">
+              <ViewerPresence
+                v-model:show-cursors="presence.showCursors.value"
+                :people="presence.people.value"
+                :site="drop.kind === 'site'"
+              />
               <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
             <ViewerShare v-model:open="shareOpen" :drop="drop" />

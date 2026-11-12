@@ -3,7 +3,7 @@ import { writtenBy } from "#shared/agents"
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
-import { sha256 } from "#shared/utils/bytes"
+import { hex, sha256 } from "#shared/utils/bytes"
 import { textValue } from "#shared/utils/text"
 import { blob } from "vite-hub/blob"
 import { detectContentType } from "vite-hub/blob/content-type"
@@ -71,7 +71,7 @@ import { findableBy } from "./related"
 
 /** What a review token says: the site drop, who sends (null for a guest on a "Can comment" link), and the page's origin. */
 const ReviewClaims = v.object({ d: v.string(), u: v.nullable(v.string()), n: v.string(), o: v.string(), e: v.number() })
-type ReviewClaims = v.InferOutput<typeof ReviewClaims>
+export type ReviewClaims = v.InferOutput<typeof ReviewClaims>
 
 /** What the popup sends back when someone picks a site drop: which one, for which origin and person. Sealed too. */
 const Choice = v.object({ c: v.string(), o: v.string(), u: v.nullable(v.string()), e: v.number() })
@@ -83,17 +83,36 @@ const encoder = new TextEncoder()
  * AES-GCM under a key from the auth secret, like content-origin labels. Not VITEHUB_SECRET: not every Drop sets it
  * (Quiver's doesn't).
  */
-async function sealKey(event: H3Event) {
+function authSecret(event: H3Event) {
   // Optional: an environment without the auth secret (the tests' one) gets the 503 below, not a TypeError.
   const secret = useServerEnv(event).auth?.secret?.unseal()
   // No fallback: a known key would let anyone mint tokens.
   if (!secret)
     throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
-  return importSealKey(await sha256(encoder.encode(`review-token:${secret}`)))
+  return secret
+}
+
+const sealKey = async (event: H3Event) =>
+  importSealKey(await sha256(encoder.encode(`review-token:${authSecret(event)}`)))
+
+/**
+ * A name for `value` that only Drop can make and that always comes out the same: HMAC-SHA-256 under a key from the
+ * auth secret, cut to 128 bits. Presence rooms are named this way, so a page in one never learns which drop it is.
+ */
+export async function keyedName(event: H3Event, purpose: string, value: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    await sha256(encoder.encode(`${purpose}:${authSecret(event)}`)),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  )
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(value)))
+  return hex(mac.subarray(0, 16))
 }
 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
-type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files"
+type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files" | "presence"
 
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
@@ -254,7 +273,7 @@ export async function openDoc(event: H3Event, handle: string, who: Identity, now
  * The person behind a token, as they are now: a ban or a lost membership ends their review session
  * before the token runs out. Null for a guest.
  */
-async function reviewer(claims: ReviewClaims): Promise<Identity | null | false> {
+export async function reviewer(claims: Pick<ReviewClaims, "u">): Promise<Identity | null | false> {
   if (!claims.u) return membersOnly() ? false : null
   const [row] = await db.select().from(user).where(eq(user.id, claims.u)).limit(1)
   if (!row || row.banned) return false

@@ -57,6 +57,9 @@ async function open(browser, source = html) {
     if (url.origin !== DROP) return route.abort()
     if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
+    // Only comment POSTs carry the multipart body these tests hold; this Drop offers no presence ticket.
+    if (url.pathname === "/api/review/presence")
+      return route.fulfill({ status: 404, contentType: "application/json", headers: CORS, body: "{}" })
     if (request.method() === "POST") {
       const data = JSON.parse(
         request
