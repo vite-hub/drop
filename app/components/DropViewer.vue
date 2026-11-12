@@ -217,6 +217,17 @@ const {
   pickImage,
   pen,
 } = annotations
+// The selection bar sits centred over the selection, kept 8px inside the window by its measured width, so a selection
+// at the page's edge doesn't push Comment or Suggest out of sight.
+const selectionBarRef = useTemplateRef<HTMLElement>("selectionBarRef")
+const { width: selectionBarWidth } = useElementSize(selectionBarRef, undefined, { box: "border-box" })
+const selectionBarStyle = computed(() => {
+  if (!selection.value) return {}
+  const { rect } = selection.value
+  const half = (selectionBarWidth.value || 180) / 2 + 8
+  const center = Math.max(half, Math.min((rect.left + rect.right) / 2, windowWidth.value - half))
+  return { left: `${center}px`, top: `${Math.max(56, rect.top - 8)}px` }
+})
 // Hidden comments (the review pill's eye) stay hidden on every drop until the eye shows them again.
 const commentsShown = useCommentsShown()
 overlays.pins = commentsShown.value
@@ -1560,11 +1571,9 @@ watch(
     </Transition>
     <div
       v-if="selection && (!commentsOpen || !popover)"
-      class="fixed z-30 -translate-x-1/2 -translate-y-full"
-      :style="{
-        left: `${Math.min(Math.max(60, (selection.rect.left + selection.rect.right) / 2), windowWidth - 60)}px`,
-        top: `${Math.max(56, selection.rect.top - 8)}px`,
-      }"
+      ref="selectionBarRef"
+      class="fixed z-30 w-max -translate-x-1/2 -translate-y-full"
+      :style="selectionBarStyle"
     >
       <ViewerSelectionBar @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
