@@ -56,7 +56,8 @@
     "vue-tsc",
     // `nuxt` is installed as an alias of nuxt-nightly, which knip reports under its real name (`#app` in app/error.vue).
     "nuxt-nightly",
-    // Tests load this through vite-hub's own resolution (createRequire), to test the copy it uses.
+    // Tests load these through vite-hub's own resolution (createRequire), to test the copies it uses.
     "@vite-hub/rate-limit",
+    "@vite-hub/workspace",
   ],
 }
