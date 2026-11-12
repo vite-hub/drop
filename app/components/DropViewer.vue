@@ -535,6 +535,7 @@ const {
   width: docWidth,
   annotations,
   clickComments: commentMode,
+  threadOverCard: computed(() => Boolean(threadSpot.value?.rail)),
   comments: computed(() => ({
     style: pinStyle.value ? "pin" : "card",
     me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
@@ -1549,13 +1550,13 @@ watch(
         v-if="pinShown"
         ref="pinRef"
         :aria-label="pinDraft ? 'Comment on selected text' : 'Comment thread'"
-        class="fixed z-40 flex max-h-[min(28rem,60dvh)] flex-col overflow-y-auto overscroll-contain border border-default bg-default shadow-lg"
+        class="fixed z-40 flex max-h-[min(28rem,60dvh)] flex-col overscroll-contain border border-default bg-default shadow-lg"
         :class="
           pinDraft
-            ? 'rounded-[6px_18px_18px_18px]'
+            ? 'overflow-y-auto rounded-[6px_18px_18px_18px]'
             : threadSpot?.rail
-              ? 'rounded-xl p-1.5'
-              : 'rounded-[6px_16px_16px_16px] p-1.5'
+              ? 'overflow-hidden rounded-xl'
+              : 'overflow-hidden rounded-[6px_16px_16px_16px]'
         "
         role="dialog"
         :style="pinBubbleStyle"
