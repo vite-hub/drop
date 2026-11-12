@@ -14,6 +14,8 @@ const generated = [
   "patches/**",
   "public/vendor/**",
   "skills/**/assets/**",
+  // A skill's scripts run on the agent's machine, copied out of Drop, and keep the style they were written in.
+  "skills/**/scripts/**",
 ]
 
 export default defineConfig({

@@ -15,6 +15,7 @@ const names = (await readdir(root, { withFileTypes: true }))
 
 test("ships the built-in skills and Slidev's own", () => {
   assert.deepEqual(names.sort(), [
+    "data-explorer",
     "handoff",
     "learning",
     "pr-evidence",

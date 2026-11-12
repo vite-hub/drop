@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Data explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap"
+    />
+    <style id="rp-style">
+      /* Paste assets/style.css here. Left empty, the page loads it from Drop. */
+    </style>
+  </head>
+  <body>
+    <div id="report"></div>
+    <!-- Paste report.json between these tags, escaped as SKILL.md says. -->
+    <script id="report-data" type="application/json"></script>
+    <!-- Paste assets/app.js between these tags. Left empty, the page loads it from Drop. -->
+    <script id="rp-app" type="text/plain"></script>
+    <!-- vega -->
+    <script>
+      // Runs whatever the page holds and fetches only what's missing: Vega and Vega-Lite from jsDelivr, then the
+      // skill's style and script as Drop serves them.
+      (async () => {
+        const cdn = "https://cdn.jsdelivr.net/npm/";
+        const skill = "https://drop.vitehub.dev/.well-known/skills/data-explorer/assets/";
+        const load = (src) =>
+          new Promise((done, fail) => {
+            const script = Object.assign(document.createElement("script"), { src, onload: done });
+            script.onerror = () => fail(new Error(`couldn't load ${src}`));
+            document.head.append(script);
+          });
+        if (!/\.rp-/.test(document.getElementById("rp-style").textContent))
+          document.head.append(
+            Object.assign(document.createElement("link"), {
+              rel: "stylesheet",
+              href: `${skill}style.css`,
+            }),
+          );
+        if (!window.vega) await load(`${cdn}vega@6/build/vega.min.js`);
+        if (!window.vegaLite) await load(`${cdn}vega-lite@6/build/vega-lite.min.js`);
+        const app = document.getElementById("rp-app").textContent;
+        if (/\bfunction render\b/.test(app))
+          document.body.append(
+            Object.assign(document.createElement("script"), {
+              textContent: `(() => {\n${app}\n})();`,
+            }),
+          );
+        else await load(`${skill}app.js`);
+      })().catch((error) => {
+        document.getElementById("report").textContent =
+          `This page couldn't load: ${error.message}. Open it online, or rebuild it with the data-explorer skill's build script.`;
+      });
+    </script>
+  </body>
+</html>

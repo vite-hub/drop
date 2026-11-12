@@ -1,0 +1,3 @@
+interface:
+  display_name: "Data explorer"
+  short_description: "Findings, graphs and filters for a dataset, from one report.json"
