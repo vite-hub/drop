@@ -362,6 +362,23 @@ test("an open thread is written in where it is: over its margin card, else besid
     assert.equal(card.rail, true)
     assert.deepEqual(card.rect, cardBox)
 
+    // Once the thread floats over it, the card hides under it, so its ring and shadow don't peek out at the corners.
+    const cardShows = () =>
+      frame.evaluate(
+        () =>
+          getComputedStyle(
+            document.querySelector("drop-comments").shadowRoot.querySelector('.rail .g[data-id="c2"] > .cr-card'),
+          ).visibility,
+      )
+    assert.equal(await cardShows(), "visible")
+    await say({ type: "active", id: "c2", covered: true })
+    await frame.waitForFunction(
+      () =>
+        getComputedStyle(
+          document.querySelector("drop-comments").shadowRoot.querySelector('.rail .g[data-id="c2"] > .cr-card'),
+        ).visibility === "hidden",
+    )
+
     // An area keeps its pin: Drop hears where the pin and its area are, so the thread opens beside them.
     await say({ type: "active", id: "c8" })
     const pin = await placeOf("c8")
@@ -380,6 +397,8 @@ test("an open thread is written in where it is: over its margin card, else besid
     assert.equal(pin.rail, false)
     assert.equal(pin.pin, true)
     assert.deepEqual(pin.rect, pinBox)
+    // Another thread open: the first card shows again.
+    assert.equal(await cardShows(), "visible")
 
     // A click on the page away from the pins puts the thread away; with none open, a click says nothing.
     await frame.locator("p").first().click()

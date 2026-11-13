@@ -44,6 +44,8 @@ export function useViewerFrame(options: {
   comments?: Ref<{ style: CommentStyle; me: { name: string; image: string | null } | null }>
   /** Comments mode (ViewerCommentsSegment): a click on the page, without a drag, comments on the element under it. */
   clickComments?: Ref<boolean>
+  /** The open thread floats over its card in the margin, so the doc hides that card under it. */
+  threadOverCard?: Ref<boolean>
   /** Whether the viewer's bar shows a prototype's variants, in place of the bar the page draws itself. */
   variantBar?: boolean
   /** ← or → on an image's page, while the page has focus: the viewer moves along the image's folder. */
@@ -391,7 +393,11 @@ export function useViewerFrame(options: {
   const openThread = computed(() =>
     annotations.popover.value?.type === "thread" ? annotations.popover.value.id : null,
   )
-  watch([ready, openThread], () => ready.value && send({ type: "active", id: openThread.value }))
+  watch(
+    [ready, openThread, () => options.threadOverCard?.value],
+    () =>
+      ready.value && send({ type: "active", id: openThread.value, covered: options.threadOverCard?.value ?? false }),
+  )
   watch(
     [ready, annotations.frameTool, () => options.clickComments?.value],
     () =>

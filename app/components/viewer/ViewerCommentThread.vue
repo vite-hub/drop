@@ -3,8 +3,7 @@
 // Shift+Enter breaks, "@" names people who may read the drop, and images come from the button, a paste, or a drop,
 // beside the ones the viewer took (the Marker's snapshot, the area's picture). Suggest on a selection adds the words
 // that replace it above the note (`#extra`). The open thread is a CommentThread: the quote or the suggestion's redline
-// in `#anchor`, Accept and the thread's menu in `#actions`, a site's screenshot in `#after`.
-import type { DropdownMenuItem } from "@nuxt/ui"
+// in `#anchor`, Accept and Copy link in `#actions`, a site's screenshot in `#after`.
 import { CommentComposer, type CommentComposerSubmit, CommentThread } from "vite-hub/ui/comments"
 import { COMMENT_IMAGE_TYPES, type CommentInput } from "#shared/schemas"
 import type { DropComment, SiteReviewItem } from "#shared/types"
@@ -103,30 +102,6 @@ const earlier = computed(() =>
     ? state.drop.data.value?.versions.find((item) => item.version === props.comment!.version)
     : undefined,
 )
-const mayDelete = computed(() =>
-  Boolean(thread.value && can("delete", { thread: thread.value, message: thread.value.messages[0] })),
-)
-const menu = computed<DropdownMenuItem[][]>(() => [
-  [
-    {
-      label: "Copy link",
-      icon: "i-mingcute-link-line",
-      onSelect: () => props.comment && emit("copyLink", props.comment),
-    },
-  ],
-  ...(mayDelete.value
-    ? [
-        [
-          {
-            label: "Delete thread",
-            icon: "i-mingcute-delete-2-line",
-            color: "error" as const,
-            onSelect: () => props.comment && emit("delete", props.comment.id),
-          },
-        ],
-      ]
-    : []),
-])
 // Deleting the comment itself deletes its thread; the viewer then closes it.
 function remove(messageId: string) {
   const comment = props.comment
@@ -262,9 +237,17 @@ const edit = (messageId: string, text: string, ids: string[]) =>
             @click="emit('accept', comment.id)"
           />
         </UTooltip>
-        <UDropdownMenu :content="{ align: 'end' }" :items="menu">
-          <UButton aria-label="More" color="neutral" icon="i-mingcute-more-1-fill" size="xs" variant="ghost" />
-        </UDropdownMenu>
+        <!-- Deleting the thread is the first message's Delete, which asks first. -->
+        <UTooltip text="Copy link">
+          <UButton
+            aria-label="Copy link"
+            color="neutral"
+            icon="i-mingcute-link-line"
+            size="xs"
+            variant="ghost"
+            @click="emit('copyLink', comment)"
+          />
+        </UTooltip>
       </template>
       <template #anchor>
         <div class="space-y-2 px-3 pt-3 empty:hidden">
@@ -308,5 +291,66 @@ const edit = (messageId: string, text: string, ids: string[]) =>
   overflow-y: auto;
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
+  padding-block: 0.25rem;
+}
+
+/* A thread reads at the app's 14px, as the comment list and the composer do: vite-hub/ui's names are 16px and a
+   message's Comark body 15px on a 1.65 line, which left four words a line in the floating card. */
+.drop-comment-card :deep([data-slot="comment-thread"]) {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+
+.drop-comment-card :deep([data-slot="comment-thread-header"]) {
+  min-height: 2.75rem;
+}
+
+.drop-comment-card :deep([data-slot="comment-thread-title"]) {
+  font-size: var(--text-sm);
+}
+
+.drop-comment-card :deep([data-slot="comment-thread-quote"]) {
+  margin-top: 0.5rem;
+}
+
+.drop-comment-card :deep([data-slot="comment-reply"]) {
+  position: relative;
+  padding: 0.5rem 0.75rem;
+}
+
+/* The 14px name and the 12px time share a baseline. Centred, the smaller time sat a pixel high. The name's line is as
+   tall as the avatar, which stays centred on it. */
+.drop-comment-card :deep([data-slot="comment-reply-header"]) {
+  align-items: baseline;
+}
+
+.drop-comment-card :deep([data-slot="comment-reply-header"] > [data-slot="avatar-stack"]) {
+  align-self: center;
+}
+
+.drop-comment-card :deep([data-slot="comment-reply-author"]) {
+  font-size: var(--text-sm);
+  line-height: 1.5rem;
+}
+
+.drop-comment-card :deep([data-slot="comment-reply-body"]) {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* Edit and Delete float over the end of the name's row, so a message's text runs the card's full width instead of
+   wrapping early beside two buttons that only show on hover. */
+.drop-comment-card :deep([data-slot="comment-reply-actions"]) {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--ui-bg);
+}
+
+/* The reply box under the divider: a focused field shows its border alone, not a second 3px ring around it. */
+.drop-comment-card
+  :deep([data-slot="comment-thread"] > [data-slot="comment-composer"] [data-slot="prompt-input-group"]) {
+  box-shadow: none;
 }
 </style>

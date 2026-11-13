@@ -410,7 +410,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const COMMENTS_CSS = __COMMENTS_CSS__;
   const RAIL_STYLE = '<style>' + COMMENTS_CSS +
     '.rail{position:absolute;height:0}.rail .g>.cr-bub{display:none}.rail .g>.cr-card{position:absolute;margin:0}.rail .cr-card{float:none;clear:none;cursor:pointer}' +
-    '.rail .g:has(.cr-tg:checked)>*{z-index:1}.rail .cr-av{overflow:hidden}.rail .cr-av img{display:block;width:100%;height:100%;object-fit:cover}' +
+    '.rail .g:has(.cr-tg:checked)>*{z-index:1}.rail .g[data-covered]>.cr-card{visibility:hidden}.rail .cr-av{overflow:hidden}.rail .cr-av img{display:block;width:100%;height:100%;object-fit:cover}' +
     '.rail .cr-entry{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}' +
     '.rail .cr-card small{display:block;margin-top:.25rem;color:var(--_comark-muted);font-size:.75rem}' +
     '</style>';
@@ -491,6 +491,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // active: the comment a "focus" pulses for a moment; opened: the one whose thread Drop shows; pointed and textPointed:
   // the one under the pointer, over its bubble or card, or over its text.
   let markers = [], active = null, opened = null, pointed = null, textPointed = null;
+  // covered: Drop floats the opened thread over its card, so the card hides under it rather than peek out at its corners.
+  let covered = false;
   const highlights = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
 
   ${ELEMENT_NAMING}
@@ -1032,7 +1034,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   /** The comment Drop shows, the one a "focus" picked, and the one under the pointer: their highlight and card stand out. */
   function emphasise() {
     const on = new Set([active, opened, pointed, textPointed].filter(Boolean));
-    marks.querySelectorAll(".rail .g:not(.slot)").forEach((group) => { group.firstElementChild.checked = on.has(group.dataset.id); });
+    marks.querySelectorAll(".rail .g:not(.slot)").forEach((group) => {
+      group.firstElementChild.checked = on.has(group.dataset.id);
+      group.toggleAttribute("data-covered", covered && group.dataset.id === opened);
+    });
     for (const [id, bubble] of bubbles) bubble.toggleAttribute("data-on", on.has(id));
     if (!highlights) return;
     const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
@@ -1910,7 +1915,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
-    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; emphasise(); if (pinMode()) render(); else placeDraft(); }
+    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft(); }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
     // The drop's own link: each heading's # points at it with the section's #id (see the click handler).
     if (m.type === "page-link" && typeof m.href === "string" && /^https?:\/\//.test(m.href)) {

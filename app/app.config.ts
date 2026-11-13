@@ -10,6 +10,25 @@ export default defineAppConfig({
   // Iconify passes only the body, not the prefix; the other sets (Phosphor, simple-icons) are fills with no stroke.
   icon: {
     customize: (content: string) => content.replaceAll('stroke-width="2"', 'stroke-width="1.75"'),
+    // vite-hub/ui's comment parts name Lucide icons, a set Drop doesn't ship, so their buttons drew blank (Resolve,
+    // Close, Edit, Delete, attach, send). Each one Drop shows gets its MingCute twin.
+    aliases: {
+      "lucide-arrow-left": "mingcute:arrow-left-line",
+      "lucide-arrow-up": "mingcute:arrow-up-line",
+      "lucide-check": "mingcute:check-line",
+      "lucide-external-link": "mingcute:arrow-right-up-line",
+      "lucide-file": "mingcute:file-line",
+      "lucide-list": "mingcute:list-check-line",
+      "lucide-message-circle": "mingcute:chat-3-line",
+      "lucide-pencil": "mingcute:edit-2-line",
+      "lucide-plus": "mingcute:add-line",
+      "lucide-refresh-cw": "mingcute:refresh-2-line",
+      "lucide-rotate-ccw": "mingcute:refresh-anticlockwise-1-line",
+      "lucide-square": "mingcute:stop-line",
+      "lucide-square-pen": "mingcute:edit-line",
+      "lucide-trash-2": "mingcute:delete-2-line",
+      "lucide-x": "mingcute:close-line",
+    },
   },
   ui: {
     colors: { primary: "neutral", neutral: "neutral" },
