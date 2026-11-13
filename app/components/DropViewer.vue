@@ -703,8 +703,9 @@ function download() {
 const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value && ready.value)
 const exportPdf = () => send({ type: "print", title: drop.value.title })
 
-// The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
-const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
+// The version on screen, as agents get it (server/middleware/0.09.drop-markdown.ts). Only Markdown docs: an HTML page's
+// Markdown loses whatever its scripts draw, so its readers download the HTML instead.
+const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 
 // The dock's links, beside Share: a Markdown doc's preview deploys, which are for opening; its other links read with its front
 // matter at the top of the doc (server/utils/markdown-document.ts withDocProperties). Every other drop shows them all.

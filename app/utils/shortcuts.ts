@@ -29,7 +29,7 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
       { keys: ["r"], label: "Comment on an area" },
       { keys: ["e"], label: "Edit together" },
       { keys: ["l"], label: "Copy the link" },
-      { keys: ["m"], label: "Copy as Markdown", where: "A doc or a single HTML page" },
+      { keys: ["m"], label: "Copy as Markdown", where: "A Markdown doc" },
       { keys: ["w"], label: "Switch the text width: readable, wide, or widest", where: "A Markdown doc" },
       { keys: ["escape"], label: "Close a comment, leave area mode, or go back from a version" },
     ],
