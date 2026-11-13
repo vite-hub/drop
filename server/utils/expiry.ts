@@ -2,10 +2,10 @@ import { and, eq, sql } from "drizzle-orm"
 import { log } from "evlog"
 import type { H3Event } from "h3"
 import { isbot } from "isbot"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { useServerEnv } from "#vitehub/env/server"
 import { DAY_MS, DEFAULT_EXPIRY_DAYS, expiresAt } from "#shared/expiry"
-import { drops } from "../databases/config"
+import { drops } from "../databases/default"
 import type { Identity } from "./identity"
 
 interface ExpiryPolicy {

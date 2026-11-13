@@ -6,6 +6,8 @@ import type { Plugin } from "vite-plus"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
 const ocache = createRequire(import.meta.resolve("nitro/package.json")).resolve("ocache")
+// The real content sniffing, from the browser-safe entry that doesn't load a store.
+const blobClient = fileURLToPath(import.meta.resolve("@vite-hub/blob/client"))
 // Drop modules swapped by their file name, wherever they're imported from.
 const modules: Record<string, string> = {
   identity:
@@ -17,9 +19,8 @@ const modules: Record<string, string> = {
 }
 // Server modules Drop reads from Nitro and ViteHub at runtime, backed by test/cost/harness.mjs's `globalThis.dropTest`.
 const stubs: Record<string, string> = {
-  "vite-hub/database/drizzle": "export const db = globalThis.dropTest.db",
-  "vite-hub/database": "export const defineDatabase = v => v",
-  "vite-hub/blob": "export const blob = globalThis.dropTest.blob",
+  "vite-hub/database": "export const db = globalThis.dropTest.db; export const defineDatabase = v => v",
+  "vite-hub/blob": `export const blob = globalThis.dropTest.blob; export { detectContentType } from ${JSON.stringify(blobClient)}`,
   // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".
   "nitro/cache": `import { defineCachedFunction as define } from ${JSON.stringify(ocache)}
 const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
@@ -28,9 +29,9 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
   "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
   "vite-hub/rate-limit": `export const checkRateLimit = async (_event, bucket, options) => {
   globalThis.dropTest.bursts.push({ bucket, ...options })
-  return globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter: 42, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }
+  return [undefined, globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter: 42, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
 }
-export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args)).allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
+export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
   "vite-hub/auth/mcp":

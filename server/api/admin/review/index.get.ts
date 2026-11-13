@@ -1,7 +1,7 @@
 import { and, inArray, count, desc, eq, isNotNull, sql } from "drizzle-orm"
 import { defineHandler } from "h3"
-import { db } from "vite-hub/database/drizzle"
-import { drops, user } from "../../../databases/config"
+import { db } from "vite-hub/database"
+import { drops, user } from "../../../databases/default"
 import { requireAdmin } from "../../../utils/identity"
 
 export default defineHandler(async (event) => {

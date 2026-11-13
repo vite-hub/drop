@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm"
 import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import {
   BOARD_CONTENT_TYPE,
   type Board,
@@ -15,7 +15,7 @@ import {
   serializeBoard,
 } from "#shared/board"
 import { base64 } from "#shared/utils/bytes"
-import { drops } from "../databases/config"
+import { drops } from "../databases/default"
 import { type DropRow, escapesFolder, MAX_FILE_BYTES, readText, storageFailure } from "./drops"
 import type { Identity } from "./identity"
 import { textStatements } from "./search"

@@ -686,18 +686,21 @@ for (const screenshot of [undefined, PNG]) {
       const options = { screenshot, images: [PNG] }
       const started = Promise.withResolvers()
       const resume = Promise.withResolvers()
-      const query = state.db.session.client
       let held = false
-      vi.spyOn(state.db.session, "client").mockImplementation(async (...args) => {
-        // Images are stored before the claim. Hold their links, which are written after it becomes visible.
-        if (!held && args[0].startsWith('update "comment_attachments"')) {
-          held = true
-          started.resolve()
-          await resume.promise
-          if (fail) throw new Error("Image links unavailable")
-        }
-        return query(...args)
-      })
+      // Drizzle's SQLite proxy runs each statement through one executor per method.
+      for (const method of ["run", "all", "get"]) {
+        const query = state.db.session.client[method]
+        vi.spyOn(state.db.session.client, method).mockImplementation(async (...args) => {
+          // Images are stored before the claim. Hold their links, which are written after it becomes visible.
+          if (!held && args[0].startsWith('update "comment_attachments"')) {
+            held = true
+            started.resolve()
+            await resume.promise
+            if (fail) throw new Error("Image links unavailable")
+          }
+          return query(...args)
+        })
+      }
       const original = comment(body.token, data, options)
       try {
         await started.promise

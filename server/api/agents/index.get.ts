@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm"
 import { defineHandler } from "h3"
-import { db } from "vite-hub/database/drizzle"
-import { oauthClient, oauthConsent } from "../../databases/config"
+import { db } from "vite-hub/database"
+import { oauthClient, oauthConsent } from "../../databases/default"
 import { requireIdentity } from "../../utils/identity"
 
 /** The agents (MCP clients) this person approved, newest first. */

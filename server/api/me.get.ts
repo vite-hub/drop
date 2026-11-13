@@ -1,8 +1,8 @@
 // doctor-disable nuxt/middleware/no-route-middleware-api-security -- public on purpose: signed out, it answers null.
 import { inArray } from "drizzle-orm"
 import { defineHandler } from "h3"
-import { db } from "vite-hub/database/drizzle"
-import { organization } from "../databases/config"
+import { db } from "vite-hub/database"
+import { organization } from "../databases/default"
 import type { Viewer } from "#shared/types"
 import { expiryPolicy } from "../utils/expiry"
 import { identify } from "../utils/identity"

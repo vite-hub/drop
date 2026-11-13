@@ -69,7 +69,13 @@ const bundle = await build({
   configFile: false,
   logLevel: "silent",
   define: { "process.env.NODE_ENV": JSON.stringify("production") },
-  resolve: { alias: { "#shared": root + "shared" } },
+  resolve: {
+    alias: [
+      { find: "#shared", replacement: root + "shared" },
+      // ViewerDevice takes DeviceFrame from the UI root, which also loads Nuxt UI's .vue files. Only the frame is mounted here.
+      { find: /^vite-hub\/ui$/, replacement: root + "node_modules/@vite-hub/ui/dist/parts/components/device-frame.js" },
+    ],
+  },
   plugins: [
     {
       name: "site-device-fixture",

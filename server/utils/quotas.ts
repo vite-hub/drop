@@ -3,7 +3,7 @@ import type { BatchItem } from "drizzle-orm/batch"
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { blob } from "vite-hub/blob"
 import { PUBLISH_BURST, publishBurst } from "./publish-burst"
 import {
@@ -17,7 +17,7 @@ import {
   type Usage,
 } from "#shared/quotas"
 import { useServerEnv } from "#vitehub/env/server"
-import { codeImages, dropFiles, drops, quotaReservations, user } from "../databases/config"
+import { codeImages, dropFiles, drops, quotaReservations, user } from "../databases/default"
 import { isPaying } from "./teams"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
@@ -296,7 +296,7 @@ export async function cleanupCodeImages(now: Date) {
       .limit(80)
     if (!rows.length) return
     const keys = rows.map((row) => row.key)
-    const [error] = await blob.del(keys)
+    const [error] = await blob.delete(keys)
     if (error) throw error
     await db.delete(codeImages).where(inArray(codeImages.blobKey, keys))
   }

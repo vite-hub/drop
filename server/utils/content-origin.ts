@@ -59,7 +59,7 @@ const LABEL = "[a-z2-7]{26}"
  * VITEHUB_SECRET. Stable, and says nothing about the id.
  */
 async function contentLabel(event: H3Event, dropId: string): Promise<string> {
-  const secret = await deriveSecret("drop:content-origin", event)
+  const secret = await deriveSecret("drop:content-origin", { event })
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

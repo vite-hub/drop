@@ -2,9 +2,9 @@ import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import { useLogger } from "evlog/nitro/v3"
 import { verifyMcpRequest } from "vite-hub/auth/mcp"
-import { getAuthForRequest } from "vite-hub/auth/server"
-import { db } from "vite-hub/database/drizzle"
-import { user as users } from "../databases/config"
+import { useAuth } from "vite-hub/auth/server"
+import { db } from "vite-hub/database"
+import { user as users } from "../databases/default"
 import { isMember } from "./members"
 import { type TeamRole, teamsOf } from "./teams"
 import { useServerEnv } from "#vitehub/env/server"
@@ -64,7 +64,7 @@ export async function syncRole(userId: string) {
       .where(eq(users.id, userId))
 }
 
-export const authFor = (event: H3Event) => getAuthForRequest(event.req, undefined, event)
+export const authFor = (event: H3Event) => useAuth(event)
 
 export const bearerFrom = (headers: Headers) => headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? null
 

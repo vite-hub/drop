@@ -3,9 +3,9 @@ import { useLogger } from "evlog/nitro/v3"
 import { getCookie, type H3Event } from "h3"
 import * as v from "valibot"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { contentTypeOf, isTextFile } from "#shared/project-bundle"
-import { dropFiles } from "../databases/config"
+import { dropFiles } from "../databases/default"
 import { onOwnOrigin } from "./content-origin"
 import { findDrop, permissions } from "./drops"
 import { identityOf, type Identity } from "./identity"
@@ -207,23 +207,25 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
     event.res.headers.set("X-Robots-Tag", "noindex, nofollow")
     // ViteHub streams the file from storage, or just the range a video asks for: Firefox resumes one mid-file and gives
     // up with a network error unless the answer starts where it asked, and Safari won't play one without ranges.
-    const [error, body] = await blob.serve(event, blobKey, { cacheControl })
-    if (error?.code === "BLOB_NOT_FOUND") {
-      if (!wasKept) return null
-      continue
-    }
-    // Not the cacheable 404 a missing file gets: the store failing is brief, and a cached miss would outlast it.
-    if (error) {
-      useLogger(event).error(error, { action: "storage" })
+    let served: Response
+    try {
+      served = await blob.serve(event.req, blobKey, { cacheControl })
+    } catch (error) {
+      // Not the cacheable 404 a missing file gets: the store failing is brief, and a cached miss would outlast it.
+      useLogger(event).error(error instanceof Error ? error : String(error), { action: "storage" })
       return new Response("File storage is temporarily unavailable.", {
         status: 503,
         headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5" },
       })
     }
-    if (body) event.res.headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
-    const status = event.res.status || 200
-    return new Response(event.req.method === "HEAD" ? null : keepFile(event, blobKey, status, body), {
-      status,
+    if (served.status === 404) {
+      if (!wasKept) return null
+      continue
+    }
+    for (const [name, value] of served.headers) event.res.headers.set(name, value)
+    if (served.status !== 304) event.res.headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
+    return new Response(event.req.method === "HEAD" ? null : keepFile(event, blobKey, served.status, served.body), {
+      status: served.status,
       headers: event.res.headers,
     })
   }

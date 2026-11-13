@@ -1,10 +1,10 @@
 import { and, inArray, isNotNull, lte, sql } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { useServerEnv } from "#vitehub/env/server"
 import { type DropMode, isPublic, liveShare, publicUntilFrom, type Share, shareBlock } from "#shared/share"
 import type { DropKind } from "#shared/types"
-import { drops } from "../databases/config"
+import { drops } from "../databases/default"
 import type { DropRow } from "./drops/types"
 import { teamOf, teamsEnabled } from "./teams"
 

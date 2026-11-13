@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { defineSkill, defineSkills, type Skill } from "vite-hub/skills"
 import comarkUiSkill from "comark-ui/skills/comark-ui/SKILL.md?raw"
 import { skills as comarkSkills } from "comark-ui/skills"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
-import { skillSettings } from "../databases/config"
+import { skillSettings } from "../databases/default"
 
 /**
  * Drop's local and bundled upstream Agent Skills. `vite-hub/skills` serves them three ways: MCP (the Skills extension,

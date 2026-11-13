@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm"
-import { db } from "vite-hub/database/drizzle"
-import { account, user as users } from "../databases/config"
+import { db } from "vite-hub/database"
+import { account, user as users } from "../databases/default"
 import { useServerEnv } from "#vitehub/env/server"
 import { isListed } from "#shared/roles"
 import { githubOrganization, isGitHubMember } from "./github-membership"

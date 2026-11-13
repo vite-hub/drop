@@ -6,7 +6,7 @@ import { H3Event } from "h3"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
-const { default: schema } = await import("../../server/databases/config.ts")
+const { default: schema } = await import("../../server/databases/default/index.ts")
 const { proxyAuth } = await import("../../server/utils/proxy-auth.ts")
 const { isGitHubMember } = await import("../../server/utils/github-membership.ts")
 const { default: proxySession } = await import("../../server/middleware/0.15.proxy-session.ts")

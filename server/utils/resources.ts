@@ -2,11 +2,11 @@ import { eq } from "drizzle-orm"
 import { parseYAML } from "confbox"
 import { HTTPError } from "h3"
 import * as v from "valibot"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { splitFrontmatter } from "#shared/frontmatter"
 import { MAX_RESOURCE_TITLE, MAX_RESOURCE_URL, MAX_RESOURCES, mergeResources, resourceUrl } from "#shared/resources"
 import type { DropResource } from "#shared/types"
-import { drops } from "../databases/config"
+import { drops } from "../databases/default"
 import type { DropRow } from "./drops"
 
 /** One link of a drop, as `publish` and `update_drop` take it. */
