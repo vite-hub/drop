@@ -32,7 +32,7 @@ LABEL org.opencontainers.image.licenses="BUSL-1.1"
 WORKDIR /app
 COPY --from=build /app/.output ./.output
 COPY scripts/start.mjs scripts/migrate-d1.mjs ./scripts/
-COPY server/databases/migrations ./server/databases/migrations
+COPY server/databases/default/migrations ./server/databases/default/migrations
 RUN mkdir .data && chown node:node .data
 USER node
 ENV HOST=0.0.0.0 PORT=3000

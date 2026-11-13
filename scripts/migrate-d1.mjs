@@ -1,6 +1,23 @@
 import { readdir, readFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
 
+const MIGRATIONS = new URL("../server/databases/default/migrations/", import.meta.url)
+
+/**
+ * Each migration folder under the `.sql` name Wrangler records it by in `d1_migrations`, in Wrangler's order.
+ * d1-migrations.json keeps the names (ViteHub's `vitehub database generate` adds new folders to it), so the folders that
+ * `vitehub database up` converted from Drizzle Kit 0.x keep the file names production already applied.
+ */
+export async function d1Migrations(directory = MIGRATIONS) {
+  const names = JSON.parse(await readFile(new URL("d1-migrations.json", directory), "utf8"))
+  const folders = (await readdir(directory, { withFileTypes: true })).filter((entry) => entry.isDirectory())
+  const unnamed = folders.find((folder) => !Object.hasOwn(names, folder.name))
+  if (unnamed) throw new Error(`d1-migrations.json has no name for ${unnamed.name}. Run \`vitehub database generate\`.`)
+  return folders
+    .map((folder) => ({ name: names[folder.name], file: new URL(`${folder.name}/migration.sql`, directory) }))
+    .sort((a, b) => (a.name < b.name ? -1 : 1))
+}
+
 // Node and Deno can run this without Wrangler or native dependencies.
 export async function migrateD1() {
   const required = ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_D1_DATABASE_ID"]
@@ -36,11 +53,9 @@ export async function migrateD1() {
     "CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
   )
   const applied = new Set((await query("SELECT name FROM d1_migrations")).map((row) => row.name))
-  const directory = new URL("../server/databases/migrations/", import.meta.url)
-  const files = (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort()
-  for (const name of files) {
+  for (const { name, file } of await d1Migrations()) {
     if (applied.has(name)) continue
-    const sql = await readFile(new URL(name, directory), "utf8")
+    const sql = await readFile(file, "utf8")
     // D1 executes the SQL and ledger insert in one request. A failure rolls back both.
     await query(`${sql}\n; INSERT INTO d1_migrations (name) VALUES ('${name.replaceAll("'", "''")}');`)
     console.log(`Applied ${name}`)

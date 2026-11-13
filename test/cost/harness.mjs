@@ -1,23 +1,23 @@
-import { readFileSync, readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
+import { d1Codecs } from "drizzle-orm/d1/codecs"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { H3Event } from "h3"
 import { installComments } from "vite-hub/comments/server"
-
-const root = new URL("../../", import.meta.url)
+import { migrationSql } from "../migrations.mjs"
 
 export const sql = new DatabaseSync(":memory:")
 export const queries = []
-const run = (query, params, method) => {
+/** One query for Drizzle's SQLite proxy: `get` answers a row, `all` the rows, as arrays unless it asks for objects. */
+const run = (query, params, method, rowMode = "array") => {
   queries.push({ query, params })
   const statement = sql.prepare(query)
   if (method === "run" || !statement.columns().length) {
     statement.run(...params)
-    return { rows: [] }
+    return method === "all" ? [] : method === "get" ? undefined : { rows: [] }
   }
-  statement.setReturnArrays(true)
+  statement.setReturnArrays(rowMode === "array")
   const rows = statement.all(...params)
-  return { rows: method === "get" ? rows[0] : rows }
+  return method === "get" ? rows[0] : rows
 }
 
 // Each D1 query is a round trip from the Worker, ~6 ms from Milan where drop.vitehub.dev runs and ~40 ms from elsewhere.
@@ -50,23 +50,30 @@ export async function roundTrips(request) {
   }
 }
 
+const executor = (method) => async (query, params, rowMode) => {
+  await waited()
+  return run(query, params, method, rowMode)
+}
+// Raw SQLite values, as D1 returns them, so D1's codecs read them (JSON columns, booleans, timestamps), as in production.
 const db = drizzle(
-  async (query, params, method) => {
-    await waited()
-    return run(query, params, method)
+  {
+    get: executor("get"),
+    all: executor("all"),
+    run: executor("run"),
+    batch: async (batch) => {
+      await waited()
+      sql.exec("BEGIN")
+      try {
+        const result = batch.map((item) => run(item.sql, item.params, item.method, item.rowMode))
+        sql.exec("COMMIT")
+        return result
+      } catch (error) {
+        sql.exec("ROLLBACK")
+        throw error
+      }
+    },
   },
-  async (batch) => {
-    await waited()
-    sql.exec("BEGIN")
-    try {
-      const result = batch.map((item) => run(item.sql, item.params, item.method))
-      sql.exec("COMMIT")
-      return result
-    } catch (error) {
-      sql.exec("ROLLBACK")
-      throw error
-    }
-  },
+  { codecs: d1Codecs },
 )
 // Match D1's raw all() results, which return named columns instead of proxy arrays.
 db.all = async (query) => {
@@ -110,39 +117,37 @@ export const state = (globalThis.dropTest = {
       const file = objects.get(key)
       return [null, file ? { ...file, size: file.body?.size ?? file.size } : null]
     },
-    // Like ViteHub's serve(): headers on event.res, then the file, or the one range asked for, as a stream.
-    serve: async (event, key, options = {}) => {
+    // Like ViteHub's serve(): a Response with the file, or the one range asked for, a 404 for a missing file, and a
+    // thrown error when storage fails.
+    serve: async (request, key, options = {}) => {
       calls.serve++
       const body = objects.get(key)?.body
-      if (!body) return [{ code: "BLOB_NOT_FOUND" }, undefined]
-      if (state.failServe) return [{ code: "BLOB_R0001", message: "injected blob serve failure" }, undefined]
+      if (!body) return new Response(null, { status: 404 })
+      if (state.failServe) throw Object.assign(new Error("injected blob serve failure"), { code: "BLOB_R0001" })
       const etag = `"${key}"`
-      event.res.headers.set("ETag", etag)
-      event.res.headers.set("Cache-Control", options.cacheControl ?? "private, no-cache")
-      event.res.headers.set("Accept-Ranges", "bytes")
-      event.res.headers.set("X-Content-Type-Options", "nosniff")
-      event.res.headers.set("Content-Type", body.type || "application/octet-stream")
-      if (event.req.headers.get("if-none-match") === etag) {
-        event.res.status = 304
-        return [null, null]
-      }
-      const ifRange = event.req.headers.get("if-range")
+      const headers = new Headers({
+        ETag: etag,
+        "Cache-Control": options.cacheControl ?? "private, no-cache",
+        "Accept-Ranges": "bytes",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Type": body.type || "application/octet-stream",
+      })
+      if (request.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers })
+      const ifRange = request.headers.get("if-range")
       const range =
-        ifRange === null || ifRange === etag ? /^bytes=(\d+)-(\d*)$/.exec(event.req.headers.get("range") ?? "") : null
+        ifRange === null || ifRange === etag ? /^bytes=(\d+)-(\d*)$/.exec(request.headers.get("range") ?? "") : null
       const start = range ? Number(range[1]) : 0
       const end = range?.[2] ? Number(range[2]) : body.size - 1
-      if (range) {
-        event.res.status = 206
-        event.res.headers.set("Content-Range", `bytes ${start}-${end}/${body.size}`)
-      }
-      event.res.headers.set("Content-Length", String(end - start + 1))
-      return [null, body.slice(start, end + 1).stream()]
+      if (range) headers.set("Content-Range", `bytes ${start}-${end}/${body.size}`)
+      headers.set("Content-Length", String(end - start + 1))
+      const part = request.method === "HEAD" ? null : body.slice(start, end + 1).stream()
+      return new Response(part, { status: range ? 206 : 200, headers })
     },
     put: async (key, body) => {
       objects.set(key, { body: new Blob([body]), uploadedAt: new Date() })
       return [null, { url: `/f/${key}` }]
     },
-    del: async (keys) => {
+    delete: async (keys) => {
       calls.del++
       if (state.failDelete) return [new Error("injected blob delete failure")]
       for (const key of Array.isArray(keys) ? keys : [keys]) objects.delete(key)
@@ -172,11 +177,7 @@ const { default: comments } = await import("../../server/comments.ts")
  * `comments: false` leaves Comments without one, as a server whose ViteHub plugin found no Database.
  */
 export function migrate({ comments: install = true } = {}) {
-  const directory = new URL("server/databases/migrations/", root)
-  for (const name of readdirSync(directory)
-    .filter((name) => name.endsWith(".sql"))
-    .sort())
-    sql.exec(readFileSync(new URL(name, directory), "utf8"))
+  for (const migration of migrationSql()) sql.exec(migration)
   if (install) installComments(comments, { database: state.db })
 }
 const authorOf = (row) => ({
