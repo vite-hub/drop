@@ -84,6 +84,9 @@ patchedDependencies:
   "@vite-hub/realtime@0.0.0-preview-03e8d1b": patches/@vite-hub__realtime@0.0.0-preview-03e8d1b.patch
   # Nuxt replays Workspace config before Vite configResolved creates its assets registry. Create it with the alias.
   "@vite-hub/workspace@0.0.0-preview-03e8d1b": patches/@vite-hub__workspace@0.0.0-preview-03e8d1b.patch
+  # Nitro's KV cache driver read raw entries as text, so getItemRaw returned a cached PNG decoded as UTF-8 and every
+  # cached /og/<id>.png card came back broken. Remove when Drop moves to a ViteHub build with vite-hub/vitehub#4190.
+  "@vite-hub/kv@0.0.0-preview-03e8d1b": patches/@vite-hub__kv@0.0.0-preview-03e8d1b.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
