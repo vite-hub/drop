@@ -256,7 +256,7 @@ async function newBoard() {
     <span v-if="part === 'icon'" class="grid size-7 shrink-0 place-items-center">
       <span
         v-if="child.href"
-        class="grid size-full place-items-center rounded-md bg-elevated ring-1 ring-default ring-inset"
+        class="grid size-full place-items-center rounded-md bg-elevated ring-1 ring-default ring-inset dark:bg-white dark:ring-0"
       >
         <ViewerResourceIcon :url="child.href" />
       </span>

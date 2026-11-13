@@ -309,3 +309,146 @@ test("a canceled capture cannot post over or unlock a new Marker session", async
     await browser.close()
   }
 })
+
+test("the Marker's Text tip types labels in the frame, keeps Drop's keys out of them, and draws them on the snapshot", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser)
+    await frame.evaluate(() => {
+      document.body.style.minHeight = "3000px"
+      scrollTo(0, 600)
+      const popover = document.createElement("div")
+      popover.id = "label-popover"
+      popover.setAttribute("popover", "manual")
+      popover.textContent = "Price details"
+      document.body.append(popover)
+      popover.showPopover()
+      document.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape") popover.hidePopover()
+        },
+        true,
+      )
+    })
+    await page.evaluate(() => tell({ type: "tool", tool: "mark", pen: { tool: "text", color: "#f59e0b", width: 20 } }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw.mark"))
+    const label = frame.getByRole("textbox", { name: "Label" })
+    const marks = () => page.evaluate(() => window.posts.findLast((m) => m.type === "marks")?.count ?? 0)
+
+    await page.mouse.click(300, 300)
+    await label.waitFor()
+    // Drop's tool keys and the Marker's keys are the label's letters while it's typed.
+    const keysBefore = (await posted(page, "key")).length
+    await page.keyboard.type("bat [x]")
+    await page.keyboard.press(" ")
+    assert.equal(await label.inputValue(), "bat [x] ")
+    assert.equal((await posted(page, "key")).length, keysBefore)
+    const beforeScroll = await frame.evaluate(() => scrollY)
+    assert.ok(beforeScroll > 0, "both paging directions have room to scroll")
+    for (const key of ["PageDown", "PageUp"]) {
+      await page.keyboard.press(key)
+      await page.waitForTimeout(250)
+      assert.equal(await frame.evaluate(() => scrollY), beforeScroll, key + " keeps the viewport locked")
+    }
+    // Native caret navigation still works while page capture handlers are isolated.
+    const typed = await label.inputValue()
+    await page.keyboard.press("Home")
+    await page.keyboard.press("Shift+End")
+    assert.equal(await label.evaluate((input) => input.selectionEnd - input.selectionStart), typed.length)
+    await page.keyboard.press("Escape")
+    assert.equal(await frame.locator("#label-popover").evaluate((el) => el.matches(":popover-open")), true)
+
+    assert.equal((await posted(page, "key")).length, keysBefore, "Esc puts the label down, not the Marker")
+    assert.equal(await label.count(), 0)
+    await page.waitForFunction(() => window.posts.findLast((m) => m.type === "marks")?.count === 1)
+    // With the label down, T is Drop's key again.
+    await page.keyboard.press("t")
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "key" && m.key === "t"))
+    // Amber takes near-black words.
+    assert.equal(
+      await frame.evaluate(() =>
+        document.querySelector("drop-comments").shadowRoot.querySelector(".ink g text").getAttribute("fill"),
+      ),
+      "#0a0a0a",
+    )
+
+    // A label emptied goes, and Drop hears the count drop.
+    const box = await frame.evaluate(() => {
+      const r = document.querySelector("drop-comments").shadowRoot.querySelector(".ink g rect").getBoundingClientRect()
+      return { x: r.x, y: r.y, height: r.height }
+    })
+    await page.mouse.click(box.x + 8, box.y + box.height / 2)
+    await label.fill("")
+    await page.keyboard.press("Enter")
+    await page.waitForFunction(() => window.posts.findLast((m) => m.type === "marks")?.count === 0)
+
+    // Done from Drop puts down the label being typed and sends it.
+    await page.mouse.click(300, 300)
+    await page.keyboard.type("Too big")
+    // A size picked in Drop's dock while the label is open restyles it. The dock's buttons don't take focus on press
+    // (mousedown.prevent), so the label stays open and keeps the caret.
+    const small = await label.boundingBox()
+    await page.evaluate(() => {
+      const button = document.createElement("button")
+      button.textContent = "36px"
+      button.style.cssText = "position: fixed; right: 8px; bottom: 8px; z-index: 9"
+      button.addEventListener("mousedown", (e) => e.preventDefault())
+      button.addEventListener("click", () => tell({ type: "pen", tool: "text", color: "#2563eb", width: 36 }))
+      document.body.append(button)
+    })
+    await page.getByRole("button", { name: "36px" }).click()
+    await frame.waitForFunction(
+      () =>
+        document.querySelector("drop-comments").shadowRoot.querySelector("input[aria-label=Label]")?.offsetHeight > 40,
+    )
+    assert.ok((await label.boundingBox()).height > small.height * 1.5)
+    await page.keyboard.type("!")
+    assert.equal(await label.inputValue(), "Too big!")
+    await page.keyboard.press("Enter")
+    // Await each bridge delivery before clicking to reopen: defaults must change while the editor is closed.
+    const pickPen = async (style) => {
+      await frame.evaluate(() => {
+        window.penApplied = new Promise((resolve) => {
+          const applied = (event) => {
+            if (event.data?.type !== "pen") return
+            removeEventListener("message", applied)
+            resolve()
+          }
+          addEventListener("message", applied)
+        })
+      })
+      await page.evaluate((style) => tell({ type: "pen", tool: "text", ...style }), style)
+      await frame.evaluate(() => window.penApplied)
+    }
+    await pickPen({ color: "#ec4899", width: 20 })
+    await page.mouse.click(300, 300)
+    await label.waitFor()
+    assert.equal(await label.evaluate((el) => el.style.fontSize), "36px")
+    assert.equal(await label.evaluate((el) => el.style.backgroundColor), "rgb(37, 99, 235)")
+    await pickPen({ color: "#16a34a" })
+    assert.equal(await label.evaluate((el) => el.style.fontSize), "36px", "colour preserves the label's size")
+    await page.keyboard.press("Enter")
+    await pickPen({ color: "#ec4899" })
+    await page.mouse.click(300, 300)
+    await label.waitFor()
+    await pickPen({ width: 20 })
+    assert.equal(await label.evaluate((el) => el.style.fontSize), "20px")
+    assert.equal(await label.evaluate((el) => el.style.backgroundColor), "rgb(22, 163, 74)", "size preserves colour")
+    await page.evaluate(() => tell({ type: "mark", do: "done" }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "area-shot"))
+    const [area] = await posted(page, "area")
+    assert.equal(area.quote, undefined, "a label quotes none of the page's words")
+    assert.ok(area.ow > 0 && area.oh > 0)
+    assert.equal(await marks(), 1)
+    assert.equal(
+      await frame.evaluate(
+        () => document.querySelector("drop-comments").shadowRoot.querySelectorAll(".draft .inkp g").length,
+      ),
+      1,
+      "the label stays on the page while the comment is written",
+    )
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

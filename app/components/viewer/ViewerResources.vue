@@ -40,13 +40,17 @@ const more = computed(() => Math.max(0, chipUrls.value.length - shown.value.leng
 // sits on white, as sites draw them for, so a black mark like Airtable's stays visible on the dark pill.
 const rings =
   "ring-2 ring-(--ui-bg) group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-aria-expanded/links:ring-(--ui-bg-inverted)"
+// The list rises centered over the whole pill, as the comments panel does, not over the icons at its end.
+const trigger = useTemplateRef<HTMLButtonElement>("trigger")
+const bar = computed(() => trigger.value?.closest<HTMLElement>('[aria-label="Document tools"]') ?? undefined)
 const chip = `${rings} grid size-5 place-items-center rounded-full bg-white inset-ring inset-ring-black/10 [--ui-text-muted:var(--color-neutral-500)]`
 </script>
 
 <template>
   <UPopover
     v-if="count"
-    :content="{ align: 'end', side: 'top', sideOffset: 8 }"
+    :content="{ align: 'center', side: 'top', sideOffset: 8 }"
+    :reference="bar"
     :ui="{
       content:
         'w-80 max-w-[calc(100vw-1rem)] max-h-[min(24rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px] motion-reduce:animate-none',
@@ -56,7 +60,12 @@ const chip = `${rings} grid size-5 place-items-center rounded-full bg-white inse
       <UTooltip :disabled="open" text="Related links" :content="{ side: 'top', sideOffset: 8 }">
         <!-- In the review dock, beside Share. Each chip is cut out of the pill's fill by a ring of that fill, so the
              overlap reads on every state of the button; a hairline keeps a white favicon's edge. -->
-        <button :aria-label="`Related links (${count})`" class="group/links shrink-0 px-1.5!" type="button">
+        <button
+          ref="trigger"
+          :aria-label="`Related links (${count})`"
+          class="group/links shrink-0 px-1.5!"
+          type="button"
+        >
           <span aria-hidden="true" class="flex -space-x-1">
             <span v-if="!shown.length && related[0]" :class="chip">
               <UIcon class="size-3.5 text-muted" :name="KIND_ICONS[related[0].kind]" />

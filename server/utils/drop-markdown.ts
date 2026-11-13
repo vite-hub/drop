@@ -2,9 +2,9 @@ import { FILE_LINK } from "#shared/embedded-images"
 import type { DropDetail } from "#shared/types"
 
 /**
- * A Markdown doc or a single HTML page as Markdown, for agents and for "Copy as Markdown". A Markdown doc is its own
- * source; an HTML page goes through mdream. Links to the drop's files become absolute, so the copy works anywhere.
- * Null for kinds that have no one text to give (apps, folders, images, files, sites).
+ * A Markdown doc or a single HTML page as Markdown, for agents; "Copy as Markdown" uses it for Markdown docs. A
+ * Markdown doc is its own source; an HTML page goes through mdream. Links to the drop's files become absolute, so the
+ * copy works anywhere. Null for kinds that have no one text to give (apps, folders, images, files, sites).
  */
 export async function dropMarkdown(drop: DropDetail, origin: string): Promise<string | null> {
   if (drop.content === undefined) return null

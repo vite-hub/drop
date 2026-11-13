@@ -185,6 +185,8 @@ const OUTLINE_SCRIPT = String.raw`(() => {
     link.onclick = (event) => {
       event.preventDefault();
       heading.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      // Drop's address keeps the section, so it can be shared from the address bar.
+      if (heading.id) parent.postMessage({ __drop: true, type: "heading", id: heading.id }, "*");
     };
     item.append(link);
     list.append(item);

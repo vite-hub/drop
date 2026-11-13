@@ -19,6 +19,7 @@
 
 [![license](https://comark-ui.onmax.me/badge.svg?label=license&value=BUSL-1.1)](https://github.com/vite-hub/drop/blob/main/LICENSE)
 [![docs](https://comark-ui.onmax.me/badge.svg?label=docs&value=drop.vitehub.dev)](https://drop.vitehub.dev)
+[![skills.sh](https://www.skills.sh/b/vite-hub/drop)](https://www.skills.sh/vite-hub/drop)
 
 ## How it works
 
@@ -39,11 +40,27 @@
    The first time it connects, Drop opens in your browser so you can sign in. [The agents page](https://drop.vitehub.dev/agents) has the setup for Codex, Cursor, VS Code, and other clients, and `npx add-mcp https://drop.vitehub.dev/mcp` works for most.
 3. Ask your agent to drop a plan. It answers with the review link.
 
+## Install the skills
+
+**data-explorer** turns a CSV, a JSON export or an API into one interactive dashboard page: findings, charts and tables behind tabs, with a filter sidebar. It needs no Drop account, and it's MIT.
+
+```sh
+npx skills add vite-hub/drop --skill data-explorer
+```
+
+To pick from all of Drop's skills, leave out `--skill`; the [skills CLI](https://github.com/vercel-labs/skills) asks which skills and which agents:
+
+```sh
+npx skills add vite-hub/drop
+```
+
+The other skills publish to Drop, so add the MCP server first. Clients that load skills over MCP already get them from the server.
+
 ## Host your own
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop&env=GITHUB_CLIENT_ID%2CGITHUB_CLIENT_SECRET%2CBETTER_AUTH_SECRET%2CDROP_ADMINS%2CCLOUDFLARE_ACCOUNT_ID%2CCLOUDFLARE_API_TOKEN%2CCLOUDFLARE_D1_DATABASE_ID%2CCLOUDFLARE_D1_DATABASE_NAME&envDescription=GitHub+sign-in%2C+admin+emails%2C+Cloudflare+D1%2C+and+a+private+Blob+store.+See+the+Drop+guide+for+each+value.&envLink=https%3A%2F%2Fdrop.vitehub.dev%2Fdocs%2Fself-host%2Fvercel&stores=%5B%7B%22type%22%3A%22blob%22%7D%5D) [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [![Deploy on Deno](https://deno.com/button)](https://console.deno.com/new?clone=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop) [Run on a VPS](https://drop.vitehub.dev/docs/self-host/vps#steps)
 
-Cloudflare creates the database and storage for you. Every host needs a GitHub OAuth app with `<origin>/api/auth/callback/github` as its callback. The [self-hosting docs](https://drop.vitehub.dev/docs/self-host) walk through each host and cover every setting, abuse handling, lifetimes, quotas, and logs.
+Cloudflare creates the database and storage for you. On a VPS or any container platform, run the published image, `ghcr.io/vite-hub/drop`, with Docker Compose. Every host needs a GitHub OAuth app with `<origin>/api/auth/callback/github` as its callback. The [self-hosting docs](https://drop.vitehub.dev/docs/self-host) walk through each host and cover every setting, abuse handling, lifetimes, quotas, and logs.
 
 ## Develop
 

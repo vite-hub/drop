@@ -2,14 +2,12 @@ import type { DropDetail } from "#shared/types"
 import type { RealtimeRoom } from "@vite-hub/realtime/client"
 import * as v from "valibot"
 
-/** Someone else with the drop open: who, in their presence color, whether they're away, and where they are. */
+/** Someone else looking at the drop right now: who, in their presence color, and where they are. */
 export interface PresencePerson {
   id: string
   name: string
   image?: string
   color: string
-  /** Away: no input for a minute, or their tab is hidden. */
-  idle: boolean
   /** Where they are: a doc's version (`v3`, an app's page after it), a reviewed site's page, or null in Drop. */
   at: string | null
 }
@@ -98,7 +96,10 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     room.value?.setLocal("cursor", null)
   })
 
-  /** Everyone else in the room, each person once, their tabs together: away only when every tab of theirs is. */
+  /**
+   * Everyone else looking at the drop now, each person once. A person whose every tab is hidden or idle for a minute
+   * doesn't show: the faces say who's here, not who opened it earlier.
+   */
   const people = computed<PresencePerson[]>(() => {
     void tick.value
     const current = room.value
@@ -108,16 +109,14 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     for (const person of current.people()) {
       if (person.clientId === current.clientId || person.id === me.value?.id) continue
       const state = stateOf(states.get(person.clientId))
-      const entry: PresencePerson = {
+      if (state.active === false || byId.has(person.id)) continue
+      byId.set(person.id, {
         id: person.id,
         name: person.name,
         ...(person.image ? { image: person.image } : {}),
         color: person.color,
-        idle: state.active === false,
         at: state.at ?? null,
-      }
-      const seen = byId.get(person.id)
-      if (!seen || (seen.idle && !entry.idle)) byId.set(person.id, entry)
+      })
     }
     return [...byId.values()]
   })

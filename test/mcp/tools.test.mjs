@@ -489,6 +489,45 @@ test("a suggestion is a comment with the words that replace its quote, and read_
   assert.match(read.content[0].text, /Suggests deleting it\.\n {3}Any number works\./)
 })
 
+test("a comment on a video's frame keeps its second, and read_drop tells agents which frame", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${id}/comments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init),
+      }),
+    )
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  insertDrop("video", { kind: "file", filename: "flow.webm", blob_key: "flow.webm", content_type: "video/webm" })
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
+  const frame = { kind: "image", selector: "video", ox: 400, oy: 300, label: "the frame at 0:12" }
+  const sent = await commentsPost(route("video", { ...frame, at: 12.48, body: "The spinner never stops." }))
+  assert.equal(sent.at, 12.48)
+  const plain = await commentsPost(route("video", { kind: "page", selector: "", ox: 0, oy: 0, body: "Nice." }))
+  assert.equal(plain.at, null)
+  await assert.rejects(
+    commentsPost(route("video", { kind: "area", selector: "main", ox: 0, oy: 0, at: 3, body: "x" })),
+    {
+      statusText: "A video's frame takes a spot or an area.",
+    },
+  )
+
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const read = await call(readDrop, { id: "video" })
+  assert.deepEqual(
+    read.structuredContent.comments.map((comment) => comment.at),
+    [12.48, undefined],
+  )
+  assert.match(
+    read.content[0].text,
+    /\[the spot 40% across, 30% down of the frame at 0:12\]\n {3}The spinner never stops\./,
+  )
+})
+
 test("accepting a suggestion, from the page or an agent, publishes its words as the next version and resolves it; undo takes it back", async () => {
   const post = (id, init) => {
     const event = new H3Event(

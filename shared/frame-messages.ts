@@ -20,6 +20,8 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
   v.object({ type: v.literal("copy"), text: v.string() }),
+  // A Markdown doc's section the reader went to, or (`copy`) whose link they copied: Drop's address keeps it as #id.
+  v.object({ type: v.literal("heading"), id: v.pipe(v.string(), v.maxLength(300)), copy: v.optional(v.boolean()) }),
   // Input inside the frame keeps the reader active, even when no cursor is being shared.
   v.object({ type: v.literal("activity") }),
   // Where the reader's pointer is, for the people in the drop's presence room (PRESENCE_CURSORS in ./presence-cursors):
@@ -109,7 +111,24 @@ export const FrameMessage = v.variant("type", [
   // An image's page sends ← and → too, for those keys or a sideways swipe: they move to the folder's other images.
   v.object({
     type: v.literal("key"),
-    key: v.picklist(["Escape", "c", "e", "v", "r", "s", "u", "x", "b", "p", "a", "[", "]", "ArrowLeft", "ArrowRight"]),
+    key: v.picklist([
+      "Escape",
+      "c",
+      "e",
+      "v",
+      "r",
+      "s",
+      "u",
+      "x",
+      "b",
+      "p",
+      "a",
+      "t",
+      "[",
+      "]",
+      "ArrowLeft",
+      "ArrowRight",
+    ]),
     tool: v.optional(v.picklist(["browse", "comment", "measure", "mark"])),
   }),
   v.object({

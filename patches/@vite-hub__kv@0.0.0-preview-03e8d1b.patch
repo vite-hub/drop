@@ -1,0 +1,12 @@
+diff --git a/dist/runtime/nitro-cache.js b/dist/runtime/nitro-cache.js
+index 9a5ce507ea409248f4f491884b61d04533c866a1..b995fb75197fd870e982a4649bbb419ea6eea141 100644
+--- a/dist/runtime/nitro-cache.js
++++ b/dist/runtime/nitro-cache.js
+@@ -15,6 +15,7 @@ function createKVCacheDriver(options = {}) {
+ 		options,
+ 		hasItem: (name) => unwrap(kv.has(key(name))),
+ 		getItem: (name) => unwrap(kv.get(key(name), { type: "text" })),
++		getItemRaw: (name) => unwrap(kv.get(key(name), { type: "bytes" })),
+ 		setItem: (name, value, opts) => unwrap(kv.set(key(name), value, opts)),
+ 		removeItem: (name) => unwrap(kv.del(key(name))),
+ 		async getKeys(base) {

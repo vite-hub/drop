@@ -1,13 +1,16 @@
 <script setup lang="ts">
-// The header locates the drop; the bottom review pill owns editing, comments, sharing, Details, and History.
+// No top bar: most readers arrive from a shared link, so the drop gets the whole height. The bottom review pill owns
+// the way back to Drop, editing, comments, sharing, Details, and History.
 // Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
+import type { VideoFrame } from "~/components/viewer/ViewerVideo.vue"
 import { breakpointsTailwind } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
+import { clock, startTime } from "#shared/video-time"
 import { isPreviewLink, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
@@ -543,6 +546,24 @@ const {
   variantBar: true,
   arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
   presence,
+  heading: (id, copySection) => {
+    // The address keeps the section without a new history entry, like the outline's own links on a page of its own.
+    const here = new URL(route.fullPath, link.value)
+    here.hash = id
+    history.replaceState(history.state, "", `${here.pathname}${here.search}${here.hash}`)
+    if (!copySection) return
+    const shared = new URL(link.value)
+    shared.hash = id
+    void copy(shared.href, { announce: "Link to the section copied" })
+  },
+})
+// A link to a section (#id) opens the doc there, once the frame has it. The frame also gets the drop's link, for the
+// headings' # links.
+watch(ready, (loaded) => {
+  if (!loaded || drop.value.kind !== "markdown") return
+  send({ type: "page-link", href: link.value })
+  const id = decodeURIComponent(route.hash.slice(1))
+  if (id) send({ type: "heading", id })
 })
 
 const outdated = computed(
@@ -628,6 +649,7 @@ defineShortcuts({
   b: () => canMark.value && annotations.mark("marker"),
   p: () => canMark.value && annotations.mark("pen"),
   a: () => canMark.value && annotations.mark("arrow"),
+  t: () => canMark.value && annotations.mark("text"),
   meta_z: () => undoMark(),
   u: () => framed.value && toggleOverlay("rulers"),
   x: () => framed.value && toggleOverlay("xray"),
@@ -684,8 +706,9 @@ function download() {
 const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value && ready.value)
 const exportPdf = () => send({ type: "print", title: drop.value.title })
 
-// The version on screen, as the server converts it (server/middleware/0.09.drop-markdown.ts): the same text agents get.
-const copiesMarkdown = computed(() => drop.value.kind === "markdown" || drop.value.kind === "html")
+// The version on screen, as agents get it (server/middleware/0.09.drop-markdown.ts). Only Markdown docs: an HTML page's
+// Markdown loses whatever its scripts draw, so its readers download the HTML instead.
+const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 
 // The dock's links, beside Share: a Markdown doc's preview deploys, which are for opening; its other links read with its front
 // matter at the top of the doc (server/utils/markdown-document.ts withDocProperties). Every other drop shows them all.
@@ -798,6 +821,15 @@ function finishMark() {
   send({ type: "mark", do: "done" })
 }
 const undoMark = () => marking.value && send({ type: "mark", do: "undo" })
+// Send explicit picks even when they match the defaults; the open label may have another style.
+function colorMark(color: MarkColor) {
+  pen.color = color
+  send({ type: "pen", tool: pen.tip, color: MARK_COLORS[color] })
+}
+function sizeMark(index: number) {
+  pen.sizes[pen.tip] = index
+  send({ type: "pen", tool: pen.tip, width: MARK_TIPS[pen.tip].sizes[index]! })
+}
 // Open when someone reaches for Edit on a doc the editor can't take: the popover says why.
 const editNoteOpen = ref(false)
 const showEditTool = computed(
@@ -915,6 +947,17 @@ async function focusComment(comment: DropComment) {
       .catch(() => {})
   }
   if (comment.kind === "page") return
+  // A comment on a video's frame opens that frame in the lightbox, with the thread beside it.
+  if (comment.at !== null && video.value) {
+    await until(videoRef)
+      .toBeTruthy({ timeout: 5000 })
+      .catch(() => {})
+    const still = await videoRef.value?.frameAt(comment.at).catch(() => null)
+    if (!still || popover.value?.type !== "thread" || popover.value.id !== comment.id) return
+    showFrame(still)
+    popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
+    return
+  }
   // A resolved comment joins the pins once its thread opens: the frame takes the new pins first.
   await nextTick()
   send({ type: "focus", id: comment.id, open: false })
@@ -937,12 +980,9 @@ async function deleteDrop() {
   if (await remove(drop.value)) await navigateTo("/drops")
 }
 
-// The folders above, as breadcrumbs: in the app for people signed in, at their share links on a public page.
 const moveTo = useMoveDialog()
-const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
-  publicView ? dropPath(crumb) : `/drops/${crumb.id}`
 
-// ⌘K offers the same actions as the header, review dock, and Details.
+// ⌘K offers the same actions as the review dock and Details.
 usePaletteOffer("drop", () => {
   if (visitor.value) return null
   if (editing.value)
@@ -1031,15 +1071,37 @@ usePaletteOffer("drop", () => {
   return { title: drop.value.title, items }
 })
 
-// Areas drawn over an image in the page anchor to that image, so the lightbox shows them too.
+// Areas drawn over an image in the page anchor to that image, so the lightbox shows them too. A video's frame shows
+// the comments on that frame.
+const sameFrame = (comment: DropComment, at: number | undefined) =>
+  at === undefined ? comment.at === null : comment.at !== null && Math.abs(comment.at - at) < 0.05
 const imageComments = computed(() =>
   lightbox.value
     ? pageComments.value.filter(
         (comment) =>
-          comment.kind !== "text" && comment.selector === lightbox.value!.selector && !outdated.value.has(comment.id),
+          comment.kind !== "text" &&
+          comment.selector === lightbox.value!.selector &&
+          sameFrame(comment, lightbox.value!.at) &&
+          !outdated.value.has(comment.id),
       )
     : [],
 )
+
+const videoRef = useTemplateRef<{ frameAt: (at?: number) => Promise<VideoFrame | null> }>("videoRef")
+/** The comments on a video's frames, for its markers. */
+const frameComments = computed(() => (video.value ? pageComments.value.filter((comment) => comment.at !== null) : []))
+/** A video's frame, still in the lightbox, where a click or a drag comments on it. */
+function showFrame(still: VideoFrame) {
+  lightbox.value = {
+    src: still.src,
+    alt: `Frame at ${clock(still.at)}`,
+    selector: "video",
+    label: `the frame at ${clock(still.at)}`,
+    at: still.at,
+    file: still.file,
+    from: still.rect,
+  }
+}
 // The dock's list, the open thread, and the composer share one ViteHub comments state over the drop's comments.
 provideDropComments({
   source: () => (lightbox.value ? imageComments.value : comments.value),
@@ -1117,38 +1179,6 @@ watch(
   </DefineComposer>
 
   <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }">
-    <template #header>
-      <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
-        <template #leading>
-          <SidebarExpand v-if="!visitor" />
-          <NuxtLink v-if="visitor" aria-label="Drop" class="grid size-8 place-items-center" to="/"
-            ><DropMark class="h-4 w-6"
-          /></NuxtLink>
-          <UButton
-            v-else-if="drop.ancestors.length"
-            :aria-label="`Back to ${drop.ancestors.at(-1)!.title}`"
-            color="neutral"
-            icon="i-mingcute-arrow-left-line"
-            size="sm"
-            variant="ghost"
-            :to="crumbTo(drop.ancestors.at(-1)!)"
-          />
-          <UButton
-            v-else
-            aria-label="Back to drops"
-            color="neutral"
-            icon="i-mingcute-arrow-left-line"
-            size="sm"
-            variant="ghost"
-            to="/drops"
-          />
-        </template>
-        <template #title>
-          <ViewerLocation :drop="drop" :public-view="publicView" />
-        </template>
-      </UDashboardNavbar>
-    </template>
-
     <template #body>
       <UAlert
         v-if="owner && trashed"
@@ -1243,7 +1273,19 @@ watch(
           />
           <LazyViewerBoard v-else-if="drop.kind === 'board'" :key="drop.id" :drop="drop" />
           <LazyViewerLink v-else-if="drop.kind === 'link'" :drop="drop" />
-          <LazyViewerVideo v-else-if="video && drop.url" :src="drop.url" :title="drop.title" :type="video" />
+          <LazyViewerVideo
+            v-else-if="video && drop.url"
+            ref="videoRef"
+            :can-comment="drop.canComment && annotationsEnabled && !trashed"
+            :comments="frameComments"
+            :link="link"
+            :src="drop.url"
+            :start="startTime(textValue(route.query.t))"
+            :title="drop.title"
+            :type="video"
+            @frame="showFrame"
+            @open="focusComment"
+          />
           <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
           <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
             <div>
@@ -1367,6 +1409,15 @@ watch(
             </ViewerComments>
           </template>
           <template #toolbar>
+            <!-- A plain link, so it opens in this tab and ⌘-click still opens a new one. -->
+            <template v-if="!editing">
+              <UTooltip :text="visitor ? 'Open Drop' : 'Go to your drops'">
+                <UButton aria-label="Drop" color="neutral" size="xs" :to="visitor ? '/' : '/drops'" variant="ghost">
+                  <DropMark class="h-3.5 w-5" /><span class="hidden sm:inline">Drop</span>
+                </UButton>
+              </UTooltip>
+              <span aria-hidden="true" class="w-1 shrink-0" />
+            </template>
             <template v-if="galleryShown">
               <LazyViewerGallery
                 :at="galleryAt"
@@ -1431,9 +1482,9 @@ watch(
                 :marks="annotations.marks.value"
                 :pen="pen"
                 @cancel="setTool('browse')"
-                @color="pen.color = $event"
+                @color="colorMark"
                 @done="finishMark"
-                @size="pen.sizes[pen.tip] = $event"
+                @size="sizeMark"
                 @tip="annotations.mark($event)"
                 @undo="undoMark"
               />

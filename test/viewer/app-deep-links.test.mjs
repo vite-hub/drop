@@ -70,6 +70,7 @@ function openApp(query, { hash = "", files: given, router } = {}) {
     useBase64: () => ({ base64: ref("") }),
     useAttachmentData: () => ({}),
     useDebounceFn: (fn) => fn,
+    useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),
     useDropFrame: (_frame, _origin, handler) => {
       receive = handler

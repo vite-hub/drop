@@ -52,6 +52,8 @@ export function useViewerFrame(options: {
   arrow?: (key: "ArrowLeft" | "ArrowRight") => void
   /** Who else has the drop open (usePresence): the reader's pointer goes up to them, and their cursors come down. */
   presence?: Presence
+  /** A Markdown doc's section the reader went to, or (`copy`) whose link they copied. */
+  heading?: (id: string, copy: boolean) => void
 }) {
   const {
     drop,
@@ -267,6 +269,9 @@ export function useViewerFrame(options: {
         return
       case "copy":
         return void copy(message.text)
+      case "heading":
+        if (drop.value.kind === "markdown") options.heading?.(message.id, message.copy === true)
+        return
       case "pointer":
         return options.presence?.point(message.at)
       case "activity":
@@ -405,7 +410,18 @@ export function useViewerFrame(options: {
         pen: annotations.penStyle.value,
       }),
   )
-  watch(annotations.penStyle, (pen) => ready.value && send({ type: "pen", ...pen }))
+  // Send only the changed attributes: an edited label can differ from the tool defaults.
+  watch(
+    annotations.penStyle,
+    (pen, before) =>
+      ready.value &&
+      send({
+        type: "pen",
+        tool: pen.tool,
+        ...(pen.color !== before.color ? { color: pen.color } : {}),
+        ...(pen.width !== before.width ? { width: pen.width } : {}),
+      }),
+  )
   // Fresh objects: postMessage can't copy a reactive proxy.
   if (options.presence) {
     const { cursors, sharing } = options.presence
@@ -426,6 +442,11 @@ export function useViewerFrame(options: {
     () => ready.value && send({ type: "inset", right: options.inset.value, bottom: options.bottom.value }),
   )
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
+  // A scroll key Drop's window has no use for scrolls the page in the frame (frameScrollKey).
+  useEventListener("keydown", (event: KeyboardEvent) => {
+    const scroll = ready.value && frameScrollKey(event)
+    if (scroll) send({ type: "scroll-key", ...scroll })
+  })
 
   // Safari reads prefers-color-scheme inside the frame from the frame's color-scheme, so the frame takes the reader's
   // color mode, once its page runs: until then a dark frame would paint the empty frame host's light canvas white.

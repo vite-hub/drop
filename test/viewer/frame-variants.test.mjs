@@ -24,6 +24,7 @@ test("content-origin app frames keep their own picker unless they are the viewer
     useBase64: () => ({ base64: ref("") }),
     useAttachmentData: () => ({}),
     useDebounceFn: (fn) => fn,
+    useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),
     useDropFrame: (_frame, _origin, handler) => {
       receive = handler

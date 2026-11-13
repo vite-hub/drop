@@ -171,6 +171,8 @@ export default defineMcpTool({
           target: commentTarget(comment),
           // The words that would replace the quote; empty suggests deleting it.
           ...(comment.suggestion === null ? {} : { suggestion: comment.suggestion }),
+          // The second of the video's frame it's on; its image is that frame.
+          ...(comment.at === null ? {} : { at: comment.at }),
           body: comment.body,
           author: writtenBy(comment),
           page: comment.page,
