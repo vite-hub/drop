@@ -1132,8 +1132,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!paint.hidden) {
       // A label being typed takes the keys, but ⌘Enter puts it down and sends.
       if (typingLabel()) {
-        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.stopPropagation(); finishMark(); }
-        return;
+        return labelKey(e, finishMark);
       }
       // The screenshot and strokes use viewport coordinates, so native scroll keys must also stay here.
       if (/^( |ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(e.key)) {

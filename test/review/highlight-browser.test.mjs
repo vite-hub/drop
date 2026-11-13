@@ -259,6 +259,23 @@ test("Highlight's Text tip types a label, edits, moves, and deletes it, and send
   const browser = await chromium.launch()
   try {
     const { page, ui } = await open(browser)
+    await page.evaluate(() => {
+      document.body.style.minHeight = "3000px"
+      scrollTo(0, 600)
+      const popover = document.createElement("div")
+      popover.id = "label-popover"
+      popover.setAttribute("popover", "manual")
+      popover.textContent = "Price details"
+      document.body.append(popover)
+      popover.showPopover()
+      document.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape") popover.hidePopover()
+        },
+        true,
+      )
+    })
     await ui.getByRole("button", { name: "Highlight" }).click()
     const done = ui.getByRole("button", { name: "Done" })
     const label = ui.getByRole("textbox", { name: "Label" })
@@ -273,7 +290,21 @@ test("Highlight's Text tip types a label, edits, moves, and deletes it, and send
     assert.equal(await ui.getByRole("button", { name: "Text" }).getAttribute("aria-pressed"), "true")
     assert.deepEqual(await page.evaluate(() => window.pageKeys), [])
     // Esc puts the label down and keeps Highlight open.
+    const beforeScroll = await page.evaluate(() => scrollY)
+    assert.ok(beforeScroll > 0, "both paging directions have room to scroll")
+    for (const key of ["PageDown", "PageUp"]) {
+      await page.keyboard.press(key)
+      await page.waitForTimeout(250)
+      assert.equal(await page.evaluate(() => scrollY), beforeScroll, key + " keeps the viewport locked")
+    }
+    // Native caret navigation still works while page capture handlers are isolated.
+    const typed = await label.inputValue()
+    await page.keyboard.press("Home")
+    await page.keyboard.press("Shift+End")
+    assert.equal(await label.evaluate((input) => input.selectionEnd - input.selectionStart), typed.length)
     await page.keyboard.press("Escape")
+    assert.equal(await page.locator("#label-popover").evaluate((el) => el.matches(":popover-open")), true)
+
     assert.equal(await label.count(), 0)
     assert.equal(await labels.count(), 1)
     assert.equal(await labels.locator("text").textContent(), "bpa [ too big")

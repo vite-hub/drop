@@ -314,6 +314,23 @@ test("the Marker's Text tip types labels in the frame, keeps Drop's keys out of 
   const browser = await chromium.launch()
   try {
     const { page, frame } = await open(browser)
+    await frame.evaluate(() => {
+      document.body.style.minHeight = "3000px"
+      scrollTo(0, 600)
+      const popover = document.createElement("div")
+      popover.id = "label-popover"
+      popover.setAttribute("popover", "manual")
+      popover.textContent = "Price details"
+      document.body.append(popover)
+      popover.showPopover()
+      document.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape") popover.hidePopover()
+        },
+        true,
+      )
+    })
     await page.evaluate(() => tell({ type: "tool", tool: "mark", pen: { tool: "text", color: "#f59e0b", width: 20 } }))
     await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw.mark"))
     const label = frame.getByRole("textbox", { name: "Label" })
@@ -327,7 +344,21 @@ test("the Marker's Text tip types labels in the frame, keeps Drop's keys out of 
     await page.keyboard.press(" ")
     assert.equal(await label.inputValue(), "bat [x] ")
     assert.equal((await posted(page, "key")).length, keysBefore)
+    const beforeScroll = await frame.evaluate(() => scrollY)
+    assert.ok(beforeScroll > 0, "both paging directions have room to scroll")
+    for (const key of ["PageDown", "PageUp"]) {
+      await page.keyboard.press(key)
+      await page.waitForTimeout(250)
+      assert.equal(await frame.evaluate(() => scrollY), beforeScroll, key + " keeps the viewport locked")
+    }
+    // Native caret navigation still works while page capture handlers are isolated.
+    const typed = await label.inputValue()
+    await page.keyboard.press("Home")
+    await page.keyboard.press("Shift+End")
+    assert.equal(await label.evaluate((input) => input.selectionEnd - input.selectionStart), typed.length)
     await page.keyboard.press("Escape")
+    assert.equal(await frame.locator("#label-popover").evaluate((el) => el.matches(":popover-open")), true)
+
     assert.equal((await posted(page, "key")).length, keysBefore, "Esc puts the label down, not the Marker")
     assert.equal(await label.count(), 0)
     await page.waitForFunction(() => window.posts.findLast((m) => m.type === "marks")?.count === 1)

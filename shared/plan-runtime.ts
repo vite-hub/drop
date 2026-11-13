@@ -191,6 +191,18 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
   let labelEditor = null;
   const typingLabel = () => labelEditor !== null;
   const commitLabel = () => { if (labelEditor) labelEditor.commit(); };
+  // Run at window capture, before the page's document capture shortcuts. Stopping propagation still permits
+  // native input editing; only paging and commit keys need their browser default prevented.
+  function labelKey(e, finish) {
+    e.stopPropagation();
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === "PageUp" || e.key === "PageDown") { e.preventDefault(); return; }
+    if (e.key === "Enter" || e.key === "Escape") {
+      e.preventDefault();
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) finish();
+      else if (!(e.metaKey || e.ctrlKey)) commitLabel();
+    }
+  }
   // A size or colour picked while a label is open goes to that label.
   const restyleLabel = (p) => { if (labelEditor && p.tool === "text") labelEditor.restyle(p); };
   function editLabel(layer, s, fresh, into, done, gone) {
@@ -240,16 +252,6 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
     labelEditor = editor;
     input.oninput = fit;
     input.onblur = () => editor.commit();
-    // Typing keys are the label's, not the page's or the Marker's; Enter and Esc put it down. ⌘Enter is left to the
-    // host, which puts it down and sends (Done).
-    input.onkeydown = (e) => {
-      if (e.isComposing || e.keyCode === 229) return e.stopPropagation();
-      if ((e.key === "Enter" || e.key === "Escape") && !(e.metaKey || e.ctrlKey)) {
-        e.preventDefault(); e.stopPropagation();
-        return editor.commit();
-      }
-      if (!(e.key === "Enter" && (e.metaKey || e.ctrlKey))) e.stopPropagation();
-    };
     layer.appendChild(input);
     input.focus({ preventScroll: true });
     if (!fresh) input.select();
@@ -1814,8 +1816,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   window.addEventListener("keydown", (e) => {
     // A label being typed takes the keys, but ⌘Enter puts it down and sends.
     if (tool === "mark" && typingLabel()) {
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.stopPropagation(); commitLabel(); finishMark(); }
-      return;
+      return labelKey(e, () => { commitLabel(); finishMark(); });
     }
     // The screenshot and ink use viewport coordinates, including when the page still has keyboard focus.
     if (tool === "mark" && /^( |ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(e.key)) {
