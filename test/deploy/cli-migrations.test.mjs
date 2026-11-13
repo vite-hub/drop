@@ -81,14 +81,14 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
   }
 })
 
-test("the package migration script uses a supported CLI namespace", () => {
+test("the package migration script supports an omitted Docker public origin", { timeout: 20_000 }, () => {
   const script = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).scripts["db:migrate"]
   const [cli, ...args] = script.split(" ")
   assert.equal(cli, "vitehub")
   const output = execFileSync(
     process.execPath,
     [fileURLToPath(new URL("../../node_modules/vite-hub/dist/bin.js", import.meta.url)), ...args, "--help"],
-    { cwd: root, encoding: "utf8" },
+    { cwd: root, encoding: "utf8", env: { ...process.env, DROP_HOST: "vps", DROP_PUBLIC_URL: "" } },
   )
   assert.match(output, /migrate/i)
 })

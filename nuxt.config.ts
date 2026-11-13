@@ -167,7 +167,7 @@ export default defineNuxtConfig({
 
   vitehub: {
     ...VITEHUB[host],
-    publicUrl: process.env.DROP_PUBLIC_URL,
+    publicUrl: process.env.DROP_PUBLIC_URL || undefined,
     auth: true,
     console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
     env: {
