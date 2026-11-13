@@ -108,11 +108,11 @@ test("reservation cleanup runs even when subsequent blob cleanup fails", async (
 test("each member's limits follow their own tier, and anything else falls back to the Drop's default plan", async () => {
   assert.equal((await getUsage("owner")).plan, "free")
   assert.equal((await getUsage("owner")).drops.limit, 50)
-  sql.prepare("UPDATE user SET plan = 'pro' WHERE id = 'owner'").run()
+  sql.prepare("INSERT INTO profile (user_id, plan) VALUES ('owner', 'pro')").run()
   const pro = await getUsage("owner")
   assert.equal(pro.plan, "pro")
   assert.deepEqual([pro.drops.limit, pro.bytes.limit, pro.writes.limit], [null, 1024 * 1024 * 1024, 10_000])
   // Admins pick Free or Pro; an old `unlimited` row doesn't lift the limits.
-  sql.prepare("UPDATE user SET plan = 'unlimited' WHERE id = 'owner'").run()
+  sql.prepare("UPDATE profile SET plan = 'unlimited' WHERE user_id = 'owner'").run()
   assert.equal((await getUsage("owner")).plan, "free")
 })

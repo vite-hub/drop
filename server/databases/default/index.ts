@@ -1,8 +1,9 @@
 // Better Auth tables (user, session, account, verification, rate_limit), its OAuth provider's (./oauth.ts), its teams
-// and billing (./teams.ts), and Drop's own (./drops.ts).
+// and billing (./teams.ts), and Drop's own (./drops.ts, and ./profile.ts for what Drop keeps about an account).
 import { defineDatabase } from "vite-hub/database"
 import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { profile } from "./profile"
 import { quotaReservations } from "./quotas"
 import { abuseReports } from "./trust"
 import { skillSettings } from "./skills"
@@ -40,9 +41,7 @@ export const user = sqliteTable("user", {
   emailVerified: integer("email_verified", { mode: "boolean" }).default(false).notNull(),
   image: text("image"),
   role: text("role"),
-  plan: text("plan", { enum: ["free", "pro", "unlimited"] }),
   shareApprovedAt: integer("share_approved_at"),
-  githubCreatedAt: integer("github_created_at"),
   banned: integer("banned", { mode: "boolean" }).default(false),
   banReason: text("ban_reason"),
   banExpires: integer("ban_expires", { mode: "timestamp_ms" }),
@@ -133,6 +132,7 @@ export const rateLimit = sqliteTable("rate_limit", {
 })
 
 export {
+  profile,
   invitation,
   member,
   organization,
@@ -166,6 +166,7 @@ export {
 // Where it lives (D1 binding, D1 over HTTP, or local SQLite) is per host, in nuxt.config.ts `vitehub.database`.
 export default defineDatabase({
   schema: {
+    profile,
     quotaReservations,
     abuseReports,
     skillSettings,

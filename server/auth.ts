@@ -9,9 +9,9 @@ import * as v from "valibot"
 import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
 import { mcpOAuth } from "vite-hub/auth/mcp"
 import { db, schema } from "vite-hub/database"
-import { user as users } from "./databases/default/index"
+import { profile, user as users } from "./databases/default/index"
 import { ac, roles } from "./utils/access"
-import { authAccessLines, countDropsByUser } from "./utils/auth-console"
+import { authAccessLines, countDropsByUser, readPlans } from "./utils/auth-console"
 import { isGitHubMember } from "./utils/github-membership"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
@@ -26,7 +26,6 @@ import {
   teamsEnabled,
 } from "./utils/teams"
 import { teamLimitAdapter } from "./utils/team-limit-adapter"
-import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
 const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
@@ -122,16 +121,17 @@ export default defineAuth(({ env, requestOrigin }) => {
         },
     emailAndPassword: { enabled: password },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
-    // Free or Pro (shared/quotas.ts TIERS). The Console edits it through Better Auth's admin plugin.
-    user: { additionalFields: { plan: { type: [...TIERS], required: false, input: false, returned: quotas } } },
     console: {
-      fields: { plan: { label: "Plan", editable: quotas, reason: "Plans apply only when DROP_QUOTAS is on." } },
       columns: {
         drops: {
           label: "Drops",
           type: "number",
           read: (people) => countDropsByUser(people.map((person) => person.id)),
         },
+        // Free or Pro (shared/quotas.ts TIERS), kept in Drop's profile table, so the Console shows it but can't change it.
+        ...(quotas
+          ? { plan: { label: "Plan", type: "string", read: (people) => readPlans(people.map((person) => person.id)) } }
+          : {}),
       },
       // Labels and the Admins filter show the role DROP_ADMINS gives each account now, not the one stored at sign-in.
       roles: {
@@ -148,16 +148,19 @@ export default defineAuth(({ env, requestOrigin }) => {
           after: async (account) => {
             if (account.providerId !== "github") return
             // Public GitHub metadata is a review signal; a lookup failure never blocks private use.
-            const profile = await fetch(`https://api.github.com/user/${encodeURIComponent(account.accountId)}`, {
+            const details = await fetch(`https://api.github.com/user/${encodeURIComponent(account.accountId)}`, {
               headers: { "User-Agent": "Drop", Accept: "application/vnd.github+json" },
               signal: AbortSignal.timeout(3000),
             })
               .then(async (response) => (response.ok ? v.safeParse(GitHubProfile, await response.json()) : null))
               .catch(() => null)
-            const createdAt = profile?.success ? profile.output.created_at : undefined
+            const createdAt = details?.success ? details.output.created_at : undefined
             const githubCreatedAt = createdAt ? Date.parse(createdAt) : NaN
             if (Number.isFinite(githubCreatedAt))
-              await db.update(users).set({ githubCreatedAt }).where(eq(users.id, account.userId))
+              await db
+                .insert(profile)
+                .values({ userId: account.userId, githubCreatedAt })
+                .onConflictDoUpdate({ target: profile.userId, set: { githubCreatedAt } })
           },
         },
       },
@@ -166,6 +169,10 @@ export default defineAuth(({ env, requestOrigin }) => {
         create: {
           before: async (user) =>
             isListedMember(user) ? { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } } : false,
+          // What Drop keeps about the account (databases/default/profile.ts) starts empty: the default plan.
+          after: async (user) => {
+            await db.insert(profile).values({ userId: user.id }).onConflictDoNothing()
+          },
         },
         // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
         delete: { before: (user, context) => leaveTeams(user, context, teamBilling) },

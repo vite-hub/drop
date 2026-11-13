@@ -47,9 +47,9 @@ async function signup(admin = false) {
 try {
   const admin = await signup(true)
   const owner = await signup()
-  // Run with DROP_ADMINS=console-admin@example.com. Admins move a member between Free and Pro in the ViteHub Console,
-  // which calls Drop with a signature this test doesn't hold, so the plan is set in the database here.
-  db.prepare("UPDATE user SET role='member', email_verified=1, plan='pro' WHERE id=?").run(admin.id)
+  // Run with DROP_ADMINS=console-admin@example.com. Sign-up made each account's profile row, where the plan is set.
+  db.prepare("UPDATE user SET role='member', email_verified=1 WHERE id=?").run(admin.id)
+  db.prepare("UPDATE profile SET plan='pro' WHERE user_id=?").run(admin.id)
   cookie = admin.cookie
   assert.equal((await request("/api/usage")).data.plan, "pro")
   cookie = owner.cookie

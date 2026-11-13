@@ -17,7 +17,7 @@ import {
   type Usage,
 } from "#shared/quotas"
 import { useServerEnv } from "vite-hub/env"
-import { codeImages, dropFiles, drops, quotaReservations, user } from "../databases/default/index"
+import { codeImages, dropFiles, drops, profile, quotaReservations } from "../databases/default/index"
 import { isPaying } from "./teams"
 import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from "./quota-sql"
 
@@ -39,8 +39,8 @@ async function ownerUsage(ownerId: string, month: string) {
   return row ?? { drops: 0, bytes: 0, writes: 0 }
 }
 
-/** A member's plan: the tier an admin gave them in the Auth Console, else DROP_DEFAULT_PLAN. */
-function planOf(stored: string | null | undefined): Plan {
+/** A member's plan: the tier an admin stored in their profile, else DROP_DEFAULT_PLAN. */
+export function planOf(stored: string | null | undefined): Plan {
   return stored === "free" || stored === "pro" ? stored : quotaConfig().defaultPlan
 }
 
@@ -62,12 +62,12 @@ async function keptCount(ownerId: string) {
 }
 
 /**
- * Someone's plan and what they've used of it. A team that pays puts each member on Pro (./teams.ts); an admin's Pro on
- * the Auth Console, or DROP_DEFAULT_PLAN, applies otherwise.
+ * Someone's plan and what they've used of it. A team that pays puts each member on Pro (./teams.ts); the plan stored in
+ * their profile, or DROP_DEFAULT_PLAN, applies otherwise.
  */
 export async function getUsage(ownerId: string): Promise<Usage> {
   const config = quotaConfig()
-  const [owner] = await db.select({ plan: user.plan }).from(user).where(eq(user.id, ownerId)).limit(1)
+  const [owner] = await db.select({ plan: profile.plan }).from(profile).where(eq(profile.userId, ownerId)).limit(1)
   const paid = await isPaying(ownerId)
   const plan = paid && planOf(owner?.plan) === "free" ? "pro" : planOf(owner?.plan)
   const limits = planLimits(config.enabled ? plan : "unlimited", config.pro, config.freeKept)

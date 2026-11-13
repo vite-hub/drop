@@ -14,5 +14,6 @@
   "20261105193016_0012_member_user_cascade": "0012_member_user_cascade.sql",
   "20261105193552_0013_team_member_limit": "0013_team_member_limit.sql",
   "20261106084719_0014_better_auth_rate_limit": "0014_better_auth_rate_limit.sql",
-  "20261112000314_0015_comments_request_id": "0015_comments_request_id.sql"
+  "20261112000314_0015_comments_request_id": "0015_comments_request_id.sql",
+  "20261113213817_0016_profile": "0016_profile.sql"
 }

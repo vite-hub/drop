@@ -1,7 +1,7 @@
 import { and, inArray, count, desc, eq, isNotNull, sql } from "drizzle-orm"
 import { defineHandler } from "h3"
 import { db } from "vite-hub/database"
-import { drops, user } from "../../../databases/default/index"
+import { drops, profile, user } from "../../../databases/default/index"
 import { requireAdmin } from "../../../utils/identity"
 
 export default defineHandler(async (event) => {
@@ -22,10 +22,11 @@ export default defineHandler(async (event) => {
           name: user.name,
           email: user.email,
           emailVerified: user.emailVerified,
-          githubCreatedAt: user.githubCreatedAt,
+          githubCreatedAt: profile.githubCreatedAt,
           banned: user.banned,
         })
         .from(user)
+        .leftJoin(profile, eq(profile.userId, user.id))
         .where(eq(user.id, id))
         .limit(1)
       const [total] = await db.select({ n: count() }).from(drops).where(eq(drops.ownerId, id))

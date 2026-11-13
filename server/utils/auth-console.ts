@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import { db } from "vite-hub/database"
+import { planOf } from "./quotas"
 
 /** The user's Drops list: no folders, embedded files, or Trash. One bind even for 100 users. */
 export async function countDropsByUser(userIds: readonly string[]): Promise<Record<string, number>> {
@@ -12,6 +13,16 @@ export async function countDropsByUser(userIds: readonly string[]): Promise<Reco
     FROM json_each(${JSON.stringify(userIds)}) ids
   `)
   return Object.fromEntries(counts.map((row) => [row.id, row.drops]))
+}
+
+/** Each person's plan, as their usage reports it before a paying team lifts it to Pro. One bind, like the count above. */
+export async function readPlans(userIds: readonly string[]): Promise<Record<string, string>> {
+  if (!userIds.length) return {}
+  const rows = await db.all<{ id: string; plan: string | null }>(sql`
+    SELECT ids.value AS id, p.plan AS plan
+    FROM json_each(${JSON.stringify(userIds)}) ids LEFT JOIN profile p ON p.user_id = ids.value
+  `)
+  return Object.fromEntries(rows.map((row) => [row.id, planOf(row.plan)]))
 }
 
 /** Display the same switches that configure sign-in; never disclose the email allowlist. */
