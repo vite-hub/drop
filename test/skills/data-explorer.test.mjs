@@ -77,10 +77,26 @@ test("the build warns when a filter has no type, since it would guess one", () =
 
 test("a matrix keeps its columns as a list of names", () => {
   const data = { ...example.data, grid: [{ store: "North", year: "2026", n: 1 }] }
-  const matrix = { type: "matrix", title: "Store by year", data: "grid", x: "year", y: "store", value: "n", columns: ["2026"] }
+  const matrix = {
+    type: "matrix",
+    title: "Store by year",
+    data: "grid",
+    x: "year",
+    y: "store",
+    value: "n",
+    columns: ["2026"],
+  }
   const views = [{ ...example.views[0], blocks: [...example.views[0].blocks, matrix] }]
   const { ok, log } = build({ ...example, data, views })
   assert.ok(ok, log)
-  const bad = build({ ...example, views: [{ ...example.views[0], blocks: [example.views[0].blocks[0], { ...example.views[0].blocks[1], segments: "fiction" }] }] })
+  const bad = build({
+    ...example,
+    views: [
+      {
+        ...example.views[0],
+        blocks: [example.views[0].blocks[0], { ...example.views[0].blocks[1], segments: "fiction" }],
+      },
+    ],
+  })
   assert.match(bad.log, /error\s+.*`segments` must be an array/)
 })
