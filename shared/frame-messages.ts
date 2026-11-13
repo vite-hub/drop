@@ -20,6 +20,8 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
   v.object({ type: v.literal("copy"), text: v.string() }),
+  // A Markdown doc's section the reader went to, or (`copy`) whose link they copied: Drop's address keeps it as #id.
+  v.object({ type: v.literal("heading"), id: v.pipe(v.string(), v.maxLength(300)), copy: v.optional(v.boolean()) }),
   // Input inside the frame keeps the reader active, even when no cursor is being shared.
   v.object({ type: v.literal("activity") }),
   // Where the reader's pointer is, for the people in the drop's presence room (PRESENCE_CURSORS in ./presence-cursors):

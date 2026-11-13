@@ -33,9 +33,16 @@ test("a Markdown doc's images wait in the frame, keyed by path; other images and
   const deferred = deferImages(html, [`/f/${a}.png`, `/f/${b}.webp`])
   assert.match(
     deferred,
-    new RegExp(`<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png" alt="Before" loading="lazy">`),
+    new RegExp(
+      `<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png" data-drop-src="https://drop.quiver.dk/f/${a}.png" alt="Before" loading="lazy">`,
+    ),
   )
-  assert.match(deferred, new RegExp(`<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp" alt="">`))
+  assert.match(
+    deferred,
+    new RegExp(
+      `<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp" data-drop-src="/f/${b}.webp\\?raw" alt="">`,
+    ),
+  )
   assert.match(
     deferred,
     new RegExp(`<a href="/f/${a}.png">full size</a><img src="https://example.com/x.png"><img src="/f/${c}.png">$`),
@@ -48,7 +55,7 @@ test("srcset candidates are deferred and srcset-only images get a placeholder", 
   assert.match(
     deferred,
     new RegExp(
-      `<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png"><img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp">`,
+      `<img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${a}.png" data-drop-src="/f/${a}.png"><img src="data:image/gif;base64,[^"]+" data-drop-image="/f/${b}.webp" data-drop-src="/f/${b}.webp">`,
     ),
   )
   assert.doesNotMatch(deferred, /srcset|sizes/)

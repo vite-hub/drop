@@ -77,6 +77,7 @@ async function commentList(row: Commented): Promise<CommentList> {
  * What a thread keeps in `metadata`: the drop it was written on, and its anchor as Drop's viewers draw it. `kind`:
  * `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of a page, `page` is the
  * whole page. `ox`/`oy`/`ow`/`oh` are thousandths of the anchor's box. `suggestion` holds a suggested edit's words.
+ * `at` is the second of a video's frame an `image` comment is on.
  * `elementX`/`elementY` place a site review pin on the element `label` names, in thousandths of its box.
  */
 const CommentMeta = v.object({
@@ -89,6 +90,7 @@ const CommentMeta = v.object({
   oh: v.number(),
   quote: v.nullable(v.string()),
   suggestion: v.optional(v.nullable(v.string()), null),
+  at: v.optional(v.nullable(v.number()), null),
   label: v.nullable(v.string()),
   page: v.nullable(v.string()),
   elementX: v.nullable(v.number()),
@@ -218,6 +220,7 @@ export function toComment(
     oh: meta.oh,
     quote: meta.quote,
     suggestion: meta.suggestion,
+    at: meta.at,
     label: meta.label,
     page: meta.page,
     body: first?.body ?? "",
@@ -296,7 +299,7 @@ export async function addThread(
   },
   list?: CommentList,
 ): Promise<DropThread> {
-  const meta: CommentMeta = { suggestion: null, dropId: row.id, ...input.fields }
+  const meta: CommentMeta = { suggestion: null, at: null, dropId: row.id, ...input.fields }
   const [error, thread] = await comments.create({
     subject: (list ?? (await commentList(row))).subject,
     anchor: anchorOf(meta),

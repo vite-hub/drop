@@ -50,6 +50,8 @@ export function useViewerFrame(options: {
   arrow?: (key: "ArrowLeft" | "ArrowRight") => void
   /** Who else has the drop open (usePresence): the reader's pointer goes up to them, and their cursors come down. */
   presence?: Presence
+  /** A Markdown doc's section the reader went to, or (`copy`) whose link they copied. */
+  heading?: (id: string, copy: boolean) => void
 }) {
   const {
     drop,
@@ -265,6 +267,9 @@ export function useViewerFrame(options: {
         return
       case "copy":
         return void copy(message.text)
+      case "heading":
+        if (drop.value.kind === "markdown") options.heading?.(message.id, message.copy === true)
+        return
       case "pointer":
         return options.presence?.point(message.at)
       case "activity":
