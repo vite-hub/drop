@@ -238,7 +238,8 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
         s.el.style.visibility = "";
       },
       restyle(p) {
-        s.width = p.width; s.color = p.color;
+        if (p.width !== undefined) s.width = p.width;
+        if (p.color !== undefined) s.color = p.color;
         fit();
         input.focus({ preventScroll: true });
       },
@@ -1418,10 +1419,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   let markSession = 0, finishing = false, forgetInk = () => {};
   function setPen(next) {
     if (/^(marker|pen|arrow|text)$/.test(next.tool)) pen.tool = next.tool;
-    if (/^#[0-9a-f]{6}$/i.test(next.color)) pen.color = next.color;
-    if (typeof next.width === "number" && next.width >= 1 && next.width <= 64) pen.width = next.width;
+    const style = { tool: pen.tool };
+    if (/^#[0-9a-f]{6}$/i.test(next.color)) style.color = pen.color = next.color;
+    if (typeof next.width === "number" && next.width >= 1 && next.width <= 64) style.width = pen.width = next.width;
     if (layer && tool === "mark") layer.style.cursor = penCursor(pen);
-    restyleLabel(pen);
+    restyleLabel(style);
   }
   function freeze() {
     const roots = [document], hovering = [], styles = [];

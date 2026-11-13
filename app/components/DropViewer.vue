@@ -798,6 +798,15 @@ function finishMark() {
   send({ type: "mark", do: "done" })
 }
 const undoMark = () => marking.value && send({ type: "mark", do: "undo" })
+// Send explicit picks even when they match the defaults; the open label may have another style.
+function colorMark(color: MarkColor) {
+  pen.color = color
+  send({ type: "pen", tool: pen.tip, color: MARK_COLORS[color] })
+}
+function sizeMark(index: number) {
+  pen.sizes[pen.tip] = index
+  send({ type: "pen", tool: pen.tip, width: MARK_TIPS[pen.tip].sizes[index]! })
+}
 // Open when someone reaches for Edit on a doc the editor can't take: the popover says why.
 const editNoteOpen = ref(false)
 const showEditTool = computed(
@@ -1431,9 +1440,9 @@ watch(
                 :marks="annotations.marks.value"
                 :pen="pen"
                 @cancel="setTool('browse')"
-                @color="pen.color = $event"
+                @color="colorMark"
                 @done="finishMark"
-                @size="pen.sizes[pen.tip] = $event"
+                @size="sizeMark"
                 @tip="annotations.mark($event)"
                 @undo="undoMark"
               />

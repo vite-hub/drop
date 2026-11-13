@@ -1120,8 +1120,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const button = e.target.closest("button");
     if (!button || button.disabled) return;
     if (button.dataset.tip) pickTip(button.dataset.tip);
-    else if (button.dataset.size) { tip.sizes[tip.name] = Number(button.dataset.size); paintTools(); restyleLabel(penNow()); }
-    else if (button.dataset.color) { tip.color = button.dataset.color; paintTools(); restyleLabel(penNow()); }
+    else if (button.dataset.size) { tip.sizes[tip.name] = Number(button.dataset.size); paintTools(); restyleLabel({ tool: tip.name, width: penNow().width }); }
+    else if (button.dataset.color) { tip.color = button.dataset.color; paintTools(); restyleLabel({ tool: tip.name, color: penNow().color }); }
     else if (button.dataset.act === "undo") undoMark();
     else if (button.dataset.act === "cancel") cancel();
     else if (button.dataset.act === "done") finishMark();

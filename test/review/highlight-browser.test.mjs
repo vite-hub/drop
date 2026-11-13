@@ -335,9 +335,27 @@ test("Highlight's Text tip types a label, edits, moves, and deletes it, and send
     assert.equal(await labels.locator("text").textContent(), "Too big!")
     assert.match(await labels.locator("text").getAttribute("style"), /\b36px\b/)
     assert.equal(await labels.locator("rect").getAttribute("fill"), "#2563eb")
+    // Reopening keeps the label's own style even when the tool defaults differ.
+    await ui.locator("[data-size='1']").click()
+    await ui.getByRole("button", { name: "Pink ink" }).click()
+    await page.mouse.click(at.x + 10, at.y + at.height / 2)
+    await label.waitFor()
+    assert.equal(await label.evaluate((el) => el.style.fontSize), "36px")
+    assert.equal(await label.evaluate((el) => el.style.backgroundColor), "rgb(37, 99, 235)")
+    await ui.getByRole("button", { name: "Green ink" }).click()
+    assert.equal(await label.evaluate((el) => el.style.fontSize), "36px", "colour preserves the label's size")
+    await page.keyboard.press("Enter")
+    await ui.getByRole("button", { name: "Pink ink" }).click()
+    await page.mouse.click(at.x + 10, at.y + at.height / 2)
+    await label.waitFor()
+    // Select the size already active in the toolbar, which still differs from the label.
+    await ui.locator("[data-size='1']").click()
+    assert.equal(await label.evaluate((el) => el.style.backgroundColor), "rgb(22, 163, 74)", "size preserves colour")
+    await page.keyboard.press("Enter")
+    assert.match(await labels.locator("text").getAttribute("style"), /\b20px\b/)
+    assert.equal(await labels.locator("rect").getAttribute("fill"), "#16a34a")
     // Back to the default tip for the labels below: 20px, pink.
-    await page.keyboard.press("[")
-    await page.keyboard.press("[")
+    await ui.locator("[data-size='1']").click()
     await ui.getByRole("button", { name: "Pink ink" }).click()
 
     // A drag moves it.
