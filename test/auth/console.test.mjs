@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
+const { syncRole } = await import("../../server/utils/identity.ts")
 const { default: authorize } = await import("../../server/console-authorize.ts")
 const { authAccessLines } = await import("../../server/utils/auth-console.ts")
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
@@ -91,4 +92,20 @@ test("access notes describe the configured allowlist, organization and sign-in m
   assert.match(restricted, /GitHub organization vite-hub/)
   assert.match(restricted, /oauth2-proxy/)
   assert.match(restricted, /Email and password/)
+})
+
+test("Console resolves the app account by signed email before synchronizing its role", async () => {
+  const calls = []
+  state.syncRole = async (id) => {
+    calls.push(id)
+    await syncRole(id)
+  }
+  try {
+    assert.equal(await authorize(signed(user.email)), true)
+    assert.deepEqual(calls, [user.id])
+    assert.equal(sql.prepare("SELECT role FROM user WHERE id = ?").get(user.id).role, "admin")
+    assert.notEqual(user.id, signed(user.email).user.id)
+  } finally {
+    delete state.syncRole
+  }
 })

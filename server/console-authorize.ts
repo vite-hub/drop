@@ -2,7 +2,10 @@ import { H3Event } from "h3"
 import * as v from "valibot"
 import { defineConsoleAuthorize } from "vite-hub/console/auth"
 import { contentHost } from "./utils/content-origin"
-import { roleOf } from "./utils/identity"
+import { db } from "vite-hub/database"
+import { eq } from "drizzle-orm"
+import { user as users } from "./databases/default/index"
+import { roleOf, syncRole } from "./utils/identity"
 import { isMember } from "./utils/members"
 
 const Operator = v.object({
@@ -23,7 +26,10 @@ export default defineConsoleAuthorize(async (context) => {
   switch (context.via) {
     case "console": {
       const email = context.user.email
-      return email ? roleOf({ email, emailVerified: true }) === "admin" : false
+      if (!email || roleOf({ email, emailVerified: true }) !== "admin") return false
+      const [person] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
+      if (person) await syncRole(person.id)
+      return true
     }
     case "cli":
       return true

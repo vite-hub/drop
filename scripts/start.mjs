@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:f
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { DatabaseSync } from "node:sqlite"
+import { adoptSqliteLedger } from "./adopt-sqlite-ledger.mjs"
 import { migrations } from "./migrations.mjs"
 
 // The container's entry: backs up the SQLite database when this image brings migrations, then starts Drop, which
@@ -36,13 +37,20 @@ export function backupBeforeMigrate({ file, entries, backups, now = new Date(), 
   const database = new DatabaseSync(file)
   try {
     const pending = pendingMigrations(database, entries)
-    if (!pending.length) return
+    const legacy = database.prepare("PRAGMA table_info('__drizzle_migrations')").all()
+    const adoption =
+      legacy.length &&
+      !legacy.some((column) => column.name === "name") &&
+      database
+        .prepare("SELECT 1 FROM __drizzle_migrations WHERE hash = ? AND created_at = ?")
+        .get("3e6aa3ac60516bdd27edd10c4de906ced19bdbb289c2a2c247a8e7d35a5be083", 1793445000000)
+    if (!pending.length && !adoption) return
     mkdirSync(backups, { recursive: true })
     const stamp = now
       .toISOString()
       .replaceAll(":", "-")
       .replace(/\.\d+Z$/, "Z")
-    const target = join(backups, `drop-${stamp}-before-${pending.at(-1).tag}.db`)
+    const target = join(backups, `drop-${stamp}-before-${pending.at(-1)?.tag ?? "ledger-adoption"}.db`)
     database.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`)
     log(`Drop: backed up the database to ${target} before ${pending.length} migration(s).`)
   } finally {
@@ -61,6 +69,14 @@ async function start() {
   } else {
     const file = databasePath(process.env.DROP_DATABASE_URL || undefined)
     backupBeforeMigrate({ file, entries: migrations(), backups: join(dirname(file), "backups") })
+    if (existsSync(file)) {
+      const database = new DatabaseSync(file)
+      try {
+        adoptSqliteLedger(database)
+      } finally {
+        database.close()
+      }
+    }
   }
   await import(pathToFileURL(join(app, ".output/server/index.mjs")).href)
 }

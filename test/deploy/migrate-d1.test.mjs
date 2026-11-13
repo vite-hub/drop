@@ -1,3 +1,4 @@
+import { adoptSqliteLedger } from "../../scripts/adopt-sqlite-ledger.mjs"
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
@@ -59,6 +60,7 @@ test("a database Drizzle Kit 0.x migrated to any point upgrades its ledger and r
   // milliseconds within the folder's second, and no name.
   const folders = dropMigrations().sort((a, b) => (a.tag < b.tag ? -1 : 1))
   const hash = (sql) => createHash("sha256").update(sql).digest("hex")
+  const journal = JSON.parse(readFileSync(new URL("./fixtures/legacy-journal.json", import.meta.url), "utf8")).entries
   for (let applied = 0; applied <= folders.length; applied++) {
     const database = new DatabaseSync(":memory:")
     try {
@@ -66,12 +68,22 @@ test("a database Drizzle Kit 0.x migrated to any point upgrades its ledger and r
       database.exec(
         "CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)",
       )
-      folders.slice(0, applied).forEach((migration, index) => {
+      folders.slice(0, applied).forEach((migration) => {
         database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
         database
           .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
-          .run(hash(migration.sql), migration.when + index)
+          .run(hash(migration.sql), journal.find((entry) => migration.tag.endsWith(`_${entry.tag}`)).when)
       })
+      // This shipped variant survives timestamp-based upgrades even though its SQL was later replaced with SELECT 1.
+      if (applied === folders.length) {
+        const historical = readFileSync(new URL("./fixtures/0004_comment_suggestions.sql", import.meta.url), "utf8")
+        assert.equal(hash(historical), "3e6aa3ac60516bdd27edd10c4de906ced19bdbb289c2a2c247a8e7d35a5be083")
+        database
+          .prepare("UPDATE __drizzle_migrations SET hash = ? WHERE created_at = ?")
+          .run(hash(historical), 1793445000000)
+        adoptSqliteLedger(database)
+        adoptSqliteLedger(database)
+      }
       const run = (query, params, rowMode) => {
         const statement = database.prepare(query)
         if (!statement.columns().length) return statement.run(...params)
@@ -94,6 +106,7 @@ test("a database Drizzle Kit 0.x migrated to any point upgrades its ledger and r
       )
       assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_comment_threads'").get())
       assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
+      assert.deepEqual(database.prepare("SELECT id FROM drops LIMIT 1").all(), [])
     } finally {
       database.close()
     }

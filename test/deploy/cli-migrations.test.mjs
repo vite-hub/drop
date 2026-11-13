@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
@@ -78,4 +79,16 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
     globalThis.fetch = previousFetch
     database.close()
   }
+})
+
+test("the package migration script uses a supported CLI namespace", () => {
+  const script = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).scripts["db:migrate"]
+  const [cli, ...args] = script.split(" ")
+  assert.equal(cli, "vitehub")
+  const output = execFileSync(
+    process.execPath,
+    [fileURLToPath(new URL("../../node_modules/vite-hub/dist/bin.js", import.meta.url)), ...args, "--help"],
+    { cwd: root, encoding: "utf8" },
+  )
+  assert.match(output, /migrate/i)
 })

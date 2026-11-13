@@ -10,7 +10,7 @@
     "lint:fix": "vp lint --fix",
     "knip": "knip",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "vitehub db migrate",
+    "db:migrate": "vitehub database migrate",
     "db:migrate:d1": "node --env-file-if-exists=.env scripts/migrate-d1.mjs",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config .output/server/wrangler.json",
     "deploy": "pnpm db:migrate:remote && node scripts/deploy-cloudflare.mjs",
