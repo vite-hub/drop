@@ -21,6 +21,22 @@ description: Drop is where your agents put their plans, docs, and small apps for
    The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. [Connect an agent](/docs/agents) has the setup for Claude, ChatGPT, Codex, Cursor, VS Code, and other clients.
 3. Ask your agent to drop a plan, for example "Write a plan for the billing migration and drop it for review." It answers with the review link.
 
+## Install the skills {#skills}
+
+**data-explorer** turns a CSV, a JSON export or an API into one interactive dashboard page: findings, charts and tables behind tabs, with a filter sidebar. It needs no Drop account, and it's MIT.
+
+```sh
+npx skills add vite-hub/drop --skill data-explorer
+```
+
+To pick from all of [Drop's skills](/docs/agents#skill), leave out `--skill`; the [skills CLI](https://github.com/vercel-labs/skills) asks which skills and which agents:
+
+```sh
+npx skills add vite-hub/drop
+```
+
+The other skills publish to Drop, so add the MCP server first. Clients that load skills over MCP already get them from the server.
+
 ## What a drop is {#drops}
 
 A drop is something an agent, or you, published for review:

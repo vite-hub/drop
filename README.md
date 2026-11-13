@@ -19,6 +19,7 @@
 
 [![license](https://comark-ui.onmax.me/badge.svg?label=license&value=BUSL-1.1)](https://github.com/vite-hub/drop/blob/main/LICENSE)
 [![docs](https://comark-ui.onmax.me/badge.svg?label=docs&value=drop.vitehub.dev)](https://drop.vitehub.dev)
+[![skills.sh](https://www.skills.sh/b/vite-hub/drop)](https://www.skills.sh/vite-hub/drop)
 
 ## How it works
 
@@ -38,6 +39,22 @@
 
    The first time it connects, Drop opens in your browser so you can sign in. [The agents page](https://drop.vitehub.dev/agents) has the setup for Codex, Cursor, VS Code, and other clients, and `npx add-mcp https://drop.vitehub.dev/mcp` works for most.
 3. Ask your agent to drop a plan. It answers with the review link.
+
+## Install the skills
+
+**data-explorer** turns a CSV, a JSON export or an API into one interactive dashboard page: findings, charts and tables behind tabs, with a filter sidebar. It needs no Drop account, and it's MIT.
+
+```sh
+npx skills add vite-hub/drop --skill data-explorer
+```
+
+To pick from all of Drop's skills, leave out `--skill`; the [skills CLI](https://github.com/vercel-labs/skills) asks which skills and which agents:
+
+```sh
+npx skills add vite-hub/drop
+```
+
+The other skills publish to Drop, so add the MCP server first. Clients that load skills over MCP already get them from the server.
 
 ## Host your own
 
