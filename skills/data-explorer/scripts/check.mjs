@@ -253,7 +253,7 @@ export function check(report) {
           for (const [i, x] of b[k].entries())
             if (!isObject(x)) err(`${at} > ${k}[${i}]`, `must be \`${shape}\`, not ${JSON.stringify(x)}.`);
       }
-      // The template maps over these, so a lone string breaks the page.
+      // The template maps over these: a lone string breaks the page (segments, fields) or its colors (tones).
       const columns = b.type === "table" && Array.isArray(b.columns) ? b.columns : [];
       for (const [w, o] of [[at, b], ...columns.map((c, ci) => [`${at} > columns[${ci}]`, c])])
         for (const k of ["segments", "fields", "tones"])
