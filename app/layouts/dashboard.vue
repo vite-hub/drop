@@ -14,6 +14,7 @@
 // straight away reads without it, until the next page (useOpenedOnLink).
 // ? opens the keyboard shortcuts (ShortcutsModal).
 import { promiseTimeout } from "@vueuse/core"
+import { CONSOLE_URL } from "#shared/console"
 
 const route = useRoute()
 const open = ref(false)
@@ -72,7 +73,7 @@ const workspace = computed(() => [
           label: "Console",
           icon: "i-mingcute-settings-3-line",
           activeIcon: "i-mingcute-settings-3-fill",
-          to: "/_vitehub/auth",
+          to: CONSOLE_URL,
           external: true,
           active: false,
         },

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CONSOLE_URL } from "#shared/console"
 useSeoMeta({ title: "Review" })
 const { data, error } = await useApi("/api/admin/review", { key: keys.adminReview })
 const now = useRelativeNow()
@@ -21,7 +22,7 @@ const review = (id: string, action: "approve" | "reject") => run(id, action)
     description="Approve a member's pending shares and future public shares."
   >
     <template #actions
-      ><UButton to="/_vitehub/auth" external label="Users" color="neutral" size="sm" variant="ghost" /><UButton
+      ><UButton :to="CONSOLE_URL" external label="Users" color="neutral" size="sm" variant="ghost" /><UButton
         to="/admin/reports"
         label="Reports"
         color="neutral"

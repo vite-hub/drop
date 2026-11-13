@@ -9,12 +9,7 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
  */
 export default defineHandler((event) => {
   const path = event.url.pathname
-  if (
-    SAFE_METHODS.has(event.req.method) ||
-    !(path.startsWith("/api/") || path === "/_vitehub" || path.startsWith("/_vitehub/")) ||
-    !event.req.headers.has("cookie")
-  )
-    return
+  if (SAFE_METHODS.has(event.req.method) || !path.startsWith("/api/") || !event.req.headers.has("cookie")) return
   const site = event.req.headers.get("sec-fetch-site")
   const origin = event.req.headers.get("origin")
   if ((site && site !== "same-origin" && site !== "none") || (origin && origin !== event.url.origin))

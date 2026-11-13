@@ -4,6 +4,7 @@
 // pages, the theme, and signing out. The sidebar's search button opens it too, and a folder's search box opens it with
 // `in:<folder>` typed in. `in:` and `kind:` narrow the drops (utils/search-query); the chips below write them.
 import type { CommandPaletteGroup, CommandPaletteItem } from "@nuxt/ui"
+import { CONSOLE_URL } from "#shared/console"
 import { DROP_KINDS, type DropSummary } from "#shared/types"
 
 const { data: me } = useMe()
@@ -118,7 +119,7 @@ const pages = computed<CommandPaletteItem[]>(() =>
     },
     ...(me.value?.role === "admin"
       ? [
-          { label: "Console", icon: "i-mingcute-settings-3-line", to: "/_vitehub/auth", external: true },
+          { label: "Console", icon: "i-mingcute-settings-3-line", to: CONSOLE_URL, external: true },
           { label: "Review shares", icon: "i-mingcute-safety-certificate-line", to: "/admin/review" },
           { label: "Reports", icon: "i-mingcute-flag-1-line", to: "/admin/reports" },
         ]
