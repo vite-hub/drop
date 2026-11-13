@@ -8,6 +8,8 @@ license: MIT
 
 A data explorer is one `report.json`: the data rows, the filters, and the blocks on each tab. This skill's template draws it like an analytics tool: tabs in a top bar, a strip of numbers (`top`) and a list of evidence rows (`bottom`) that stay on every tab, the blocks of the tab between them, and a filter sidebar where every name keeps one color across the page. You decide **what to show**; the template owns **how it looks**. You write no HTML, CSS or page script.
 
+The page is for people: they scan it, filter it and comment on it. An agent that needs the numbers reads `report.json`, so shape the page for its human reader and add nothing to it for agents.
+
 Words are the scarcest thing on the page. A reader scans numbers, colors and bars; prose goes in `method`.
 
 When the reader has to choose between options or approve a plan, write a `report` instead: a page with the answer first.
@@ -39,7 +41,7 @@ The block reference is [references/blocks.md](references/blocks.md); read it bef
 7. **Build and look.** Build the page as [Build it](#build-it) says, and fix every error and warning the build prints; each says how. Then look at it like a reader, in **every** screenshot (light, dark and phone), or without Node in your host's preview if it has one: labels collide or are cut, a block is empty or flat, colors disagree between blocks, a tab without a table or matrix, a fact the blocks don't support. Change the blocks or the prep, not the template.
    Done when the build exits 0 and you have opened every screenshot of the last build, or, without Node, when `report.json` keeps every limit and you have looked at the page.
 
-8. **Hand back** the path to `report.html`, the screenshot folder if you built with `--shots`, and three lines: what the report answers, the most surprising finding, and anything the data couldn't answer. The page is one file that opens from disk or any static host. When the reader wants to share it, publish it to Drop as `html`, following the `vitehub-drop` skill: the link is private, a rebuild on new data becomes a new version at the same URL, and readers can comment on the numbers.
+8. **Hand back** the paths to `report.html` and `report.json`, the screenshot folder if you built with `--shots`, and three lines: what the report answers, the most surprising finding, and anything the data couldn't answer. The page is one file that opens from disk or any static host. When the reader wants to share it, publish it to Drop as `html`, following the `vitehub-drop` skill: the link is private, a rebuild on new data becomes a new version at the same URL, and readers can comment on the numbers.
 
 ## Build it
 
@@ -59,7 +61,7 @@ The page is [assets/page.html](assets/page.html) with `report.json`, [assets/sty
 
    Without `playwright`, drop `--shots`. Without `vega` and `vega-lite`, the page loads Vega from jsDelivr when it opens, so it needs a network connection.
 
-2. **Without Node**, such as in a chat app's sandbox, fill [assets/page.html](assets/page.html) yourself, with any language: `report.json` goes inside `<script id="report-data">` with every `<` written as `\u003c`, `style.css` inside `<style id="rp-style">`, and `app.js` inside `<script id="rp-app">`. Set the `<title>`. When you can't read a file of this skill, leave its slot empty: the page then loads it from Drop, and Vega from jsDelivr, so it needs a network connection. Nothing checks the limits on this path, so compare `report.json` with the limits in [references/blocks.md](references/blocks.md) before you hand it back.
+2. **Without Node**, such as in a chat app's sandbox, fill [assets/page.html](assets/page.html) yourself, with any language: `report.json` goes inside `<script id="report-data">` with every `<` written as `\u003c`, `style.css` inside `<style id="rp-style">`, and `app.js` inside `<script id="rp-app">`. Set the `<title>`. When a file of this skill isn't on disk, read it as `skill://data-explorer/assets/app.js` (or `style.css`) from Drop's MCP server, or at `https://drop.vitehub.dev/.well-known/skills/data-explorer/assets/`, and paste it in: the page runs only what it holds, and says which file is missing. It loads Vega from jsDelivr, so it needs a network connection. Nothing checks the limits on this path, so compare `report.json` with the limits in [references/blocks.md](references/blocks.md) before you hand it back.
 
 ## When the blocks don't fit
 
