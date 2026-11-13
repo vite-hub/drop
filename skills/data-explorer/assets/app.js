@@ -157,6 +157,13 @@ const options = (f) =>
     : valuesOf(f.field).map((v) => ({ value: v, label: String(v) }));
 const kindOf = (f) => f.type ?? (f.options && f.options.length <= 5 ? "tabs" : "list");
 
+// Catch-all values (Not set, Unknown, Other countries, a folded tail) are the biggest count in many lists, but say the
+// least. They sort after the real names and stay gray unless `colors` gives them a tone.
+const CATCH_ALL =
+  /^(not set|unset|not given|unknown|none|n\/a|missing|unspecified|blank|empty|no [\w ]+|others?\b.*|rest of .+|the rest|everyone else|everything else|all others|\(.*\)|[-–—?])$/i;
+const isCatchAll = (v) => typeof v === "string" && CATCH_ALL.test(v.trim());
+const catchAllLast = (a, b) => isCatchAll(a) - isCatchAll(b);
+
 // Every value of a list filter keeps one color in every block, so a customer reads the same everywhere.
 const COLORS = {};
 for (const f of filters) {
@@ -164,12 +171,16 @@ for (const f of filters) {
   const counts = countsFor(f, true);
   const order = options(f)
     .map((o) => o.value)
-    .sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0));
+    .sort((a, b) => catchAllLast(a, b) || (counts.get(b) ?? 0) - (counts.get(a) ?? 0));
   const given = typeof f.colors === "object" ? f.colors : {};
   COLORS[f.field] = new Map(
     order.map((v, i) => [
       v,
-      given[v] != null ? tone(given[v], i) : i < PALETTE.length ? PALETTE[i] : TONES.muted,
+      given[v] != null
+        ? tone(given[v], i)
+        : i < PALETTE.length && !isCatchAll(v)
+          ? PALETTE[i]
+          : TONES.muted,
     ]),
   );
 }
@@ -1211,7 +1222,10 @@ function barsBlock(block) {
         : PALETTE[i % PALETTE.length],
   );
   const total = (r) => segments.reduce((a, s) => a + (r[s] ?? 0), 0);
-  if (block.sort !== "data") rows = [...rows].sort((a, b) => total(b) - total(a));
+  if (block.sort !== "data")
+    rows = [...rows].sort(
+      (a, b) => catchAllLast(a[block.label], b[block.label]) || total(b) - total(a),
+    );
   if (block.limit) rows = rows.slice(0, block.limit);
   const max = block.percent ? 1 : Math.max(...rows.map(total), 0) || 1;
   const labelColor = (r) => colorOf(block.label, r[block.label]);
@@ -1504,6 +1518,19 @@ function cell(row, col, max, min) {
   );
 }
 
+// A rows table drops its header to stay dense, but numbers need one: past 5 columns, or with two number columns, the
+// reader can't tell which is which without it.
+const NUMERIC = ["number", "integer", "compact", "percent", "money", "bar", "heat", "delta"];
+const hasHeader = (block) =>
+  block.header ??
+  (block.style !== "rows" ||
+    block.columns.length > 5 ||
+    block.columns.filter(
+      (c) =>
+        NUMERIC.includes(c.format) ||
+        (!c.format && (data[block.data] ?? []).some((r) => typeof r[c.field] === "number")),
+    ).length > 1);
+
 const local = new Map();
 function tableBlock(block) {
   const wrap = h("div", { class: `rp-table${block.style === "rows" ? " is-rows" : ""}` });
@@ -1552,7 +1579,7 @@ function tableBlock(block) {
     const table = h(
       "table",
       {},
-      block.header === false || block.style === "rows"
+      !hasHeader(block)
         ? null
         : h(
             "thead",
@@ -1650,6 +1677,7 @@ function tableBlock(block) {
       h("div", { class: "rp-scroll" }, table),
       more || "",
     );
+    if (wrap.isConnected) scrollHint(wrap.querySelector(".rp-scroll"));
     return rows.length;
   };
   wrap.count = draw();
@@ -1667,9 +1695,18 @@ function blockEl(block, id) {
         !block.horizontal) ||
       block.type === "vega");
   const wide = block.wide ?? !half;
+  const matrix = block.type === "matrix" || block.chart === "heatmap";
   const section = h("section", {
     class: `rp-block${wide ? " is-wide" : ""} is-${block.type}`,
     id: block.id ?? null,
+    "data-auto":
+      block.wide == null && block.half == null && block.type !== "stats" && block.type !== "facts"
+        ? matrix
+          ? "matrix"
+          : half
+            ? "half"
+            : null
+        : null,
   });
   const toggles =
     (block.logToggle &&
@@ -1840,7 +1877,8 @@ function sidebar() {
         );
       const counts = countsFor(f);
       const sorted = [...opts].sort(
-        (a, b) => (counts.get(b.value) ?? 0) - (counts.get(a.value) ?? 0),
+        (a, b) =>
+          catchAllLast(a.value, b.value) || (counts.get(b.value) ?? 0) - (counts.get(a.value) ?? 0),
       );
       return h(
         "div",
@@ -1864,7 +1902,7 @@ function sidebar() {
               h(
                 "button",
                 {
-                  class: `${on ? "is-on" : ""}${n ? "" : " is-zero"}`,
+                  class: `${on ? "is-on" : ""}${n ? "" : " is-zero"}${isCatchAll(o.value) ? " is-rest" : ""}`,
                   "aria-pressed": String(on),
                   onclick: () => setFilter(f.field, o.value),
                 },
@@ -2001,10 +2039,60 @@ function render() {
       side,
     ),
   );
+  layout();
   window.scrollTo({ top: scrollY });
   return Promise.all(charts.map(drawChart)).then(() => {
     document.body.dataset.ready = state.view;
   });
+}
+
+// A matrix narrow enough for half a row takes half, so it doesn't leave the other half empty, and a half block left
+// alone in its row takes the whole row. Only blocks without `wide` or `half` move.
+function layout() {
+  const grid = root.querySelector(".rp-grid");
+  if (!grid) return;
+  const css = getComputedStyle(grid);
+  const two = css.gridTemplateColumns.split(" ").length > 1;
+  const half = (grid.clientWidth - (parseFloat(css.columnGap) || 0)) / 2;
+  const blocks = [...grid.children];
+  for (const el of blocks) {
+    if (el.dataset.auto === "half") el.classList.remove("is-wide");
+    if (el.dataset.auto !== "matrix") continue;
+    el.classList.add("is-wide");
+    const table = el.querySelector(".rp-matrix");
+    if (two && table && table.offsetWidth <= half) el.classList.remove("is-wide");
+  }
+  let run = [];
+  const flush = () => {
+    const last = run.at(-1);
+    if (run.length % 2 && last.dataset.auto === "half") last.classList.add("is-wide");
+    run = [];
+  };
+  for (const el of blocks)
+    if (!el.classList.contains("rp-block") || el.classList.contains("is-wide")) flush();
+    else run.push(el);
+  flush();
+  for (const el of grid.querySelectorAll(".rp-scroll")) scrollHint(el);
+}
+
+// A table or matrix wider than the screen fades at the edge it scrolls toward, so a phone reader sees there's more.
+function scrollHint(el) {
+  const update = () => {
+    const more = el.scrollWidth - el.clientWidth > 2;
+    const sides = [
+      more && el.scrollLeft > 2 ? "left" : "",
+      more && el.scrollLeft < el.scrollWidth - el.clientWidth - 2 ? "right" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    if (sides) el.dataset.more = sides;
+    else delete el.dataset.more;
+  };
+  if (!el.dataset.hinted) {
+    el.dataset.hinted = "1";
+    el.addEventListener("scroll", update, { passive: true });
+  }
+  update();
 }
 
 const SEARCH =
@@ -2036,7 +2124,7 @@ new ResizeObserver(() => {
   if (Math.abs(w - lastWidth) < 8) return;
   lastWidth = w;
   clearTimeout(window.__rpResize);
-  window.__rpResize = setTimeout(() => Promise.all(charts.map(drawChart)), 120);
+  window.__rpResize = setTimeout(() => (layout(), Promise.all(charts.map(drawChart))), 120);
 }).observe(root);
 void render();
 window.__report = {

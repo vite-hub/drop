@@ -161,10 +161,27 @@ const COLUMN_FORMATS = [
   "delta",
   ...FORMATS,
 ];
+// The same pattern as CATCH_ALL in assets/app.js: values the template sorts last and grays.
+export const CATCH_ALL =
+  /^(not set|unset|not given|unknown|none|n\/a|missing|unspecified|blank|empty|no [\w ]+|others?\b.*|rest of .+|the rest|everyone else|everything else|all others|\(.*\)|[-–—?])$/i;
+const NUMERIC = ["number", "integer", "compact", "percent", "money", "bar", "heat", "delta"];
 const TONE_NAMES = ["good", "fair", "warn", "bad", "muted", "accent"];
 const MAX_SERIES = 12;
 
 const sentences = (s) => (String(s).match(/[.!?](\s|$)/g) ?? []).length;
+
+// The first and last day of the period a value names ("2026", 2026, "2026-11", "2026-Q4", "2026 to Nov 11"), or null.
+const day = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10);
+const periodOf = (v) => {
+  const s = String(v ?? "").trim();
+  let m = s.match(/^(\d{4})-(\d{2})(?!-\d)/);
+  if (m) return [day(+m[1], +m[2], 1), day(+m[1], +m[2] + 1, 0)];
+  m = s.match(/^(\d{4})[- ]?Q([1-4])\b/i);
+  if (m) return [day(+m[1], m[2] * 3 - 2, 1), day(+m[1], m[2] * 3 + 1, 0)];
+  m = s.match(/^(\d{4})(?![-\d])/);
+  if (m && +m[1] > 1900 && +m[1] < 2200) return [day(+m[1], 1, 1), day(+m[1], 12, 31)];
+  return null;
+};
 
 export function check(report) {
   const errors = [];
@@ -406,8 +423,43 @@ export function check(report) {
       if (b.style && b.style !== "rows")
         err(
           at,
-          '`style` can only be `"rows"`: a dense list with no header, for the evidence behind the numbers.',
+          '`style` can only be `"rows"`: a dense list for the evidence behind the numbers.',
         );
+      const cols = b.columns ?? [];
+      const numeric = cols.filter(
+        (c) =>
+          NUMERIC.includes(c.format) ||
+          (!c.format && rows.some((r) => typeof r[c.field] === "number")),
+      ).length;
+      const needsHeader = cols.length > 5 || numeric > 1;
+      if (b.header === false && needsHeader)
+        err(
+          at,
+          `has ${numeric > 1 ? `${numeric} number columns` : `${cols.length} columns`}, which no one can tell apart without a header; remove \`header: false\`.`,
+        );
+      if (b.header ?? (b.style !== "rows" || needsHeader))
+        for (const [ci, c] of cols.entries())
+          if (!c.label)
+            err(
+              `${at} > columns[${ci}]`,
+              `add a \`label\`: the table shows a header${b.style === "rows" ? ` (it has ${numeric > 1 ? "2 or more number columns" : "more than 5 columns"})` : ""}, and without one it prints the field name \`${c.field}\`.`,
+            );
+      // A partial period against a full one: 2026 to November against all of 2025 reads as a collapse.
+      const updated = /^\d{4}-\d{2}-\d{2}$/.test(report.updated ?? "") ? report.updated : null;
+      const periodField = cols
+        .filter((c) => !NUMERIC.includes(c.format) && c.format !== "stack")
+        .map((c) => c.field)
+        .find((f) => rows.filter((r) => periodOf(r[f])).length * 2 >= rows.length && rows.length);
+      for (const c of updated && periodField ? cols.filter((c) => c.format === "delta") : [])
+        for (const r of rows) {
+          const period = periodOf(r[periodField]);
+          if (r[c.field] == null || !period || !(period[0] <= updated && updated < period[1]))
+            continue;
+          warn(
+            at,
+            `the \`${c.field}\` of "${r[periodField]}" compares a period that \`updated\` (${updated}) cuts short with a full one, so the change mostly measures the missing months. Leave it empty, and compare a trailing full window instead, like the last 12 months against the full year before.`,
+          );
+        }
       for (const [ci, c] of (b.columns ?? []).entries()) {
         const w = `${at} > columns[${ci}]`;
         keys(c, "column", w);
@@ -433,6 +485,67 @@ export function check(report) {
   };
 
   for (const [i, b] of (report.top ?? []).entries()) checkBlock(b, `top[${i}]`);
+
+  // Two stats that print the same number on a period tab tell the reader one thing twice, like contributors and
+  // newcomers on All time, when everyone is new.
+  const kindOf = (f) => f.type ?? (f.options && f.options.length <= 5 ? "tabs" : "list");
+  const valueOf = (o) => (o && typeof o === "object" ? o.value : o);
+  const tabFilters = (report.filters ?? []).filter((f) => kindOf(f) === "tabs" && f.field);
+  const settings = (report.filters ?? []).map((f) => [
+    f,
+    kindOf(f) === "tabs"
+      ? (f.default ?? valueOf(f.options?.[0]))
+      : kindOf(f) === "toggle"
+        ? Boolean(f.default)
+        : (f.default ?? null),
+  ]);
+  const statValue = (v, chosen) => {
+    if (v == null || typeof v !== "object") return v;
+    let rows = data[v.data] ?? [];
+    for (const [f, value] of chosen) {
+      if (kindOf(f) === "toggle") {
+        if (!value) rows = rows.filter((r) => !r[f.field]);
+      } else if (value != null && value !== "*")
+        rows = rows.filter((r) => !(f.field in r) || r[f.field] === value);
+    }
+    if (v.where)
+      rows = rows.filter((r) => Object.entries(v.where).every(([k, x]) => r[k] === x));
+    if (v.agg === "count" && v.field == null) return rows.length;
+    const xs = rows.map((r) => r[v.field]).filter((x) => typeof x === "number");
+    if (!xs.length) return null;
+    const agg = v.agg ?? "sum";
+    if (agg === "count") return xs.length;
+    if (agg === "mean") return xs.reduce((a, b) => a + b, 0) / xs.length;
+    if (agg === "min") return Math.min(...xs);
+    if (agg === "max") return Math.max(...xs);
+    if (agg === "first") return xs[0];
+    if (agg === "last") return xs.at(-1);
+    return xs.reduce((a, b) => a + b, 0);
+  };
+  const tabCases = tabFilters.length
+    ? tabFilters.flatMap((t) =>
+        (t.options ?? []).map((o) => [
+          `on "${o?.label ?? valueOf(o)}"`,
+          settings.map(([f, v]) => [f, f === t ? valueOf(o) : v]),
+        ]),
+      )
+    : [["", settings]];
+  for (const [i, b] of (report.top ?? []).entries()) {
+    if (b.type !== "stats") continue;
+    for (const [where, chosen] of tabCases) {
+      const seen = new Map();
+      for (const s of b.items ?? []) {
+        const v = statValue(s.value, chosen);
+        if (typeof v !== "number" || v === 0) continue;
+        if (seen.has(v))
+          warn(
+            `top[${i}]`,
+            `"${seen.get(v)}" and "${s.label}" both show ${v.toLocaleString("en")}${where ? ` ${where}` : ""}, so one tells the reader nothing new there. Keep one, or show a number that differs on every tab.`,
+          );
+        else seen.set(v, s.label);
+      }
+    }
+  }
   for (const [i, b] of (report.bottom ?? []).entries()) checkBlock(b, `bottom[${i}]`);
   if ((report.top ?? []).length > 2)
     err("report", "`top` holds at most 2 blocks (the numbers that stay on every tab).");

@@ -408,7 +408,8 @@ button {
   color: var(--rp-fg);
   font-weight: 500;
 }
-.rp-side-group li button.is-zero {
+.rp-side-group li button.is-zero,
+.rp-side-group li button.is-rest:not(.is-on) {
   color: var(--rp-muted);
 }
 .rp-side-group li button span:nth-child(2) {
@@ -636,6 +637,23 @@ button {
 /* tables */
 .rp-scroll {
   overflow-x: auto;
+  --rp-fade: 48px;
+}
+/* The edge a table scrolls toward fades out, so a cut-off column reads as "more this way". */
+.rp-scroll[data-more="right"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--rp-fade)), transparent);
+}
+.rp-scroll[data-more="left"] {
+  mask-image: linear-gradient(to left, #000 calc(100% - var(--rp-fade)), transparent);
+}
+.rp-scroll[data-more="left right"] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--rp-fade),
+    #000 calc(100% - var(--rp-fade)),
+    transparent
+  );
 }
 .rp-table table {
   width: 100%;

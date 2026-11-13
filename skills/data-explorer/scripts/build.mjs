@@ -1,6 +1,7 @@
 // node build.mjs report.json report.html [--shots dir]
 // Checks report.json, then writes one self-contained HTML page. With --shots, it opens the page and saves a
-// screenshot of every view in light and dark, plus the first view on a phone, and fails on any chart that broke.
+// screenshot of every view in light, dark and on a phone, and fails on any chart that broke or layout the template
+// should have prevented.
 // It needs nothing installed. Where vega and vega-lite are, it inlines them so the page works offline; --shots needs
 // playwright.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -8,7 +9,7 @@ import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { check } from "./check.mjs";
+import { CATCH_ALL, check } from "./check.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = join(here, "../assets");
@@ -161,6 +162,55 @@ if (shots) {
             .map((t) => t.closest(".rp-block")?.querySelector("h3")?.textContent ?? "a table"),
         );
         for (const t of shifted) problems.push(`view ${id}: "${t}" has cells out of line with their row`);
+        // Numbers without a header: "591" and "4,932" side by side say nothing.
+        const headless = await page.$$eval(".rp-table table", (tables) =>
+          tables
+            .filter((t) => {
+              const row = t.querySelector("tbody tr");
+              return (
+                !t.tHead &&
+                row &&
+                (row.cells.length > 5 || row.querySelectorAll("td.rp-num:not(.rp-muted)").length > 1)
+              );
+            })
+            .map((t) => t.closest(".rp-block")?.querySelector("h3")?.firstChild?.textContent ?? "a table"),
+        );
+        for (const t of headless)
+          problems.push(
+            `view ${id}: "${t}" shows numbers with no header; the template shows one past 5 columns or with 2 number columns, so don't set \`header: false\` on it`,
+          );
+        // A matrix that fits in half a row, in a full row, leaves the other half empty.
+        const narrow = await page.$$eval(".rp-block.is-wide", (blocks) => {
+          const grid = document.querySelector(".rp-grid");
+          const half = (grid.clientWidth - parseFloat(getComputedStyle(grid).columnGap)) / 2;
+          return blocks
+            .map((b) => [b, b.querySelector(".rp-matrix")])
+            .filter(([, m]) => m && m.offsetWidth <= half)
+            .map(([b, m]) => `${b.querySelector("h3")?.textContent ?? "a matrix"}" is ${m.offsetWidth}px wide in a ${b.clientWidth}px row`);
+        });
+        for (const n of narrow)
+          problems.push(
+            `view ${id}: "${n}; drop its \`wide: true\` so it takes half a row, and put a chart or bar list next to it`,
+          );
+        // Catch-all values ("Not set", "Other") say the least, so they sort after the real names.
+        const rest = await page.$$eval(
+          ".rp-side-group ul",
+          (lists, source) => {
+            const catchAll = new RegExp(source, "i");
+            return lists
+              .filter((ul) => {
+                const names = [...ul.querySelectorAll("button span:nth-child(2)")].map((s) =>
+                  catchAll.test(s.textContent.trim()),
+                );
+                const first = names.indexOf(true);
+                return first >= 0 && names.slice(first).includes(false);
+              })
+              .map((ul) => ul.closest(".rp-side-group").querySelector(".rp-side-head span").textContent);
+          },
+          CATCH_ALL.source,
+        );
+        for (const r of rest)
+          problems.push(`view ${id}: the "${r}" filter lists a catch-all value like "Not set" or "Other" before a real name`);
       }
       await page.screenshot({ path: join(shots, `${id}-${theme}.png`), fullPage: true });
     }
@@ -171,14 +221,26 @@ if (shots) {
     deviceScaleFactor: 2,
   });
   await phone.goto(`${url}?theme=light`);
-  await phone
-    .waitForFunction(() => document.body.dataset.ready, null, { timeout: 20000 })
-    .catch(() => {});
-  await phone.screenshot({ path: join(shots, "phone.png"), fullPage: true });
+  for (const id of await phone.evaluate(() => window.__report?.views ?? [])) {
+    await phone.evaluate((v) => window.__report.go(v), id);
+    await phone
+      .waitForFunction((v) => document.body.dataset.ready === v, id, { timeout: 20000 })
+      .catch(() => {});
+    await phone.waitForTimeout(150);
+    // A table cut at the screen's edge with nothing that says it scrolls reads as the whole table.
+    const silent = await phone.$$eval(".rp-scroll", (els) =>
+      els
+        .filter((el) => el.scrollWidth - el.clientWidth > 2 && !el.dataset.more)
+        .map((el) => el.closest(".rp-block")?.querySelector("h3")?.firstChild?.textContent ?? "a table"),
+    );
+    for (const s of silent)
+      problems.push(`phone, view ${id}: "${s}" is cut at the screen's edge with no sign that it scrolls`);
+    await phone.screenshot({ path: join(shots, `${id}-phone.png`), fullPage: true });
+  }
   await browser.close();
   for (const p of new Set(problems)) console.log(`error    ${p}`);
   console.log(
-    `Screenshots in ${shots}: one per view and theme, plus phone.png. Open every one before you call the report done.`,
+    `Screenshots in ${shots}: one per view in light, dark and on a phone. Open every one before you call the report done.`,
   );
   if (problems.length) process.exit(1);
 }

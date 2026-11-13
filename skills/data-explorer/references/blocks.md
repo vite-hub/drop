@@ -74,11 +74,11 @@ A view `id` is kebab-case, and `method` is taken by the Method tab. A key the re
 
 ## Layout
 
-Blocks sit in two columns. Charts and `bars` take half a row, so put related ones next to each other; tables, matrices, `stats` and `facts` take the full row. `"wide": true` or `"half": true` overrides that. Sections have no boxes: a hairline separates them.
+Blocks sit in two columns. Charts and `bars` take half a row, so put related ones next to each other; tables, `stats` and `facts` take the full row. A matrix takes the full row unless it fits in half, so a 4×4 or 9×9 grid sits next to the block after it. A half block left alone in its row grows to the full row. `"wide": true` or `"half": true` fixes a block's width, and the build fails on a matrix that fits in half a row but is set `wide`. On a phone, a table or matrix wider than the screen fades at the edge it scrolls toward. Sections have no boxes: a hairline separates them.
 
 ## Colors
 
-Every value of a `list` filter gets one color, used by the sidebar, `entity` columns, `bars` labels, matrix rows or columns, and chart series on that field. So name a chart's `series`, a bar list's `label` or a matrix's `x`/`y` after the filter's field when they show that entity. For anything else, `tones` sets colors in order: `good`, `fair`, `warn`, `bad`, `muted`, `accent`, a palette index, or a `#hex`. Use the semantic tones for scales that run from good to bad (answered → only the team knows).
+Every value of a `list` filter gets one color, used by the sidebar, `entity` columns, `bars` labels, matrix rows or columns, and chart series on that field. So name a chart's `series`, a bar list's `label` or a matrix's `x`/`y` after the filter's field when they show that entity. Catch-all values (`Not set`, `Unknown`, `None`, `Other …`, `Rest of …`) sort last in the sidebar and in bar lists and stay gray, so name a folded tail that way. For anything else, `tones` sets colors in order: `good`, `fair`, `warn`, `bad`, `muted`, `accent`, a palette index, or a `#hex`. Use the semantic tones for scales that run from good to bad (answered → only the team knows).
 
 ## Blocks
 
@@ -103,10 +103,10 @@ A click on a `line`, `area` or bar chart filters by its `series` when that's a l
 
 Options for any chart: `format` (`number`, `integer`, `compact`, `percent` for 0–1 values, `money` in US dollars), `height` (default 240), `highlight` (one series in color, the rest gray), `tones`, `logToggle`, `xTitle`, `yTitle`.
 
-**table**: `data`, `columns` of `{ field, label, format, number }`, `sort` (a field, descending), `limit` (rows shown, default 12), `more` (rows each "Show more" adds), `search: true`, `rank: false`. `"style": "rows"` is the dense evidence list: no header, no rank, its title shows the matching count, and the sidebar search filters it. Column `format`:
+**table**: `data`, `columns` of `{ field, label, format, number }`, `sort` (a field, descending), `limit` (rows shown, default 12), `more` (rows each "Show more" adds), `search: true`, `rank: false`. `"style": "rows"` is the dense evidence list: no rank, its title shows the matching count, and the sidebar search filters it. It hides the header only while the columns read without one: past 5 columns, or with 2 number columns, it shows it, so give every column a `label` (the build says when it's missing). `header: false` hides a header, but never on such a table. Column `format`:
 
 - `entity`: a colored dot and the name, for a list filter's field. Rows click to filter.
-- `bar`: inline bar and number; `heat`: tinted cell; `delta`: signed and colored, a 0–1 change printed as a percent; `number`/`integer`/`compact`/`percent`/`money`.
+- `bar`: inline bar and number; `heat`: tinted cell; `delta`: signed and colored, a 0–1 change printed as a percent. Leave it empty on a period the report's `updated` date cuts short (2026 when `updated` is `2026-11-11`); the build warns otherwise. Add a row for a trailing full window, like `Last 12 months`, to carry the change; `number`/`integer`/`compact`/`percent`/`money`.
 - `stack`: a small bar split by `fields` (with `names`, `tones`), for a mix per row. Give it any `field` name as its key.
 - `chips`: an array of strings or `[label, count]` pairs, as pills, like the two things a customer most needs.
 - `text` (`truncate: true` cuts it to the cell), `date`, `user` (GitHub avatar), `country` (flag from an ISO code), `link`. `suffix` prints another field after a number, small.
@@ -115,7 +115,7 @@ Options for any chart: `format` (`number`, `integer`, `compact`, `percent` for 0
 
 ## Filters
 
-- `tabs`: periods or modes in the sidebar, one always on; more than 5 options become a dropdown, so list every year if the reader needs them. Give every dataset that should follow it the field, with one set of rows per option.
+- `tabs`: periods or modes in the sidebar, one always on. The build warns when two `top` stats show the same number on one tab, like contributors and newcomers on All time, when everyone is new; more than 5 options become a dropdown, so list every year if the reader needs them. Give every dataset that should follow it the field, with one set of rows per option.
 - `list` (default for more than 5 options): the entity list in the sidebar, each name with its color and a count of rows in `count` (a dataset name; `countField` sums a field instead). Click to filter every dataset with that field; click again to clear. `colors` maps a value to a tone (`{ "Bug": "bad" }`) when its meaning has a color.
 - `toggle`: a checkbox in the top bar. Rows whose field is true are hidden until it's checked, like "Include thanks and scheduling".
 - `search` (report level, the placeholder text): filters every `table`.
