@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { user } from "./config"
+import { user } from "./index"
 
 // Teams on a personal Drop (server/utils/teams.ts): Better Auth's organization plugin keeps who is on which team, and
 // its Stripe plugin keeps each team's subscription. A team's drops live in its team folders (`drops.team_id`).

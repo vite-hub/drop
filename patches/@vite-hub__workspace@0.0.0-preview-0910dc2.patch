@@ -1,7 +1,8 @@
-diff --git a/dist/vite-HBjWlJi8.js b/dist/vite-HBjWlJi8.js
---- a/dist/vite-HBjWlJi8.js
-+++ b/dist/vite-HBjWlJi8.js
-@@ -18769,11 +18769,13 @@
+diff --git a/dist/vite.js b/dist/vite.js
+index f40c910fba0d9e906b909789cb608d760b6ecac7..1d22533d5250059e0f636b4d2d5b857e38975b2f 100644
+--- a/dist/vite.js
++++ b/dist/vite.js
+@@ -20750,11 +20750,13 @@ function mergeNitroWorkspaceConfig(value, dev) {
  	kit.addPlugin(generatedNitroWorkspacePlugin, dev ? "start" : "end");
  	return kit.config;
  }
@@ -16,19 +17,19 @@ diff --git a/dist/vite-HBjWlJi8.js b/dist/vite-HBjWlJi8.js
 +		[WORKSPACE_ASSETS_REGISTRY_ID]: registryFile
  	};
  }
- function mergeNitroExternal(value, addition) {
-@@ -18920,7 +18922,7 @@
+ function configureCloudflareNitroRuntime(nitro) {
+@@ -20911,7 +20913,7 @@ async function createWorkspaceNitroConfig(options = {}) {
  	const cloudflareRuntime = cloudflareArtifactsConfigs.length > 0 || getHostingProvider(hosting) === "cloudflare";
- 	await writeNitroWorkspacePlugin(roots.projectRoot, runtimeConfig, workspaceOptions, definitions, cloudflareRuntime, WORKSPACE_PACKAGE_NAME, definitionOverrides);
+ 	await writeNitroWorkspacePlugin(roots.projectRoot, runtimeConfig, workspaceOptions, definitions, cloudflareRuntime, definitionOverrides, storeUsage);
  	const nitro = mergeNitroWorkspaceConfig(options.nitro, options.command !== "build");
 -	if (options.command === "build") configureNitroWorkspaceAssets(nitro, roots.projectRoot);
 +	if (options.command === "build") await configureNitroWorkspaceAssets(nitro, roots.projectRoot);
  	for (const config of cloudflareArtifactsConfigs) configureCloudflareArtifacts(nitro, config);
  	if (cloudflareRuntime) configureCloudflareNitroRuntime(nitro);
  	return nitro;
-@@ -19020,7 +19022,7 @@
+@@ -21003,7 +21005,7 @@ function hubWorkspace(options) {
  				const usesCloudflareRuntime = artifacts.length > 0 || getHostingProvider(resolvedHosting) === "cloudflare";
- 				await writeNitroWorkspacePlugin(roots.projectRoot, runtimeConfig, runtimeOptions, definitions, usesCloudflareRuntime, importBase, definitionOverrides);
+ 				await writeNitroWorkspacePlugin(roots.projectRoot, runtimeConfig, runtimeOptions, definitions, usesCloudflareRuntime, definitionOverrides, storeUsage);
  				const nitro = mergeNitroWorkspaceConfig(config.nitro, env?.command === "serve");
 -				if (env?.command === "build") configureNitroWorkspaceAssets(nitro, roots.projectRoot);
 +				if (env?.command === "build") await configureNitroWorkspaceAssets(nitro, roots.projectRoot);

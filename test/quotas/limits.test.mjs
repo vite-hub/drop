@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import { test, vi } from "vite-plus/test"
+import { migrations } from "../../scripts/migrations.mjs"
 import { DatabaseSync } from "node:sqlite"
-import { readFileSync, mkdtempSync, rmSync, readdirSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { Worker } from "node:worker_threads"
@@ -16,11 +17,7 @@ import { appFileChunks, QUOTA_RESERVATION_TTL_MS, reserveSQL, usageSQL } from ".
 function setup(path = ":memory:") {
   const db = new DatabaseSync(path)
   db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000")
-  const migrations = new URL("../../server/databases/migrations/", import.meta.url)
-  for (const name of readdirSync(migrations)
-    .filter((name) => name.endsWith(".sql"))
-    .sort())
-    db.exec(readFileSync(new URL(name, migrations), "utf8"))
+  for (const migration of migrations()) db.exec(migration.sql)
   return db
 }
 // Free allows 50 drops; three keep the slot arithmetic below readable.

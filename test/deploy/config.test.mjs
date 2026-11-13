@@ -10,7 +10,7 @@ test("host detection and explicit presets select compatible storage", () => {
     [{ DENO_DEPLOYMENT_ID: "deployment" }, "deno", "d1"],
     [{ NITRO_PRESET: "node-server" }, "vps", "sqlite"],
     [{ SERVER_PRESET: "cloudflare-module" }, "cloudflare", "d1"],
-    [{ VITEHUB_HOSTING: "netlify" }, "netlify", "d1"],
+    [{ VITEHUB_HOST: "netlify" }, "netlify", "d1"],
     [{ DROP_HOST: "vps", VERCEL: "1" }, "vps", "sqlite"],
     [{ DROP_DATABASE_URL: "file:.data/custom.db" }, "vps", "sqlite"],
     [{ DROP_HOST: "vps", CLOUDFLARE_D1_DATABASE_ID: "existing" }, "vps", "d1"],

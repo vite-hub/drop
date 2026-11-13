@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { DatabaseSync } from "node:sqlite"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { test } from "vite-plus/test"
+import { migrations } from "../../scripts/migrations.mjs"
 
 const require = createRequire(import.meta.resolve("vite-hub"))
 const { createDbCliContributor } = await import(pathToFileURL(require.resolve("@vite-hub/database/cli")))
@@ -33,7 +34,7 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
       default: {
         name: "default",
         dialect: "sqlite",
-        migrationsDir: "server/databases/migrations",
+        migrationsDir: "server/databases/default/migrations",
         cloudflare: { http: true, databaseId: "test-database" },
       },
     },
@@ -67,9 +68,7 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
         .filter(Boolean)
       assert.equal(await migrate.run(args, context), 0, stderr)
       assert.equal(await migrate.run(args, context), 0, stderr)
-      const expected = readdirSync(new URL("../../server/databases/migrations/", import.meta.url)).filter((file) =>
-        file.endsWith(".sql"),
-      ).length
+      const expected = migrations().length
       assert.equal(database.prepare("SELECT count(*) AS n FROM d1_migrations").get().n, expected)
       assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
       assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = 'comments'").get(), undefined)

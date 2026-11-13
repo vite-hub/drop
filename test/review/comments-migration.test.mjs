@@ -6,8 +6,8 @@ import { test } from "vite-plus/test"
 import { readMigrationFiles } from "drizzle-orm/migrator"
 import { dropBackfills } from "../../scripts/comments-migration.mjs"
 
-const directory = new URL("../../server/databases/migrations/", import.meta.url)
-const file = "0011_comments_one_model.sql"
+const directory = new URL("../../server/databases/default/migrations/", import.meta.url)
+const file = "20261103143224_0011_comments_one_model/migration.sql"
 
 test("review retry claims follow the replacement thread table", () => {
   const database = beforeMove()

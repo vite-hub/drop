@@ -17,9 +17,9 @@ const modules: Record<string, string> = {
 }
 // Server modules Drop reads from Nitro and ViteHub at runtime, backed by test/cost/harness.mjs's `globalThis.dropTest`.
 const stubs: Record<string, string> = {
-  "vite-hub/database/drizzle": "export const db = globalThis.dropTest.db",
-  "vite-hub/database": "export const defineDatabase = v => v",
-  "vite-hub/blob": "export const blob = globalThis.dropTest.blob",
+  "vite-hub/database": "export const db = globalThis.dropTest.db; export const defineDatabase = v => v",
+  "vite-hub/blob":
+    'export { detectContentType } from "@vite-hub/blob/client"; export const blob = globalThis.dropTest.blob',
   // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".
   "nitro/cache": `import { defineCachedFunction as define } from ${JSON.stringify(ocache)}
 const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
@@ -28,16 +28,16 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
   "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
   "vite-hub/rate-limit": `export const checkRateLimit = async (_event, bucket, options) => {
   globalThis.dropTest.bursts.push({ bucket, ...options })
-  return globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter: 42, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }
+  return [undefined, globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter: 42, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
 }
-export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args)).allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
+export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
   "vite-hub/auth/mcp":
     "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }",
   "vite-hub/realtime/server":
     "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true",
-  "#vitehub/env/server":
+  "vite-hub/env":
     "export const deriveSecret = async (purpose) => `test-secret:${purpose}`; export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: t.githubOrg ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: { unseal: () => t.billing ? 'sk_test' : '' }, stripeWebhookSecret: { unseal: () => t.billing ? 'whsec_test' : '' }, priceId: t.billing ? 'price_team' : '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
 }
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.

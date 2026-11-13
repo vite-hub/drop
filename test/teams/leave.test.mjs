@@ -6,7 +6,7 @@ import { admin, organization } from "better-auth/plugins"
 import { beforeEach, test } from "vite-plus/test"
 import { insertDrop, insertVersion, migrate, objects, reset, sql, state } from "../cost/harness.mjs"
 
-const { default: schema } = await import("../../server/databases/config.ts")
+const { default: schema } = await import("../../server/databases/default/index.ts")
 const { leaveTeams, teamPlans } = await import("../../server/utils/teams.ts")
 
 // Deleting an account takes it off its teams, as server/auth.ts wires it: Stripe bills one seat less, and a team it owned

@@ -1,4 +1,4 @@
-import { detectPreset } from "vite-hub/deployment"
+import { detectHost } from "vite-hub"
 
 export const HOSTS = ["cloudflare", "vercel", "netlify", "deno", "vps"] as const
 export type HostId = (typeof HOSTS)[number]
@@ -9,10 +9,10 @@ const isHost = (value: string): value is Host => HOSTS.some((host) => host === v
 /**
  * Build-time choices. Credentials and the SQLite path remain runtime settings. DROP_HOST wins; otherwise ViteHub reads
  * the host from the build env (NITRO_PRESET, VERCEL, NETLIFY, ...), and ViteHub's build rejects a preset that
- * conflicts with it. Drop calls ViteHub's node preset `vps`.
+ * conflicts with it. Drop calls ViteHub's node host `vps`.
  */
 export function deployment(env: Record<string, string | undefined> = process.env) {
-  const detected = detectPreset(env)
+  const detected = detectHost(env)
   const host =
     env.DROP_HOST || (detected === "node" ? "vps" : detected) || (env.DROP_DATABASE_URL ? "vps" : "cloudflare")
   if (!isHost(host)) throw new Error(`DROP_HOST must be one of ${HOSTS.join(", ")}; got "${host}".`)

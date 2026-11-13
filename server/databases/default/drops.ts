@@ -1,7 +1,7 @@
-import type { AgentMetadata } from "../../shared/agent.ts"
+import type { AgentMetadata } from "../../../shared/agent.ts"
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../shared/types.ts"
+import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../../shared/types.ts"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any

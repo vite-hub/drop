@@ -78,9 +78,9 @@ test("Auth generates ambient types and Nitro handlers at the project root", () =
 // ViteHub 0.1 exposes Content through shared operations, without a per-definition dev handler or path import.
 test("Content discovers the project-root definition and contributes loadable operations", () =>
   fixture(async (root) => {
-    await writeFile(join(root, "server/content.ts"), "export const content = {}\n")
+    await writeFile(join(root, "server/content.ts"), "export default {}\n")
     const plugin = hubContent()
-    const config = { root: join(root, "app"), plugins: [plugin] }
+    const config = { root: join(root, "app"), plugins: [plugin], resolve: { alias: [] } }
     await plugin.config.handler(config)
     await plugin.configResolved(config)
     const contributions = await plugin.vitehub.operations()
@@ -96,7 +96,7 @@ test("Content discovers the project-root definition and contributes loadable ope
 test("Content contributes no operations when the project has no definition", () =>
   fixture(async (root) => {
     const plugin = hubContent()
-    const config = { root: join(root, "app"), plugins: [plugin] }
+    const config = { root: join(root, "app"), plugins: [plugin], resolve: { alias: [] } }
     await plugin.config.handler(config)
     await plugin.configResolved(config)
     assert.deepEqual(await plugin.vitehub.operations(), [])

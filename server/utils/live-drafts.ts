@@ -40,7 +40,7 @@ export const readDraft = async (drop: Version) => (LIVE_EDITING ? read(draftPath
 export async function deleteDrafts(drops: Version[]) {
   if (!drops.length) return
   const paths = drops.map((drop) => draftPath(drop.id, drop.version))
-  const [error] = await blob.del(paths)
+  const [error] = await blob.delete(paths)
   if (error) log.warn({ action: "draft-cleanup", drafts: paths.join(","), error: String(error) })
 }
 

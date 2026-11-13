@@ -3,9 +3,9 @@ import { useLogger } from "evlog/nitro/v3"
 import { getCookie, type H3Event } from "h3"
 import * as v from "valibot"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { contentTypeOf, isTextFile } from "#shared/project-bundle"
-import { dropFiles } from "../databases/config"
+import { dropFiles } from "../databases/default/index"
 import { onOwnOrigin } from "./content-origin"
 import { findDrop, permissions } from "./drops"
 import { identityOf, type Identity } from "./identity"
@@ -153,15 +153,17 @@ async function keptFile(event: H3Event, blobKey: string): Promise<Response | und
 }
 
 /** The body for this response, keeping a copy of a whole file once it has been read. */
-function keepFile(event: H3Event, blobKey: string, status: number, body: ReadableStream | null | undefined) {
-  const size = Number(event.res.headers.get("Content-Length"))
+function keepFile(event: H3Event, blobKey: string, status: number, body: ReadableStream | null, headers: Headers) {
+  const size = Number(headers.get("Content-Length"))
   const cache = event.req.method === "GET" && status === 200 && size <= KEEP_MAX_BYTES ? fileCache() : undefined
   if (!cache || !body) return body
   const [sent, copy] = body.tee()
-  const headers = new Headers(event.res.headers)
-  headers.set("Cache-Control", "public, max-age=31536000, immutable")
+  const forever = new Headers(headers)
+  forever.set("Cache-Control", "public, max-age=31536000, immutable")
   event.waitUntil(
-    (async () => (await cache).put(cacheKey(event, blobKey), new Response(copy, { headers })))().catch(() => {}),
+    (async () => (await cache).put(cacheKey(event, blobKey), new Response(copy, { headers: forever })))().catch(
+      () => {},
+    ),
   )
   return sent
 }
@@ -204,28 +206,29 @@ export async function serveAppFile(event: H3Event, now = Date.now()): Promise<Re
       if (cached.status !== 304) headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
       return new Response(cached.body, { status: cached.status, headers })
     }
-    event.res.headers.set("X-Robots-Tag", "noindex, nofollow")
     // ViteHub streams the file from storage, or just the range a video asks for: Firefox resumes one mid-file and gives
     // up with a network error unless the answer starts where it asked, and Safari won't play one without ranges.
-    const [error, body] = await blob.serve(event, blobKey, { cacheControl })
-    if (error?.code === "BLOB_NOT_FOUND") {
-      if (!wasKept) return null
-      continue
-    }
-    // Not the cacheable 404 a missing file gets: the store failing is brief, and a cached miss would outlast it.
-    if (error) {
-      useLogger(event).error(error, { action: "storage" })
+    let served: Response
+    try {
+      served = await blob.serve(event.req, blobKey, { cacheControl, headers: { "X-Robots-Tag": "noindex, nofollow" } })
+    } catch (error) {
+      // Not the cacheable 404 a missing file gets: the store failing is brief, and a cached miss would outlast it.
+      useLogger(event).error(error instanceof Error ? error : String(error), { action: "storage" })
       return new Response("File storage is temporarily unavailable.", {
         status: 503,
         headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5" },
       })
     }
-    if (body) event.res.headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
-    const status = event.res.status || 200
-    return new Response(event.req.method === "HEAD" ? null : keepFile(event, blobKey, status, body), {
-      status,
-      headers: event.res.headers,
-    })
+    if (served.status === 404) {
+      if (!wasKept) return null
+      continue
+    }
+    const headers = new Headers(served.headers)
+    if (served.body) headers.set("Content-Type", isTextFile(file) ? `${type}; charset=utf-8` : type)
+    return new Response(
+      event.req.method === "HEAD" ? null : keepFile(event, blobKey, served.status, served.body, headers),
+      { status: served.status, headers },
+    )
   }
   return null
 }

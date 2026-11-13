@@ -2,7 +2,7 @@ import { H3Event } from "h3"
 import * as v from "valibot"
 import { defineConsoleAuthorize } from "vite-hub/console/auth"
 import { contentHost } from "./utils/content-origin"
-import { roleOf, syncRole } from "./utils/identity"
+import { roleOf } from "./utils/identity"
 import { isMember } from "./utils/members"
 
 const Operator = v.object({
@@ -13,18 +13,29 @@ const Operator = v.object({
 })
 
 /**
- * The Console, its pages included, is for a current, verified Drop admin using a browser session, who sees every
- * section. Anyone else signed in, agents too, gets a 404 as if Drop had none; a signed-out visit goes to /signin
- * (nuxt.config `console.signInPage`). The content origin never serves any of it (middleware/0.05).
+ * Drop's admins use the ViteHub Console at console.vitehub.dev, which signs each call with the key of the team that
+ * linked this Drop. A Console person whose email is in DROP_ADMINS gets every section; anyone else on that team gets
+ * a 403. The page tools pill shows its Console link only to a current, verified admin signed in to Drop. Agents get
+ * nothing, and the content origin never serves any of it (middleware/0.05).
  */
-export default defineConsoleAuthorize(async ({ request, user }) => {
-  const hidden = new Response(null, { status: 404 })
-  if (contentHost(new H3Event(request)) || request.headers.has("authorization")) return hidden
-  const parsed = v.safeParse(Operator, user)
-  if (!parsed.success || parsed.output.banned || roleOf(parsed.output) !== "admin") return hidden
-  if (!(await isMember(parsed.output.id))) return hidden
-  // Better Auth's admin endpoints read the operator's stored role.
-  await syncRole(parsed.output.id)
-  // Grant all sections, including Comments for the page toolbar, Console triage, and ViteHub MCP tools.
-  return true
+export default defineConsoleAuthorize(async (context) => {
+  if (contentHost(new H3Event(context.request))) return new Response(null, { status: 404 })
+  switch (context.via) {
+    case "console": {
+      const email = context.user.email
+      return email ? roleOf({ email, emailVerified: true }) === "admin" : false
+    }
+    case "cli":
+      return true
+    case "agent":
+      return false
+    case "page": {
+      const parsed = v.safeParse(Operator, context.user)
+      if (!parsed.success || parsed.output.banned || roleOf(parsed.output) !== "admin") return false
+      return isMember(parsed.output.id)
+    }
+    default:
+      // An open Console on a development server.
+      return true
+  }
 })
