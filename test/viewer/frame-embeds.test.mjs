@@ -31,6 +31,7 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
     useBase64: () => ({ base64: ref("") }),
     useAttachmentData: () => ({ ready: ref(true), deferred: ref(false), inline: (html) => html }),
     useDebounceFn: (fn) => fn,
+    useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),
     useDropFrame: (_frame, _origin, handler) => {
       receive = handler
