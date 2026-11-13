@@ -45,7 +45,7 @@ The block reference is [references/blocks.md](references/blocks.md); read it bef
 
 The page is [assets/page.html](assets/page.html) with `report.json`, [assets/style.css](assets/style.css) and [assets/app.js](assets/app.js) in its slots. Fill it the first way your environment allows:
 
-1. **With Node**, run the build. It checks `report.json` against every limit and names the fix, fills the page, and with `--shots` screenshots every view. It needs this skill's `scripts/` and `assets/` folders side by side; when the skill isn't on disk, download both from `https://drop.vitehub.dev/.well-known/skills/data-explorer/`. It loads packages from the folder you run it in. Set that folder up once:
+1. **With Node**, run the build. It checks `report.json` against every limit and names the fix, fills the page, and with `--shots` screenshots every view. It needs this skill's `scripts/` and `assets/` folders side by side; when the skill isn't on disk, unpack it with `mkdir -p /tmp/de-skill && curl -sL https://drop.vitehub.dev/.well-known/agent-skills/data-explorer.tar.gz | tar xz -C /tmp/de-skill`. It loads packages from the folder you run it in. Set that folder up once:
 
    ```sh
    mkdir -p /tmp/de-build && cd /tmp/de-build && npm init -y && npm i vega vega-lite playwright && npx playwright install chromium

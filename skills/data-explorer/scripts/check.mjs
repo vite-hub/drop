@@ -248,10 +248,19 @@ export function check(report) {
           else
             for (const [i, x] of b[k].entries())
               if (!isObject(x)) err(`${where} > blocks[${bi}] > ${k}[${i}]`, `must be \`${shape}\`, not ${JSON.stringify(x)}.`);
+      // The template maps over these, so a lone string breaks the page.
+      for (const [at, o] of [[`${where} > blocks[${bi}]`, b], ...(Array.isArray(b?.columns) ? b.columns : []).map((c, ci) => [`${where} > blocks[${bi}] > columns[${ci}]`, c])])
+        for (const k of ["segments", "fields", "tones"])
+          if (isObject(o) && o[k] != null && !Array.isArray(o[k])) err(at, `\`${k}\` must be an array, like [${JSON.stringify(o[k])}].`);
+      for (const [i, s] of (Array.isArray(b?.items) ? b.items : []).entries())
+        for (const slot of ["value", "delta"])
+          if (isObject(s?.[slot]) && s[slot].where != null && !isObject(s[slot].where))
+            err(`${where} > blocks[${bi}] > items[${i}].${slot}`, "`where` must be an object of field: value pairs.");
     }
   for (const [i, f] of (Array.isArray(report.filters) ? report.filters : []).entries())
     if (!isObject(f)) err(`filters[${i}]`, "must be `{ field, type, label }`.");
     else if (f.options != null && !Array.isArray(f.options)) err(`filters[${i}]`, "`options` must be an array.");
+    else if (f.options?.some((o) => o == null)) err(`filters[${i}]`, "`options` has an empty entry; remove it.");
   if (errors.length) return { errors, warnings, escapes: 0, rows: 0, size: 0 };
 
   keys(report, "report", "report");
