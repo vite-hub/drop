@@ -19,7 +19,7 @@
 
 [![license](https://comark-ui.onmax.me/badge.svg?label=license&value=BUSL-1.1)](https://github.com/vite-hub/drop/blob/main/LICENSE)
 [![docs](https://comark-ui.onmax.me/badge.svg?label=docs&value=drop.vitehub.dev)](https://drop.vitehub.dev)
-[![skills](https://comark-ui.onmax.me/badge.svg?label=skills&value=vite-hub/drop)](https://www.skills.sh/vite-hub/drop)
+[![skills](https://comark-ui.onmax.me/badge.svg?label=skills&value=vite-hub/drop)](#install-the-skills)
 
 ## How it works
 
