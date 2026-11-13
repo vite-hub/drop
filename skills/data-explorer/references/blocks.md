@@ -97,7 +97,7 @@ Every block takes `title` and `note` (a `note` needs a `title`), and every block
 
 - `line`, `area`: `x` (a year, an ISO date, or a category), `y`, optional `series`; or wide rows with `"y": ["fix", "feat"]` and `names`. Lines are named at their end; `endValues: true` adds the last value. `emphasis` draws one series (a total, "All") in the text color and thicker. `points: true` marks every value. `area` stacks with a series; `"stack": "percent"` on an `area` makes shares.
 - `bar`, `stacked`, `grouped`: `x` the category, `y` the value, optional `series`. `horizontal: true` sorts by value; `limit` keeps the top N; `"stack": "percent"` turns stacked bars (`stacked`, or `bar` with a `series`) into shares.
-- `scatter`: `x`, `y`, optional `size`, `series`, `label` (names the top `labelTop` points, moved apart so they don't overlap). `logX`/`logY` keep points at 0 on the axis. When `label` isn't a filter's field and the report has `search`, a click on a point searches for its `label`.
+- `scatter`: `x`, `y`, optional `size`, `series`, `label` (names the top `labelTop` points, moved apart so they don't overlap). `logX`/`logY` keep points at 0 on the axis. A click on a point filters by its `label`, else its `series`, when that is a `list` filter's field; with neither, and with the report's `search`, it searches for its `label`.
 - `histogram`: `x` only; `bins` (default 30). With `logToggle` on log, values at or below 0 are left out.
 
 A click on a line, area or bar chart filters by its `series`, or else by its `x`, when that is a `list` filter's field; a second click clears it.
