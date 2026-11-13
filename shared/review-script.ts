@@ -2,8 +2,8 @@
 // preview builds or from the "Review with Drop" bookmarklet. It adds one element, a toolbar in a closed shadow root,
 // so the page's CSS can't reach it and it touches nothing else on the page. Presses, focus, and keys inside it stop at
 // that element, so the page doesn't take them for its own: a menu it has open stays open while someone comments on it.
-// It does nothing until someone presses Comment or Highlight. It carries no key: Drop finds the site drop from the
-// page's origin when someone connects.
+// Until someone presses Comment or Highlight, it only asks whether any drop links to the page, to show Related links.
+// It carries no key: Drop finds the site drop from the page's origin when someone connects.
 //
 // The toolbar is ViteHub's page pill, the same code as ViteHub's page tools (vite-hub/vitehub#3377): it docks to
 // any edge, its mark drags it there and collapses it to the hexagon, and the browser remembers both for the site. The
@@ -114,20 +114,22 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 @media (any-pointer: coarse) { .links a { min-height: 44px; } }
 .links .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .links .detail { min-width: 0; max-width: 40%; overflow: hidden; color: #a3a3a3; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.links img { width: 16px; height: 16px; flex: none; border-radius: 3px; object-fit: contain; }
 .links svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; color: #a3a3a3; }
 .links .out { width: 14px; height: 14px; }
-.links .github { fill: currentColor; stroke: none; color: inherit; }
+/* Favicons are drawn for a light tab bar, and many (GitHub, Airtable, Vercel) are a black mark, so each sits on a
+   light plate, as the link icon does when a site has none. The ring grows the plate 2px past the icon. */
+.links img, .links .site { width: 16px; height: 16px; flex: none; border-radius: 2px; background: #fff; box-shadow: 0 0 0 2px #fff; object-fit: contain; }
+.links .site { display: grid; place-items: center; }
+.links .site svg { width: 14px; height: 14px; color: #737373; }
 .paint { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
 .inked, .ink { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .ink .mk { stroke-opacity: .4; stroke-linecap: butt; }
-/* Who else is on the review (the people button): their faces, ringed in their cursor's color, dimmed while away. */
+/* Who else is on the review now (the people button): their faces, ringed in their cursor's color. */
 .seg .people { gap: 0; padding: 0 6px; }
 .people .face { display: grid; place-items: center; width: 20px; height: 20px; margin-left: -4px; overflow: hidden; border-radius: 50%; background: var(--vitehub-pill-hover); color: inherit; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 0 0 1.5px var(--face, transparent); transition: opacity 200ms ease, filter 200ms ease; }
 .people .face:first-child { margin-left: 0; }
 .people .face img { width: 100%; height: 100%; object-fit: cover; }
-.people .face.idle { opacity: .45; filter: grayscale(1); box-shadow: 0 0 0 1.5px var(--vitehub-pill-line); }
 .people .more { margin-left: 4px; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 /* Not a mode the pill has on: pressed only says the cursors show, which the faces' rings already say. */
 .seg .people[aria-pressed] { background: none; color: inherit; }
@@ -159,9 +161,6 @@ const ICONS = {
     `<path d="M107 139a53 53 0 0 0 80 6l32-32a53 53 0 0 0-75-75l-18 18"/><path d="M149 117a53 53 0 0 0-80-6l-32 32a53 53 0 0 0 75 75l18-18"/>`,
   ),
 }
-// GitHub's favicon is a black mark that the dark menu would hide, so its Simple Icons mark takes the text color.
-const GITHUB_MARK = `<svg class="github" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .32.21.69.82.57A12 12 0 0 0 12 .3"/></svg>`
-
 const COMPOSE = (label: string, placeholder: string, send: string, cancel: boolean) =>
   `<div class="compose"><textarea aria-label="${label}" maxlength="4000" placeholder="${placeholder}"></textarea><div class="files"></div><p class="msg" role="alert" hidden></p>` +
   `<div class="row"><button class="icon" type="button" data-act="attach" title="Add images (or paste them)" aria-label="Add images">${ICONS.image}</button><span class="who"></span>` +
@@ -778,17 +777,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     holder.innerHTML = html;
     return holder.content.firstChild;
   };
-  // A row's icon: GitHub's mark, the first of the link's favicons that loads, asked with no referrer, or a link icon.
+  // A row's icon: the first of the link's favicons that loads, asked with no referrer, or a link icon.
+  const linkIcon = () => iconFrom(${JSON.stringify(`<span class="site">${ICONS.link}</span>`)});
   function relatedIcon(link) {
-    if (/^https:\/\/(?:www\.)?github\.com\//.test(link.url)) return iconFrom(${JSON.stringify(GITHUB_MARK)});
     const tries = (link.icons || []).slice();
-    if (!tries.length) return iconFrom(${JSON.stringify(ICONS.link)});
+    if (!tries.length) return linkIcon();
     const image = document.createElement("img");
     image.alt = ""; image.referrerPolicy = "no-referrer"; image.decoding = "async";
     const next = () => {
       const url = tries.shift();
       if (url) image.src = url;
-      else image.replaceWith(iconFrom(${JSON.stringify(ICONS.link)}));
+      else image.replaceWith(linkIcon());
     };
     image.addEventListener("error", next);
     next();
@@ -1407,12 +1406,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const others = new Map();
     for (const person of people) {
       if (person.id === me) continue;
+      // Someone whose every tab is hidden or idle isn't here: no grayed faces for people who already left.
       const state = states.get(person.clientId) || {};
-      const entry = Object.assign({}, person, { idle: state.active === false, at: typeof state.at === "string" ? state.at : null });
-      const seen = others.get(person.id);
-      if (!seen || (seen.idle && !entry.idle)) others.set(person.id, entry);
+      if (state.active === false || others.has(person.id)) continue;
+      others.set(person.id, person);
     }
-    renderPeople([...others.values()].sort((a, b) => a.idle - b.idle));
+    renderPeople([...others.values()]);
     const here = herePage(), shown = [];
     if (cursorsShown) {
       for (const [clientId, state] of states) {
@@ -1432,13 +1431,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   function renderPeople(people) {
     peopleButton.hidden = !people.length;
     if (!people.length) { peopleButton.textContent = ""; return; }
-    const names = people.map((person) => person.name + (person.idle ? " (away)" : "")).join(", ");
+    const names = people.map((person) => person.name).join(", ");
     peopleButton.title = names + ". " + (cursorsShown ? "Hide cursors" : "Show cursors");
     peopleButton.setAttribute("aria-label", "Here now: " + peopleButton.title);
     peopleButton.setAttribute("aria-pressed", String(cursorsShown));
     peopleButton.textContent = "";
     for (const person of people.slice(0, people.length > 3 ? 2 : 3)) {
-      const face = avatar(person, el("span", "face" + (person.idle ? " idle" : "")));
+      const face = avatar(person, el("span", "face"));
       face.style.setProperty("--face", person.color);
       peopleButton.appendChild(face);
     }
@@ -1480,7 +1479,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   document.documentElement.addEventListener("pointerleave", pointerLeft);
   addEventListener("blur", pointerLeft);
   for (const type of ["keydown", "scroll", "pointerdown"]) addEventListener(type, () => { lastInput = Date.now(); }, { capture: true, passive: true });
-  // Away after a minute without input, or while the tab is hidden.
+  // Gone from the others' faces after a minute without input, or while the tab is hidden.
   function checkActive() {
     const now = document.visibilityState === "visible" && Date.now() - lastInput < PRESENCE_IDLE_MS;
     if (now === active) return;

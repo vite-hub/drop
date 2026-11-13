@@ -60,7 +60,7 @@ The root `wrangler.jsonc` describes resources for the button. Cloudflare writes 
    DROP_URL=https://<your-domain> pnpm test:e2e:deployed
    ```
 
-To deploy on every push instead, connect the repository in Workers Builds with `CLOUDFLARE_D1_DATABASE_ID` as a build variable. Keep its existing `pnpm build` and `npx wrangler deploy` commands. That deploy command does not run migrations, so apply new ones with `pnpm db:migrate:remote`.
+To deploy on every push instead, connect the repository in Workers Builds with `CLOUDFLARE_D1_DATABASE_ID` as a build variable, `pnpm build` as the build command, and `pnpm run deploy` as the deploy command, as the button sets up. Its default, `npx wrangler deploy`, publishes without applying new migrations.
 
 ## Settings {#env}
 
@@ -78,6 +78,8 @@ To [give apps their own domain](/docs/self-host#content-origin), add a proxied w
 ## Database {#database}
 
 D1. `pnpm run deploy` applies new migrations before it publishes; `pnpm db:migrate:remote` applies them on their own.
+
+To update, [pull Drop's changes into your repository](/docs/self-host#update) and push.
 
 ## On Cloudflare {#different}
 

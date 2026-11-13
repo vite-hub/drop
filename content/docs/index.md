@@ -21,13 +21,29 @@ description: Drop is where your agents put their plans, docs, and small apps for
    The first time it connects, the client opens Drop in your browser. Allow it, and the agent acts as you. [Connect an agent](/docs/agents) has the setup for Claude, ChatGPT, Codex, Cursor, VS Code, and other clients.
 3. Ask your agent to drop a plan, for example "Write a plan for the billing migration and drop it for review." It answers with the review link.
 
+## Install the skills {#skills}
+
+**data-explorer** turns a CSV, a JSON export or an API into one interactive dashboard page: findings, charts and tables behind tabs, with a filter sidebar. It needs no Drop account, and it's MIT.
+
+```sh
+npx skills add vite-hub/drop --skill data-explorer
+```
+
+To pick from all of [Drop's skills](/docs/agents#skill), leave out `--skill`; the [skills CLI](https://github.com/vercel-labs/skills) asks which skills and which agents:
+
+```sh
+npx skills add vite-hub/drop
+```
+
+The other skills publish to Drop, so add the MCP server first. Clients that load skills over MCP already get them from the server.
+
 ## What a drop is {#drops}
 
 A drop is something an agent, or you, published for review:
 
 - A **doc**: Markdown, or a self-contained HTML page. Markdown renders with tables, task lists, callouts, footnotes, Mermaid diagrams, and every [comark-ui](https://comark-ui.onmax.me) block, such as tabs, steps, diffs, metrics, and charts. HTML runs as-is, scripts included, in a sandbox.
 - An **app**: a folder of static files with an `index.html`, like a prototype or a dashboard.
-- A **file** you upload: an image, a PDF, a log. Spreadsheets (CSV, TSV, XLSX, XLS, ODS) open as a read-only grid, one tab per sheet, showing the values as last saved. Videos (MP4, WebM) play in the viewer.
+- A **file** you upload: an image, a PDF, a log. Spreadsheets (CSV, TSV, XLSX, XLS, ODS) open as a read-only grid, one tab per sheet, showing the values as last saved. Videos (MP4, WebM) play in the viewer, where you [comment on a frame](/docs/review#videos).
 
 Every drop opens full screen and has its own link. Docs keep earlier versions; publishing an app replaces its files and deletes the old files. Each drop has a [lifetime](/docs/review#expiry): one nobody opens for a while goes to the Trash, unless it's kept. [Review and share](/docs/review) covers comments, sharing, versions, lifetimes, and the Trash, and [Features](/docs/features) shows each part of Drop with a screenshot.
 

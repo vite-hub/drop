@@ -11,6 +11,18 @@ Markdown renders with tables, task lists, callouts, footnotes, Mermaid diagrams,
 
 Images a doc embeds from Drop belong to it. Whoever can open the doc sees them, and they go to the Trash with it.
 
+In a Markdown doc, the **#** beside a heading copies a link to that section, which opens the doc there. The address bar follows the section you open from the outline. An image's button in its corner copies the image's own address, and a video's settings copy its address at the second it's at (`#t=`) or the frame on screen.
+
+## Videos {#videos}
+
+A **video** you upload (MP4, WebM) plays in the viewer. Add `?t=` to its link to open it at a second: `?t=75`, `?t=1:15`, or `?t=1m15s`.
+
+| Button in the player | What it does |
+| --- | --- |
+| **Comment on this frame** | Pauses the video and opens the frame still, where you click a spot or drag an area. See [Comments](#comments). |
+| **Copy link** | Copies the video's link at the second it's at. |
+| **Copy frame** | Copies the frame on screen as a PNG. |
+
 ### Rules for HTML plans
 
 ::plan-rules
@@ -33,7 +45,7 @@ A built app, such as a Vite `dist/` folder, a prerendered Nuxt site, or a Slidev
 
 An app's link opens at any of its pages with `?path=`: `/d/<key>/<slug>?path=/guide/setup#install` opens the app at `/guide/setup`, scrolled to `#install`, and so does `/d/<key>/<slug>/guide/setup#install`. The address bar follows the app as you move through it, so **Copy link** and a copied address open the page you were on. An address the app doesn't have shows its own `404.html`, or its `index.html` for a single-page app. `publish` and `read_drop` give agents each page with its link.
 
-To present a Slidev deck, press **Present** in the drop's header. The deck opens alone in a new window for the projector, and the drop's page turns into Slidev's presenter view, with your notes, the next slide, and a timer; it drives the other window. Any other app or HTML page opens alone with **Open in new window** in **Details**.
+To present a Slidev deck, press **Present** in the review bar at the bottom of the drop. The deck opens alone in a new window for the projector, and the drop's page turns into Slidev's presenter view, with your notes, the next slide, and a timer; it drives the other window. Any other app or HTML page opens alone with **Open in new window** in **Details**.
 
 An app with server code, like API routes, sign-in, or a database, isn't a drop. Deploy it to a preview and review it as a [site](/docs/sites).
 
@@ -64,6 +76,7 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | Text | Select it and pick **Comment**. |
 | Text you'd word differently | Select it and pick **Suggest**, then write the words that replace it, or clear them to suggest deleting it. The doc shows the old words struck through and the new ones after them. People who can edit the doc **Accept** it, which publishes the next version with the change and resolves it. **Undo** in the note that follows publishes the text from before and opens the suggestion again. |
 | An image | In a Markdown doc or an image drop, click it to zoom, then click a spot or drag an area. In an HTML doc or an app, clicks stay the page's own, so use the Comment tool. |
+| A video's frame | Press **Comment on this frame** in the player, then click a spot or drag an area on the still. A marker under the seek bar opens that frame and its thread again. The comment carries the frame as its image, so agents see it. |
 | An element or part of a page | Pick **Comment** in the toolbar under the page, or press :kbd[R]. Click an element to pin a comment to it, or drag a rectangle. The tool stays on for the next one. |
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
 | The whole page | Write in the box at the bottom of the Comments panel. |

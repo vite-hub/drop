@@ -233,6 +233,8 @@ export interface DropComment {
   quote: string | null
   /** A suggested edit: the words that replace the quote, empty to delete it. Null on a plain comment. */
   suggestion: string | null
+  /** On a video's frame: the second it's at. `ox`/`oy`/`ow`/`oh` are then thousandths of the frame. */
+  at: number | null
   label: string | null
   page: string | null
   body: string

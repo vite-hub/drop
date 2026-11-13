@@ -1,19 +1,16 @@
 <script setup lang="ts">
-// Who else has the drop open (usePresence): their faces in the bar, ringed in the color of their cursor, dimmed while
-// they're away. Pressing them lists each person and where they are, with the switch that hides everyone's cursors.
+// Who else is looking at the drop (usePresence): their faces in the bar, ringed in the color of their cursor. Pressing
+// them lists each person and where they are, with the switch that hides everyone's cursors.
 import { AvatarStack } from "vite-hub/ui/avatar-stack"
 import type { PresencePerson } from "~/composables/usePresence"
 
 const props = defineProps<{ people: PresencePerson[]; site: boolean }>()
 const showCursors = defineModel<boolean>("showCursors", { required: true })
 
-const label = computed(
-  () => `Who's here: ${props.people.map((person) => (person.idle ? `${person.name} (away)` : person.name)).join(", ")}`,
-)
+const label = computed(() => `Who's here: ${props.people.map((person) => person.name).join(", ")}`)
 
-/** Where someone is, for the list: away, a reviewed site's page, or nothing on a doc, where everyone is on it. */
+/** Where someone is, for the list: a reviewed site's page, or nothing on a doc, where everyone is on it. */
 function whereOf(person: PresencePerson) {
-  if (person.idle) return "Away"
   if (!props.site) return ""
   if (!person.at) return "In Drop"
   try {
@@ -46,11 +43,10 @@ function whereOf(person: PresencePerson) {
           <li v-for="person in people" :key="person.id" class="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1">
             <UAvatar
               :alt="person.name"
-              class="shrink-0 ring-2 transition-[opacity,filter] duration-200 motion-reduce:transition-none"
-              :class="{ 'opacity-45 grayscale': person.idle }"
+              class="shrink-0 ring-2"
               size="2xs"
               :src="person.image"
-              :style="{ '--tw-ring-color': person.idle ? 'var(--ui-border)' : person.color }"
+              :style="{ '--tw-ring-color': person.color }"
             />
             <span class="min-w-0 flex-1 truncate text-sm text-highlighted">{{ person.name }}</span>
             <span v-if="whereOf(person)" class="max-w-[45%] shrink-0 truncate text-xs text-muted">{{

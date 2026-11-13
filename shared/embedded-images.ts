@@ -58,10 +58,18 @@ export function deferImages(html: string, paths: string[]) {
     if (!path || !wanted.has(path)) return tag
 
     let deferred = tag.replace(/\s(?:srcset|sizes)\s*=\s*(["']).*?\1/gi, "")
+    // data-drop-src keeps the file's own address, for the image's Copy image link button, once a data: URL takes `src`.
+    const own = src && srcPath === path ? src : path
     if (src) {
-      deferred = deferred.replace(/\ssrc\s*=\s*(["']).*?\1/i, ` src="${PENDING_IMAGE}" data-drop-image="${path}"`)
+      deferred = deferred.replace(
+        /\ssrc\s*=\s*(["']).*?\1/i,
+        ` src="${PENDING_IMAGE}" data-drop-image="${path}" data-drop-src="${own}"`,
+      )
     } else {
-      deferred = deferred.replace(/<img\b/i, `<img src="${PENDING_IMAGE}" data-drop-image="${path}"`)
+      deferred = deferred.replace(
+        /<img\b/i,
+        `<img src="${PENDING_IMAGE}" data-drop-image="${path}" data-drop-src="${own}"`,
+      )
     }
     return deferred
   })

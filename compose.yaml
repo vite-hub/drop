@@ -1,12 +1,8 @@
 services:
   drop:
-    build:
-      context: .
-      args:
-        DROP_DATABASE: ${DROP_DATABASE:-}
-        DROP_DATABASE_URL: ${DROP_DATABASE_URL:-}
-        CLOUDFLARE_D1_DATABASE_ID: ${CLOUDFLARE_D1_DATABASE_ID:-}
-        CLOUDFLARE_D1_DATABASE_NAME: ${CLOUDFLARE_D1_DATABASE_NAME:-my-drop}
+    # The published image: SQLite in the drop-data volume. DROP_IMAGE_TAG pins a release, such as 0.1.0.
+    # Building it yourself, for a D1 database: add compose.build.yaml (docs/self-host/vps#d1).
+    image: ghcr.io/vite-hub/drop:${DROP_IMAGE_TAG:-latest}
     env_file: .env
     environment:
       HOST: 0.0.0.0

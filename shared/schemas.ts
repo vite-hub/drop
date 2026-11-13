@@ -98,6 +98,8 @@ export const CommentSchema = v.pipe(
     page: v.optional(v.pipe(v.string(), v.maxLength(300))),
     /** A suggested edit: the words that replace the quote. Empty suggests deleting it. */
     suggestion: v.optional(v.pipe(v.string(), v.maxLength(2000))),
+    /** A comment on a video's frame: the second it's at. The spot or area is on that frame. */
+    at: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(86_400))),
     // Empty only with images, such as the Marker's snapshot: the endpoint checks once it has read them.
     body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
     mentions: MentionsSchema,
@@ -120,6 +122,7 @@ export const CommentSchema = v.pipe(
     (input) => input.suggestion === undefined || (input.kind === "text" && Boolean(input.quote)),
     "A suggestion replaces selected text.",
   ),
+  v.check((input) => input.at === undefined || input.kind === "image", "A video's frame takes a spot or an area."),
 )
 
 /**
