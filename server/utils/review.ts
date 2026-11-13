@@ -9,7 +9,7 @@ import { blob, detectContentType } from "vite-hub/blob"
 import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database"
 import { useServerEnv } from "vite-hub/env"
-import { importSealKey, sealWithKey, unsealWithKey } from "vite-hub/env/seal"
+import { seal as sealValue, unseal as unsealValue } from "vite-hub/env/server"
 import { newLink, slugify } from "#shared/links"
 import {
   isSitePattern,
@@ -78,10 +78,7 @@ type Choice = v.InferOutput<typeof Choice>
 
 const encoder = new TextEncoder()
 
-/**
- * AES-GCM under a key from the auth secret, like content-origin labels. Not VITEHUB_SECRET: not every Drop sets it
- * (Quiver's doesn't).
- */
+/** The auth secret. Not VITEHUB_SECRET: not every Drop sets it (Quiver's doesn't). */
 function authSecret(event: H3Event) {
   // Optional: an environment without the auth secret (the tests' one) gets the 503 below, not a TypeError.
   const secret = useServerEnv(event).auth?.secret?.unseal()
@@ -90,9 +87,6 @@ function authSecret(event: H3Event) {
     throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
   return secret
 }
-
-const sealKey = async (event: H3Event) =>
-  importSealKey(await sha256(encoder.encode(`review-token:${authSecret(event)}`)))
 
 /**
  * A name for `value` that only Drop can make and that always comes out the same: HMAC-SHA-256 under a key from the
@@ -113,9 +107,12 @@ export async function keyedName(event: H3Event, purpose: string, value: string) 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
 type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files" | "presence"
 
-/** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
+// ViteHub's seal() keys each purpose from a root of at least 32 characters; a digest of the auth secret always is one.
+const sealRoot = async (event: H3Event) => hex(await sha256(encoder.encode(`review-token:${authSecret(event)}`)))
+
+/** Encrypted and authenticated: the page can neither read it nor change it. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
-  return sealWithKey(await sealKey(event), encoder.encode(purpose), JSON.stringify(value))
+  return sealValue(`drop:${purpose}`, value, { secret: await sealRoot(event) })
 }
 
 /** The sealed value, when it was sealed for `purpose` and parses as `schema`. Null for anything else. */
@@ -127,13 +124,8 @@ export async function unseal<T extends v.GenericSchema>(
   maxLength = 3072,
 ): Promise<v.InferOutput<T> | null> {
   if (text.length > maxLength) return null
-  const key = await sealKey(event)
-  try {
-    const parsed = v.safeParse(schema, JSON.parse(await unsealWithKey(key, encoder.encode(purpose), text)))
-    return parsed.success ? parsed.output : null
-  } catch {
-    return null
-  }
+  const [error, value] = await unsealValue(`drop:${purpose}`, text, { schema, secret: await sealRoot(event) })
+  return error ? null : value
 }
 
 export async function signReviewToken(event: H3Event, claims: Omit<ReviewClaims, "e">, now = Date.now()) {

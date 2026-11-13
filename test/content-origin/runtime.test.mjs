@@ -216,7 +216,7 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     assert.match(detail.contentOrigin, /^https:\/\/[a-z2-7]{26}-drop\.example$/)
     assert.deepEqual(Object.keys(detail.files).sort(), ["docs/index.html", "index.html"], "only its pages")
     assert.equal(detail.sizes["_nuxt/inter.woff2"], font.byteLength)
-    assert.match(detail.contentGrant, /^[\da-f]{24}:[\da-f]+$/)
+    assert.match(detail.contentGrant, /^[\w-]+$/)
 
     const origin = detail.contentOrigin
     const load = (path, { grant = detail.contentGrant, dest = "script", headers = {} } = {}) =>
