@@ -1862,6 +1862,22 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (printedDark) { document.documentElement.classList.add("dark"); document.documentElement.classList.remove("light"); }
   });
 
+  // A scroll key Drop's window passed on, because its focus was there and not on the page: the page scrolls as it would
+  // for the key itself. Quick presses add up while the smooth scroll runs. The Marker holds the page still.
+  let keyTarget = 0, keyTargetAt = -Infinity;
+  function keyScroll(key, shift) {
+    if (tool === "mark") return;
+    const page = Math.max(40, innerHeight * 0.875);
+    const step = { ArrowUp: -40, ArrowDown: 40, PageUp: -page, PageDown: page, " ": shift ? -page : page }[key];
+    if (step === undefined && key !== "Home" && key !== "End") return;
+    const end = (document.scrollingElement || document.documentElement).scrollHeight - innerHeight;
+    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const from = smooth && performance.now() - keyTargetAt < 500 ? keyTarget : scrollY;
+    keyTarget = Math.max(0, Math.min(end, key === "Home" ? 0 : key === "End" ? end : from + step));
+    keyTargetAt = performance.now();
+    scrollTo({ top: keyTarget, behavior: smooth ? "smooth" : "auto" });
+  }
+
   window.addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
@@ -1909,6 +1925,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // A link to a section (Drop's address with #id): the page opens there.
     if (m.type === "heading" && typeof m.id === "string") { const to = document.getElementById(m.id); if (to) to.scrollIntoView({ block: "start" }); }
     if (m.type === "scroll-by" && typeof m.y === "number") scrollBy({ top: m.y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    if (m.type === "scroll-key") keyScroll(m.key, m.shift === true);
     if (m.type === "focus") {
       active = m.id; render();
       // A pin, or a margin comment's bubble.

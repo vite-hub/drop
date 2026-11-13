@@ -436,6 +436,11 @@ export function useViewerFrame(options: {
     () => ready.value && send({ type: "inset", right: options.inset.value, bottom: options.bottom.value }),
   )
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
+  // A scroll key Drop's window has no use for scrolls the page in the frame (frameScrollKey).
+  useEventListener("keydown", (event: KeyboardEvent) => {
+    const scroll = ready.value && frameScrollKey(event)
+    if (scroll) send({ type: "scroll-key", ...scroll })
+  })
 
   // Safari reads prefers-color-scheme inside the frame from the frame's color-scheme, so the frame takes the reader's
   // color mode, once its page runs: until then a dark frame would paint the empty frame host's light canvas white.
