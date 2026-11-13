@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
@@ -20,6 +21,18 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
+
+// What /api/health reports: package.json's version and the commit the host built, from Drop's Docker build or the host's
+// own build variable (Workers Builds, Vercel, Netlify).
+const release = {
+  version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
+  commit:
+    process.env.DROP_COMMIT ||
+    process.env.WORKERS_CI_COMMIT_SHA ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.COMMIT_REF ||
+    "",
+}
 const liveEditing = host === "cloudflare" || host === "vps"
 
 // The browser keeps a file but asks again on every use: the access gate runs each time, and an unchanged file answers
@@ -180,6 +193,7 @@ export default defineNuxtConfig({
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
   // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
+    release,
     seoIndex: false,
     clientIpHeader: CLIENT_IP_HEADERS[host],
     public: { realtime: liveEditing },

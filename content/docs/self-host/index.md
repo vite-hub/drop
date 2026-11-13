@@ -133,15 +133,27 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 | Cloudflare | `pnpm run deploy`, which the button runs. Workers Builds that run `npx wrangler deploy` need `pnpm db:migrate:remote` after schema changes. |
 | Vercel, Netlify | `pnpm db:migrate` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
 | Deno Deploy | `pnpm db:migrate:d1` as a pre-deploy command. |
-| Docker Compose | Drop itself before it listens for SQLite, or `pnpm db:migrate:d1` for an explicit D1 build, before Drop starts. |
+| Docker | Drop itself before it listens, after copying the SQLite file to `backups/`; an image built for D1 runs `pnpm db:migrate:d1` before Drop starts. |
 
 Both commands need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_D1_DATABASE_ID`. They record migrations in `d1_migrations`, as Wrangler does, and skip those already applied.
 
-The Vercel and Netlify builds explicitly allow Drop's intentional destructive migrations, including removal of the legacy comment tables after moving to ViteHub Comments. Review new migrations before deploying, as with the D1 migration script used by Deno and Docker.
+`pnpm db:migrate` on Vercel and Netlify and Drop's own migration on Docker refuse a migration that would delete existing data. The D1 script that Deno and D1 Docker builds use has no such check, so read new migrations before you deploy there.
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 
 `0000_init.sql` creates a new database, and each later numbered migration changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/`, `pnpm db:generate` writes the next migration.
+
+## Update {#update}
+
+**Each release lists what changed**, and which versions migrate the database, on [GitHub Releases](https://github.com/vite-hub/drop/releases). `/api/health` answers with the version and commit a deployment runs.
+
+- **Docker**: pull the new image and restart, as [Updates and backups](/docs/self-host/vps#data) shows. Drop backs up its SQLite database before it migrates.
+- **Cloudflare, Vercel, Netlify, Deno Deploy**: the button copied Drop into a repository of yours, and the host deploys it on every push. Pull Drop's changes into it, from `main` or a release tag such as `v0.1.0`, and push; the host rebuilds and migrates:
+
+```sh
+git pull https://github.com/vite-hub/drop.git main
+git push
+```
 
 ## Pick a host {#hosts}
 

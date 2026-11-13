@@ -1,0 +1,12 @@
+# Builds Drop from this checkout instead of pulling the published image, for a D1 database or your own changes:
+# docker compose -f compose.yaml -f compose.build.yaml up -d --build
+services:
+  drop:
+    image: drop:local
+    build:
+      context: .
+      args:
+        DROP_DATABASE: ${DROP_DATABASE:-}
+        DROP_DATABASE_URL: ${DROP_DATABASE_URL:-}
+        CLOUDFLARE_D1_DATABASE_ID: ${CLOUDFLARE_D1_DATABASE_ID:-}
+        CLOUDFLARE_D1_DATABASE_NAME: ${CLOUDFLARE_D1_DATABASE_NAME:-my-drop}
