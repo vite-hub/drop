@@ -44,6 +44,8 @@ extra:
 
 Cloudflare D1 over HTTPS. `pnpm db:migrate:d1` skips migrations already applied. The GitHub flow runs it as a pre-deploy command. For a local build, run it before publishing.
 
+To update, [pull Drop's changes into your repository](/docs/self-host#update) and push.
+
 ## On Deno Deploy {#different}
 
 - Code images are SVG only: PNG needs Cloudflare Browser Run.

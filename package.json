@@ -1,5 +1,6 @@
 {
   "name": "vitehub-drop",
+  "version": "0.1.0",
   "private": true,
   "license": "BUSL-1.1",
   "type": "module",
@@ -142,7 +143,7 @@
         "description": "Generate with `openssl rand -base64 32`."
       },
       "DROP_ADMINS": {
-        "description": "Your GitHub user id: `gh api users/<login> --jq .id`. Comma-separated for multiple admins."
+        "description": "Your email, the one your GitHub account verified. Comma-separated for more admins."
       }
     }
   }

@@ -11,7 +11,7 @@ description: One Node.js process in Docker, with local SQLite and a Docker volum
 
 ## Before you start {#need}
 
-You need a server with Git, Docker Compose, and a domain pointing at it. SQLite, files, and KV stay on your server.
+You need a server with Docker Compose and a domain pointing at it. SQLite, files, and KV stay on your server.
 
 [Create a GitHub OAuth app](/docs/self-host#github) with callback `https://<your-domain>/api/auth/callback/github`. Put your email in `DROP_ADMINS` and generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`.
 
@@ -20,14 +20,21 @@ You need a server with Git, Docker Compose, and a domain pointing at it. SQLite,
 Paste this on the server. Fill the sign-in settings when the editor opens:
 
 ```sh
-git clone https://github.com/vite-hub/drop my-drop
-cd my-drop
-cp .env.example .env
+mkdir my-drop && cd my-drop
+curl -fsSLO https://raw.githubusercontent.com/vite-hub/drop/main/compose.yaml
+curl -fsSL https://raw.githubusercontent.com/vite-hub/drop/main/.env.example -o .env
 ${EDITOR:-nano} .env
-docker compose up -d --build
+docker compose up -d
 ```
 
-Compose builds for `DROP_HOST=vps` and starts Drop, which applies pending migrations before it listens. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. If migrations fail, the server does not start. A fresh SQLite database needs no data-loss override. If an upgrade refuses an intentional removal, back up the database and review `DROP_HOST=vps pnpm db:migrate --dry-run` before running `DROP_HOST=vps pnpm db:migrate --allow-data-loss` once against that database.
+Compose pulls **`ghcr.io/vite-hub/drop`**, Drop's published image for amd64 and arm64, and starts it. It binds port 3000 to localhost and keeps the SQLite database, files, and cleanup history in the `drop-data` volume. Drop applies pending migrations before it listens; if one fails, it doesn't start. `curl -s localhost:3000/api/health` answers with the version it runs.
+
+| Tag | What it runs |
+| --- | --- |
+| `latest` | The newest release. Compose's default. |
+| `0.1.0`, `0.1` | One release, or the newest patch of a minor version. Set `DROP_IMAGE_TAG=0.1` in `.env` to stay on it. |
+| `main` | Every change merged into Drop, like drop.vitehub.dev. |
+| `sha-<commit>` | One commit, by its first 7 characters. |
 
 ## Serve HTTPS {#proxy}
 
@@ -63,7 +70,8 @@ To [give apps their own domain](/docs/self-host#content-origin), proxy a wildcar
 ::docs-env
 ---
 extra:
-  - ["DROP_DATABASE", "Optional build override: sqlite or d1. Existing D1 database ids keep the D1 driver."]
+  - ["DROP_IMAGE_TAG", "Optional image tag for Compose: latest by default, a release such as 0.1, or main."]
+  - ["DROP_DATABASE", "Optional, when you build the image yourself: sqlite or d1. Existing D1 database ids keep the D1 driver."]
   - ["DROP_DATABASE_URL", "Runtime SQLite file: URL. Defaults to file:.data/database/drop.db. Keep it on the persistent volume."]
   - ["DROP_MEMBERS", "Optional emails, comma-separated; only these people and the admins may publish, view, and use MCP."]
   - ["DROP_GITHUB_ORG", "Optional active organization membership requirement for publishing, viewing, and MCP."]
@@ -91,15 +99,50 @@ Keep `/_vitehub/**` and `/api/_vitehub/console/**` behind the same proxy authent
 
 ## Keep an existing D1 database {#d1}
 
-Keep the four Cloudflare settings from your existing deployment and optionally set `DROP_DATABASE=d1`. Compose passes the database selection to the build and runs D1 migrations at startup. Changing to SQLite needs a rebuild and a separate data migration.
+The published image uses SQLite: the database is fixed when an image is built. To keep a D1 database, build the image from a checkout with `compose.build.yaml`, and keep the four Cloudflare settings from your existing deployment in `.env`:
+
+```sh
+git clone https://github.com/vite-hub/drop my-drop && cd my-drop
+cp .env.example .env
+${EDITOR:-nano} .env
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
+
+Drop runs the D1 migrations before it starts. To update, `git pull` and run the same command. Changing to SQLite needs a separate data migration.
 
 ## Updates and backups {#data}
 
 ```sh
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Migrations run on every container start and skip those already applied. Stop Drop before backing up the Docker volume, or use SQLite's backup API and also back up the blobs. Rebuilding preserves the volume; `docker compose down -v` deletes it.
+**Drop backs up its database before it migrates.** When a new image brings migrations, it copies the SQLite file to `.data/database/backups/` in the volume first, and keeps the three newest copies. Release notes say which versions migrate.
+
+To go back, stop Drop, restore the copy from before the upgrade, set `DROP_IMAGE_TAG` in `.env` to the version you ran before, and start it:
+
+```sh
+docker compose stop
+docker compose run --rm --no-deps --entrypoint sh drop -c \
+  'cd .data/database && rm -f drop.db-wal drop.db-shm && cp backups/<file>.db drop.db'
+docker compose up -d
+```
+
+Drop refuses a migration that would delete existing data, and stops with the statements in its log. Keep the previous tag until that release's notes say how to upgrade.
+
+The copies cover the database only. For files and KV too, stop Drop and back up the whole volume. Pulling a new image keeps the volume; `docker compose down -v` deletes it.
 
 Run one instance. Rate limits count in its memory. Code images are SVG, and an hourly timer deletes expired images.
+
+## Run the image elsewhere {#image}
+
+`ghcr.io/vite-hub/drop` runs on any container platform, such as Kubernetes, with the same settings as `.env`:
+
+| | |
+| --- | --- |
+| Port | `3000`, or `PORT`. |
+| Volume | `/app/.data`, persistent. The image runs as user 1000; on Kubernetes set `fsGroup: 1000`. |
+| Instances | One. SQLite has one writer, so replace the old instance before starting the new one (Kubernetes `strategy: Recreate`). |
+| Health | `GET /api/health` answers `{ ok, version, commit }` without a sign-in. |
+
+To update, restart it on a moving tag such as `latest`, with the image pulled again (Kubernetes `imagePullPolicy: Always`), or change a pinned tag.

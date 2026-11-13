@@ -34,6 +34,8 @@ extra:
 
 Cloudflare D1 over HTTPS. `pnpm db:migrate` skips migrations already applied and refuses migrations that lose existing data. A fresh database needs no override. For an upgrade that reports an intentional removal, back up the database and run `pnpm db:migrate --allow-data-loss` once after reviewing `pnpm db:migrate --dry-run`. The configured Vercel build runs it after building. Disable previews or give them a separate D1 database.
 
+To update, [pull Drop's changes into your repository](/docs/self-host#update) and push.
+
 ## On Vercel {#different}
 
 - Code images are SVG only: PNG needs Cloudflare Browser Run.
