@@ -91,8 +91,9 @@ export default defineAuth(({ env, requestOrigin }) => {
     rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
     route: false,
     advanced: {
-      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For.
-      ipAddress: { ipAddressHeaders: [clientIpHeader] },
+      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For. Without a header
+      // (Cloudflare, Deno), ViteHub's default: the address the runtime reports.
+      ...(clientIpHeader ? { ipAddress: { ipAddressHeaders: [clientIpHeader] } } : {}),
       // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
       // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
       ...(requestOrigin.startsWith("https://")
