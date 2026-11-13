@@ -237,25 +237,32 @@ export function check(report) {
     ...(Array.isArray(report.views) ? report.views : []).map((v, vi) => [`views[${vi}]`, v?.blocks]),
   ])
     for (const [bi, b] of (Array.isArray(blocks) ? blocks : []).entries()) {
-      if (!isObject(b)) err(`${where} > blocks[${bi}]`, "must be a block object with a `type`.");
-      else
-        for (const [k, shape] of [
-          ["items", b.type === "facts" ? "{ value, text }" : "{ label, value }"],
-          ["columns", "{ field, label, format }"],
-        ])
-          if (b[k] == null) continue;
-          else if (!Array.isArray(b[k])) err(`${where} > blocks[${bi}]`, `\`${k}\` must be an array.`);
-          else
-            for (const [i, x] of b[k].entries())
-              if (!isObject(x)) err(`${where} > blocks[${bi}] > ${k}[${i}]`, `must be \`${shape}\`, not ${JSON.stringify(x)}.`);
+      const at = `${where} > blocks[${bi}]`;
+      if (!isObject(b)) {
+        err(at, "must be a block object with a `type`.");
+        continue;
+      }
+      // A table's `columns` are objects; a matrix's `columns` lists its column names in order.
+      const lists = [["items", b.type === "facts" ? "{ value, text }" : "{ label, value }"]];
+      if (b.type === "table") lists.push(["columns", "{ field, label, format }"]);
+      else lists.push(["columns", null]);
+      for (const [k, shape] of lists) {
+        if (b[k] == null) continue;
+        if (!Array.isArray(b[k])) err(at, `\`${k}\` must be an array.`);
+        else if (shape)
+          for (const [i, x] of b[k].entries())
+            if (!isObject(x)) err(`${at} > ${k}[${i}]`, `must be \`${shape}\`, not ${JSON.stringify(x)}.`);
+      }
       // The template maps over these, so a lone string breaks the page.
-      for (const [at, o] of [[`${where} > blocks[${bi}]`, b], ...(Array.isArray(b?.columns) ? b.columns : []).map((c, ci) => [`${where} > blocks[${bi}] > columns[${ci}]`, c])])
+      const columns = b.type === "table" && Array.isArray(b.columns) ? b.columns : [];
+      for (const [w, o] of [[at, b], ...columns.map((c, ci) => [`${at} > columns[${ci}]`, c])])
         for (const k of ["segments", "fields", "tones"])
-          if (isObject(o) && o[k] != null && !Array.isArray(o[k])) err(at, `\`${k}\` must be an array, like [${JSON.stringify(o[k])}].`);
-      for (const [i, s] of (Array.isArray(b?.items) ? b.items : []).entries())
+          if (isObject(o) && o[k] != null && !Array.isArray(o[k]))
+            err(w, `\`${k}\` must be an array, like [${JSON.stringify(o[k])}].`);
+      for (const [i, s] of (Array.isArray(b.items) ? b.items : []).entries())
         for (const slot of ["value", "delta"])
           if (isObject(s?.[slot]) && s[slot].where != null && !isObject(s[slot].where))
-            err(`${where} > blocks[${bi}] > items[${i}].${slot}`, "`where` must be an object of field: value pairs.");
+            err(`${at} > items[${i}].${slot}`, "`where` must be an object of field: value pairs.");
     }
   for (const [i, f] of (Array.isArray(report.filters) ? report.filters : []).entries())
     if (!isObject(f)) err(`filters[${i}]`, "must be `{ field, type, label }`.");
