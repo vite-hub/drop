@@ -47,9 +47,11 @@ test("the build names the field and the fix when the text runs long", () => {
   assert.match(log, /error\s+.*title/)
 })
 
-test("an unfilled page loads the template from this skill on Drop", async () => {
+// Snyk fails a skill whose page runs code fetched from a URL that can change, so the page only runs what it holds.
+test("an unfilled page names the missing file instead of loading it from Drop", async () => {
   const page = readFileSync(join(skill, "assets/page.html"), "utf8")
-  assert.match(page, /https:\/\/drop\.vitehub\.dev\/\.well-known\/skills\/data-explorer\/assets\//)
+  assert.doesNotMatch(page, /drop\.vitehub\.dev/)
+  assert.match(page, /assets\/app\.js isn't in the page/)
   const { findSkill } = await import("../../server/utils/skills.ts")
   const paths = new Set(findSkill("data-explorer").files.map((file) => file.path))
   for (const path of [
