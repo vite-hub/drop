@@ -20,10 +20,13 @@ on:
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
+      - .npmrc
       - patches/**
       - nuxt.config.ts
       - scripts/start.mjs
       - scripts/migrate-d1.mjs
+      - scripts/deployment.ts
+      - server/databases/**
       - test/deploy/image-smoke.mjs
       - .github/workflows/image.yml
 
