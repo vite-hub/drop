@@ -70,5 +70,7 @@ test("database paths read like libSQL's file: URLs", () => {
   assert.equal(databasePath(), resolve(".data/database/drop.db"))
   assert.equal(databasePath("file:///var/drop/drop.db"), "/var/drop/drop.db")
   assert.equal(databasePath("file:data/drop.db?mode=rwc"), resolve("data/drop.db"))
+  assert.equal(databasePath("file:.data/database/my%20drop.db"), resolve(".data/database/my drop.db"))
+  assert.equal(databasePath("file:/app/.data/my%20drop.db"), "/app/.data/my drop.db")
   assert.throws(() => databasePath("libsql://example.turso.io"), /file: URL/)
 })

@@ -9,10 +9,11 @@ import { DatabaseSync } from "node:sqlite"
 const app = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const KEEP_BACKUPS = 3
 
-/** Path of a libSQL `file:` URL, relative to the working directory like libSQL reads it. */
+/** Path of a libSQL `file:` URL, percent-decoded and relative to the working directory, as libSQL opens it. */
 export function databasePath(url = "file:.data/database/drop.db") {
   if (!url.startsWith("file:")) throw new Error("DROP_DATABASE_URL must be a local file: URL.")
-  return url.startsWith("file://") ? fileURLToPath(url) : resolve(url.slice("file:".length).split("?")[0])
+  if (url.startsWith("file://")) return fileURLToPath(url)
+  return resolve(decodeURIComponent(url.slice("file:".length).split("?")[0]))
 }
 
 /** Migrations in the journal newer than the newest one the database recorded, the rule ViteHub applies them by. */

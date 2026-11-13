@@ -5,7 +5,8 @@ name: image
 #   sha-<7 chars> every push to main and every release
 #   0.1.0, 0.1    a release tag such as v0.1.0
 #   latest        the newest release, not a prerelease such as v0.2.0-rc.1
-# Pull requests that touch the image build it and run the smoke test, without publishing.
+# Pull requests that touch the image build it and run the smoke test, without publishing. Copies of the repository,
+# such as the ones Drop's deploy buttons create, skip it: they can't publish here.
 
 on:
   push:
@@ -43,6 +44,7 @@ env:
 jobs:
   # Builds on a native runner per platform: arm64 under QEMU takes several times as long.
   build:
+    if: github.repository == 'vite-hub/drop'
     strategy:
       matrix:
         include:
@@ -117,7 +119,7 @@ jobs:
 
   # Joins both platforms under the tags.
   publish:
-    if: github.event_name != 'pull_request'
+    if: github.repository == 'vite-hub/drop' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
