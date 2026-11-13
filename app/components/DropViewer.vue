@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The header locates the drop; the bottom review pill owns editing, comments, sharing, Details, and History.
+// No top bar: most readers arrive from a shared link, so the drop gets the whole height. The bottom review pill owns
+// the way back to Drop, editing, comments, sharing, Details, and History.
 // Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
@@ -968,12 +969,9 @@ async function deleteDrop() {
   if (await remove(drop.value)) await navigateTo("/drops")
 }
 
-// The folders above, as breadcrumbs: in the app for people signed in, at their share links on a public page.
 const moveTo = useMoveDialog()
-const crumbTo = (crumb: { id: string; link: string; slug: string }) =>
-  publicView ? dropPath(crumb) : `/drops/${crumb.id}`
 
-// ⌘K offers the same actions as the header, review dock, and Details.
+// ⌘K offers the same actions as the review dock and Details.
 usePaletteOffer("drop", () => {
   if (visitor.value) return null
   if (editing.value)
@@ -1170,38 +1168,6 @@ watch(
   </DefineComposer>
 
   <UDashboardPanel id="drop-main" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }">
-    <template #header>
-      <UDashboardNavbar :toggle="!visitor" :ui="{ root: 'h-12 gap-2 px-2 sm:px-3', left: 'min-w-0', title: 'min-w-0' }">
-        <template #leading>
-          <SidebarExpand v-if="!visitor" />
-          <NuxtLink v-if="visitor" aria-label="Drop" class="grid size-8 place-items-center" to="/"
-            ><DropMark class="h-4 w-6"
-          /></NuxtLink>
-          <UButton
-            v-else-if="drop.ancestors.length"
-            :aria-label="`Back to ${drop.ancestors.at(-1)!.title}`"
-            color="neutral"
-            icon="i-mingcute-arrow-left-line"
-            size="sm"
-            variant="ghost"
-            :to="crumbTo(drop.ancestors.at(-1)!)"
-          />
-          <UButton
-            v-else
-            aria-label="Back to drops"
-            color="neutral"
-            icon="i-mingcute-arrow-left-line"
-            size="sm"
-            variant="ghost"
-            to="/drops"
-          />
-        </template>
-        <template #title>
-          <ViewerLocation :drop="drop" :public-view="publicView" />
-        </template>
-      </UDashboardNavbar>
-    </template>
-
     <template #body>
       <UAlert
         v-if="owner && trashed"
@@ -1432,6 +1398,15 @@ watch(
             </ViewerComments>
           </template>
           <template #toolbar>
+            <!-- A plain link, so it opens in this tab and ⌘-click still opens a new one. -->
+            <template v-if="!editing">
+              <UTooltip :text="visitor ? 'Open Drop' : 'Go to your drops'">
+                <UButton aria-label="Drop" color="neutral" size="xs" :to="visitor ? '/' : '/drops'" variant="ghost">
+                  <DropMark class="h-3.5 w-5" /><span class="hidden sm:inline">Drop</span>
+                </UButton>
+              </UTooltip>
+              <span aria-hidden="true" class="w-1 shrink-0" />
+            </template>
             <template v-if="galleryShown">
               <LazyViewerGallery
                 :at="galleryAt"
