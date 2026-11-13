@@ -95,7 +95,7 @@ Successful membership checks expire after five minutes. Failed checks deny acces
 
 If a browser cannot connect a site review, check the response from `/review/connect`. A 401 means GitHub rejected the token; open `/signin` to sign in again. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means verification failed because GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` and `data.githubStatus` distinguish these cases without including credentials. Sign-in and sign-out stay available when a proxy token fails verification.
 
-Keep `/_vitehub/**` and `/api/_vitehub/console/**` behind the same proxy authentication as Drop's browser pages. Forward cookies, the public `Host` and `Origin`, and `X-Auth-Request-Access-Token` on Console requests, including its RPC POSTs. Drop establishes its session from the proxy before the Console checks the verified email against `DROP_ADMINS`; organization membership alone does not grant Console access.
+Exempt `POST /_vitehub/rpc` from the proxy too: the [ViteHub Console](/docs/self-host#github) calls it from its own server with a signature, not a sign-in, and Drop refuses any call that its `VITEHUB_CONSOLE_KEY_<NAME>` doesn't verify. Forward the public `Host`, since the signature covers the URL. Drop then lets in only a Console person whose email is in `DROP_ADMINS`; organization membership alone does not grant Console access.
 
 ## Keep an existing D1 database {#d1}
 

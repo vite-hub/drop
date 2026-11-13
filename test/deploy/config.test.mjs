@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
 import { deployment } from "../../scripts/deployment.ts"
 
-test("host detection and explicit presets select compatible storage", () => {
+test("host detection and explicit hosts select compatible storage", () => {
   for (const [env, host, database] of [
     [{}, "cloudflare", "d1"],
     [{ VERCEL: "1" }, "vercel", "d1"],

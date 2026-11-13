@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtemp, mkdir, writeFile, readFile, access, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, access, rm } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -10,9 +10,6 @@ const require = createRequire(import.meta.resolve("vite-hub"))
 const { hubRateLimit } = await import(pathToFileURL(require.resolve("@vite-hub/rate-limit/vite")))
 const { hubAuth } = await import(pathToFileURL(require.resolve("@vite-hub/auth/vite")))
 const { hubContent } = await import(pathToFileURL(require.resolve("@vite-hub/content/vite")))
-const { hubWorkspace, createWorkspaceNitroConfig } = await import(
-  pathToFileURL(require.resolve("@vite-hub/workspace/vite"))
-)
 
 async function fixture(run) {
   const root = await mkdtemp(join(tmpdir(), "drop-generated-roots-"))
@@ -38,29 +35,6 @@ for (const command of ["build", "serve"]) {
       for (const file of config.nitro.plugins) await access(file)
       assert.ok(config.nitro.plugins.includes(join(root, ".vitehub/nitro/rate-limit/plugin.ts")))
       await assert.rejects(access(join(root, "app/.vitehub")), { code: "ENOENT" })
-    }))
-}
-
-for (const entry of ["plugin config", "Nitro config"]) {
-  test(`Workspace's assets alias is loadable before configResolved from ${entry}`, () =>
-    fixture(async (root) => {
-      const workspace = { root: ".data/workspaces", store: { provider: "local" } }
-      const configure = async () => {
-        if (entry === "Nitro config")
-          return createWorkspaceNitroConfig({ viteRoot: join(root, "app"), command: "build", workspace })
-        const plugin = hubWorkspace(workspace)
-        const config = { root: join(root, "app"), nitro: {}, plugins: [] }
-        await plugin.config(config, { command: "build" })
-        return config.nitro
-      }
-      const registry = (await configure()).alias["#vitehub-workspace-assets-registry"]
-      assert.equal(registry, join(root, ".vitehub/vite-runtime/workspace/assets/registry.mjs"))
-      assert.deepEqual((await import(pathToFileURL(registry))).default, {})
-      // Nuxt can replay config after Vite has populated the registry; keep those built assets.
-      const populated = "export default { built: {} }\n"
-      await writeFile(registry, populated)
-      await configure()
-      assert.equal(await readFile(registry, "utf8"), populated)
     }))
 }
 

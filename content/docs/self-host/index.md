@@ -117,7 +117,7 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 
 ## Database and migrations {#database}
 
-VPS and Docker builds use local SQLite on persistent disk by default. The other hosts each use their own Cloudflare D1 database, over D1's HTTP API outside Cloudflare. All of them apply the migrations in `server/databases/default/migrations`.
+VPS and Docker builds use local SQLite on persistent disk by default. The other hosts each use their own Cloudflare D1 database, over D1's HTTP API outside Cloudflare. All of them apply the migrations in `server/databases/default/migrations`, one folder each.
 
 To create a D1 database for a host outside Cloudflare:
 
@@ -141,7 +141,7 @@ Both commands need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFL
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 
-`0000_init.sql` creates a new database, and each later numbered migration changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/`, `pnpm db:generate` writes the next migration.
+The first folder creates a new database, and each later one changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/default/`, `pnpm db:generate` writes the next folder. `d1-migrations.json` gives each folder the file name D1 records it by, such as `0000_init.sql`. The next Cloudflare build adds the new folder's name there: commit it, and never rename one.
 
 ## Update {#update}
 

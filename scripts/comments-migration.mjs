@@ -1,6 +1,7 @@
-// Writes server/databases/default/migrations/0011_comments_one_model.sql: ViteHub's move of the live-site comment tables to
-// its one comment model (`commentsMigrationSql({ from: "live" })`), then Drop's own backfills. This migration has
-// shipped: later ViteHub schema changes need a new migration from `pnpm db:generate`, not a rewrite of 0011.
+// Writes server/databases/default/migrations/20261103143224_0011_comments_one_model/migration.sql: ViteHub's move of
+// the live-site comment tables to its one comment model (`commentsMigrationSql({ from: "live" })`), then Drop's own
+// backfills. This migration has shipped: later ViteHub schema changes need a new migration from `pnpm db:generate`, not
+// a rewrite of 0011.
 //
 //   node scripts/comments-migration.mjs
 import { writeFileSync } from "node:fs"
@@ -70,6 +71,9 @@ export const migrationFile = () =>
 
 if (import.meta.url === `file://${process.argv[1]}`)
   writeFileSync(
-    new URL("../server/databases/default/migrations/0011_comments_one_model.sql", import.meta.url),
+    new URL(
+      "../server/databases/default/migrations/20261103143224_0011_comments_one_model/migration.sql",
+      import.meta.url,
+    ),
     migrationFile(),
   )

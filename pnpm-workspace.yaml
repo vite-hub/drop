@@ -1,36 +1,44 @@
 blockExoticSubdeps: false
 
 overrides:
-  "@vite-hub/agent": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/auth": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/blob": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/browser": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/channels": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/cli": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/connections": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/content": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/database": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/decisions": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/decisions@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/email": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/env": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/forge": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/gateways": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/gateways@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/kv": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/markdown-template": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/presets": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/queue": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/rate-limit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/realtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/sandbox": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/schedule": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/shell": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/source": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@0910dc2de88d38a9d6938bb4e0f14f359c51163a
-  "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@0910dc2de88d38a9d6938bb4e0f14f359c51163a
+  "@vite-hub/agent": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/auth": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/blob": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/browser": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/bundle": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/bundle@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/channels": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/cli": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/cms": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cms@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/codemods": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/codemods@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/connections": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/content": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/database": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/decisions": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/decisions@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/docs": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/docs@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/email": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/env": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/forge": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/forms": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forms@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/gateways": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/gateways@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/i18n": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/i18n@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/kit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kit@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/kv": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/markdown-template": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/mcp": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/mcp@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/presets": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/queue": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/rate-limit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/realtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/sandbox": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/schedule": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/shell": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/source": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
+  "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@b8bb9fd09e674e0f6315af0c6793bc59e1561de9
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.15
   "@better-auth/oauth-provider": 1.7.15
@@ -38,16 +46,12 @@ overrides:
   vue: 3.5.44
   # Keep older consumers on the patched v5 serializer without downgrading Nuxt's v6.
   devalue@5: ^5.9.4
-  # ViteHub's build asks for exactly 3.0.260903-beta. This keeps one Nitro.
-  nitro: 3.0.261029-rc
+  # Nuxt's nightly asks for ^3.0.261029-rc, which matches no later release candidate. This keeps one Nitro.
+  nitro: 3.0.261103-rc
   vite@*: "catalog:"
   # Nuxt UI's editor menus stay on @tiptap/core's 3.31.4; a 3.32 menu beside core 3.31.4 breaks them.
   "@tiptap/extension-bubble-menu": 3.31.4
   "@tiptap/extension-floating-menu": 3.31.4
-  # One h3 v2 in the server bundle. Nitro and ViteHub asked for older release candidates; Nitro's rc.22 answered a
-  # malformed escape such as /f/%E0%A4 with a 500 before any of Drop's middleware ran.
-  "h3@2.0.1-rc.22": 2.0.8
-  "h3@2.0.1-rc.33": 2.0.8
 
 patchedDependencies:
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
@@ -63,17 +67,10 @@ patchedDependencies:
   # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
   # padding, so keep this part after #7267 ships.
   "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
-  # Rolldown's `entriesAware` splits library chunks by the entries that load them, upstream in nitrojs/nitro#4967. When
-  # Nitro grouped them only by package, one small import such as mrmime, entities or the comark-ui skills loaded a whole
-  # package chunk and everything it imports. That was about half the code of a cold /drops request.
-  # Preserve registered virtual handler ids: resolving ViteHub's MCP discovery middleware as a file breaks the build.
-  nitro@3.0.261029-rc: patches/nitro@3.0.261029-rc.patch
   # A refresh copied the approving browser session's id into the new access token even after that session expired,
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
   "@better-auth/oauth-provider@1.7.15": patches/@better-auth__oauth-provider@1.7.15.patch
-  # Nuxt replays Workspace config before Vite configResolved creates its assets registry. Create it with the alias.
-  "@vite-hub/workspace@0.0.0-preview-0910dc2": patches/@vite-hub__workspace@0.0.0-preview-0910dc2.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
@@ -100,7 +97,6 @@ minimumReleaseAgeExclude:
   - "@nuxt/vite-builder-nightly@5.0.0-2610292252-da55a91"
   - "@nuxt/vite-server-nightly@5.0.0-2610292252-da55a91"
   - nuxt-nightly@5.0.0-2610292252-da55a91
-  - nitro@3.0.261029-rc
   - comark-annotate@0.9.1 || 0.10.1 || 0.11.0
   - comark-badge@0.9.1 || 0.10.1 || 0.11.0
   - comark-cards@0.9.1 || 0.10.1 || 0.11.0

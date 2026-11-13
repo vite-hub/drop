@@ -8,8 +8,8 @@ const isHost = (value: string): value is Host => HOSTS.some((host) => host === v
 
 /**
  * Build-time choices. Credentials and the SQLite path remain runtime settings. DROP_HOST wins; otherwise ViteHub reads
- * the host from the build env (NITRO_PRESET, VERCEL, NETLIFY, ...), and ViteHub's build rejects a preset that
- * conflicts with it. Drop calls ViteHub's node host `vps`.
+ * the host from the build env (VITEHUB_HOST, NITRO_PRESET, VERCEL, NETLIFY, ...), and ViteHub's build rejects a Nitro
+ * preset that conflicts with it. Drop calls ViteHub's node host `vps`.
  */
 export function deployment(env: Record<string, string | undefined> = process.env) {
   const detected = detectHost(env)
