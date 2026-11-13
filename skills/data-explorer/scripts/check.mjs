@@ -168,6 +168,8 @@ const NUMERIC = ["number", "integer", "compact", "percent", "money", "bar", "hea
 const TONE_NAMES = ["good", "fair", "warn", "bad", "muted", "accent"];
 const MAX_SERIES = 12;
 
+// The same rule as kindOf in assets/app.js: a filter without `type` is `tabs` with 5 options or fewer, else `list`.
+const kindOf = (f) => f.type ?? (f.options && f.options.length <= 5 ? "tabs" : "list");
 const sentences = (s) => (String(s).match(/[.!?](\s|$)/g) ?? []).length;
 
 // The first and last day of the period a value names ("2026", 2026, "2026-11", "2026-Q4", "2026 to Nov 11"), or null.
@@ -237,9 +239,19 @@ export function check(report) {
     for (const [bi, b] of (Array.isArray(blocks) ? blocks : []).entries()) {
       if (!isObject(b)) err(`${where} > blocks[${bi}]`, "must be a block object with a `type`.");
       else
-        for (const k of ["items", "columns"])
-          if (b[k] != null && !Array.isArray(b[k])) err(`${where} > blocks[${bi}]`, `\`${k}\` must be an array.`);
+        for (const [k, shape] of [
+          ["items", b.type === "facts" ? "{ value, text }" : "{ label, value }"],
+          ["columns", "{ field, label, format }"],
+        ])
+          if (b[k] == null) continue;
+          else if (!Array.isArray(b[k])) err(`${where} > blocks[${bi}]`, `\`${k}\` must be an array.`);
+          else
+            for (const [i, x] of b[k].entries())
+              if (!isObject(x)) err(`${where} > blocks[${bi}] > ${k}[${i}]`, `must be \`${shape}\`, not ${JSON.stringify(x)}.`);
     }
+  for (const [i, f] of (Array.isArray(report.filters) ? report.filters : []).entries())
+    if (!isObject(f)) err(`filters[${i}]`, "must be `{ field, type, label }`.");
+    else if (f.options != null && !Array.isArray(f.options)) err(`filters[${i}]`, "`options` must be an array.");
   if (errors.length) return { errors, warnings, escapes: 0, rows: 0, size: 0 };
 
   keys(report, "report", "report");
@@ -327,13 +339,12 @@ export function check(report) {
     else if (!Object.keys(data).some((name) => rowsOf(name).some((r) => f.field in r)))
       err(where, `no dataset has a \`${f.field}\` field, so this filter would do nothing.`);
     if (f.count) needData(f.count, where);
-    if (!f.type && f.options?.length > 5)
+    if (!f.type)
       warn(
         where,
-        `has ${f.options.length} \`options\` and no \`type\`, so it shows as a \`list\` of colored names. Set \`"type": "tabs"\` for periods or modes, or \`"type": "list"\`.`,
+        `has no \`type\`, so it shows as a \`${kindOf(f)}\`. Set \`type\`: \`tabs\` for periods or modes, \`list\` for entities, \`toggle\` for a checkbox.`,
       );
-    if ((f.type ?? (f.options && f.options.length <= 5 ? "tabs" : "list")) === "list")
-      listFields.add(f.field);
+    if (kindOf(f) === "list") listFields.add(f.field);
   }
 
   let escapes = 0;
@@ -518,7 +529,6 @@ export function check(report) {
 
   // Two stats that print the same number on a period tab tell the reader one thing twice, like contributors and
   // newcomers on All time, when everyone is new.
-  const kindOf = (f) => f.type ?? (f.options && f.options.length <= 5 ? "tabs" : "list");
   const valueOf = (o) => (o && typeof o === "object" ? o.value : o);
   const tabFilters = (report.filters ?? []).filter((f) => kindOf(f) === "tabs" && f.field);
   const settings = (report.filters ?? []).map((f) => [

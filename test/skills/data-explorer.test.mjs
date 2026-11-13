@@ -68,9 +68,9 @@ test("the build names a list written as an object instead of crashing", () => {
   assert.match(log, /error\s+report: `views` must be an array/)
 })
 
-test("the build warns when a filter of many options has no type and turns into a list", () => {
+test("the build warns when a filter has no type, since it would guess one", () => {
   const years = ["2021", "2022", "2023", "2024", "2025", "2026"]
   const { ok, log } = build({ ...example, filters: [...example.filters, { field: "period", options: years }] })
   assert.ok(ok)
-  assert.match(log, /warning\s+filters\[4\]: has 6 `options` and no `type`/)
+  assert.match(log, /warning\s+filters\[4\]: has no `type`, so it shows as a `list`/)
 })

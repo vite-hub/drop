@@ -95,7 +95,7 @@ if (shots) {
     path = local.resolve("playwright");
   } catch {
     console.log(
-      "error    --shots needs playwright: run the build where it's installed (pnpm add playwright).",
+      "error    --shots needs playwright: run the build where it's installed (npm i playwright).",
     );
     process.exit(1);
   }
@@ -113,12 +113,14 @@ if (shots) {
   let browser;
   try {
     browser = await chromium.launch();
-  } catch {
-    browser = await chromium.launch({ executablePath: fallback }).catch(() => null);
-  }
-  if (!browser) {
-    console.log("error    --shots found no Chromium: run `npx playwright install chromium` where you build.");
-    process.exit(1);
+  } catch (error) {
+    browser = fallback ? await chromium.launch({ executablePath: fallback }).catch(() => null) : null;
+    if (!browser) {
+      console.log(
+        `error    --shots couldn't start Chromium: ${error.message.split("\n")[0]}\n         Run \`npx playwright install --with-deps chromium\` where you build.`,
+      );
+      process.exit(1);
+    }
   }
   const problems = [];
   const url = pathToFileURL(resolve(output)).href;
