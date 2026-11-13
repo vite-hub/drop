@@ -114,10 +114,11 @@ The Marker draws on a snapshot of the page and sends it as one comment. Press :k
 | Marker | :kbd[B] | A see-through highlighter stroke. Hold :kbd[Shift] to keep it on its line. |
 | Pen | :kbd[P] | A thin line, to circle, underline, or cross out. Hold :kbd[Shift] for a straight one. |
 | Arrow | :kbd[A] | Drag from where it starts to what it points at. |
+| Text | :kbd[T] | Click and type a short label. :kbd[Enter], :kbd[Esc], or a click elsewhere puts it down. Click a label to change it, and pick a size or colour while it is open to restyle it. Drag a label to move it, or clear it to delete it. |
 | Size | :kbd[[] :kbd[]] | Four sizes for each tool. |
-| Undo | :kbd[⌘Z] | Takes back the last stroke. |
+| Undo | :kbd[⌘Z] | Takes back the last stroke or label. |
 
-**Done** (:kbd[Enter]) opens the comment with the snapshot and your strokes attached, and the words under them quoted. The note is optional. The comment points at the part of the page you marked, and agents read the marked words and the image with `read_drop`. :kbd[Esc] or **Cancel** throws the snapshot away.
+**Done** (:kbd[Enter], or :kbd[⌘Enter] while you type a label) opens the comment with the snapshot and your strokes attached, and the words under them quoted. The note is optional. The comment points at the part of the page you marked, and agents read the marked words and the image with `read_drop`. :kbd[Esc] or **Cancel** throws the snapshot away.
 
 ## Sharing {#sharing}
 

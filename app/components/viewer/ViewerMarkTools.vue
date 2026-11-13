@@ -44,6 +44,7 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
         data-icon
         type="button"
         @click="emit('size', size.index)"
+        @mousedown.prevent
       >
         <span
           aria-hidden="true"
@@ -68,6 +69,7 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
       data-icon
       type="button"
       @click="emit('color', name)"
+      @mousedown.prevent
     >
       <span aria-hidden="true" class="block size-3.5 rounded-full ring-1 ring-black/10" :style="{ background: hex }" />
     </button>

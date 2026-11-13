@@ -92,13 +92,14 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
 
 /**
  * What the frame's comment layer and the site review script share: the Marker's ink (the path of a stroke, a marker,
- * pen, or arrow in viewport pixels, drawn on an SVG layer or a canvas, the pointer for a tip, and drawing strokes on a
- * layer) and people's initials.
+ * pen, or arrow in viewport pixels, or a text label, drawn on an SVG layer or a canvas, the pointer for a tip, and
+ * drawing strokes and typing labels on a layer) and people's initials.
  */
 export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
   // The pointer is the tip: its size and colour, see-through for the marker. The arrow keeps the crosshair.
   function penCursor(pen) {
     if (pen.tool === "arrow") return "";
+    if (pen.tool === "text") return "text";
     const d = Math.max(8, Math.ceil(pen.width) + 4), r = d / 2;
     const svg = '<svg xmlns="' + SVG + '" width="' + d + '" height="' + d + '"><circle cx="' + r + '" cy="' + r + '" r="' + Math.max(2, pen.width / 2) + '" fill="' + pen.color + '" fill-opacity="' + (pen.tool === "marker" ? 0.4 : 0.9) + '" stroke="#0a0a0a" stroke-opacity=".55"/></svg>';
     return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '") ' + r + " " + r + ", crosshair";
@@ -119,7 +120,41 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
     return "M" + pt(a) + "Q" + pt(c) + " " + pt(b) + "M" + pt(side(-0.5)) + "L" + pt(b) + "L" + pt(side(0.5));
   }
   const strokePath = (s) => (s.tool === "arrow" ? arrowPath(s.points[0], s.points[s.points.length - 1], s.straight, s.width) : smoothPath(s.points));
+  // A label is a pill in the ink's colour, its words in system sans, white or near-black, whichever reads on that
+  // colour. Its point is the middle of its left edge; its width is the stroke's size as a font size. Labels are measured
+  // on a canvas, so the SVG on the page and the flattened screenshot agree, and a copy drawn off the page needs no layout.
+  const labelFont = (size) => "600 " + size + "px ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif";
+  let measurer = null;
+  function labelBox(s) {
+    measurer = measurer || document.createElement("canvas").getContext("2d");
+    measurer.font = labelFont(s.width);
+    const size = s.width, pad = Math.round(size * 0.45), h = Math.round(size * 1.5);
+    const w = Math.ceil(measurer.measureText(s.text || "").width) + pad * 2;
+    return { x: s.points[0][0], y: s.points[0][1] - h / 2, w, h, pad, r: Math.round(size * 0.35) };
+  }
+  function labelInk(hex) {
+    const c = [1, 3, 5].map((i) => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 0.4 ? "#0a0a0a" : "#fff";
+  }
+  function paintLabel(group, s) {
+    const b = labelBox(s), rect = document.createElementNS(SVG, "rect"), text = document.createElementNS(SVG, "text");
+    rect.setAttribute("x", String(b.x)); rect.setAttribute("y", String(b.y));
+    rect.setAttribute("width", String(b.w)); rect.setAttribute("height", String(b.h));
+    rect.setAttribute("rx", String(b.r)); rect.setAttribute("fill", s.color);
+    text.setAttribute("x", String(b.x + b.pad)); text.setAttribute("y", String(s.points[0][1]));
+    text.setAttribute("dominant-baseline", "central"); text.setAttribute("fill", labelInk(s.color));
+    text.setAttribute("style", "font: " + labelFont(s.width) + "; white-space: pre;");
+    text.textContent = s.text;
+    group.replaceChildren(rect, text);
+  }
   function drawStroke(s, into) {
+    if (s.tool === "text") {
+      const group = document.createElementNS(SVG, "g");
+      group.setAttribute("filter", "drop-shadow(0 1px 1.5px rgb(0 0 0 / .3))");
+      paintLabel(group, s);
+      into.appendChild(group);
+      return group;
+    }
     const path = document.createElementNS(SVG, "path");
     path.setAttribute("d", strokePath(s));
     path.setAttribute("stroke", s.color);
@@ -132,6 +167,18 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
   function inkOn(g, list) {
     for (const s of list) {
       g.save();
+      if (s.tool === "text") {
+        const b = labelBox(s);
+        const k = g.getTransform().a;
+        g.shadowColor = "rgb(0 0 0 / .3)"; g.shadowBlur = 1.5 * k; g.shadowOffsetY = k;
+        g.fillStyle = s.color;
+        g.beginPath(); g.roundRect(b.x, b.y, b.w, b.h, b.r); g.fill();
+        g.shadowColor = "transparent";
+        g.font = labelFont(s.width); g.textBaseline = "middle"; g.fillStyle = labelInk(s.color);
+        g.fillText(s.text, b.x + b.pad, s.points[0][1]);
+        g.restore();
+        continue;
+      }
       g.globalAlpha = s.tool === "marker" ? 0.4 : 1;
       g.globalCompositeOperation = s.tool === "marker" ? "multiply" : "source-over";
       g.strokeStyle = s.color; g.lineWidth = s.width; g.lineCap = s.tool === "marker" ? "butt" : "round"; g.lineJoin = "round";
@@ -139,19 +186,122 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
       g.restore();
     }
   }
-  // Draws the strokes made on a layer into an SVG, each with pen()'s tip, and hands each finished one to done. The page
-  // stays still under the layer. Handlers are on* properties: the frame hands held events only to those (EVENT_HOLD).
-  // Returns a function that forgets the stroke in progress.
-  function takeStrokes(layer, into, pen, done) {
-    let stroke = null;
+  // The label being typed, if any: an input over the layer, styled like the pill it becomes. While it's open, the
+  // hosts' Marker keys stand aside (typingLabel), and Done takes it as it is (commitLabel).
+  let labelEditor = null;
+  const typingLabel = () => labelEditor !== null;
+  const commitLabel = () => { if (labelEditor) labelEditor.commit(); };
+  // Run at window capture, before the page's document capture shortcuts. Stopping propagation still permits
+  // native input editing; only paging and commit keys need their browser default prevented.
+  function labelKey(e, finish) {
+    e.stopPropagation();
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === "PageUp" || e.key === "PageDown") { e.preventDefault(); return; }
+    if (e.key === "Enter" || e.key === "Escape") {
+      e.preventDefault();
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) finish();
+      else if (!(e.metaKey || e.ctrlKey)) commitLabel();
+    }
+  }
+  // A size or colour picked while a label is open goes to that label.
+  const restyleLabel = (p) => { if (labelEditor && p.tool === "text") labelEditor.restyle(p); };
+  function editLabel(layer, s, fresh, into, done, gone) {
+    const input = document.createElement("input");
+    input.type = "text"; input.maxLength = 200; input.value = s.text || ""; input.spellcheck = false;
+    input.setAttribute("aria-label", "Label");
+    input.setAttribute("enterkeyhint", "done");
+    const fit = () => {
+      const b = labelBox(Object.assign({}, s, { text: input.value || " " }));
+      input.style.cssText = "position: fixed; z-index: 1; box-sizing: border-box; margin: 0; border: 0; outline: 0;" +
+        "left: " + b.x + "px; top: " + b.y + "px; width: " + (b.w + 2) + "px; height: " + b.h + "px; padding: 0 " + b.pad + "px;" +
+        "border-radius: " + b.r + "px; background: " + s.color + "; color: " + labelInk(s.color) + "; caret-color: currentColor;" +
+        "font: " + labelFont(s.width) + "; box-shadow: 0 1px 1.5px rgb(0 0 0 / .3), 0 0 0 2px rgb(255 255 255 / .9);";
+    };
+    fit();
+    if (s.el) s.el.style.visibility = "hidden";
+    const editor = {
+      input,
+      commit() {
+        if (labelEditor !== editor) return;
+        labelEditor = null;
+        const text = input.value.trim();
+        input.remove();
+        if (fresh) {
+          if (!text) return;
+          s.text = text;
+          s.el = drawStroke(s, into);
+          return done(s);
+        }
+        if (!text) { s.el.remove(); return gone(s); }
+        s.text = text;
+        paintLabel(s.el, s);
+        s.el.style.visibility = "";
+      },
+      restyle(p) {
+        if (p.width !== undefined) s.width = p.width;
+        if (p.color !== undefined) s.color = p.color;
+        fit();
+        input.focus({ preventScroll: true });
+      },
+      forget() {
+        if (labelEditor !== editor) return;
+        labelEditor = null;
+        input.remove();
+        if (s.el) s.el.style.visibility = "";
+      },
+    };
+    labelEditor = editor;
+    input.oninput = fit;
+    input.onblur = () => editor.commit();
+    layer.appendChild(input);
+    input.focus({ preventScroll: true });
+    if (!fresh) input.select();
+  }
+  // Draws the strokes made on a layer into an SVG, each with pen()'s tip, and hands each finished one to done. The text
+  // tip types a label where it's clicked instead; with it, a click on a label edits it and a drag moves it, and a label
+  // emptied is handed to gone. The page stays still under the layer. Handlers are on* properties: the frame hands held
+  // events only to those (EVENT_HOLD). Returns a function that forgets the stroke or label in progress.
+  function takeStrokes(layer, into, pen, done, gone) {
+    let stroke = null, label = null;
+    const labels = [];
+    const labelAt = (x, y) => {
+      for (let i = labels.length - 1; i >= 0; i--) {
+        const s = labels[i];
+        if (!s.el || !s.el.isConnected) { labels.splice(i, 1); continue; }
+        const b = labelBox(s);
+        if (x >= b.x - 4 && x <= b.x + b.w + 4 && y >= b.y - 4 && y <= b.y + b.h + 4) return s;
+      }
+      return null;
+    };
+    const keep = (s) => { if (s.tool === "text") labels.push(s); done(s); };
     layer.onpointerdown = (e) => {
+      // The frame's hold calls each handler on the path itself, so a press in the label reaches here too: it's the input's.
+      if (labelEditor && e.composedPath().includes(labelEditor.input)) return;
       if (e.button !== 0) return;
       e.preventDefault();
+      // A click away from the label being typed puts it down, and that's all it does.
+      if (labelEditor) return commitLabel();
+      const p = pen();
+      if (p.tool === "text") {
+        const hit = labelAt(e.clientX, e.clientY);
+        layer.setPointerCapture(e.pointerId);
+        label = { s: hit, from: [e.clientX, e.clientY], at: hit ? hit.points[0].slice() : null, moved: false, pen: p };
+        return;
+      }
       layer.setPointerCapture(e.pointerId);
-      stroke = Object.assign(pen(), { points: [[e.clientX, e.clientY]], straight: false });
+      stroke = Object.assign(p, { points: [[e.clientX, e.clientY]], straight: false });
       stroke.el = drawStroke(stroke, into);
     };
     layer.onpointermove = (e) => {
+      if (label) {
+        if (!label.s) return;
+        const dx = e.clientX - label.from[0], dy = e.clientY - label.from[1];
+        if (!label.moved && Math.hypot(dx, dy) < 3) return;
+        label.moved = true;
+        label.s.points = [[label.at[0] + dx, label.at[1] + dy]];
+        paintLabel(label.s.el, label.s);
+        return;
+      }
       if (!stroke) return;
       const p = [e.clientX, e.clientY], first = stroke.points[0];
       // Shift draws straight: a marker stays on its line, a pen and an arrow go point to point.
@@ -164,7 +314,16 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
       }
       stroke.el.setAttribute("d", strokePath(stroke));
     };
-    const end = () => {
+    const end = (e) => {
+      if (label) {
+        const l = label;
+        label = null;
+        if (e.type === "pointercancel" || l.moved) return;
+        if (l.s) return editLabel(layer, l.s, false, into, keep, gone);
+        // The caret goes where it was clicked: the label's left edge, a little before it, and its middle.
+        const s = Object.assign(l.pen, { points: [[e.clientX - Math.round(l.pen.width * 0.45), e.clientY]], text: "" });
+        return editLabel(layer, s, true, into, keep, gone);
+      }
       if (!stroke) return;
       const s = stroke, a = s.points[0], b = s.points[s.points.length - 1];
       stroke = null;
@@ -174,7 +333,7 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
     };
     layer.onpointerup = layer.onpointercancel = end;
     layer.onwheel = layer.ontouchmove = (e) => e.preventDefault();
-    return () => { stroke = null; };
+    return () => { stroke = null; label = null; if (labelEditor) labelEditor.forget(); };
   }
   function initials(name) {
     return String(name || "?").trim().split(/\s+/).slice(0, 2).map((word) => word[0] || "").join("").toUpperCase() || "?";
@@ -1356,12 +1515,14 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
    */
   ${INK}
   let pen = { tool: "marker", color: "#ec4899", width: 14 }, strokes = [], shot = null, frozen = null, ink = null;
-  let markSession = 0, finishing = false;
+  let markSession = 0, finishing = false, forgetInk = () => {};
   function setPen(next) {
-    if (/^(marker|pen|arrow)$/.test(next.tool)) pen.tool = next.tool;
-    if (/^#[0-9a-f]{6}$/i.test(next.color)) pen.color = next.color;
-    if (typeof next.width === "number" && next.width >= 1 && next.width <= 64) pen.width = next.width;
+    if (/^(marker|pen|arrow|text)$/.test(next.tool)) pen.tool = next.tool;
+    const style = { tool: pen.tool };
+    if (/^#[0-9a-f]{6}$/i.test(next.color)) style.color = pen.color = next.color;
+    if (typeof next.width === "number" && next.width >= 1 && next.width <= 64) style.width = pen.width = next.width;
     if (layer && tool === "mark") layer.style.cursor = penCursor(pen);
+    restyleLabel(style);
   }
   function freeze() {
     const roots = [document], hovering = [], styles = [];
@@ -1402,19 +1563,24 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     ink.setAttribute("class", "ink");
     el.appendChild(ink);
     // The layer goes with the mark, and the stroke in progress with it.
-    takeStrokes(el, ink, () => ({ ...pen }), (s) => {
+    forgetInk = takeStrokes(el, ink, () => ({ ...pen }), (s) => {
       strokes.push(s);
+      post({ type: "marks", count: strokes.length });
+    }, (s) => {
+      strokes = strokes.filter((other) => other !== s);
       post({ type: "marks", count: strokes.length });
     });
     return el;
   }
   function leaveMark() {
     markSession++; finishing = false;
+    forgetInk();
     unfreeze();
     strokes = []; shot = null; ink = null;
     post({ type: "marks", count: 0 });
   }
   function undoMark() {
+    commitLabel();
     const s = strokes.pop();
     if (s) s.el.remove();
     post({ type: "marks", count: strokes.length });
@@ -1470,6 +1636,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const keyOf = (w) => { if (!ids.has(w.node)) ids.set(w.node, ids.size); return ids.get(w.node) + ":" + w.start; };
     const take = (x, y, slack) => { const w = wordAt(x, y, slack); if (w) words.set(keyOf(w), w); };
     for (const s of list) {
+      if (s.tool === "text") continue;
       if (s.tool === "arrow") { const [x, y] = s.points[s.points.length - 1]; take(x, y, 10); continue; }
       const third = s.width / 3;
       for (const [x, y] of along(s.points)) {
@@ -1516,6 +1683,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     return out && out.size <= MAX_BYTES ? out : null;
   }
   async function finishMark() {
+    if (tool === "mark") commitLabel();
     if (tool !== "mark" || !strokes.length || finishing) return;
     finishing = true;
     const list = strokes.slice(), picture = shot, session = markSession;
@@ -1759,6 +1927,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // Escape under a tool unpicks the measured element, else goes to Drop, which closes what's open or puts the tool down.
   // Caught first, so Comark's zoom under the layer stays open.
   window.addEventListener("keydown", (e) => {
+    // A label being typed takes the keys, but ⌘Enter puts it down and sends.
+    if (tool === "mark" && typingLabel()) {
+      return labelKey(e, () => { commitLabel(); finishMark(); });
+    }
     // The screenshot and ink use viewport coordinates, including when the page still has keyboard focus.
     if (tool === "mark" && /^( |ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(e.key)) {
       e.preventDefault(); e.stopPropagation(); return;
@@ -1783,7 +1955,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (e.metaKey || e.ctrlKey || e.altKey || typing || e.defaultPrevented) return;
     // With text selected, C comments on it and E suggests an edit to it: the bar over it is outside the page's focus.
     if (lastQuote && (key === "c" || key === "e")) { e.preventDefault(); return post({ type: "key", key }); }
-    if (/^[vrsuxbpa]$/.test(key) || (tool === "mark" && (key === "[" || key === "]"))) post({ type: "key", key, tool });
+    if (/^[vrsuxbpat]$/.test(key) || (tool === "mark" && (key === "[" || key === "]"))) post({ type: "key", key, tool });
     // An image's page (the one Drop takes point comments on) has no use for ← and →: Drop moves to the folder's next image.
     if (pointComments && (e.key === "ArrowLeft" || e.key === "ArrowRight")) post({ type: "key", key: e.key });
   });

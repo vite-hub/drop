@@ -404,7 +404,18 @@ export function useViewerFrame(options: {
         pen: annotations.penStyle.value,
       }),
   )
-  watch(annotations.penStyle, (pen) => ready.value && send({ type: "pen", ...pen }))
+  // Send only the changed attributes: an edited label can differ from the tool defaults.
+  watch(
+    annotations.penStyle,
+    (pen, before) =>
+      ready.value &&
+      send({
+        type: "pen",
+        tool: pen.tool,
+        ...(pen.color !== before.color ? { color: pen.color } : {}),
+        ...(pen.width !== before.width ? { width: pen.width } : {}),
+      }),
+  )
   // Fresh objects: postMessage can't copy a reactive proxy.
   if (options.presence) {
     const { cursors, sharing } = options.presence
