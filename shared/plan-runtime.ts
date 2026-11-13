@@ -579,19 +579,32 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
     marks.appendChild(dot);
   }
+  // The page's pins from the last render, by comment: one that looks the same is moved, not drawn again, since a canvas
+  // pan renders every frame and a new picture each time could flash.
+  let lastPins = new Map();
   function placePin(m, x, y, into, away) {
+    const className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "") + (away ? " away" : "");
+    const title = (m.author || "Comment") + " · #" + m.n + (away ? " · on something that opens here" : "");
+    const last = into === marks && lastPins.get(m.id);
+    if (last && last.className === className && last.title === title && last.dataset.image === (m.image || "")) {
+      last.style.left = x + "px"; last.style.top = y + "px";
+      into.appendChild(last);
+      return;
+    }
     const dot = document.createElement("div");
-    dot.className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "") + (away ? " away" : "");
+    dot.className = className;
     // The author's picture, else their initials; the panel and the agent feedback keep the number.
     if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.textContent = initials(m.author); }; dot.appendChild(img); }
     else dot.textContent = initials(m.author);
-    dot.title = (m.author || "Comment") + " · #" + m.n + (away ? " · on something that opens here" : "");
+    dot.title = title;
+    dot.dataset.image = m.image || "";
     dot.style.left = x + "px"; dot.style.top = y + "px"; dot.dataset.id = m.id;
     dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
     into.appendChild(dot);
   }
 
   function render() {
+    lastPins = new Map(Array.from(marks.querySelectorAll(":scope > .m[data-id]:not(.gp)"), (dot) => [dot.dataset.id, dot]));
     marks.innerHTML = "";
     // Hidden comments (the toolbar's eye) give the doc its margin back, so the column centers again. Shown before
     // drawing, so the margin's cards measure their size when the eye turns them back on.
@@ -740,6 +753,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     placeDraft();
   }
 
+  // The rectangle or spot a comment is being written on (finishArea), as a share of the element it's on.
+  let drawn = null;
+  /** Draws it where its element is now, in viewport pixels too; hidden while its element doesn't show. */
+  function placeDrawn() {
+    const r = drawn.el.getBoundingClientRect(), node = drawn.node;
+    const left = r.left + drawn.x * r.width, top = r.top + drawn.y * r.height, right = left + drawn.w * r.width, bottom = top + drawn.h * r.height;
+    node.style.left = left + scrollX + "px"; node.style.top = top + scrollY + "px";
+    if (drawn.w) { node.style.width = right - left + "px"; node.style.height = bottom - top + "px"; }
+    node.style.display = shows(drawn.el) ? "" : "none";
+    return { left, top, right, bottom };
+  }
+
   /** Where the composer for the held selection goes: its place in the margin, else the quote, for Drop to float it under. */
   function placeDraft() {
     const box = (r) => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
@@ -755,6 +780,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       const open = opened && marks.querySelector('.gp[data-id="' + CSS.escape(opened) + '"]');
       if (open) return post({ type: "draft-place", rail: false, pin: true, id: opened, rect: pinBox(open) });
     }
+    // A drawn area or spot: the composer Drop floats under it moves with it as the page scrolls or a canvas pans.
+    if (drawn && !drafted) return post({ type: "draft-place", rail: false, rect: placeDrawn() });
     // Any other style: the open thread is written in beside its pin, or over its card in the margin.
     if (opened && !drafted) {
       const id = CSS.escape(opened), card = marks.querySelector('.rail .g[data-id="' + id + '"] > .cr-card');
@@ -968,23 +995,49 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const view = { rulers: false, xray: false, pins: true, style: "card", me: null };
   const fx = document.createElement("div");
   fx.className = "fx";
+  /**
+   * On a canvas (a prototype's), a rectangle across two items is held only by the page, which stays put while the plane
+   * pans under it. It goes on the item it covers most instead, cut to that item, so it moves with the item.
+   */
+  function onItem(left, top, right, bottom) {
+    let best = null, most = 0;
+    for (const el of document.body.children) {
+      if (el === host || getComputedStyle(el).transform === "none") continue;
+      const r = el.getBoundingClientRect();
+      const covered = Math.max(0, Math.min(right, r.right) - Math.max(left, r.left)) * Math.max(0, Math.min(bottom, r.bottom) - Math.max(top, r.top));
+      if (covered > most) { best = el; most = covered; }
+    }
+    return best;
+  }
   function finishArea(left, top, right, bottom) {
     // Over the zoom, an area on a screenshot is on that image; anywhere else it anchors to the original of the copy under it.
     const shot = zoom && shotAt((left + right) / 2, (top + bottom) / 2);
     if (shot) return commentOnShot(shot, left, top, right, bottom);
-    const under = anchorFor(left, top, right, bottom, host), el = zoom ? originalOf(under) : under;
+    let under = anchorFor(left, top, right, bottom, host);
+    const item = !zoom && right > left && (under === document.body || under === document.documentElement) && onItem(left, top, right, bottom);
+    if (item) {
+      const b = item.getBoundingClientRect();
+      [under, left, top, right, bottom] = [item, Math.max(left, b.left), Math.max(top, b.top), Math.min(right, b.right), Math.min(bottom, b.bottom)];
+    }
+    const el = zoom ? originalOf(under) : under;
     if (!el) return;
     const r = under.getBoundingClientRect();
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     // Keep the drawn rectangle, or the clicked spot, on the page or the zoom while the comment is written; Drop clears it.
-    draft.innerHTML = "";
+    // On the page it's kept as a share of what it's on, like a saved area, so it moves with that and not with the screen.
+    draft.innerHTML = ""; drawn = null;
     if (zoom) zoomDraft(left, top, right, bottom);
-    else if (right > left) areaBox(draft, left + scrollX, top + scrollY, right - left, bottom - top);
-    else { const dot = document.createElement("div"); dot.className = "dp"; dot.style.cssText = "left:" + (left + scrollX) + "px;top:" + (top + scrollY) + "px"; draft.appendChild(dot); }
+    else {
+      const node = right > left ? areaBox(draft, 0, 0, 0, 0) : draft.appendChild(Object.assign(document.createElement("div"), { className: "dp" }));
+      const w = r.width || 1, h = r.height || 1;
+      drawn = { el: under, node, x: (left - r.left) / w, y: (top - r.top) / h, w: (right - left) / w, h: (bottom - top) / h };
+      placeDrawn();
+    }
     const ow = right > left ? thousandths(right, r.left, r.width) - ox : 0, oh = right > left ? thousandths(bottom, r.top, r.height) - oy : 0;
     const around = !zoom && under.closest(TRANSIENT);
     const n = around ? ++shots : undefined;
     post({ type: "area", selector: pathOf(el), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, shot: n });
+    placeDraft();
     if (around) shoot(n, around.getBoundingClientRect(), left, top, right, bottom);
   }
 
@@ -1482,7 +1535,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     const ow = Math.max(1, Math.min(1000 - ox, thousandths(right, r.left, r.width) - ox));
     const oh = Math.max(1, Math.min(1000 - oy, thousandths(bottom, r.top, r.height) - oy));
-    draft.innerHTML = "";
+    draft.innerHTML = ""; drawn = null;
     const kept = document.createElementNS(SVG, "svg");
     kept.setAttribute("class", "inkp");
     for (const s of list) drawStroke(Object.assign({}, s, { points: s.points.map(([x, y]) => [x + scrollX, y + scrollY]) }), kept);
@@ -1645,7 +1698,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; drawn = null; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
     if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("drop-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; clickComments = m.clickComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
@@ -1660,7 +1713,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "mark" && m.do === "undo") undoMark();
     if (m.type === "mark" && m.do === "done") finishMark();
     if (m.type === "view") setView(m);
-    if (m.type === "clear-area") { draft.innerHTML = ""; zoomDraft(); }
+    if (m.type === "clear-area") { draft.innerHTML = ""; drawn = null; zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
     if (m.type === "inset") {
       document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px");
@@ -1751,6 +1804,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     swipe = null;
   });
   window.addEventListener("resize", () => { render(); redraw(); });
+  // A prototype's canvas moves its items with transforms, which no observer reports: its picker says when, each frame.
+  document.addEventListener("canvasmove", () => { if (markers.length || drawn) render(); });
   // A web font that arrives late moves the words, and with them each comment's bubble and card.
   if (document.fonts) document.fonts.addEventListener("loadingdone", () => render());
   // So does a block that scrolls on its own, such as a wide table, under a comment in the margin.

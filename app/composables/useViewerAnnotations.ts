@@ -56,7 +56,10 @@ export function useViewerAnnotations(options: {
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
   const popover = ref<Popover | null>(null)
-  /** Where the frame keeps the place of the comment being written on a selection, in page coordinates (draft-place). */
+  /**
+   * Where the frame keeps the place of the comment being written on a selection or a drawn area, in page coordinates
+   * (draft-place). An area's moves with what it's on, as a prototype's canvas pans.
+   */
   const draftPlace = ref<{ rail: boolean; pin?: boolean; rect: Rect } | null>(null)
   /**
    * Where the open thread is written in, in page coordinates, as the page scrolls (draft-place with an id): beside its
@@ -68,8 +71,8 @@ export function useViewerAnnotations(options: {
     (id) => threadPlace.value?.id !== id && (threadPlace.value = null),
   )
   watch(
-    () => popover.value?.type === "new" && popover.value.pending.kind === "text",
-    (text) => !text && (draftPlace.value = null),
+    () => popover.value?.type === "new" && ["text", "area"].includes(popover.value.pending.kind),
+    (placed) => !placed && (draftPlace.value = null),
   )
   /**
    * The comment whose thread the frame will open once it has scrolled to the pin (`awaitThread`). Escape, a tool, or
@@ -252,6 +255,8 @@ export function useViewerAnnotations(options: {
       if (marked) tool.value = "browse"
       if (commenting.value) {
         const { kind = "area", selector, label, ox, oy, ow, oh, quote } = message
+        // The comment written before kept its place; this one's comes from the frame right after.
+        draftPlace.value = null
         popover.value = {
           type: "new",
           pending: { kind, selector, label, ox, oy, ow, oh, ...(marked && quote ? { quote } : {}) },

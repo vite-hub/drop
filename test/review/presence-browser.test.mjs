@@ -255,12 +255,9 @@ test("review.js shows who else is on the review and their cursors on this page",
       y: 250,
     })
 
-    // Ben goes away: his face dims and says so.
+    // Ben's tab goes idle: he leaves the faces instead of staying there grayed out.
     await page.evaluate((ben) => window.__presence.set(2, ben, { active: false, at: "https://site.test/" }), BEN)
-    await page.waitForFunction(() =>
-      document.querySelector("drop-review").shadowRoot.querySelector("[data-act=people] .face.idle"),
-    )
-    assert.equal(await people.getAttribute("aria-label"), "Here now: Ben (away). Hide cursors")
+    await people.waitFor({ state: "hidden" })
 
     // Pressing the faces hides the cursors, and the browser remembers.
     await page.evaluate(
@@ -273,6 +270,7 @@ test("review.js shows who else is on the review and their cursors on this page",
       BEN,
     )
     await cursor.waitFor()
+    await people.waitFor()
     await people.click()
     assert.equal(await people.getAttribute("aria-pressed"), "false")
     assert.equal(await cursor.count(), 0)

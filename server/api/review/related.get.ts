@@ -1,4 +1,4 @@
-import { defineHandler, HTTPError } from "h3"
+import { defineHandler } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { faviconUrls, resourceLabel } from "#shared/resources"
 import { siteCoversDrop } from "../../utils/content-origin"
@@ -21,8 +21,10 @@ export default reviewApi(
       const origin = event.req.headers.get("origin") ?? ""
       event.res.headers.set("Vary", "Origin")
       event.res.headers.set("Cache-Control", "no-store")
-      if (!(await covered(origin))) throw new HTTPError({ status: 404, statusText: "No site review here." })
-      event.res.headers.set("Access-Control-Allow-Origin", origin)
+      if (origin) event.res.headers.set("Access-Control-Allow-Origin", origin)
+      // The script asks on every page that loads it. An origin no review covers gets the answer of one nothing links
+      // to, so the page's console stays quiet and it learns no more than that.
+      if (!(await covered(origin))) return { linked: false }
       await requireRateLimit(event, "review-related", { limit: 30, window: "1m" })
       return { linked: await linkedFrom(origin) }
     }
