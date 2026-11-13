@@ -150,6 +150,17 @@ if (shots) {
             .map((c) => c.querySelector("h3")?.textContent ?? "a block"),
         );
         for (const c of clipped) problems.push(`view ${id}: "${c}" is wider than its card`);
+        // A cell that isn't display: table-cell keeps its own height, so its text and divider leave the row's line.
+        const shifted = await page.$$eval(".rp-table", (tables) =>
+          tables
+            .filter((t) =>
+              [...t.querySelectorAll("td")].some(
+                (td) => Math.abs(td.getBoundingClientRect().height - td.parentElement.getBoundingClientRect().height) > 1,
+              ),
+            )
+            .map((t) => t.closest(".rp-block")?.querySelector("h3")?.textContent ?? "a table"),
+        );
+        for (const t of shifted) problems.push(`view ${id}: "${t}" has cells out of line with their row`);
       }
       await page.screenshot({ path: join(shots, `${id}-${theme}.png`), fullPage: true });
     }

@@ -715,7 +715,7 @@ button {
 .rp-barcell {
   min-width: 140px;
 }
-.rp-barcell {
+.rp-barline {
   display: flex;
   align-items: center;
   justify-content: flex-end;

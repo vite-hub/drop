@@ -1469,11 +1469,17 @@ function cell(row, col, max, min) {
     );
   if (kind === "bar") {
     const w = max > 0 && typeof v === "number" ? Math.max(0, (v / max) * 100) : 0;
+    // The flex row goes inside the cell: a <td> with display: flex stops being a table cell, keeps its own height, and
+    // its number and divider sit higher than the rest of the row.
     return h(
       "td",
       { class: "rp-num rp-barcell" },
-      h("span", { class: "rp-inbar" }, h("span", { style: { width: `${w}%` } })),
-      h("span", {}, fmt(v, col.number ?? "number")),
+      h(
+        "span",
+        { class: "rp-barline" },
+        h("span", { class: "rp-inbar" }, h("span", { style: { width: `${w}%` } })),
+        h("span", {}, fmt(v, col.number ?? "number")),
+      ),
     );
   }
   if (kind === "heat") {
