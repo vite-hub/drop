@@ -242,6 +242,85 @@ test("a prototype opens on the canvas; an item opens in focus and comes back as 
   }
 })
 
+test("the canvas camera stops before the last item leaves the screen, and the minimap moves it", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(
+      page("").replaceAll("<section ", '<section data-width="800" data-height="500" '),
+      false,
+      0,
+      true,
+    )
+    const tab = await context.newPage()
+    await tab.route("https://picker.test/fence", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    // Three items in a row and one far below: the empty corners of their bounding box are no place to stop.
+    await tab.addInitScript(() =>
+      localStorage.setItem(
+        "drop-prototype-canvas:/fence",
+        JSON.stringify({
+          v: 1,
+          camera: null,
+          positions: { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1200, 2400] },
+        }),
+      ),
+    )
+    await tab.goto("https://picker.test/fence")
+    await tab.waitForFunction(() => document.documentElement.dataset.prototypeLayout === "canvas")
+    // Some item shows 160px of itself each way on screen, or all of itself where it's smaller.
+    const shown = () =>
+      tab.evaluate(() =>
+        [...document.querySelectorAll("body > [data-variant]")].some((el) => {
+          const r = el.getBoundingClientRect()
+          const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0)
+          const h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)
+          return w >= Math.min(160, r.width) - 1 && h >= Math.min(160, r.height) - 1
+        }),
+      )
+    for (const [dx, dy] of [
+      [9000, 9000],
+      [-9000, -9000],
+      [-9000, 9000],
+      [9000, -9000],
+    ]) {
+      await tab.mouse.move(500, 350)
+      await tab.mouse.down({ button: "middle" })
+      for (let step = 1; step <= 20; step++) await tab.mouse.move(500 + (dx * step) / 20, 350 + (dy * step) / 20)
+      await tab.mouse.up({ button: "middle" })
+      assert.ok(await shown(), `an item stays on screen after dragging ${dx}, ${dy}`)
+    }
+    // Wheel panning stops at the fence too.
+    await tab.mouse.move(500, 350)
+    for (let n = 0; n < 40; n++) await tab.mouse.wheel(0, 2000)
+    assert.ok(await shown(), "an item stays on screen after wheeling away")
+
+    // The minimap: a click centres the camera there, at the same zoom.
+    await tab.keyboard.press("0")
+    await tab.waitForFunction(() => document.getElementById("v-one").style.transform.endsWith("scale(1)"))
+    const transform = () => tab.evaluate(() => document.getElementById("v-one").style.transform)
+    const before = await transform()
+    const map = await tab.evaluate(() => {
+      const r = document.querySelector("prototype-picker").shadowRoot.querySelector(".map").getBoundingClientRect()
+      return { x: r.x, y: r.y, w: r.width, h: r.height }
+    })
+    assert.ok(map.w > 0 && map.x + map.w <= 1000 && map.y + map.h <= 700, "the minimap sits in the bottom-right corner")
+    await tab.mouse.click(map.x + map.w / 2, map.y + map.h * 0.9)
+    await tab.waitForFunction((before) => document.getElementById("v-one").style.transform !== before, before)
+    assert.ok((await transform()).endsWith("scale(1)"))
+    assert.ok(await shown(), "the jump lands inside the fence")
+    // Focus has no minimap.
+    await tab.keyboard.press("1")
+    assert.equal(
+      await tab.evaluate(
+        () => document.querySelector("prototype-picker").shadowRoot.querySelector(".map").getBoundingClientRect().width,
+      ),
+      0,
+    )
+  } finally {
+    await browser.close()
+  }
+})
+
 test("inside Drop's viewer the page reports to Drop's bar and takes its commands, even with a trimmed copy pasted", async () => {
   const browser = await chromium.launch()
   try {

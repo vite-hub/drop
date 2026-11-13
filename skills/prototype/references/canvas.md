@@ -4,7 +4,7 @@ Drop opens a page with two or more `<section data-variant>` items as a canvas: e
 
 What readers get, so you can tell them:
 
-- Canvas: drag empty space, Space + drag, or middle-drag to pan; Ctrl/⌘ + wheel or pinch to zoom; Fit and Reset in Drop's bar. Click a name to copy it, drag the handle beside it to move the item. The canvas remembers each reader's camera and positions by section `id`.
+- Canvas: drag empty space, Space + drag, or middle-drag to pan; Ctrl/⌘ + wheel or pinch to zoom; Fit and Reset in Drop's bar. Click a name to copy it, drag the handle beside it to move the item. Panning stops before the last item leaves the screen, and the minimap in the bottom-right corner jumps the camera anywhere: click a spot or drag the screen's box. The canvas remembers each reader's camera and positions by section `id`.
 - Focus: double-click a name, press Enter on it, or press 1–9. ← and → step, Esc or Canvas go back to the canvas, centred on that item. The address's `#v-…` opens that item in focus.
 
 ## Live pages as items

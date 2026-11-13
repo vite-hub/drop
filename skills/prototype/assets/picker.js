@@ -5,7 +5,8 @@
 //   1280) by `data-height` (px, default its content). Drag empty space, Space + drag, or middle-drag to pan; Ctrl/⌘ +
 //   wheel or pinch to zoom; + and − zoom, Shift+1 fits all, 0 resets the camera. Click a name to copy it; double-click
 //   it, press Enter on it, or press 1–9 to open that item in focus. Drag the handle beside a name, or focus it and press
-//   the arrow keys, to move the item.
+//   the arrow keys, to move the item. The camera stops where an item would leave the screen (a fence), and a minimap in
+//   the bottom-right corner shows the items and the screen: click it to jump, drag the screen's box to move.
 // - Focus: one item fills the page, the same element as on the canvas, so what you typed stays. ← and → step, 1–9
 //   jump, Esc or C go back to the canvas, centred on that item.
 // `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live.
@@ -91,6 +92,15 @@
     .tnote { color: #737373; overflow: hidden; text-overflow: ellipsis; }
     .done:not(:empty) { position: absolute; top: 0; right: 0; height: 22px; padding: 0 2px 0 8px; display: grid; align-items: center; background: #fff; color: #15803d; white-space: nowrap; }
     .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .map { position: absolute; right: 12px; bottom: 12px; width: 160px; height: 104px; box-sizing: border-box; pointer-events: auto; cursor: pointer; touch-action: none;
+      border: 1px solid #e5e5e5; border-radius: 10px; background: #fff; box-shadow: 0 4px 16px rgb(0 0 0 / .08); overflow: hidden; }
+    .map canvas { display: block; width: 100%; height: 100%; }
+    .edge { position: absolute; pointer-events: none; opacity: 0; }
+    .edge.fade { transition: opacity .35s ease-out; }
+    .edge.l { left: 0; top: 0; bottom: 0; width: 28px; border-left: 2px solid #2563eb; background: linear-gradient(90deg, rgb(37 99 235 / .3), transparent); }
+    .edge.r { right: 0; top: 0; bottom: 0; width: 28px; border-right: 2px solid #2563eb; background: linear-gradient(270deg, rgb(37 99 235 / .3), transparent); }
+    .edge.t { top: 0; left: 0; right: 0; height: 28px; border-top: 2px solid #2563eb; background: linear-gradient(180deg, rgb(37 99 235 / .3), transparent); }
+    .edge.b { bottom: 0; left: 0; right: 0; height: 28px; border-bottom: 2px solid #2563eb; background: linear-gradient(0deg, rgb(37 99 235 / .3), transparent); }
   </style>
   <nav class="bar" aria-label="Prototype">
     <span class="cam count"></span>
@@ -107,14 +117,14 @@
     <i class="one sep"></i>
     <button class="one back" title="Every item side by side (Esc)">Canvas</button>
   </nav>
-  <div class="tags"></div>
+  <div class="tags"><i class="edge l"></i><i class="edge r"></i><i class="edge t"></i><i class="edge b"></i><div class="map" role="img" aria-label="Minimap: click to move the camera there"><canvas></canvas></div></div>
   <p class="sr" id="move-help">Arrow keys move the item, Shift moves it further.</p>`;
   const $ = (s) => shadow.querySelector(s);
-  const bar = $(".bar"), tags = $(".tags"), zoomText = $(".zoom"), currentText = $(".current"), noteText = $(".note");
+  const bar = $(".bar"), tags = $(".tags"), map = $(".map"), mapCanvas = $(".map canvas"), zoomText = $(".zoom"), currentText = $(".current"), noteText = $(".note");
   $(".count").textContent = variants.length + " items";
 
   // Canvas state. Positions and the camera are in plane pixels; screen = camera + plane × zoom.
-  const GAP = 160, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24;
+  const GAP = 160, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24, KEEP = 160;
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
@@ -214,6 +224,7 @@
       it.tag.style.width = w + LABEL_INSET + "px";
       it.tag.classList.toggle("narrow", w < 160);
     }
+    drawMap();
     const zoom = Math.round(cam.z * 100);
     zoomText.textContent = zoom + "%";
     if (zoom !== reportedZoom) report();
@@ -221,7 +232,107 @@
     document.dispatchEvent(new Event("canvasmove"));
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
-  const bound = () => { cam.z = clamp(cam.z, MIN_Z, MAX_Z); cam.x = clamp(cam.x, -LIMIT, LIMIT); cam.y = clamp(cam.y, -LIMIT, LIMIT); };
+  // The fence. Each item gives the camera a box of places where the screen still shows KEEP px of it, or all of it
+  // when it's smaller; the camera may stand in any of them, so the plane never pans into emptiness. A pan (`from` is
+  // where it started) slides along the box it's in rather than jumping across an empty gap to another item's; a jump
+  // (zoom, fit, the minimap) lands in the nearest box. Returns the sides it stopped at.
+  function bound(from) {
+    cam.z = clamp(cam.z, MIN_Z, MAX_Z);
+    cam.x = clamp(cam.x, -LIMIT, LIMIT); cam.y = clamp(cam.y, -LIMIT, LIMIT);
+    const v = view(), z = cam.z;
+    const boxes = items.map((it) => {
+      const b = box(it), kx = Math.min(KEEP, b.w * z), ky = Math.min(KEEP, b.h * z);
+      return { x0: kx - (b.x + b.w) * z, x1: v.w - kx - b.x * z, y0: ky - (b.y + b.h) * z, y1: v.h - ky - b.y * z };
+    });
+    const inside = (r, c) => c.x >= r.x0 - .5 && c.x <= r.x1 + .5 && c.y >= r.y0 - .5 && c.y <= r.y1 + .5;
+    if (!boxes.length || boxes.some((r) => inside(r, cam))) return null;
+    const near = from ? boxes.filter((r) => inside(r, from)) : [];
+    const gap = (r) => (clamp(cam.x, r.x0, r.x1) - cam.x) ** 2 + (clamp(cam.y, r.y0, r.y1) - cam.y) ** 2;
+    const r = (near.length ? near : boxes).reduce((a, b) => gap(b) < gap(a) ? b : a);
+    const hit = { l: cam.x > r.x1, r: cam.x < r.x0, t: cam.y > r.y1, b: cam.y < r.y0 };
+    cam.x = clamp(cam.x, r.x0, r.x1); cam.y = clamp(cam.y, r.y0, r.y1);
+    return hit;
+  }
+  // A pan by dx, dy that stops at the fence, with a short blue flash on the side it stopped at.
+  function pan(dx, dy) {
+    const from = { x: cam.x, y: cam.y };
+    cam.x += dx; cam.y += dy; touched = true;
+    const hit = bound(from);
+    if (hit) for (const side of "lrtb") if (hit[side]) flash(side);
+    schedule();
+  }
+  function flash(side) {
+    const el = $(".edge." + side);
+    el.classList.remove("fade"); el.style.opacity = "1";
+    requestAnimationFrame(() => { el.classList.add("fade"); el.style.opacity = "0"; });
+  }
+  // A zoom floor: half of what fits everything, so the content never shrinks to a dot.
+  const floor = () => { const v = view(), b = extent(items); return b ? clamp(Math.min((v.w - 64) / b.w, (v.h - 128) / b.h, 1) / 2, MIN_Z, 1) : MIN_Z; };
+  function extent(list) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const it of list) { const b = box(it); x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
+    return Number.isFinite(x0) ? { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 } : null;
+  }
+
+  // The minimap: every item and the screen, framed around both. While its box is dragged the frame holds still.
+  let mapFrame = null;
+  function frameMap() {
+    if (mapFrame) return mapFrame;
+    const b = extent(items), v = view();
+    if (!b) return null;
+    let x0 = Math.min(b.x0, -cam.x / cam.z), y0 = Math.min(b.y0, -cam.y / cam.z), x1 = Math.max(b.x1, (v.w - cam.x) / cam.z), y1 = Math.max(b.y1, (v.h - cam.y) / cam.z);
+    const px = (x1 - x0) * 0.06, py = (y1 - y0) * 0.06;
+    x0 -= px; x1 += px; y0 -= py; y1 += py;
+    const W = map.clientWidth, H = map.clientHeight, s = Math.min(W / (x1 - x0), H / (y1 - y0));
+    return { s, ox: (W - (x1 - x0) * s) / 2 - x0 * s, oy: (H - (y1 - y0) * s) / 2 - y0 * s };
+  }
+  function drawMap() {
+    const W = map.clientWidth, H = map.clientHeight, f = frameMap(), dpr = devicePixelRatio || 1;
+    if (!W || !f) return;
+    if (mapCanvas.width !== Math.round(W * dpr)) { mapCanvas.width = Math.round(W * dpr); mapCanvas.height = Math.round(H * dpr); }
+    const ctx = mapCanvas.getContext("2d"), v = view();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#e5e5e5"; ctx.strokeStyle = "#a3a3a3"; ctx.lineWidth = 1;
+    for (const it of items) {
+      const b = box(it), x = f.ox + b.x * f.s, y = f.oy + b.y * f.s;
+      ctx.fillRect(x, y, b.w * f.s, b.h * f.s);
+      ctx.strokeRect(x + .5, y + .5, Math.max(0, b.w * f.s - 1), Math.max(0, b.h * f.s - 1));
+    }
+    const sx = f.ox - cam.x / cam.z * f.s, sy = f.oy - cam.y / cam.z * f.s, sw = v.w / cam.z * f.s, sh = v.h / cam.z * f.s;
+    ctx.fillStyle = "rgb(37 99 235 / .1)"; ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 1.5;
+    ctx.fillRect(sx, sy, sw, sh);
+    ctx.strokeRect(sx, sy, sw, sh);
+  }
+  const onMap = (e) => {
+    const r = map.getBoundingClientRect(), f = mapFrame || frameMap();
+    return { x: (e.clientX - r.left - f.ox) / f.s, y: (e.clientY - r.top - f.oy) / f.s };
+  };
+  function centreOn(x, y) {
+    const v = view();
+    cam.x = v.w / 2 - x * cam.z; cam.y = v.h / 2 - y * cam.z; touched = true;
+    bound(); schedule();
+  }
+  let mapDrag = null;
+  map.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || gesture) return;
+    e.preventDefault(); e.stopPropagation();
+    mapFrame = frameMap();
+    const p = onMap(e), v = view(), x0 = -cam.x / cam.z, y0 = -cam.y / cam.z, x1 = x0 + v.w / cam.z, y1 = y0 + v.h / cam.z;
+    const held = p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
+    try { map.setPointerCapture(e.pointerId); } catch {}
+    mapDrag = { id: e.pointerId, dx: held ? p.x - (x0 + x1) / 2 : 0, dy: held ? p.y - (y0 + y1) / 2 : 0 };
+    if (!held) centreOn(p.x, p.y);
+  });
+  map.addEventListener("pointermove", (e) => {
+    if (!mapDrag || e.pointerId !== mapDrag.id) return;
+    const p = onMap(e);
+    centreOn(p.x - mapDrag.dx, p.y - mapDrag.dy);
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) map.addEventListener(type, (e) => {
+    if (!mapDrag || e.pointerId !== mapDrag.id) return;
+    mapDrag = null; mapFrame = null; schedule(); settle();
+  });
   // After a gesture: save, and let Drop's comment pins measure their anchors again.
   function settle() {
     clearTimeout(settleTimer);
@@ -234,7 +345,7 @@
     try { localStorage.setItem(canvasKey, JSON.stringify(doc)); } catch {}
   }
   function zoomAt(z, px, py) {
-    z = clamp(z, MIN_Z, MAX_Z);
+    z = clamp(z, Math.min(floor(), cam.z), MAX_Z);
     const wx = (px - cam.x) / cam.z, wy = (py - cam.y) / cam.z;
     cam.z = z; cam.x = px - wx * z; cam.y = py - wy * z;
     touched = true; bound(); schedule(); settle();
@@ -243,17 +354,16 @@
   const box = (it) => ({ x: it.x, y: it.y, w: it.mw || it.w, h: it.mh || it.h || 1 });
   // Fits the given items between the top labels and the bottom bar, at 100% or less.
   function fit(list = items) {
-    const v = view(), top = 56, bottom = 72, side = 32;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const it of list) { const b = box(it); x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
-    if (!Number.isFinite(x0)) return;
+    const v = view(), top = 56, bottom = 72, side = 32, b = extent(list);
+    if (!b) return;
+    const { x0, y0, x1, y1 } = b;
     const z = clamp(Math.min((v.w - side * 2) / (x1 - x0), (v.h - top - bottom) / (y1 - y0), 1), MIN_Z, MAX_Z);
     cam.z = z;
     cam.x = (v.w - (x1 - x0) * z) / 2 - x0 * z;
     cam.y = top + Math.max(0, (v.h - top - bottom - (y1 - y0) * z) / 2) - y0 * z;
     bound(); schedule(); settle();
   }
-  function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; schedule(); settle(); }
+  function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; bound(); schedule(); settle(); }
   // Centres an item at the current zoom, or fits it when it's bigger than the screen.
   function reveal(it) {
     const v = view(), b = box(it);
@@ -292,6 +402,7 @@
       if (mode !== "canvas") return;
       if (from) reveal(from);
       else if (!saved.camera && !touched) fit();
+      else { bound(); schedule(); }
     }));
     (document.fonts ? document.fonts.ready : Promise.resolve()).then(go, go);
     hash(null);
@@ -395,8 +506,8 @@
       if (t === host) return;
       if (e.key === " ") { if (interactive(t)) return; space = true; e.preventDefault(); return; }
       if (interactive(t) && t !== document.body) return;
-      const pan = { ArrowLeft: [80, 0], ArrowRight: [-80, 0], ArrowUp: [0, 80], ArrowDown: [0, -80] }[e.key];
-      if (pan) { cam.x += pan[0]; cam.y += pan[1]; touched = true; bound(); schedule(); settle(); }
+      const step = { ArrowLeft: [80, 0], ArrowRight: [-80, 0], ArrowUp: [0, 80], ArrowDown: [0, -80] }[e.key];
+      if (step) { pan(step[0], step[1]); settle(); }
       else if (e.key === "+" || e.key === "=") zoomCenter(1.25);
       else if (e.key === "-" || e.key === "_") zoomCenter(1 / 1.25);
       else if (e.key === "!" || (e.shiftKey && e.code === "Digit1")) fit();
@@ -437,7 +548,7 @@
     const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
     gesture.x = e.clientX; gesture.y = e.clientY;
     if (Math.abs(dx) + Math.abs(dy) > 0) gesture.moved = true;
-    if (gesture.kind === "pan") { cam.x += dx; cam.y += dy; touched = true; bound(); schedule(); }
+    if (gesture.kind === "pan") pan(dx, dy);
     else place(gesture.it, gesture.it.x + dx / cam.z, gesture.it.y + dy / cam.z);
   }, true);
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) window.addEventListener(type, (e) => { if (gesture && e.pointerId === gesture.id) endGesture(); }, true);
@@ -460,13 +571,14 @@
   }
   window.addEventListener("wheel", (e) => {
     if (mode !== "canvas" || e.composedPath().includes(bar)) return;
+    if (e.composedPath().includes(map)) { e.preventDefault(); return; }
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
     let dx = e.deltaX * unit, dy = e.deltaY * unit;
     if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(cam.z * Math.exp(-clamp(dy, -30, 30) / 100), e.clientX, e.clientY); return; }
     if (e.shiftKey && !dx) { dx = dy; dy = 0; }
     if (scrolls(e.target, dx, dy)) return;
     e.preventDefault();
-    cam.x -= dx; cam.y -= dy; touched = true; bound(); schedule(); settle();
+    pan(-dx, -dy); settle();
   }, { passive: false, capture: true });
   // Safari reports trackpad pinch as gesture events.
   let pinchFrom = 1;
@@ -491,9 +603,9 @@
     if (r.left + dx < 24) dx = 24 - r.left;
     if (r.bottom > v.h - 80) dy = v.h - 80 - r.bottom;
     if (r.top + dy < 56) dy = 56 - r.top;
-    if (dx || dy) { cam.x += dx; cam.y += dy; bound(); schedule(); settle(); }
+    if (dx || dy) { pan(dx, dy); settle(); }
   });
-  window.addEventListener("resize", schedule);
+  window.addEventListener("resize", () => { if (mode === "canvas") bound(); schedule(); });
   window.addEventListener("pagehide", () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; save(); } });
 
   if (hosted || !several) bar.remove();
