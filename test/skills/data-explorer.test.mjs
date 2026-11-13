@@ -61,3 +61,16 @@ test("an unfilled page loads the template from this skill on Drop", async () => 
   ])
     assert.ok(paths.has(path), `missing ${path}`)
 })
+
+test("the build names a list written as an object instead of crashing", () => {
+  const { ok, log } = build({ ...example, views: { ...example.views[0] } })
+  assert.equal(ok, false)
+  assert.match(log, /error\s+report: `views` must be an array/)
+})
+
+test("the build warns when a filter of many options has no type and turns into a list", () => {
+  const years = ["2021", "2022", "2023", "2024", "2025", "2026"]
+  const { ok, log } = build({ ...example, filters: [...example.filters, { field: "period", options: years }] })
+  assert.ok(ok)
+  assert.match(log, /warning\s+filters\[4\]: has 6 `options` and no `type`/)
+})

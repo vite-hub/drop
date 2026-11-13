@@ -219,6 +219,29 @@ export function check(report) {
         );
   };
 
+  // A list written as an object would crash the checks below; name it instead.
+  const isObject = (v) => v != null && typeof v === "object" && !Array.isArray(v);
+  if (!isObject(report)) return { errors: ["report: must be a JSON object."], warnings, escapes: 0, rows: 0, size: 0 };
+  for (const k of ["filters", "top", "views", "bottom"])
+    if (report[k] != null && !Array.isArray(report[k])) err("report", `\`${k}\` must be an array.`);
+  if (report.data != null && !isObject(report.data))
+    err("report", "`data` must be an object of datasets, keyed by name.");
+  for (const [vi, view] of (Array.isArray(report.views) ? report.views : []).entries())
+    if (!isObject(view)) err(`views[${vi}]`, "must be an object with `id`, `label` and `blocks`.");
+    else if (view.blocks != null && !Array.isArray(view.blocks)) err(`views[${vi}]`, "`blocks` must be an array.");
+  for (const [where, blocks] of [
+    ["top", report.top],
+    ["bottom", report.bottom],
+    ...(Array.isArray(report.views) ? report.views : []).map((v, vi) => [`views[${vi}]`, v?.blocks]),
+  ])
+    for (const [bi, b] of (Array.isArray(blocks) ? blocks : []).entries()) {
+      if (!isObject(b)) err(`${where} > blocks[${bi}]`, "must be a block object with a `type`.");
+      else
+        for (const k of ["items", "columns"])
+          if (b[k] != null && !Array.isArray(b[k])) err(`${where} > blocks[${bi}]`, `\`${k}\` must be an array.`);
+    }
+  if (errors.length) return { errors, warnings, escapes: 0, rows: 0, size: 0 };
+
   keys(report, "report", "report");
   if (!report.title)
     err(
@@ -260,9 +283,11 @@ export function check(report) {
       "data",
       `${total} rows in all; aggregate in the prep script unless a table needs every row.`,
     );
+  const rowsOf = (name) =>
+    Array.isArray(data[name]) ? data[name].filter((r) => r && typeof r === "object") : [];
   const fieldsOf = (name) => {
     const set = new Set();
-    for (const r of data[name] ?? []) for (const k of Object.keys(r)) set.add(k);
+    for (const r of rowsOf(name)) for (const k of Object.keys(r)) set.add(k);
     return set;
   };
   const needData = (name, where) => {
@@ -276,7 +301,7 @@ export function check(report) {
             .join(", ")}.`,
         ) ?? false
       );
-    return true;
+    return Array.isArray(data[name]);
   };
   const needField = (name, f, where, what) => {
     if (f == null) return;
@@ -299,9 +324,14 @@ export function check(report) {
         "`type` must be `tabs` (a few periods or modes), `list` (names with a color and a count) or `toggle` (a checkbox in the top bar).",
       );
     if (!f.field) err(where, "add the `field` it filters on.");
-    else if (!Object.values(data).some((rows) => rows.some?.((r) => f.field in r)))
+    else if (!Object.keys(data).some((name) => rowsOf(name).some((r) => f.field in r)))
       err(where, `no dataset has a \`${f.field}\` field, so this filter would do nothing.`);
     if (f.count) needData(f.count, where);
+    if (!f.type && f.options?.length > 5)
+      warn(
+        where,
+        `has ${f.options.length} \`options\` and no \`type\`, so it shows as a \`list\` of colored names. Set \`"type": "tabs"\` for periods or modes, or \`"type": "list"\`.`,
+      );
     if ((f.type ?? (f.options && f.options.length <= 5 ? "tabs" : "list")) === "list")
       listFields.add(f.field);
   }
@@ -354,7 +384,7 @@ export function check(report) {
     }
     if (!b.title && kind !== "table") err(at, "add a `title` that says what is measured.");
     if (!needData(b.data, at)) return;
-    const rows = data[b.data] ?? [];
+    const rows = rowsOf(b.data);
     tones(b.tones, at);
     if (b.format && !FORMATS.includes(b.format))
       err(at, `\`format\` must be one of ${FORMATS.join(", ")}.`);
@@ -501,7 +531,7 @@ export function check(report) {
   ]);
   const statValue = (v, chosen) => {
     if (v == null || typeof v !== "object") return v;
-    let rows = data[v.data] ?? [];
+    let rows = rowsOf(v.data);
     for (const [f, value] of chosen) {
       if (kindOf(f) === "toggle") {
         if (!value) rows = rows.filter((r) => !r[f.field]);

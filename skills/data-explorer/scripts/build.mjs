@@ -114,7 +114,11 @@ if (shots) {
   try {
     browser = await chromium.launch();
   } catch {
-    browser = await chromium.launch({ executablePath: fallback });
+    browser = await chromium.launch({ executablePath: fallback }).catch(() => null);
+  }
+  if (!browser) {
+    console.log("error    --shots found no Chromium: run `npx playwright install chromium` where you build.");
+    process.exit(1);
   }
   const problems = [];
   const url = pathToFileURL(resolve(output)).href;
