@@ -73,6 +73,31 @@ test("@ suggests people who may read the drop, and only to people signed in", as
   )
 })
 
+test("@ finds people by name without accents or case, and a % or _ in the query is just text", async () => {
+  for (const [id, name] of [
+    ["jose", "José Núñez"],
+    ["zoe", "Zoë Ångström"],
+    ["mara", "Mara Josephs"],
+    ["deco", "Ana Bajose"],
+    ["percent", "100% Ops"],
+    ["under", "Ops_Bot"],
+  ])
+    sql.prepare("INSERT INTO user (id, name, email) VALUES (?, ?, ?)").run(id, name, `${id}@example.com`)
+  sql.exec("INSERT INTO user (id, name, email, banned) VALUES ('jo', 'Josefina Gone', 'jo@example.com', 1)")
+  const search = async (query, limit = 10) =>
+    (await comments.options.people.search(query, limit)).map((person) => person.id)
+
+  // A name that starts with it, then one with a word that does, then one that only contains it; never a banned one.
+  assert.deepEqual(await search("jose"), ["jose", "mara", "deco"])
+  assert.deepEqual(await search("JOSÉ"), ["jose", "mara", "deco"])
+  assert.deepEqual(await search("nunez"), ["jose"])
+  assert.deepEqual(await search("zoe angs"), ["zoe"])
+  assert.deepEqual(await search("jose", 2), ["jose", "mara"])
+  assert.deepEqual(await search("%"), ["percent"])
+  assert.deepEqual(await search("s_b"), ["under"])
+  assert.deepEqual(await search("", 3), ["percent", "deco", "bo"], "no query lists people by name")
+})
+
 test("a mention is an id the text names, of someone who may read the drop", async () => {
   insertDrop("private", { visibility: "private" })
   insertDrop("shared")

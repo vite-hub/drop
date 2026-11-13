@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, like, or } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
 import { H3Event } from "h3"
 import type { CommentSubject, CommentsUser, CommentUser } from "vite-hub/comments"
 import { defineComments, defineCommentSubject } from "vite-hub/comments"
@@ -56,6 +56,19 @@ const person = (row: { id: string; name: string; image: string | null }): Commen
 
 const notBanned = or(eq(users.banned, false), isNull(users.banned))
 
+/** A name as "@" compares it, the way ViteHub's suggestions do: without accents or case. */
+const fold = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()
+
+/**
+ * How well a folded name matches: starts with the query, has a word that does, or contains it, else -1. ViteHub keeps
+ * the first `limit` people that may be mentioned, and the suggestions list puts names that start with it first.
+ */
+function rank(name: string, needle: string) {
+  if (name.startsWith(needle)) return 0
+  if (name.split(/\s+/u).some((word) => word.startsWith(needle))) return 1
+  return name.includes(needle) ? 2 : -1
+}
+
 /** People by id, as `@` names them: the ones a comment's mentions point at, so readers see their names. */
 export async function peopleByIds(ids: readonly string[]): Promise<CommentUser[]> {
   if (!ids.length) return []
@@ -90,13 +103,21 @@ export default defineComments({
   // Everyone in this Drop, by name. `canMention` then keeps the ones who may read the thread.
   people: {
     async search(query, limit) {
-      const rows = await db
+      const everyone = db
         .select({ id: users.id, name: users.name, image: users.image })
         .from(users)
-        .where(and(notBanned, query ? like(users.name, `%${query.slice(0, 40)}%`) : undefined))
+        .where(notBanned)
         .orderBy(asc(users.name), asc(users.id))
-        .limit(limit)
-      return rows.map(person)
+      const needle = fold(query.slice(0, 40)).trim()
+      if (!needle) return (await everyone.limit(limit)).map(person)
+      // SQLite's LIKE ignores case only in ASCII and D1 has nothing that removes accents, so "jose" missed "José": names
+      // are compared here instead. `LIKE '%…%'` read every account too; only their names now come back with it.
+      return (await everyone)
+        .map((row) => ({ row, tier: rank(fold(row.name), needle) }))
+        .filter(({ tier }) => tier >= 0)
+        .sort((a, b) => a.tier - b.tier)
+        .slice(0, limit)
+        .map(({ row }) => person(row))
     },
     byIds: peopleByIds,
   },
