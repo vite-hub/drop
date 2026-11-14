@@ -1,5 +1,5 @@
 import type { DocWidth } from "#shared/documents"
-import type { DeviceFrameSize } from "@vite-hub/ui/device-frame"
+import type { DeviceFrameSize } from "vite-hub/ui"
 
 const year = 60 * 60 * 24 * 365
 

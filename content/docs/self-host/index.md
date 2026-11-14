@@ -28,7 +28,7 @@ Drop reads its settings when it runs, so a change needs a restart, not a rebuild
 
 - **Who signs in.** Anyone with a GitHub account, as a Member. `DROP_MEMBERS` lets in only the people whose emails it lists, plus the admins, for publishing and viewing, shared links and MCP included. Like `DROP_ADMINS`, it compares emails a sign-in method verified, so it keeps working if you swap GitHub for another provider. Take someone off and restart, and they're out. `DROP_GITHUB_ORG` requires active membership of that organization instead; sign-in then asks for `read:org`. With both, a person needs both.
 - **Who is Admin.** `DROP_ADMINS` lists admin emails, separated by commas or spaces, in any case. Whoever signs in with one, by a method that verified the email, is Admin. Restart to apply a change. In `nuxt dev` and with `DROP_TEST_SIGNIN`, an unverified email counts too.
-- **Roles come only from that list.** Admins open **Console** in the sidebar, or `/_vitehub/auth`, to ban and unban users, revoke sessions, and change plans when `DROP_QUOTAS` is on. The Auth Console requires a verified email listed in `DROP_ADMINS` and the same membership checks as Drop. Roles are read-only and impersonation is disabled. Admins can find **Review shares** and **Reports** through Search.
+- **Roles come only from that list.** Admins open **Console** in the sidebar, which opens this Drop in the [ViteHub Console](https://console.vitehub.dev), to ban and unban users, revoke sessions, and change plans when `DROP_QUOTAS` is on. Link the Drop there once and set the `VITEHUB_CONSOLE_KEY_<NAME>` variable it shows; the Console then lets in only people whose email is in `DROP_ADMINS`. On Node/VPS, build with `DROP_PUBLIC_URL=https://drop.example.com`; signed calls require this trusted origin at build time. For Docker, build your deployment image with `docker build --build-arg DROP_PUBLIC_URL=https://drop.example.com -t my-drop .` instead of using the generic prebuilt image for Console access. Rebuild when the public origin changes. The ingress must pass `POST /_vitehub/rpc` and its subpaths unchanged. Roles are read-only and impersonation is disabled. Admins can find **Review shares** and **Reports** through Search.
 - **Other sign-in.** Change the Better Auth options in `server/auth.ts`, or [reuse an existing GitHub oauth2-proxy](/docs/self-host/vps#auth-proxy).
 
 ::roles-table
@@ -117,7 +117,7 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 
 ## Database and migrations {#database}
 
-VPS and Docker builds use local SQLite on persistent disk by default. The other hosts each use their own Cloudflare D1 database, over D1's HTTP API outside Cloudflare. All of them apply the migrations in `server/databases/migrations`.
+VPS and Docker builds use local SQLite on persistent disk by default. The other hosts each use their own Cloudflare D1 database, over D1's HTTP API outside Cloudflare. All of them apply the migrations in `server/databases/default/migrations`, one folder each.
 
 To create a D1 database for a host outside Cloudflare:
 
@@ -131,7 +131,7 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 | Host | Applies migrations with |
 | --- | --- |
 | Cloudflare | `pnpm run deploy`, which the button runs. Workers Builds that run `npx wrangler deploy` need `pnpm db:migrate:remote` after schema changes. |
-| Vercel, Netlify | `pnpm db:migrate` (ViteHub's `vitehub db migrate`) after the build, before publishing. |
+| Vercel, Netlify | `pnpm db:migrate` (ViteHub's `vitehub database migrate`) after the build, before publishing. |
 | Deno Deploy | `pnpm db:migrate:d1` as a pre-deploy command. |
 | Docker | Drop itself before it listens, after copying the SQLite file to `backups/`; an image built for D1 runs `pnpm db:migrate:d1` before Drop starts. |
 
@@ -141,7 +141,7 @@ Both commands need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFL
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 
-`0000_init.sql` creates a new database, and each later numbered migration changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/`, `pnpm db:generate` writes the next migration.
+The first folder creates a new database, and each later one changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/default/`, `pnpm db:generate` writes the next folder. `d1-migrations.json` gives each folder the file name D1 records it by, such as `0000_init.sql`. The next Cloudflare build adds the new folder's name there: commit it, and never rename one.
 
 ## Update {#update}
 
@@ -202,3 +202,7 @@ pnpm dev          # http://localhost:3000
 ```
 
 Local dev runs against a local D1 and keeps files in `.vitehub/data/blob`. It has no GitHub app, so it also allows email and password sign-in: open `/?signin=1`.
+
+### Adopt an older SQLite migration ledger
+
+Before upgrading a SQLite deployment that ran the original comment-suggestions migration, stop Drop and back up its database. Run `node scripts/adopt-sqlite-ledger.mjs /path/to/drop.db` from this checkout before running Drizzle or starting the new server. This adopts only the known shipped hash at its original journal timestamp; it never replays SQL or rewrites migration files. Other unknown hashes still fail closed. The Docker entry point performs this adoption after its backup.

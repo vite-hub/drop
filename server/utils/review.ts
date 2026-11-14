@@ -5,12 +5,11 @@ import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { hex, sha256 } from "#shared/utils/bytes"
 import { textValue } from "#shared/utils/text"
-import { blob } from "vite-hub/blob"
-import { detectContentType } from "vite-hub/blob/content-type"
+import { blob, detectContentType } from "vite-hub/blob"
 import { commentsSchema } from "vite-hub/comments/database"
-import { db } from "vite-hub/database/drizzle"
-import { useServerEnv } from "#vitehub/env/server"
-import { importSealKey, seal as sealValue, unseal as unsealValue } from "vite-hub/env/seal"
+import { db } from "vite-hub/database"
+import { useServerEnv } from "vite-hub/env"
+import { importSealKey, sealWithKey, unsealWithKey } from "vite-hub/env/seal"
 import { newLink, slugify } from "#shared/links"
 import {
   isSitePattern,
@@ -24,7 +23,7 @@ import {
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { CommentAttachment, ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
-import { drops, reviewSubmissions, user } from "../databases/config"
+import { drops, reviewSubmissions, user } from "../databases/default/index"
 import { type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
 import {
   addThread,
@@ -116,7 +115,7 @@ type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files" | "presen
 
 /** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
-  return sealValue(await sealKey(event), encoder.encode(purpose), JSON.stringify(value))
+  return sealWithKey(await sealKey(event), encoder.encode(purpose), JSON.stringify(value))
 }
 
 /** The sealed value, when it was sealed for `purpose` and parses as `schema`. Null for anything else. */
@@ -130,7 +129,7 @@ export async function unseal<T extends v.GenericSchema>(
   if (text.length > maxLength) return null
   const key = await sealKey(event)
   try {
-    const parsed = v.safeParse(schema, JSON.parse(await unsealValue(key, encoder.encode(purpose), text)))
+    const parsed = v.safeParse(schema, JSON.parse(await unsealWithKey(key, encoder.encode(purpose), text)))
     return parsed.success ? parsed.output : null
   } catch {
     return null
@@ -650,7 +649,7 @@ async function insertReviewComment(
     undefined,
     async (quota) => {
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
-      const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
+      const [storageError] = await blob.put(key, shot.bytes, { contentType: shot.contentType })
       if (storageError) throw storageFailure(storageError)
       const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
       const row = imageDrop(
@@ -669,7 +668,7 @@ async function insertReviewComment(
       try {
         await quota.commit([db.insert(drops).values(row)])
       } catch (error) {
-        await blob.del([key])
+        await blob.delete([key])
         throw error
       }
       return row

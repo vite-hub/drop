@@ -28,7 +28,7 @@ export async function ensureDraft(drop: Version, body: string) {
   if (!LIVE_EDITING) throw new HTTPError({ status: 404, statusText: "Live editing isn't available on this host." })
   const path = draftPath(drop.id, drop.version)
   if ((await read(path)) === null) {
-    const [error] = await blob.put(path, body, { access: "private", contentType: "text/markdown; charset=utf-8" })
+    const [error] = await blob.put(path, body, { contentType: "text/markdown; charset=utf-8" })
     if (error) throw error
   }
   return path
@@ -40,7 +40,7 @@ export const readDraft = async (drop: Version) => (LIVE_EDITING ? read(draftPath
 export async function deleteDrafts(drops: Version[]) {
   if (!drops.length) return
   const paths = drops.map((drop) => draftPath(drop.id, drop.version))
-  const [error] = await blob.del(paths)
+  const [error] = await blob.delete(paths)
   if (error) log.warn({ action: "draft-cleanup", drafts: paths.join(","), error: String(error) })
 }
 

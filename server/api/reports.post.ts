@@ -1,11 +1,11 @@
 import { useLogger } from "evlog/nitro/v3"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { ReportSchema } from "#shared/schemas"
 import { reportTarget } from "#shared/trust"
-import { abuseReports } from "../databases/config"
+import { abuseReports } from "../databases/default/index"
 import { findDrop, findDropByBlob } from "../utils/drops"
 
 export default defineValidatedHandler({

@@ -3,10 +3,9 @@ import { and, eq, exists, inArray, isNotNull, isNull, ne, sql } from "drizzle-or
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
-import { blob } from "vite-hub/blob"
-import { detectContentType } from "vite-hub/blob/content-type"
-import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, dropFiles, drops, dropVersions, suggestionAcceptances } from "../../databases/config"
+import { blob, detectContentType } from "vite-hub/blob"
+import { db } from "vite-hub/database"
+import { blobCleanup, dropFiles, drops, dropVersions, suggestionAcceptances } from "../../databases/default/index"
 import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
 import { kindFromFilename, titleFromSource, videoType } from "#shared/plans"
@@ -121,7 +120,7 @@ export async function deleteBlobKeys(keys: string[]) {
     await queueBlobCleanup(unique)
     return
   }
-  const [error] = await blob.del(unique)
+  const [error] = await blob.delete(unique)
   if (error) {
     log.error({ action: "blob-cleanup", error: error.message, keys: unique.length })
     await queueBlobCleanup(unique)
@@ -247,7 +246,7 @@ export async function createDocDrop(
     event,
     async (quota) => {
       const key = `${crypto.randomUUID()}${extension}`
-      const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
+      const [storageError] = await blob.put(key, input.bytes, { contentType })
       if (storageError) {
         await deleteBlobKeys([key])
         throw storageFailure(storageError)
@@ -607,7 +606,7 @@ export async function publishApp(
             const blobKey = `${prefix}/${path}`
             stagedKeys.push(blobKey)
             try {
-              const [error] = await blob.put(blobKey, bytes, { access: "private", contentType: contentTypeOf(path) })
+              const [error] = await blob.put(blobKey, bytes, { contentType: contentTypeOf(path) })
               if (error) throw storageFailure(error)
             } catch (error) {
               failed = true

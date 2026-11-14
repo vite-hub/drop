@@ -1,16 +1,15 @@
 import { asc, eq, inArray, type SQL, sql } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
-import { blob } from "vite-hub/blob"
-import { detectContentType } from "vite-hub/blob/content-type"
-import { db } from "vite-hub/database/drizzle"
+import { blob, detectContentType } from "vite-hub/blob"
+import { db } from "vite-hub/database"
 import { newLink } from "#shared/links"
 import { COMMENT_IMAGE_TYPES, MAX_COMMENT_IMAGES, MAX_FILE_BYTES } from "#shared/schemas"
 import type { CommentSubject } from "vite-hub/comments"
 import { commentAttachmentUrl } from "vite-hub/comments/client"
 import type { CommentAttachment } from "#shared/types"
 import { textValue } from "#shared/utils/text"
-import { commentAttachments, drops } from "../databases/config"
+import { commentAttachments, drops } from "../databases/default/index"
 import { type DropRow, deleteDrop, findDrop, permissions, storageFailure } from "./drops"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
@@ -192,7 +191,6 @@ async function storeImages(parent: DropRow, images: CommentImage[], actorName: s
       for (const [index, row] of rows.entries()) {
         const image = images[index]!
         const [storageError] = await blob.put(row.blobKey!, image.bytes, {
-          access: "private",
           contentType: image.contentType,
         })
         if (storageError) throw storageFailure(storageError)
@@ -206,7 +204,7 @@ async function storeImages(parent: DropRow, images: CommentImage[], actorName: s
         ),
       ])
     } catch (error) {
-      if (stored.length) await blob.del(stored)
+      if (stored.length) await blob.delete(stored)
       throw error
     }
     return rows

@@ -686,9 +686,10 @@ for (const screenshot of [undefined, PNG]) {
       const options = { screenshot, images: [PNG] }
       const started = Promise.withResolvers()
       const resume = Promise.withResolvers()
-      const query = state.db.session.client
+      const client = state.db.session.client
+      const query = client.run.bind(client)
       let held = false
-      vi.spyOn(state.db.session, "client").mockImplementation(async (...args) => {
+      vi.spyOn(client, "run").mockImplementation(async (...args) => {
         // Images are stored before the claim. Hold their links, which are written after it becomes visible.
         if (!held && args[0].startsWith('update "comment_attachments"')) {
           held = true

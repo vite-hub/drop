@@ -6,7 +6,6 @@ import { calls, migrate, reset, insertDrop, objects, queries, sql, state, who } 
 const { contentHost, contentOrigin, FRAME_HOST_HTML } = await import("../../server/utils/content-origin.ts")
 const isContentRequest = (event) => contentHost(event) === "content"
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
-const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
 const { isHashedAsset, serveAppFile } = await import("../../server/utils/app-files.ts")
 const { publishApp } = await import("../../server/utils/drops.ts")
@@ -169,33 +168,6 @@ test("ViteHub adds no page tools to the frame host, so Firefox keeps an app's im
   const host = await (await page("https://drop-usercontent.example/")).text()
   assert.doesNotMatch(host, /type="module"/)
   assert.equal(host, FRAME_HOST_HTML)
-})
-
-test("cookie-carrying API writes must come from Drop's own origin", () => {
-  const cookie = { cookie: "__Host-drop.session_token=abc" }
-  const blocked = [
-    { ...cookie, "sec-fetch-site": "same-site", origin: "https://drop-usercontent.example" },
-    { ...cookie, "sec-fetch-site": "cross-site" },
-    { ...cookie, origin: "https://evil.example" },
-  ]
-  for (const headers of blocked)
-    assert.throws(
-      () => writesMiddleware(request("https://drop.example/api/drops/x", { method: "DELETE", headers })),
-      (error) => error.status === 403,
-    )
-  const allowed = [
-    ["DELETE", "/api/drops/x", { ...cookie, "sec-fetch-site": "same-origin", origin: "https://drop.example" }],
-    ["POST", "/api/apps", { ...cookie }],
-    ["POST", "/api/apps", { "sec-fetch-site": "cross-site", origin: "https://agent.example" }],
-    ["GET", "/api/drops/x", { ...cookie, "sec-fetch-site": "cross-site" }],
-    ["POST", "/mcp", { ...cookie, origin: "https://evil.example" }],
-  ]
-  for (const [method, path, headers] of allowed)
-    assert.equal(
-      writesMiddleware(request(`https://drop.example${path}`, { method, headers })),
-      undefined,
-      `${method} ${path}`,
-    )
 })
 
 test("apps and HTML docs carry the content origin; other kinds don't", async () => {

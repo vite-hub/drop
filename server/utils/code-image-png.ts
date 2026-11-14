@@ -1,6 +1,6 @@
 import { useLogger } from "evlog/nitro/v3"
 import { type H3Event, HTTPError } from "h3"
-import { isBrowserAvailable, runBrowserAction } from "vite-hub/browser/actions"
+import { isBrowserAvailable, runBrowserAction } from "vite-hub/browser"
 
 /**
  * PNG code images: one stateless Browser Run screenshot of the SVG (no Playwright, no page session). Only Cloudflare

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
-import { readFileSync, readdirSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "vite-plus/test"
+import { migrations } from "../../scripts/migrations.mjs"
 import { needsShareReview, reportTarget } from "../../shared/trust.ts"
 
 // The harness loads the production permission function with its storage stubbed (and the CSS imports pages use).
@@ -66,11 +66,7 @@ test("HTML report chrome is outside the frame and user markup is escaped", () =>
 
 test("reports keep their own status check and outlive the drops they name", () => {
   const db = new DatabaseSync(":memory:")
-  const migrations = new URL("../../server/databases/migrations/", import.meta.url)
-  for (const name of readdirSync(migrations)
-    .filter((name) => name.endsWith(".sql"))
-    .sort())
-    db.exec(readFileSync(new URL(name, migrations), "utf8"))
+  for (const migration of migrations()) db.exec(migration.sql)
   db.exec("INSERT INTO abuse_reports(id,target,reason,details,created_at) VALUES ('r','/d/missing','spam','details',1)")
   assert.equal(db.prepare("SELECT status FROM abuse_reports").get().status, "open")
   assert.throws(() => db.exec("UPDATE abuse_reports SET status='invalid'"))

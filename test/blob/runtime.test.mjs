@@ -2,13 +2,9 @@ import assert from "node:assert/strict"
 import { afterEach, test } from "vite-plus/test"
 import { H3 } from "h3"
 import { blob } from "vite-hub/blob"
-import {
-  setActiveCloudflareEnv,
-  setBlobRuntimeConfig,
-  setBlobRuntimeStorage,
-} from "vite-hub/_internal/blob/runtime/state"
+import { setActiveCloudflareEnv, setBlobRuntimeConfig, setBlobRuntimeStorage } from "@vite-hub/blob/runtime/state"
 
-// Exercise the installed patch through the real R2 driver and served-URL wrapper.
+// Exercise the real R2 driver and served-URL wrapper.
 afterEach(() => {
   setActiveCloudflareEnv(undefined)
   setBlobRuntimeConfig(undefined)
@@ -21,8 +17,8 @@ test("R2 missing heads and reads preserve null with /f serving enabled", async (
     serve: { route: "/f", store: "default" },
   })
   setActiveCloudflareEnv({ BLOB: { head: async () => null, get: async () => null } })
-  assert.deepEqual(await blob.head("unknown.txt"), [null, null])
-  assert.deepEqual(await blob.get("unknown.txt"), [null, null])
+  assert.deepEqual(await blob.head("unknown.txt"), [undefined, null])
+  assert.deepEqual(await blob.get("unknown.txt"), [undefined, null])
 })
 
 test("R2 failures remain errors and existing heads retain their served URL", async () => {
@@ -44,7 +40,7 @@ test("R2 failures remain errors and existing heads retain their served URL", asy
   assert.equal(error.cause, cause)
   assert.equal(missing, undefined)
   const [headError, object] = await blob.head("existing.txt")
-  assert.equal(headError, null)
+  assert.equal(headError, undefined)
   assert.equal(object.url, "/f/existing.txt")
 })
 
@@ -76,11 +72,7 @@ test("serve answers a byte range with 206 so videos can seek", async () => {
     },
   })
   const serve = async (range) => {
-    const app = new H3().get("/f/clip.mp4", async (event) => {
-      const [error, stream] = await blob.serve(event, "clip.mp4")
-      if (error) throw error
-      return stream
-    })
+    const app = new H3().get("/f/clip.mp4", (event) => blob.serve(event.req, "clip.mp4"))
     return app.fetch(new Request("http://drop.test/f/clip.mp4", { headers: range ? { range } : {} }))
   }
 

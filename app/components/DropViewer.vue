@@ -15,8 +15,7 @@ import { isPreviewLink, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
-import { AvatarStack } from "vite-hub/ui/avatar-stack"
-import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
+import { AvatarStack, ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui"
 // The parts' one stylesheet: comments, presence, and the editor's carets.
 import "vite-hub/ui/styles.css"
 
