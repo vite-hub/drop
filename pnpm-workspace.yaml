@@ -1,3 +1,7 @@
+packages:
+  # @vite-hub/drop, the Nuxt module that sites install to load review.js.
+  - packages/*
+
 blockExoticSubdeps: false
 
 overrides:
@@ -15,6 +19,8 @@ overrides:
   "@vite-hub/email": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/env": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/forge": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@03e8d1b57b7edc7c03924971902d13948df72216
+  # @vite-hub/drop bundles @vite-hub/forge/build from vite-hub/vitehub#4359 until a ViteHub release has it.
+  "@vite-hub/drop>@vite-hub/forge": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6
   "@vite-hub/gateways": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/gateways@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/kv": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@03e8d1b57b7edc7c03924971902d13948df72216
   "@vite-hub/markdown-template": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@03e8d1b57b7edc7c03924971902d13948df72216

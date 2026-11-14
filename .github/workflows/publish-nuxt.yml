@@ -1,0 +1,39 @@
+name: publish @vite-hub/drop
+
+# Push a tag such as `nuxt-v0.1.0` after bumping packages/nuxt/package.json to the same version.
+on:
+  push:
+    tags: ["nuxt-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # npm trusted publishing: add this repository, this workflow file and the environment on npmjs.com.
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --filter @vite-hub/drop...
+      - name: Check the tag matches the version
+        working-directory: packages/nuxt
+        run: test "nuxt-v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: pnpm --filter @vite-hub/drop test
+      - run: pnpm --filter @vite-hub/drop build
+      - working-directory: packages/nuxt
+        run: npm publish --provenance --access public
