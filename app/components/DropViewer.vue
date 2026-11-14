@@ -120,6 +120,7 @@ function showComments() {
   detailsPop.value = null
 }
 function closeComments() {
+  popover.value = null
   commentsOpen.value = false
   tool.value = "browse"
   annotations.beginFocus()
@@ -349,7 +350,12 @@ function showSent(id: string) {
 const shownWhileHidden = computed(() =>
   overlays.pins
     ? []
-    : [...new Set([...(popover.value?.type === "thread" ? [popover.value.id] : []), ...sentShown.value])],
+    : [
+        ...new Set([
+          ...(commentsOpen.value && popover.value?.type === "thread" ? [popover.value.id] : []),
+          ...sentShown.value,
+        ]),
+      ],
 )
 watch(areaMode, (active) => active && showComments())
 watch(

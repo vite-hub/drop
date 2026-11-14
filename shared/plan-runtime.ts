@@ -808,12 +808,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     for (const m of redlined) insertSuggestion(m, ranges.get(m.id));
     // The strike's style is in BUBBLES too: a deletion with no margin open still needs it.
     if (redlined.length && !BUBBLES.isConnected) document.head.appendChild(BUBBLES);
-    for (const m of shown) {
+    for (const m of markers) {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {
         // Placed from the anchor's current box, so areas and pins follow reflow.
         const el = query(m.selector);
         if (!el || (m.earlier && !sameAnchor(el, m))) { unplaced.push(m.id); continue; }
+        if (!shown.includes(m)) continue;
         resized.observe(el);
         const r = el.getBoundingClientRect();
         // A hidden anchor keeps a pin, without its area, on what stands in for it until it shows again.
@@ -839,6 +840,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       } else {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
+        if (!shown.includes(m)) continue;
         const railedHere = bubbles.has(m.id);
         textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere, suggest: suggests(m) });
         if (zoom) continue;
