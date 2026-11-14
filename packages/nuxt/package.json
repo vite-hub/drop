@@ -1,0 +1,49 @@
+{
+  "name": "@vite-hub/drop",
+  "version": "0.1.0",
+  "description": "Connect a Nuxt site to Drop: load review.js, and name the build of a preview so Drop can find its pull request.",
+  "keywords": [
+    "drop",
+    "nuxt",
+    "nuxt-module",
+    "preview",
+    "review"
+  ],
+  "homepage": "https://drop.vitehub.dev/docs/sites",
+  "bugs": "https://github.com/vite-hub/drop/issues",
+  "license": "Apache-2.0",
+  "author": "onmax <maximogarciamtnez@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vite-hub/drop.git",
+    "directory": "packages/nuxt"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./nuxt": {
+      "types": "./dist/nuxt.d.mts",
+      "import": "./dist/nuxt.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "prepack": "vp pack",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^4.1.0"
+  },
+  "devDependencies": {
+    "@vite-hub/forge": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3",
+    "nuxt": "npm:nuxt-nightly@5.0.0-2610292252-da55a91",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "nuxt": ">=4.0.0"
+  }
+}

@@ -50,18 +50,22 @@ Add this tag to the site's preview builds, never production. Every preview then 
 ::review-snippet
 ::
 
-For a Nuxt app, behind a flag your preview builds set:
+For a Nuxt app, install the `@vite-hub/drop` module instead of writing the tag:
+
+```bash
+pnpm add -D @vite-hub/drop
+```
 
 ```ts
-// nuxt.config.ts: preview builds only
+// nuxt.config.ts
 export default defineNuxtConfig({
-  app: {
-    head: {
-      script: process.env.PREVIEW ? [{ src: "$ORIGIN/review.js", defer: true }] : [],
-    },
-  },
+  modules: ["@vite-hub/drop/nuxt"],
 })
 ```
+
+It loads nothing until a deployment sets `NUXT_PUBLIC_DROP_URL=$ORIGIN`, so one server build can serve staging with the toolbar and production without it. Prerendered pages keep the value from when they were prerendered, so set it at build time for a static site. `NUXT_PUBLIC_DROP_EDGE`, `NUXT_PUBLIC_DROP_AT` and `NUXT_PUBLIC_DROP_COLLAPSED` set the attributes below.
+
+In preview builds, also set `DROP_PREVIEW=1` while the site builds. The page then names the repository and commit it was built from, in `<meta name="vitehub:build">`. A Docker build without `.git` or CI variables needs `VITEHUB_BUILD_REPOSITORY` and `VITEHUB_BUILD_COMMIT` as well; on a pull request, use the head commit, not GitHub's test merge commit.
 
 The tag is the same for every site and carries no key. The button sits in its own shadow root, so your styles and its styles never mix, and until someone presses it, it only asks Drop whether any drop links to the page.
 
