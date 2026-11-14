@@ -335,9 +335,22 @@ watch(popover, (value, before) => {
   // before.
   if (!before && (value?.type === "new" || value?.type === "thread")) startComment()
   else if (value) showComments()
-  // Writing a comment or opening one brings hidden comments back.
-  if (value) overlays.pins = true
 })
+/**
+ * Hidden comments stay hidden while someone writes one or opens one from the list. The frame still shows the open
+ * thread's pin, and a comment just sent for a moment, then it pops out (`only` in the view the frame gets).
+ */
+const sentShown = ref<string[]>([])
+function showSent(id: string) {
+  if (overlays.pins) return
+  sentShown.value = [...sentShown.value, id]
+  setTimeout(() => (sentShown.value = sentShown.value.filter((shown) => shown !== id)), 2500)
+}
+const shownWhileHidden = computed(() =>
+  overlays.pins
+    ? []
+    : [...new Set([...(popover.value?.type === "thread" ? [popover.value.id] : []), ...sentShown.value])],
+)
 watch(areaMode, (active) => active && showComments())
 watch(
   () => siteRef.value?.pending,
@@ -542,6 +555,7 @@ const {
   comments: computed(() => ({
     style: pinStyle.value ? "pin" : "card",
     me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
+    only: shownWhileHidden.value,
   })),
   variantBar: true,
   arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
@@ -874,6 +888,7 @@ async function submit(body: string, files: File[] = [], mentions: string[] = [])
       if (popoverRef.value === composer) composer?.fail(sent.error)
       return
     }
+    showSent(sent.value.id)
     const cleared = finish(true)
     if (popover.value !== open || popoverRef.value !== composer) return
     if (!cleared) return composer?.fail()

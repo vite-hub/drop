@@ -384,6 +384,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.draw .a,.draft .a{border:calc(2px * var(--drop-z,1)) solid var(--hi);box-shadow:none;background:color-mix(in oklab,var(--hi) 16%,transparent)}' +
     '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--hi);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
     '.a .tag{position:absolute;left:-2px;top:calc(100% + 6px)}' +
+    // A comment shown on its own while the eye hides the rest (view.only) pops out when it goes: shrinks and fades.
+    '.leave>*{pointer-events:none;animation:drop-leave 180ms cubic-bezier(.4,0,1,1) forwards}.leave>.a{animation-name:drop-leave-area}' +
+    '@keyframes drop-leave{to{opacity:0;transform:scale(.6)}}@keyframes drop-leave-area{to{opacity:0;transform:scale(.97)}}' +
+    '@media (prefers-reduced-motion:reduce){.leave>*,.leave>.a{animation-name:drop-fade}}@keyframes drop-fade{to{opacity:0}}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
     // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
     '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
@@ -418,6 +422,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '</style>';
   shadow.innerHTML = STYLE + RAIL_STYLE + LAYERS;
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
+  const leave = shadow.appendChild(Object.assign(document.createElement("div"), { className: "leave" }));
 
   // Live cursors: the people in the drop's presence room point here too. Drop says when this reader shares their pointer
   // ("cursors" with share), and it goes up at most every 50 ms, as the element under it and the spot inside it.
@@ -707,7 +712,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   let pinsPrimed = false, draftPinShown = false, quietUntil = 0;
   /** The right edge of the doc's text, and room for a pin beside it: a narrow page pads the column to make that room. */
   function gutter() {
-    const root = document.documentElement, want = pinMode() && view.pins && (drafting() || markers.some((m) => m.kind === "text"));
+    const root = document.documentElement, want = pinMode() && (drafting() || shownMarkers().some((m) => m.kind === "text"));
     if (!want) { root.removeAttribute("data-drop-pins"); return 0; }
     root.removeAttribute("data-drop-pins");
     let r = article.getBoundingClientRect(), pad = parseFloat(getComputedStyle(article).paddingRight) || 0;
@@ -766,12 +771,16 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     into.appendChild(dot);
   }
 
+  /** The comments that draw: all of them, or while the eye hides them, the ones Drop still shows (view.only). */
+  const shownMarkers = () => (view.pins ? markers : markers.filter((m) => view.only.has(m.id)));
   function render() {
     lastPins = new Map(Array.from(marks.querySelectorAll(":scope > .m[data-id]:not(.gp)"), (dot) => [dot.dataset.id, dot]));
     marks.innerHTML = "";
     // Hidden comments (the toolbar's eye) give the doc its margin back, so the column centers again. Shown before
-    // drawing, so the margin's cards measure their size when the eye turns them back on.
-    marks.style.display = view.pins ? "" : "none";
+    // drawing, so the margin's cards measure their size when the eye turns them back on. While hidden, the layer still
+    // shows the comments Drop names (view.only) and the reader's draft pin.
+    const shown = shownMarkers();
+    marks.style.display = view.pins || shown.length || drafting() ? "" : "none";
     const layer = zoom && zoomLayer(), zoomMarks = layer && layer.querySelector(".marks");
     const aside = zoomMarks && zoomAside(), asideMarks = aside && aside.querySelector(".marks");
     if (zoomMarks) zoomMarks.innerHTML = "";
@@ -794,11 +803,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (anchor && document.documentElement.style.getPropertyValue("--drop-anchor") !== anchor) document.documentElement.style.setProperty("--drop-anchor", anchor);
     }
     // After the bubbles: each is inserted at its quote's end, so the new words land between the quote and its bubble.
-    const redlined = view.pins && !zoom ? markers.filter((m) => suggests(m) && ranges.get(m.id)) : [];
+    const redlined = !zoom ? shown.filter((m) => suggests(m) && ranges.get(m.id)) : [];
     for (const m of redlined) insertSuggestion(m, ranges.get(m.id));
     // The strike's style is in BUBBLES too: a deletion with no margin open still needs it.
     if (redlined.length && !BUBBLES.isConnected) document.head.appendChild(BUBBLES);
-    for (const m of markers) {
+    for (const m of shown) {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {
         // Placed from the anchor's current box, so areas and pins follow reflow.
@@ -851,7 +860,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       placePin(m, x, y, into, false);
     }
     railHits = railed.map(({ m, lines }) => ({ id: m.id, boxes: lines.map((l) => ({ left: l.left + scrollX, right: l.right + scrollX, top: l.top + scrollY, bottom: l.bottom + scrollY })) }));
-    if (pins && view.pins && drafting()) { const lines = drafted.getClientRects(); if (lines.length) gutterPin(null, lines[lines.length - 1], gutterX); }
+    if (pins && drafting()) { const lines = drafted.getClientRects(); if (lines.length) gutterPin(null, lines[lines.length - 1], gutterX); }
     if (!drafted) draftPinShown = false;
     const draftLines = wide && view.pins && !zoom && drafting() ? drafted.getClientRects() : [];
     if (draftLines.length) railed.push({ m: null, last: draftLines[draftLines.length - 1], lines: [] });
@@ -1046,7 +1055,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (zoom) for (const box of [zoom.layer, zoom.aside]) { const host = box && Array.from(box.children).find((el) => el.localName === "drop-comments"); if (host) roots.push(host.shadowRoot); }
     for (const root of roots) root.querySelectorAll(".a[data-for]").forEach((box) => box.classList.toggle("on", on.has(box.dataset.for)));
     if (!highlights) return;
-    const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
+    // Only the comments that draw have ranges (render), so hidden ones lose their marks too.
+    const show = (pick) => new Highlight(...textRanges.filter(pick).map((t) => t.range));
     CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail && !t.suggest));
     CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail && !t.suggest));
     // Under the others, so a picked suggestion takes their tint and keeps its strike.
@@ -1162,7 +1172,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   let tool = "browse", layer = null, hovered = null, picked = null, pointComments = false, clickComments = false;
   // style: how comments on a Markdown doc's text show ("card": the margin's cards, "pin": gutter pins); me: who the
   // reader is, for the draft's pin.
-  const view = { rulers: false, xray: false, pins: true, style: "card", me: null };
+  const view = { rulers: false, xray: false, pins: true, style: "card", me: null, only: new Set() };
   const fx = document.createElement("div");
   fx.className = "fx";
   /**
@@ -1841,12 +1851,29 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const xrayStyle = document.createElement("style");
   xrayStyle.textContent = "*:not(drop-comments){outline:1px solid oklch(0.62 0.18 255) !important;outline-offset:-1px !important}";
   function setView(next) {
-    view.rulers = Boolean(next.rulers); view.pins = next.pins !== false;
+    const pins = next.pins !== false, only = new Set(Array.isArray(next.only) ? next.only.filter((id) => typeof id === "string") : []);
+    // While the eye hides comments, one Drop stops showing on its own leaves with a pop-out: a copy of its pin and area
+    // plays it once the page drew without it.
+    const gone = view.pins || pins ? [] : [...view.only].filter((id) => !only.has(id));
+    const ghosts = gone.flatMap((id) => Array.from(marks.querySelectorAll('[data-id="' + CSS.escape(id) + '"],[data-for="' + CSS.escape(id) + '"]'), (el) => {
+      const ghost = el.cloneNode(true);
+      ghost.classList.remove("pulse", "in");
+      ghost.removeAttribute("data-id"); ghost.removeAttribute("data-for");
+      return ghost;
+    }));
+    view.pins = pins; view.only = only;
+    view.rulers = Boolean(next.rulers);
     view.style = next.style === "pin" ? "pin" : "card";
     view.me = next.me && typeof next.me.name === "string" ? { name: next.me.name, image: typeof next.me.image === "string" ? next.me.image : null } : null;
     if (Boolean(next.xray) !== xrayStyle.isConnected) { if (next.xray) document.head.appendChild(xrayStyle); else xrayStyle.remove(); }
     view.xray = Boolean(next.xray);
     render(); redraw();
+    if (pins) leave.replaceChildren();
+    for (const ghost of ghosts) {
+      leave.appendChild(ghost);
+      ghost.addEventListener("animationend", () => ghost.remove());
+      setTimeout(() => ghost.remove(), 400);
+    }
   }
   addEventListener("scroll", () => { if (tool !== "browse" || view.rulers) redraw(); }, { capture: true, passive: true });
   drawRulers();

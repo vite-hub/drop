@@ -422,7 +422,12 @@ test("a saved area is a soft neutral hairline, firmer while its thread is open, 
         const root = document.querySelector("drop-comments").shadowRoot
         const style = (el) => {
           const css = getComputedStyle(el)
-          return { border: css.borderTopColor, width: css.borderTopWidth, ring: css.boxShadow, fill: css.backgroundColor }
+          return {
+            border: css.borderTopColor,
+            width: css.borderTopWidth,
+            ring: css.boxShadow,
+            fill: css.backgroundColor,
+          }
         }
         const drawing = document.createElement("div")
         drawing.className = "a"
@@ -455,6 +460,41 @@ test("a saved area is a soft neutral hairline, firmer while its thread is open, 
     const focused = await look()
     assert.equal(focused.area.border, "rgba(0, 0, 0, 0.45)")
     assert.notEqual(focused.area.fill, "rgba(0, 0, 0, 0)", "the open thread's area takes a faint tint")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("with comments hidden, an area Drop still shows draws alone, and pops out with its pin when it goes", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    const say = (message) =>
+      page.evaluate(
+        (message) => document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, "*"),
+        message,
+      )
+    const layer = () =>
+      frame.evaluate(() => {
+        const root = document.querySelector("drop-comments").shadowRoot
+        const visible = (selector) =>
+          [...root.querySelectorAll(selector)]
+            .filter((el) => el.checkVisibility())
+            .map((el) => el.dataset.id ?? el.dataset.for)
+        return {
+          pins: visible(".marks > .m"),
+          areas: visible(".marks > .a"),
+          rail: document.documentElement.getAttribute("data-drop-rail"),
+          leaving: root.querySelectorAll(".leave > *").length,
+        }
+      })
+    await say({ type: "view", pins: false, only: ["c8"] })
+    await frame.waitForFunction(() => document.documentElement.getAttribute("data-drop-rail") === null)
+    assert.deepEqual(await layer(), { pins: ["c8"], areas: ["c8"], rail: null, leaving: 0 })
+    await say({ type: "view", pins: false, only: [] })
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".leave > *"))
+    assert.deepEqual(await layer(), { pins: [], areas: [], rail: null, leaving: 2 })
+    await frame.waitForFunction(() => !document.querySelector("drop-comments").shadowRoot.querySelector(".leave > *"))
   } finally {
     await browser.close()
   }
