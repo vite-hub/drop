@@ -5,7 +5,7 @@ import { defineComments, defineCommentSubject } from "vite-hub/comments"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database"
 import { user as users } from "./databases/default/index"
-import { storeCommentFile } from "./utils/comment-images"
+import { pageImageType, storeCommentFile, storePageImage } from "./utils/comment-images"
 import { findDrop, permissions } from "./utils/drops"
 import { type Identity, identify, identityOf } from "./utils/identity"
 
@@ -135,14 +135,26 @@ export default defineComments({
   // The hook for telling people they were mentioned. Drop sends no email yet; the viewer marks the mention.
   onMention() {},
 
-  /** A file from ViteHub's surfaces: an image drop under the commented drop, like the images Drop's own routes take. */
-  storeAttachment: (file, { user, subject }) => storeCommentFile(file, subject, identityIn(user)),
+  /**
+   * A file from ViteHub's surfaces: an image drop under the commented drop, like the images Drop's own routes take. On
+   * Drop's own pages, for those who may write there, a blob of its own (storePageImage); anyone else is refused.
+   */
+  async storeAttachment(file, { user, subject }) {
+    const who = identityIn(user)
+    if (subject?.kind === "page" && (await allowed(subject, who)).comment) return storePageImage(file)
+    return storeCommentFile(file, subject, who)
+  },
 
   /**
-   * A comment image by its key, the image drop's id. ViteHub serves it at /api/_vitehub/comments/attachments/<id> once
-   * it found a thread that lists the key and the reader may read.
+   * A comment image by its key: a page image's blob key, else the image drop's id. ViteHub serves it at
+   * /api/_vitehub/comments/attachments/<key> once it found a thread that lists the key and the reader may read.
    */
   async readAttachment(key) {
+    const pageType = pageImageType(key)
+    if (pageType) {
+      const [error, file] = await blob.get(key)
+      return error || !file ? null : new Blob([file], { type: pageType })
+    }
     const row = await findDrop(key)
     if (!row?.blobKey || row.kind !== "image") return null
     const [error, file] = await blob.get(row.blobKey)
