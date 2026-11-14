@@ -34,8 +34,10 @@ jobs:
       - name: Check the tag matches the version
         working-directory: packages/nuxt
         run: test "nuxt-v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      # Checks the installed copy, since pnpm-workspace.yaml overrides can swap in a pkg.pr.new build.
       - name: Check the bundled Forge is a ViteHub release
-        run: "! grep -n pkg.pr.new packages/nuxt/package.json"
+        working-directory: packages/nuxt
+        run: node -e 'const v = require("./node_modules/@vite-hub/forge/package.json").version; if (v.includes("-")) { console.error("@vite-hub/forge is " + v + ", not a release"); process.exit(1) }'
       - run: pnpm --filter @vite-hub/drop test
       # pnpm pack runs the build and writes real versions for `catalog:` specs; npm publish would keep them as they are.
       - working-directory: packages/nuxt
