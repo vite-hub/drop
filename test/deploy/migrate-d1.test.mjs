@@ -1,13 +1,14 @@
+import { adoptSqliteLedger } from "../../scripts/adopt-sqlite-ledger.mjs"
 import assert from "node:assert/strict"
-import { readFileSync, readdirSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "vite-plus/test"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { migrate } from "drizzle-orm/sqlite-proxy/migrator"
-import { readMigrationFiles } from "drizzle-orm/migrator"
-import { createCommentsStore } from "vite-hub/comments/server"
 import { migrateD1 } from "../../scripts/migrate-d1.mjs"
+import { migrations as dropMigrations } from "../../scripts/migrations.mjs"
 
 const settings = {
   CLOUDFLARE_ACCOUNT_ID: "test-account",
@@ -19,9 +20,7 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
   const previousFetch = globalThis.fetch
   const previousEnv = { ...process.env }
   const database = new DatabaseSync(":memory:")
-  const expectedMigrations = readdirSync(new URL("../../server/databases/migrations/", import.meta.url)).filter(
-    (name) => name.endsWith(".sql"),
-  ).length
+  const expectedMigrations = dropMigrations().length
   let migrations = 0
   try {
     Object.assign(process.env, settings)
@@ -43,9 +42,7 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
         .prepare("SELECT name FROM d1_migrations ORDER BY id")
         .all()
         .map((row) => row.name),
-      readdirSync(new URL("../../server/databases/migrations/", import.meta.url))
-        .filter((name) => name.endsWith(".sql"))
-        .sort(),
+      dropMigrations().map((migration) => migration.name),
     )
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
     await migrateD1()
@@ -57,250 +54,59 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
   }
 })
 
-test("Drizzle applies migrations once on fresh databases and previews using the current Drop baseline", async () => {
-  const directory = new URL("../../server/databases/migrations/", import.meta.url)
-  const journal = JSON.parse(readFileSync(new URL("meta/_journal.json", directory), "utf8"))
-  const filenames = readdirSync(directory)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()
-  assert.deepEqual(journal.entries.map((entry) => `${entry.tag}.sql`).sort(), filenames)
-  // Keep existing filenames for Wrangler's ledger; journal indexes can have gaps after main's squash.
-  for (let index = 1; index < journal.entries.length; index++) {
-    assert.ok(journal.entries[index].idx > journal.entries[index - 1].idx)
-    assert.ok(journal.entries[index].when > journal.entries[index - 1].when)
-  }
-  const config = { migrationsFolder: fileURLToPath(directory) }
-  const migrations = readMigrationFiles(config)
-  const [baseline, authEvents, suggestions, comments, dropComments, cleanup, acceptances, undos, release] = migrations
-  const oneModel = migrations[journal.entries.findIndex((entry) => entry.tag === "0011_comments_one_model")]
-  // Comments must follow main's latest migration. Earlier previews can already contain comments at older timestamps.
-  for (const {
-    appliedMigrations,
-    appliedTimestamps = appliedMigrations.map((migration) => migration.folderMillis),
-  } of [
-    { appliedMigrations: [] },
-    { appliedMigrations: [baseline] },
-    { appliedMigrations: [baseline, authEvents] },
-    {
-      appliedMigrations: [baseline, comments],
-      appliedTimestamps: [baseline.folderMillis, 1793094947398],
-    },
-    {
-      appliedMigrations: [baseline, authEvents, comments],
-      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793094947398],
-    },
-    {
-      appliedMigrations: [baseline, authEvents, comments],
-      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001],
-    },
-    { appliedMigrations: [baseline, authEvents, suggestions] },
-    { appliedMigrations: [baseline, authEvents, suggestions, comments] },
-    { appliedMigrations: [baseline, authEvents, suggestions, comments, release] },
-    {
-      appliedMigrations: [baseline, authEvents, comments, dropComments],
-      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001, 1793095000002],
-    },
-    {
-      appliedMigrations: [baseline, authEvents, comments, dropComments, cleanup],
-      appliedTimestamps: [baseline.folderMillis, authEvents.folderMillis, 1793095000001, 1793095000002, 1793129177718],
-    },
-    {
-      appliedMigrations: [baseline, authEvents, suggestions, comments, dropComments, cleanup, acceptances],
-    },
-    {
-      appliedMigrations: [baseline, authEvents, suggestions, comments, dropComments, cleanup, acceptances, undos],
-    },
-    { appliedMigrations: migrations.slice(0, -1) },
-    { appliedMigrations: migrations },
-  ]) {
+test("a database Drizzle Kit 0.x migrated to any point upgrades its ledger and runs only the rest", async () => {
+  const directory = new URL("../../server/databases/default/migrations/", import.meta.url)
+  // In folder order, as Drizzle applies them. Rows 0.x wrote carry the hash of the SQL file and its journal time, in
+  // milliseconds within the folder's second, and no name.
+  const folders = dropMigrations().sort((a, b) => (a.tag < b.tag ? -1 : 1))
+  const hash = (sql) => createHash("sha256").update(sql).digest("hex")
+  const journal = JSON.parse(readFileSync(new URL("./fixtures/legacy-journal.json", import.meta.url), "utf8")).entries
+  for (let applied = 0; applied <= folders.length; applied++) {
     const database = new DatabaseSync(":memory:")
     try {
       database.exec("PRAGMA foreign_keys = ON")
       database.exec(
         "CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)",
       )
-      for (const timestamp of appliedTimestamps) {
+      folders.slice(0, applied).forEach((migration) => {
+        database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
         database
           .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
-          .run(`applied-${timestamp}`, timestamp)
+          .run(hash(migration.sql), journal.find((entry) => migration.tag.endsWith(`_${entry.tag}`)).when)
+      })
+      // This shipped variant survives timestamp-based upgrades even though its SQL was later replaced with SELECT 1.
+      if (applied === folders.length) {
+        const historical = readFileSync(new URL("./fixtures/0004_comment_suggestions.sql", import.meta.url), "utf8")
+        assert.equal(hash(historical), "3e6aa3ac60516bdd27edd10c4de906ced19bdbb289c2a2c247a8e7d35a5be083")
+        database
+          .prepare("UPDATE __drizzle_migrations SET hash = ? WHERE created_at = ?")
+          .run(hash(historical), 1793445000000)
+        adoptSqliteLedger(database)
+        adoptSqliteLedger(database)
       }
-      for (const migration of appliedMigrations) {
-        database.exec(migration.sql.join(";\n"))
-        if (migration !== baseline) continue
-        database.exec(`
-          INSERT INTO drops (id, owner_id, kind, title, filename, actor_kind, actor_name, created_at, updated_at)
-          VALUES ('legacy-image', 'owner', 'image', 'Image', 'image.png', 'human', 'Owner', 1, 1);
-          INSERT INTO comments (id, drop_id, n, kind, selector, body, author_name, created_at)
-          VALUES ('legacy-comment', 'legacy-image', 1, 'page', '', 'Comment', 'Owner', 1);
-          INSERT INTO comment_replies (id, comment_id, body, author_name, created_at)
-          VALUES ('legacy-reply', 'legacy-comment', 'Reply', 'Owner', 1);
-          INSERT INTO comment_attachments (drop_id, comment_id, reply_id, created_at)
-          VALUES ('legacy-image', 'legacy-comment', 'legacy-reply', 1);
-        `)
-      }
-      if (appliedMigrations.includes(oneModel))
-        database.exec(`
-          INSERT INTO vitehub_comment_threads
-            (id, scope, n, subject_kind, subject_id, anchor, status, author_id, author_name, created_at, updated_at)
-          VALUES ('upgrade-thread', 'upgrade', 1, 'page', '/', '{"kind":"page"}', 'open', 'admin', 'Admin', 1, 1);
-        `)
-      // Live-site rows, while the database still has the live-site tables.
-      const seeded = appliedMigrations.includes(comments) && !appliedMigrations.includes(oneModel)
-      if (seeded) {
-        database.exec(`
-          INSERT INTO vitehub_comment_threads (id, number, page, anchor, status, created_by, created_at, updated_at)
-            VALUES ('existing-thread', 12, '/', '{}', 'open', '{"id":"admin","name":"Admin"}', 1, 1);
-          INSERT INTO vitehub_comments (id, thread_id, body, mentions, author, created_at)
-            VALUES ('existing-comment', 'existing-thread', 'Keep this comment', '[]', '{"id":"admin","name":"Admin"}', 1);
-        `)
-        if (appliedMigrations.includes(release))
-          database.exec("INSERT INTO vitehub_comment_scope_counters (scope, last_number) VALUES ('pages', 12)")
-      }
-      if (appliedMigrations.includes(cleanup))
-        database.exec("INSERT INTO comment_cleanup VALUES ('deleted-drop', 'drop:deleted-drop', 0, 1)")
-      if (appliedMigrations.includes(acceptances))
-        database.exec(
-          "INSERT INTO suggestion_acceptances (thread_id, drop_id, version) VALUES ('accepted-thread', 'legacy-image', 2)",
-        )
-      if (appliedMigrations.includes(undos)) database.exec("UPDATE suggestion_acceptances SET undone_version = 3")
-      // Drizzle runs every migration newer than the ledger's latest timestamp, each adding a row.
-      const latest = Math.max(0, ...appliedTimestamps)
-      const expectedMigrations =
-        appliedTimestamps.length + migrations.filter((migration) => migration.folderMillis > latest).length
-      const runQuery = async (query, params, method) => {
+      const run = (query, params, rowMode) => {
         const statement = database.prepare(query)
-        if (method === "run") {
-          statement.run(...params)
-          return { rows: [] }
-        }
-        statement.setReturnArrays(true)
-        const rows = statement.all(...params)
-        return { rows: method === "get" ? rows[0] : rows }
+        if (!statement.columns().length) return statement.run(...params)
+        statement.setReturnArrays(rowMode !== "object")
+        return statement.all(...params)
       }
-      const db = drizzle(runQuery, async (batch) =>
-        Promise.all(batch.map((item) => runQuery(item.sql, item.params, item.method))),
-      )
-      const apply = async (statements) => database.exec(`BEGIN; ${statements.join(";\n")}; COMMIT;`)
-      await migrate(db, apply, config)
-      assert.ok(
-        database
-          .prepare("PRAGMA table_info(user)")
-          .all()
-          .some((column) => column.name === "plan"),
-      )
-      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
-      for (const table of [
-        "drop_versions",
-        "code_images",
-        "quota_reservations",
-        "abuse_reports",
-        "vitehub_comment_threads",
-        "vitehub_comment_messages",
-        "vitehub_comment_counters",
-        "vitehub_comment_threads_live",
-        "vitehub_comments",
-        "vitehub_comment_scope_counters",
-        "vitehub_comment_forge",
-        "vitehub_auth_events",
-        "comment_cleanup",
-        "suggestion_acceptances",
-      ])
-        assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table))
-      assert.ok(
-        database
-          .prepare("PRAGMA table_info(suggestion_acceptances)")
-          .all()
-          .some((column) => column.name === "undone_version"),
-      )
-      if (appliedMigrations.includes(acceptances))
-        assert.deepEqual(
-          { ...database.prepare("SELECT version, undone_version FROM suggestion_acceptances").get() },
-          { version: 2, undone_version: appliedMigrations.includes(undos) ? 3 : null },
-        )
+      const db = drizzle({
+        get: async (query, params, rowMode) => run(query, params, rowMode)[0],
+        all: async (query, params, rowMode) => run(query, params, rowMode),
+        run: async (query, params) => run(query, params),
+      })
+      await migrate(db, async (statements) => database.exec(`BEGIN; ${statements.join(";\n")}; COMMIT;`), {
+        migrationsFolder: fileURLToPath(directory),
+      })
+      const ledger = database.prepare("SELECT name FROM __drizzle_migrations ORDER BY id").all()
       assert.deepEqual(
-        database
-          .prepare("PRAGMA index_list(vitehub_auth_events)")
-          .all()
-          .map((row) => row.name)
-          .filter((name) => !name.startsWith("sqlite_"))
-          .sort(),
-        [
-          "vitehub_auth_events_actor",
-          "vitehub_auth_events_time",
-          "vitehub_auth_events_type",
-          "vitehub_auth_events_user",
-        ],
+        ledger.map((row) => row.name),
+        folders.map((migration) => migration.tag),
+        `after ${applied} applied`,
       )
-      assert.ok(
-        database
-          .prepare("PRAGMA table_info(drops)")
-          .all()
-          .some((column) => column.name === "quarantined_at"),
-      )
-      assert.ok(
-        database
-          .prepare("PRAGMA table_info(drops)")
-          .all()
-          .some((column) => column.name === "agent"),
-      )
-      const threadColumns = database.prepare("PRAGMA table_info(vitehub_comment_threads)").all()
-      for (const name of ["scope", "n", "subject_kind", "metadata", "revision", "request_id"])
-        assert.ok(threadColumns.some((column) => column.name === name))
-      if (appliedMigrations.includes(oneModel)) {
-        const store = createCommentsStore(db)
-        assert.equal((await store.getById("upgrade-thread")).author.name, "Admin")
-        assert.equal(await store.getByRequestId("upgrade", "retry"), null)
-        database.exec("UPDATE vitehub_comment_threads SET request_id = 'retry' WHERE id = 'upgrade-thread'")
-        assert.equal((await store.getByRequestId("upgrade", "retry")).id, "upgrade-thread")
-        assert.throws(
-          () =>
-            database.exec(`
-              INSERT INTO vitehub_comment_threads
-                (id, scope, n, subject_kind, subject_id, anchor, status, author_id, request_id, created_at, updated_at)
-              VALUES ('duplicate-retry', 'upgrade', 2, 'page', '/', '{"kind":"page"}', 'open', 'admin', 'retry', 1, 1);
-            `),
-          /UNIQUE/,
-        )
-      }
-      for (const table of ["comments", "comment_replies"])
-        assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table), undefined)
-      assert.equal(
-        database.prepare("SELECT count(*) AS n FROM comment_attachments").get().n,
-        appliedMigrations.includes(baseline) ? 1 : 0,
-      )
+      assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_comment_threads'").get())
       assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
-      assert.equal(
-        database.prepare("SELECT count(*) AS n FROM comment_cleanup").get().n,
-        appliedMigrations.includes(cleanup) ? 1 : 0,
-      )
-      if (seeded) {
-        assert.equal(
-          database.prepare("SELECT last_number FROM vitehub_comment_scope_counters WHERE scope = 'pages'").get()
-            .last_number,
-          12,
-        )
-        assert.equal(
-          database.prepare("SELECT body FROM vitehub_comment_messages WHERE id = 'existing-comment'").get().body,
-          "Keep this comment",
-        )
-        assert.deepEqual(
-          {
-            ...database
-              .prepare(
-                "SELECT scope, n, subject_kind, subject_id FROM vitehub_comment_threads WHERE id = 'existing-thread'",
-              )
-              .get(),
-          },
-          { scope: "site", n: 12, subject_kind: "page", subject_id: "/" },
-        )
-        // The live-site rows stay behind as the backup.
-        assert.equal(
-          database.prepare("SELECT page FROM vitehub_comment_threads_live WHERE id = 'existing-thread'").get().page,
-          "/",
-        )
-      }
-      await migrate(db, apply, config)
-      assert.equal(database.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, expectedMigrations)
+      assert.deepEqual(database.prepare("SELECT id FROM drops LIMIT 1").all(), [])
     } finally {
       database.close()
     }
@@ -308,21 +114,24 @@ test("Drizzle applies migrations once on fresh databases and previews using the 
 })
 
 test("the latest Drizzle snapshot includes all migrated columns of its registered tables", () => {
-  const directory = new URL("../../server/databases/migrations/", import.meta.url)
-  const journal = JSON.parse(readFileSync(new URL("meta/_journal.json", directory), "utf8"))
-  const latest = readdirSync(new URL("meta/", directory))
-    .filter((name) => name.endsWith("_snapshot.json"))
+  const directory = new URL("../../server/databases/default/migrations/", import.meta.url)
+  const latest = dropMigrations()
+    .map((migration) => migration.tag)
     .sort()
     .at(-1)
-  const snapshot = JSON.parse(readFileSync(new URL(`meta/${latest}`, directory), "utf8"))
+  const snapshot = JSON.parse(readFileSync(new URL(`${latest}/snapshot.json`, directory), "utf8"))
   const database = new DatabaseSync(":memory:")
   try {
-    for (const entry of journal.entries) database.exec(readFileSync(new URL(`${entry.tag}.sql`, directory), "utf8"))
-    for (const table of Object.values(snapshot.tables)) {
+    for (const migration of dropMigrations()) database.exec(migration.sql)
+    const tables = snapshot.ddl.filter((entity) => entity.entityType === "tables")
+    for (const table of tables) {
       const columns = database.prepare("SELECT name FROM pragma_table_info(?) ORDER BY name").all(table.name)
       assert.deepEqual(
         columns.map((column) => column.name),
-        Object.keys(table.columns).sort(),
+        snapshot.ddl
+          .filter((entity) => entity.entityType === "columns" && entity.table === table.name)
+          .map((column) => column.name)
+          .sort(),
         table.name,
       )
     }

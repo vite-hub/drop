@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Who else is looking at the drop (usePresence): their faces in the bar, ringed in the color of their cursor. Pressing
 // them lists each person and where they are, with the switch that hides everyone's cursors.
-import { AvatarStack } from "vite-hub/ui/avatar-stack"
+import { AvatarStack } from "vite-hub/ui"
 import type { PresencePerson } from "~/composables/usePresence"
 
 const props = defineProps<{ people: PresencePerson[]; site: boolean }>()

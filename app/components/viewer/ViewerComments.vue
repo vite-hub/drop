@@ -3,7 +3,7 @@
 // Resolved switch it; the box at the bottom comments on the page as a whole, with images and "@" for people who may read
 // the drop. A row opens its thread where the viewer shows threads, beside its pin. Open comments whose text or element
 // this version no longer has sit apart, under "From earlier versions" (`outdated` in DropViewer.vue).
-import { CommentPanel } from "vite-hub/ui/comments"
+import { CommentPanel } from "vite-hub/ui"
 import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
 import type { DropComment } from "#shared/types"
 

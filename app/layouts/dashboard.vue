@@ -16,6 +16,7 @@
 import { promiseTimeout } from "@vueuse/core"
 
 const route = useRoute()
+const consoleAuth = consoleUrl("/auth")
 const open = ref(false)
 const at = (path: string) => route.path === path || route.path.startsWith(`${path}/`)
 const close = () => (open.value = false)
@@ -72,8 +73,8 @@ const workspace = computed(() => [
           label: "Console",
           icon: "i-mingcute-settings-3-line",
           activeIcon: "i-mingcute-settings-3-fill",
-          to: "/_vitehub/auth",
-          external: true,
+          to: consoleAuth,
+          target: "_blank",
           active: false,
         },
       ]

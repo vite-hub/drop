@@ -1,8 +1,8 @@
 import { and, inArray, eq } from "drizzle-orm"
 import { defineValidatedHandler, HTTPError } from "h3"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import { ReviewSchema } from "#shared/schemas"
-import { drops, user } from "../../../databases/config"
+import { drops, user } from "../../../databases/default/index"
 import { requireAdmin } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 

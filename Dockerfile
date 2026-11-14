@@ -10,6 +10,9 @@ ARG CLOUDFLARE_D1_DATABASE_ID
 ARG CLOUDFLARE_D1_DATABASE_NAME=my-drop
 ARG DROP_DATABASE_URL
 ARG DROP_DATABASE
+# Signed Console RPC on Node uses a trusted origin compiled into ViteHub.
+ARG DROP_PUBLIC_URL
+ENV DROP_PUBLIC_URL=$DROP_PUBLIC_URL
 # The commit /api/health reports. The build context has no .git.
 ARG DROP_COMMIT
 ENV DROP_COMMIT=$DROP_COMMIT
@@ -31,8 +34,8 @@ LABEL org.opencontainers.image.source="https://github.com/vite-hub/drop"
 LABEL org.opencontainers.image.licenses="BUSL-1.1"
 WORKDIR /app
 COPY --from=build /app/.output ./.output
-COPY scripts/start.mjs scripts/migrate-d1.mjs ./scripts/
-COPY server/databases/migrations ./server/databases/migrations
+COPY scripts/start.mjs scripts/migrate-d1.mjs scripts/migrations.mjs scripts/adopt-sqlite-ledger.mjs ./scripts/
+COPY server/databases/default/migrations ./server/databases/default/migrations
 RUN mkdir .data && chown node:node .data
 USER node
 ENV HOST=0.0.0.0 PORT=3000

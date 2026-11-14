@@ -17,7 +17,7 @@ const users = []
 async function request(path, method = "GET", body) {
   const response = await fetch(`${origin}${path}`, {
     method,
-    headers: { cookie, origin, ...(body ? { "content-type": "application/json", "x-vitehub-console": "1" } : {}) },
+    headers: { cookie, origin, ...(body ? { "content-type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   })
   return { status: response.status, data: await response.json() }
@@ -47,32 +47,10 @@ async function signup(admin = false) {
 try {
   const admin = await signup(true)
   const owner = await signup()
-  // Run with DROP_ADMINS=console-admin@example.com. The Console must repair this stale stored role.
-  db.prepare("UPDATE user SET role='member', email_verified=1 WHERE id=?").run(admin.id)
+  // Run with DROP_ADMINS=console-admin@example.com. Admins move a member between Free and Pro in the ViteHub Console,
+  // which calls Drop with a signature this test doesn't hold, so the plan is set in the database here.
+  db.prepare("UPDATE user SET role='member', email_verified=1, plan='pro' WHERE id=?").run(admin.id)
   cookie = admin.cookie
-  // Admins move a member between Free and Pro through Better Auth's admin plugin; there's no Unlimited tier.
-  assert.equal(
-    (
-      await request("/_vitehub/auth/manage", "POST", {
-        action: "editField",
-        userId: owner.id,
-        field: "plan",
-        value: "unlimited",
-      })
-    ).status,
-    400,
-  )
-  assert.equal(
-    (
-      await request("/_vitehub/auth/manage", "POST", {
-        action: "editField",
-        userId: admin.id,
-        field: "plan",
-        value: "pro",
-      })
-    ).status,
-    200,
-  )
   assert.equal((await request("/api/usage")).data.plan, "pro")
   cookie = owner.cookie
   const doc = await request("/api/drops", "POST", { filename: "doc.md", content: "# Owner" })

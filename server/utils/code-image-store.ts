@@ -1,8 +1,8 @@
 import { useLogger } from "evlog/nitro/v3"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database/drizzle"
-import { codeImages } from "../databases/config"
+import { db } from "vite-hub/database"
+import { codeImages } from "../databases/default/index"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { PNG_CODE_IMAGES, renderCodePng } from "./code-image-png"
 import type { CodeImageInput } from "#shared/schemas"
@@ -32,7 +32,6 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
   return withDropQuota(who.userId, { drops: 0, bytes: image.size, writes: 1 }, event, async (quota) => {
     const { expiresAt, key } = createCodeImageLocation(format)
     const [storageError, stored] = await blob.put(key, image, {
-      access: "private",
       contentType: format === "png" ? "image/png" : "image/svg+xml",
     })
     // No code_images row points at the key yet, so the hourly cleanup would never find it: deleteBlobKeys queues a

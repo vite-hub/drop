@@ -1,0 +1,18 @@
+{
+  "20261027095547_0000_init": "0000_init.sql",
+  "20261027095640_0003_auth_events": "0003_auth_events.sql",
+  "20261031111000_0003_vitehub_comments": "0003_vitehub_comments.sql",
+  "20261031111000_0004_comment_suggestions": "0004_comment_suggestions.sql",
+  "20261031111000_0004_drop_comments_on_vitehub": "0004_drop_comments_on_vitehub.sql",
+  "20261031111000_0005_comment_cleanup": "0005_comment_cleanup.sql",
+  "20261031124553_0006_suggestion_acceptances": "0006_suggestion_acceptances.sql",
+  "20261031140048_0007_suggestion_undos": "0007_suggestion_undos.sql",
+  "20261101104536_0005_vitehub_comments_release": "0005_vitehub_comments_release.sql",
+  "20261101104536_0009_drop_comments_release_upgrade": "0009_drop_comments_release_upgrade.sql",
+  "20261103143224_0010_review_submissions": "0010_review_submissions.sql",
+  "20261103143224_0011_comments_one_model": "0011_comments_one_model.sql",
+  "20261105193016_0012_member_user_cascade": "0012_member_user_cascade.sql",
+  "20261105193552_0013_team_member_limit": "0013_team_member_limit.sql",
+  "20261106084719_0014_better_auth_rate_limit": "0014_better_auth_rate_limit.sql",
+  "20261112000314_0015_comments_request_id": "0015_comments_request_id.sql"
+}

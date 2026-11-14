@@ -6,7 +6,7 @@ import { commentsMcpTools } from "vite-hub/comments/runtime"
 import comments from "../comments"
 import { requireIdentity } from "../utils/identity"
 
-/** The ViteHub Comments tools, by name: the same ones ViteHub MCP serves at /_vitehub/mcp. */
+/** The ViteHub Comments tools, by name: the same ones the ViteHub Console's MCP serves. */
 const tools = new Map(commentsMcpTools(comments).map((tool) => [tool.name, tool]))
 
 /**

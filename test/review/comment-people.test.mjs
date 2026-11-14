@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { blob } from "@vite-hub/blob"
+import { setBlobRuntimeConfig } from "@vite-hub/blob/runtime/state"
 import { H3Event } from "h3"
-import { beforeEach, test } from "vite-plus/test"
+import { beforeEach, test, vi } from "vite-plus/test"
 import { insertDrop, migrate, reset, sql, state, threads, who } from "../cost/harness.mjs"
 
 const { default: comments } = await import("../../server/comments.ts")
@@ -186,7 +191,17 @@ test("a file sent through ViteHub's upload becomes an image of the drop, out of 
   )
 })
 
-test("an image sent from the toolbar on Drop's own pages is a blob of its own, for admins only", async () => {
+test("an image sent from the toolbar on Drop's own pages is a blob of its own, for admins only", async (t) => {
+  // Use the pinned runtime and filesystem driver so unsupported write options cannot pass a permissive stub.
+  const base = await mkdtemp(join(tmpdir(), "drop-page-image-"))
+  setBlobRuntimeConfig({ store: { driver: "fs", base } })
+  vi.spyOn(state.blob, "put").mockImplementation((...args) => blob.put(...args))
+  vi.spyOn(state.blob, "get").mockImplementation((...args) => blob.get(...args))
+  t.onTestFinished(async () => {
+    vi.restoreAllMocks()
+    setBlobRuntimeConfig(undefined)
+    await rm(base, { recursive: true, force: true })
+  })
   const png = Uint8Array.from(
     Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",

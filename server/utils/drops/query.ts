@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql }
 import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import type {
   DropAttachment,
   DropCrumb,
@@ -38,7 +38,7 @@ import { resourcesOf } from "../resources"
 import { answerable, quizOf } from "../answers"
 import { viewsOf } from "../views"
 import { dropExcerpt } from "../og"
-import { dropFiles, drops, dropVersions, dropVisits, user } from "../../databases/config"
+import { dropFiles, drops, dropVersions, dropVisits, user } from "../../databases/default/index"
 import type { Identity } from "../identity"
 import type { DropRow } from "./types"
 import { permissions, toCrumb, toSummary } from "./access"

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 
 /** The user's Drops list: no folders, embedded files, or Trash. One bind even for 100 users. */
 export async function countDropsByUser(userIds: readonly string[]): Promise<Record<string, number>> {

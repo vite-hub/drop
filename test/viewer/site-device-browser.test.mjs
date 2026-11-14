@@ -69,7 +69,13 @@ const bundle = await build({
   configFile: false,
   logLevel: "silent",
   define: { "process.env.NODE_ENV": JSON.stringify("production") },
-  resolve: { alias: { "#shared": root + "shared" } },
+  resolve: {
+    alias: [
+      { find: "#shared", replacement: root + "shared" },
+      // The ViteHub UI root also loads its Nuxt UI parts; the device frame alone needs no SFC compiler.
+      { find: /^vite-hub\/ui$/, replacement: root + "node_modules/@vite-hub/ui/dist/parts/components/device-frame.js" },
+    ],
+  },
   plugins: [
     {
       name: "site-device-fixture",

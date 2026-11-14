@@ -5,12 +5,11 @@ import { defineHandler, type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { hex, sha256 } from "#shared/utils/bytes"
 import { textValue } from "#shared/utils/text"
-import { blob } from "vite-hub/blob"
-import { detectContentType } from "vite-hub/blob/content-type"
+import { blob, detectContentType } from "vite-hub/blob"
 import { commentsSchema } from "vite-hub/comments/database"
-import { db } from "vite-hub/database/drizzle"
-import { useServerEnv } from "#vitehub/env/server"
-import { importSealKey, seal as sealValue, unseal as unsealValue } from "vite-hub/env/seal"
+import { db } from "vite-hub/database"
+import { useServerEnv } from "vite-hub/env"
+import { seal as sealValue, unseal as unsealValue } from "vite-hub/env/server"
 import { newLink, slugify } from "#shared/links"
 import {
   isSitePattern,
@@ -24,7 +23,7 @@ import {
 import { MAX_FILE_BYTES, type ReviewCommentInput, ReviewCommentSchema } from "#shared/schemas"
 import type { CommentAttachment, ReviewThread, SiteReviewItem } from "#shared/types"
 import { defaultShare, isPublic, type Share } from "#shared/share"
-import { drops, reviewSubmissions, user } from "../databases/config"
+import { drops, reviewSubmissions, user } from "../databases/default/index"
 import { type CommentImage, imageDrop, imagesOf, readForm, withImages } from "./comment-images"
 import {
   addThread,
@@ -79,10 +78,7 @@ type Choice = v.InferOutput<typeof Choice>
 
 const encoder = new TextEncoder()
 
-/**
- * AES-GCM under a key from the auth secret, like content-origin labels. Not VITEHUB_SECRET: not every Drop sets it
- * (Quiver's doesn't).
- */
+/** The auth secret. Not VITEHUB_SECRET: not every Drop sets it (Quiver's doesn't). */
 function authSecret(event: H3Event) {
   // Optional: an environment without the auth secret (the tests' one) gets the 503 below, not a TypeError.
   const secret = useServerEnv(event).auth?.secret?.unseal()
@@ -91,9 +87,6 @@ function authSecret(event: H3Event) {
     throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
   return secret
 }
-
-const sealKey = async (event: H3Event) =>
-  importSealKey(await sha256(encoder.encode(`review-token:${authSecret(event)}`)))
 
 /**
  * A name for `value` that only Drop can make and that always comes out the same: HMAC-SHA-256 under a key from the
@@ -114,9 +107,12 @@ export async function keyedName(event: H3Event, purpose: string, value: string) 
 /** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
 type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files" | "presence"
 
-/** Encrypted and authenticated: the page can neither read it nor change it. `purpose` keeps a choice from passing as a token. */
+// ViteHub's seal() keys each purpose from a root of at least 32 characters; a digest of the auth secret always is one.
+const sealRoot = async (event: H3Event) => hex(await sha256(encoder.encode(`review-token:${authSecret(event)}`)))
+
+/** Encrypted and authenticated: the page can neither read it nor change it. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
-  return sealValue(await sealKey(event), encoder.encode(purpose), JSON.stringify(value))
+  return sealValue(`drop:${purpose}`, value, { secret: await sealRoot(event) })
 }
 
 /** The sealed value, when it was sealed for `purpose` and parses as `schema`. Null for anything else. */
@@ -128,13 +124,8 @@ export async function unseal<T extends v.GenericSchema>(
   maxLength = 3072,
 ): Promise<v.InferOutput<T> | null> {
   if (text.length > maxLength) return null
-  const key = await sealKey(event)
-  try {
-    const parsed = v.safeParse(schema, JSON.parse(await unsealValue(key, encoder.encode(purpose), text)))
-    return parsed.success ? parsed.output : null
-  } catch {
-    return null
-  }
+  const [error, value] = await unsealValue(`drop:${purpose}`, text, { schema, secret: await sealRoot(event) })
+  return error ? null : value
 }
 
 export async function signReviewToken(event: H3Event, claims: Omit<ReviewClaims, "e">, now = Date.now()) {
@@ -650,7 +641,7 @@ async function insertReviewComment(
     undefined,
     async (quota) => {
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
-      const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
+      const [storageError] = await blob.put(key, shot.bytes, { contentType: shot.contentType })
       if (storageError) throw storageFailure(storageError)
       const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
       const row = imageDrop(
@@ -669,7 +660,7 @@ async function insertReviewComment(
       try {
         await quota.commit([db.insert(drops).values(row)])
       } catch (error) {
-        await blob.del([key])
+        await blob.delete([key])
         throw error
       }
       return row

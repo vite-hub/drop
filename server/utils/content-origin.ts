@@ -1,5 +1,5 @@
 import type { H3Event } from "h3"
-import { deriveSecret, useServerEnv } from "#vitehub/env/server"
+import { deriveSecret, useServerEnv } from "vite-hub/env"
 import { siteMatches } from "#shared/review"
 import { escapeRegExp } from "#shared/utils/text"
 
@@ -59,7 +59,7 @@ const LABEL = "[a-z2-7]{26}"
  * VITEHUB_SECRET. Stable, and says nothing about the id.
  */
 async function contentLabel(event: H3Event, dropId: string): Promise<string> {
-  const secret = await deriveSecret("drop:content-origin", event)
+  const secret = await deriveSecret("drop:content-origin", { event })
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

@@ -4,7 +4,7 @@
 // beside the ones the viewer took (the Marker's snapshot, the area's picture). Suggest on a selection adds the words
 // that replace it above the note (`#extra`). The open thread is a CommentThread: the quote or the suggestion's redline
 // in `#anchor`, Accept and Copy link in `#actions`, a site's screenshot in `#after`.
-import { CommentComposer, type CommentComposerSubmit, CommentThread } from "vite-hub/ui/comments"
+import { CommentComposer, type CommentComposerSubmit, CommentThread } from "vite-hub/ui"
 import { COMMENT_IMAGE_TYPES, type CommentInput } from "#shared/schemas"
 import type { DropComment, SiteReviewItem } from "#shared/types"
 

@@ -1,4 +1,4 @@
-import type { drops } from "../../databases/config"
+import type { drops } from "../../databases/default/index"
 import { slugify } from "#shared/links"
 import type { DropCrumb, DropSummary } from "#shared/types"
 import { expiresAt } from "#shared/expiry"

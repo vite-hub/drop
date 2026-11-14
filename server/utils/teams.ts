@@ -6,9 +6,9 @@ import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm"
 import type { BatchItem } from "drizzle-orm/batch"
 import type { H3Event } from "h3"
 import type Stripe from "stripe"
-import { db } from "vite-hub/database/drizzle"
-import { useServerEnv } from "#vitehub/env/server"
-import { drops, member, organization, subscription } from "../databases/config"
+import { db } from "vite-hub/database"
+import { useServerEnv } from "vite-hub/env"
+import { drops, member, organization, subscription } from "../databases/default/index"
 import type { DropRow } from "./drops/types"
 
 // Teams on a personal Drop. A team is a Better Auth organization: its members, their roles, and invitations live there.

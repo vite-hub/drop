@@ -1,6 +1,6 @@
 import { eq, like, sql } from "drizzle-orm"
-import { db } from "vite-hub/database/drizzle"
-import { blobCleanup, commentCleanup, dropFiles, drops, dropVersions } from "../databases/config"
+import { db } from "vite-hub/database"
+import { blobCleanup, commentCleanup, dropFiles, drops, dropVersions } from "../databases/default/index"
 import { d1Chunks } from "./d1"
 import type { DropRow } from "./drops"
 

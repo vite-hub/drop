@@ -8,8 +8,8 @@ import { useRuntimeConfig } from "nitro/runtime-config"
 import * as v from "valibot"
 import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
 import { mcpOAuth } from "vite-hub/auth/mcp"
-import { db, schema } from "vite-hub/database/drizzle"
-import { user as users } from "./databases/config"
+import { db, schema } from "vite-hub/database"
+import { user as users } from "./databases/default/index"
 import { ac, roles } from "./utils/access"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { isGitHubMember } from "./utils/github-membership"
@@ -91,8 +91,9 @@ export default defineAuth(({ env, requestOrigin }) => {
     rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
     route: false,
     advanced: {
-      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For.
-      ipAddress: { ipAddressHeaders: [clientIpHeader] },
+      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For. Without a header
+      // (Cloudflare, Deno), ViteHub's default: the address the runtime reports.
+      ...(clientIpHeader ? { ipAddress: { ipAddressHeaders: [clientIpHeader] } } : {}),
       // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
       // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
       ...(requestOrigin.startsWith("https://")

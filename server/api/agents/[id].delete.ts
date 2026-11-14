@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
-import { db } from "vite-hub/database/drizzle"
-import { oauthAccessToken, oauthConsent, oauthRefreshToken } from "../../databases/config"
+import { db } from "vite-hub/database"
+import { oauthAccessToken, oauthConsent, oauthRefreshToken } from "../../databases/default/index"
 import { requireIdentity } from "../../utils/identity"
 import { routeId } from "../../utils/params"
 

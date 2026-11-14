@@ -7,6 +7,7 @@ import type { CommandPaletteGroup, CommandPaletteItem } from "@nuxt/ui"
 import { DROP_KINDS, type DropSummary } from "#shared/types"
 
 const { data: me } = useMe()
+const consoleAuth = consoleUrl("/auth")
 const shortcutsOpen = useShortcutsOpen()
 const signOut = useSignOut()
 const { createDoc, createBoard, createFolder, newSite, upload } = useDropActions()
@@ -118,7 +119,7 @@ const pages = computed<CommandPaletteItem[]>(() =>
     },
     ...(me.value?.role === "admin"
       ? [
-          { label: "Console", icon: "i-mingcute-settings-3-line", to: "/_vitehub/auth", external: true },
+          { label: "Console", icon: "i-mingcute-settings-3-line", to: consoleAuth, target: "_blank" },
           { label: "Review shares", icon: "i-mingcute-safety-certificate-line", to: "/admin/review" },
           { label: "Reports", icon: "i-mingcute-flag-1-line", to: "/admin/reports" },
         ]

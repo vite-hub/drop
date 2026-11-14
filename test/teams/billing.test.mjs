@@ -6,7 +6,7 @@ import { organization } from "better-auth/plugins"
 import { beforeEach, test } from "vite-plus/test"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
-const { default: schema } = await import("../../server/databases/config.ts")
+const { default: schema } = await import("../../server/databases/default/index.ts")
 const { authorizeBilling, checkoutParams, teamPlans } = await import("../../server/utils/teams.ts")
 
 // The Team plan through Stripe's plugin, with a Stripe client that keeps what Checkout was asked to bill.

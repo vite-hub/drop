@@ -1,5 +1,5 @@
 import { getTableColumns, sql, type SQL } from "drizzle-orm"
-import { dropFiles } from "../databases/drops.ts"
+import { dropFiles } from "../databases/default/drops.ts"
 import { d1Chunks } from "./d1.ts"
 
 export const QUOTA_RESERVATION_TTL_MS = 15 * 60 * 1000

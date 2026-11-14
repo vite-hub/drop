@@ -5,7 +5,7 @@ import { organization } from "better-auth/plugins"
 import { beforeEach, test } from "vite-plus/test"
 import { migrate, reset, roundTrips, sql, state } from "../cost/harness.mjs"
 
-const { default: schema } = await import("../../server/databases/config.ts")
+const { default: schema } = await import("../../server/databases/default/index.ts")
 const { teamLimitAdapter } = await import("../../server/utils/team-limit-adapter.ts")
 const { teamOptions } = await import("../../server/utils/teams.ts")
 

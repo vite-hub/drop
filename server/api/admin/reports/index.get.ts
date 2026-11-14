@@ -1,7 +1,7 @@
 import { desc, sql } from "drizzle-orm"
 import { defineHandler } from "h3"
-import { db } from "vite-hub/database/drizzle"
-import { abuseReports } from "../../../databases/config"
+import { db } from "vite-hub/database"
+import { abuseReports } from "../../../databases/default/index"
 import { requireAdmin } from "../../../utils/identity"
 export default defineHandler(async (event) => {
   await requireAdmin(event)

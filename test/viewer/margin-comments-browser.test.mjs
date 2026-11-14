@@ -496,3 +496,35 @@ test("with comments hidden, an area Drop still shows draws alone, and pops out w
     await browser.close()
   }
 }, 30_000)
+
+test("missing earlier-version anchors stay unplaced while overlays are hidden or temporarily revealed", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    const missing = [
+      text("missing-text", "A paragraph removed in version two", { earlier: true }),
+      { ...markers[7], id: "missing-area", selector: "#removed", earlier: true },
+      { ...markers[7], id: "changed-area", label: 'h1 "Old title"', earlier: true },
+    ]
+    const say = async (message) => {
+      await page.evaluate((message) => {
+        document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, "*")
+      }, message)
+      await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await page.waitForFunction(() => window.posts.some((message) => message.type === "unplaced"))
+      return page.evaluate(() => window.posts.findLast((message) => message.type === "unplaced").ids)
+    }
+    const expected = missing.map((marker) => marker.id).sort()
+    assert.deepEqual((await say({ type: "markers", markers: [...markers, ...missing] })).sort(), expected)
+    for (const view of [
+      { pins: false, only: [] },
+      { pins: false, only: ["c8"] },
+      { pins: false, only: [] },
+      { pins: true },
+    ]) {
+      assert.deepEqual((await say({ type: "view", ...view })).sort(), expected)
+    }
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

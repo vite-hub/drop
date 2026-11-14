@@ -1,4 +1,4 @@
-import { useServerEnv } from "#vitehub/env/server"
+import { useServerEnv } from "vite-hub/env"
 import { githubOrganization } from "./github-membership.ts"
 
 /** Whether sign-in is delegated to oauth2-proxy, and the cookie it sets. */

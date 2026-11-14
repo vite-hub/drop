@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm"
 import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database/drizzle"
+import { db } from "vite-hub/database"
 import {
   BOARD_CONTENT_TYPE,
   type Board,
@@ -15,7 +15,7 @@ import {
   serializeBoard,
 } from "#shared/board"
 import { base64 } from "#shared/utils/bytes"
-import { drops } from "../databases/config"
+import { drops } from "../databases/default/index"
 import { type DropRow, escapesFolder, MAX_FILE_BYTES, readText, storageFailure } from "./drops"
 import type { Identity } from "./identity"
 import { textStatements } from "./search"
@@ -62,7 +62,7 @@ export async function writeBoard(
   const bytes = new TextEncoder().encode(text)
   if (bytes.byteLength > MAX_FILE_BYTES)
     throw new HTTPError({ status: 413, statusText: "The board is over the 4 MiB limit. Split it into two boards." })
-  const [error] = await blob.put(drop.blobKey!, bytes, { access: "private", contentType: BOARD_CONTENT_TYPE })
+  const [error] = await blob.put(drop.blobKey!, bytes, { contentType: BOARD_CONTENT_TYPE })
   if (error) throw storageFailure(error)
   const now = Date.now()
   await db.batch([
@@ -89,7 +89,7 @@ export async function storeBoardImages(drop: DropRow, images: { frame: string; p
     // A PNG starts with these 8 bytes; anything else isn't stored.
     const key = imageKey(drop, image.frame)
     if (!key || bytes.byteLength > MAX_FILE_BYTES || bytes[0] !== 0x89 || bytes[1] !== 0x50) continue
-    const [error] = await blob.put(key, bytes, { access: "private", contentType: "image/png" })
+    const [error] = await blob.put(key, bytes, { contentType: "image/png" })
     if (error) throw storageFailure(error)
   }
 }
