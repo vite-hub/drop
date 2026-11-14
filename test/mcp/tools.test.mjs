@@ -1381,7 +1381,7 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
         share: "public",
       })
     ).structuredContent
-    assert.match(ticket.uploadUrl, /^https:\/\/drop\.example\/api\/uploads\/[\da-f]{24}:[\da-f]+$/)
+    assert.match(ticket.uploadUrl, /^https:\/\/drop\.example\/api\/uploads\/[\w-]+$/)
     assert.equal(ticket.method, "PUT")
     assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0, "nothing exists until the upload")
 
@@ -1507,7 +1507,7 @@ test("a built app goes up as one archive, binary files and all, and its next arc
     )
     const ticket = (await call(publish, { archive: {}, slug: "site", note: "Build", lifetime: "temporary" }))
       .structuredContent
-    assert.match(ticket.uploadUrl, /\/api\/uploads\/[\da-f]{24}:/)
+    assert.match(ticket.uploadUrl, /\/api\/uploads\/[\w-]+$/)
     assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0, "nothing exists until the upload")
 
     state.who = null

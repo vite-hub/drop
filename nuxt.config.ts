@@ -37,7 +37,9 @@ const liveEditing = host === "cloudflare" || host === "vps"
 
 // The browser keeps a file but asks again on every use: the access gate runs each time, and an unchanged file answers
 // 304 without its bytes (the blob handler handles conditional requests). server/plugins/content-headers.ts agrees.
-const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-cache" } } }
+// `access: "public"` only means ViteHub runs no check of its own: server/middleware/0.drop-access.ts gates every
+// `/f/` request first, per drop and per share link, which ViteHub's `authorize` can't do without the request's event.
+const files = { serve: { route: "/f", access: "public", headers: { "Cache-Control": "private, no-cache" } } } as const
 
 // drop.vitehub.dev's own D1, in Cloudflare's EEUR region, which runs it in Milan.
 const HOSTED_D1 = "d634358e-4605-45ca-970f-d390584795a5"
@@ -58,7 +60,7 @@ const d1 = (fallback: string) => ({
  */
 const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   cloudflare: {
-    preset: "cloudflare",
+    host: "cloudflare",
     // drop.vitehub.dev's files sit in Eastern Europe beside its D1 and Worker: from the WNAM bucket each file read
     // cost 200-700 ms in Milan (measured 2026-11-11). Its own binding name, because wrangler.jsonc's BLOB keeps the
     // Deploy button's bucket for self-hosted Drops.
@@ -90,7 +92,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   },
   // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job.
   vercel: {
-    preset: "vercel",
+    host: "vercel",
     blob: { ...files, driver: "vercel-blob", access: "private" },
     database: d1("vitehub-drop-vercel"),
     // Vercel Hobby runs cron jobs at most once a day; other hosts keep the hourly cron.
@@ -98,7 +100,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   },
   // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
   netlify: {
-    preset: "netlify",
+    host: "netlify",
     blob: files,
     database: d1("vitehub-drop-netlify"),
     schedule: { providerOutput: "standalone" },
@@ -107,7 +109,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   // Deno preset has no schedule, so none of the hourly cleanup runs: expired drops and code images stop being served
   // but stay stored, the Trash is never purged, and unused OAuth clients stay registered.
   deno: {
-    preset: "deno",
+    host: "deno",
     blob: {
       ...files,
       driver: "s3",
@@ -120,7 +122,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   // One Node process: local SQLite or explicit D1, files on disk under .data/, in-memory rate limits, and cleanup on a
   // timer inside the process (its run history in KV files).
   vps: {
-    preset: "node",
+    host: "node",
     blob: { ...files, driver: "fs", base: ".data/blob" },
     database:
       database === "sqlite"
@@ -167,17 +169,89 @@ export default defineNuxtConfig({
 
   vitehub: {
     ...VITEHUB[host],
+    publicUrl: process.env.DROP_PUBLIC_URL || undefined,
+    // On a VPS a reverse proxy ends HTTPS, so URLs built from the request (the GitHub callback, the OAuth issuer, the
+    // MCP resource) take `https:` from X-Forwarded-Proto. Hosted platforms already see https.
+    trustProxy: true,
+    // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
+    // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
+    sameOriginWrites: { exclude: ["/mcp"] },
     auth: true,
-    console: {
-      auth: "app",
-      authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)),
-      signInPage: "/signin",
+    console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
+    env: {
+      server: {
+        auth: {
+          github: {
+            // Declared secret so wrangler passes it through with the others (it only injects declared secrets).
+            clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID"), default: "" }),
+            clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET"), default: "" }),
+          },
+          secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
+        },
+        // Every Drop setting is read at runtime: changing one needs a restart, not a rebuild. Each also reads its
+        // canonical VITEHUB_DROP_* name first (VITEHUB_DROP_QUOTAS_ENABLED for quotas.enabled).
+        drop: {
+          // Emails of the admins, comma-separated. Whoever signs in with one of them, verified by any sign-in method, is an admin.
+          admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
+          // personal: drops start private and share by public link. team: everyone signed in is a teammate, drops start
+          // shared with the team, and admins keep the team's folders (shared/share.ts).
+          mode: env.enum(["personal", "team"], { source: env.source("DROP_MODE"), default: "personal" }),
+          // Days a public link stays open: empty for the mode's default (team 7, personal until changed), 0 turns them off.
+          publicLinkDays: env({ source: env.source("DROP_PUBLIC_LINK_DAYS"), default: "" }),
+          // Only active members of this GitHub organization may sign in, open shared links, or use MCP.
+          // Emails of the only people who may sign in, open shared links, or use MCP, comma-separated; admins always may.
+          // Verified by any sign-in method, like DROP_ADMINS. Empty lets anyone in.
+          members: env({ secret: true, source: env.source("DROP_MEMBERS"), default: "" }),
+          githubOrg: env({ source: env.source("DROP_GITHUB_ORG"), default: "" }),
+          // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
+          authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
+          authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),
+          // Email and password sign-in outside `nuxt dev`, for the runtime tests.
+          testSignin: env.boolean({ source: env.source("DROP_TEST_SIGNIN"), default: false }),
+          shareApproval: env.boolean({ source: env.source("DROP_SHARE_APPROVAL"), default: false }),
+          abuseEmail: env({ source: env.source("DROP_ABUSE_EMAIL"), default: "" }),
+          // Days a review drop lives after its last visit (temporary ones at most 14); 0 keeps every drop.
+          expiryDays: env.number({ source: env.source("DROP_EXPIRY_DAYS"), default: DEFAULT_EXPIRY_DAYS }),
+          // false lets only admins keep drops.
+          customExpiry: env.boolean({ source: env.source("DROP_CUSTOM_EXPIRY"), default: true }),
+          // Where apps and HTML docs run: https://*-drop.example.com gives each drop its own subdomain (see server/utils/content-origin.ts).
+          contentOrigin: env({ source: env.source("DROP_CONTENT_ORIGIN"), default: "" }),
+          // Owner quotas: one plan for everyone (shared/quotas.ts).
+          quotas: {
+            enabled: env.boolean({ source: env.source("DROP_QUOTAS"), default: false }),
+            plan: env.enum(PLANS, { source: env.source("DROP_DEFAULT_PLAN"), default: "free" }),
+            // Unset keeps Pro drops unlimited; a number caps them.
+            proDrops: env.number({ optional: true, source: env.source("DROP_PRO_DROPS") }),
+            proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
+            proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
+            // Drops a Free plan keeps forever at once; Pro keeps any number.
+            freeKept: env.number({ source: env.source("DROP_FREE_KEPT"), default: DEFAULT_FREE_KEPT }),
+          },
+          // Teams on a personal Drop: people make a team, invite others, and share its folders with them (server/utils/teams.ts).
+          teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
+          // Paid teams through Stripe. Billing is on once the key, the webhook secret, and the per-member price are all set.
+          billing: {
+            stripeSecretKey: env({ secret: true, source: env.source("STRIPE_SECRET_KEY"), default: "" }),
+            stripeWebhookSecret: env({ secret: true, source: env.source("STRIPE_WEBHOOK_SECRET"), default: "" }),
+            // A recurring price per member (quantity = members), and optionally its yearly one.
+            priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
+            annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),
+            // Members a team has before it needs a subscription.
+            freeMembers: env.number({
+              source: env.source("DROP_FREE_TEAM_MEMBERS"),
+              default: DEFAULT_FREE_TEAM_MEMBERS,
+            }),
+            // Stripe as merchant of record, which files sales tax and VAT. Turn off to sell under your own account.
+            managedPayments: env.boolean({ source: env.source("STRIPE_MANAGED_PAYMENTS"), default: true }),
+          },
+        },
+      },
     },
   },
 
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
   $development: {
-    vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
+    vitehub: { blob: { driver: "fs", serve: { route: "/f", access: "public" } } },
   },
 
   css: [
@@ -195,7 +269,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     release,
     seoIndex: false,
-    clientIpHeader: CLIENT_IP_HEADERS[host],
+    clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
     public: { realtime: liveEditing },
   },
 
@@ -372,74 +446,5 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [reviewPresence()],
-    env: {
-      server: {
-        auth: {
-          github: {
-            // Declared secret so wrangler passes it through with the others (it only injects declared secrets).
-            clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID"), default: "" }),
-            clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET"), default: "" }),
-          },
-          secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
-        },
-        // Every Drop setting is read at runtime: changing one needs a restart, not a rebuild. Each also reads its
-        // canonical VITEHUB_DROP_* name first (VITEHUB_DROP_QUOTAS_ENABLED for quotas.enabled).
-        drop: {
-          // Emails of the admins, comma-separated. Whoever signs in with one of them, verified by any sign-in method, is an admin.
-          admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
-          // personal: drops start private and share by public link. team: everyone signed in is a teammate, drops start
-          // shared with the team, and admins keep the team's folders (shared/share.ts).
-          mode: env.enum(["personal", "team"], { source: env.source("DROP_MODE"), default: "personal" }),
-          // Days a public link stays open: empty for the mode's default (team 7, personal until changed), 0 turns them off.
-          publicLinkDays: env({ source: env.source("DROP_PUBLIC_LINK_DAYS"), default: "" }),
-          // Only active members of this GitHub organization may sign in, open shared links, or use MCP.
-          // Emails of the only people who may sign in, open shared links, or use MCP, comma-separated; admins always may.
-          // Verified by any sign-in method, like DROP_ADMINS. Empty lets anyone in.
-          members: env({ secret: true, source: env.source("DROP_MEMBERS"), default: "" }),
-          githubOrg: env({ source: env.source("DROP_GITHUB_ORG"), default: "" }),
-          // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
-          authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
-          authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),
-          // Email and password sign-in outside `nuxt dev`, for the runtime tests.
-          testSignin: env.boolean({ source: env.source("DROP_TEST_SIGNIN"), default: false }),
-          shareApproval: env.boolean({ source: env.source("DROP_SHARE_APPROVAL"), default: false }),
-          abuseEmail: env({ source: env.source("DROP_ABUSE_EMAIL"), default: "" }),
-          // Days a review drop lives after its last visit (temporary ones at most 14); 0 keeps every drop.
-          expiryDays: env.number({ source: env.source("DROP_EXPIRY_DAYS"), default: DEFAULT_EXPIRY_DAYS }),
-          // false lets only admins keep drops.
-          customExpiry: env.boolean({ source: env.source("DROP_CUSTOM_EXPIRY"), default: true }),
-          // Where apps and HTML docs run: https://*-drop.example.com gives each drop its own subdomain (see server/utils/content-origin.ts).
-          contentOrigin: env({ source: env.source("DROP_CONTENT_ORIGIN"), default: "" }),
-          // Owner quotas: one plan for everyone (shared/quotas.ts).
-          quotas: {
-            enabled: env.boolean({ source: env.source("DROP_QUOTAS"), default: false }),
-            plan: env.enum(PLANS, { source: env.source("DROP_DEFAULT_PLAN"), default: "free" }),
-            // Unset keeps Pro drops unlimited; a number caps them.
-            proDrops: env.number({ optional: true, source: env.source("DROP_PRO_DROPS") }),
-            proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
-            proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
-            // Drops a Free plan keeps forever at once; Pro keeps any number.
-            freeKept: env.number({ source: env.source("DROP_FREE_KEPT"), default: DEFAULT_FREE_KEPT }),
-          },
-          // Teams on a personal Drop: people make a team, invite others, and share its folders with them (server/utils/teams.ts).
-          teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
-          // Paid teams through Stripe. Billing is on once the key, the webhook secret, and the per-member price are all set.
-          billing: {
-            stripeSecretKey: env({ secret: true, source: env.source("STRIPE_SECRET_KEY"), default: "" }),
-            stripeWebhookSecret: env({ secret: true, source: env.source("STRIPE_WEBHOOK_SECRET"), default: "" }),
-            // A recurring price per member (quantity = members), and optionally its yearly one.
-            priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
-            annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),
-            // Members a team has before it needs a subscription.
-            freeMembers: env.number({
-              source: env.source("DROP_FREE_TEAM_MEMBERS"),
-              default: DEFAULT_FREE_TEAM_MEMBERS,
-            }),
-            // Stripe as merchant of record, which files sales tax and VAT. Turn off to sell under your own account.
-            managedPayments: env.boolean({ source: env.source("STRIPE_MANAGED_PAYMENTS"), default: true }),
-          },
-        },
-      },
-    },
   },
 })

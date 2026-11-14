@@ -15,8 +15,7 @@ import { isPreviewLink, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
-import { AvatarStack } from "vite-hub/ui/avatar-stack"
-import { ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui/connection-status"
+import { AvatarStack, ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui"
 // The parts' one stylesheet: comments, presence, and the editor's carets.
 import "vite-hub/ui/styles.css"
 
@@ -120,7 +119,7 @@ function showComments() {
   detailsPop.value = null
 }
 function closeComments() {
-  popover.value = null
+  if (popover.value?.type === "thread") popover.value = null
   commentsOpen.value = false
   tool.value = "browse"
   annotations.beginFocus()
@@ -250,12 +249,12 @@ const framed = computed(
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
-/** Whether the viewer stops above the review dock: boards, apps and files have controls along their bottom edge. A
- * video clears the dock inside its own stage, so the stage's color runs under the dock. A site runs under the dock like
- * an HTML doc, and its setup page keeps its own trailing room (ViewerSite). */
+/** Whether the viewer stops above the review dock: boards and files have controls along their bottom edge. A video
+ * clears the dock inside its own stage, so the stage's color runs under the dock. Apps and sites run under the dock like
+ * an HTML doc, so a page fills the pane instead of ending at a cut-off strip; a site's setup page keeps its own trailing
+ * room (ViewerSite). */
 const dockClearance = computed(
-  () =>
-    !editing.value && !trashed.value && !video.value && ["board", "app", "file", "folder"].includes(drop.value.kind),
+  () => !editing.value && !trashed.value && !video.value && ["board", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null

@@ -1,6 +1,6 @@
 import * as v from "valibot"
 import { HTTPError } from "h3"
-import { useServerEnv } from "#vitehub/env/server"
+import { useServerEnv } from "vite-hub/env"
 
 const Membership = v.object({ state: v.picklist(["active", "pending"]) })
 

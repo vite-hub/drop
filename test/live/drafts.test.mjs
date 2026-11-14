@@ -11,7 +11,7 @@ beforeEach(() => objects.clear())
 test("a draft starts from the published body, and opening it again keeps the room's text", async () => {
   assert.equal(await ensureDraft(ID, "# Plan\n"), PATH)
   assert.equal(await readDraft(ID), "# Plan\n")
-  await state.blob.put(PATH, "# Plan\n\nEdited.\n", { access: "private" })
+  await state.blob.put(PATH, "# Plan\n\nEdited.\n")
   await ensureDraft(ID, "# Plan\n")
   assert.equal(await readDraft(ID), "# Plan\n\nEdited.\n")
 })

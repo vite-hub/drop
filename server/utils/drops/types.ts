@@ -1,4 +1,4 @@
-import type { drops } from "../../databases/config"
+import type { drops } from "../../databases/default/index"
 import type { Lifetime } from "#shared/expiry"
 import type { Grant } from "../nodes"
 

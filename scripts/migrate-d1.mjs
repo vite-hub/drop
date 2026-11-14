@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises"
+import { migrations } from "./migrations.mjs"
 import { pathToFileURL } from "node:url"
 
 // Node and Deno can run this without Wrangler or native dependencies.
@@ -36,11 +36,8 @@ export async function migrateD1() {
     "CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
   )
   const applied = new Set((await query("SELECT name FROM d1_migrations")).map((row) => row.name))
-  const directory = new URL("../server/databases/migrations/", import.meta.url)
-  const files = (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort()
-  for (const name of files) {
+  for (const { name, sql } of migrations()) {
     if (applied.has(name)) continue
-    const sql = await readFile(new URL(name, directory), "utf8")
     // D1 executes the SQL and ledger insert in one request. A failure rolls back both.
     await query(`${sql}\n; INSERT INTO d1_migrations (name) VALUES ('${name.replaceAll("'", "''")}');`)
     console.log(`Applied ${name}`)

@@ -6,7 +6,7 @@ import { H3Event } from "h3"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
-const { default: schema } = await import("../../server/databases/config.ts")
+const { default: schema } = await import("../../server/databases/default/index.ts")
 const { proxyAuth } = await import("../../server/utils/proxy-auth.ts")
 const { isGitHubMember } = await import("../../server/utils/github-membership.ts")
 const { default: proxySession } = await import("../../server/middleware/0.15.proxy-session.ts")
@@ -263,6 +263,32 @@ test("proxy sign-in runs Better Auth user and account creation hooks", async () 
       (error) => error.status === 403 && /membership required/i.test(error.message),
     )
   }
+})
+
+test("proxy sign-in works when the request's headers are immutable, as on Deno", async () => {
+  github()
+  state.auth = auth()
+  class ImmutableHeaders extends Headers {
+    set() {
+      throw new TypeError("immutable")
+    }
+    append() {
+      throw new TypeError("immutable")
+    }
+    delete() {
+      throw new TypeError("immutable")
+    }
+  }
+  const request = new Request("https://drop.example/review/connect")
+  Object.defineProperty(request, "headers", {
+    value: new ImmutableHeaders({ "x-auth-request-access-token": "test-immutable" }),
+    configurable: true,
+  })
+  const event = new H3Event(request)
+  await proxySession(event)
+  assert.ok(event.res.headers.getSetCookie().length > 0, "The browser gets the session cookie")
+  const session = await state.auth.api.getSession({ headers: event.req.headers })
+  assert.equal(session?.user.email, "maxi@example.com", "The same request sees the new session")
 })
 
 test("a Better Auth user policy rejection leaves no proxy user or account", async () => {
