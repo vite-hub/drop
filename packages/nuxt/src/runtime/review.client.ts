@@ -4,7 +4,8 @@ import { reviewScript } from "./script.ts"
 
 import type { DropPublicConfig } from "./script.ts"
 
-// Runs in the browser, so a deployment turns review.js on or off with NUXT_PUBLIC_DROP_URL, prerendered pages included.
+// Reads the runtime config the page was rendered with: per request on server-rendered pages, and frozen at prerender time
+// on prerendered ones.
 export default defineNuxtPlugin(() => {
   const script = reviewScript(useRuntimeConfig().public.drop as Partial<DropPublicConfig> | undefined)
   if (!script) return

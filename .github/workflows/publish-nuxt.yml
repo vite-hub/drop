@@ -1,6 +1,7 @@
 name: publish @vite-hub/drop
 
-# Push a tag such as `nuxt-v0.1.0` after bumping packages/nuxt/package.json to the same version.
+# Push a tag such as `nuxt-v0.1.0` after bumping packages/nuxt/package.json to the same version. Its @vite-hub/forge
+# must be a ViteHub release, not a pkg.pr.new build: the module bundles it.
 on:
   push:
     tags: ["nuxt-v*"]
@@ -33,7 +34,11 @@ jobs:
       - name: Check the tag matches the version
         working-directory: packages/nuxt
         run: test "nuxt-v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - name: Check the bundled Forge is a ViteHub release
+        run: "! grep -n pkg.pr.new packages/nuxt/package.json"
       - run: pnpm --filter @vite-hub/drop test
-      - run: pnpm --filter @vite-hub/drop build
+      # pnpm pack runs the build and writes real versions for `catalog:` specs; npm publish would keep them as they are.
       - working-directory: packages/nuxt
-        run: npm publish --provenance --access public
+        run: pnpm pack --out package.tgz
+      - working-directory: packages/nuxt
+        run: npm publish package.tgz --provenance --access public
