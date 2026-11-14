@@ -285,7 +285,7 @@ export async function storePageImage(file: { name: string; size: number; data: U
   const contentType = imageType(file.data)
   if (!contentType) throw new HTTPError({ status: 400, statusText: "Images must be PNG, JPEG, WebP, or GIF." })
   const key = `comments/page/${crypto.randomUUID()}/${imageName(file.name, contentType)}`
-  const [error] = await blob.put(key, file.data, { access: "private", contentType })
+  const [error] = await blob.put(key, file.data, { contentType })
   if (error) throw storageFailure(error)
   return key
 }
