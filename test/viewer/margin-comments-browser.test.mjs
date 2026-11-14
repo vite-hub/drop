@@ -413,7 +413,7 @@ test("an open thread is written in where it is: over its margin card, else besid
   }
 }, 30_000)
 
-test("a saved area is a soft neutral hairline, firmer while its thread is open, and the one drawn keeps the tools' blue", async () => {
+test("a saved area is a soft line of ViteHub's comment blue, full blue while its thread is open, as is the one drawn", async () => {
   const browser = await chromium.launch()
   try {
     const { page, frame } = await open(browser, 1440)
@@ -422,30 +422,27 @@ test("a saved area is a soft neutral hairline, firmer while its thread is open, 
         const root = document.querySelector("drop-comments").shadowRoot
         const style = (el) => {
           const css = getComputedStyle(el)
-          return {
-            border: css.borderTopColor,
-            width: css.borderTopWidth,
-            ring: css.boxShadow,
-            fill: css.backgroundColor,
-          }
+          return { border: css.borderTopColor, width: css.borderTopWidth, fill: css.backgroundColor }
         }
         const drawing = document.createElement("div")
         drawing.className = "a"
         root.querySelector(".draft").appendChild(drawing)
+        // ViteHub's comment blue (--ring in @vite-hub/ui/theme.css), whole and at half strength.
         const probe = document.createElement("i")
-        probe.style.color = "oklch(0.62 0.18 255)"
         document.body.appendChild(probe)
+        probe.style.color = "oklch(0.588 0.158 241.966)"
         const blue = getComputedStyle(probe).color
-        const result = { area: style(root.querySelector('.a[data-for="c8"]')), draft: style(drawing), blue }
+        probe.style.color = "color-mix(in oklab, oklch(0.588 0.158 241.966) 50%, transparent)"
+        const half = getComputedStyle(probe).color
+        const result = { area: style(root.querySelector('.a[data-for="c8"]')), draft: style(drawing), blue, half }
         probe.remove()
         drawing.remove()
         return result
       })
     const saved = await look()
-    // Dark at low alpha with a light ring: it shows on a light page and a dark one, and covers nothing.
-    assert.equal(saved.area.border, "rgba(0, 0, 0, 0.22)")
+    // Half-strength blue with no fill: it shows on a light page and a dark one, and covers nothing.
+    assert.equal(saved.area.border, saved.half)
     assert.equal(saved.area.width, "1px")
-    assert.match(saved.area.ring, /rgba\(255, 255, 255, 0\.24\)/)
     assert.equal(saved.area.fill, "rgba(0, 0, 0, 0)")
     assert.equal(saved.draft.border, saved.blue)
     assert.equal(saved.draft.width, "2px")
@@ -458,7 +455,7 @@ test("a saved area is a soft neutral hairline, firmer while its thread is open, 
       return area.classList.contains("on") && !area.getAnimations().length
     })
     const focused = await look()
-    assert.equal(focused.area.border, "rgba(0, 0, 0, 0.45)")
+    assert.equal(focused.area.border, focused.blue)
     assert.notEqual(focused.area.fill, "rgba(0, 0, 0, 0)", "the open thread's area takes a faint tint")
   } finally {
     await browser.close()

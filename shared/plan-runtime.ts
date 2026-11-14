@@ -375,14 +375,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
     '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
     '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
-    // A saved area or quote is a soft hairline, so many of them don't cover a busy page: dark at low alpha with a light
-    // ring outside it, which shows on a light page, a dark one, and a white image on either. The thread that's open,
-    // pointed at, or focused (on, pulse) gets a firmer line and a faint tint, and a resolved one turns dashed. The area
-    // being drawn or written on (.draw, .draft) keeps the tools' blue (--hi), with corner handles and its size while dragging.
-    '.a{position:absolute;box-sizing:border-box;border:calc(1px * var(--drop-z,1)) solid rgb(0 0 0/.22);border-radius:3px;box-shadow:0 0 0 calc(1px * var(--drop-z,1)) rgb(255 255 255/.24);pointer-events:none;transition:border-color 150ms ease-out,box-shadow 150ms ease-out,background-color 150ms ease-out}' +
-    '.a.on,.a.pulse{border-color:rgb(0 0 0/.45);box-shadow:0 0 0 calc(1px * var(--drop-z,1)) rgb(255 255 255/.45);background:rgb(128 128 128/.08)}.a.done{border-style:dashed;opacity:.6}' +
-    '.draw .a,.draft .a{border:calc(2px * var(--drop-z,1)) solid var(--hi);box-shadow:none;background:color-mix(in oklab,var(--hi) 16%,transparent)}' +
-    '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--hi);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
+    // Comment marks use ViteHub's comment blue (--cm, --ring in @vite-hub/ui/theme.css), as the ViteHub pill does. A
+    // saved area or quote is a 1px line of it at half strength with no fill, so many of them don't cover a busy page. The
+    // thread that's open, pointed at, or focused (on, pulse) gets the full blue and a faint tint, and a resolved one turns
+    // dashed and grey. The area being drawn or written on (.draw, .draft) is the full blue, with corner handles and its
+    // size while dragging. The measuring tools keep their own blue (--hi).
+    '.a{position:absolute;box-sizing:border-box;border:calc(1px * var(--drop-z,1)) solid color-mix(in oklab,var(--cm) 50%,transparent);border-radius:4px;pointer-events:none;transition:border-color 150ms ease-out,background-color 150ms ease-out}' +
+    '.a.on,.a.pulse{border-color:var(--cm);background:color-mix(in oklab,var(--cm) 8%,transparent)}.a.done{border-style:dashed;border-color:color-mix(in oklab,var(--muted-foreground) 50%,transparent)}' +
+    '.draw .a,.draft .a{border:calc(2px * var(--drop-z,1)) solid var(--cm);border-radius:3px;background:color-mix(in oklab,var(--cm) 16%,transparent)}' +
+    '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--cm);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
     '.a .tag{position:absolute;left:-2px;top:calc(100% + 6px)}' +
     // A comment shown on its own while the eye hides the rest (view.only) pops out when it goes: shrinks and fades.
     '.leave>*{pointer-events:none;animation:drop-leave 180ms cubic-bezier(.4,0,1,1) forwards}.leave>.a{animation-name:drop-leave-area}' +
@@ -392,11 +393,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
     '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
     '.ink path,.inkp path{fill:none;stroke-linecap:round;stroke-linejoin:round}.ink .mk,.inkp .mk{stroke-opacity:.4;stroke-linecap:butt}' +
-    '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--hi);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
+    '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--cm);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
     // (4.7:1 under white) behind labels, its white card and rulers in light mode and their dark cut in dark, and the box
     // model in DevTools' colors.
-    ':host{--hi:oklch(0.62 0.18 255);--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
+    ':host{--hi:oklch(0.62 0.18 255);--cm:' + (DARK ? 'oklch(0.746 0.16 232.661)' : 'oklch(0.588 0.158 241.966)') + ';--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
     (DARK ? '--sf:#18181b;--ink:#fafafa;--ink-muted:#a1a1aa;--tick:#52525b;--float:0 0 0 .5px rgb(255 255 255/.16),0 1px 1px rgb(0 0 0/.125),0 2px 5px rgb(0 0 0/.125),0 3px 8px rgb(0 0 0/.125)}'
       : '--sf:#fff;--ink:#18181b;--ink-muted:#71717a;--tick:#cbd5e1;--float:0 0 0 .5px rgb(0 0 0/.18),0 1px 1px rgb(0 0 0/.06),0 3px 9px rgb(0 0 0/.06),0 6px 18px rgb(0 0 0/.03)}') +
     '.fx>*{position:fixed;box-sizing:border-box;pointer-events:none}.hl{outline:1.5px solid var(--hi);outline-offset:-.75px}.hl.sel{outline-width:2px;background:color-mix(in oklab,var(--hi) 8%,transparent)}' +
