@@ -375,22 +375,29 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
     '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
     '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
-    // Areas take the tools' blue (--hi): a line in the text color vanished on a dark page over a white image. Text keeps
-    // its outline in the text color, and a resolved area turns gray. While dragging, corner handles and the size show.
-    '.a{position:absolute;box-sizing:border-box;border:calc(2px * var(--drop-z,1)) solid var(--hi);border-radius:3px;background:color-mix(in oklab,var(--hi) 16%,transparent);pointer-events:none;transition:background 120ms}' +
-    '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--hi) 32%,transparent)}' +
-    '.a.t{border-width:calc(1.5px * var(--drop-z,1));border-color:var(--foreground);background:none}.a.t.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
-    '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--hi);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
+    // Comment marks use ViteHub's comment blue (--cm, --ring in @vite-hub/ui/theme.css), as the ViteHub pill does. A
+    // saved area or quote is a 1px line of it at half strength with no fill, so many of them don't cover a busy page. The
+    // thread that's open, pointed at, or focused (on, pulse) gets the full blue and a faint tint, and a resolved one turns
+    // dashed and grey. The area being drawn or written on (.draw, .draft) is the full blue, with corner handles and its
+    // size while dragging. The measuring tools keep their own blue (--hi).
+    '.a{position:absolute;box-sizing:border-box;border:calc(1px * var(--drop-z,1)) solid color-mix(in oklab,var(--cm) 50%,transparent);border-radius:4px;pointer-events:none;transition:border-color 150ms ease-out,background-color 150ms ease-out}' +
+    '.a.on,.a.pulse{border-color:var(--cm);background:color-mix(in oklab,var(--cm) 8%,transparent)}.a.done{border-style:dashed;border-color:color-mix(in oklab,var(--muted-foreground) 50%,transparent)}' +
+    '.draw .a,.draft .a{border:calc(2px * var(--drop-z,1)) solid var(--cm);border-radius:3px;background:color-mix(in oklab,var(--cm) 16%,transparent)}' +
+    '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--cm);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
     '.a .tag{position:absolute;left:-2px;top:calc(100% + 6px)}' +
+    // A comment shown on its own while the eye hides the rest (view.only) pops out when it goes: shrinks and fades.
+    '.leave>*{pointer-events:none;animation:drop-leave 180ms cubic-bezier(.4,0,1,1) forwards}.leave>.a{animation-name:drop-leave-area}' +
+    '@keyframes drop-leave{to{opacity:0;transform:scale(.6)}}@keyframes drop-leave-area{to{opacity:0;transform:scale(.97)}}' +
+    '@media (prefers-reduced-motion:reduce){.leave>*,.leave>.a{animation-name:drop-fade}}@keyframes drop-fade{to{opacity:0}}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
     // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
     '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
     '.ink path,.inkp path{fill:none;stroke-linecap:round;stroke-linejoin:round}.ink .mk,.inkp .mk{stroke-opacity:.4;stroke-linecap:butt}' +
-    '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--hi);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
+    '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--cm);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
     // (4.7:1 under white) behind labels, its white card and rulers in light mode and their dark cut in dark, and the box
     // model in DevTools' colors.
-    ':host{--hi:oklch(0.62 0.18 255);--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
+    ':host{--hi:oklch(0.62 0.18 255);--cm:' + (DARK ? 'oklch(0.746 0.16 232.661)' : 'oklch(0.588 0.158 241.966)') + ';--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
     (DARK ? '--sf:#18181b;--ink:#fafafa;--ink-muted:#a1a1aa;--tick:#52525b;--float:0 0 0 .5px rgb(255 255 255/.16),0 1px 1px rgb(0 0 0/.125),0 2px 5px rgb(0 0 0/.125),0 3px 8px rgb(0 0 0/.125)}'
       : '--sf:#fff;--ink:#18181b;--ink-muted:#71717a;--tick:#cbd5e1;--float:0 0 0 .5px rgb(0 0 0/.18),0 1px 1px rgb(0 0 0/.06),0 3px 9px rgb(0 0 0/.06),0 6px 18px rgb(0 0 0/.03)}') +
     '.fx>*{position:fixed;box-sizing:border-box;pointer-events:none}.hl{outline:1.5px solid var(--hi);outline-offset:-.75px}.hl.sel{outline-width:2px;background:color-mix(in oklab,var(--hi) 8%,transparent)}' +
@@ -416,6 +423,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '</style>';
   shadow.innerHTML = STYLE + RAIL_STYLE + LAYERS;
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
+  const leave = shadow.appendChild(Object.assign(document.createElement("div"), { className: "leave" }));
 
   // Live cursors: the people in the drop's presence room point here too. Drop says when this reader shares their pointer
   // ("cursors" with share), and it goes up at most every 50 ms, as the element under it and the spot inside it.
@@ -705,7 +713,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   let pinsPrimed = false, draftPinShown = false, quietUntil = 0;
   /** The right edge of the doc's text, and room for a pin beside it: a narrow page pads the column to make that room. */
   function gutter() {
-    const root = document.documentElement, want = pinMode() && view.pins && (drafting() || markers.some((m) => m.kind === "text"));
+    const root = document.documentElement, want = pinMode() && (drafting() || shownMarkers().some((m) => m.kind === "text"));
     if (!want) { root.removeAttribute("data-drop-pins"); return 0; }
     root.removeAttribute("data-drop-pins");
     let r = article.getBoundingClientRect(), pad = parseFloat(getComputedStyle(article).paddingRight) || 0;
@@ -764,12 +772,16 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     into.appendChild(dot);
   }
 
+  /** The comments that draw: all of them, or while the eye hides them, the ones Drop still shows (view.only). */
+  const shownMarkers = () => (view.pins ? markers : markers.filter((m) => view.only.has(m.id)));
   function render() {
     lastPins = new Map(Array.from(marks.querySelectorAll(":scope > .m[data-id]:not(.gp)"), (dot) => [dot.dataset.id, dot]));
     marks.innerHTML = "";
     // Hidden comments (the toolbar's eye) give the doc its margin back, so the column centers again. Shown before
-    // drawing, so the margin's cards measure their size when the eye turns them back on.
-    marks.style.display = view.pins ? "" : "none";
+    // drawing, so the margin's cards measure their size when the eye turns them back on. While hidden, the layer still
+    // shows the comments Drop names (view.only) and the reader's draft pin.
+    const shown = shownMarkers();
+    marks.style.display = view.pins || shown.length || drafting() ? "" : "none";
     const layer = zoom && zoomLayer(), zoomMarks = layer && layer.querySelector(".marks");
     const aside = zoomMarks && zoomAside(), asideMarks = aside && aside.querySelector(".marks");
     if (zoomMarks) zoomMarks.innerHTML = "";
@@ -792,7 +804,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (anchor && document.documentElement.style.getPropertyValue("--drop-anchor") !== anchor) document.documentElement.style.setProperty("--drop-anchor", anchor);
     }
     // After the bubbles: each is inserted at its quote's end, so the new words land between the quote and its bubble.
-    const redlined = view.pins && !zoom ? markers.filter((m) => suggests(m) && ranges.get(m.id)) : [];
+    const redlined = !zoom ? shown.filter((m) => suggests(m) && ranges.get(m.id)) : [];
     for (const m of redlined) insertSuggestion(m, ranges.get(m.id));
     // The strike's style is in BUBBLES too: a deletion with no margin open still needs it.
     if (redlined.length && !BUBBLES.isConnected) document.head.appendChild(BUBBLES);
@@ -802,6 +814,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         // Placed from the anchor's current box, so areas and pins follow reflow.
         const el = query(m.selector);
         if (!el || (m.earlier && !sameAnchor(el, m))) { unplaced.push(m.id); continue; }
+        if (!shown.includes(m)) continue;
         resized.observe(el);
         const r = el.getBoundingClientRect();
         // A hidden anchor keeps a pin, without its area, on what stands in for it until it shows again.
@@ -827,6 +840,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       } else {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
+        if (!shown.includes(m)) continue;
         const railedHere = bubbles.has(m.id);
         textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere, suggest: suggests(m) });
         if (zoom) continue;
@@ -843,13 +857,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         }
         if (railedHere) { railed.push({ m, last, lines }); continue; }
         if (pins && article.contains(range.commonAncestorContainer)) { gutterPin(m, last, gutterX); continue; }
-        for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
+        for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "")).dataset.for = m.id;
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
       placePin(m, x, y, into, false);
     }
     railHits = railed.map(({ m, lines }) => ({ id: m.id, boxes: lines.map((l) => ({ left: l.left + scrollX, right: l.right + scrollX, top: l.top + scrollY, bottom: l.bottom + scrollY })) }));
-    if (pins && view.pins && drafting()) { const lines = drafted.getClientRects(); if (lines.length) gutterPin(null, lines[lines.length - 1], gutterX); }
+    if (pins && drafting()) { const lines = drafted.getClientRects(); if (lines.length) gutterPin(null, lines[lines.length - 1], gutterX); }
     if (!drafted) draftPinShown = false;
     const draftLines = wide && view.pins && !zoom && drafting() ? drafted.getClientRects() : [];
     if (draftLines.length) railed.push({ m: null, last: draftLines[draftLines.length - 1], lines: [] });
@@ -1039,8 +1053,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       group.toggleAttribute("data-covered", covered && group.dataset.id === opened);
     });
     for (const [id, bubble] of bubbles) bubble.toggleAttribute("data-on", on.has(id));
+    // Its area or quote outline too, on the page and on a zoom's copy.
+    const roots = [marks];
+    if (zoom) for (const box of [zoom.layer, zoom.aside]) { const host = box && Array.from(box.children).find((el) => el.localName === "drop-comments"); if (host) roots.push(host.shadowRoot); }
+    for (const root of roots) root.querySelectorAll(".a[data-for]").forEach((box) => box.classList.toggle("on", on.has(box.dataset.for)));
     if (!highlights) return;
-    const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
+    // Only the comments that draw have ranges (render), so hidden ones lose their marks too.
+    const show = (pick) => new Highlight(...textRanges.filter(pick).map((t) => t.range));
     CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail && !t.suggest));
     CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail && !t.suggest));
     // Under the others, so a picked suggestion takes their tint and keeps its strike.
@@ -1156,7 +1175,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   let tool = "browse", layer = null, hovered = null, picked = null, pointComments = false, clickComments = false;
   // style: how comments on a Markdown doc's text show ("card": the margin's cards, "pin": gutter pins); me: who the
   // reader is, for the draft's pin.
-  const view = { rulers: false, xray: false, pins: true, style: "card", me: null };
+  const view = { rulers: false, xray: false, pins: true, style: "card", me: null, only: new Set() };
   const fx = document.createElement("div");
   fx.className = "fx";
   /**
@@ -1835,12 +1854,29 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const xrayStyle = document.createElement("style");
   xrayStyle.textContent = "*:not(drop-comments){outline:1px solid oklch(0.62 0.18 255) !important;outline-offset:-1px !important}";
   function setView(next) {
-    view.rulers = Boolean(next.rulers); view.pins = next.pins !== false;
+    const pins = next.pins !== false, only = new Set(Array.isArray(next.only) ? next.only.filter((id) => typeof id === "string") : []);
+    // While the eye hides comments, one Drop stops showing on its own leaves with a pop-out: a copy of its pin and area
+    // plays it once the page drew without it.
+    const gone = view.pins || pins ? [] : [...view.only].filter((id) => !only.has(id));
+    const ghosts = gone.flatMap((id) => Array.from(marks.querySelectorAll('[data-id="' + CSS.escape(id) + '"],[data-for="' + CSS.escape(id) + '"]'), (el) => {
+      const ghost = el.cloneNode(true);
+      ghost.classList.remove("pulse", "in");
+      ghost.removeAttribute("data-id"); ghost.removeAttribute("data-for");
+      return ghost;
+    }));
+    view.pins = pins; view.only = only;
+    view.rulers = Boolean(next.rulers);
     view.style = next.style === "pin" ? "pin" : "card";
     view.me = next.me && typeof next.me.name === "string" ? { name: next.me.name, image: typeof next.me.image === "string" ? next.me.image : null } : null;
     if (Boolean(next.xray) !== xrayStyle.isConnected) { if (next.xray) document.head.appendChild(xrayStyle); else xrayStyle.remove(); }
     view.xray = Boolean(next.xray);
     render(); redraw();
+    if (pins) leave.replaceChildren();
+    for (const ghost of ghosts) {
+      leave.appendChild(ghost);
+      ghost.addEventListener("animationend", () => ghost.remove());
+      setTimeout(() => ghost.remove(), 400);
+    }
   }
   addEventListener("scroll", () => { if (tool !== "browse" || view.rulers) redraw(); }, { capture: true, passive: true });
   drawRulers();

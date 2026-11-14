@@ -413,22 +413,117 @@ test("an open thread is written in where it is: over its margin card, else besid
   }
 }, 30_000)
 
-test("an area is drawn in the tools' blue, which shows on a dark page and on a white image alike", async () => {
+test("a saved area is a soft line of ViteHub's comment blue, full blue while its thread is open, as is the one drawn", async () => {
   const browser = await chromium.launch()
   try {
-    const { frame } = await open(browser, 1440)
-    const look = await frame.evaluate(() => {
-      const root = document.querySelector("drop-comments").shadowRoot
-      const area = getComputedStyle(root.querySelector(".a:not(.t)"))
-      const probe = document.createElement("i")
-      probe.style.color = "oklch(0.62 0.18 255)"
-      document.body.appendChild(probe)
-      const blue = getComputedStyle(probe).color
-      probe.remove()
-      return { border: area.borderTopColor, width: area.borderTopWidth, blue }
+    const { page, frame } = await open(browser, 1440)
+    const look = () =>
+      frame.evaluate(() => {
+        const root = document.querySelector("drop-comments").shadowRoot
+        const style = (el) => {
+          const css = getComputedStyle(el)
+          return { border: css.borderTopColor, width: css.borderTopWidth, fill: css.backgroundColor }
+        }
+        const drawing = document.createElement("div")
+        drawing.className = "a"
+        root.querySelector(".draft").appendChild(drawing)
+        // ViteHub's comment blue (--ring in @vite-hub/ui/theme.css), whole and at half strength.
+        const probe = document.createElement("i")
+        document.body.appendChild(probe)
+        probe.style.color = "oklch(0.588 0.158 241.966)"
+        const blue = getComputedStyle(probe).color
+        probe.style.color = "color-mix(in oklab, oklch(0.588 0.158 241.966) 50%, transparent)"
+        const half = getComputedStyle(probe).color
+        const result = { area: style(root.querySelector('.a[data-for="c8"]')), draft: style(drawing), blue, half }
+        probe.remove()
+        drawing.remove()
+        return result
+      })
+    const saved = await look()
+    // Half-strength blue with no fill: it shows on a light page and a dark one, and covers nothing.
+    assert.equal(saved.area.border, saved.half)
+    assert.equal(saved.area.width, "1px")
+    assert.equal(saved.area.fill, "rgba(0, 0, 0, 0)")
+    assert.equal(saved.draft.border, saved.blue)
+    assert.equal(saved.draft.width, "2px")
+
+    await page.evaluate(() =>
+      document.querySelector("iframe").contentWindow.postMessage({ __drop: true, type: "active", id: "c8" }, "*"),
+    )
+    await frame.waitForFunction(() => {
+      const area = document.querySelector("drop-comments").shadowRoot.querySelector('.a[data-for="c8"]')
+      return area.classList.contains("on") && !area.getAnimations().length
     })
-    assert.equal(look.border, look.blue)
-    assert.equal(look.width, "2px")
+    const focused = await look()
+    assert.equal(focused.area.border, focused.blue)
+    assert.notEqual(focused.area.fill, "rgba(0, 0, 0, 0)", "the open thread's area takes a faint tint")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("with comments hidden, an area Drop still shows draws alone, and pops out with its pin when it goes", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    const say = (message) =>
+      page.evaluate(
+        (message) => document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, "*"),
+        message,
+      )
+    const layer = () =>
+      frame.evaluate(() => {
+        const root = document.querySelector("drop-comments").shadowRoot
+        const visible = (selector) =>
+          [...root.querySelectorAll(selector)]
+            .filter((el) => el.checkVisibility())
+            .map((el) => el.dataset.id ?? el.dataset.for)
+        return {
+          pins: visible(".marks > .m"),
+          areas: visible(".marks > .a"),
+          rail: document.documentElement.getAttribute("data-drop-rail"),
+          leaving: root.querySelectorAll(".leave > *").length,
+        }
+      })
+    await say({ type: "view", pins: false, only: ["c8"] })
+    await frame.waitForFunction(() => document.documentElement.getAttribute("data-drop-rail") === null)
+    assert.deepEqual(await layer(), { pins: ["c8"], areas: ["c8"], rail: null, leaving: 0 })
+    await say({ type: "view", pins: false, only: [] })
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".leave > *"))
+    assert.deepEqual(await layer(), { pins: [], areas: [], rail: null, leaving: 2 })
+    await frame.waitForFunction(() => !document.querySelector("drop-comments").shadowRoot.querySelector(".leave > *"))
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("missing earlier-version anchors stay unplaced while overlays are hidden or temporarily revealed", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    const missing = [
+      text("missing-text", "A paragraph removed in version two", { earlier: true }),
+      { ...markers[7], id: "missing-area", selector: "#removed", earlier: true },
+      { ...markers[7], id: "changed-area", label: 'h1 "Old title"', earlier: true },
+    ]
+    const say = async (message) => {
+      await page.evaluate((message) => {
+        document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, "*")
+      }, message)
+      await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await page.waitForFunction(() => window.posts.some((message) => message.type === "unplaced"))
+      return page.evaluate(() => window.posts.findLast((message) => message.type === "unplaced").ids)
+    }
+    const expected = missing.map((marker) => marker.id).sort()
+    assert.deepEqual((await say({ type: "markers", markers: [...markers, ...missing] })).sort(), expected)
+    for (const view of [
+      { pins: false, only: [] },
+      { pins: false, only: ["c8"] },
+      { pins: false, only: [] },
+      { pins: true },
+    ]) {
+      assert.deepEqual((await say({ type: "view", ...view })).sort(), expected)
+    }
   } finally {
     await browser.close()
   }

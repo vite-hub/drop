@@ -269,7 +269,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     release,
     seoIndex: false,
-    clientIpHeader: CLIENT_IP_HEADERS[host],
+    clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
     public: { realtime: liveEditing },
   },
 

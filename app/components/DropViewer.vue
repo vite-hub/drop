@@ -119,6 +119,7 @@ function showComments() {
   detailsPop.value = null
 }
 function closeComments() {
+  if (popover.value?.type === "thread") popover.value = null
   commentsOpen.value = false
   tool.value = "browse"
   annotations.beginFocus()
@@ -248,12 +249,12 @@ const framed = computed(
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
-/** Whether the viewer stops above the review dock: boards, apps and files have controls along their bottom edge. A
- * video clears the dock inside its own stage, so the stage's color runs under the dock. A site runs under the dock like
- * an HTML doc, and its setup page keeps its own trailing room (ViewerSite). */
+/** Whether the viewer stops above the review dock: boards and files have controls along their bottom edge. A video
+ * clears the dock inside its own stage, so the stage's color runs under the dock. Apps and sites run under the dock like
+ * an HTML doc, so a page fills the pane instead of ending at a cut-off strip; a site's setup page keeps its own trailing
+ * room (ViewerSite). */
 const dockClearance = computed(
-  () =>
-    !editing.value && !trashed.value && !video.value && ["board", "app", "file", "folder"].includes(drop.value.kind),
+  () => !editing.value && !trashed.value && !video.value && ["board", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null
@@ -334,9 +335,27 @@ watch(popover, (value, before) => {
   // before.
   if (!before && (value?.type === "new" || value?.type === "thread")) startComment()
   else if (value) showComments()
-  // Writing a comment or opening one brings hidden comments back.
-  if (value) overlays.pins = true
 })
+/**
+ * Hidden comments stay hidden while someone writes one or opens one from the list. The frame still shows the open
+ * thread's pin, and a comment just sent for a moment, then it pops out (`only` in the view the frame gets).
+ */
+const sentShown = ref<string[]>([])
+function showSent(id: string) {
+  if (overlays.pins) return
+  sentShown.value = [...sentShown.value, id]
+  setTimeout(() => (sentShown.value = sentShown.value.filter((shown) => shown !== id)), 2500)
+}
+const shownWhileHidden = computed(() =>
+  overlays.pins
+    ? []
+    : [
+        ...new Set([
+          ...(commentsOpen.value && popover.value?.type === "thread" ? [popover.value.id] : []),
+          ...sentShown.value,
+        ]),
+      ],
+)
 watch(areaMode, (active) => active && showComments())
 watch(
   () => siteRef.value?.pending,
@@ -541,6 +560,7 @@ const {
   comments: computed(() => ({
     style: pinStyle.value ? "pin" : "card",
     me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
+    only: shownWhileHidden.value,
   })),
   variantBar: true,
   arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
@@ -873,6 +893,7 @@ async function submit(body: string, files: File[] = [], mentions: string[] = [])
       if (popoverRef.value === composer) composer?.fail(sent.error)
       return
     }
+    showSent(sent.value.id)
     const cleared = finish(true)
     if (popover.value !== open || popoverRef.value !== composer) return
     if (!cleared) return composer?.fail()

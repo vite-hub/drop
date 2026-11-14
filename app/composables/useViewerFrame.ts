@@ -40,8 +40,11 @@ export function useViewerFrame(options: {
   /** How wide a Markdown doc's text runs. */
   width: Ref<DocWidth>
   annotations: ReturnType<typeof useViewerAnnotations>
-  /** How comments on a Markdown doc's text show (useCommentStyle), and who's reading, for the Pin style's draft pin. */
-  comments?: Ref<{ style: CommentStyle; me: { name: string; image: string | null } | null }>
+  /**
+   * How comments on a Markdown doc's text show (useCommentStyle), who's reading, for the Pin style's draft pin, and the
+   * comments that still show while the eye hides the others (`only`).
+   */
+  comments?: Ref<{ style: CommentStyle; me: { name: string; image: string | null } | null; only: string[] }>
   /** Comments mode (ViewerCommentsSegment): a click on the page, without a drag, comments on the element under it. */
   clickComments?: Ref<boolean>
   /** The open thread floats over its card in the margin, so the doc hides that card under it. */

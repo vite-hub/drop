@@ -212,6 +212,65 @@ test("a mouse selection is reported, and the held draft gets the reader's pin wh
   }
 }, 30_000)
 
+test("with comments hidden, the draft's pin and the comments Drop names in only show, and one that goes pops out", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, 1440)
+    const pins = () =>
+      frame.evaluate(() => {
+        const root = document.querySelector("drop-comments").shadowRoot
+        return {
+          shown: [...root.querySelectorAll(".marks .gp")]
+            .filter((pin) => pin.checkVisibility())
+            .map((pin) => pin.dataset.id ?? "draft"),
+          leaving: root.querySelectorAll(".leave > *").length,
+          open: CSS.highlights.get("drop-open")?.size ?? 0,
+        }
+      })
+    await page.evaluate((view) => window.toFrame({ ...view, pins: false }), view)
+    await frame.waitForFunction(() => !document.querySelector("drop-comments").shadowRoot.querySelector(".marks .gp"))
+    assert.deepEqual(await pins(), { shown: [], leaving: 0, open: 0 })
+
+    // Writing a comment: its draft pin shows, and nothing else does.
+    const p = frame.locator("article p").last()
+    const box = await p.boundingBox()
+    await page.mouse.move(box.x + 4, box.y + 8)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 200, box.y + 10, { steps: 6 })
+    await page.mouse.up()
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "selection" && m.quote))
+    await page.evaluate(() => window.toFrame({ type: "hold-selection" }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "draft-place" && m.pin && !m.id))
+    assert.deepEqual((await pins()).shown, ["draft"])
+
+    // Sent: Drop names it in only, so its pin shows alone; the others stay hidden.
+    await page.evaluate(() => window.toFrame({ type: "clear-selection" }))
+    await page.evaluate(
+      (markers) => window.toFrame({ type: "markers", markers }),
+      [...markers, text("c3", "We copy every comment", { author: "Maxi Garcia" })],
+    )
+    await page.evaluate((view) => window.toFrame({ ...view, pins: false, only: ["c3"] }), view)
+    await frame.waitForFunction(() =>
+      document.querySelector("drop-comments").shadowRoot.querySelector('.gp[data-id="c3"]'),
+    )
+    assert.deepEqual(await pins(), { shown: ["c3"], leaving: 0, open: 1 })
+
+    // Then Drop lets it go: it leaves with a pop-out, and comments are hidden again.
+    await page.evaluate((view) => window.toFrame({ ...view, pins: false, only: [] }), view)
+    const leaving = await pins()
+    assert.deepEqual(leaving, { shown: [], leaving: 1, open: 0 })
+    await frame.waitForFunction(() => !document.querySelector("drop-comments").shadowRoot.querySelector(".leave > *"))
+
+    // The eye still shows every comment.
+    await page.evaluate((view) => window.toFrame(view), view)
+    await frame.waitForFunction(
+      () => document.querySelector("drop-comments").shadowRoot.querySelectorAll(".marks .gp").length === 3,
+    )
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
 test("on a phone the column makes room, so a pin never covers the text", async () => {
   const browser = await chromium.launch()
   try {

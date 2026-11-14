@@ -265,6 +265,32 @@ test("proxy sign-in runs Better Auth user and account creation hooks", async () 
   }
 })
 
+test("proxy sign-in works when the request's headers are immutable, as on Deno", async () => {
+  github()
+  state.auth = auth()
+  class ImmutableHeaders extends Headers {
+    set() {
+      throw new TypeError("immutable")
+    }
+    append() {
+      throw new TypeError("immutable")
+    }
+    delete() {
+      throw new TypeError("immutable")
+    }
+  }
+  const request = new Request("https://drop.example/review/connect")
+  Object.defineProperty(request, "headers", {
+    value: new ImmutableHeaders({ "x-auth-request-access-token": "test-immutable" }),
+    configurable: true,
+  })
+  const event = new H3Event(request)
+  await proxySession(event)
+  assert.ok(event.res.headers.getSetCookie().length > 0, "The browser gets the session cookie")
+  const session = await state.auth.api.getSession({ headers: event.req.headers })
+  assert.equal(session?.user.email, "maxi@example.com", "The same request sees the new session")
+})
+
 test("a Better Auth user policy rejection leaves no proxy user or account", async () => {
   github()
   const instance = auth({ user: { create: { before: async () => false } } })
