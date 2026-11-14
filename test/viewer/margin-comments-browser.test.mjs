@@ -413,22 +413,48 @@ test("an open thread is written in where it is: over its margin card, else besid
   }
 }, 30_000)
 
-test("an area is drawn in the tools' blue, which shows on a dark page and on a white image alike", async () => {
+test("a saved area is a soft neutral hairline, firmer while its thread is open, and the one drawn keeps the tools' blue", async () => {
   const browser = await chromium.launch()
   try {
-    const { frame } = await open(browser, 1440)
-    const look = await frame.evaluate(() => {
-      const root = document.querySelector("drop-comments").shadowRoot
-      const area = getComputedStyle(root.querySelector(".a:not(.t)"))
-      const probe = document.createElement("i")
-      probe.style.color = "oklch(0.62 0.18 255)"
-      document.body.appendChild(probe)
-      const blue = getComputedStyle(probe).color
-      probe.remove()
-      return { border: area.borderTopColor, width: area.borderTopWidth, blue }
+    const { page, frame } = await open(browser, 1440)
+    const look = () =>
+      frame.evaluate(() => {
+        const root = document.querySelector("drop-comments").shadowRoot
+        const style = (el) => {
+          const css = getComputedStyle(el)
+          return { border: css.borderTopColor, width: css.borderTopWidth, ring: css.boxShadow, fill: css.backgroundColor }
+        }
+        const drawing = document.createElement("div")
+        drawing.className = "a"
+        root.querySelector(".draft").appendChild(drawing)
+        const probe = document.createElement("i")
+        probe.style.color = "oklch(0.62 0.18 255)"
+        document.body.appendChild(probe)
+        const blue = getComputedStyle(probe).color
+        const result = { area: style(root.querySelector('.a[data-for="c8"]')), draft: style(drawing), blue }
+        probe.remove()
+        drawing.remove()
+        return result
+      })
+    const saved = await look()
+    // Dark at low alpha with a light ring: it shows on a light page and a dark one, and covers nothing.
+    assert.equal(saved.area.border, "rgba(0, 0, 0, 0.22)")
+    assert.equal(saved.area.width, "1px")
+    assert.match(saved.area.ring, /rgba\(255, 255, 255, 0\.24\)/)
+    assert.equal(saved.area.fill, "rgba(0, 0, 0, 0)")
+    assert.equal(saved.draft.border, saved.blue)
+    assert.equal(saved.draft.width, "2px")
+
+    await page.evaluate(() =>
+      document.querySelector("iframe").contentWindow.postMessage({ __drop: true, type: "active", id: "c8" }, "*"),
+    )
+    await frame.waitForFunction(() => {
+      const area = document.querySelector("drop-comments").shadowRoot.querySelector('.a[data-for="c8"]')
+      return area.classList.contains("on") && !area.getAnimations().length
     })
-    assert.equal(look.border, look.blue)
-    assert.equal(look.width, "2px")
+    const focused = await look()
+    assert.equal(focused.area.border, "rgba(0, 0, 0, 0.45)")
+    assert.notEqual(focused.area.fill, "rgba(0, 0, 0, 0)", "the open thread's area takes a faint tint")
   } finally {
     await browser.close()
   }

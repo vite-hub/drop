@@ -375,11 +375,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
     '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
     '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
-    // Areas take the tools' blue (--hi): a line in the text color vanished on a dark page over a white image. Text keeps
-    // its outline in the text color, and a resolved area turns gray. While dragging, corner handles and the size show.
-    '.a{position:absolute;box-sizing:border-box;border:calc(2px * var(--drop-z,1)) solid var(--hi);border-radius:3px;background:color-mix(in oklab,var(--hi) 16%,transparent);pointer-events:none;transition:background 120ms}' +
-    '.a.done{border-style:dashed;border-color:var(--muted-foreground);background:none;opacity:.6}.a.pulse{background:color-mix(in oklab,var(--hi) 32%,transparent)}' +
-    '.a.t{border-width:calc(1.5px * var(--drop-z,1));border-color:var(--foreground);background:none}.a.t.pulse{background:color-mix(in oklab,var(--foreground) 16%,transparent)}' +
+    // A saved area or quote is a soft hairline, so many of them don't cover a busy page: dark at low alpha with a light
+    // ring outside it, which shows on a light page, a dark one, and a white image on either. The thread that's open,
+    // pointed at, or focused (on, pulse) gets a firmer line and a faint tint, and a resolved one turns dashed. The area
+    // being drawn or written on (.draw, .draft) keeps the tools' blue (--hi), with corner handles and its size while dragging.
+    '.a{position:absolute;box-sizing:border-box;border:calc(1px * var(--drop-z,1)) solid rgb(0 0 0/.22);border-radius:3px;box-shadow:0 0 0 calc(1px * var(--drop-z,1)) rgb(255 255 255/.24);pointer-events:none;transition:border-color 150ms ease-out,box-shadow 150ms ease-out,background-color 150ms ease-out}' +
+    '.a.on,.a.pulse{border-color:rgb(0 0 0/.45);box-shadow:0 0 0 calc(1px * var(--drop-z,1)) rgb(255 255 255/.45);background:rgb(128 128 128/.08)}.a.done{border-style:dashed;opacity:.6}' +
+    '.draw .a,.draft .a{border:calc(2px * var(--drop-z,1)) solid var(--hi);box-shadow:none;background:color-mix(in oklab,var(--hi) 16%,transparent)}' +
     '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--hi);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
     '.a .tag{position:absolute;left:-2px;top:calc(100% + 6px)}' +
     '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
@@ -843,7 +845,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         }
         if (railedHere) { railed.push({ m, last, lines }); continue; }
         if (pins && article.contains(range.commonAncestorContainer)) { gutterPin(m, last, gutterX); continue; }
-        for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : ""));
+        for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "")).dataset.for = m.id;
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
       placePin(m, x, y, into, false);
@@ -1039,6 +1041,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       group.toggleAttribute("data-covered", covered && group.dataset.id === opened);
     });
     for (const [id, bubble] of bubbles) bubble.toggleAttribute("data-on", on.has(id));
+    // Its area or quote outline too, on the page and on a zoom's copy.
+    const roots = [marks];
+    if (zoom) for (const box of [zoom.layer, zoom.aside]) { const host = box && Array.from(box.children).find((el) => el.localName === "drop-comments"); if (host) roots.push(host.shadowRoot); }
+    for (const root of roots) root.querySelectorAll(".a[data-for]").forEach((box) => box.classList.toggle("on", on.has(box.dataset.for)));
     if (!highlights) return;
     const show = (pick) => new Highlight(...(view.pins ? textRanges.filter(pick).map((t) => t.range) : []));
     CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail && !t.suggest));
