@@ -1,50 +1,22 @@
 <script setup lang="ts">
-// A new comment's composer as one small surface beside what it's on: a line that grows with the text, to about 168px,
-// and a send button. No avatar and no field inside a card. Enter sends, Shift+Enter breaks the line, Escape drops it.
+// A new comment's composer as one small surface beside what it's on: ViteHub's CommentComposer as a row, so it reads
+// and works as the box in the dock does. Enter sends, Shift+Enter breaks the line, Escape drops it, "@" names people.
 // The words and pictures are the review draft's, so they follow the reader to other text they select. A picture can
-// still come in: the one the frame takes of a tooltip under an area, or one pasted into the line; each shows above it.
+// still come in: the one the frame takes of a tooltip under an area, or one pasted or dropped into the box.
 // Comment or Suggest is picked before it opens (the selection bar, C or E); a suggestion gets the full composer.
-const emit = defineEmits<{ submit: [body: string, files: File[]]; cancel: [] }>()
+import { CommentComposer, type CommentComposerSubmit } from "vite-hub/ui"
+import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
+
+const emit = defineEmits<{ submit: [body: string, files: File[], mentions: string[]]; cancel: [] }>()
 const draft = injectReviewDraft()!
-const field = useTemplateRef<HTMLTextAreaElement>("field")
+const { user, users } = injectDropComments()!
+const mentions = ref<string[]>([])
 const error = ref<string>()
+watch(draft.body, () => (error.value = undefined))
 const busy = computed(() => draft.sending.value || draft.waiting.value)
-const pictures = computed(() => draft.images.picks.value)
-const empty = computed(() => !draft.body.value.trim() && !pictures.value.length)
 
-// Sized to its text by hand: field-sizing isn't in every browser yet.
-function fit() {
-  const el = field.value
-  if (!el) return
-  el.style.height = "auto"
-  el.style.height = `${Math.min(el.scrollHeight, 168)}px`
-}
-watch(draft.body, () => {
-  error.value = undefined
-  void nextTick(fit)
-})
-onMounted(fit)
-
-function send() {
-  if (busy.value || empty.value) return
-  emit("submit", draft.body.value, draft.images.files.value)
-}
-function key(event: KeyboardEvent) {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-    event.preventDefault()
-    send()
-  } else if (event.key === "Escape") {
-    event.preventDefault()
-    event.stopPropagation()
-    if (!busy.value) emit("cancel")
-  }
-}
-function paste(event: ClipboardEvent) {
-  if (busy.value) return event.preventDefault()
-  const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith("image/"))
-  if (!files.length) return
-  event.preventDefault()
-  draft.images.add(files)
+function send(sent: CommentComposerSubmit) {
+  if (!busy.value) emit("submit", sent.body, sent.files, sent.mentions)
 }
 defineExpose({
   fail: async (reason?: string, text?: string) => {
@@ -55,47 +27,24 @@ defineExpose({
 </script>
 
 <template>
-  <form data-comment-editor @submit.prevent="send">
-    <div v-if="pictures.length" class="flex flex-wrap gap-1.5 px-3 pt-3">
-      <span v-for="pick in pictures" :key="pick.url" class="group relative">
-        <img
-          :src="pick.url"
-          alt="Attached picture"
-          class="size-10 rounded-md object-cover outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
-        />
-        <button
-          aria-label="Remove picture"
-          class="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-inverted text-inverted shadow-sm"
-          :disabled="busy"
-          type="button"
-          @click="draft.images.remove(pick)"
-        >
-          <UIcon name="i-mingcute-close-line" class="size-3" />
-        </button>
-      </span>
-    </div>
-    <div class="flex items-end gap-1.5 py-1.5 pr-1.5 pl-3.5">
-      <textarea
-        ref="field"
-        v-model="draft.body.value"
-        aria-label="Comment"
-        class="min-h-7 min-w-0 flex-1 resize-none bg-transparent py-0.5 text-base/6 text-highlighted outline-none placeholder:text-dimmed sm:text-sm/6"
-        placeholder="Comment, ↵ to send"
-        :readonly="busy"
-        rows="1"
-        @keydown="key"
-        @paste="paste"
-      />
-      <UButton
-        aria-label="Send comment"
-        class="shrink-0 rounded-full"
-        :disabled="empty"
-        icon="i-mingcute-arrow-up-line"
-        :loading="busy"
-        size="sm"
-        type="submit"
-      />
-    </div>
-    <p v-if="error" role="alert" class="px-3.5 pb-2 text-xs text-error">{{ error }}</p>
-  </form>
+  <div data-comment-editor>
+    <CommentComposer
+      v-model="draft.body.value"
+      v-model:files="draft.images.files.value"
+      v-model:mentions="mentions"
+      :accept="COMMENT_IMAGE_TYPES.join(',')"
+      allow-empty
+      :autofocus="false"
+      :busy="busy"
+      :error="error || draft.images.problem.value"
+      :guard="false"
+      layout="row"
+      placeholder="Comment, ↵ to send"
+      size="sm"
+      :user="user"
+      :users="users"
+      @cancel="emit('cancel')"
+      @submit="send"
+    />
+  </div>
 </template>

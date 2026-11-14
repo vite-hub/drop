@@ -48,16 +48,7 @@ const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
 const busy = computed(() => Boolean(draft && (draft.sending.value || draft.waiting.value)))
 // The composer's files are the draft's picks, so the viewer's own pictures show and go with the rest.
-const files = computed({
-  get: () => draft?.images.files.value ?? [],
-  set: (next: File[]) => {
-    if (!draft) return
-    const { images } = draft
-    for (const pick of images.picks.value) if (!next.includes(pick.file)) images.remove(pick)
-    const added = next.filter((file) => !images.files.value.includes(file))
-    if (added.length) images.add(added)
-  },
-})
+const files = draft?.images.files ?? ref<File[]>([])
 const problem = computed(() => draft?.images.problem.value)
 
 // A suggested edit on the selection: the words that replace it, empty to delete it.
