@@ -25,7 +25,7 @@ overrides:
   '@vite-hub/email': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@03e8d1b57b7edc7c03924971902d13948df72216
   '@vite-hub/env': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@03e8d1b57b7edc7c03924971902d13948df72216
   '@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@03e8d1b57b7edc7c03924971902d13948df72216
-  '@vite-hub/drop>@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6
+  '@vite-hub/drop>@vite-hub/forge': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3
   '@vite-hub/gateways': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/gateways@03e8d1b57b7edc7c03924971902d13948df72216
   '@vite-hub/kv': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@03e8d1b57b7edc7c03924971902d13948df72216
   '@vite-hub/markdown-template': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@03e8d1b57b7edc7c03924971902d13948df72216
@@ -338,8 +338,8 @@ importers:
         version: 4.6.2(@nuxt/schema@4.6.2)(confbox@0.3.2)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.153.0)(rolldown@1.2.15)(unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))(esbuild@0.28.2)(rolldown@1.2.15))
     devDependencies:
       '@vite-hub/forge':
-        specifier: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6
-        version: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
+        specifier: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3
+        version: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
       nuxt:
         specifier: npm:nuxt-nightly@5.0.0-2610292252-da55a91
         version: nuxt-nightly@5.0.0-2610292252-da55a91(e75e683512be45cfe57f58260d0bb38b)
@@ -5184,9 +5184,9 @@ packages:
     version: 0.0.0-preview-03e8d1b
     engines: {node: '>=22.18.0'}
 
-  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6':
-    resolution: {integrity: sha512-yqjQh7JIlHCbxrt56RQxskLIDbSN31+bQHmERr7Ai2kaI1iWTqTnUlyS0tQZ0E2fyMHSe4bHD07AR0g/69Z9lA==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6}
-    version: 0.0.0-preview-a3c412d
+  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3':
+    resolution: {integrity: sha512-LDCHZ5Zkk4J/D9qZ8aFYFkLpih+jWgsyFiisoQGIcvzTqQWaY60jfxsu12O/KW8X/pL/Uix0o8PwHhpn8bXO5Q==, tarball: https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3}
+    version: 0.0.0-preview-b7f9222
     engines: {node: '>=22.18.0'}
 
   '@vite-hub/gateways@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/gateways@03e8d1b57b7edc7c03924971902d13948df72216':
@@ -18059,7 +18059,7 @@ snapshots:
     dependencies:
       nostics: 1.3.0
 
-  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)':
+  '@vite-hub/forge@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)':
     dependencies:
       '@vite-hub/runtime': https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@16b007adc450ff5652e95e4bfa4b80228fca44f3(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
       nostics: 1.3.0

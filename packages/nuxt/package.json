@@ -39,7 +39,7 @@
     "@nuxt/kit": "^4.1.0"
   },
   "devDependencies": {
-    "@vite-hub/forge": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@a3c412d4d0fac46f69fcf4a08778d14d48163ff6",
+    "@vite-hub/forge": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@b7f92222fb5060d0f7ca06932c98883f86ac70b3",
     "nuxt": "npm:nuxt-nightly@5.0.0-2610292252-da55a91",
     "vite-plus": "catalog:"
   },
