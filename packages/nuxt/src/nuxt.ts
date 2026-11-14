@@ -22,7 +22,7 @@ export interface DropModuleOptions {
 export type { DropPublicConfig }
 
 // A method signature keeps the module callable by Nuxt 4 and Nuxt 5, whose `Nuxt` types differ, without naming either.
-export type DropNuxtModule = { setup(inlineOptions: DropModuleOptions, nuxt: object): unknown }["setup"] & {
+export type DropNuxtModule = { setup(inlineOptions: DropModuleOptions, nuxt: unknown): unknown }["setup"] & {
   getMeta?: () => Promise<Record<string, unknown>>
 }
 
@@ -30,6 +30,7 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
   meta: { name: "@vite-hub/drop", configKey: "drop", compatibility: { nuxt: ">=4.0.0" } },
   async setup(options, nuxt) {
     const resolver = createResolver(import.meta.url)
+    // SAFETY: only this module and NUXT_PUBLIC_DROP_* write `public.drop`, and every field is checked before use.
     const current = nuxt.options.runtimeConfig.public.drop as Partial<DropPublicConfig> | undefined
     const drop: DropPublicConfig = {
       url: current?.url ?? options.url ?? "",

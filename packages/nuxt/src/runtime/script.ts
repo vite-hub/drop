@@ -24,7 +24,7 @@ export function reviewScript(
   if (!base.pathname.endsWith("/")) base.pathname += "/"
   const data: Record<string, string> = {}
   if (config?.edge && ["top", "right", "bottom", "left"].includes(config.edge)) data.edge = config.edge
-  if (typeof config?.at === "number" && config.at >= 0 && config.at <= 100) data.at = String(config.at)
+  if (config?.at !== undefined && config.at >= 0 && config.at <= 100) data.at = String(config.at)
   if (config?.collapsed) data.collapsed = ""
   return { src: new URL("review.js", base).href, data }
 }
