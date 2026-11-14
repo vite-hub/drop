@@ -6,6 +6,7 @@ import THEME from "./theme.css?raw"
 import { CAPTURE } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
 import COMMENTS_CSS from "comark-comments/style.css?raw"
+import MARKS_CSS from "@vite-hub/ui/comment-marks.css?raw"
 
 const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
 
@@ -355,51 +356,40 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
   const host = document.createElement("drop-comments");
   host.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;";
+  // ViteHub's comment marks take their dark values from the shadow host.
+  if (DARK) host.setAttribute("data-theme", "dark");
   const shadow = host.attachShadow({ mode: "open" });
-  // --drop-z keeps pins their size on screen over a scaled-up zoom (see zoomLayer).
+  // ViteHub's comment marks (@vite-hub/ui/comment-marks.css) draw the pins and areas, as in the ViteHub pill. Drop gives
+  // them its neutrals for the pin's face, ring, and resolved grey; the comment blue is ViteHub's. --vh-comment-zoom keeps
+  // marks their size on screen over a scaled-up zoom (see zoomLayer).
   // A page without Drop's theme may lack its tokens, or hold its own under the same names: pins keep Drop's neutrals.
-  const STYLE = '<style>' + (THEMED ? '' : ':host{--primary:#171717;--primary-foreground:#fafafa;--background:#fff;--foreground:#0a0a0a;--muted-foreground:#737373;--card:#fff;--border:#e5e5e5;--font-sans:ui-sans-serif,system-ui,sans-serif}') +
-    // Pins are 28px, as in the ViteHub pill and Drop's gutter pins: a round face on an area or image, and a drop whose
-    // small corner points at the spot elsewhere.
-    '.m{position:absolute;z-index:2;scale:var(--drop-z,1);width:28px;height:28px;margin:-14px 0 0 -2px;overflow:hidden;border-radius:14px 14px 14px 4px;background:var(--primary);color:var(--primary-foreground);font:600 11px/28px var(--font-sans);letter-spacing:.02em;text-align:center;cursor:pointer;box-shadow:0 1px 4px rgb(0 0 0/.25),0 0 0 2px var(--background);transition:transform 120ms}' +
-    '.m img{display:block;width:100%;height:100%;object-fit:cover}' +
-    '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-14px 0 0 -14px;border-radius:14px}' +
-    '.m.pulse{animation:p 900ms ease-out 2}@keyframes p{50%{transform:scale(1.4)}}' +
-    // The Pin comment style (view.style): a 28px avatar in the gutter right of the text, level with the quote's last line.
-    '.m.gp{display:grid;place-items:center;width:28px;height:28px;margin:0;overflow:visible;padding:0;border:0;border-radius:50% 50% 50% 4px;font:600 11px/1 var(--font-sans);box-shadow:0 0 0 2px var(--background),0 2px 8px rgb(0 0 0/.18);transition:scale 150ms cubic-bezier(.23,1,.32,1)}' +
-    '.m.gp img{border-radius:inherit}.m.gp:hover{transform:none;scale:1.06}.m.gp:active{scale:.96}.m.gp[aria-expanded="true"]{scale:1.06}' +
-    '.m.gp:focus-visible{outline:2px solid var(--foreground);outline-offset:2px}.m.gp::before{content:"";position:absolute;inset:-6px}' +
-    '.m.gp b{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--background);color:var(--foreground);font:600 10px/16px var(--font-sans);font-variant-numeric:tabular-nums;box-shadow:0 0 0 1px var(--border)}' +
-    '.m.gp.me{cursor:default}.m.gp.in{animation:gp-in 200ms cubic-bezier(.23,1,.32,1) both}@keyframes gp-in{from{opacity:0;scale:.7}}' +
-    '@media (prefers-reduced-motion:reduce){.m.gp{transition:none}.m.gp.in{animation:none}}' +
+  const MARKS_CSS = __MARKS_CSS__;
+  const STYLE = '<style>' + MARKS_CSS + (THEMED ? '' : ':host{--primary:#171717;--primary-foreground:#fafafa;--background:#fff;--foreground:#0a0a0a;--muted-foreground:#737373;--card:#fff;--border:#e5e5e5;--font-sans:ui-sans-serif,system-ui,sans-serif}') +
+    ':host{--vh-ui-comment-pin:var(--primary);--vh-ui-comment-pin-text:var(--primary-foreground);--vh-ui-comment-surface:var(--background);--vh-ui-comment-muted:var(--muted-foreground)}' +
+    '[data-slot="comment-mark-pin"]{z-index:2;font-family:var(--font-sans)}' +
+    // The Pin comment style (view.style): an avatar pin in the gutter right of the text, level with the quote's last
+    // line, with its thread's count.
+    '.gp:active{scale:.96}.gp:focus-visible{outline:2px solid var(--foreground);outline-offset:2px}' +
+    '.gp b{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--background);color:var(--foreground);font:600 10px/16px var(--font-sans);font-variant-numeric:tabular-nums;box-shadow:0 0 0 1px var(--border)}' +
+    '.gp.me{cursor:default}.gp.in{animation:gp-in 200ms cubic-bezier(.23,1,.32,1) both}@keyframes gp-in{from{opacity:0;scale:.7}}' +
+    '@media (prefers-reduced-motion:reduce){.gp.in{animation:none}}' +
     // On what opens a closed tooltip or menu (standIn), not on the thing itself.
-    '.m.away{outline:1.5px dashed var(--foreground);outline-offset:2px}' +
+    '.away{outline:1.5px dashed var(--foreground);outline-offset:2px}' +
     '.cp{position:absolute;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:var(--card);box-shadow:0 0 0 1px var(--border),0 1px 2px rgb(0 0 0/.06);color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease-out,color 150ms ease-out}' +
     '.cp::before{content:"";position:absolute;inset:-6px}.cp svg{width:15px;height:15px}' +
     '.cp:hover,.cp:focus-visible,.cp.on{opacity:1}.cp:hover{color:var(--foreground)}@media (hover:none){.cp{opacity:1}}' +
-    // Comment marks use ViteHub's comment blue (--cm, --ring in @vite-hub/ui/theme.css), as the ViteHub pill does. A
-    // saved area or quote is a 1px line of it at half strength with no fill, so many of them don't cover a busy page. The
-    // thread that's open, pointed at, or focused (on, pulse) gets the full blue and a faint tint, and a resolved one turns
-    // dashed and grey. The area being drawn or written on (.draw, .draft) is the full blue, with corner handles and its
-    // size while dragging. The measuring tools keep their own blue (--hi).
-    '.a{position:absolute;box-sizing:border-box;border:calc(1px * var(--drop-z,1)) solid color-mix(in oklab,var(--cm) 50%,transparent);border-radius:4px;pointer-events:none;transition:border-color 150ms ease-out,background-color 150ms ease-out}' +
-    '.a.on,.a.pulse{border-color:var(--cm);background:color-mix(in oklab,var(--cm) 8%,transparent)}.a.done{border-style:dashed;border-color:color-mix(in oklab,var(--muted-foreground) 50%,transparent)}' +
-    '.draw .a,.draft .a{border:calc(2px * var(--drop-z,1)) solid var(--cm);border-radius:3px;background:color-mix(in oklab,var(--cm) 16%,transparent)}' +
-    '.a i{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid var(--cm);border-radius:50%;background:#fff}.a i:nth-child(1){left:-5px;top:-5px}.a i:nth-child(2){right:-5px;top:-5px}.a i:nth-child(3){left:-5px;bottom:-5px}.a i:nth-child(4){right:-5px;bottom:-5px}' +
-    '.a .tag{position:absolute;left:-2px;top:calc(100% + 6px)}' +
-    // A comment shown on its own while the eye hides the rest (view.only) pops out when it goes: shrinks and fades.
-    '.leave>*{pointer-events:none;animation:drop-leave 180ms cubic-bezier(.4,0,1,1) forwards}.leave>.a{animation-name:drop-leave-area}' +
-    '@keyframes drop-leave{to{opacity:0;transform:scale(.6)}}@keyframes drop-leave-area{to{opacity:0;transform:scale(.97)}}' +
-    '@media (prefers-reduced-motion:reduce){.leave>*,.leave>.a{animation-name:drop-fade}}@keyframes drop-fade{to{opacity:0}}' +
-    '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw .a{position:fixed}.draw.measure{cursor:default}' +
+    // The area being dragged out shows its size under it. The measuring tools keep their own blue (--hi).
+    '[data-slot="comment-mark-area"]>.tag{position:absolute;left:-2px;top:calc(100% + 6px)}' +
+    '.draw{position:fixed;inset:0;cursor:crosshair;touch-action:none}.draw [data-slot="comment-mark-area"]{position:fixed}.draw.measure{cursor:default}' +
     // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
     '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
     '.ink path,.inkp path{fill:none;stroke-linecap:round;stroke-linejoin:round}.ink .mk,.inkp .mk{stroke-opacity:.4;stroke-linecap:butt}' +
-    '.dp{position:absolute;scale:var(--drop-z,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--cm);box-shadow:0 0 0 2px #fff,0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
+    // The spot a point comment is being written on.
+    '.dp{position:absolute;scale:var(--vh-comment-zoom,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--vh-comment-mark);box-shadow:0 0 0 2px var(--vh-comment-surface),0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
     // (4.7:1 under white) behind labels, its white card and rulers in light mode and their dark cut in dark, and the box
     // model in DevTools' colors.
-    ':host{--hi:oklch(0.62 0.18 255);--cm:' + (DARK ? 'oklch(0.746 0.16 232.661)' : 'oklch(0.588 0.158 241.966)') + ';--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
+    ':host{--hi:oklch(0.62 0.18 255);--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
     (DARK ? '--sf:#18181b;--ink:#fafafa;--ink-muted:#a1a1aa;--tick:#52525b;--float:0 0 0 .5px rgb(255 255 255/.16),0 1px 1px rgb(0 0 0/.125),0 2px 5px rgb(0 0 0/.125),0 3px 8px rgb(0 0 0/.125)}'
       : '--sf:#fff;--ink:#18181b;--ink-muted:#71717a;--tick:#cbd5e1;--float:0 0 0 .5px rgb(0 0 0/.18),0 1px 1px rgb(0 0 0/.06),0 3px 9px rgb(0 0 0/.06),0 6px 18px rgb(0 0 0/.03)}') +
     '.fx>*{position:fixed;box-sizing:border-box;pointer-events:none}.hl{outline:1.5px solid var(--hi);outline-offset:-.75px}.hl.sel{outline-width:2px;background:color-mix(in oklab,var(--hi) 8%,transparent)}' +
@@ -470,12 +460,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
   const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m3.514 11.83l5.657 5.656L20.485 6.172"/></svg>';
   const pageStyle = document.createElement("style");
-  pageStyle.textContent = "::highlight(drop-open){background:color-mix(in oklab,var(--foreground) 13%,transparent)}::highlight(drop-done){background:color-mix(in oklab,var(--foreground) 6%,transparent)}::highlight(drop-active),::highlight(drop-draft){background:color-mix(in oklab,var(--foreground) 26%,transparent)}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
+  // Commented text takes ViteHub's highlights (vh-comment and the others, in MARKS_CSS), a tint of Drop's text color.
+  // Without Drop's theme they take a grey that shows on light and dark pages.
+  pageStyle.textContent = MARKS_CSS + ":root{--vh-ui-comment-ink:" + (THEMED ? "var(--foreground)" : "#808080") + "}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
     // Drop's review dock floats over the frame's bottom edge (--drop-bottom), out of reach of the page's own layers, so
     // Comark's zoom ends above it and its thumbnails stay clickable. Its backdrop still runs under the dock.
     ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
-  // Highlights draw on the page itself, so without Drop's theme they take a grey that shows on light and dark pages.
-  if (!THEMED) pageStyle.textContent = pageStyle.textContent.replaceAll("var(--foreground)", "#808080");
   // comark-comments' speech bubble, in a given color.
   const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   // A margin comment's bubble is the package's, in the page's own text after its quote, so it takes its room in the
@@ -498,7 +488,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     "::highlight(drop-del){color:color-mix(in oklab,var(--destructive) 70%,var(--foreground));background-color:color-mix(in srgb,var(--destructive) 11%,transparent);text-decoration:line-through 1.5px color-mix(in srgb,var(--destructive) 75%,transparent)}" +
     "drop-ins.cr-sg{margin-left:.125rem;padding:.0625rem .1875rem;color:color-mix(in oklab,var(--_cr-ins) 60%,var(--_comark-foreground));background:color-mix(in srgb,var(--_cr-ins) 13%,transparent);-webkit-box-decoration-break:clone;box-decoration-break:clone;cursor:pointer}" +
     "drop-ins.cr-sg::after{content:attr(data-text)}";
-  // active: the comment a "focus" pulses for a moment; opened: the one whose thread Drop shows; pointed and textPointed:
+  // active: the comment a "focus" picks for a moment; opened: the one whose thread Drop shows; pointed and textPointed:
   // the one under the pointer, over its bubble or card, or over its text.
   let markers = [], active = null, opened = null, pointed = null, textPointed = null;
   // covered: Drop floats the opened thread over its card, so the card hides under it rather than peek out at its corners.
@@ -533,10 +523,20 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     return null;
   }
 
-  /** An outlined rectangle at page coordinates, for saved areas and the one being commented on. */
-  function areaBox(parentEl, left, top, width, height, className) {
+  /**
+   * An outlined rectangle at page coordinates: a comment's area, or a line of its quote (text), else the area being drawn
+   * or commented on.
+   */
+  function areaBox(parentEl, left, top, width, height, m, text) {
     const box = document.createElement("div");
-    box.className = "a" + (className || "");
+    box.dataset.slot = "comment-mark-area";
+    if (!m) box.dataset.draft = "true";
+    else {
+      box.dataset.for = m.id;
+      if (m.resolved) box.dataset.status = "resolved";
+      if (m.id === active) box.dataset.active = "true";
+      if (text) box.className = "t";
+    }
     box.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + width + "px;height:" + height + "px";
     parentEl.appendChild(box);
     return box;
@@ -556,10 +556,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (!host) {
       host = document.createElement("drop-comments");
       host.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;";
+      if (DARK) host.setAttribute("data-theme", "dark");
       host.attachShadow({ mode: "open" }).innerHTML = STYLE + LAYERS;
       box.appendChild(host);
     }
-    if (box === zoom.layer) host.style.setProperty("--drop-z", String(1 / (zoom.scale || 1)));
+    if (box === zoom.layer) host.style.setProperty("--vh-comment-zoom", String(1 / (zoom.scale || 1)));
     return host.shadowRoot;
   }
   const zoomLayer = () => zoom && zoomShadow(zoom.layer);
@@ -653,7 +654,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const article = !AUTHORED && THEMED ? document.querySelector("main > article.typeset") : null;
   const inRail = (m) => Boolean(article) && m.kind === "text" && !m.resolved && !m.earlier;
   let textRanges = [], railHits = [];
-  // The selection a comment is being written on ("hold-selection"): its quote stays marked (drop-draft), and in the
+  // The selection a comment is being written on ("hold-selection"): its quote stays marked (vh-comment-draft), and in the
   // margin it keeps a card's place, so the composer Drop floats over that place is where the card lands once it's sent.
   let drafted = null;
   const drafting = () => Boolean(drafted && article && article.contains(drafted.commonAncestorContainer));
@@ -728,7 +729,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function gutterPin(m, last, x) {
     const dot = document.createElement("button");
     dot.type = "button";
-    dot.className = "m gp" + (m ? (m.resolved ? " done" : "") : " me");
+    dot.dataset.slot = "comment-mark-pin"; dot.dataset.shape = "point";
+    dot.className = m ? "gp" : "gp me";
+    if (m && m.resolved) dot.dataset.status = "resolved";
     const who = m ? m.author : view.me && view.me.name;
     const image = m ? m.image : view.me && view.me.image;
     if (image) { const img = document.createElement("img"); img.src = image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.prepend(initials(who)); }; dot.appendChild(img); }
@@ -745,6 +748,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (replies) { const count = document.createElement("b"); count.textContent = String(replies + 1); count.setAttribute("aria-hidden", "true"); dot.appendChild(count); }
     dot.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (replies ? ", " + (replies + 1) + " comments" : ""));
     dot.setAttribute("aria-expanded", String(m.id === opened));
+    if (m.id === opened) dot.dataset.active = "true";
     dot.dataset.id = m.id;
     if (!seenPins.has(m.id)) { seenPins.add(m.id); if (pinsPrimed && !drafted && Date.now() > quietUntil) dot.classList.add("in"); }
     dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
@@ -753,23 +757,32 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The page's pins from the last render, by comment: one that looks the same is moved, not drawn again, since a canvas
   // pan renders every frame and a new picture each time could flash.
   let lastPins = new Map();
+  // ViteHub's pin is 28px (comment-marks.css). A point pin's bottom-left corner is the spot; a round one, for an area or
+  // an image, is centered on it.
+  const PIN = 28;
   function placePin(m, x, y, into, away) {
-    const className = "m" + (m.kind !== "text" ? " img" : "") + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "") + (away ? " away" : "");
+    const round = m.kind !== "text", look = [round, m.resolved, m.id === active, away].join();
+    const left = round ? x - PIN / 2 : x, top = round ? y - PIN / 2 : y - PIN;
     const title = (m.author || "Comment") + " · #" + m.n + (away ? " · on something that opens here" : "");
     const last = into === marks && lastPins.get(m.id);
-    if (last && last.className === className && last.title === title && last.dataset.image === (m.image || "")) {
-      last.style.left = x + "px"; last.style.top = y + "px";
+    if (last && last.look === look && last.title === title && last.dataset.image === (m.image || "")) {
+      last.style.left = left + "px"; last.style.top = top + "px";
       into.appendChild(last);
       return;
     }
     const dot = document.createElement("div");
-    dot.className = className;
+    dot.look = look;
+    dot.dataset.slot = "comment-mark-pin";
+    dot.dataset.shape = round ? "round" : "point";
+    if (m.resolved) dot.dataset.status = "resolved";
+    if (m.id === active) dot.dataset.active = "true";
+    if (away) dot.className = "away";
     // The author's picture, else their initials; the panel and the agent feedback keep the number.
     if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.textContent = initials(m.author); }; dot.appendChild(img); }
     else dot.textContent = initials(m.author);
     dot.title = title;
     dot.dataset.image = m.image || "";
-    dot.style.left = x + "px"; dot.style.top = y + "px"; dot.dataset.id = m.id;
+    dot.style.left = left + "px"; dot.style.top = top + "px"; dot.dataset.id = m.id;
     dot.onclick = (e) => { e.stopPropagation(); const r = dot.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
     into.appendChild(dot);
   }
@@ -777,7 +790,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   /** The comments that draw: all of them, or while the eye hides them, the ones Drop still shows (view.only). */
   const shownMarkers = () => (view.pins ? markers : markers.filter((m) => view.only.has(m.id)));
   function render() {
-    lastPins = new Map(Array.from(marks.querySelectorAll(":scope > .m[data-id]:not(.gp)"), (dot) => [dot.dataset.id, dot]));
+    lastPins = new Map(Array.from(marks.querySelectorAll(':scope > [data-slot="comment-mark-pin"][data-id]:not(.gp)'), (dot) => [dot.dataset.id, dot]));
     marks.innerHTML = "";
     // Hidden comments (the toolbar's eye) give the doc its margin back, so the column centers again. Shown before
     // drawing, so the margin's cards measure their size when the eye turns them back on. While hidden, the layer still
@@ -827,7 +840,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
           const s = stand.getBoundingClientRect(), before = standing.get(stand) || 0;
           // Side by side when several wait on the same element, so each can be clicked.
           standing.set(stand, before + 1);
-          x = s.right + scrollX + before * 24; y = s.top + scrollY;
+          x = s.right + scrollX + before * (PIN + 4); y = s.top + scrollY;
           placePin(m, x, y, into, true);
           continue;
         }
@@ -838,7 +851,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(copy.getBoundingClientRect()) : inLayer(copy.getBoundingClientRect());
         if (copy) into = beside ? asideMarks : zoomMarks;
         x = b.left + (m.ox / 1000) * b.width; y = b.top + (m.oy / 1000) * b.height;
-        if (m.ow || m.oh) areaBox(into, x, y, (m.ow / 1000) * b.width, (m.oh / 1000) * b.height, (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "")).dataset.for = m.id;
+        if (m.ow || m.oh) areaBox(into, x, y, (m.ow / 1000) * b.width, (m.oh / 1000) * b.height, m);
       } else {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
@@ -859,7 +872,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         }
         if (railedHere) { railed.push({ m, last, lines }); continue; }
         if (pins && article.contains(range.commonAncestorContainer)) { gutterPin(m, last, gutterX); continue; }
-        for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, " t" + (m.resolved ? " done" : "") + (m.id === active ? " pulse" : "")).dataset.for = m.id;
+        for (const l of lines) areaBox(marks, l.left + scrollX - 2, l.top + scrollY - 1, l.right - l.left + 4, l.bottom - l.top + 2, m, true);
         x = last.right + scrollX + 2; y = last.top + scrollY;
       }
       placePin(m, x, y, into, false);
@@ -963,10 +976,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (opened && !drafted) {
       const id = CSS.escape(opened), card = marks.querySelector('.rail .g[data-id="' + id + '"] > .cr-card');
       if (card) return post({ type: "draft-place", rail: true, id: opened, rect: box(card.getBoundingClientRect()) });
-      const dot = marks.querySelector('.m[data-id="' + id + '"]');
+      const dot = marks.querySelector('[data-slot="comment-mark-pin"][data-id="' + id + '"]');
       if (!dot) return;
       // A pin with an area: the thread goes beside both, so it never covers what the comment is about.
-      const r = dot.getBoundingClientRect(), area = marks.querySelector('.a[data-for="' + id + '"]');
+      const r = dot.getBoundingClientRect(), area = marks.querySelector('[data-slot="comment-mark-area"][data-for="' + id + '"]');
       const a = area ? area.getBoundingClientRect() : r;
       return post({ type: "draft-place", rail: false, pin: true, id: opened, rect: { left: Math.min(r.left, a.left), top: Math.min(r.top, a.top), right: Math.max(r.right, a.right), bottom: Math.max(r.bottom, a.bottom) } });
       return;
@@ -1058,18 +1071,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // Its area or quote outline too, on the page and on a zoom's copy.
     const roots = [marks];
     if (zoom) for (const box of [zoom.layer, zoom.aside]) { const host = box && Array.from(box.children).find((el) => el.localName === "drop-comments"); if (host) roots.push(host.shadowRoot); }
-    for (const root of roots) root.querySelectorAll(".a[data-for]").forEach((box) => box.classList.toggle("on", on.has(box.dataset.for)));
+    for (const root of roots) root.querySelectorAll('[data-slot="comment-mark-area"][data-for]').forEach((box) => { if (on.has(box.dataset.for)) box.dataset.active = "true"; else delete box.dataset.active; });
     if (!highlights) return;
     // Only the comments that draw have ranges (render), so hidden ones lose their marks too.
     const show = (pick) => new Highlight(...textRanges.filter(pick).map((t) => t.range));
     CSS.highlights.set("drop-margin", show((t) => !on.has(t.id) && t.rail && !t.suggest));
-    CSS.highlights.set("drop-open", show((t) => !on.has(t.id) && !t.resolved && !t.rail && !t.suggest));
+    CSS.highlights.set("vh-comment", show((t) => !on.has(t.id) && !t.resolved && !t.rail && !t.suggest));
     // Under the others, so a picked suggestion takes their tint and keeps its strike.
     const struck = show((t) => t.suggest);
     struck.priority = -1;
     CSS.highlights.set("drop-del", struck);
-    CSS.highlights.set("drop-done", show((t) => !on.has(t.id) && t.resolved));
-    CSS.highlights.set("drop-active", show((t) => on.has(t.id)));
+    CSS.highlights.set("vh-comment-resolved", show((t) => !on.has(t.id) && t.resolved));
+    CSS.highlights.set("vh-comment-active", show((t) => on.has(t.id)));
   }
   // Over a margin comment's text, its card and bubble stand out too.
   let pointerFrame = 0;
@@ -1095,7 +1108,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   window.addEventListener("blur", clearPointed);
 
   // The selection's range too: the page loses the selection once focus moves to Drop's composer, and "hold-selection"
-  // keeps its text marked (drop-draft) until the comment is sent or dropped.
+  // keeps its text marked (vh-comment-draft) until the comment is sent or dropped.
   let lastQuote = "", lastRange = null;
   function reportSelection() {
     const sel = getSelection();
@@ -1503,7 +1516,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (!box && Math.max(width, height) < 6) return;
         if (!box) {
           box = areaBox(layer, 0, 0, 0, 0);
-          box.innerHTML = '<i></i><i></i><i></i><i></i><span class="tag"></span>';
+          box.innerHTML = ["top-left", "top-right", "bottom-left", "bottom-right"].map((corner) => '<i data-slot="comment-mark-handle" data-corner="' + corner + '"></i>').join("") + '<span class="tag"></span>';
           layer.dragging = true; redraw();
         }
         box.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + width + "px;height:" + height + "px";
@@ -1857,13 +1870,14 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   xrayStyle.textContent = "*:not(drop-comments){outline:1px solid oklch(0.62 0.18 255) !important;outline-offset:-1px !important}";
   function setView(next) {
     const pins = next.pins !== false, only = new Set(Array.isArray(next.only) ? next.only.filter((id) => typeof id === "string") : []);
-    // While the eye hides comments, one Drop stops showing on its own leaves with a pop-out: a copy of its pin and area
-    // plays it once the page drew without it.
+    // While the eye hides comments, one Drop stops showing on its own leaves with ViteHub's pop-out (data-leaving): a
+    // copy of its pin and area plays it once the page drew without it.
     const gone = view.pins || pins ? [] : [...view.only].filter((id) => !only.has(id));
     const ghosts = gone.flatMap((id) => Array.from(marks.querySelectorAll('[data-id="' + CSS.escape(id) + '"],[data-for="' + CSS.escape(id) + '"]'), (el) => {
       const ghost = el.cloneNode(true);
-      ghost.classList.remove("pulse", "in");
-      ghost.removeAttribute("data-id"); ghost.removeAttribute("data-for");
+      ghost.classList.remove("in");
+      ghost.removeAttribute("data-id"); ghost.removeAttribute("data-for"); ghost.removeAttribute("data-active");
+      ghost.dataset.leaving = "true";
       return ghost;
     }));
     view.pins = pins; view.only = only;
@@ -1876,8 +1890,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (pins) leave.replaceChildren();
     for (const ghost of ghosts) {
       leave.appendChild(ghost);
-      ghost.addEventListener("animationend", () => ghost.remove());
-      setTimeout(() => ghost.remove(), 400);
+      setTimeout(() => ghost.remove(), 180);
     }
   }
   addEventListener("scroll", () => { if (tool !== "browse" || view.rulers) redraw(); }, { capture: true, passive: true });
@@ -1925,8 +1938,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; drawn = null; zoomDraft(); if (highlights) CSS.highlights.delete("drop-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
-    if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("drop-draft", new Highlight(drafted)); render(); }
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; drawn = null; zoomDraft(); if (highlights) CSS.highlights.delete("vh-comment-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
+    if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("vh-comment-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; clickComments = m.clickComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
     if (m.type === "pen") setPen(m);
@@ -1972,7 +1985,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "focus") {
       active = m.id; render();
       // A pin, or a margin comment's bubble.
-      const pinOf = () => (typeof m.id === "string" && (marks.querySelector('.m[data-id="' + CSS.escape(m.id) + '"]') || bubbles.get(m.id))) || null;
+      const pinOf = () => (typeof m.id === "string" && (marks.querySelector('[data-slot="comment-mark-pin"][data-id="' + CSS.escape(m.id) + '"]') || bubbles.get(m.id))) || null;
       const dot = pinOf();
       if (dot) scrollTo({ top: Math.max(0, dot.getBoundingClientRect().top + scrollY - innerHeight / 3), behavior: "smooth" });
       // With open: once the scroll settles, report the pin like a click, so Drop opens its thread beside it. Marked
@@ -2246,6 +2259,7 @@ export function injectRuntime(html: string, dark: boolean, inset = 0, authored =
       : `<style data-drop-theme>${THEME_CSS}</style><script>document.documentElement.classList.toggle("dark", ${dark});document.documentElement.classList.toggle("light", ${!dark});</script>`
   const head = `<script>${ERROR_REPORTER}</script><script>${EVENT_HOLD}</script><script>${OPAQUE_ORIGIN_SHIM}</script>${theme}<script>document.documentElement.style.setProperty("--drop-inset", "${inset || 0}px");</script>`
   const tail = `<script>${ANNOTATOR_SCRIPT.replace("__COMMENTS_CSS__", () => JSON.stringify(COMMENTS_CSS))
+    .replace("__MARKS_CSS__", () => JSON.stringify(MARKS_CSS))
     .replace("__AUTHORED__", String(authored))
     .replace("__THEMED__", String(Boolean(theme)))
     .replace("__DARK__", String(dark))}</script>`

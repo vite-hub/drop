@@ -109,12 +109,15 @@ async function drag(page, box, dx = 110, dy = 10) {
 }
 const pins = (frame) =>
   frame.evaluate(() =>
-    [...document.querySelector("drop-comments").shadowRoot.querySelectorAll(".m")].map((pin) => ({
-      id: pin.dataset.id,
-      away: pin.classList.contains("away"),
-      left: parseFloat(pin.style.left),
-      top: parseFloat(pin.style.top),
-    })),
+    [...document.querySelector("drop-comments").shadowRoot.querySelectorAll('[data-slot="comment-mark-pin"]')].map(
+      (pin) => ({
+        id: pin.dataset.id,
+        away: pin.classList.contains("away"),
+        // The spot: a round pin's middle, a point pin's bottom-left corner.
+        left: parseFloat(pin.style.left) + (pin.dataset.shape === "round" ? pin.offsetWidth / 2 : 0),
+        top: parseFloat(pin.style.top) + (pin.dataset.shape === "round" ? pin.offsetHeight / 2 : pin.offsetHeight),
+      }),
+    ),
   )
 async function setTool(page, tool) {
   await page.evaluate((tool) => send({ type: "tool", tool }), tool)
@@ -276,10 +279,14 @@ test("a comment on a closed tooltip pins to its trigger, and one in a variant th
       (markers) => send({ type: "markers", markers }),
       [marker("c1", "#v-a-tip > b"), marker("c2", "#v-b-text"), marker("c3", "#v-a-fade > b")],
     )
-    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".m"), null, {
-      polling: 100,
-      timeout: 5000,
-    })
+    await frame.waitForFunction(
+      () => document.querySelector("drop-comments").shadowRoot.querySelector('[data-slot="comment-mark-pin"]'),
+      null,
+      {
+        polling: 100,
+        timeout: 5000,
+      },
+    )
     const trigger = await frame.evaluate(() => document.getElementById("v-a-trigger").getBoundingClientRect().toJSON())
     const fadeTrigger = await frame.evaluate(() =>
       document.getElementById("v-a-fade-trigger").getBoundingClientRect().toJSON(),
@@ -300,7 +307,7 @@ test("a comment on a closed tooltip pins to its trigger, and one in a variant th
     await frame.hover("#v-a-trigger", { timeout: 5000 })
     await frame.waitForFunction(
       () =>
-        [...document.querySelector("drop-comments").shadowRoot.querySelectorAll(".m")].some(
+        [...document.querySelector("drop-comments").shadowRoot.querySelectorAll('[data-slot="comment-mark-pin"]')].some(
           (pin) => !pin.classList.contains("away"),
         ),
       null,
@@ -323,7 +330,7 @@ test("a comment on a closed tooltip pins to its trigger, and one in a variant th
       () =>
         !document
           .querySelector("drop-comments")
-          .shadowRoot.querySelector('.m[data-id="c3"]')
+          .shadowRoot.querySelector('[data-slot="comment-mark-pin"][data-id="c3"]')
           .classList.contains("away"),
       null,
       { polling: 100, timeout: 5000 },

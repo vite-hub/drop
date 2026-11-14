@@ -73,9 +73,9 @@ const panAndMeasure = (frame, dx) =>
     return {
       moved: item.left - before,
       item: { left: item.left, top: item.top, width: item.width, height: item.height },
-      area: box(shadow.querySelector(".marks .a")),
-      pin: box(shadow.querySelector(".marks .m")),
-      draft: box(shadow.querySelector(".draft .a")),
+      area: box(shadow.querySelector('.marks [data-slot="comment-mark-area"]')),
+      pin: box(shadow.querySelector('.marks [data-slot="comment-mark-pin"]')),
+      draft: box(shadow.querySelector('.draft [data-slot="comment-mark-area"]')),
     }
   }, dx)
 
@@ -84,7 +84,9 @@ test("pins and areas on a canvas item move with it in the same frame as the pan"
   try {
     const { page, frame } = await open(browser)
     await page.evaluate((marker) => send({ type: "markers", markers: [marker] }), marker)
-    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".marks .a"))
+    await frame.waitForFunction(() =>
+      document.querySelector("drop-comments").shadowRoot.querySelector('.marks [data-slot="comment-mark-area"]'),
+    )
     for (const dx of [120, -260]) {
       const at = await panAndMeasure(frame, dx)
       assert.ok(Math.abs(at.moved + dx) < 1, "the canvas panned")
