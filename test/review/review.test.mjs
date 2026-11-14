@@ -408,7 +408,7 @@ test("a token is for the picked review and the page's origin only", async () => 
   )
 
   // The page can't read the token: no id, no link.
-  const sealed = Buffer.from(guest.body.token.split(":")[1], "hex").toString("latin1")
+  const sealed = Buffer.from(guest.body.token, "base64url").toString("latin1")
   assert.doesNotMatch(sealed, /previews|"d"/)
 
   // A choice works for its origin and its person only, and never as a token.
@@ -438,11 +438,10 @@ test("tokens are sealed, bound to their review, and expire", async () => {
   assert.equal(expiresAt, 1_000 + 12 * 3_600_000)
   assert.ok(await readReviewToken(event, value, 2_000))
   assert.equal(await readReviewToken(event, value, expiresAt), null, "expired")
-  const [iv, body] = value.split(":")
-  const bytes = Buffer.from(body, "hex")
+  const bytes = Buffer.from(value, "base64url")
   bytes[bytes.length - 1] ^= 1
-  assert.equal(await readReviewToken(event, `${iv}:${bytes.toString("hex")}`, 2_000), null, "a changed token")
-  assert.equal(await readReviewToken(event, `${iv}:${body}:x`, 2_000), null)
+  assert.equal(await readReviewToken(event, bytes.toString("base64url"), 2_000), null, "a changed token")
+  assert.equal(await readReviewToken(event, `${value}:x`, 2_000), null)
   const choice = await sealChoice(event, { id: "site" }, SITE, null)
   assert.equal(await readReviewToken(event, choice, 2_000), null, "a choice isn't a token")
   state.authSecret = "another-secret"
