@@ -6,7 +6,6 @@ const { syncRole } = await import("../../server/utils/identity.ts")
 const { default: authorize } = await import("../../server/console-authorize.ts")
 const { authAccessLines } = await import("../../server/utils/auth-console.ts")
 const { default: contentMiddleware } = await import("../../server/middleware/0.05.content-origin.ts")
-const { default: writesMiddleware } = await import("../../server/middleware/0.06.same-origin-writes.ts")
 const { H3Event } = await import("h3")
 const user = { id: "operator", email: "operator@example.com", emailVerified: true, role: "member" }
 const request = new Request("https://drop.example/_vitehub/rpc", { method: "POST" })
@@ -58,27 +57,6 @@ test("content-origin hosts never reach the Console", async () => {
         assert.equal((await authorize({ ...signed(user.email), request })).status, 404)
         assert.equal((await contentMiddleware(new H3Event(request))).status, 404)
       }
-})
-
-test("cookie-bearing Console writes reject a sibling origin", () => {
-  const url = "https://drop.example/_vitehub/rpc/__call"
-  assert.throws(
-    () =>
-      writesMiddleware(
-        new H3Event(
-          new Request(url, { method: "POST", headers: { cookie: "session=x", origin: "https://content.example" } }),
-        ),
-      ),
-    { status: 403 },
-  )
-  assert.equal(
-    writesMiddleware(
-      new H3Event(
-        new Request(url, { method: "POST", headers: { cookie: "session=x", origin: "https://drop.example" } }),
-      ),
-    ),
-    undefined,
-  )
 })
 
 test("access notes describe the configured allowlist, organization and sign-in methods", () => {

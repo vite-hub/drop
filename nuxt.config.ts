@@ -170,6 +170,12 @@ export default defineNuxtConfig({
   vitehub: {
     ...VITEHUB[host],
     publicUrl: process.env.DROP_PUBLIC_URL || undefined,
+    // On a VPS a reverse proxy ends HTTPS, so URLs built from the request (the GitHub callback, the OAuth issuer, the
+    // MCP resource) take `https:` from X-Forwarded-Proto. Hosted platforms already see https.
+    trustProxy: true,
+    // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
+    // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
+    sameOriginWrites: { exclude: ["/mcp"] },
     auth: true,
     console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
     env: {
