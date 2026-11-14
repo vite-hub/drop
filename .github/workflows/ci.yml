@@ -39,4 +39,5 @@ jobs:
       - run: pnpm run doctor
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
+      - run: pnpm --filter @vite-hub/drop test
       - run: pnpm build

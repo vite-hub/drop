@@ -10,7 +10,25 @@ import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
 const emit = defineEmits<{ submit: [body: string, files: File[], mentions: string[]]; cancel: [] }>()
 const draft = injectReviewDraft()!
 const { user, users } = injectDropComments()!
-const mentions = ref<string[]>([])
+const body = computed({
+  get: () => draft.body.value,
+  set: (value) => {
+    if (!busy.value) draft.body.value = value
+  },
+})
+const mentions = computed({
+  get: () => draft.mentions.value,
+  set: (value) => {
+    if (!busy.value) draft.mentions.value = value
+  },
+})
+const files = computed({
+  get: () => draft.images.files.value,
+  set: (value) => {
+    if (!busy.value) draft.images.files.value = value
+  },
+})
+const lookup = async (query: string) => draft.rememberPeople(await users(query))
 const error = ref<string>()
 watch(draft.body, () => (error.value = undefined))
 const busy = computed(() => draft.sending.value || draft.waiting.value)
@@ -27,10 +45,10 @@ defineExpose({
 </script>
 
 <template>
-  <div data-comment-editor>
+  <div data-comment-editor data-pin-composer>
     <CommentComposer
-      v-model="draft.body.value"
-      v-model:files="draft.images.files.value"
+      v-model="body"
+      v-model:files="files"
       v-model:mentions="mentions"
       :accept="COMMENT_IMAGE_TYPES.join(',')"
       allow-empty
@@ -42,9 +60,18 @@ defineExpose({
       placeholder="Comment, ↵ to send"
       size="sm"
       :user="user"
-      :users="users"
+      :users="lookup"
+      :people="draft.people.value"
       @cancel="emit('cancel')"
       @submit="send"
     />
   </div>
 </template>
+
+<style>
+/* Keep lookup results in the measured card so both floating scroll containers grow to expose them. */
+[data-pin-composer] [data-slot="comment-composer-mentions"] {
+  position: static;
+  margin-top: 0.25rem;
+}
+</style>

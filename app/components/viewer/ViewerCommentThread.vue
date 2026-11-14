@@ -43,13 +43,37 @@ const accept = COMMENT_IMAGE_TYPES.join(",")
 const draft = props.pending ? injectReviewDraft()! : undefined
 const body = draft?.body ?? ref("")
 if (props.draft && !body.value) body.value = props.draft
-const mentions = ref<string[]>([])
+const mentions = draft?.mentions ?? ref<string[]>([])
+const composerPeople = computed(() => [...people.value, ...(draft?.people.value ?? [])])
+const lookup = async (query: string) => {
+  const found = await dropComments.users(query)
+  return draft ? draft.rememberPeople(found) : found
+}
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
 const busy = computed(() => Boolean(draft && (draft.sending.value || draft.waiting.value)))
 // The composer's files are the draft's picks, so the viewer's own pictures show and go with the rest.
 const files = draft?.images.files ?? ref<File[]>([])
 const problem = computed(() => draft?.images.problem.value)
+// Programmatic mention selection must obey the same lock as native textarea edits.
+const composerBody = computed({
+  get: () => body.value,
+  set: (value) => {
+    if (!busy.value) body.value = value
+  },
+})
+const composerFiles = computed({
+  get: () => files.value,
+  set: (value) => {
+    if (!busy.value) files.value = value
+  },
+})
+const composerMentions = computed({
+  get: () => mentions.value,
+  set: (value) => {
+    if (!busy.value) mentions.value = value
+  },
+})
 
 // A suggested edit on the selection: the words that replace it, empty to delete it.
 const suggesting = computed(() => props.pending?.suggestion !== undefined)
@@ -134,9 +158,9 @@ const edit = (messageId: string, text: string, ids: string[]) =>
         {{ pending.quote }}
       </p>
       <CommentComposer
-        v-model="body"
-        v-model:files="files"
-        v-model:mentions="mentions"
+        v-model="composerBody"
+        v-model:files="composerFiles"
+        v-model:mentions="composerMentions"
         :accept="accept"
         allow-empty
         :autofocus="false"
@@ -154,7 +178,8 @@ const edit = (messageId: string, text: string, ids: string[]) =>
                 : 'Comment on this spot'
         "
         :user="user"
-        :users="dropComments.users"
+        :users="lookup"
+        :people="composerPeople"
         @cancel="emit('cancel')"
         @submit="send"
       >

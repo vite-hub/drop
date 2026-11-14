@@ -359,9 +359,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // --drop-z keeps pins their size on screen over a scaled-up zoom (see zoomLayer).
   // A page without Drop's theme may lack its tokens, or hold its own under the same names: pins keep Drop's neutrals.
   const STYLE = '<style>' + (THEMED ? '' : ':host{--primary:#171717;--primary-foreground:#fafafa;--background:#fff;--foreground:#0a0a0a;--muted-foreground:#737373;--card:#fff;--border:#e5e5e5;--font-sans:ui-sans-serif,system-ui,sans-serif}') +
-    '.m{position:absolute;z-index:2;scale:var(--drop-z,1);width:22px;height:22px;margin:-11px 0 0 -2px;overflow:hidden;border-radius:11px 11px 11px 2px;background:var(--primary);color:var(--primary-foreground);font:600 10px/22px var(--font-sans);letter-spacing:.02em;text-align:center;cursor:pointer;box-shadow:0 1px 4px rgb(0 0 0/.25),0 0 0 2px var(--background);transition:transform 120ms}' +
+    // Pins are 28px, as in the ViteHub pill and Drop's gutter pins: a round face on an area or image, and a drop whose
+    // small corner points at the spot elsewhere.
+    '.m{position:absolute;z-index:2;scale:var(--drop-z,1);width:28px;height:28px;margin:-14px 0 0 -2px;overflow:hidden;border-radius:14px 14px 14px 4px;background:var(--primary);color:var(--primary-foreground);font:600 11px/28px var(--font-sans);letter-spacing:.02em;text-align:center;cursor:pointer;box-shadow:0 1px 4px rgb(0 0 0/.25),0 0 0 2px var(--background);transition:transform 120ms}' +
     '.m img{display:block;width:100%;height:100%;object-fit:cover}' +
-    '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-11px 0 0 -11px;border-radius:11px}' +
+    '.m:hover{transform:scale(1.15)}.m.done{opacity:.55;filter:grayscale(1)}.m.done:not(:has(img)){background:var(--muted-foreground)}.m.img{margin:-14px 0 0 -14px;border-radius:14px}' +
     '.m.pulse{animation:p 900ms ease-out 2}@keyframes p{50%{transform:scale(1.4)}}' +
     // The Pin comment style (view.style): a 28px avatar in the gutter right of the text, level with the quote's last line.
     '.m.gp{display:grid;place-items:center;width:28px;height:28px;margin:0;overflow:visible;padding:0;border:0;border-radius:50% 50% 50% 4px;font:600 11px/1 var(--font-sans);box-shadow:0 0 0 2px var(--background),0 2px 8px rgb(0 0 0/.18);transition:scale 150ms cubic-bezier(.23,1,.32,1)}' +
