@@ -45,5 +45,13 @@ export default defineHandler(async (event) => {
   const previous = (event.req.headers.get("cookie") ?? "")
     .split(";")
     .filter((cookie) => !replaced.has(cookie.trim().split("=")[0]))
-  event.req.headers.set("cookie", [...previous, ...pairs].filter(Boolean).join("; "))
+  const cookie = [...previous, ...pairs].filter(Boolean).join("; ")
+  try {
+    event.req.headers.set("cookie", cookie)
+  } catch {
+    // Deno's incoming headers are immutable: there the request gets a copy with the new cookie.
+    const headers = new Headers(event.req.headers)
+    headers.set("cookie", cookie)
+    Object.defineProperty(event.req, "headers", { value: headers, configurable: true })
+  }
 })
