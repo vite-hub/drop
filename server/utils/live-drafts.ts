@@ -28,7 +28,7 @@ export async function ensureDraft(drop: Version, body: string) {
   if (!LIVE_EDITING) throw new HTTPError({ status: 404, statusText: "Live editing isn't available on this host." })
   const path = draftPath(drop.id, drop.version)
   if ((await read(path)) === null) {
-    const [error] = await blob.put(path, body, { access: "private", contentType: "text/markdown; charset=utf-8" })
+    const [error] = await blob.put(path, body, { contentType: "text/markdown; charset=utf-8" })
     if (error) throw error
   }
   return path

@@ -37,7 +37,9 @@ const liveEditing = host === "cloudflare" || host === "vps"
 
 // The browser keeps a file but asks again on every use: the access gate runs each time, and an unchanged file answers
 // 304 without its bytes (the blob handler handles conditional requests). server/plugins/content-headers.ts agrees.
-const files = { serve: { route: "/f", headers: { "Cache-Control": "private, no-cache" } } }
+// `access: "public"` only means ViteHub runs no check of its own: server/middleware/0.drop-access.ts gates every
+// `/f/` request first, per drop and per share link, which ViteHub's `authorize` can't do without the request's event.
+const files = { serve: { route: "/f", access: "public", headers: { "Cache-Control": "private, no-cache" } } } as const
 
 // drop.vitehub.dev's own D1, in Cloudflare's EEUR region, which runs it in Milan.
 const HOSTED_D1 = "d634358e-4605-45ca-970f-d390584795a5"
@@ -243,7 +245,7 @@ export default defineNuxtConfig({
 
   // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
   $development: {
-    vitehub: { blob: { driver: "fs", serve: { route: "/f" } } },
+    vitehub: { blob: { driver: "fs", serve: { route: "/f", access: "public" } } },
   },
 
   css: [

@@ -246,7 +246,7 @@ export async function createDocDrop(
     event,
     async (quota) => {
       const key = `${crypto.randomUUID()}${extension}`
-      const [storageError] = await blob.put(key, input.bytes, { access: "private", contentType })
+      const [storageError] = await blob.put(key, input.bytes, { contentType })
       if (storageError) {
         await deleteBlobKeys([key])
         throw storageFailure(storageError)
@@ -606,7 +606,7 @@ export async function publishApp(
             const blobKey = `${prefix}/${path}`
             stagedKeys.push(blobKey)
             try {
-              const [error] = await blob.put(blobKey, bytes, { access: "private", contentType: contentTypeOf(path) })
+              const [error] = await blob.put(blobKey, bytes, { contentType: contentTypeOf(path) })
               if (error) throw storageFailure(error)
             } catch (error) {
               failed = true

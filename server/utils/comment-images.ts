@@ -191,7 +191,6 @@ async function storeImages(parent: DropRow, images: CommentImage[], actorName: s
       for (const [index, row] of rows.entries()) {
         const image = images[index]!
         const [storageError] = await blob.put(row.blobKey!, image.bytes, {
-          access: "private",
           contentType: image.contentType,
         })
         if (storageError) throw storageFailure(storageError)

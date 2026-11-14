@@ -649,7 +649,7 @@ async function insertReviewComment(
     undefined,
     async (quota) => {
       const key = `${crypto.randomUUID()}.${EXTENSIONS[shot.contentType]}`
-      const [storageError] = await blob.put(key, shot.bytes, { access: "private", contentType: shot.contentType })
+      const [storageError] = await blob.put(key, shot.bytes, { contentType: shot.contentType })
       if (storageError) throw storageFailure(storageError)
       const where = site.siteUrl && isSitePattern(site.siteUrl) ? new URL(origin).host + path : path
       const row = imageDrop(
