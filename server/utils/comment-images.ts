@@ -277,6 +277,31 @@ export async function storeCommentFile(
 }
 
 /**
+ * Images in the threads on Drop's own pages (`page` subjects, the admins' toolbar): there is no drop to keep them under,
+ * so each is a private blob at `comments/page/<uuid>/<name>`, checked by its bytes and at most 4 MiB like a drop's. The
+ * caller checked that the writer may comment there. Returns the key, which the message keeps.
+ */
+export async function storePageImage(file: { name: string; size: number; data: Uint8Array }): Promise<string> {
+  if (file.size > MAX_FILE_BYTES)
+    throw new HTTPError({ status: 413, statusText: `${file.name} exceeds the 4 MiB limit.` })
+  const contentType = imageType(file.data)
+  if (!contentType) throw new HTTPError({ status: 400, statusText: "Images must be PNG, JPEG, WebP, or GIF." })
+  const key = `comments/page/${crypto.randomUUID()}/${imageName(file.name, contentType)}`
+  const [error] = await blob.put(key, file.data, { access: "private", contentType })
+  if (error) throw storageFailure(error)
+  return key
+}
+
+const PAGE_IMAGE_KEY =
+  /^comments\/page\/[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}\/[\w .-]{1,84}\.(png|jpg|webp|gif)$/
+
+/** The image type of a key `storePageImage` makes, from its extension; null for any other key. */
+export function pageImageType(key: string): ImageType | null {
+  const extension = PAGE_IMAGE_KEY.exec(key)?.[1]
+  return COMMENT_IMAGE_TYPES.find((type) => EXTENSIONS[type] === extension) ?? null
+}
+
+/**
  * The comment images stored under the drops `parents` selects (a subquery, or one id), oldest first. A comment's images
  * live under the drop it's on, or under the site a screenshot came from (imageParent), so this reads a list's images
  * beside its threads; their messages name them by id.

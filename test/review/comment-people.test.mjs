@@ -185,3 +185,41 @@ test("a file sent through ViteHub's upload becomes an image of the drop, out of 
     { status: 404 },
   )
 })
+
+test("an image sent from the toolbar on Drop's own pages is a blob of its own, for admins only", async () => {
+  const png = Uint8Array.from(
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  )
+  const as = (person) => ({ id: person.userId, name: person.name, identity: person })
+  const subject = { kind: "page", id: "/d/gv3sp2a5m1t4/vitehub-console-prototype" }
+  const store = (user, file = { name: "shot.png", size: png.byteLength, data: png }) =>
+    comments.options.storeAttachment(file, { user, subject })
+  const drops = () => sql.prepare("SELECT count(*) AS n FROM drops").get().n
+  const before = drops()
+
+  const key = await store(as(admin))
+  assert.match(key, /^comments\/page\/[\da-f-]{36}\/shot\.png$/)
+  assert.equal(drops(), before, "no image drop: a page has no drop to keep it under")
+  const file = await comments.options.readAttachment(key, { user: null, thread: {} })
+  assert.equal(file.type, "image/png")
+  assert.deepEqual(new Uint8Array(await file.arrayBuffer()), png)
+
+  // Its name follows its bytes, not what the browser called it.
+  assert.match(await store(as(admin), { name: "photo.gif", size: png.byteLength, data: png }), /\/photo\.png$/)
+  await assert.rejects(store(as(admin), { name: "a.txt", size: 2, data: new Uint8Array([104, 105]) }), { status: 400 })
+  await assert.rejects(store(as(admin), { name: "big.png", size: 5 * 1024 * 1024, data: png }), { status: 413 })
+  for (const user of [as(bo), as(who), null, { id: "guest:1", name: "Guest", guest: true }])
+    await assert.rejects(store(user), { status: 404 })
+
+  // Only keys of that exact shape read from the store; anything else is still an image drop's id.
+  for (const other of [
+    key.replace("comments/page/", "comments/"),
+    `${key}/x.png`,
+    key.replace(/[\da-f]{8}-/, "../../aa-"),
+    key.replace(".png", ".svg"),
+  ])
+    assert.equal(await comments.options.readAttachment(other, { user: null, thread: {} }), null)
+})
