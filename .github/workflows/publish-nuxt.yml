@@ -1,0 +1,46 @@
+name: publish @vite-hub/drop
+
+# Push a tag such as `nuxt-v0.1.0` after bumping packages/nuxt/package.json to the same version. Its @vite-hub/forge
+# must be a ViteHub release, not a pkg.pr.new build: the module bundles it.
+on:
+  push:
+    tags: ["nuxt-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # npm trusted publishing: add this repository, this workflow file and the environment on npmjs.com.
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --filter @vite-hub/drop...
+      - name: Check the tag matches the version
+        working-directory: packages/nuxt
+        run: test "nuxt-v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      # Checks the installed copy, since pnpm-workspace.yaml overrides can swap in a pkg.pr.new build.
+      - name: Check the bundled Forge is a ViteHub release
+        working-directory: packages/nuxt
+        run: node -e 'const v = require("./node_modules/@vite-hub/forge/package.json").version; if (v.includes("-")) { console.error("@vite-hub/forge is " + v + ", not a release"); process.exit(1) }'
+      - run: pnpm --filter @vite-hub/drop test
+      # pnpm pack runs the build and writes real versions for `catalog:` specs; npm publish would keep them as they are.
+      - working-directory: packages/nuxt
+        run: pnpm pack --out package.tgz
+      - working-directory: packages/nuxt
+        run: npm publish package.tgz --provenance --access public
