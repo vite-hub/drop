@@ -15,7 +15,13 @@ import { isPreviewLink, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
-import { AvatarStack, ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui"
+import {
+  AvatarStack,
+  ConnectionStatus,
+  ConnectionStatusLabel,
+  type ConnectionStatusState,
+  createCommentVisibility,
+} from "vite-hub/ui"
 // The parts' one stylesheet: comments, presence, and the editor's carets.
 import "vite-hub/ui/styles.css"
 
@@ -337,25 +343,27 @@ watch(popover, (value, before) => {
   else if (value) showComments()
 })
 /**
- * Hidden comments stay hidden while someone writes one or opens one from the list. The frame still shows the open
- * thread's pin, and a comment just sent for a moment, then it pops out (`only` in the view the frame gets).
+ * Hidden comments stay hidden while someone writes one or opens one from the list. ViteHub's visibility model decides
+ * what still shows: the open thread's pin, and a comment just sent for 2.5 s, then it pops out (`only` in the view the
+ * frame gets). It is the same model the ViteHub pill and CommentLayer use.
  */
-const sentShown = ref<string[]>([])
-function showSent(id: string) {
-  if (overlays.pins) return
-  sentShown.value = [...sentShown.value, id]
-  setTimeout(() => (sentShown.value = sentShown.value.filter((shown) => shown !== id)), 2500)
-}
-const shownWhileHidden = computed(() =>
-  overlays.pins
-    ? []
-    : [
-        ...new Set([
-          ...(commentsOpen.value && popover.value?.type === "thread" ? [popover.value.id] : []),
-          ...sentShown.value,
-        ]),
-      ],
+const visibility = createCommentVisibility({ visibility: overlays.pins ? "all" : "hidden" })
+const shownWhileHidden = shallowRef<readonly string[]>(visibility.only)
+const stopVisibility = visibility.subscribe(() => (shownWhileHidden.value = visibility.only))
+onScopeDispose(() => {
+  stopVisibility()
+  visibility.stop()
+})
+watch(
+  () => overlays.pins,
+  (pins) => visibility.set(pins ? "all" : "hidden"),
 )
+watch(
+  () => (commentsOpen.value && popover.value?.type === "thread" ? popover.value.id : null),
+  (id) => visibility.open(id),
+  { immediate: true },
+)
+const showSent = (id: string) => visibility.flash(id)
 watch(areaMode, (active) => active && showComments())
 watch(
   () => siteRef.value?.pending,
@@ -560,7 +568,7 @@ const {
   comments: computed(() => ({
     style: pinStyle.value ? "pin" : "card",
     me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
-    only: shownWhileHidden.value,
+    only: [...shownWhileHidden.value],
   })),
   variantBar: true,
   arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
