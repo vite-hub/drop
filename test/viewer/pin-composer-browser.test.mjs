@@ -224,7 +224,7 @@ test(
       await pastePicture(page, "retained.png")
       await page.evaluate(() => replaceComposer())
       assert.match(await field.inputValue(), /@Ana Ruiz/)
-      await page.getByRole("button", { name: /send/i }).click()
+      await page.getByRole("button", { name: "Comment", exact: true }).click()
       assert.deepEqual(await page.evaluate(() => submissions.at(-1).mentions), ["ana"])
       assert.deepEqual(await page.evaluate(() => submissions.at(-1).files), ["retained.png"])
 
@@ -243,7 +243,7 @@ test(
         for (const selection of ["keyboard", "pointer"]) {
           await field.fill("@An")
           await option.waitFor()
-          await page.getByRole("button", { name: /send/i }).click()
+          await page.getByRole("button", { name: "Comment", exact: true }).click()
           if (phase === "sending")
             await page.evaluate(() => {
               window.finish = draft.beginSend()
@@ -276,18 +276,19 @@ test(
 test("immediate guest lookups preserve native keyboard input in compact and dock composers", async () => {
   const browser = await chromium.launch()
   try {
-    const page = await open(browser)
-    await page.evaluate(() => {
-      window.guest = true
-    })
-    const field = page.locator("textarea")
     for (const inDock of [false, true]) {
+      // Each presentation starts with an empty draft; remounting intentionally preserves existing text.
+      const page = await open(browser)
+      await page.evaluate(() => {
+        window.guest = true
+      })
       await page.evaluate((inDock) => replaceComposer(inDock), inDock)
+      const field = page.locator("textarea")
       await field.focus()
       await field.pressSequentially("@An")
       assert.equal(await field.inputValue(), "@An")
       assert.equal(await page.evaluate(() => draft.body.value), "@An")
-      await field.fill("")
+      await page.close()
     }
   } finally {
     await browser.close()
