@@ -95,6 +95,9 @@ writeFileSync(
       Vue.h("button", { ...attrs, disabled: props.disabled || props.loading }, slots.default?.() ?? props.label ?? "Send"),
   })
   app.component("UIcon", { render: () => Vue.h("span") })
+  // Attachment thumbnails use UModal. Keep this Nuxt UI shell local, like UButton and UIcon, so the
+  // standalone Vite fixture does not try to load an uncompiled Nuxt SFC after a picture is attached.
+  app.component("UModal", { setup: (_, { slots }) => () => slots.default?.() })
   app.mount("#app")`,
 )
 
