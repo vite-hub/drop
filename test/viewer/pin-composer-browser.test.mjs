@@ -65,7 +65,8 @@ writeFileSync(
   window.injectReviewDraft = injectReviewDraft
   window.useVersionTo = () => () => ""
   window.injectDrop = () => ({})
-  window.injectDropComments = () => ({ people: Vue.ref([]), user: { id: "me", name: "Me" }, users: async () => [{ id: "ana", name: "Ana Ruiz" }] })
+  window.guest = false
+  window.injectDropComments = () => ({ people: Vue.ref([]), user: window.guest ? undefined : { id: "me", name: "Me" }, users: async () => window.guest ? [] : [{ id: "ana", name: "Ana Ruiz" }] })
   window.submissions = []
   window.cancellations = 0
   window.unhandledEscapes = 0
@@ -271,3 +272,24 @@ test(
     }
   },
 )
+
+test("immediate guest lookups preserve native keyboard input in compact and dock composers", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await open(browser)
+    await page.evaluate(() => {
+      window.guest = true
+    })
+    const field = page.locator("textarea")
+    for (const inDock of [false, true]) {
+      await page.evaluate((inDock) => replaceComposer(inDock), inDock)
+      await field.focus()
+      await field.pressSequentially("@An")
+      assert.equal(await field.inputValue(), "@An")
+      assert.equal(await page.evaluate(() => draft.body.value), "@An")
+      await field.fill("")
+    }
+  } finally {
+    await browser.close()
+  }
+})

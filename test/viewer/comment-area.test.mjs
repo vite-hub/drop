@@ -207,7 +207,10 @@ test("text, mentions and attached images survive plain/area composer replacement
   const image = new File(["image"], "feedback.png", { type: "image/png" })
   draft.body.value = "Keep this feedback @Ana Ruiz"
   draft.mentions.value = ["ana"]
-  draft.rememberPeople([{ id: "ana", name: "Ana Ruiz" }])
+  const lookup = draft.rememberPeople([{ id: "ana", name: "Ana Ruiz" }])
+  await Promise.resolve()
+  assert.deepEqual(draft.people.value, []) // Publication must wait beyond the native input event's microtasks.
+  await lookup
   draft.images.drop({ dataTransfer: { files: [image] }, preventDefault() {} })
   const preview = draft.images.picks.value[0].url
   for (const next of ["area", "plain"]) {

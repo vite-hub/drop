@@ -6,7 +6,10 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState(() =
   const images = useImagePicks()
   const mentions = ref<string[]>([])
   const people = ref<CommentUser[]>([])
-  function rememberPeople(found: CommentUser[]) {
+  async function rememberPeople(found: CommentUser[]) {
+    // Mention lookup starts in input capture. Wait for the target input handler to save the native text
+    // before publishing reactive people (a microtask can still run between those event handlers).
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
     people.value = [...new Map([...people.value, ...found].map((person) => [person.id, person])).values()]
     return found
   }
