@@ -12,7 +12,7 @@ import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact } from "#shared/doc-header"
-import { resourceLabel } from "#shared/resources"
+import { faviconUrl, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
@@ -756,6 +756,23 @@ watch(
   { immediate: true },
 )
 
+// The owner's views as the Details used to count them (server/utils/views.ts): a total, then who they came from, only
+// the kinds that have any, each saying on hover what it counts.
+function viewsFact(views: { person: number; anonymous: number; agent: number }): DocHeaderFact {
+  const total = views.person + views.anonymous + views.agent
+  const parts = [
+    { icon: "person" as const, n: views.person, tip: `${views.person} by people signed in` },
+    { icon: "anonymous" as const, n: views.anonymous, tip: `${views.anonymous} by visitors not signed in` },
+    { icon: "agent" as const, n: views.agent, tip: `${views.agent} by agents reading it, yours included` },
+  ]
+  return {
+    icon: "views",
+    label: "Views",
+    value: total ? `${total} ${total === 1 ? "view" : "views"}` : "No views yet",
+    parts: parts.filter((part) => part.n > 0),
+  }
+}
+
 /**
  * A Markdown doc's header (#shared/doc-header): Copy as Markdown, Download and Export as PDF at the top right of its
  * properties box, its related drops among its links, and under See more the facts the Details used to list.
@@ -766,16 +783,7 @@ const docHeader = computed<DocHeader | null>(() => {
   const views = d.views
   const folder = d.ancestors.map((crumb) => crumb.title).join(" / ")
   const facts: DocHeaderFact[] = [
-    ...(views
-      ? [
-          {
-            icon: "views" as const,
-            label: "Views",
-            value: String(views.person + views.anonymous + views.agent),
-            detail: `${views.person} signed in · ${views.anonymous} anonymous · ${views.agent} agents`,
-          },
-        ]
-      : []),
+    ...(views ? [viewsFact(views)] : []),
     { icon: "file", label: "File", value: d.filename, detail: `Markdown · ${formatBytes(d.size)}` },
     { icon: "person", label: "Dropped by", value: d.actorName, detail: `via ${VIA_LABELS[d.actorKind]}` },
     ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder }] : []),
@@ -790,12 +798,20 @@ const docHeader = computed<DocHeader | null>(() => {
     ],
     copied: copied("markdown"),
     facts,
-    related: related.value.map((item) => ({ id: item.id, title: item.title, href: `${origin}/drops/${item.id}` })),
+    related: related.value.map((item) => ({
+      id: item.id,
+      title: item.title,
+      href: `${origin}/drops/${item.id}`,
+      icon: `${origin}/favicon.ico`,
+    })),
     links: related.value
       .flatMap((item) => item.links)
       .filter((resource) => !listed.has(resource.url))
-      .map((resource) => ({ url: resource.url, label: resourceLabel(resource) })),
-    icon: `${origin}/favicon.ico`,
+      .map((resource) => ({
+        url: resource.url,
+        label: resourceLabel(resource),
+        icon: faviconUrl(resource.url, origin),
+      })),
   }
 })
 watch(

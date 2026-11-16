@@ -15,15 +15,33 @@ const HEADER = {
   ],
   copied: false,
   facts: [
-    { icon: "views", label: "Views", value: "38", detail: "21 signed in · 12 anonymous · 5 agents" },
+    {
+      icon: "views",
+      label: "Views",
+      value: "38 views",
+      parts: [
+        { icon: "person", n: 21, tip: "21 by people signed in" },
+        { icon: "agent", n: 17, tip: "17 by agents reading it, yours included" },
+      ],
+    },
     { icon: "file", label: "File", value: "plan.md", detail: "Markdown · 14.2 KB" },
   ],
-  related: [{ id: "abc123", title: "Before and after", href: "https://drop.test/drops/abc123" }],
-  links: [
-    { url: "https://linear.app/acme/issue/ACM-7", label: "ACM-7" },
-    { url: "https://github.com/acme/app/pull/212", label: "acme/app#212" },
+  related: [
+    {
+      id: "abc123",
+      title: "Before and after",
+      href: "https://drop.test/drops/abc123",
+      icon: "https://drop.test/favicon.ico",
+    },
   ],
-  icon: "https://drop.test/favicon.ico",
+  links: [
+    { url: "https://linear.app/acme/issue/ACM-7", label: "ACM-7", icon: "https://drop.test/api/favicons/linear.app" },
+    {
+      url: "https://github.com/acme/app/pull/212",
+      label: "acme/app#212",
+      icon: "https://drop.test/api/favicons/github.com",
+    },
+  ],
 }
 
 // A Markdown doc with a front matter box in the viewer's frame, as DropViewer renders one without a content origin.
@@ -63,10 +81,13 @@ test(
       await page.evaluate((header) => window.tell(header), HEADER)
       await frame.locator("drop-doc-actions button").first().waitFor()
 
-      // Every link starts on its site's icon; here none loads (the frame reaches no site), so each ends on the plain link
-      // icon, never a broken image.
-      await frame.waitForFunction(() => !document.querySelector("dl.cfm img.drop-favicon"))
-      assert.equal(await frame.locator("dl.cfm a[href^='https:'] > span.drop-favicon svg").count(), 3)
+      // Every link is a chip with its site's icon from Drop, the doc's own and the ones the viewer adds alike.
+      assert.deepEqual(
+        await frame
+          .locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
+          .evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src"))),
+        ["/api/favicons/github.com", "https://drop.test/favicon.ico", "https://drop.test/api/favicons/linear.app"],
+      )
       assert.equal((await frame.locator('dl.cfm > div[data-key="links"] > dt').innerText()).trim(), "Links")
       // Related drops and their links join the Links row; a link the doc lists already isn't repeated.
       const links = await frame.locator('dl.cfm > div[data-key="links"] dd a').allTextContents()
@@ -78,7 +99,8 @@ test(
       await frame.getByRole("button", { name: "See more" }).click()
       assert.equal(await facts.evaluate((el) => el.inert), false)
       assert.equal(await frame.getByRole("button", { name: "See less" }).getAttribute("aria-expanded"), "true")
-      assert.match(await facts.innerText(), /Views\s+38\s*· 21 signed in/)
+      assert.match(await facts.innerText(), /Views\s+38 views\s+21\s+17/)
+      assert.equal(await facts.locator(".drop-fact-part").first().getAttribute("title"), "21 by people signed in")
 
       // Copy is the button; its arrow's menu holds the rest, and Escape closes the menu without reaching Drop.
       await frame.getByRole("button", { name: "Copy as Markdown" }).click()
@@ -92,6 +114,7 @@ test(
       await frame.getByRole("button", { name: "More ways to save this doc" }).click()
       await frame.getByRole("menuitem", { name: /Download original/ }).click()
       await frame.getByRole("link", { name: "Before and after" }).click()
+      await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-open"))
       assert.deepEqual(
         (await docPosts(page)).map((m) => m.action ?? m.id),
         ["markdown", "download", "abc123"],

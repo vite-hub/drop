@@ -30,20 +30,11 @@ export function resourceLabel(resource: DropResource) {
   return reference ? `${reference[1]}#${reference[2]}` : new URL(resource.url).hostname.replace(/^www\./, "")
 }
 
-/**
- * Where its site's icon may be: `/favicon.ico` on its host, then on each domain above it, down to two labels. A
- * favicon belongs to the site, not the page, so a private repository's pull request still gets GitHub's, and a
- * preview behind a sign-in (pr123.preview.example.com) falls back to its company's (example.com).
- */
-export function faviconUrls(url: string): string[] {
-  const { origin, hostname } = new URL(url)
-  const urls = [`${origin}/favicon.ico`]
-  if (isLocal(hostname) || /^[\d.]+$|^\[/.test(hostname)) return urls
-  const labels = hostname.split(".")
-  for (let start = 1; labels.length - start >= 2; start++)
-    urls.push(`https://${labels.slice(start).join(".")}/favicon.ico`)
-  return urls
-}
+/** Where Drop serves a site's icon (server/api/favicons/[host].get.ts). */
+export const FAVICON_PATH = "/api/favicons/"
+
+/** A link's site icon, from Drop: relative to Drop's origin, or under `origin` for a page on another one. */
+export const faviconUrl = (url: string, origin = "") => `${origin}${FAVICON_PATH}${new URL(url).hostname}`
 
 /** `next` added to `current`: a link already there keeps its place and takes the new title, if it has one. */
 export function mergeResources(current: DropResource[], next: DropResource[]): DropResource[] {

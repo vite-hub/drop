@@ -50,7 +50,7 @@ test("a doc's links, its preview deploy too, and its version's day join its fron
   )
   assert.match(
     merged,
-    /<dt>Links<\/dt><dd><span class="cfm-tag"><a href="https:\/\/pr42-demo\.preview\.example\.com\/">Preview<\/a><\/span><span class="cfm-tag"><a href="https:\/\/linear\.app\/acme\/issue\/ACM-7">ACM-7<\/a><\/span><\/dd>/,
+    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/pr42-demo\.preview\.example\.com" alt="">Preview<\/a><a class="cp" href="https:\/\/linear\.app\/acme\/issue\/ACM-7" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/linear\.app" alt="">ACM-7<\/a><\/dd>/,
   )
   assert.match(merged, /<dt>Updated<\/dt><dd><time datetime="2026-11-05">Nov 5, 2026<\/time><\/dd>/)
   assert.ok(merged.indexOf('class="cfm"') < merged.indexOf("<h1"), "at the top, above the title")
@@ -66,7 +66,7 @@ test("a doc without front matter gets the box, with its styles", async () => {
   assert.match(boxed, /^<style data-comark-properties>/)
   assert.match(
     strip(boxed),
-    /<dt>Links<\/dt><dd><span class="cfm-tag"><a href="[^"]+pull\/42">acme\/portal#42<\/a><\/span><span class="cfm-tag"><a href="https:\/\/acme\.dev\/spec">acme\.dev\/spec<\/a><\/span><\/dd>/,
+    /<dt>Links<\/dt><dd><a class="cp" href="[^"]+pull\/42" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/github\.com" alt="">acme\/portal#42<\/a><a class="cp" href="https:\/\/acme\.dev\/spec" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/acme\.dev" alt="">acme\.dev\/spec<\/a><\/dd>/,
   )
 })
 
@@ -81,7 +81,7 @@ test("the doc the viewer gets carries them; its source and cached render don't",
   const detail = await dropDetail(await findDrop(row.id), who, "https://drop.example")
   assert.match(
     strip(detail.html),
-    /<dt>Links<\/dt><dd><span class="cfm-tag"><a href="https:\/\/github\.com\/acme\/portal\/pull\/42">PR #42<\/a><\/span><span class="cfm-tag"><a href="https:\/\/pr42-demo\.preview\.example\.com\/">Preview<\/a>/,
+    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/github\.com\/acme\/portal\/pull\/42" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/github\.com" alt="">PR #42<\/a><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/pr42-demo\.preview\.example\.com" alt="">Preview<\/a>/,
   )
   assert.equal(detail.content, "# Plan\n\nText.\n")
   assert.deepEqual(
