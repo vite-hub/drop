@@ -7,6 +7,7 @@ const { default: detailHandler } = await import("../../server/api/drops/[id].get
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: createFolder } = await import("../../server/mcp/tools/create_folder.ts")
 const { skillsAddCommand } = await import("../../shared/links.ts")
+const { serveHubSkills } = await import("../../server/utils/hub-skills.ts")
 
 // The Install button on a folder's page (ViewerFolder) reads `install` from the folder's detail: a public skill hub's
 // link, or on one of its skills' folders, the hub's link and the skill's name.
@@ -91,6 +92,38 @@ test("a public hub's page carries its link and skill count; a skill's folder car
   // A subfolder that isn't a skill gets no button.
   assert.equal((await detail(drafts.id)).install, undefined)
 })
+
+for (const failure of ["missing", "transient"]) {
+  test(`folder browsing survives ${failure} child skill content while downloads still fail`, async () => {
+    const { root, notes } = await hub()
+    // Find the SKILL blob by content, without depending on storage key layout.
+    let skillKey
+    for (const [candidate, object] of objects) {
+      if ((await object.body.text()) === skillMd("release-notes")) skillKey = candidate
+    }
+    assert.ok(skillKey)
+    const original = state.blob.get
+    state.blob.get = async (key) =>
+      key === skillKey
+        ? failure === "missing"
+          ? [null, null]
+          : [Object.assign(new Error("storage unavailable"), { code: "BLOB_R0001" }), null]
+        : original(key)
+    try {
+      const page = await detail(root.id)
+      assert.equal(page.id, root.id)
+      assert.ok(page.children.some((child) => child.id === notes.id))
+      assert.equal(page.install, undefined)
+      assert.equal((await detail(notes.id)).install, undefined)
+      await assert.rejects(
+        () => serveHubSkills(event(`/d/${root.id}/skill-hub/.well-known/agent-skills/release-notes/SKILL.md`)),
+        { status: failure === "missing" ? 404 : 503 },
+      )
+    } finally {
+      state.blob.get = original
+    }
+  })
+}
 
 test("private and team folders, public folders with no skills, and other drops carry nothing", async () => {
   const { root: privateHub, notes } = await hub("private")
