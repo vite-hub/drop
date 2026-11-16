@@ -148,7 +148,8 @@ export function useViewerAnnotations(options: {
   const toggleArea = () => setTool("comment")
   function toggleOverlay(name: keyof ViewerOverlays) {
     if (!(options.enabled?.value ?? true)) return
-    if (name !== "pins" && !["html", "app"].includes(drop.value.kind)) return
+    // Rulers measure any page in the frame, an image or a doc too; X-ray outlines an HTML page's or app's elements.
+    if (name === "xray" && !["html", "app"].includes(drop.value.kind)) return
     overlays[name] = !overlays[name]
   }
   watch(canDrawArea, (value) => !value && ["comment", "mark"].includes(tool.value) && (tool.value = "browse"))

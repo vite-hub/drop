@@ -79,16 +79,24 @@ const groups = computed(() =>
 </script>
 
 <template>
-  <div aria-label="Preview tools" class="flex items-center gap-0.5" role="group">
+  <div
+    aria-label="Preview tools"
+    class="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-0.5"
+    role="group"
+  >
     <template v-for="(group, index) in groups" :key="group.label">
       <div v-if="index" aria-hidden="true" class="w-1 shrink-0" />
-      <div :aria-label="group.label" class="flex items-center gap-0.5" role="group">
+      <div
+        :aria-label="group.label"
+        class="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-0.5"
+        role="group"
+      >
         <UTooltip v-for="item in group.items" :key="item.id" :content="{ side: 'top', sideOffset: 8 }">
           <button
             :aria-keyshortcuts="item.kbd"
             :aria-label="item.label"
             :aria-pressed="item.on"
-            class="grid size-8 place-items-center rounded-md outline-none select-none [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-tool/50 motion-safe:transition-[scale,background-color,color] motion-safe:duration-150 motion-safe:ease-out motion-safe:active:scale-[0.96]"
+            class="grid size-8 shrink-0 place-items-center rounded-md outline-none select-none [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-tool/50 motion-safe:transition-[scale,background-color,color] motion-safe:duration-150 motion-safe:ease-out motion-safe:active:scale-[0.96]"
             :class="item.on ? 'bg-tool text-white' : 'text-highlighted hover:bg-elevated'"
             type="button"
             @click="item.press"

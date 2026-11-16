@@ -11,10 +11,11 @@ import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
-import { isPreviewLink, resourceLabel } from "#shared/resources"
+import type { DocHeader, DocHeaderFact } from "#shared/doc-header"
+import { faviconUrl, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
+import type { DropComment, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
 import { AvatarStack, ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui"
 // The parts' one stylesheet: comments, presence, and the editor's carets.
 import "vite-hub/ui/styles.css"
@@ -368,10 +369,13 @@ watch(
 // composer for a new comment or the thread of the pin clicked. Selected text gets the selection bar either way, so the
 // reader picks Comment or Suggest before writing.
 const commentStyle = useCommentStyle()
-const commentStyles: { value: CommentStyle; label: string }[] = [
-  { value: "card", label: "Cards beside the text" },
-  { value: "pin", label: "Pins beside the text" },
-]
+// Cards or Pins, picked in the Comments segment; only a Markdown doc's text has the choice.
+const commentStyleModel = computed({
+  get: () => (drop.value.kind === "markdown" ? commentStyle.value : undefined),
+  set: (value?: CommentStyle) => {
+    if (value) commentStyle.value = value
+  },
+})
 const pinStyle = computed(() => commentStyle.value === "pin" && drop.value.kind === "markdown")
 const pinOpen = computed(() => commentsOpen.value && !editing.value && !trashed.value && !lightbox.value)
 const pinDraft = computed(
@@ -575,6 +579,12 @@ const {
     shared.hash = id
     void copy(shared.href, { announce: "Link to the section copied" })
   },
+  docAction: (action) => {
+    if (action === "markdown") void copyMarkdown()
+    else if (action === "download") download()
+    else if (printsPdf.value) exportPdf()
+  },
+  openDrop: (id) => void router.push(`/drops/${id}`),
 })
 // A link to a section (#id) opens the doc there, once the frame has it. The frame also gets the drop's link, for the
 // headings' # links.
@@ -729,16 +739,85 @@ const exportPdf = () => send({ type: "print", title: drop.value.title })
 // Markdown loses whatever its scripts draw, so its readers download the HTML instead.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 
-// The dock's links, beside Share: a Markdown doc's preview deploys, which are for opening; its other links read with its front
-// matter at the top of the doc (server/utils/markdown-document.ts withDocProperties). Every other drop shows them all.
-const dockLinks = computed(() => {
-  const links = drop.value.resources ?? []
-  return drop.value.kind === "markdown" ? links.filter(isPreviewLink) : links
-})
-
-// Drops are related through the pages they link to, so only a drop with links, or a site, can have related drops.
+// Drops are related through the pages they link to, so only a drop with links, or a site, can have related drops. A
+// Markdown doc lists its links and related drops in its header (docHeader); every other drop in the dock, beside Share.
 const relatesTo = computed(() =>
   drop.value.kind === "site" || drop.value.resources?.length ? drop.value.id : undefined,
+)
+const related = ref<RelatedDrop[]>([])
+watch(
+  () => (drop.value.kind === "markdown" ? relatesTo.value : undefined),
+  async (id) => {
+    related.value = []
+    if (!id) return
+    const found = await $fetch<RelatedDrop[]>(`/api/drops/${id}/related`).catch(() => [])
+    if (relatesTo.value === id) related.value = found
+  },
+  { immediate: true },
+)
+
+// The owner's views as the Details used to count them (server/utils/views.ts): a total, then who they came from, only
+// the kinds that have any, each saying on hover what it counts.
+function viewsFact(views: { person: number; anonymous: number; agent: number }): DocHeaderFact {
+  const total = views.person + views.anonymous + views.agent
+  const parts = [
+    { icon: "person" as const, n: views.person, tip: `${views.person} by people signed in` },
+    { icon: "anonymous" as const, n: views.anonymous, tip: `${views.anonymous} by visitors not signed in` },
+    { icon: "agent" as const, n: views.agent, tip: `${views.agent} by agents reading it, yours included` },
+  ]
+  return {
+    icon: "views",
+    label: "Views",
+    value: total ? `${total} ${total === 1 ? "view" : "views"}` : "No views yet",
+    parts: parts.filter((part) => part.n > 0),
+  }
+}
+
+/**
+ * A Markdown doc's header (#shared/doc-header): Copy as Markdown, Download and Export as PDF at the top right of its
+ * properties box, its related drops among its links, and under See more the facts the Details used to list.
+ */
+const docHeader = computed<DocHeader | null>(() => {
+  const d = drop.value
+  if (d.kind !== "markdown" || editing.value) return null
+  const views = d.views
+  const folder = d.ancestors.map((crumb) => crumb.title).join(" / ")
+  const facts: DocHeaderFact[] = [
+    ...(views ? [viewsFact(views)] : []),
+    { icon: "file", label: "File", value: d.filename, detail: `Markdown · ${formatBytes(d.size)}` },
+    { icon: "person", label: "Dropped by", value: d.actorName, detail: `via ${VIA_LABELS[d.actorKind]}` },
+    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder }] : []),
+  ]
+  const origin = import.meta.client ? location.origin : ""
+  const listed = new Set((d.resources ?? []).map((resource) => resource.url))
+  return {
+    actions: [
+      ...(copiesMarkdown.value ? [{ id: "markdown" as const, label: "Copy as Markdown", kbd: "M" }] : []),
+      ...(d.url ? [{ id: "download" as const, label: "Download original", kbd: "D" }] : []),
+      ...(printsPdf.value ? [{ id: "pdf" as const, label: "Export as PDF" }] : []),
+    ],
+    copied: copied("markdown"),
+    facts,
+    related: related.value.map((item) => ({
+      id: item.id,
+      title: item.title,
+      href: `${origin}/drops/${item.id}`,
+      icon: `${origin}/favicon.ico`,
+    })),
+    links: related.value
+      .flatMap((item) => item.links)
+      .filter((resource) => !listed.has(resource.url))
+      .map((resource) => ({
+        url: resource.url,
+        label: resourceLabel(resource),
+        icon: faviconUrl(resource.url, origin),
+      })),
+  }
+})
+watch(
+  [ready, docHeader],
+  ([loaded, header]) => loaded && header && send({ type: "doc-header", ...JSON.parse(JSON.stringify(header)) }),
+  { immediate: true },
 )
 
 // The segment's chip: the size (a folder's item count) and, for its owner, the views.
@@ -750,15 +829,18 @@ const detailsMeta = computed(() => {
       : d.kind === "site" || d.kind === "link"
         ? KIND_LABELS[d.kind]
         : formatBytes(d.size)
+  // A Markdown doc's header holds its facts and the lifetime is its own chip: nothing is left to open.
+  if (d.kind === "markdown") return undefined
   const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
   return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
 })
-// What the details panel listed as rows, as the segment's icons: the same rows for the same people.
+// What the details panel listed as rows, as the segment's icons: the same rows for the same people. A Markdown doc's
+// Download, Copy as Markdown and Export as PDF are in its header (docHeader).
 const detailsActions = computed<DetailsAction[]>(() => [
-  ...(drop.value.url
+  ...(drop.value.url && drop.value.kind !== "markdown"
     ? [{ id: "download", label: "Download original", icon: "i-mingcute-download-2-line", kbd: "D", press: download }]
     : []),
-  ...(copiesMarkdown.value
+  ...(copiesMarkdown.value && !docHeader.value
     ? [
         {
           id: "markdown",
@@ -769,19 +851,8 @@ const detailsActions = computed<DetailsAction[]>(() => [
         },
       ]
     : []),
-  ...(printsPdf.value ? [{ id: "pdf", label: "Export as PDF", icon: "i-mingcute-pdf-line", press: exportPdf }] : []),
   ...(presents.value && !slidev.value
     ? [{ id: "window", label: "Open in new window", icon: "i-mingcute-external-link-line", press: openWindow }]
-    : []),
-  ...(owner.value && !trashed.value
-    ? [
-        {
-          id: "move",
-          label: "Move to folder",
-          icon: "i-mingcute-new-folder-line",
-          press: () => moveTo({ drop: drop.value }),
-        },
-      ]
     : []),
   ...(visitor.value
     ? [
@@ -830,10 +901,17 @@ const inspectable = computed(
 /** Whether the Marker can draw on a snapshot of the page: docs, images, HTML, and apps in the frame. */
 const canMark = computed(() => framed.value && canDrawArea.value && !shownVersion.value)
 const marking = computed(() => tool.value === "mark")
-const markTools = computed(() => [
-  ...(inspectable.value ? (["browse", "measure"] as const) : []),
-  ...(canMark.value ? (["mark"] as const) : []),
+/** Whether Rulers can draw over the page: any page in the frame, an image or a doc too (#shared/plan-runtime). */
+const measurable = computed(() => framed.value && annotationsEnabled.value && !lightbox.value)
+// The preview tools fill the dock's +; the Marker stays in the pill. Measure and X-ray read an HTML page's elements.
+const previewTools = computed(() => (inspectable.value ? (["browse", "measure"] as const) : []))
+const previewViews = computed(() => [
+  ...(measurable.value ? (["rulers"] as const) : []),
+  ...(inspectable.value ? (["xray"] as const) : []),
 ])
+// What's on stays beside the + while it's closed, pressed, so one press turns it off.
+const pinnedTools = computed(() => (tool.value === "measure" ? (["measure"] as const) : []))
+const pinnedViews = computed(() => previewViews.value.filter((view) => overlays[view]))
 function finishMark() {
   if (!marking.value || !annotations.marks.value || annotations.finishing.value) return
   annotations.finishing.value = true
@@ -1044,7 +1122,12 @@ usePaletteOffer("drop", () => {
     ...(hasHistory.value
       ? [{ label: "History", icon: "i-mingcute-history-line", kbds: ["h"], onSelect: () => showDetails("history") }]
       : []),
-    { label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => showDetails("meta") },
+    {
+      label: "Details",
+      icon: "i-mingcute-information-line",
+      kbds: ["i"],
+      onSelect: () => showDetails(detailsMeta.value ? "meta" : null),
+    },
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
     ...(drop.value.url
       ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
@@ -1161,11 +1244,11 @@ watch(
 
 <template>
   <DefineDetails>
-    <ViewerOverview :drop="drop" :show-description="owner || (Boolean(me) && !publicView)" />
-    <div v-if="widens" class="space-y-2 border-t border-default p-4">
-      <label for="drop-comment-style" class="text-xs font-medium text-muted">Comments</label>
-      <USelect id="drop-comment-style" v-model="commentStyle" class="w-full" :items="commentStyles" />
-    </div>
+    <ViewerOverview
+      :drop="drop"
+      :facts-in-doc="drop.kind === 'markdown'"
+      :show-description="owner || (Boolean(me) && !publicView)"
+    />
   </DefineDetails>
   <DefineHistory>
     <LazyViewerHistory :comments="comments" :drop="drop" :selected="shownVersion?.version" @open="showVersion" />
@@ -1403,6 +1486,7 @@ watch(
               :can-comment="canCommentOnPage"
               :comments="lightbox ? imageComments : comments"
               :outdated="outdated"
+              :screenshots="screenshots"
               @focus="focusComment"
             >
               <template #actions>
@@ -1511,13 +1595,12 @@ watch(
             </template>
             <template v-else-if="hasComments && !trashed">
               <ViewerToolbar
-                v-if="!lightbox && !shownVersion && (inspectable || canMark || sizable || siteRef?.canDraw)"
-                :tools="markTools"
-                :views="inspectable ? ['rulers', 'xray'] : []"
+                v-if="canMark && !lightbox"
                 :overlays="overlays"
-                :sizable="sizable || Boolean(siteRef?.canDraw)"
+                :sizable="false"
                 :tool="tool"
-                @toggle="toggleOverlay"
+                :tools="['mark']"
+                :views="[]"
                 @tool="setTool"
               />
               <UButton
@@ -1529,26 +1612,9 @@ watch(
                 variant="ghost"
                 @click="present"
               />
-              <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  icon="i-mingcute-pencil-line"
-                  label="Edit"
-                  :loading="live.opening.value"
-                  variant="ghost"
-                  @click="startEdit"
-                />
-              </UTooltip>
-              <LazyViewerEditNote
-                v-else-if="showEditTool && drop.editNote"
-                v-model:open="editNoteOpen"
-                :can-comment="drop.canComment"
-                :note="drop.editNote"
-                @copy="copyMarkdown('Markdown copied')"
-              />
               <ViewerCommentsSegment
                 v-model:on="commentMode"
+                v-model:style="commentStyleModel"
                 :can-comment="canCommentOnPage"
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
@@ -1562,7 +1628,31 @@ watch(
               />
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
+            <template v-if="!editing && presence.people.value.length">
+              <ViewerPresence
+                v-model:show-cursors="presence.showCursors.value"
+                :people="presence.people.value"
+                :site="drop.kind === 'site'"
+              />
+              <span aria-hidden="true" class="w-1 shrink-0" />
+            </template>
+            <ViewerResources
+              v-if="drop.kind !== 'markdown'"
+              :related-to="relatesTo"
+              :resources="drop.resources ?? []"
+            />
+            <ViewerShare v-model:open="shareOpen" :drop="drop" />
             <template v-if="!editing">
+              <ViewerToolbar
+                v-if="!detailsOpen && (pinnedTools.length || pinnedViews.length)"
+                :overlays="overlays"
+                :sizable="false"
+                :tool="tool"
+                :tools="pinnedTools"
+                :views="pinnedViews"
+                @toggle="toggleOverlay"
+                @tool="setTool"
+              />
               <ViewerDetailsSegment
                 v-model:open="detailsOpen"
                 v-model:pop="detailsPop"
@@ -1572,21 +1662,41 @@ watch(
                 :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
                 @width="nextWidth"
               >
+                <template v-if="hasComments && !trashed && !marking" #tools>
+                  <ViewerToolbar
+                    v-if="!lightbox && !shownVersion && (measurable || sizable || siteRef?.canDraw)"
+                    :overlays="overlays"
+                    :sizable="sizable || Boolean(siteRef?.canDraw)"
+                    :tool="tool"
+                    :tools="previewTools"
+                    :views="previewViews"
+                    @toggle="toggleOverlay"
+                    @tool="setTool"
+                  />
+                  <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      icon="i-mingcute-pencil-line"
+                      label="Edit"
+                      :loading="live.opening.value"
+                      variant="ghost"
+                      @click="startEdit"
+                    />
+                  </UTooltip>
+                  <LazyViewerEditNote
+                    v-else-if="showEditTool && drop.editNote"
+                    v-model:open="editNoteOpen"
+                    :can-comment="drop.canComment"
+                    :note="drop.editNote"
+                    @copy="copyMarkdown('Markdown copied')"
+                  />
+                </template>
+                <template v-if="drop.isOwner" #lifetime><ViewerLifetime :drop="drop" /></template>
                 <template #details><ReuseDetails /></template>
                 <template #history><ReuseHistory /></template>
               </ViewerDetailsSegment>
-              <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
-            <template v-if="!editing && presence.people.value.length">
-              <ViewerPresence
-                v-model:show-cursors="presence.showCursors.value"
-                :people="presence.people.value"
-                :site="drop.kind === 'site'"
-              />
-              <span aria-hidden="true" class="w-1 shrink-0" />
-            </template>
-            <ViewerResources :related-to="relatesTo" :resources="dockLinks" />
-            <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
         </ViewerReviewDock>
       </div>

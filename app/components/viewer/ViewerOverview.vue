@@ -1,14 +1,12 @@
 <script setup lang="ts">
 // Details in sections, not a label/value table: the drop itself first (its name, type and size, who dropped it, when,
-// where), then views and lifetime. Versions have their own tab (ViewerHistory). A folder leads with
+// where), then views. The lifetime is the review pill's chip (ViewerLifetime). Versions have their own tab (ViewerHistory). A folder leads with
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
-// it in place.
-import { expiryLabel } from "#shared/expiry"
+// it in place. A Markdown doc shows its file, who dropped it and its views at its top (`factsInDoc`, #shared/doc-header),
+// so here it keeps only what can be changed.
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; showDescription: boolean }>()
-const { data: me } = useMe()
-const now = useRelativeNow()
+const props = defineProps<{ drop: DropDetail; showDescription: boolean; factsInDoc?: boolean }>()
 // A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
 const site = computed(() => props.drop.kind === "site")
 const type = computed(() =>
@@ -80,7 +78,7 @@ async function save() {
 
 <template>
   <div class="divide-y divide-default">
-    <section aria-label="File" class="space-y-3 p-4">
+    <section v-if="!factsInDoc" aria-label="File" class="space-y-3 p-4">
       <div class="flex items-center gap-3">
         <span
           class="grid size-10 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-default ring-inset"
@@ -155,7 +153,7 @@ async function save() {
       </p>
     </section>
 
-    <section v-if="views" aria-labelledby="details-views" class="@container space-y-2.5 p-4">
+    <section v-if="views && !factsInDoc" aria-labelledby="details-views" class="@container space-y-2.5 p-4">
       <h3 id="details-views" class="text-xs font-medium text-muted">Views</h3>
       <!-- A total and where the views came from, each a number over what it counts; two by two in a narrow panel.
            Hovering says how they're counted. -->
@@ -177,27 +175,6 @@ async function save() {
         </UTooltip>
       </dl>
     </section>
-
-    <!-- The team's folders never expire, so there's nothing to choose. -->
-    <section v-if="drop.teamFolder" aria-labelledby="details-lifetime" class="space-y-1 p-4 text-sm">
-      <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
-      <p class="text-highlighted">Never deleted</p>
-      <p class="text-xs text-pretty text-muted">Team folders stay until an admin deletes them.</p>
-    </section>
-    <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
-    <section
-      v-else-if="drop.isOwner && drop.parentId && drop.ancestors.length && me?.expiry.days"
-      aria-labelledby="details-lifetime"
-      class="space-y-1 p-4 text-sm"
-    >
-      <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
-      <p class="text-highlighted tabular-nums">{{ expiryLabel(drop, now) }}</p>
-      <p class="text-xs text-pretty text-muted">
-        It lives as long as its folder, {{ drop.ancestors[0]!.title }}. Change that folder's lifetime instead.
-      </p>
-    </section>
-    <!-- A drop at the top chooses its own lifetime. -->
-    <ViewerLifetime v-else-if="drop.isOwner && !drop.parentId" class="p-4" :drop="drop" />
 
     <section v-if="$slots.actions" class="p-2">
       <slot name="actions" />

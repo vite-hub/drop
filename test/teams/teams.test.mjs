@@ -3,7 +3,7 @@ import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { sql, state, migrate, reset, who } from "../cost/harness.mjs"
-const { findDrop, listFolders, listSharedWithMe, permissions } = await import("../../server/utils/drops.ts")
+const { dropDetail, findDrop, listFolders, listSharedWithMe, permissions } = await import("../../server/utils/drops.ts")
 const { updateDrop } = await import("../../server/utils/drop-update.ts")
 const { createFolder: makeFolder, requireFolder } = await import("../../server/utils/folders.ts")
 const { closePublicLinks } = await import("../../server/utils/share.ts")
@@ -176,7 +176,7 @@ test("the Free plan keeps a few drops forever; new versions of a kept one don't 
   const first = await keep("One")
   assert.ok(!first.isError, first.message)
   assert.ok(!(await keep("Two")).isError)
-  assert.match((await keep("Three")).message, /Plan limit for drops set to Never delete \(keep\): 2\/2/)
+  assert.match((await keep("Three")).message, /Plan limit for drops set to Forever \(keep\): 2\/2/)
   const next = await call(publish, { markdown: "# One again", note: "v2", previous: first.id })
   assert.ok(!next.isError, next.message)
   assert.equal((await getUsage("owner")).kept.used, 2)
@@ -205,4 +205,22 @@ test("a team that pays puts its members on Pro and keeps boards; a free team sto
 
   sql.prepare("UPDATE subscription SET status = 'canceled'").run()
   assert.equal((await getUsage("mate")).plan, "free")
+})
+
+test("lifetime editing follows the effective root, not a child's own team-folder flag or kept lifetime", async () => {
+  const team = await acmeFolder()
+  const personal = await makeFolder(mate, { title: "Personal", lifetime: "keep" })
+  for (const [folder, fixed] of [
+    [team, true],
+    [personal, false],
+  ]) {
+    const published = await call(publish, { markdown: "# Child", note: "First", folder: folder.id })
+    assert.ok(!published.isError, published.message)
+    const row = await findDrop(published.id)
+    const detail = await dropDetail(row, mate, "https://drop.example")
+    assert.equal(detail.isOwner, true)
+    assert.equal(detail.teamFolder, undefined, "the child isn't itself a team folder")
+    assert.equal(detail.lifetime, "keep", "both folders are kept")
+    assert.equal(Boolean(detail.lifetimeFixed), fixed)
+  }
 })

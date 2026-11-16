@@ -1,6 +1,6 @@
 import { defineHandler } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
-import { faviconUrls, resourceLabel } from "#shared/resources"
+import { faviconUrl, resourceLabel } from "#shared/resources"
 import { siteCoversDrop } from "../../utils/content-origin"
 import { linkedFrom, relatedDrops } from "../../utils/related"
 import { covered, reviewApi, reviewSession, sealDoc } from "../../utils/review"
@@ -43,7 +43,7 @@ export default reviewApi(
             url: resource.url,
             label: resourceLabel(resource),
             detail: resource.title ? new URL(resource.url).hostname.replace(/^www\./, "") : "",
-            icons: faviconUrls(resource.url),
+            icons: [faviconUrl(resource.url, event.url.origin)],
           })),
         })),
       ),

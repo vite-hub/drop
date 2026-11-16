@@ -30,20 +30,11 @@ export function resourceLabel(resource: DropResource) {
   return reference ? `${reference[1]}#${reference[2]}` : new URL(resource.url).hostname.replace(/^www\./, "")
 }
 
-/**
- * Where its site's icon may be: `/favicon.ico` on its host, then on each domain above it, down to two labels. A
- * favicon belongs to the site, not the page, so a private repository's pull request still gets GitHub's, and a
- * preview behind a sign-in (pr123.preview.example.com) falls back to its company's (example.com).
- */
-export function faviconUrls(url: string): string[] {
-  const { origin, hostname } = new URL(url)
-  const urls = [`${origin}/favicon.ico`]
-  if (isLocal(hostname) || /^[\d.]+$|^\[/.test(hostname)) return urls
-  const labels = hostname.split(".")
-  for (let start = 1; labels.length - start >= 2; start++)
-    urls.push(`https://${labels.slice(start).join(".")}/favicon.ico`)
-  return urls
-}
+/** Where Drop serves a site's icon (server/api/favicons/[host].get.ts). */
+export const FAVICON_PATH = "/api/favicons/"
+
+/** A link's site icon, from Drop: relative to Drop's origin, or under `origin` for a page on another one. */
+export const faviconUrl = (url: string, origin = "") => `${origin}${FAVICON_PATH}${new URL(url).hostname}`
 
 /** `next` added to `current`: a link already there keeps its place and takes the new title, if it has one. */
 export function mergeResources(current: DropResource[], next: DropResource[]): DropResource[] {
@@ -68,13 +59,6 @@ export function linkSource(url: string) {
   const pull = pullRequestOf(url)
   return pull ? `${pull.repo}#${pull.number}` : new URL(url).hostname.replace(/^www\./, "")
 }
-
-/**
- * A preview deploy of the change, which stays in a doc's header: something to open and try, not a fact about the doc.
- * Agents title it exactly "Preview" (pr-evidence); a host with a `preview` label counts too. "Design preview" doesn't.
- */
-export const isPreviewLink = (resource: DropResource) =>
-  resource.title?.trim().toLowerCase() === "preview" || new URL(resource.url).hostname.split(".").includes("preview")
 
 /** A link's words in a doc's properties: its title, `owner/repo#123` for a pull request or issue, or its address. */
 export function linkText(resource: DropResource) {

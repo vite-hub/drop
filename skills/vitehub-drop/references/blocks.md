@@ -13,6 +13,7 @@ Drop reads no files, so a block that points at one (`src` on `::table`, `::tests
 | A component's props or a command's options | [fields](#fields) |
 | A project's files | [a file tree](#file-trees) |
 | A suggested code change | [a diff](#diffs) |
+| Branches, merges, and which branch has a fix | [a git graph](#git-graphs) |
 | A file's code, with lines marked or explained | [code titles, marks, and notes](#code-titles-marks-and-notes) |
 | Numbers that moved, or progress | [metrics](#metrics) |
 | Rows of data | [a data table](#data-tables) |
@@ -162,6 +163,20 @@ if (issues.annotations.length) throw error
 ````
 
 The first fence is the code as it is, the second as it should be. [comark-diff](https://comark-ui.onmax.me/diff/)
+
+## Git graphs
+
+````md
+```git-graph [Sign-in stack]
+* 0d65aff 676e7b8 (HEAD -> main) Bump Vite to 8
+| * 67cab57 8bb4fd2 (stack/sign-in-form) Remember the last email
+| * 8bb4fd2 676e7b8 Sign-in form
+|/
+* 676e7b8 Release 1.4
+```
+````
+
+Paste what `git log --all --graph --oneline --decorate --parents` prints; the label in brackets is the title. [comark-git-graph](https://comark-ui.onmax.me/git-graph/)
 
 ## Code titles, marks, and notes
 
