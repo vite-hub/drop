@@ -49,7 +49,7 @@ export const MAX_SKILL_BYTES = 2 * MAX_FILE_BYTES
  * What one request builds at once: the index builds every skill (bytes, then each archive for its digest) before it
  * answers. One skill at MAX_SKILL_BYTES fits, and so do a hundred real ones; BUILT_BYTES says why no more.
  */
-export const MAX_HUB_BYTES = MAX_SKILL_BYTES
+const MAX_HUB_BYTES = MAX_SKILL_BYTES
 /** Skills and files one request builds or checks, empty files included: a hundred real skills fit. */
 export const MAX_HUB_SKILLS = 100
 export const MAX_HUB_FILES = 2000
