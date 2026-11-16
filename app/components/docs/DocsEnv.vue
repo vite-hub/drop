@@ -8,8 +8,8 @@ const COMMON: Array<[string, string]> = [
   ["BETTER_AUTH_SECRET", "Signs sessions and agent tokens. One per deployment: openssl rand -base64 32"],
   ["DROP_ADMINS", "Admin emails, comma-separated. Whoever signs in with one of them is Admin."],
   [
-    "DROP_MEMBERS",
-    "Optional. Emails, comma-separated: only these people (and the admins) sign in, open shared links, and use MCP.",
+    "VITEHUB_MEMBERS",
+    "Optional. Only these people (and the admins) sign in, open shared links, and use MCP: github:<id>, verified emails, @domains, or github-org:<org>, comma-separated.",
   ],
   [
     "DROP_MODE",

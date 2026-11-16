@@ -73,9 +73,7 @@ extra:
   - ["DROP_IMAGE_TAG", "Optional image tag for Compose: latest by default, a release such as 0.1, or main."]
   - ["DROP_DATABASE", "Optional, when you build the image yourself: sqlite or d1. Existing D1 database ids keep the D1 driver."]
   - ["DROP_DATABASE_URL", "Runtime SQLite file: URL. Defaults to file:.data/database/drop.db. Keep it on the persistent volume."]
-  - ["DROP_MEMBERS", "Optional emails, comma-separated; only these people and the admins may publish, view, and use MCP."]
-  - ["DROP_GITHUB_ORG", "Optional active organization membership requirement for publishing, viewing, and MCP."]
-  - ["DROP_AUTH_PROXY", "Set true to reuse GitHub oauth2-proxy; requires DROP_GITHUB_ORG."]
+  - ["DROP_AUTH_PROXY", "Set true to reuse GitHub oauth2-proxy; requires a github-org:<org> entry in VITEHUB_MEMBERS."]
   - ["DROP_AUTH_PROXY_COOKIE", "Optional proxy cookie name to clear on logout. Secure, host-only, Path=/."]
   - ["DROP_CONTENT_ORIGIN", "Optional wildcard origin for apps and HTML docs, one subdomain per drop, proxied to the same port. Needs VITEHUB_SECRET."]
 ---
@@ -83,7 +81,7 @@ extra:
 
 ## Reuse GitHub oauth2-proxy {#auth-proxy}
 
-Set `DROP_AUTH_PROXY=true` and `DROP_GITHUB_ORG=your-org`. Native GitHub client credentials are unnecessary in this mode. Configure the existing OAuth app to accept `https://<your-domain>/oauth2/callback`.
+Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native GitHub client credentials are unnecessary in this mode. Configure the existing OAuth app to accept `https://<your-domain>/oauth2/callback`.
 
 Configure oauth2-proxy with `--provider=github`, `--scope=user:email read:org`, `--github-org=your-org`, `--set-xauthrequest=true`, and `--pass-access-token=true`. Forward `X-Auth-Request-Access-Token` from its auth response to Drop. Drop checks that token against GitHub, maps its numeric user id, and creates its normal session. Do not forward client-supplied identity headers.
 

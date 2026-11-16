@@ -3,8 +3,7 @@ import { setSessionCookie } from "better-auth/cookies"
 import { handleOAuthUserInfo } from "better-auth/oauth2"
 import { HTTPError } from "h3"
 import * as v from "valibot"
-import { isGitHubMember } from "./github-membership"
-import { readAuthProxyConfig } from "./proxy-auth-config"
+import { isProxyMember, readAuthProxyConfig } from "./proxy-auth-config"
 export const authProxy = readAuthProxyConfig
 
 const signIns = new Map<string, Promise<void>>()
@@ -27,7 +26,7 @@ export const proxyAuth = () => ({
       if (!token || !authProxy().enabled)
         throw new APIError("UNAUTHORIZED", { message: "GitHub proxy sign-in is unavailable." })
       try {
-        if (!(await isGitHubMember(token)))
+        if (!(await isProxyMember(token)))
           throw new APIError("FORBIDDEN", { message: "Active GitHub organization membership required." })
       } catch (error) {
         if (!(error instanceof HTTPError)) throw error

@@ -54,7 +54,7 @@
     "@tiptap/vue-3": "3.31.4",
     "@tiptap/y-tiptap": "3.0.9",
     "@valibot/to-json-schema": "^1.8.0",
-    "@vite-hub/auth": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@a6a5653dbddd26a8d8a6fab21e1b59bed105d483",
+    "@vite-hub/auth": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@ff2ae8475e629dc9387ef483f36759d823875fc0",
     "@vite-hub/blob": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@a6a5653dbddd26a8d8a6fab21e1b59bed105d483",
     "@vite-hub/browser": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@a6a5653dbddd26a8d8a6fab21e1b59bed105d483",
     "@vite-hub/comments": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@785072732e8c003852d87ba051c52bf8ba5571a0",

@@ -52,13 +52,13 @@ test("service failures offer a retry without blaming account permissions", async
 })
 
 test("behind the auth proxy, signed-in content errors don't send people back through sign-in", async () => {
-  Object.assign(state, { authProxy: true, githubOrg: "acme" })
+  Object.assign(state, { authProxy: true, members: "github-org:acme" })
   try {
     const html = await (await render(404, { email: "member@example.test" })).text()
     assert.doesNotMatch(html, /Use another account|\/signin/)
     assert.equal(html.match(/href="\/drops"/g)?.length, 1)
     assert.match(await (await render(404)).text(), /Sign in with GitHub/)
   } finally {
-    Object.assign(state, { authProxy: false, githubOrg: "" })
+    Object.assign(state, { authProxy: false, members: "" })
   }
 })

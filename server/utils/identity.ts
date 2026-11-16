@@ -90,7 +90,7 @@ async function verify(event: H3Event): Promise<Identity | null> {
   const who = await resolveIdentity(event)
   if (!who) return null
   // Both are a round trip to the database, so they start together.
-  const [member, teams] = await Promise.all([isMember(who.userId), teamsOf(who.userId, event)])
+  const [member, teams] = await Promise.all([isMember(who.userId, event), teamsOf(who.userId, event)])
   if (!member) return null
   who.teams = teams
   return who
