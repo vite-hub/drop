@@ -3,10 +3,11 @@ import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { parseTarGzip } from "nanotar"
 import { createMcpHandler } from "nitro-mcp-toolkit"
+import { skillArchive, skillDigest } from "vite-hub/skills"
 import { calls, event, insertDrop, migrate, objects, reset, roundTrips, sql, state, who } from "../cost/harness.mjs"
 const { findDrop, permissions } = await import("../../server/utils/drops.ts")
 const { default: discovery } = await import("../../server/middleware/0.3.well-known.ts")
-const { hubSkillNames } = await import("../../server/utils/hub-skills.ts")
+const { BUILT_BYTES, buildBudget, builtSkills, hubSkillNames } = await import("../../server/utils/hub-skills.ts")
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: createFolder } = await import("../../server/mcp/tools/create_folder.ts")
 const { default: updateTool } = await import("../../server/mcp/tools/update_drop.ts")
@@ -377,16 +378,17 @@ test("a skill over 200 files or 8 MiB is left out whole, its files never read; o
   assert.deepEqual(await hubSkillNames(root.id), served)
 })
 
-test("one request reads at most 24 MiB: skills past it, in name order, are left out whole", async () => {
+test("one request reads at most 8 MiB: skills past it, in name order, are left out whole", async () => {
   const { root } = await hub()
-  // 7 MiB each: a, b and c fit in 24 MiB with the hub's small skills, d doesn't.
-  for (const name of ["a-skill", "b-skill", "c-skill", "d-skill"]) await skillWith(root, name, 7, MIB)
+  // 3 MiB each: a and b fit in 8 MiB with the hub's small skills, c and d don't.
+  for (const name of ["a-skill", "b-skill", "c-skill", "d-skill"]) await skillWith(root, name, 3, MIB)
   const index = await (await get(`/d/${root.id}/x/.well-known/skills/index.json`)).json()
   assert.deepEqual(
     index.skills.map((skill) => skill.name),
-    ["a-skill", "b-skill", "c-skill", "handoff", "release-notes"],
+    ["a-skill", "b-skill", "handoff", "release-notes"],
   )
-  assert.equal((await get(`/d/${root.id}/x/.well-known/skills/d-skill/f0.txt`)).status, 404)
+  for (const name of ["c-skill", "d-skill"])
+    assert.equal((await get(`/d/${root.id}/x/.well-known/skills/${name}/f0.txt`)).status, 404, name)
 })
 
 test("a skill's files are read six at a time", async () => {
@@ -524,4 +526,297 @@ test("a skill with a path no skill archive can hold is left out whole, and the r
   assert.equal(await (await get(`${base}/skills/release-notes/scripts/check.mjs`)).text(), CHECK)
   assert.equal((await get(`${base}/agent-skills/release-notes.tar.gz`)).status, 200)
   assert.deepEqual(await hubSkillNames(root.id), ["handoff", "release-notes"])
+})
+
+/** `size` bytes of printable ASCII drawn at random, so gzip shrinks it little and the archive stays near its input. */
+function noise(size) {
+  const bytes = new Uint8Array(size)
+  for (let at = 0; at < size; at += 65536) crypto.getRandomValues(bytes.subarray(at, at + 65536))
+  return bytes.map((byte) => 33 + (byte % 94))
+}
+
+/** What a cached skill holds, measured on its objects: key, file bytes, text at 2 bytes a character, archive, digest. */
+async function held(key, skill) {
+  let bytes = key.length * 2
+  if (!skill) return bytes
+  for (const file of skill.files)
+    bytes += file.bytes.buffer.byteLength + (file.text?.length ?? 0) * 2 + file.path.length * 2
+  const archive = await skillArchive(skill)
+  return (
+    bytes + JSON.stringify(skill.frontmatter).length * 2 + archive.byteLength + (await skillDigest(skill)).length * 2
+  )
+}
+
+test("the skill cache charges at least what each kept skill holds, and never more than its budget", async () => {
+  // Two hubs, each with one skill near the limits: 8 MiB in 9 files, then 200 files in just under 8 MiB. Together they
+  // are more than the cache keeps, so the second request makes room.
+  const hubs = []
+  for (const [name, count, size] of [
+    ["big", 8, MIB - 512],
+    ["wide", 199, 40 * 1024],
+  ]) {
+    const root = await folder(`${name} hub`, `${name}-hub`, {
+      lifetime: "keep",
+      keepReason: "Limits.",
+      share: "public",
+    })
+    await skillWith(root, name, count, size)
+    for (let index = 0; index < count; index++)
+      objects.set(`${name}/${index}.txt`, { body: new Blob([noise(size)]), uploadedAt: new Date() })
+    hubs.push([root, name])
+  }
+  for (const [root, name] of hubs) {
+    const index = await (await get(`/d/${root.id}/x/.well-known/agent-skills/index.json`)).json()
+    assert.deepEqual(
+      index.skills.map((skill) => skill.name),
+      [name],
+    )
+    assert.equal((await get(index.skills[0].url)).status, 200, name)
+
+    const kept = builtSkills()
+    assert.ok(
+      kept.some(({ skill }) => skill?.name === name),
+      `the cache keeps ${name}, built from ${index.skills[0].name}`,
+    )
+    let total = 0
+    for (const { key, bytes, skill } of kept) {
+      total += bytes
+      const measured = await held(key, skill)
+      assert.ok(bytes >= measured, `${skill?.name ?? key}: charged ${bytes}, holds ${measured}`)
+    }
+    assert.ok(total <= BUILT_BYTES, `charged ${total} in all, budget ${BUILT_BYTES}`)
+  }
+  const sizes = builtSkills().map(
+    ({ skill }) => skill?.files.reduce((sum, file) => sum + file.bytes.byteLength, 0) ?? 0,
+  )
+  assert.ok(Math.max(...sizes) > 7 * MIB, "a kept skill is near MAX_SKILL_BYTES")
+  assert.ok(!builtSkills().some(({ skill }) => skill?.name === "big"), "big made room for wide")
+})
+
+test("Install names exactly the skills discovery serves", async () => {
+  const { root } = await hub()
+  const png = await skillWith(root, "long-png", 1)
+  // An image discovery leaves out once read, and a text file it would serve, each with a name over 100 bytes.
+  insertDrop("long-png-image", {
+    kind: "image",
+    parent_id: png.id,
+    title: "diagram",
+    filename: `${"p".repeat(120)}.png`,
+    blob_key: "long-png/diagram.png",
+    size: 12,
+  })
+  objects.set("long-png/diagram.png", {
+    body: new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0, 0, 0])]),
+    uploadedAt: new Date(),
+  })
+  const text = await skillWith(root, "long-text", 1)
+  insertDrop("long-text-file", {
+    kind: "file",
+    parent_id: text.id,
+    title: "notes",
+    filename: `${"t".repeat(120)}.txt`,
+    blob_key: "long-text/notes.txt",
+    size: 8,
+  })
+  await skillWith(root, "crowded", 200)
+
+  const base = `/d/${root.id}/x/.well-known`
+  const served = async (path) => (await (await get(`${base}/${path}`)).json()).skills.map((skill) => skill.name)
+  const install = await hubSkillNames(root.id)
+  // A path no archive holds leaves its skill out, binary or not; release-notes' short-named PNG doesn't.
+  assert.deepEqual(install, ["handoff", "release-notes"])
+  for (const path of ["agent-skills/index.json", "skills/index.json"])
+    assert.deepEqual(await served(path), install, path)
+  for (const name of ["handoff", "release-notes", "long-png", "long-text", "crowded"])
+    assert.deepEqual(
+      await hubSkillNames(root.id, undefined, name),
+      install.includes(name) ? [name] : [],
+      `${name}'s own Install button`,
+    )
+})
+
+/** What a stranger's index lists, both versions, checked against what the Install button names. */
+async function servedAndInstalled(root) {
+  const base = `/d/${root.id}/x/.well-known`
+  const v2 = (await (await get(`${base}/agent-skills/index.json`)).json()).skills.map((skill) => skill.name)
+  const v1 = (await (await get(`${base}/skills/index.json`)).json()).skills.map((skill) => skill.name)
+  assert.deepEqual(v1, v2)
+  assert.deepEqual(await hubSkillNames(root.id), v2, "the Install button names what discovery serves")
+  return v2
+}
+
+test("a SKILL doc whose frontmatter is over 4 KiB is left out, in discovery and the Install button", async () => {
+  const { root } = await hub()
+  // A frontmatter block of exactly `length` characters, padded in a metadata value.
+  const skillDoc = (name, length) => {
+    const head = `name: ${name}\ndescription: Long metadata.\nmetadata:\n  notes: ""`
+    const block = head.replace('""', `"${"n".repeat(length - head.length)}"`)
+    assert.equal(block.length, length)
+    return `---\n${block}\n---\n\n# ${name}\n`
+  }
+  for (const [name, length] of [
+    ["at-cap", 4096],
+    ["over-cap", 4097],
+  ]) {
+    const at = await folder(name, name, { folder: root.id })
+    await doc(skillDoc(name, length), "skill", at.id)
+  }
+  assert.deepEqual(await servedAndInstalled(root), ["at-cap", "handoff", "release-notes"])
+  assert.equal((await get(`/d/${root.id}/x/.well-known/skills/over-cap/SKILL.md`)).status, 404)
+})
+
+/** A skill subfolder of `root` written straight to the database: a folder, its SKILL doc, and `count` small files. */
+function quickSkill(root, name, count = 0) {
+  insertDrop(`${name}-dir`, { kind: "folder", parent_id: root.id, title: name, slug: name, blob_key: null })
+  insertDrop(`${name}-doc`, { parent_id: `${name}-dir`, slug: "skill", title: "SKILL", blob_key: `${name}/SKILL.md` })
+  objects.set(`${name}/SKILL.md`, { body: new Blob([skillMd(name)]), uploadedAt: new Date() })
+  for (let index = 0; index < count; index++)
+    insertDrop(`${name}-${index}`, {
+      kind: "file",
+      parent_id: `${name}-dir`,
+      title: `f${index}.txt`,
+      filename: `f${index}.txt`,
+      blob_key: `${name}/${index}.txt`,
+      size: index % 2 ? 0 : 8,
+    })
+}
+
+test("one request builds at most 100 skills: those past it, in name order, are left out", async () => {
+  const { root } = await hub()
+  const names = Array.from({ length: 100 }, (_, index) => `a-${String(index).padStart(3, "0")}`)
+  for (const name of names) quickSkill(root, name)
+  assert.deepEqual(await servedAndInstalled(root), names)
+})
+
+test("one request builds at most 2000 files, empty ones included: skills past it, in name order, are left out", async () => {
+  const { root } = await hub()
+  // Nine skills of 200 files each are 1800; handoff and release-notes (4 with the image) make 1805. wide's 200 don't
+  // fit, zz-small's 1 does. Half the files are empty and still count.
+  for (let index = 1; index <= 9; index++) quickSkill(root, `files-${index}`, 199)
+  quickSkill(root, "wide", 199)
+  quickSkill(root, "zz-small")
+  assert.deepEqual(await servedAndInstalled(root), [
+    ...Array.from({ length: 9 }, (_, index) => `files-${index + 1}`),
+    "handoff",
+    "release-notes",
+    "zz-small",
+  ])
+})
+
+/** Runs `body` with the isolate's build budget set to `settings`, as a stranger, then puts both back. */
+async function withBudget(settings, body) {
+  const saved = { ...buildBudget }
+  Object.assign(buildBudget ?? {}, settings)
+  state.who = null
+  try {
+    return await body()
+  } finally {
+    Object.assign(buildBudget ?? {}, saved)
+    state.who = agent
+  }
+}
+
+/** Holds blob reads of keys under `prefix` until `open()`; `started` resolves on the first one. */
+function gate(prefix) {
+  const { get: original } = state.blob
+  let open
+  let started
+  const opened = new Promise((resolve) => (open = resolve))
+  const first = new Promise((resolve) => (started = resolve))
+  const log = []
+  state.blob.get = async (key) => {
+    log.push(key)
+    if (key.startsWith(prefix)) {
+      started()
+      await opened
+    }
+    return original(key)
+  }
+  return { open, started: first, log, restore: () => (state.blob.get = original) }
+}
+
+/** A public hub of one skill with a few small files, for the build budget tests. */
+async function smallHub(name) {
+  const root = await folder(`${name} hub`, `${name}-hub`, { lifetime: "keep", keepReason: "Budget.", share: "public" })
+  quickSkill(root, name, 3)
+  return root
+}
+
+const archiveOf = (root, name) => `/d/${root.id}/x/.well-known/agent-skills/${name}.tar.gz`
+
+test("a build waits while other builds hold the isolate's budget, then runs once they finish", async () => {
+  const first = await smallHub("first")
+  const second = await smallHub("second")
+  const reads = gate("first/")
+  try {
+    await withBudget({ limit: 1, waitMs: 5000, leaseMs: 60_000 }, async () => {
+      const one = discovery(event(archiveOf(first, "first")))
+      await reads.started
+      const two = discovery(event(archiveOf(second, "second")))
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      assert.ok(!reads.log.some((key) => key.startsWith("second/")), "second read nothing while first held the budget")
+      reads.open()
+      const [a, b] = await Promise.all([one, two])
+      assert.equal(a.status, 200)
+      assert.equal(b.status, 200)
+      assert.equal((await parseTarGzip(new Uint8Array(await b.arrayBuffer()))).length, 4)
+      const last = reads.log.findLastIndex((key) => key.startsWith("first/"))
+      assert.ok(reads.log.findIndex((key) => key.startsWith("second/")) > last, "second read after first finished")
+    })
+  } finally {
+    reads.open()
+    reads.restore()
+  }
+})
+
+test("a build that waits too long answers 503 with Retry-After, and the index lists nothing, uncached", async () => {
+  const first = await smallHub("holder")
+  const second = await smallHub("waiter")
+  const reads = gate("holder/")
+  try {
+    await withBudget({ limit: 1, waitMs: 40, leaseMs: 60_000 }, async () => {
+      const one = discovery(event(archiveOf(first, "holder")))
+      await reads.started
+      const archive = await discovery(event(archiveOf(second, "waiter")))
+      assert.equal(archive.status, 503)
+      assert.ok(Number(archive.headers.get("retry-after")) > 0)
+      assert.equal(archive.headers.get("cache-control"), "no-store")
+      for (const path of ["agent-skills/index.json", "skills/index.json"]) {
+        const index = await discovery(event(`/d/${second.id}/x/.well-known/${path}`))
+        assert.equal(index.status, 200, path)
+        assert.equal(index.headers.get("cache-control"), "no-store", path)
+        assert.ok(Number(index.headers.get("retry-after")) > 0, path)
+        assert.deepEqual((await index.json()).skills, [], path)
+      }
+      assert.deepEqual(await hubSkillNames(second.id), [], "the Install button hides while discovery lists nothing")
+      reads.open()
+      assert.equal((await one).status, 200)
+      const index = await discovery(event(`/d/${second.id}/x/.well-known/agent-skills/index.json`))
+      assert.equal(index.headers.get("cache-control"), "public, max-age=60")
+      assert.deepEqual(
+        (await index.json()).skills.map((skill) => skill.name),
+        ["waiter"],
+      )
+    })
+  } finally {
+    reads.open()
+    reads.restore()
+  }
+})
+
+test("a build whose client went away holds the budget only until its lease runs out", async () => {
+  const gone = await smallHub("gone")
+  const next = await smallHub("next")
+  // Its reads never finish, as when Workers stop a request's I/O after its client disconnects.
+  const reads = gate("gone/")
+  try {
+    await withBudget({ limit: 1, waitMs: 5000, leaseMs: 50 }, async () => {
+      void discovery(event(archiveOf(gone, "gone")))
+      await reads.started
+      const response = await discovery(event(archiveOf(next, "next")))
+      assert.equal(response.status, 200)
+    })
+  } finally {
+    reads.restore()
+  }
 })
