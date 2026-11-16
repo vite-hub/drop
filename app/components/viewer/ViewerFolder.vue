@@ -5,7 +5,8 @@
 // F2, or Rename in its right-click menu renames it. What goes in the folder (its description) is in Details
 // (ViewerOverview). Everyone on the team adds to a team folder, by Upload, by pasting files, or by dropping them on the
 // page; only admins add folders to it or change what it says. A link item opens its page outside Drop in a new tab,
-// and Copy link copies that page's address.
+// and Copy link copies that page's address. A public skill hub, and each skill's folder in it, offers Install
+// (ViewerInstallSkills).
 import { breakpointsTailwind } from "@vueuse/core"
 import { dropPath } from "#shared/links"
 import { linkSource } from "#shared/resources"
@@ -305,19 +306,28 @@ async function newBoard() {
             size="sm"
           />
           <p v-else class="label-mono">{{ itemCount(children.length) }}</p>
-          <div v-if="adds" class="flex items-center gap-1">
-            <NewMenu :folder="addsFolders" @board="newBoard" @doc="newDoc" @folder="newFolder" @site="newSite(drop)" />
-            <UTooltip text="Or paste files, or drop them on the page">
-              <UButton
-                color="neutral"
-                icon="i-mingcute-upload-2-line"
-                :label="uploading ? `Uploading ${uploading}…` : 'Upload'"
-                :loading="uploading > 0"
-                size="sm"
-                variant="outline"
-                @click="openPicker()"
+          <div v-if="adds || drop.install" class="flex items-center gap-1">
+            <ViewerInstallSkills v-if="drop.install" :install="drop.install" />
+            <template v-if="adds">
+              <NewMenu
+                :folder="addsFolders"
+                @board="newBoard"
+                @doc="newDoc"
+                @folder="newFolder"
+                @site="newSite(drop)"
               />
-            </UTooltip>
+              <UTooltip text="Or paste files, or drop them on the page">
+                <UButton
+                  color="neutral"
+                  icon="i-mingcute-upload-2-line"
+                  :label="uploading ? `Uploading ${uploading}…` : 'Upload'"
+                  :loading="uploading > 0"
+                  size="sm"
+                  variant="outline"
+                  @click="openPicker()"
+                />
+              </UTooltip>
+            </template>
           </div>
         </div>
         <!-- Search results replace the normal rows, but uploads still show their progress above them. -->

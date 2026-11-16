@@ -43,6 +43,10 @@ export const dropPath = (drop: { link: string; slug: string }, version?: number)
  */
 export const HUB_SKILLS_PATH = /^\/d\/([^/]+)(?:\/[^/]+)?(?=\/\.well-known\/(?:agent-skills|skills)\/)/
 
+/** The command that installs a hub's skills from `origin`, or one of them when `skill` names it. */
+export const skillsAddCommand = (origin: string, hub: { link: string; slug: string; skill?: string }) =>
+  `npx skills add ${origin}${dropPath(hub)}${hub.skill ? ` --skill ${hub.skill}` : ""}`
+
 /** What `/api/links/:key` answers: the version to show, where the doc lives, and the version an old link pointed at. */
 export interface DropLink {
   id: string

@@ -4,8 +4,9 @@ import { db } from "vite-hub/database"
 import { defineSkill, serveSkills, type Skill } from "vite-hub/skills"
 import { HUB_SKILLS_PATH, slugify } from "#shared/links"
 import { MAX_DEPTH } from "#shared/nodes"
+import type { SkillInstall } from "#shared/types"
 import { drops, user } from "../databases/default/index"
-import { findDrop, permissions, readBytes, readText } from "./drops"
+import { type DropRow, findDrop, permissions, readBytes, readText } from "./drops"
 import { expiryPolicy } from "./expiry"
 import { resolveNode, walkUp } from "./nodes"
 
@@ -146,16 +147,38 @@ export async function hubSkills(id: string, event?: H3Event, only?: string): Pro
   return built.filter((skill) => skill !== undefined)
 }
 
-/** Names of the skills public hub folder `id` serves, reading only each SKILL doc; empty for any other folder or id. */
-export async function hubSkillNames(id: string, event?: H3Event): Promise<string[]> {
+/**
+ * Names of the skills public hub folder `id` serves, reading only each SKILL doc; empty for any other folder or id.
+ * `only` reads just the skill of that name.
+ */
+export async function hubSkillNames(id: string, event?: H3Event, only?: string): Promise<string[]> {
   const tree = await hubTree(id, event)
   const names = await Promise.all(
-    (tree ?? []).map(async (entry) => {
-      const main = entry.files.get("SKILL.md")
-      return main && skillOf(entry.name, { "SKILL.md": await readText(main.blobKey) })?.name
-    }),
+    (tree ?? [])
+      .filter((entry) => only === undefined || entry.name === only)
+      .map(async (entry) => {
+        const main = entry.files.get("SKILL.md")
+        return main && skillOf(entry.name, { "SKILL.md": await readText(main.blobKey) })?.name
+      }),
   )
   return names.filter((name) => name !== undefined)
+}
+
+/**
+ * What the Install button on folder `row`'s page copies: the folder's own link when it's a hub serving skills, or its
+ * parent hub's link and the skill's name when it is one of the skills a hub serves. Only for a folder a signed-out
+ * visitor opens; the caller checks that first, so other folders pay no query. Both reads start together.
+ */
+export async function hubInstall(row: DropRow, event?: H3Event): Promise<SkillInstall | undefined> {
+  const parent = row.ancestors?.[0]
+  const name = segmentOf(row)
+  const [own, above] = await Promise.all([
+    hubSkillNames(row.id, event),
+    parent?.kind === "folder" && name ? hubSkillNames(parent.id, event, name) : [],
+  ])
+  if (own.length) return { link: row.id, slug: name, skills: own.length }
+  if (parent && above.length) return { link: parent.id, slug: segmentOf(parent), skill: above[0] }
+  return undefined
 }
 
 /**
