@@ -431,6 +431,13 @@ body {
   --comark-grain: none;
 }
 
+/* vite-hub/ui clamps a list row's text to two lines. A site review's row also shows its screenshot under the text
+   (ViewerComments.vue), so the clamp moves to the text alone. */
+[data-slot="comment-list-text"]:has(> [data-review-thumb]) {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+
 /* Other people's carets come from vite-hub/ui/styles.css. Drop sets their name pill in its mono face. */
 .drop-doc .collaboration-carets__label {
   font: 500 11px/1.4 var(--font-mono);

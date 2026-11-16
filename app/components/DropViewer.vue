@@ -1403,6 +1403,7 @@ watch(
               :can-comment="canCommentOnPage"
               :comments="lightbox ? imageComments : comments"
               :outdated="outdated"
+              :screenshots="screenshots"
               @focus="focusComment"
             >
               <template #actions>

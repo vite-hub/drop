@@ -2,12 +2,18 @@
 // The review dock's list: vite-hub/ui's CommentPanel, docked, over the drop's comments (useDropComments). Open and
 // Resolved switch it; the box at the bottom comments on the page as a whole, with images and "@" for people who may read
 // the drop. A row opens its thread where the viewer shows threads, beside its pin. Open comments whose text or element
-// this version no longer has sit apart, under "From earlier versions" (`outdated` in DropViewer.vue).
+// this version no longer has sit apart, under "From earlier versions" (`outdated` in DropViewer.vue). A site review's
+// row shows the screenshot it came with; the row opens the thread, whose screenshot opens full size.
 import { CommentPanel } from "vite-hub/ui"
 import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
-import type { DropComment } from "#shared/types"
+import type { DropComment, SiteReviewItem } from "#shared/types"
 
-const props = defineProps<{ comments: DropComment[]; canComment: boolean; outdated: Set<string> }>()
+const props = defineProps<{
+  comments: DropComment[]
+  canComment: boolean
+  outdated: Set<string>
+  screenshots?: Map<string, SiteReviewItem["screenshot"]>
+}>()
 const emit = defineEmits<{ focus: [comment: DropComment] }>()
 const { comments: state, people, upload, attachmentUrl, can } = injectDropComments()!
 const root = useTemplateRef<HTMLElement>("root")
@@ -27,6 +33,8 @@ const suggestions = computed(() => {
 
 const group = (thread: { id: string; status: string }) =>
   thread.status === "open" && props.outdated.has(thread.id) ? "From earlier versions" : undefined
+
+const screenshotOf = (id: string) => props.screenshots?.get(id) ?? null
 
 function select(thread: { id: string }) {
   const comment = props.comments.find((item) => item.id === thread.id)
@@ -52,6 +60,15 @@ function select(thread: { id: string }) {
       <template #list-actions><slot name="actions" /></template>
       <template #preview="{ thread, text }">
         <ViewerSuggestion v-if="!text && suggestions.has(thread.id)" v-bind="suggestions.get(thread.id)!" inline />
+        <template v-else-if="screenshotOf(thread.id)">
+          <span v-if="text" class="line-clamp-2">{{ text }}</span>
+          <ViewerScreenshotImage
+            data-review-thumb
+            class="mt-1.5 max-h-24 w-fit"
+            :comment="comments.find((item) => item.id === thread.id)!"
+            :url="screenshotOf(thread.id)!.url"
+          />
+        </template>
         <template v-else>{{ text }}</template>
       </template>
     </CommentPanel>

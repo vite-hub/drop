@@ -20,24 +20,7 @@ const pageLink = computed(() => {
     :aria-label="`Open screenshot for comment ${comment.n}`"
     class="flex items-center justify-center rounded-md bg-muted p-2"
   >
-    <span class="relative block">
-      <img
-        :src="screenshot.url"
-        :alt="`Screenshot of ${comment.page || 'the reviewed page'}`"
-        class="block max-h-40 max-w-full rounded-sm object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
-        loading="lazy"
-      />
-      <span
-        aria-hidden="true"
-        class="pointer-events-none absolute rounded-sm border-2 border-inverted"
-        :style="{
-          left: `${comment.ox / 10}%`,
-          top: `${comment.oy / 10}%`,
-          width: `${comment.ow / 10}%`,
-          height: `${comment.oh / 10}%`,
-        }"
-      />
-    </span>
+    <ViewerScreenshotImage class="max-h-40" :comment="comment" :url="screenshot.url" />
   </NuxtLink>
   <ULink v-if="pageLink" :href="pageLink" external target="_blank" class="text-xs text-muted hover:text-highlighted"
     >Open reviewed page</ULink
