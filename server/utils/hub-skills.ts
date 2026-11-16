@@ -189,17 +189,30 @@ const bytesOf = (entry: HubEntry) => [...entry.files.values()].reduce((sum, file
 function pool(size: number) {
   let active = 0
   const waiting: (() => void)[] = []
+  let failure: { error: unknown } | undefined
   return async <T>(task: () => Promise<T>): Promise<T> => {
     if (active < size) active++
     else await new Promise<void>((resolve) => waiting.push(resolve))
     try {
+      if (failure) throw failure.error
       return await task()
+    } catch (error) {
+      failure ??= { error }
+      throw error
     } finally {
       const next = waiting.shift()
       if (next) next()
       else active--
     }
   }
+}
+
+/** Drain every started task before propagating failure and releasing its memory reservation. */
+async function drained<T>(tasks: Promise<T>[]): Promise<T[]> {
+  const results = await Promise.allSettled(tasks)
+  const failed = results.find((result) => result.status === "rejected")
+  if (failed?.status === "rejected") throw failed.reason
+  return results.map((result) => (result as PromiseFulfilledResult<T>).value)
 }
 
 /**
@@ -219,10 +232,11 @@ const built = new Map<string, { at: number; bytes: number; skill: Skill | undefi
  *   MAX_FRONTMATTER × YAML_BYTES = 128 KiB (`costOf`).
  * - The largest request, MAX_HUB_BYTES in MAX_HUB_FILES files over MAX_HUB_SKILLS skills, may take
  *   5 × 8 MiB + 2000 × 3 KiB + 100 × 128 KiB = 58.4 MiB while it builds.
- * - Builds across the isolate hold at most BUILDING_BYTES at once, enough for that request; one that doesn't fit waits
- *   (`buildBudget`).
+ * - Live requests across the isolate reserve at most BUILDING_BYTES at once, including borrowed cache hits until
+ *   serving finishes. One that does not fit waits (`buildBudget`), without holding cache references.
  * - The cache keeps BUILT_BYTES, charged by `charge`: one skill at MAX_SKILL_BYTES is a little over 32 MiB.
  *
+ * Borrowed cache entries are conservatively charged in both budgets until eviction or request completion.
  * 60 + 36 = 96 MiB in the worst case (incompressible files, two-byte text, adversarial YAML), which leaves 32 MiB for
  * the app; real skills take a small fraction of it.
  */
@@ -249,27 +263,19 @@ const costOf = (files: { size: number }[], skills: number) =>
 /**
  * Room for builds in this isolate, shared by every request: `acquire(cost)` resolves once `cost` fits beside the builds
  * running (or none is), first come first served, with a release to call in `finally`; or undefined after `waitMs`.
- * Workers stop a request's I/O when its client goes away, so its release may never run: a lease also ends after
- * `leaseMs`, and a waiting request wakes for that on its own timer, never stuck behind one that's gone. Settings are
- * open for tests.
+ * Capacity is held until all work finishes; elapsed time cannot establish that allocations are dead.
+ * Settings are open for tests.
  */
-function budget(limit: number, waitMs: number, leaseMs: number) {
-  const leases = new Set<{ cost: number; until: number }>()
+function budget(limit: number, waitMs: number) {
+  const leases = new Set<{ cost: number }>()
   const waiting: { wake: () => void }[] = []
   const wakeAll = () => {
     for (const waiter of waiting) waiter.wake()
   }
-  const held = (now: number) => {
-    let total = 0
-    for (const lease of leases)
-      if (lease.until <= now) leases.delete(lease)
-      else total += lease.cost
-    return total
-  }
+  const held = () => [...leases].reduce((total, lease) => total + lease.cost, 0)
   const room = {
     limit,
     waitMs,
-    leaseMs,
     async acquire(cost: number): Promise<(() => void) | undefined> {
       const me = { wake: () => {} }
       waiting.push(me)
@@ -277,13 +283,11 @@ function budget(limit: number, waitMs: number, leaseMs: number) {
       try {
         for (;;) {
           const now = Date.now()
-          const used = held(now)
+          const used = held()
           if (waiting[0] === me && (used === 0 || used + cost <= room.limit)) break
           if (now >= deadline) return undefined
-          let next = deadline
-          for (const lease of leases) next = Math.min(next, lease.until)
           await new Promise<void>((resolve) => {
-            const timer = setTimeout(resolve, next - now)
+            const timer = setTimeout(resolve, deadline - now)
             me.wake = () => {
               clearTimeout(timer)
               resolve()
@@ -294,7 +298,7 @@ function budget(limit: number, waitMs: number, leaseMs: number) {
         waiting.splice(waiting.indexOf(me), 1)
         wakeAll()
       }
-      const lease = { cost, until: Date.now() + room.leaseMs }
+      const lease = { cost }
       leases.add(lease)
       return () => {
         if (leases.delete(lease)) wakeAll()
@@ -304,8 +308,8 @@ function budget(limit: number, waitMs: number, leaseMs: number) {
   return room
 }
 
-/** Builds in this isolate: BUILDING_BYTES at once, a 10 s wait, and a lease of 30 s, far past a real build. */
-export const buildBudget = budget(BUILDING_BYTES, 10_000, 30_000)
+/** Live request allocations in this isolate: BUILDING_BYTES at once, with a 10 s admission wait. */
+export const buildBudget = budget(BUILDING_BYTES, 10_000)
 /** Seconds a client should wait after a build found no room. */
 const RETRY_AFTER = "10"
 
@@ -337,7 +341,7 @@ function lookup(entry: HubEntry) {
 }
 
 async function buildSkill({ entry, files, key }: ReturnType<typeof lookup>, read: ReturnType<typeof pool>) {
-  const contents = await Promise.all(files.map(async ([path, file]) => [path, await read(() => textOf(file))] as const))
+  const contents = await drained(files.map(async ([path, file]) => [path, await read(() => textOf(file))] as const))
   const skill = skillOf(
     entry.name,
     Object.fromEntries(contents.filter((file): file is readonly [string, string] => file[1] !== undefined)),
@@ -392,26 +396,20 @@ async function textOf(file: { blobKey: string; text: boolean }) {
 
 /**
  * The skills a public hub folder serves, every file read; `only` reads just the skill of that name. Skills this isolate
- * built come from `built`, and the rest wait for room in `buildBudget`: undefined when none came in time. `release`
+ * built come from `built`, and all entries wait for room in `buildBudget`: undefined when none came in time. `release`
  * gives the room back; call it once the answer is made, since serving builds each archive.
  */
 async function hubSkills(id: string, event?: H3Event, only?: string) {
   const tree = await hubTree(id, event)
-  const entries = (tree ?? []).filter((entry) => only === undefined || entry.name === only).map(lookup)
-  const misses = entries.filter((entry) => !entry.hit)
-  const release = misses.length
-    ? await buildBudget.acquire(
-        costOf(
-          misses.flatMap(({ entry }) => [...entry.files.values()]),
-          misses.length,
-        ),
-      )
-    : () => {}
+  const entries = (tree ?? []).filter((entry) => only === undefined || entry.name === only)
+  // Reserve all entries, including hits, before borrowing any cached objects. Eviction may remove the cache's
+  // charge while this request still holds them; this reservation covers that entire lifetime through serveSkills.
+  const release = await buildBudget.acquire(costOf(entries.flatMap((entry) => [...entry.files.values()]), entries.length))
   if (!release) return undefined
   try {
     const read = pool(READ_POOL)
-    const skills = await Promise.all(
-      entries.map((entry) => (entry.hit ? Promise.resolve(entry.hit.skill) : buildSkill(entry, read))),
+    const skills = await drained(
+      entries.map(lookup).map((entry) => (entry.hit ? Promise.resolve(entry.hit.skill) : buildSkill(entry, read))),
     )
     return { skills: skills.filter((skill) => skill !== undefined), release }
   } catch (error) {
@@ -434,7 +432,7 @@ export async function hubSkillNames(id: string, event?: H3Event, only?: string):
   if (!release) return []
   try {
     const read = pool(READ_POOL)
-    const names = await Promise.all(
+    const names = await drained(
       entries.map(async (entry, index) => {
         const text = await read(() => textOf(docs[index]!))
         return text === undefined ? undefined : skillOf(entry.name, { "SKILL.md": text })?.name

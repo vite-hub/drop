@@ -804,19 +804,87 @@ test("a build that waits too long answers 503 with Retry-After, and the index li
   }
 })
 
-test("a build whose client went away holds the budget only until its lease runs out", async () => {
-  const gone = await smallHub("gone")
-  const next = await smallHub("next")
-  // Its reads never finish, as when Workers stop a request's I/O after its client disconnects.
-  const reads = gate("gone/")
+test("a live build stays charged past the former lease deadline", async () => {
+  const first = await smallHub("long-live")
+  const next = await smallHub("after-live")
+  const reads = gate("long-live/")
   try {
-    await withBudget({ limit: 1, waitMs: 5000, leaseMs: 50 }, async () => {
-      void discovery(event(archiveOf(gone, "gone")))
+    await withBudget({ limit: 1, waitMs: 80, leaseMs: 10 }, async () => {
+      const one = discovery(event(archiveOf(first, "long-live")))
       await reads.started
-      const response = await discovery(event(archiveOf(next, "next")))
-      assert.equal(response.status, 200)
+      try {
+        const response = await discovery(event(archiveOf(next, "after-live")))
+        assert.equal(response.status, 503)
+        assert.ok(!reads.log.some((key) => key.startsWith("after-live/")))
+      } finally {
+        reads.open()
+        await one
+      }
     })
   } finally {
+    reads.open()
+    reads.restore()
+  }
+})
+
+test("cached skills also wait for admission before borrowing their allocations", async () => {
+  const cached = await smallHub("cached-live")
+  const holder = await smallHub("holder-live")
+  assert.equal((await get(archiveOf(cached, "cached-live"))).status, 200)
+  const reads = gate("holder-live/")
+  try {
+    await withBudget({ limit: 1, waitMs: 40 }, async () => {
+      const one = discovery(event(archiveOf(holder, "holder-live")))
+      await reads.started
+      try {
+        assert.equal((await discovery(event(archiveOf(cached, "cached-live")))).status, 503)
+      } finally {
+        reads.open()
+        await one
+      }
+    })
+  } finally {
+    reads.open()
+    reads.restore()
+  }
+})
+
+test("failed builds drain started reads and skip queued reads before releasing capacity", async () => {
+  const first = await folder("Drain hub", "drain-hub", { lifetime: "keep", keepReason: "Budget.", share: "public" })
+  quickSkill(first, "drain-live", 12)
+  const next = await smallHub("after-drain")
+  const reads = gate("drain-live/")
+  const original = state.blob.get
+  let fail
+  const failed = new Promise((resolve) => (fail = resolve))
+  state.blob.get = async (key) => {
+    if (key.startsWith("drain-live/") && key.endsWith("/SKILL.md")) {
+      fail()
+      throw new Error("storage unavailable")
+    }
+    return original(key)
+  }
+  try {
+    await withBudget({ limit: 1, waitMs: 40 }, async () => {
+      let settled = false
+      const one = discovery(event(archiveOf(first, "drain-live"))).then(
+        () => { settled = true; return undefined },
+        () => { settled = true; return undefined },
+      )
+      await failed
+      await reads.started
+      try {
+        assert.equal((await discovery(event(archiveOf(next, "after-drain")))).status, 503)
+        assert.equal(settled, false, "failure waits for sibling reads")
+        assert.ok(reads.log.filter((key) => key.startsWith("drain-live/")).length <= 5, "queued reads are skipped")
+      } finally {
+        reads.open()
+        await one
+      }
+      assert.equal((await discovery(event(archiveOf(next, "after-drain")))).status, 200)
+    })
+  } finally {
+    reads.open()
     reads.restore()
   }
 })
