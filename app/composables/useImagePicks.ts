@@ -60,7 +60,15 @@ export function useImagePicks() {
   return {
     picks,
     problem,
-    files: computed(() => picks.value.map((pick) => pick.file)),
+    /** The picked files. Setting it removes the picks that are gone and adds the new files, as a composer's `v-model:files`. */
+    files: computed({
+      get: () => picks.value.map((pick) => pick.file),
+      set: (next: File[]) => {
+        for (const pick of picks.value) if (!next.includes(pick.file)) remove(pick)
+        const added = next.filter((file) => !picks.value.some((pick) => pick.file === file))
+        if (added.length) add(added)
+      },
+    }),
     add,
     remove,
     clear,

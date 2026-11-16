@@ -102,7 +102,7 @@ const drawn = (frame) =>
         ...pin.getBoundingClientRect().toJSON(),
       })),
       lines: { c1: lastLine("one set of numbers"), c2: lastLine("behind the new API") },
-      open: CSS.highlights.get("drop-open")?.size ?? 0,
+      open: CSS.highlights.get("vh-comment")?.size ?? 0,
     }
   })
 
@@ -160,9 +160,9 @@ test("pins sit in the gutter level with their quote's last line, and the eye hid
         (pin) => !pin.checkVisibility(),
       ),
     )
-    assert.equal(await frame.evaluate(() => CSS.highlights.get("drop-open")?.size ?? 0), 0)
+    assert.equal(await frame.evaluate(() => CSS.highlights.get("vh-comment")?.size ?? 0), 0)
     await page.evaluate((view) => window.toFrame(view), view)
-    await frame.waitForFunction(() => CSS.highlights.get("drop-open")?.size === 2)
+    await frame.waitForFunction(() => CSS.highlights.get("vh-comment")?.size === 2)
   } finally {
     await browser.close()
   }
@@ -224,7 +224,7 @@ test("with comments hidden, the draft's pin and the comments Drop names in only 
             .filter((pin) => pin.checkVisibility())
             .map((pin) => pin.dataset.id ?? "draft"),
           leaving: root.querySelectorAll(".leave > *").length,
-          open: CSS.highlights.get("drop-open")?.size ?? 0,
+          open: CSS.highlights.get("vh-comment")?.size ?? 0,
         }
       })
     await page.evaluate((view) => window.toFrame({ ...view, pins: false }), view)
