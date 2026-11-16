@@ -881,10 +881,17 @@ const inspectable = computed(
 /** Whether the Marker can draw on a snapshot of the page: docs, images, HTML, and apps in the frame. */
 const canMark = computed(() => framed.value && canDrawArea.value && !shownVersion.value)
 const marking = computed(() => tool.value === "mark")
-const markTools = computed(() => [
-  ...(inspectable.value ? (["browse", "measure"] as const) : []),
-  ...(canMark.value ? (["mark"] as const) : []),
+/** Whether Rulers can draw over the page: any page in the frame, an image or a doc too (#shared/plan-runtime). */
+const measurable = computed(() => framed.value && annotationsEnabled.value && !lightbox.value)
+// The preview tools fill the dock's +; the Marker stays in the pill. Measure and X-ray read an HTML page's elements.
+const previewTools = computed(() => (inspectable.value ? (["browse", "measure"] as const) : []))
+const previewViews = computed(() => [
+  ...(measurable.value ? (["rulers"] as const) : []),
+  ...(inspectable.value ? (["xray"] as const) : []),
 ])
+// What's on stays beside the + while it's closed, pressed, so one press turns it off.
+const pinnedTools = computed(() => (tool.value === "measure" ? (["measure"] as const) : []))
+const pinnedViews = computed(() => previewViews.value.filter((view) => overlays[view]))
 function finishMark() {
   if (!marking.value || !annotations.marks.value || annotations.finishing.value) return
   annotations.finishing.value = true
@@ -1567,13 +1574,12 @@ watch(
             </template>
             <template v-else-if="hasComments && !trashed">
               <ViewerToolbar
-                v-if="!lightbox && !shownVersion && (inspectable || canMark || sizable || siteRef?.canDraw)"
-                :tools="markTools"
-                :views="inspectable ? ['rulers', 'xray'] : []"
+                v-if="canMark && !lightbox"
                 :overlays="overlays"
-                :sizable="sizable || Boolean(siteRef?.canDraw)"
+                :sizable="false"
                 :tool="tool"
-                @toggle="toggleOverlay"
+                :tools="['mark']"
+                :views="[]"
                 @tool="setTool"
               />
               <UButton
@@ -1584,24 +1590,6 @@ watch(
                 label="Present"
                 variant="ghost"
                 @click="present"
-              />
-              <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  icon="i-mingcute-pencil-line"
-                  label="Edit"
-                  :loading="live.opening.value"
-                  variant="ghost"
-                  @click="startEdit"
-                />
-              </UTooltip>
-              <LazyViewerEditNote
-                v-else-if="showEditTool && drop.editNote"
-                v-model:open="editNoteOpen"
-                :can-comment="drop.canComment"
-                :note="drop.editNote"
-                @copy="copyMarkdown('Markdown copied')"
               />
               <ViewerCommentsSegment
                 v-model:on="commentMode"
@@ -1618,21 +1606,6 @@ watch(
               />
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
-            <template v-if="!editing">
-              <ViewerDetailsSegment
-                v-model:open="detailsOpen"
-                v-model:pop="detailsPop"
-                :actions="detailsActions"
-                :meta="detailsMeta"
-                :version="hasHistory ? `v${shownVersion?.version ?? drop.version}` : undefined"
-                :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
-                @width="nextWidth"
-              >
-                <template #details><ReuseDetails /></template>
-                <template #history><ReuseHistory /></template>
-              </ViewerDetailsSegment>
-              <span aria-hidden="true" class="w-1 shrink-0" />
-            </template>
             <template v-if="!editing && presence.people.value.length">
               <ViewerPresence
                 v-model:show-cursors="presence.showCursors.value"
@@ -1647,6 +1620,60 @@ watch(
               :resources="drop.resources ?? []"
             />
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
+            <template v-if="!editing">
+              <ViewerToolbar
+                v-if="!detailsOpen && (pinnedTools.length || pinnedViews.length)"
+                :overlays="overlays"
+                :sizable="false"
+                :tool="tool"
+                :tools="pinnedTools"
+                :views="pinnedViews"
+                @toggle="toggleOverlay"
+                @tool="setTool"
+              />
+              <ViewerDetailsSegment
+                v-model:open="detailsOpen"
+                v-model:pop="detailsPop"
+                :actions="detailsActions"
+                :meta="detailsMeta"
+                :version="hasHistory ? `v${shownVersion?.version ?? drop.version}` : undefined"
+                :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
+                @width="nextWidth"
+              >
+                <template v-if="hasComments && !trashed && !marking" #tools>
+                  <ViewerToolbar
+                    v-if="!lightbox && !shownVersion && (measurable || sizable || siteRef?.canDraw)"
+                    :overlays="overlays"
+                    :sizable="sizable || Boolean(siteRef?.canDraw)"
+                    :tool="tool"
+                    :tools="previewTools"
+                    :views="previewViews"
+                    @toggle="toggleOverlay"
+                    @tool="setTool"
+                  />
+                  <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      icon="i-mingcute-pencil-line"
+                      label="Edit"
+                      :loading="live.opening.value"
+                      variant="ghost"
+                      @click="startEdit"
+                    />
+                  </UTooltip>
+                  <LazyViewerEditNote
+                    v-else-if="showEditTool && drop.editNote"
+                    v-model:open="editNoteOpen"
+                    :can-comment="drop.canComment"
+                    :note="drop.editNote"
+                    @copy="copyMarkdown('Markdown copied')"
+                  />
+                </template>
+                <template #details><ReuseDetails /></template>
+                <template #history><ReuseHistory /></template>
+              </ViewerDetailsSegment>
+            </template>
           </template>
         </ViewerReviewDock>
       </div>
