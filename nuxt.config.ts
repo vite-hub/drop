@@ -7,6 +7,7 @@ import { env } from "vite-hub/env"
 import { CLIENT_IP_HEADERS } from "./shared/client-ip.ts"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
+import { ROBOTS_DISALLOW } from "./shared/robots.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
@@ -176,6 +177,9 @@ export default defineNuxtConfig({
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
+    // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
+    // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
+    seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
     auth: true,
     console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
     env: {
