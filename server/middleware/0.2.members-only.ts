@@ -1,4 +1,5 @@
 import { defineHandler } from "h3"
+import { HUB_SKILLS_PATH } from "#shared/links"
 import { membersOnly } from "../utils/members"
 
 /**
@@ -34,7 +35,8 @@ export default defineHandler(async (event) => {
   if (/^\/api\/uploads\/[^/]+$/.test(path)) return
   if (/^\/(?:api|[dfi])(?:\/|$)/.test(path)) {
     event.res.headers.set("Cache-Control", "private, no-store")
-    if (PUBLIC_LINK.test(path)) return
+    // A public folder's skills (../utils/hub-skills.ts) serve what that folder's page shows a stranger.
+    if (PUBLIC_LINK.test(path) || HUB_SKILLS_PATH.test(path)) return
     const { requireIdentity } = await import("../utils/identity")
     await requireIdentity(event)
   }

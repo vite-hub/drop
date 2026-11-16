@@ -37,6 +37,12 @@ export const DROP_PAGE_PARAMS = ["v", "comment", "changes", "present", "from", "
 export const dropPath = (drop: { link: string; slug: string }, version?: number) =>
   `/d/${drop.link}${drop.slug ? `/${drop.slug}` : ""}${version ? `?v=${version}` : ""}`
 
+/**
+ * Agent Skills Discovery under a folder's link (server/utils/hub-skills.ts): `/d/<link>[/<slug>]/.well-known/agent-skills/…`
+ * or `…/.well-known/skills/…`, any slug or none. The match is the prefix the discovery folders start at; group 1 the link.
+ */
+export const HUB_SKILLS_PATH = /^\/d\/([^/]+)(?:\/[^/]+)?(?=\/\.well-known\/(?:agent-skills|skills)\/)/
+
 /** What `/api/links/:key` answers: the version to show, where the doc lives, and the version an old link pointed at. */
 export interface DropLink {
   id: string

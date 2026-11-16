@@ -1,5 +1,6 @@
 import { definePlugin } from "nitro"
 import { useRuntimeConfig } from "nitro/runtime-config"
+import { HUB_SKILLS_PATH } from "#shared/links"
 import { isIndexedPath } from "#shared/utils/docs"
 
 /** Error handlers replace the response, so set content headers after them too. */
@@ -14,6 +15,8 @@ export default definePlugin((app) => {
     const path = new URL(event.req.url).pathname
     if (path.startsWith("/f/") || path.startsWith("/d/")) {
       response.headers.set("X-Robots-Tag", "noindex, nofollow")
+      // A public folder's skills are the same for everyone, so they keep the minute serveSkills gives them.
+      if (HUB_SKILLS_PATH.test(path) && response.ok) return
       // Shared content is checked again on every request. A file with an ETag stays in the browser and is revalidated,
       // so a screenshot opened twice comes back as a 304 without its bytes; pages, errors, and rendered documents
       // aren't kept at all.

@@ -501,7 +501,7 @@ async function readFile(key: string) {
 
 export const readText = async (key: string) => (await readFile(key)).text()
 
-const readBytes = async (key: string) => new Uint8Array(await (await readFile(key)).arrayBuffer())
+export const readBytes = async (key: string) => new Uint8Array(await (await readFile(key)).arrayBuffer())
 
 /**
  * Whether someone may open this drop in the live editor: a person in the browser (never an agent) who may edit the

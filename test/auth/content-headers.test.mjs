@@ -26,3 +26,10 @@ test("rendered documents, errors, and share pages are never kept", () => {
   assert.equal(respond(`/f/${key}.png`, { status: 416, headers: { ETag: '"abc"' } }), "private, no-store")
   assert.equal(respond("/d/abc/slug", { headers: { ETag: '"abc"' } }), "private, no-store")
 })
+
+test("a folder's skill discovery keeps the minute it's cached for; its misses are never kept", () => {
+  const cached = { headers: { "Cache-Control": "public, max-age=60" } }
+  assert.equal(respond("/d/abc/skill-hub/.well-known/agent-skills/index.json", cached), "public, max-age=60")
+  assert.equal(respond("/d/abc/.well-known/skills/x/SKILL.md", cached), "public, max-age=60")
+  assert.equal(respond("/d/abc/.well-known/skills/x/SKILL.md", { ...cached, status: 404 }), "private, no-store")
+})
