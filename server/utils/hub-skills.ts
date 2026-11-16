@@ -207,7 +207,8 @@ function skillOf(name: string, files: Record<string, string>): Skill | undefined
     const skill = defineSkill(files)
     return skill.name === name ? skill : undefined
   } catch {
-    // A SKILL doc without valid frontmatter isn't a skill: the hub leaves it out.
+    // A SKILL doc without valid frontmatter, or a path a skill archive can't hold (SKILL_INVALID_PATH), isn't a
+    // skill: the hub leaves it out whole.
     return undefined
   }
 }
@@ -244,7 +245,9 @@ export async function hubSkillNames(id: string, event?: H3Event, only?: string):
       .filter((entry) => only === undefined || entry.name === only)
       .map(async (entry) => {
         const main = entry.files.get("SKILL.md")!
-        return skillOf(entry.name, { "SKILL.md": await read(() => readText(main.blobKey)) })?.name
+        // The other files' paths, empty, so a path the archive can't hold leaves the skill out here too.
+        const paths = Object.fromEntries([...entry.files.keys()].map((path) => [path, ""]))
+        return skillOf(entry.name, { ...paths, "SKILL.md": await read(() => readText(main.blobKey)) })?.name
       }),
   )
   return names.filter((name) => name !== undefined)

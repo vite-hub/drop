@@ -420,3 +420,108 @@ test("index and file requests after the first read no blob until a file changes"
   await call(updateTool, { id: root.id, share: "private" })
   assert.deepEqual((await (await get(`${base}/agent-skills/index.json`)).json()).skills, [])
 })
+
+const CSP = "default-src 'none'; sandbox"
+
+test("HTML and SVG files in a skill come back as sandboxed plain text, not as pages on Drop's origin", async () => {
+  const { root, notes } = await hub()
+  const page = "<!doctype html><script>parent.postMessage(document.cookie, '*')</script>"
+  const image = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.domain)</script></svg>'
+  await file("page.html", page, notes.id)
+  await file("logo.svg", image, notes.id)
+  const base = `/d/${root.id}/x/.well-known`
+  for (const [path, text] of [
+    ["page.html", page],
+    ["logo.svg", image],
+  ])
+    for (const at of [`${base}/skills/release-notes/${path}`, `${base}/agent-skills/release-notes/${path}`]) {
+      const response = await get(at)
+      assert.equal(response.status, 200, at)
+      assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8", at)
+      assert.equal(response.headers.get("content-security-policy"), CSP, at)
+      assert.equal(response.headers.get("x-content-type-options"), "nosniff", at)
+      assert.equal(await response.text(), text, at)
+    }
+  const skillDoc = await get(`${base}/skills/release-notes/SKILL.md`)
+  assert.equal(skillDoc.headers.get("content-type"), "text/markdown; charset=utf-8")
+  assert.equal(skillDoc.headers.get("content-security-policy"), CSP)
+})
+
+/** A `.tar.gz` as the skills CLI reads it: each ustar entry's `prefix` and `name` joined, and its text. */
+async function untar(gzipped) {
+  const bytes = new Uint8Array(
+    await new Response(new Blob([gzipped]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(),
+  )
+  const field = (block, start, length) => {
+    const raw = block.subarray(start, start + length)
+    const end = raw.indexOf(0)
+    return new TextDecoder().decode(end === -1 ? raw : raw.subarray(0, end))
+  }
+  const files = []
+  for (let offset = 0; offset + 512 <= bytes.length && bytes[offset] !== 0;) {
+    const header = bytes.subarray(offset, offset + 512)
+    const prefix = field(header, 345, 155)
+    const name = field(header, 0, 100)
+    const size = Number.parseInt(field(header, 124, 12), 8)
+    const text = new TextDecoder().decode(bytes.subarray(offset + 512, offset + 512 + size))
+    files.push({ name: prefix ? `${prefix}/${name}` : name, text })
+    offset += 512 + Math.ceil(size / 512) * 512
+  }
+  return files
+}
+
+test("two long paths that share their first 100 bytes stay whole and distinct in the v0.2 archive", async () => {
+  const { root, notes } = await hub()
+  const outer = await folder("Outer", "o".repeat(60), { folder: notes.id })
+  const inner = await folder("Inner", "i".repeat(50), { folder: outer.id })
+  await doc("# First\n", "notes-first", inner.id)
+  await doc("# Second\n", "notes-second", inner.id)
+  const dir = `${"o".repeat(60)}/${"i".repeat(50)}`
+  const first = `${dir}/notes-first.md`
+  const second = `${dir}/notes-second.md`
+  assert.ok(first.length > 100 && first.slice(0, 100) === second.slice(0, 100))
+
+  const base = `/d/${root.id}/x/.well-known`
+  const index = await (await get(`${base}/agent-skills/index.json`)).json()
+  const entry = index.skills.find((skill) => skill.name === "release-notes")
+  const archive = new Uint8Array(await (await get(entry.url)).arrayBuffer())
+  assert.equal(entry.digest, await sha256(archive))
+  const files = await untar(archive)
+  assert.deepEqual(
+    files.map((item) => item.name),
+    ["SKILL.md", "references/format.md", "scripts/check.mjs", first, second].sort(),
+  )
+  assert.equal(files.find((item) => item.name === first).text, "# First\n")
+  assert.equal(files.find((item) => item.name === second).text, "# Second\n")
+  assert.equal(await (await get(`${base}/skills/release-notes/${second}`)).text(), "# Second\n")
+})
+
+test("a skill with a path no skill archive can hold is left out whole, and the rest of the hub still serves", async () => {
+  const { root } = await hub()
+  const odd = await skillWith(root, "odd", 1)
+  // A file name over 100 bytes: the ustar `name` field can't hold it, and there is no `/` to split it at.
+  insertDrop("odd-long", {
+    kind: "file",
+    parent_id: odd.id,
+    title: "long",
+    filename: `${"n".repeat(120)}.txt`,
+    blob_key: "odd/long.txt",
+    size: 8,
+  })
+  const base = `/d/${root.id}/x/.well-known`
+  for (const path of ["agent-skills/index.json", "skills/index.json"]) {
+    const response = await get(`${base}/${path}`)
+    assert.equal(response.status, 200, path)
+    assert.deepEqual(
+      (await response.json()).skills.map((skill) => skill.name),
+      ["handoff", "release-notes"],
+      path,
+    )
+  }
+  assert.equal((await get(`${base}/skills/odd/SKILL.md`)).status, 404)
+  assert.equal((await get(`${base}/skills/odd/f0.txt`)).status, 404)
+  assert.equal((await get(`${base}/agent-skills/odd.tar.gz`)).status, 404)
+  assert.equal(await (await get(`${base}/skills/release-notes/scripts/check.mjs`)).text(), CHECK)
+  assert.equal((await get(`${base}/agent-skills/release-notes.tar.gz`)).status, 200)
+  assert.deepEqual(await hubSkillNames(root.id), ["handoff", "release-notes"])
+})

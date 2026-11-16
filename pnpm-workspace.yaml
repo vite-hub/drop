@@ -77,6 +77,8 @@ patchedDependencies:
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
   "@better-auth/oauth-provider@1.7.15": patches/@better-auth__oauth-provider@1.7.15.patch
+  # Serves skill files as sandboxed text and keeps skill archive paths over 100 bytes whole; drop once vite-hub/vitehub#4635 ships.
+  vite-hub@0.0.0-preview-a6a5653: patches/vite-hub@0.0.0-preview-a6a5653.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
