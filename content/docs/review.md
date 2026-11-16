@@ -45,7 +45,7 @@ A built app, such as a Vite `dist/` folder, a prerendered Nuxt site, or a Slidev
 
 An app's link opens at any of its pages with `?path=`: `/d/<key>/<slug>?path=/guide/setup#install` opens the app at `/guide/setup`, scrolled to `#install`, and so does `/d/<key>/<slug>/guide/setup#install`. The address bar follows the app as you move through it, so **Copy link** and a copied address open the page you were on. An address the app doesn't have shows its own `404.html`, or its `index.html` for a single-page app. `publish` and `read_drop` give agents each page with its link.
 
-To present a Slidev deck, press **Present** in the review bar at the bottom of the drop. The deck opens alone in a new window for the projector, and the drop's page turns into Slidev's presenter view, with your notes, the next slide, and a timer; it drives the other window. Any other app or HTML page opens alone with **Open in new window** in **Details**.
+To present a Slidev deck, press **Present** in the review bar at the bottom of the drop. The deck opens alone in a new window for the projector, and the drop's page turns into Slidev's presenter view, with your notes, the next slide, and a timer; it drives the other window. Any other app or HTML page opens alone with **Open in new window** under the review toolbar's **+**.
 
 An app with server code, like API routes, sign-in, or a database, isn't a drop. Deploy it to a preview and review it as a [site](/docs/sites).
 
@@ -91,7 +91,7 @@ To comment on a running website, such as a preview deploy, see [Review a live si
 
 ### Review toolbar {#toolbar}
 
-Docs and apps show a toolbar under the page. Each tool has a key, which also works while the page has focus. In an app, the page keeps its own keys until a tool is on.
+Docs and apps show a toolbar under the page. **Comments** and the Marker sit in it; press **+** at its right end, or :kbd[I], and it grows to the right with the rest: Browse, Measure, Rulers, X-ray, the device sizes, **Edit**, the drop's details and History. A tool you leave on stays beside the **+** after it closes, so one press turns it off. Each tool has a key, which also works while the page has focus. In an app, the page keeps its own keys until a tool is on.
 
 | Tool | Key | What it does |
 | --- | --- | --- |
@@ -99,7 +99,7 @@ Docs and apps show a toolbar under the page. Each tool has a key, which also wor
 | Comment | :kbd[R] | Highlights the element under the pointer. Click to pin a comment, drag for an area. |
 | Marker | :kbd[B] | Freezes the page and lets you draw on it. See [Marker](#marker). |
 | Measure | :kbd[S] | Shows an element's size, padding, and margin, with its font, colors, gap, and corners. Click one to pick it, then point at another to see the distance between them. |
-| Rulers and guides | :kbd[U] | Pixel rulers along the top and left. Drag a guide out of a ruler. Drag it back, or double-click it, to remove it. |
+| Rulers and guides | :kbd[U] | Pixel rulers along the top and left, on images and Markdown docs too. Drag a guide out of a ruler. Drag it back, or double-click it, to remove it. |
 | X-ray | :kbd[X] | Outlines every element without moving anything. |
 | Hide comments | | The eye beside **Comments**. Hides the pins and highlights while you look at the page. |
 
@@ -146,7 +146,7 @@ Only people who could open the drop without its link join: its owner, admins, an
 
 ## Edit together {#edit}
 
-Anyone who may edit a Markdown doc opens it with **Edit**, a Notion-like editor where everyone sees each other's avatars, cursors, and keystrokes as they happen. Type `/` for blocks, `@` to mention someone on this Drop, and `:` for an emoji.
+Anyone who may edit a Markdown doc opens it with **Edit** under the review toolbar's **+**, or :kbd[E], a Notion-like editor where everyone sees each other's avatars, cursors, and keystrokes as they happen. Type `/` for blocks, `@` to mention someone on this Drop, and `:` for an emoji.
 
 Edits go to a draft until someone presses **Publish**, which makes it the next version. The draft stays when you close the editor. If an agent publishes meanwhile, Drop asks before putting the draft on top. Only the latest version can be edited. Components, footnotes and suggested edits stay as they are; a doc the editor couldn't save without changing how it reads stays read-only.
 

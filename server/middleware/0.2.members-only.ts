@@ -28,6 +28,8 @@ export default defineHandler(async (event) => {
   const path = event.url.pathname
   if (path.startsWith("/api/auth/") && !path.startsWith("/api/auth/admin/")) return
   if (path === "/api/health" || path === "/api/mcp" || path === "/api/sign-in") return
+  // Site icons (server/utils/favicons.ts) load from docs' frames, which send no session, and say nothing about drops.
+  if (path.startsWith("/api/favicons/")) return
   // A site's review script sends no session, only a review token, which carries a member and is checked there. Before
   // it has one, the related route tells the page only whether a drop links to it.
   if (REVIEW_SCRIPT.test(path) || PRESENCE_ROOM.test(path)) return

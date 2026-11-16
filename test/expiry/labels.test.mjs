@@ -5,7 +5,7 @@ const { DAY_MS, expiryLabel, lifetimeHint, lifetimeLabel, LIFETIMES } = await im
 test("people see each lifetime as how long it lasts, never its API value", () => {
   assert.deepEqual(
     LIFETIMES.map((lifetime) => lifetimeLabel(lifetime, 30)),
-    ["14 days", "30 days", "Never delete"],
+    ["14 days", "30 days", "Forever"],
   )
   assert.deepEqual(
     LIFETIMES.map((lifetime) => lifetimeHint(lifetime, 30)),
@@ -20,7 +20,7 @@ test("people see each lifetime as how long it lasts, never its API value", () =>
 test("the labels follow an admin's window", () => {
   assert.deepEqual(
     LIFETIMES.map((lifetime) => lifetimeLabel(lifetime, 60)),
-    ["14 days", "60 days", "Never delete"],
+    ["14 days", "60 days", "Forever"],
   )
   assert.equal(lifetimeLabel("temporary", 7), "7 days")
   assert.equal(lifetimeHint("review", 1), "Goes to the Trash if nobody opens it for 1 day.")

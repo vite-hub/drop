@@ -143,6 +143,8 @@ export interface DropAttachment {
 }
 
 export interface DropDetail extends DropSummary {
+  /** The effective root is a team folder, whose lifetime cannot change. */
+  lifetimeFixed?: boolean
   /** Change its share, name, lifetime, or folder: its owner and admins; a team folder's admins only. */
   isOwner: boolean
   /** Move it to the Trash: who may change it, and anyone on the team for a drop in a team folder. */

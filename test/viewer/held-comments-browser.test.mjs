@@ -45,6 +45,7 @@ const html = `<!doctype html><html><head><style>
 // modern-screenshot, as the frame loads it from esm.sh: a plain grey viewport, so the test needs no network.
 const SCREENSHOT_STUB = `export async function createContext(node, options) { return { ...options, drawImageCount: 0 } }
 export async function domToCanvas(context) {
+  window.__keptOut = ["drop-comments", "drop-bubble", "drop-ins", "p"].filter((name) => !context.filter(document.createElement(name)));
   const canvas = document.createElement("canvas");
   canvas.width = context.width; canvas.height = context.height;
   const g = canvas.getContext("2d"); g.fillStyle = "#888"; g.fillRect(0, 0, canvas.width, canvas.height);
@@ -148,6 +149,34 @@ for (const touch of [false, true]) {
     }
   })
 }
+
+test("a click comment keeps a picture of its box, with room around it and none of Drop's comment layer", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser)
+    const box = await frame.locator("#v-a-row").boundingBox()
+    await page.evaluate(() => send({ type: "tool", tool: "comment", clickComments: true }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw"))
+    await page.mouse.click(box.x + 20, box.y + 20)
+    const area = await page
+      .waitForFunction(() => posts.find((m) => m.type === "area"), null, { timeout: 5000 })
+      .then((h) => h.jsonValue())
+    assert.equal(typeof area.shot, "number")
+    await page.waitForFunction((n) => posts.some((m) => m.type === "area-shot" && m.shot === n), area.shot, {
+      timeout: 5000,
+    })
+    const shot = await page.evaluate(async (n) => {
+      const { image } = posts.find((m) => m.type === "area-shot" && m.shot === n)
+      const bitmap = await createImageBitmap(image)
+      return { width: bitmap.width, height: bitmap.height }
+    }, area.shot)
+    // The row with 24px around it, not the whole viewport.
+    assert.deepEqual(shot, { width: Math.round(box.width + 48), height: Math.round(box.height + 48) })
+    assert.deepEqual(await frame.evaluate(() => window.__keptOut), ["drop-comments", "drop-bubble", "drop-ins"])
+  } finally {
+    await browser.close()
+  }
+})
 
 test("Escape the page used itself stays in the page; any other Escape goes to Drop", async () => {
   const browser = await chromium.launch()

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { migrate, reset, state, who } from "../cost/harness.mjs"
-import { isPreviewLink, linkText } from "../../shared/resources.ts"
+import { linkText } from "../../shared/resources.ts"
 const { withDocProperties, renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
 const { createDocDrop, dropDetail, findDrop } = await import("../../server/utils/drops.ts")
 const { saveResources } = await import("../../server/utils/resources.ts")
@@ -10,7 +10,7 @@ migrate()
 beforeEach(reset)
 
 const PR = "https://github.com/acme/portal/pull/42"
-const PREVIEW = { url: "https://pr42-demo.preview.quiver.dk/", title: "Preview" }
+const PREVIEW = { url: "https://pr42-demo.preview.example.com/", title: "Preview" }
 const at = Date.UTC(2026, 10, 5, 15)
 const strip = (html) =>
   html
@@ -18,18 +18,13 @@ const strip = (html) =>
     .replace(/>\s+/g, ">")
     .replace(/\s+</g, "<")
 
-test("a preview stays in the header; a link reads as owner/repo#n, its title, or its address", () => {
-  assert.equal(isPreviewLink(PREVIEW), true)
-  assert.equal(isPreviewLink({ url: "https://pr7.preview.example.com/" }), true)
-  assert.equal(isPreviewLink({ url: PR, title: "PR #42" }), false)
-  assert.equal(isPreviewLink({ url: "https://www.figma.com/file/x", title: " preview " }), true)
-  assert.equal(isPreviewLink({ url: "https://www.figma.com/file/x", title: "Design preview" }), false)
+test("a link reads as owner/repo#n, its title, or its address", () => {
   assert.equal(linkText({ url: PR }), "acme/portal#42")
   assert.equal(linkText({ url: PR, title: "PR #42" }), "PR #42")
   assert.equal(linkText({ url: "https://www.figma.com/file/x" }), "figma.com/file/x")
 })
 
-test("a doc's links and its version's day join its front matter rows, once each, previews aside", async () => {
+test("a doc's links, its preview deploy too, and its version's day join its front matter rows, once each", async () => {
   const source = `---\nstatus: Ready\npr: ${PR}\n---\n\n# Plan\n\nText.\n`
   const { html } = await renderMarkdownCached("props-1.md", async () => source)
   const merged = strip(
@@ -53,8 +48,10 @@ test("a doc's links and its version's day join its front matter rows, once each,
     1,
     "the PR the front matter shows isn't repeated",
   )
-  assert.match(merged, /<dt>Link<\/dt><dd><a href="https:\/\/linear\.app\/acme\/issue\/ACM-7">ACM-7<\/a><\/dd>/)
-  assert.doesNotMatch(merged, /preview\.quiver\.dk/)
+  assert.match(
+    merged,
+    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/pr42-demo\.preview\.example\.com" alt="">Preview<\/a><a class="cp" href="https:\/\/linear\.app\/acme\/issue\/ACM-7" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/linear\.app" alt="">ACM-7<\/a><\/dd>/,
+  )
   assert.match(merged, /<dt>Updated<\/dt><dd><time datetime="2026-11-05">Nov 5, 2026<\/time><\/dd>/)
   assert.ok(merged.indexOf('class="cfm"') < merged.indexOf("<h1"), "at the top, above the title")
 })
@@ -69,7 +66,7 @@ test("a doc without front matter gets the box, with its styles", async () => {
   assert.match(boxed, /^<style data-comark-properties>/)
   assert.match(
     strip(boxed),
-    /<dt>Links<\/dt><dd><span class="cfm-tag"><a href="[^"]+pull\/42">acme\/portal#42<\/a><\/span><span class="cfm-tag"><a href="https:\/\/acme\.dev\/spec">acme\.dev\/spec<\/a><\/span><\/dd>/,
+    /<dt>Links<\/dt><dd><a class="cp" href="[^"]+pull\/42" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/github\.com" alt="">acme\/portal#42<\/a><a class="cp" href="https:\/\/acme\.dev\/spec" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/acme\.dev" alt="">acme\.dev\/spec<\/a><\/dd>/,
   )
 })
 
@@ -84,9 +81,8 @@ test("the doc the viewer gets carries them; its source and cached render don't",
   const detail = await dropDetail(await findDrop(row.id), who, "https://drop.example")
   assert.match(
     strip(detail.html),
-    /<dt>Link<\/dt><dd><a href="https:\/\/github\.com\/acme\/portal\/pull\/42">PR #42<\/a>/,
+    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/github\.com\/acme\/portal\/pull\/42" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/github\.com" alt="">PR #42<\/a><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/pr42-demo\.preview\.example\.com" alt="">Preview<\/a>/,
   )
-  assert.doesNotMatch(detail.html, /preview\.quiver\.dk/)
   assert.equal(detail.content, "# Plan\n\nText.\n")
   assert.deepEqual(
     detail.resources.map((resource) => resource.url),

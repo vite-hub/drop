@@ -3,8 +3,12 @@
 // on that spot, and the button says so ("Click anywhere"). A segment grows beside it inside the pill, holding only
 // actions: Whole page (a comment on the page itself, in the dock), All comments with the open count (the dock's list),
 // and × to stop. On a phone the segment takes its own row above the pill's. With `pins`, the eye that hides the
-// comments on the page sits against Comments, the thing it hides.
+// comments on the page sits against Comments, the thing it hides. With `style` (a Markdown doc), the segment opens with
+// two icons that pick how comments on the text show, Cards or Pins (useCommentStyle).
+import type { CommentStyle } from "~/composables/usePreferences"
+
 const on = defineModel<boolean>("on", { required: true })
+const style = defineModel<CommentStyle>("style")
 defineProps<{
   count: number
   listOpen: boolean
@@ -15,6 +19,10 @@ defineProps<{
 }>()
 const emit = defineEmits<{ page: []; list: []; toggle: []; pins: [] }>()
 
+const styles = [
+  { value: "card", label: "Cards beside the text", icon: "i-mingcute-layout-right-line" },
+  { value: "pin", label: "Pins beside the text", icon: "i-mingcute-map-pin-line" },
+] as const
 const item =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted aria-expanded:bg-elevated aria-expanded:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
 </script>
@@ -69,6 +77,25 @@ const item =
       :class="on ? 'opacity-100 delay-75' : 'opacity-0'"
     >
       <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border) max-sm:hidden" />
+      <template v-if="style">
+        <UTooltip
+          v-for="option in styles"
+          :key="option.value"
+          :text="option.label"
+          :content="{ side: 'top', sideOffset: 8 }"
+        >
+          <button
+            :aria-label="option.label"
+            :aria-pressed="style === option.value"
+            class="grid size-7 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-highlighted aria-pressed:bg-elevated aria-pressed:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
+            type="button"
+            @click="style = option.value"
+          >
+            <UIcon :name="option.icon" class="size-3.5" />
+          </button>
+        </UTooltip>
+        <span aria-hidden="true" class="w-1 shrink-0" />
+      </template>
       <UTooltip v-if="canComment" text="Comment on the whole page" :content="{ side: 'top', sideOffset: 8 }">
         <button :class="item" type="button" @click="emit('page')">
           <UIcon name="i-mingcute-file-line" class="size-3.5" />Whole page
