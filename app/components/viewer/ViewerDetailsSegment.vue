@@ -50,14 +50,14 @@ const popoverUi = {
        it a row of its own. -->
   <div
     id="drop-details"
-    class="grid min-w-0 transition-[grid-template-columns] duration-250 ease-[cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none max-sm:order-first max-sm:basis-full"
+    class="grid min-w-0 max-w-full transition-[grid-template-columns] duration-250 ease-[cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none max-sm:order-first max-sm:basis-full"
     :class="open ? 'grid-cols-[1fr]' : 'grid-cols-[0fr] max-sm:hidden'"
     :inert="!open"
     role="group"
     aria-label="Details and actions"
   >
     <div
-      class="flex min-w-0 items-center gap-0.5 overflow-hidden transition-opacity duration-150 motion-reduce:transition-none max-sm:flex-wrap max-sm:justify-center max-sm:pb-0.5"
+      class="flex min-w-0 flex-wrap items-center justify-center gap-0.5 overflow-hidden transition-opacity duration-150 motion-reduce:transition-none max-sm:pb-0.5"
       :class="open ? 'opacity-100 delay-75' : 'opacity-0'"
     >
       <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border) max-sm:hidden" />
