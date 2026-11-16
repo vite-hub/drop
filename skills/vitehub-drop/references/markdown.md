@@ -140,6 +140,7 @@ Set `title` when the first heading isn't the doc's title. Add `supersedes`, the 
 | --- | --- | --- |
 | `$x^2$` math | its TeX source, in monospace | a code span or a `text` block |
 | `:time[2026-11-02]` | the date as written, never "2 days ago" | the date itself, such as `Nov 2, 2026` |
+| `::bundle` | a problem: it measures build folders, and Drop reads no files ([comark-bundle](https://comark-ui.onmax.me/bundle/)) | a [table](blocks.md#data-tables) or [metrics](blocks.md#metrics) with the sizes |
 | `:rocket:` | an "Unsupported component" box | the emoji itself, when it carries meaning |
 | `#123` | plain text | `owner/repo#123`, or a full link: `[#123](https://github.com/owner/repo/pull/123)` |
 | `<script>`, `<style>`, `<iframe>`, or a tag GitHub doesn't allow | nothing | Markdown, a [block](blocks.md), an [interactive drop](#interactive-drops), or publish `html` |

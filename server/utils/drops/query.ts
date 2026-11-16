@@ -621,10 +621,15 @@ async function bodyOf(
       const { renderMarkdownCached, withDocProperties } = await import("../markdown-document")
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
-      detail.html = await withDocProperties(rendered.html, {
-        resources: isAttachment(row) ? [] : resourcesOf(row),
-        updatedAt: row.createdAt,
-      })
+      const { absoluteFavicons } = await import("../favicons")
+      // The viewer's frame is on another origin, so the icons' Drop-relative addresses name Drop's.
+      detail.html = absoluteFavicons(
+        await withDocProperties(rendered.html, {
+          resources: isAttachment(row) ? [] : resourcesOf(row),
+          updatedAt: row.createdAt,
+        }),
+        origin,
+      )
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     else if (row.kind === "file") {
       // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
