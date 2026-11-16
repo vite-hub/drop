@@ -31,7 +31,7 @@ After note.
       readFile(new URL("../../shared/" + file, import.meta.url), "utf8"),
     ),
   )
-  const document = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${styles.join("\n")}</style></head><body><main><article class="typeset">${html}</article></main></body></html>`
+  const document = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${styles.join("\n")}</style></head><body><main><article class="typeset">${html}</article></main></body></html>`
   const browser = await chromium.launch()
   try {
     const context = await browser.newContext({

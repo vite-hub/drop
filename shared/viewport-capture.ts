@@ -1,5 +1,5 @@
 // A screenshot of what someone sees in a page, taken inside it: the site review script's (./review-script) for each
-// comment, and the comment layer's (./plan-runtime) for a comment on something that shows only for a while.
+// comment, and the comment layer's (./plan-runtime) for each comment on a doc or an app, cut to its box.
 
 /** Pinned, and loaded only when someone presses Comment. A page whose CSP blocks it sends comments without a screenshot. */
 const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
@@ -114,7 +114,8 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
         const open = [];
         let cut = false, slice = performance.now();
         const filter = (node) => {
-          if (node === skip) return false;
+          // Drop's comment layer (pins, bubbles, suggested insertions) stays out, so a comment's picture shows only the page.
+          if (node === skip || (node.nodeType === 1 && /^drop-(comments|bubble|ins)$/.test(node.localName))) return false;
           if (node.nodeType === 1) open.push(node);
           return true;
         };

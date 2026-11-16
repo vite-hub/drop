@@ -364,9 +364,22 @@ const edit = (messageId: string, text: string, ids: string[]) =>
   background: var(--ui-bg);
 }
 
-/* The reply box under the divider: a focused field shows its border alone, not a second 3px ring around it. */
+/* The reply box is a soft filled field with no divider above it: the card's edge already bounds it, and a line over a
+   bordered field read as two borders. Its border shows only while it has the focus, without a second 3px ring. */
+.drop-comment-card :deep([data-slot="comment-thread"] > [data-slot="comment-composer"]) {
+  border-block-start: 0;
+}
+
 .drop-comment-card
   :deep([data-slot="comment-thread"] > [data-slot="comment-composer"] [data-slot="prompt-input-group"]) {
+  border-color: transparent;
+  background: var(--ui-bg-elevated);
   box-shadow: none;
+}
+
+.drop-comment-card
+  :deep([data-slot="comment-thread"] > [data-slot="comment-composer"] [data-slot="prompt-input-group"]:focus-within) {
+  border-color: var(--ui-border-accented);
+  background: var(--ui-bg);
 }
 </style>

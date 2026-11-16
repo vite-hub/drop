@@ -983,7 +983,7 @@ test("Related links on the page lists the docs that link to it, only ones the re
     ],
     "the preview it's on and Drop's own links stay out",
   )
-  assert.deepEqual(found.groups[0].links[0].icons, ["https://github.com/favicon.ico"])
+  assert.deepEqual(found.groups[0].links[0].icons, ["https://drop.example/api/favicons/github.com"])
   assert.doesNotMatch(JSON.stringify(found), /evidence|"mine"|drops\//, "no id, no link")
 
   // Each doc opens from its handle, with Drop's session, for people who'd find it anyway.

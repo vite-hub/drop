@@ -17,7 +17,8 @@ import { TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
-import { isPreviewLink, linkText } from "#shared/resources"
+import { FAVICON_PATH, faviconUrl, linkText } from "#shared/resources"
+import { chipNode } from "comark-chips"
 import type { DropResource } from "#shared/types"
 
 /** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
@@ -35,14 +36,15 @@ const dropPlayer = (url: URL) => {
 
 /**
  * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
- * off and cast, table, and tests read no files (the preset's defaults), chips leave favicons and avatars for the
+ * off and cast, table, and tests read no files (the preset's defaults), chips take each site's icon from Drop's own
+ * endpoint (server/utils/favicons.ts; the address is made absolute per read, absoluteFavicons) and leave avatars for the
  * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments,
  * Mermaid draws at most 4 diagrams and 8,000 characters of source a doc, Shiki colors code in the languages Drop
  * loads (GitHub light, and GitHub dark for the viewer's dark mode) up to 200,000 characters a doc, so a huge dump can't
  * eat the Worker's CPU, and Drop supplies the document's typography.
  */
 const preset = comarkUi({
-  chips: { download: false },
+  chips: { download: false, favicon: (host) => `${FAVICON_PATH}${host}` },
   embed: { player: dropPlayer },
   mermaid: { maxDiagrams: 4, maxSource: 8_000 },
   shiki: {
@@ -404,12 +406,13 @@ type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[
 // comark-properties' box opens with `<dl class="cfm"`, then whatever attributes its release adds, such as 0.10's
 // data-comark-frame.
 const PROPERTIES_BOX = /<dl class="cfm"[^>]*>/
+const CHIP_STYLES = /<style data-comark-chips[^>]*>[\s\S]*?<\/style>/
 
 /**
  * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
- * pull request, its issue) and when this version was published. They read as more front matter rows, at the top of
- * the doc, where a reader looks for what a doc is about; preview deploys stay in the header, as something to open. A
- * doc without front matter gets the box. A link its front matter already shows isn't repeated.
+ * pull request, its issue, its preview deploy) and when this version was published. They read as more front matter
+ * rows, at the top of the doc, where a reader looks for what a doc is about, each link a chip with its site's icon from
+ * Drop (server/utils/favicons.ts), as the front matter's own links are. A doc without front matter gets the box. A link its front matter already shows isn't repeated.
  *
  * Added to the cached render on each read, since a doc's links change without a new version.
  */
@@ -417,10 +420,11 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   const open = html.search(PROPERTIES_BOX)
   const close = open === -1 ? -1 : html.indexOf("</dl>", open)
   const box = open === -1 ? "" : html.slice(open, close)
-  const links = doc.resources.filter(
-    (resource) => !isPreviewLink(resource) && !box.includes(`href="${escapeHtml(resource.url)}"`),
+  const links = doc.resources.filter((resource) => !box.includes(`href="${escapeHtml(resource.url)}"`))
+  // SAFETY: chipNode builds an element node, [tag, attributes, ...children], as PropertyNode describes.
+  const chips = links.map(
+    (resource) => chipNode(resource.url, linkText(resource), faviconUrl(resource.url)) as PropertyNode,
   )
-  const anchors = links.map((resource): PropertyNode => ["a", { href: resource.url }, linkText(resource)])
   const updated = new Date(doc.updatedAt)
   const shown = updated.toLocaleDateString("en-US", {
     month: "short",
@@ -435,11 +439,7 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
             "div",
             { "data-key": "links", "data-kind": links.length === 1 ? "link" : "tags" },
             ["dt", {}, links.length === 1 ? "Link" : "Links"],
-            [
-              "dd",
-              {},
-              ...(links.length === 1 ? anchors : anchors.map((a): PropertyNode => ["span", { class: "cfm-tag" }, a])),
-            ],
+            ["dd", {}, ...chips],
           ] satisfies PropertyNode,
         ]
       : []),
@@ -456,8 +456,15 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
     { components: preset.components },
   )
   if (open === -1) return rendered + html
-  // The page already has the box's styles and date script: only its rows go in, after the front matter's.
+  // The page already has the box's styles and date script: only its rows go in, after the front matter's, with the
+  // chips' styles when none of the doc's own links brought them.
   const opening = PROPERTIES_BOX.exec(rendered)!
   const start = opening.index + opening[0].length
-  return html.slice(0, close) + rendered.slice(start, rendered.lastIndexOf("</dl>")) + html.slice(close)
+  const chipStyles = CHIP_STYLES.exec(rendered)?.[0] ?? ""
+  return (
+    (CHIP_STYLES.test(html) ? "" : chipStyles) +
+    html.slice(0, close) +
+    rendered.slice(start, rendered.lastIndexOf("</dl>")) +
+    html.slice(close)
+  )
 }
