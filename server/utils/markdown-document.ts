@@ -17,7 +17,7 @@ import { TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
-import { isPreviewLink, linkText } from "#shared/resources"
+import { linkText } from "#shared/resources"
 import type { DropResource } from "#shared/types"
 
 /** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
@@ -407,9 +407,9 @@ const PROPERTIES_BOX = /<dl class="cfm"[^>]*>/
 
 /**
  * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
- * pull request, its issue) and when this version was published. They read as more front matter rows, at the top of
- * the doc, where a reader looks for what a doc is about; preview deploys stay in the header, as something to open. A
- * doc without front matter gets the box. A link its front matter already shows isn't repeated.
+ * pull request, its issue, its preview deploy) and when this version was published. They read as more front matter
+ * rows, at the top of the doc, where a reader looks for what a doc is about, and the viewer adds each link's site icon
+ * (#shared/doc-header). A doc without front matter gets the box. A link its front matter already shows isn't repeated.
  *
  * Added to the cached render on each read, since a doc's links change without a new version.
  */
@@ -417,9 +417,7 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   const open = html.search(PROPERTIES_BOX)
   const close = open === -1 ? -1 : html.indexOf("</dl>", open)
   const box = open === -1 ? "" : html.slice(open, close)
-  const links = doc.resources.filter(
-    (resource) => !isPreviewLink(resource) && !box.includes(`href="${escapeHtml(resource.url)}"`),
-  )
+  const links = doc.resources.filter((resource) => !box.includes(`href="${escapeHtml(resource.url)}"`))
   const anchors = links.map((resource): PropertyNode => ["a", { href: resource.url }, linkText(resource)])
   const updated = new Date(doc.updatedAt)
   const shown = updated.toLocaleDateString("en-US", {
@@ -435,11 +433,7 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
             "div",
             { "data-key": "links", "data-kind": links.length === 1 ? "link" : "tags" },
             ["dt", {}, links.length === 1 ? "Link" : "Links"],
-            [
-              "dd",
-              {},
-              ...(links.length === 1 ? anchors : anchors.map((a): PropertyNode => ["span", { class: "cfm-tag" }, a])),
-            ],
+            ["dd", {}, ...anchors.map((a): PropertyNode => ["span", { class: "cfm-tag" }, a])],
           ] satisfies PropertyNode,
         ]
       : []),

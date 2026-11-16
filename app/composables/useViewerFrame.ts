@@ -57,6 +57,9 @@ export function useViewerFrame(options: {
   presence?: Presence
   /** A Markdown doc's section the reader went to, or (`copy`) whose link they copied. */
   heading?: (id: string, copy: boolean) => void
+  /** A button in a Markdown doc's header (#shared/doc-header), or a related drop it lists, by id. */
+  docAction?: (action: "markdown" | "download" | "pdf") => void
+  openDrop?: (id: string) => void
 }) {
   const {
     drop,
@@ -274,6 +277,12 @@ export function useViewerFrame(options: {
         return void copy(message.text)
       case "heading":
         if (drop.value.kind === "markdown") options.heading?.(message.id, message.copy === true)
+        return
+      case "doc-action":
+        if (drop.value.kind === "markdown") options.docAction?.(message.action)
+        return
+      case "doc-open":
+        if (drop.value.kind === "markdown") options.openDrop?.(message.id)
         return
       case "pointer":
         return options.presence?.point(message.at)

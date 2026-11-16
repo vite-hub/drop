@@ -2,11 +2,12 @@
 // Details in sections, not a label/value table: the drop itself first (its name, type and size, who dropped it, when,
 // where), then views and lifetime. Versions have their own tab (ViewerHistory). A folder leads with
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
-// it in place.
+// it in place. A Markdown doc shows its file, who dropped it and its views at its top (`factsInDoc`, #shared/doc-header),
+// so here it keeps only what can be changed.
 import { expiryLabel } from "#shared/expiry"
 import type { DropDetail } from "#shared/types"
 
-const props = defineProps<{ drop: DropDetail; showDescription: boolean }>()
+const props = defineProps<{ drop: DropDetail; showDescription: boolean; factsInDoc?: boolean }>()
 const { data: me } = useMe()
 const now = useRelativeNow()
 // A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
@@ -80,7 +81,7 @@ async function save() {
 
 <template>
   <div class="divide-y divide-default">
-    <section aria-label="File" class="space-y-3 p-4">
+    <section v-if="!factsInDoc" aria-label="File" class="space-y-3 p-4">
       <div class="flex items-center gap-3">
         <span
           class="grid size-10 shrink-0 place-items-center rounded-lg bg-elevated text-muted ring-1 ring-default ring-inset"
@@ -155,7 +156,7 @@ async function save() {
       </p>
     </section>
 
-    <section v-if="views" aria-labelledby="details-views" class="@container space-y-2.5 p-4">
+    <section v-if="views && !factsInDoc" aria-labelledby="details-views" class="@container space-y-2.5 p-4">
       <h3 id="details-views" class="text-xs font-medium text-muted">Views</h3>
       <!-- A total and where the views came from, each a number over what it counts; two by two in a narrow panel.
            Hovering says how they're counted. -->

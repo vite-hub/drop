@@ -69,13 +69,6 @@ export function linkSource(url: string) {
   return pull ? `${pull.repo}#${pull.number}` : new URL(url).hostname.replace(/^www\./, "")
 }
 
-/**
- * A preview deploy of the change, which stays in a doc's header: something to open and try, not a fact about the doc.
- * Agents title it exactly "Preview" (pr-evidence); a host with a `preview` label counts too. "Design preview" doesn't.
- */
-export const isPreviewLink = (resource: DropResource) =>
-  resource.title?.trim().toLowerCase() === "preview" || new URL(resource.url).hostname.split(".").includes("preview")
-
 /** A link's words in a doc's properties: its title, `owner/repo#123` for a pull request or issue, or its address. */
 export function linkText(resource: DropResource) {
   if (resource.title) return resource.title

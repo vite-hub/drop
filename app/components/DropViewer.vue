@@ -11,10 +11,11 @@ import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
-import { isPreviewLink, resourceLabel } from "#shared/resources"
+import type { DocHeader, DocHeaderFact } from "#shared/doc-header"
+import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import type { DropComment, DropVersion, SiteReviewItem } from "#shared/types"
+import type { DropComment, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
 import { AvatarStack, ConnectionStatus, ConnectionStatusLabel, type ConnectionStatusState } from "vite-hub/ui"
 // The parts' one stylesheet: comments, presence, and the editor's carets.
 import "vite-hub/ui/styles.css"
@@ -575,6 +576,12 @@ const {
     shared.hash = id
     void copy(shared.href, { announce: "Link to the section copied" })
   },
+  docAction: (action) => {
+    if (action === "markdown") void copyMarkdown()
+    else if (action === "download") download()
+    else if (printsPdf.value) exportPdf()
+  },
+  openDrop: (id) => void router.push(`/drops/${id}`),
 })
 // A link to a section (#id) opens the doc there, once the frame has it. The frame also gets the drop's link, for the
 // headings' # links.
@@ -729,16 +736,69 @@ const exportPdf = () => send({ type: "print", title: drop.value.title })
 // Markdown loses whatever its scripts draw, so its readers download the HTML instead.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 
-// The dock's links, beside Share: a Markdown doc's preview deploys, which are for opening; its other links read with its front
-// matter at the top of the doc (server/utils/markdown-document.ts withDocProperties). Every other drop shows them all.
-const dockLinks = computed(() => {
-  const links = drop.value.resources ?? []
-  return drop.value.kind === "markdown" ? links.filter(isPreviewLink) : links
-})
-
-// Drops are related through the pages they link to, so only a drop with links, or a site, can have related drops.
+// Drops are related through the pages they link to, so only a drop with links, or a site, can have related drops. A
+// Markdown doc lists its links and related drops in its header (docHeader); every other drop in the dock, beside Share.
 const relatesTo = computed(() =>
   drop.value.kind === "site" || drop.value.resources?.length ? drop.value.id : undefined,
+)
+const related = ref<RelatedDrop[]>([])
+watch(
+  () => (drop.value.kind === "markdown" ? relatesTo.value : undefined),
+  async (id) => {
+    related.value = []
+    if (!id) return
+    const found = await $fetch<RelatedDrop[]>(`/api/drops/${id}/related`).catch(() => [])
+    if (relatesTo.value === id) related.value = found
+  },
+  { immediate: true },
+)
+
+/**
+ * A Markdown doc's header (#shared/doc-header): Copy as Markdown, Download and Export as PDF at the top right of its
+ * properties box, its related drops among its links, and under See more the facts the Details used to list.
+ */
+const docHeader = computed<DocHeader | null>(() => {
+  const d = drop.value
+  if (d.kind !== "markdown" || editing.value) return null
+  const views = d.views
+  const folder = d.ancestors.map((crumb) => crumb.title).join(" / ")
+  const facts: DocHeaderFact[] = [
+    ...(views
+      ? [
+          {
+            icon: "views" as const,
+            label: "Views",
+            value: String(views.person + views.anonymous + views.agent),
+            detail: `${views.person} signed in · ${views.anonymous} anonymous · ${views.agent} agents`,
+          },
+        ]
+      : []),
+    { icon: "file", label: "File", value: d.filename, detail: `Markdown · ${formatBytes(d.size)}` },
+    { icon: "person", label: "Dropped by", value: d.actorName, detail: `via ${VIA_LABELS[d.actorKind]}` },
+    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder }] : []),
+  ]
+  const origin = import.meta.client ? location.origin : ""
+  const listed = new Set((d.resources ?? []).map((resource) => resource.url))
+  return {
+    actions: [
+      ...(copiesMarkdown.value ? [{ id: "markdown" as const, label: "Copy as Markdown", kbd: "M" }] : []),
+      ...(d.url ? [{ id: "download" as const, label: "Download original", kbd: "D" }] : []),
+      ...(printsPdf.value ? [{ id: "pdf" as const, label: "Export as PDF" }] : []),
+    ],
+    copied: copied("markdown"),
+    facts,
+    related: related.value.map((item) => ({ id: item.id, title: item.title, href: `${origin}/drops/${item.id}` })),
+    links: related.value
+      .flatMap((item) => item.links)
+      .filter((resource) => !listed.has(resource.url))
+      .map((resource) => ({ url: resource.url, label: resourceLabel(resource) })),
+    icon: `${origin}/favicon.ico`,
+  }
+})
+watch(
+  [ready, docHeader],
+  ([loaded, header]) => loaded && header && send({ type: "doc-header", ...JSON.parse(JSON.stringify(header)) }),
+  { immediate: true },
 )
 
 // The segment's chip: the size (a folder's item count) and, for its owner, the views.
@@ -750,15 +810,17 @@ const detailsMeta = computed(() => {
       : d.kind === "site" || d.kind === "link"
         ? KIND_LABELS[d.kind]
         : formatBytes(d.size)
+  if (d.kind === "markdown") return "Details"
   const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
   return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
 })
-// What the details panel listed as rows, as the segment's icons: the same rows for the same people.
+// What the details panel listed as rows, as the segment's icons: the same rows for the same people. A Markdown doc's
+// Download, Copy as Markdown and Export as PDF are in its header (docHeader).
 const detailsActions = computed<DetailsAction[]>(() => [
-  ...(drop.value.url
+  ...(drop.value.url && drop.value.kind !== "markdown"
     ? [{ id: "download", label: "Download original", icon: "i-mingcute-download-2-line", kbd: "D", press: download }]
     : []),
-  ...(copiesMarkdown.value
+  ...(copiesMarkdown.value && !docHeader.value
     ? [
         {
           id: "markdown",
@@ -769,19 +831,8 @@ const detailsActions = computed<DetailsAction[]>(() => [
         },
       ]
     : []),
-  ...(printsPdf.value ? [{ id: "pdf", label: "Export as PDF", icon: "i-mingcute-pdf-line", press: exportPdf }] : []),
   ...(presents.value && !slidev.value
     ? [{ id: "window", label: "Open in new window", icon: "i-mingcute-external-link-line", press: openWindow }]
-    : []),
-  ...(owner.value && !trashed.value
-    ? [
-        {
-          id: "move",
-          label: "Move to folder",
-          icon: "i-mingcute-new-folder-line",
-          press: () => moveTo({ drop: drop.value }),
-        },
-      ]
     : []),
   ...(visitor.value
     ? [
@@ -1161,7 +1212,11 @@ watch(
 
 <template>
   <DefineDetails>
-    <ViewerOverview :drop="drop" :show-description="owner || (Boolean(me) && !publicView)" />
+    <ViewerOverview
+      :drop="drop"
+      :facts-in-doc="drop.kind === 'markdown'"
+      :show-description="owner || (Boolean(me) && !publicView)"
+    />
     <div v-if="widens" class="space-y-2 border-t border-default p-4">
       <label for="drop-comment-style" class="text-xs font-medium text-muted">Comments</label>
       <USelect id="drop-comment-style" v-model="commentStyle" class="w-full" :items="commentStyles" />
@@ -1586,7 +1641,11 @@ watch(
               />
               <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
-            <ViewerResources :related-to="relatesTo" :resources="dockLinks" />
+            <ViewerResources
+              v-if="drop.kind !== 'markdown'"
+              :related-to="relatesTo"
+              :resources="drop.resources ?? []"
+            />
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
           </template>
         </ViewerReviewDock>
