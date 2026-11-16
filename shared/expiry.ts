@@ -18,7 +18,7 @@ interface ExpiryRow {
 }
 
 /** Days a drop with this lifetime lives after its last visit; 0 means it never expires. `days` of 0 turns expiry off. */
-function lifetimeDays(lifetime: Lifetime, days: number) {
+export function lifetimeDays(lifetime: Lifetime, days: number) {
   if (lifetime === "keep" || days <= 0) return 0
   return lifetime === "temporary" ? Math.min(TEMPORARY_DAYS, days) : days
 }
@@ -38,11 +38,11 @@ const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`
 
 /**
  * What people call a lifetime: how long it lasts, never its API value. `days` is this Drop's window, as for
- * `lifetimeDays`. "14 days", "30 days", "Never delete".
+ * `lifetimeDays`. "14 days", "30 days", "Forever".
  */
 export function lifetimeLabel(lifetime: Lifetime, days: number) {
   const window = lifetimeDays(lifetime, days)
-  return window ? plural(window, "day") : "Never delete"
+  return window ? plural(window, "day") : "Forever"
 }
 
 /** What happens to a drop with this lifetime, in one sentence. */

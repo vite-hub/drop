@@ -1,15 +1,12 @@
 <script setup lang="ts">
 // Details in sections, not a label/value table: the drop itself first (its name, type and size, who dropped it, when,
-// where), then views and lifetime. Versions have their own tab (ViewerHistory). A folder leads with
+// where), then views. The lifetime is the review pill's chip (ViewerLifetime). Versions have their own tab (ViewerHistory). A folder leads with
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
 // it in place. A Markdown doc shows its file, who dropped it and its views at its top (`factsInDoc`, #shared/doc-header),
 // so here it keeps only what can be changed.
-import { expiryLabel } from "#shared/expiry"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; showDescription: boolean; factsInDoc?: boolean }>()
-const { data: me } = useMe()
-const now = useRelativeNow()
 // A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
 const site = computed(() => props.drop.kind === "site")
 const type = computed(() =>
@@ -178,27 +175,6 @@ async function save() {
         </UTooltip>
       </dl>
     </section>
-
-    <!-- The team's folders never expire, so there's nothing to choose. -->
-    <section v-if="drop.teamFolder" aria-labelledby="details-lifetime" class="space-y-1 p-4 text-sm">
-      <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
-      <p class="text-highlighted">Never deleted</p>
-      <p class="text-xs text-pretty text-muted">Team folders stay until an admin deletes them.</p>
-    </section>
-    <!-- A drop in a folder lives as long as the folder at the top, so its lifetime is changed there. -->
-    <section
-      v-else-if="drop.isOwner && drop.parentId && drop.ancestors.length && me?.expiry.days"
-      aria-labelledby="details-lifetime"
-      class="space-y-1 p-4 text-sm"
-    >
-      <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
-      <p class="text-highlighted tabular-nums">{{ expiryLabel(drop, now) }}</p>
-      <p class="text-xs text-pretty text-muted">
-        It lives as long as its folder, {{ drop.ancestors[0]!.title }}. Change that folder's lifetime instead.
-      </p>
-    </section>
-    <!-- A drop at the top chooses its own lifetime. -->
-    <ViewerLifetime v-else-if="drop.isOwner && !drop.parentId" class="p-4" :drop="drop" />
 
     <section v-if="$slots.actions" class="p-2">
       <slot name="actions" />

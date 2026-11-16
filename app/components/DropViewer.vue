@@ -369,10 +369,13 @@ watch(
 // composer for a new comment or the thread of the pin clicked. Selected text gets the selection bar either way, so the
 // reader picks Comment or Suggest before writing.
 const commentStyle = useCommentStyle()
-const commentStyles: { value: CommentStyle; label: string }[] = [
-  { value: "card", label: "Cards beside the text" },
-  { value: "pin", label: "Pins beside the text" },
-]
+// Cards or Pins, picked in the Comments segment; only a Markdown doc's text has the choice.
+const commentStyleModel = computed({
+  get: () => (drop.value.kind === "markdown" ? commentStyle.value : undefined),
+  set: (value?: CommentStyle) => {
+    if (value) commentStyle.value = value
+  },
+})
 const pinStyle = computed(() => commentStyle.value === "pin" && drop.value.kind === "markdown")
 const pinOpen = computed(() => commentsOpen.value && !editing.value && !trashed.value && !lightbox.value)
 const pinDraft = computed(
@@ -826,7 +829,8 @@ const detailsMeta = computed(() => {
       : d.kind === "site" || d.kind === "link"
         ? KIND_LABELS[d.kind]
         : formatBytes(d.size)
-  if (d.kind === "markdown") return "Details"
+  // A Markdown doc's header holds its facts and the lifetime is its own chip: nothing is left to open.
+  if (d.kind === "markdown") return undefined
   const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
   return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
 })
@@ -897,10 +901,17 @@ const inspectable = computed(
 /** Whether the Marker can draw on a snapshot of the page: docs, images, HTML, and apps in the frame. */
 const canMark = computed(() => framed.value && canDrawArea.value && !shownVersion.value)
 const marking = computed(() => tool.value === "mark")
-const markTools = computed(() => [
-  ...(inspectable.value ? (["browse", "measure"] as const) : []),
-  ...(canMark.value ? (["mark"] as const) : []),
+/** Whether Rulers can draw over the page: any page in the frame, an image or a doc too (#shared/plan-runtime). */
+const measurable = computed(() => framed.value && annotationsEnabled.value && !lightbox.value)
+// The preview tools fill the dock's +; the Marker stays in the pill. Measure and X-ray read an HTML page's elements.
+const previewTools = computed(() => (inspectable.value ? (["browse", "measure"] as const) : []))
+const previewViews = computed(() => [
+  ...(measurable.value ? (["rulers"] as const) : []),
+  ...(inspectable.value ? (["xray"] as const) : []),
 ])
+// What's on stays beside the + while it's closed, pressed, so one press turns it off.
+const pinnedTools = computed(() => (tool.value === "measure" ? (["measure"] as const) : []))
+const pinnedViews = computed(() => previewViews.value.filter((view) => overlays[view]))
 function finishMark() {
   if (!marking.value || !annotations.marks.value || annotations.finishing.value) return
   annotations.finishing.value = true
@@ -1111,7 +1122,12 @@ usePaletteOffer("drop", () => {
     ...(hasHistory.value
       ? [{ label: "History", icon: "i-mingcute-history-line", kbds: ["h"], onSelect: () => showDetails("history") }]
       : []),
-    { label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => showDetails("meta") },
+    {
+      label: "Details",
+      icon: "i-mingcute-information-line",
+      kbds: ["i"],
+      onSelect: () => showDetails(detailsMeta.value ? "meta" : null),
+    },
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
     ...(drop.value.url
       ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
@@ -1233,10 +1249,6 @@ watch(
       :facts-in-doc="drop.kind === 'markdown'"
       :show-description="owner || (Boolean(me) && !publicView)"
     />
-    <div v-if="widens" class="space-y-2 border-t border-default p-4">
-      <label for="drop-comment-style" class="text-xs font-medium text-muted">Comments</label>
-      <USelect id="drop-comment-style" v-model="commentStyle" class="w-full" :items="commentStyles" />
-    </div>
   </DefineDetails>
   <DefineHistory>
     <LazyViewerHistory :comments="comments" :drop="drop" :selected="shownVersion?.version" @open="showVersion" />
@@ -1583,13 +1595,12 @@ watch(
             </template>
             <template v-else-if="hasComments && !trashed">
               <ViewerToolbar
-                v-if="!lightbox && !shownVersion && (inspectable || canMark || sizable || siteRef?.canDraw)"
-                :tools="markTools"
-                :views="inspectable ? ['rulers', 'xray'] : []"
+                v-if="canMark && !lightbox"
                 :overlays="overlays"
-                :sizable="sizable || Boolean(siteRef?.canDraw)"
+                :sizable="false"
                 :tool="tool"
-                @toggle="toggleOverlay"
+                :tools="['mark']"
+                :views="[]"
                 @tool="setTool"
               />
               <UButton
@@ -1601,26 +1612,9 @@ watch(
                 variant="ghost"
                 @click="present"
               />
-              <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  icon="i-mingcute-pencil-line"
-                  label="Edit"
-                  :loading="live.opening.value"
-                  variant="ghost"
-                  @click="startEdit"
-                />
-              </UTooltip>
-              <LazyViewerEditNote
-                v-else-if="showEditTool && drop.editNote"
-                v-model:open="editNoteOpen"
-                :can-comment="drop.canComment"
-                :note="drop.editNote"
-                @copy="copyMarkdown('Markdown copied')"
-              />
               <ViewerCommentsSegment
                 v-model:on="commentMode"
+                v-model:style="commentStyleModel"
                 :can-comment="canCommentOnPage"
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
@@ -1634,21 +1628,6 @@ watch(
               />
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
-            <template v-if="!editing">
-              <ViewerDetailsSegment
-                v-model:open="detailsOpen"
-                v-model:pop="detailsPop"
-                :actions="detailsActions"
-                :meta="detailsMeta"
-                :version="hasHistory ? `v${shownVersion?.version ?? drop.version}` : undefined"
-                :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
-                @width="nextWidth"
-              >
-                <template #details><ReuseDetails /></template>
-                <template #history><ReuseHistory /></template>
-              </ViewerDetailsSegment>
-              <span aria-hidden="true" class="w-1 shrink-0" />
-            </template>
             <template v-if="!editing && presence.people.value.length">
               <ViewerPresence
                 v-model:show-cursors="presence.showCursors.value"
@@ -1663,6 +1642,61 @@ watch(
               :resources="drop.resources ?? []"
             />
             <ViewerShare v-model:open="shareOpen" :drop="drop" />
+            <template v-if="!editing">
+              <ViewerToolbar
+                v-if="!detailsOpen && (pinnedTools.length || pinnedViews.length)"
+                :overlays="overlays"
+                :sizable="false"
+                :tool="tool"
+                :tools="pinnedTools"
+                :views="pinnedViews"
+                @toggle="toggleOverlay"
+                @tool="setTool"
+              />
+              <ViewerDetailsSegment
+                v-model:open="detailsOpen"
+                v-model:pop="detailsPop"
+                :actions="detailsActions"
+                :meta="detailsMeta"
+                :version="hasHistory ? `v${shownVersion?.version ?? drop.version}` : undefined"
+                :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
+                @width="nextWidth"
+              >
+                <template v-if="hasComments && !trashed && !marking" #tools>
+                  <ViewerToolbar
+                    v-if="!lightbox && !shownVersion && (measurable || sizable || siteRef?.canDraw)"
+                    :overlays="overlays"
+                    :sizable="sizable || Boolean(siteRef?.canDraw)"
+                    :tool="tool"
+                    :tools="previewTools"
+                    :views="previewViews"
+                    @toggle="toggleOverlay"
+                    @tool="setTool"
+                  />
+                  <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      icon="i-mingcute-pencil-line"
+                      label="Edit"
+                      :loading="live.opening.value"
+                      variant="ghost"
+                      @click="startEdit"
+                    />
+                  </UTooltip>
+                  <LazyViewerEditNote
+                    v-else-if="showEditTool && drop.editNote"
+                    v-model:open="editNoteOpen"
+                    :can-comment="drop.canComment"
+                    :note="drop.editNote"
+                    @copy="copyMarkdown('Markdown copied')"
+                  />
+                </template>
+                <template v-if="drop.isOwner" #lifetime><ViewerLifetime :drop="drop" /></template>
+                <template #details><ReuseDetails /></template>
+                <template #history><ReuseHistory /></template>
+              </ViewerDetailsSegment>
+            </template>
           </template>
         </ViewerReviewDock>
       </div>
