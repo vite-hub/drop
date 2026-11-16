@@ -20,7 +20,7 @@ const label = computed(() => (span.value ? `${span.value} d` : "Forever"))
 /** Owners keep drops unless the admin turned that off; admins always may. */
 const canKeep = computed(() => Boolean(me.value && (me.value.expiry.custom || me.value.role === "admin")))
 // A team folder never expires and nothing in it can change that.
-const fixed = computed(() => props.drop.teamFolder)
+const fixed = computed(() => props.drop.lifetimeFixed || props.drop.teamFolder)
 const busy = ref(false)
 
 async function run(change: { lifetime?: Lifetime; renew?: true }, done?: string) {

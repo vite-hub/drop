@@ -29,6 +29,7 @@ import {
   listedNode,
   parentNode,
   resolveNode,
+  rootOf,
   walkUp,
   withAncestors,
 } from "../nodes"
@@ -566,6 +567,7 @@ export async function dropDetail(
   const resources = isAttachment(row) ? [] : resourcesOf(row)
   const detail: DropDetail = {
     ...toSummary(row, undefined, days),
+    ...(rootOf(row).teamFolder ? { lifetimeFixed: true } : {}),
     isOwner: can.manage,
     canTrash: can.trash,
     canComment: can.comment,
