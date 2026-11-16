@@ -3,7 +3,8 @@ import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { parseTarGzip } from "nanotar"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { insertDrop, migrate, objects, reset, roundTrips, sql, state, who } from "../cost/harness.mjs"
+import { calls, event, insertDrop, migrate, objects, reset, roundTrips, sql, state, who } from "../cost/harness.mjs"
+const { findDrop, permissions } = await import("../../server/utils/drops.ts")
 const { default: discovery } = await import("../../server/middleware/0.3.well-known.ts")
 const { hubSkillNames } = await import("../../server/utils/hub-skills.ts")
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
@@ -259,4 +260,163 @@ test("the index reads the hub folder and its tree in one database round trip", a
   const { root } = await hub()
   const count = await roundTrips(() => get(`/d/${root.id}/skill-hub/.well-known/agent-skills/index.json`))
   assert.equal(count, 1)
+})
+
+test("discovery applies the review the page applies now, not the one stored when the link was shared", async () => {
+  // Shared while approval was required and the owner not approved yet: the hub's row keeps `share_review = pending`.
+  state.shareApproval = true
+  const { root, skill } = await hub()
+  assert.equal(sql.prepare("SELECT share_review FROM drops WHERE id = ?").get(root.id).share_review, "pending")
+  // What a signed-out visitor's `/d/` page opens (findDrop), and what discovery and the Install button serve.
+  const page = async (id) => {
+    const drop = await findDrop(id, event(`/d/${id}`))
+    return Boolean(drop && permissions(drop, null).view)
+  }
+  const served = async () =>
+    (await (await get(`/d/${root.id}/skill-hub/.well-known/agent-skills/index.json`)).json()).skills.map(
+      (entry) => entry.name,
+    )
+  const install = () => hubSkillNames(root.id, event(`/api/drops/${root.id}`))
+  const expect = async (open, names, message) => {
+    assert.equal(await page(root.id), open, `hub page: ${message}`)
+    assert.equal(await page(skill.id), open, `SKILL doc page: ${message}`)
+    assert.deepEqual(await served(), names, `discovery: ${message}`)
+    assert.deepEqual(await install(), names, `Install button: ${message}`)
+  }
+  const both = ["handoff", "release-notes"]
+  await expect(false, [], "waiting for approval")
+  state.shareApproval = false
+  await expect(true, both, "approval turned off")
+  // Shared again while approval is off, the hub stores no review. A skill shared once approval is back on waits for
+  // review on its own, under a hub that doesn't.
+  await call(updateTool, { id: root.id, share: "private" })
+  await call(updateTool, { id: root.id, share: "public" })
+  assert.equal(sql.prepare("SELECT share_review FROM drops WHERE id = ?").get(root.id).share_review, null)
+  state.shareApproval = true
+  const late = await folder("Late", "late", { folder: root.id, share: "public" })
+  const lateSkill = await doc(skillMd("late"), "skill", late.id)
+  assert.equal(sql.prepare("SELECT share_review FROM drops WHERE id = ?").get(late.id).share_review, "pending")
+  assert.equal(await page(lateSkill.id), false, "the late skill's page waits for review")
+  await expect(true, both, "approval back on, the hub stored as reviewed")
+  // The owner's approval counts the same way as approval turned off.
+  sql.prepare("UPDATE user SET share_approved_at = 1").run()
+  assert.equal(await page(lateSkill.id), true, "the late skill's page once the owner is approved")
+  await expect(true, ["handoff", "late", "release-notes"], "owner approved")
+  sql.prepare("UPDATE user SET share_approved_at = NULL").run()
+  state.shareApproval = false
+  await call(updateTool, { id: root.id, share: "private" })
+  state.shareApproval = true
+  await call(updateTool, { id: root.id, share: "public" })
+  await expect(false, [], "shared again while approval is required")
+})
+
+const MIB = 1024 * 1024
+
+/** Blob keys read while `request` runs, and the most reads in flight at once; each read takes a few milliseconds. */
+async function reads(request) {
+  const { get: original } = state.blob
+  const keys = []
+  let inFlight = 0
+  let most = 0
+  state.blob.get = async (key) => {
+    keys.push(key)
+    most = Math.max(most, ++inFlight)
+    await new Promise((resolve) => setTimeout(resolve, 2))
+    inFlight--
+    return original(key)
+  }
+  try {
+    await request()
+  } finally {
+    state.blob.get = original
+  }
+  return { keys, most }
+}
+
+/** A skill subfolder of `root` with a valid SKILL doc and `count` text files of `size` bytes each (as their rows say). */
+async function skillWith(root, name, count, size = 8) {
+  const at = await folder(name, name, { folder: root.id })
+  await doc(skillMd(name), "skill", at.id)
+  for (let index = 0; index < count; index++)
+    insertDrop(`${name}-${index}`, {
+      kind: "file",
+      parent_id: at.id,
+      title: `f${index}.txt`,
+      filename: `f${index}.txt`,
+      blob_key: `${name}/${index}.txt`,
+      size,
+    })
+  return at
+}
+
+test("a skill over 200 files or 8 MiB is left out whole, its files never read; one at the limits is served", async () => {
+  const { root } = await hub()
+  // SKILL.md and 199 files: 200, the most a skill may have. One more file is over.
+  await skillWith(root, "full", 199)
+  await skillWith(root, "crowded", 200)
+  // Three 3 MiB files are 9 MiB; two are 6 MiB.
+  await skillWith(root, "bulky", 3, 3 * MIB)
+  await skillWith(root, "hefty", 2, 3 * MIB)
+  const base = `/d/${root.id}/x/.well-known`
+  const served = ["full", "handoff", "hefty", "release-notes"]
+  const { keys } = await reads(async () => {
+    const index = await (await get(`${base}/agent-skills/index.json`)).json()
+    assert.deepEqual(
+      index.skills.map((skill) => skill.name),
+      served,
+    )
+    for (const name of ["crowded", "bulky"]) {
+      assert.equal((await get(`${base}/skills/${name}/SKILL.md`)).status, 404, name)
+      assert.equal((await get(`${base}/skills/${name}/f0.txt`)).status, 404, name)
+      assert.equal((await get(`${base}/agent-skills/${name}.tar.gz`)).status, 404, name)
+    }
+  })
+  assert.ok(!keys.some((key) => /^(crowded|bulky)\//.test(key)), "an over-limit skill's files are never read")
+  const files = await parseTarGzip(new Uint8Array(await (await get(`${base}/agent-skills/full.tar.gz`)).arrayBuffer()))
+  assert.equal(files.length, 200)
+  assert.deepEqual(await hubSkillNames(root.id), served)
+})
+
+test("one request reads at most 24 MiB: skills past it, in name order, are left out whole", async () => {
+  const { root } = await hub()
+  // 7 MiB each: a, b and c fit in 24 MiB with the hub's small skills, d doesn't.
+  for (const name of ["a-skill", "b-skill", "c-skill", "d-skill"]) await skillWith(root, name, 7, MIB)
+  const index = await (await get(`/d/${root.id}/x/.well-known/skills/index.json`)).json()
+  assert.deepEqual(
+    index.skills.map((skill) => skill.name),
+    ["a-skill", "b-skill", "c-skill", "handoff", "release-notes"],
+  )
+  assert.equal((await get(`/d/${root.id}/x/.well-known/skills/d-skill/f0.txt`)).status, 404)
+})
+
+test("a skill's files are read six at a time", async () => {
+  const { root } = await hub()
+  await skillWith(root, "many", 40)
+  const { keys, most } = await reads(() => get(`/d/${root.id}/x/.well-known/agent-skills/many.tar.gz`))
+  assert.equal(keys.length, 41)
+  assert.equal(most, 6)
+})
+
+test("index and file requests after the first read no blob until a file changes", async () => {
+  const { root, skill } = await hub()
+  const base = `/d/${root.id}/skill-hub/.well-known`
+  const first = await (await get(`${base}/agent-skills/index.json`)).json()
+  assert.ok(calls.get > 0)
+  calls.get = 0
+  assert.deepEqual(await (await get(`${base}/agent-skills/index.json`)).json(), first)
+  assert.deepEqual(
+    (await (await get(`${base}/skills/index.json`)).json()).skills.map((entry) => entry.name),
+    ["handoff", "release-notes"],
+  )
+  assert.equal(await (await get(`${base}/skills/release-notes/scripts/check.mjs`)).text(), CHECK)
+  assert.equal((await get(`${base}/agent-skills/release-notes.tar.gz`)).status, 200)
+  assert.equal(await (await get(`${base}/agent-skills/handoff/SKILL.md`)).text(), skillMd("handoff"))
+  assert.equal(calls.get, 0, "every answer came from the skills already built")
+  // A new version is a new file set: that skill is read again, the other isn't.
+  await call(publish, { markdown: skillMd("release-notes", "Do it better."), previous: skill.id, note: "Better" })
+  const { keys } = await reads(() => get(`${base}/agent-skills/index.json`))
+  assert.equal(keys.length, 4, "release-notes' SKILL doc, reference, script, and the image it leaves out")
+  // Still served to a stranger only while the link is public: the cache answers what the tree query lets through.
+  await call(updateTool, { id: root.id, share: "private" })
+  assert.deepEqual((await (await get(`${base}/agent-skills/index.json`)).json()).skills, [])
 })

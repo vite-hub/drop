@@ -15,22 +15,26 @@ export default definePlugin((app) => {
     const path = new URL(event.req.url).pathname
     if (path.startsWith("/f/") || path.startsWith("/d/")) {
       response.headers.set("X-Robots-Tag", "noindex, nofollow")
-      // A public folder's skills are the same for everyone, so they keep the minute serveSkills gives them.
-      if (HUB_SKILLS_PATH.test(path) && response.ok) return
-      // Shared content is checked again on every request. A file with an ETag stays in the browser and is revalidated,
-      // so a screenshot opened twice comes back as a 304 without its bytes; pages, errors, and rendered documents
-      // aren't kept at all.
-      const revalidated =
-        path.startsWith("/f/") &&
-        (response.status === 304 || (response.status >= 200 && response.status < 300 && response.headers.has("ETag")))
-      response.headers.set("Cache-Control", revalidated ? "private, no-cache" : "private, no-store")
-      return
+      // A public folder's skills are the same for everyone, so they keep the minute serveSkills gives them. Shared
+      // content is checked again on every request. A file with an ETag stays in the browser and is revalidated, so a
+      // screenshot opened twice comes back as a 304 without its bytes; pages, errors, and rendered documents aren't kept
+      // at all.
+      if (!HUB_SKILLS_PATH.test(path) || !response.ok) {
+        const revalidated =
+          path.startsWith("/f/") &&
+          (response.status === 304 || (response.status >= 200 && response.status < 300 && response.headers.has("ETag")))
+        response.headers.set("Cache-Control", revalidated ? "private, no-cache" : "private, no-store")
+      }
+    } else {
+      // When indexing is on, search engines index the landing, docs and legal pages and nothing else: not the app, its
+      // API, sign-in, /home, or the Markdown copies of the docs. Without it, nothing. Files (the favicon, og.png,
+      // scripts) stay as they are.
+      const file = /\.(?!md$|txt$)\w+$/.test(path)
+      const indexed = useRuntimeConfig().seoIndex && isIndexedPath(path)
+      if (!file && !indexed && !response.headers.has("X-Robots-Tag")) response.headers.set("X-Robots-Tag", "noindex")
     }
-    // When indexing is on, search engines index the landing, docs and legal pages and nothing else: not the app, its API,
-    // sign-in, /home, or the Markdown copies of the docs. Without it, nothing. Files (the favicon, og.png, scripts) stay
-    // as they are.
-    const file = /\.(?!md$|txt$)\w+$/.test(path)
-    const indexed = useRuntimeConfig().seoIndex && isIndexedPath(path)
-    if (!file && !indexed && !response.headers.has("X-Robots-Tag")) response.headers.set("X-Robots-Tag", "noindex")
+    // An answer that sets a cookie belongs to whoever it signs in, whatever its path: the auth proxy's middleware
+    // (../middleware/0.15.proxy-session.ts) adds one to any request. A shared cache would replay it to the next reader.
+    if (response.headers.has("Set-Cookie")) response.headers.set("Cache-Control", "private, no-store")
   })
 })

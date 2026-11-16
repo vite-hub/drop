@@ -33,3 +33,19 @@ test("a folder's skill discovery keeps the minute it's cached for; its misses ar
   assert.equal(respond("/d/abc/.well-known/skills/x/SKILL.md", cached), "public, max-age=60")
   assert.equal(respond("/d/abc/.well-known/skills/x/SKILL.md", { ...cached, status: 404 }), "private, no-store")
 })
+
+test("an answer that sets a cookie is never kept, whatever it was cached for", () => {
+  // The auth proxy's session middleware (server/middleware/0.15.proxy-session.ts) adds the cookie before any handler runs.
+  const session = (cacheControl, extra = {}) => ({
+    headers: { "Cache-Control": cacheControl, "Set-Cookie": "session=secret; Path=/; HttpOnly", ...extra },
+  })
+  assert.equal(
+    respond("/d/abc/skill-hub/.well-known/agent-skills/index.json", session("public, max-age=60")),
+    "private, no-store",
+  )
+  assert.equal(respond("/d/abc/.well-known/skills/x/SKILL.md", session("public, max-age=60")), "private, no-store")
+  assert.equal(respond("/.well-known/skills/index.json", session("public, max-age=60")), "private, no-store")
+  assert.equal(respond("/llms.txt", session("public, max-age=300")), "private, no-store")
+  assert.equal(respond("/_nuxt/app.js", session("public, max-age=31536000, immutable")), "private, no-store")
+  assert.equal(respond(`/f/${key}.png`, session("private, no-cache", { ETag: '"abc"' })), "private, no-store")
+})
