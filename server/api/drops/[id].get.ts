@@ -46,9 +46,7 @@ export default defineHandler(async (event) => {
   // Install metadata is optional: unavailable child content must not prevent browsing the folder itself.
   const hub =
     drop.kind === "folder" && permissions(drop, null).view
-      ? import("../../utils/hub-skills")
-          .then(({ hubInstall }) => hubInstall(drop, event))
-          .catch(() => undefined)
+      ? import("../../utils/hub-skills").then(({ hubInstall }) => hubInstall(drop, event)).catch(() => undefined)
       : undefined
   const [detail, install] = await Promise.all([
     dropDetail(drop, who, event.url.origin, event, served ? "pages" : "all"),
