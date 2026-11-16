@@ -1219,24 +1219,29 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       placeDrawn();
     }
     const ow = right > left ? thousandths(right, r.left, r.width) - ox : 0, oh = right > left ? thousandths(bottom, r.top, r.height) - oy : 0;
-    const around = !zoom && under.closest(TRANSIENT);
-    const n = around ? ++shots : undefined;
+    // Every comment on the page keeps a picture of its box, so whoever reads it later (an agent too) sees what it's about.
+    const n = zoom ? undefined : ++shots;
     post({ type: "area", selector: pathOf(el), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, shot: n });
     placeDraft();
-    if (around) shoot(n, around.getBoundingClientRect(), left, top, right, bottom);
+    if (n !== undefined) {
+      const around = under.closest(TRANSIENT);
+      shoot(n, around ? around.getBoundingClientRect() : { left, top, right, bottom }, left, top, right, bottom);
+    }
   }
 
   ${CAPTURE}
   /**
-   * A comment on something that shows only for a while (a tooltip, a menu, a popover, a dialog) keeps a picture of it,
-   * since the page won't show it once it closes: the viewport, cut to that element and the box with some room around,
-   * with the box drawn on. Drop adds it to the comment being written ("area-shot", by the area's number). A page that
-   * blocks the screenshot module gets no picture and the comment still goes.
+   * A comment keeps a picture of what it's about: the viewport, cut to its box with some room around, with the box drawn
+   * on and none of Drop's own pins or bubbles (captureViewport). On something that shows only for a while (a tooltip, a
+   * menu, a popover, a dialog) the cut takes in that whole element, since the page won't show it once it closes. A
+   * comment on a spot has no box, so it gets a dot and room around it. Drop adds the picture to the comment being
+   * written ("area-shot", by the area's number). A page that blocks the screenshot module gets no picture and the
+   * comment still goes.
    */
   const TRANSIENT = "[role=tooltip],[role=menu],[role=listbox],[role=dialog],[role=alertdialog],[popover],dialog,[data-state=open]";
   let shots = 0;
   async function shoot(n, around, left, top, right, bottom) {
-    const ROOM = 24;
+    const ROOM = right > left ? 24 : 120;
     const cut = {
       left: Math.max(0, Math.min(left, around.left) - ROOM), top: Math.max(0, Math.min(top, around.top) - ROOM),
       right: Math.min(innerWidth, Math.max(right, around.right) + ROOM), bottom: Math.min(innerHeight, Math.max(bottom, around.bottom) + ROOM),
@@ -1255,6 +1260,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       if (right > left) for (const [color, width] of [["#fff", 4], ["#171717", 2]]) {
         g.strokeStyle = color; g.lineWidth = width * k;
         g.strokeRect((left - cut.left) * k, (top - cut.top) * k, (right - left) * k, (bottom - top) * k);
+      }
+      else for (const [color, radius] of [["#fff", 7], ["#171717", 5]]) {
+        g.fillStyle = color; g.beginPath();
+        g.arc((left - cut.left) * k, (top - cut.top) * k, radius * k, 0, 2 * Math.PI); g.fill();
       }
       image = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
     } catch {} finally {
@@ -1466,8 +1475,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     tool = next;
     self.__dropHold(tool === "browse" ? null : held);
     if (!wasHeld && tool !== "browse") { heldHover = Array.from(document.querySelectorAll(":hover")); pointer = null; }
-    // The picture a comment on a tooltip or menu keeps (shoot) starts sooner with its module loaded.
-    if (tool === "comment" && document.querySelector(TRANSIENT)) loadScreenshot().catch(() => { screenshotModule = null; });
+    // The picture each comment keeps (shoot) starts sooner with its module loaded.
+    if (tool === "comment") loadScreenshot().catch(() => { screenshotModule = null; });
     hovered = picked = null;
     if (layer) {
       const root = layer.getRootNode();
