@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { chromium } from "playwright"
 import { createServer } from "vite-plus"
@@ -15,6 +15,8 @@ const component = transpileModule(compileScript(descriptor, { id: "pin-composer"
   compilerOptions: { module: ModuleKind.ESNext },
 }).outputText
 const root = fileURLToPath(new URL("../../node_modules/.cache/pin-composer-browser/", import.meta.url))
+// A cache from another ViteHub build would serve stale pre-bundled files.
+rmSync(root, { force: true, recursive: true })
 mkdirSync(root, { recursive: true })
 writeFileSync(`${root}composer.js`, component)
 writeFileSync(
