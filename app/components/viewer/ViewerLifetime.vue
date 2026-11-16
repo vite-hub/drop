@@ -1,98 +1,109 @@
 <script setup lang="ts">
-// How long the drop lives, for the people who manage it: pick a lifetime, renew it, or restore it from the Trash.
-import { expiryLabel, type Lifetime, lifetimeHint, lifetimeLabel, LIFETIMES } from "#shared/expiry"
+// The lifetime as a chip in the review pill's + row, left of the version: "30 d", or ∞ "Forever". One click opens the
+// choices. A drop in a folder lives as long as the folder at the top, so there the choice changes that folder, and the
+// menu says so. Opening a drop restarts its count, so the chip shows the window, never a countdown. A trashed drop has
+// the page's Restore banner instead.
+import { type Lifetime, lifetimeDays, lifetimeLabel, LIFETIMES } from "#shared/expiry"
 import type { DropDetail } from "#shared/types"
+import type { DropdownMenuItem } from "@nuxt/ui"
 
 const props = defineProps<{ drop: DropDetail }>()
 const { data: me } = useMe()
-const { setLifetime, restore } = useDropActions()
+const { setLifetime } = useDropActions()
 const notify = useNotify()
-const now = useRelativeNow()
 const days = computed(() => me.value?.expiry.days ?? 0)
-// The shared clock dates from the page load, so a window that just restarted would read a day long; this one is
-// taken again each time the drop changes.
-const status = computed(() => expiryLabel(props.drop, Math.max(now.value, Date.now())))
-const trashed = computed(() => props.drop.trashedAt !== null)
+/** The folder at the top decides for everything in it. */
+const folder = computed(() => (props.drop.parentId ? props.drop.ancestors[0] : undefined))
+const current = computed<Lifetime>(() => (props.drop.expiresAt === null ? "keep" : props.drop.lifetime))
+const span = computed(() => lifetimeDays(current.value, days.value))
+const label = computed(() => (span.value ? `${span.value} d` : "Forever"))
 /** Owners keep drops unless the admin turned that off; admins always may. */
 const canKeep = computed(() => Boolean(me.value && (me.value.expiry.custom || me.value.role === "admin")))
+// A team folder never expires and nothing in it can change that.
+const fixed = computed(() => props.drop.teamFolder)
 const busy = ref(false)
-const options = computed(() =>
-  LIFETIMES.map((value) => ({
-    label: lifetimeLabel(value, days.value),
-    value,
-    disabled: busy.value || (value === "keep" && !canKeep.value && props.drop.lifetime !== "keep"),
-  })),
-)
-/** Renewing restarts the window; the button says to what. */
-const reset = computed(() => `Reset to ${lifetimeLabel(props.drop.lifetime, days.value)}`)
-const hint = computed(() => {
-  if (trashed.value)
-    return props.drop.trashReason === "expired"
-      ? "Nobody opened it for a while. Restore it to bring the link back."
-      : "Restore it to bring the link back."
-  if (props.drop.lifetime === "keep" && props.drop.keepReason)
-    return `Stays until someone deletes it. An agent chose this because: ${props.drop.keepReason}`
-  return lifetimeHint(props.drop.lifetime, days.value)
-})
-// A segmented control whose selected item sits raised on a layered shadow rather than a ring. Corners nest: the track's
-// 12px is the thumb's 8px plus its 4px of padding. The trigger's `before:` classes style the selected item until
-// hydration adds the indicator.
-const tabsUi = {
-  list: "w-full rounded-xl p-1",
-  indicator:
-    "rounded-lg bg-default shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)] dark:bg-accented dark:shadow-none",
-  trigger:
-    "h-7 flex-1 justify-center rounded-lg data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:rounded-lg in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)] dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-accented dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:shadow-none",
-}
 
-async function run(action: () => Promise<boolean>, done?: string) {
+async function run(change: { lifetime?: Lifetime; renew?: true }, done?: string) {
   busy.value = true
-  if ((await action()) && done) notify.done(done)
+  const target = folder.value ?? props.drop
+  const ok = await setLifetime(target, change)
+  if (ok && folder.value) await refreshNuxtData(keys.drop(props.drop.id))
+  if (ok && done) notify.done(done)
   busy.value = false
 }
-// The control shows the new lifetime; renewing, which may not change what it says, gets a note.
-const choose = (lifetime: Lifetime) => run(() => setLifetime(props.drop, { lifetime }))
+
+const items = computed<DropdownMenuItem[][]>(() => [
+  [
+    {
+      type: "label",
+      // Labels truncate by default; this one is a sentence, so it wraps.
+      ui: { label: "font-normal text-muted", itemLabel: "whitespace-normal text-pretty" },
+      label: folder.value ? `Set on its folder, ${folder.value.title}` : "Goes to the Trash when nobody opens it for",
+    },
+    ...LIFETIMES.map((value) => ({
+      type: "checkbox" as const,
+      label: lifetimeLabel(value, days.value),
+      checked: current.value === value,
+      disabled: busy.value || (value === "keep" && !canKeep.value && current.value !== "keep"),
+      onSelect: () => current.value !== value && void run({ lifetime: value }),
+    })),
+  ],
+  ...(span.value
+    ? [
+        [
+          {
+            label: `Reset to ${lifetimeLabel(current.value, days.value)}`,
+            icon: "i-mingcute-refresh-2-line",
+            disabled: busy.value,
+            onSelect: () => void run({ renew: true }, "Count restarted"),
+          },
+        ],
+      ]
+    : []),
+])
+const chip =
+  "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned tabular-nums transition-colors hover:bg-elevated hover:text-highlighted aria-expanded:bg-inverted aria-expanded:text-inverted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
 </script>
 
 <template>
-  <section v-if="days > 0" aria-labelledby="details-lifetime" class="space-y-2.5 text-sm">
-    <div class="flex items-center gap-3">
-      <div class="min-w-0 flex-1">
-        <h3 id="details-lifetime" class="text-xs font-medium text-muted">Lifetime</h3>
-        <p class="truncate text-highlighted tabular-nums">{{ status }}</p>
-      </div>
-      <UButton
-        v-if="trashed"
-        class="-my-1"
-        color="neutral"
-        label="Restore"
-        :loading="busy"
-        size="xs"
-        variant="outline"
-        @click="run(() => restore(drop))"
-      />
-      <UButton
-        v-else-if="drop.lifetime !== 'keep'"
-        class="-my-1"
-        color="neutral"
-        :label="reset"
-        :loading="busy"
-        size="xs"
-        variant="outline"
-        title="Start the count over, as if someone just opened it"
-        @click="run(() => setLifetime(drop, { renew: true }), reset)"
-      />
-    </div>
-    <UTabs
-      v-if="!trashed"
-      color="neutral"
-      :content="false"
-      :items="options"
-      :model-value="drop.lifetime"
-      size="xs"
-      :ui="tabsUi"
-      @update:model-value="(value) => choose(value as Lifetime)"
-    />
-    <p class="text-xs text-pretty text-muted">{{ hint }}</p>
-  </section>
+  <span v-if="fixed" :class="[chip, 'pointer-events-none']" aria-label="Lifetime: forever">
+    <!-- MingCute has no infinity sign; this one is drawn at its 1.75 stroke. -->
+    <svg
+      aria-hidden="true"
+      class="size-3.5"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-width="1.75"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M12 12c-2-2.7-3.6-4-5.3-4a4 4 0 0 0 0 8c1.7 0 3.3-1.3 5.3-4m0 0c2 2.7 3.6 4 5.3 4a4 4 0 0 0 0-8c-1.7 0-3.3 1.3-5.3 4"
+      /></svg
+    >Forever
+  </span>
+  <UDropdownMenu
+    v-else-if="days > 0"
+    :content="{ side: 'top', sideOffset: 10 }"
+    :items="items"
+    :ui="{ content: 'w-64' }"
+  >
+    <button :aria-label="`Lifetime: ${lifetimeLabel(current, days)}`" :class="chip" type="button">
+      <UIcon v-if="span" name="i-mingcute-time-line" class="size-3.5" />
+      <svg
+        v-else
+        aria-hidden="true"
+        class="size-3.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-width="1.75"
+        viewBox="0 0 24 24"
+      >
+        <path
+          d="M12 12c-2-2.7-3.6-4-5.3-4a4 4 0 0 0 0 8c1.7 0 3.3-1.3 5.3-4m0 0c2 2.7 3.6 4 5.3 4a4 4 0 0 0 0-8c-1.7 0-3.3 1.3-5.3 4"
+        /></svg
+      >{{ label }}
+    </button>
+  </UDropdownMenu>
 </template>

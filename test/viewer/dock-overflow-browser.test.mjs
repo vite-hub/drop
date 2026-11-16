@@ -13,7 +13,15 @@ import { compileScript, compileStyle, parse } from "vue/compiler-sfc"
 const require = createRequire(import.meta.url)
 const root = fileURLToPath(new URL("../../", import.meta.url))
 const components = new Map()
-const candidates = ["grid-cols-[1fr]", "grid-cols-[0fr]", "max-sm:hidden"]
+const candidates = [
+  "grid-cols-[1fr]",
+  "grid-cols-[0fr]",
+  "max-sm:hidden",
+  "invisible",
+  "flex-wrap",
+  "flex-nowrap",
+  "[&_[role=group]]:flex-nowrap",
+]
 let styles = readFileSync(require.resolve("tailwindcss/preflight.css"), "utf8")
 styles += readFileSync(root + "node_modules/@vite-hub/ui/dist/styles.css", "utf8")
 for (const name of ["ViewerReviewDock", "ViewerDetailsSegment", "ViewerToolbar"]) {

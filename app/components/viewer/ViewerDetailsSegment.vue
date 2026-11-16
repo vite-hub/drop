@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // The review pill's + (I), at its right end: it grows the pill to the right, the + turning into a ×, with what the pill
-// keeps out of sight. First the preview tools and Edit (#tools), then a chip with the size and views that opens the
-// details (#details) in a popover, the version chip (H) that opens History (#history), the width button (W) that steps
-// the reading width, and the drop's actions as icons with tooltips. The two chips show their words, so they have no
+// keeps out of sight. First the preview tools and Edit (#tools), then the lifetime chip (#lifetime), a chip with the size
+// and views that opens the details (#details) in a popover, the version chip (H) that opens History (#history), the
+// width button (W) that steps the reading width, and the drop's actions as icons with tooltips. The two chips show their words, so they have no
 // tooltip (one inside a popover's trigger loses its provider). Escape closes the popover first, then the segment. On a
 // phone the segment takes its own rows above the pill's, wrapping rather than hiding anything.
 export type DetailsAction = {
@@ -18,7 +18,8 @@ export type DetailsAction = {
 const open = defineModel<boolean>("open", { required: true })
 const pop = defineModel<"meta" | "history" | null>("pop", { required: true })
 const props = defineProps<{
-  meta: string
+  /** The details chip's words; none hides it, as on a Markdown doc whose header already holds its facts. */
+  meta?: string
   version?: string
   width?: string
   actions: DetailsAction[]
@@ -35,6 +36,17 @@ const historyOpen = popOpen("history")
 const main = computed(() => props.actions.filter((action) => !action.destructive))
 const danger = computed(() => props.actions.filter((action) => action.destructive))
 watch(open, (value) => !value && (pop.value = null))
+// The row wraps on a narrow pill, but only once it has grown: while it is closed or easing open its width is too small
+// for anything, and wrapping then would stack every button into a tall column.
+const grown = ref(false)
+const reduced = usePreferredReducedMotion()
+let growing: ReturnType<typeof setTimeout> | undefined
+watch(open, (value) => {
+  clearTimeout(growing)
+  grown.value = false
+  if (value) growing = setTimeout(() => (grown.value = true), reduced.value === "reduce" ? 0 : 260)
+})
+onBeforeUnmount(() => clearTimeout(growing))
 
 const chip =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned tabular-nums transition-colors hover:bg-elevated hover:text-highlighted aria-expanded:bg-inverted aria-expanded:text-inverted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
@@ -50,22 +62,24 @@ const popoverUi = {
        it a row of its own. -->
   <div
     id="drop-details"
-    class="grid min-w-0 max-w-full transition-[grid-template-columns] duration-250 ease-[cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none max-sm:order-first max-sm:basis-full"
-    :class="open ? 'grid-cols-[1fr]' : 'grid-cols-[0fr] max-sm:hidden'"
+    class="grid min-w-0 max-w-full transition-[grid-template-columns,visibility] duration-250 ease-[cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none max-sm:order-first max-sm:basis-full"
+    :class="open ? 'grid-cols-[1fr]' : 'invisible grid-cols-[0fr] max-sm:hidden'"
     :inert="!open"
     role="group"
     aria-label="Details and actions"
   >
     <div
-      class="flex min-w-0 flex-wrap items-center justify-center gap-0.5 overflow-hidden transition-opacity duration-150 motion-reduce:transition-none max-sm:pb-0.5"
-      :class="open ? 'opacity-100 delay-75' : 'opacity-0'"
+      class="flex min-w-0 items-center justify-center gap-0.5 overflow-hidden transition-opacity duration-150 motion-reduce:transition-none max-sm:pb-0.5"
+      :class="[
+        open ? 'opacity-100 delay-75' : 'opacity-0',
+        grown ? 'flex-wrap' : 'flex-nowrap [&_[role=group]]:flex-nowrap',
+      ]"
     >
       <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border) max-sm:hidden" />
-      <template v-if="$slots.tools">
-        <slot name="tools" />
-        <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border) max-sm:hidden" />
-      </template>
-      <UPopover v-model:open="metaOpen" :content="{ side: 'top', sideOffset: 10 }" :ui="popoverUi">
+      <slot name="tools" />
+      <span v-if="$slots.tools" aria-hidden="true" class="w-1 shrink-0" />
+      <slot name="lifetime" />
+      <UPopover v-if="meta" v-model:open="metaOpen" :content="{ side: 'top', sideOffset: 10 }" :ui="popoverUi">
         <button aria-label="Details" :class="chip" type="button">
           <UIcon name="i-mingcute-document-2-line" class="size-3.5" />{{ meta }}
         </button>

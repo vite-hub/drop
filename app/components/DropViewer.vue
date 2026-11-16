@@ -369,10 +369,13 @@ watch(
 // composer for a new comment or the thread of the pin clicked. Selected text gets the selection bar either way, so the
 // reader picks Comment or Suggest before writing.
 const commentStyle = useCommentStyle()
-const commentStyles: { value: CommentStyle; label: string }[] = [
-  { value: "card", label: "Cards beside the text" },
-  { value: "pin", label: "Pins beside the text" },
-]
+// Cards or Pins, picked in the Comments segment; only a Markdown doc's text has the choice.
+const commentStyleModel = computed({
+  get: () => (drop.value.kind === "markdown" ? commentStyle.value : undefined),
+  set: (value?: CommentStyle) => {
+    if (value) commentStyle.value = value
+  },
+})
 const pinStyle = computed(() => commentStyle.value === "pin" && drop.value.kind === "markdown")
 const pinOpen = computed(() => commentsOpen.value && !editing.value && !trashed.value && !lightbox.value)
 const pinDraft = computed(
@@ -810,7 +813,8 @@ const detailsMeta = computed(() => {
       : d.kind === "site" || d.kind === "link"
         ? KIND_LABELS[d.kind]
         : formatBytes(d.size)
-  if (d.kind === "markdown") return "Details"
+  // A Markdown doc's header holds its facts and the lifetime is its own chip: nothing is left to open.
+  if (d.kind === "markdown") return undefined
   const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
   return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
 })
@@ -1102,7 +1106,12 @@ usePaletteOffer("drop", () => {
     ...(hasHistory.value
       ? [{ label: "History", icon: "i-mingcute-history-line", kbds: ["h"], onSelect: () => showDetails("history") }]
       : []),
-    { label: "Details", icon: "i-mingcute-information-line", kbds: ["i"], onSelect: () => showDetails("meta") },
+    {
+      label: "Details",
+      icon: "i-mingcute-information-line",
+      kbds: ["i"],
+      onSelect: () => showDetails(detailsMeta.value ? "meta" : null),
+    },
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
     ...(drop.value.url
       ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
@@ -1224,10 +1233,6 @@ watch(
       :facts-in-doc="drop.kind === 'markdown'"
       :show-description="owner || (Boolean(me) && !publicView)"
     />
-    <div v-if="widens" class="space-y-2 border-t border-default p-4">
-      <label for="drop-comment-style" class="text-xs font-medium text-muted">Comments</label>
-      <USelect id="drop-comment-style" v-model="commentStyle" class="w-full" :items="commentStyles" />
-    </div>
   </DefineDetails>
   <DefineHistory>
     <LazyViewerHistory :comments="comments" :drop="drop" :selected="shownVersion?.version" @open="showVersion" />
@@ -1593,6 +1598,7 @@ watch(
               />
               <ViewerCommentsSegment
                 v-model:on="commentMode"
+                v-model:style="commentStyleModel"
                 :can-comment="canCommentOnPage"
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
@@ -1670,6 +1676,7 @@ watch(
                     @copy="copyMarkdown('Markdown copied')"
                   />
                 </template>
+                <template v-if="drop.isOwner" #lifetime><ViewerLifetime :drop="drop" /></template>
                 <template #details><ReuseDetails /></template>
                 <template #history><ReuseHistory /></template>
               </ViewerDetailsSegment>
