@@ -12,16 +12,25 @@ import { defineRealtime } from "vite-hub/realtime"
  */
 export default defineRealtime({
   async authorize({ event: hostEvent, documentId, mode }) {
-    if (mode === "write") return false
-    if (documentId === null) return true
+    if (documentId === null && mode !== "write") return true
     // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which findDrop and identify read.
     const event = hostEvent as H3Event
-    const [{ expiredLink, findDrop, permissions, waitingForReview }, { identify }] = await Promise.all([
+    const [{ expiredLink, findDrop, permissions, waitingForReview }, { identify }, { requestLog }] = await Promise.all([
       import("../utils/drops"),
       import("../utils/identity"),
+      import("../utils/logs"),
     ])
+    const refuse = (refused: string) => {
+      requestLog(event)?.set({ realtime: { room: "latest", refused } })
+      return false
+    }
+    if (mode === "write") return refuse("write")
+    if (documentId === null) return true
     const [head, who] = await Promise.all([findDrop(documentId, event), identify(event)])
-    return Boolean(head && (permissions(head, who).view || waitingForReview(head, who) || expiredLink(head, who)))
+    if (!head) return refuse("not-found")
+    if (!(permissions(head, who).view || waitingForReview(head, who) || expiredLink(head, who)))
+      return refuse("no-access")
+    return true
   },
   document: {
     kind: "drop-latest",

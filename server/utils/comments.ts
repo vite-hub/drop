@@ -125,11 +125,13 @@ function anchorOf(meta: Omit<CommentMeta, "dropId">): CommentAnchor {
     : { kind: "element", selector, x: meta.ox, y: meta.oy }
 }
 
-/** A Comments error as an HTTP error: bad input is the caller's, anything else Drop's. */
+/**
+ * A Comments error as an HTTP error: bad input is the caller's, anything else Drop's. Thrown, it reaches the request's
+ * wide event with the Comments error as its cause.
+ */
 function commentsFailure(error: Error & { code: string }) {
   if (error.code === "COMMENTS_INVALID_INPUT")
     return new HTTPError({ status: 400, statusText: error.message, cause: error })
-  log.error({ action: "comments", code: error.code, error: error.message })
   return new HTTPError({ status: 503, statusText: "Comments are temporarily unavailable.", cause: error })
 }
 

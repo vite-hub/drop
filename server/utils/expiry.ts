@@ -1,5 +1,4 @@
 import { and, eq, sql } from "drizzle-orm"
-import { log } from "evlog"
 import type { H3Event } from "h3"
 import { isbot } from "isbot"
 import { db } from "vite-hub/database"
@@ -7,6 +6,7 @@ import { useServerEnv } from "vite-hub/env"
 import { DAY_MS, DEFAULT_EXPIRY_DAYS, expiresAt } from "#shared/expiry"
 import { drops } from "../databases/default/index"
 import type { Identity } from "./identity"
+import { logError } from "./logs"
 
 interface ExpiryPolicy {
   /** Days a `review` drop lives after its last visit (`temporary` ones get at most 14). 0 turns expiry off. */
@@ -69,7 +69,7 @@ export async function recordVisit(
       sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt}) <= ${now - DAY_MS}`,
     )
   } catch (error) {
-    log.error({ action: "drop-visit", error: String(error) })
+    logError(event, error, { action: "drop-visit" })
   }
 }
 

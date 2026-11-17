@@ -1,5 +1,4 @@
 import { eq, lt, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { getRequestIP, type H3Event } from "h3"
 import { db } from "vite-hub/database"
 import { useServerEnv } from "vite-hub/env"
@@ -9,6 +8,7 @@ import { dropViewers, dropViews } from "../databases/default/index"
 import type { DropRow } from "./drops"
 import { isHumanVisit } from "./expiry"
 import type { Identity } from "./identity"
+import { logError } from "./logs"
 import { isAttachment } from "./nodes"
 
 type Viewed = Pick<DropRow, "id" | "ownerId" | "parentId" | "ancestors">
@@ -35,7 +35,7 @@ export async function countView(event: H3Event, row: Viewed, who: Identity | nul
     // A new row counts the view (the drop_viewers_count trigger); a repeat visit the same day writes nothing.
     await db.insert(dropViewers).values({ dropId: row.id, day, id, viewer }).onConflictDoNothing()
   } catch (error) {
-    log.error({ action: "drop-view", error: String(error) })
+    logError(event, error, { action: "drop-view" })
   }
 }
 

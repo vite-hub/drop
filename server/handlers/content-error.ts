@@ -1,13 +1,29 @@
+import { log } from "evlog"
 import type { H3Event, HTTPError } from "h3"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { contentUnavailable, contentUnavailableIcon, missingInDrop } from "../../shared/content-unavailable.ts"
 import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
 import DROP_MARK from "../../shared/drop-mark.svg?raw"
+import { requestLog } from "../utils/logs.ts"
 import { readAuthProxyConfig as authProxy } from "../utils/proxy-auth-config.ts"
 
 const theme = `${THEME_CSS.replace(":root.dark {", "@media (prefers-color-scheme: dark) { :root {")}\n}`
 const mark = DROP_MARK.replace("<svg ", '<svg class="content-unavailable-mark" aria-hidden="true" focusable="false" ')
+
+/**
+ * A lookup this page did without. The request's own event is often out already (evlog emits it as the error is
+ * thrown), so this is an event of its own, with the request's id.
+ */
+function fellBack(event: H3Event, step: string, error: unknown) {
+  log.warn({
+    action: "content-error",
+    step,
+    path: event.url.pathname,
+    requestId: requestLog(event)?.getContext().requestId,
+    error: error instanceof Error ? error.message : String(error),
+  })
+}
 
 async function signedIn(event: H3Event) {
   if (event.context.dropIdentity) return event.context.dropIdentity
@@ -31,7 +47,8 @@ async function openableDrop(event: H3Event, path: string, identity: Awaited<Retu
     if (!drop || waitingForReview(drop, identity) || expiredLink(drop, identity) || !permissions(drop, identity).view)
       return null
     return dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
-  } catch {
+  } catch (error) {
+    fellBack(event, "drop", error)
     return null
   }
 }
@@ -45,7 +62,9 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
   let identity: Awaited<ReturnType<typeof signedIn>> = null
   try {
     identity = await signedIn(event)
-  } catch {}
+  } catch (failure) {
+    fellBack(event, "identity", failure)
+  }
   const drop = status === 404 ? await openableDrop(event, path, identity) : null
   const message = drop
     ? missingInDrop(drop, identity?.email)
