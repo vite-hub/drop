@@ -44,7 +44,7 @@ overrides:
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@20ab8225980df89b18a8f7a150bde1b144dc27c1
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@20ab8225980df89b18a8f7a150bde1b144dc27c1
   # ViteHub Content renders the docs with Drop's comark-ui, so the app holds one copy and its patches apply to it.
-  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@a410d811a6d25eb5c8dc8389b3e5fc82b1696def
+  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@5ed58864ab45b829202737a626779abd4043fbf0
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.15
   "@better-auth/oauth-provider": 1.7.15
@@ -58,12 +58,6 @@ overrides:
   # Nuxt UI's editor menus stay on @tiptap/core's 3.31.4; a 3.32 menu beside core 3.31.4 breaks them.
   "@tiptap/extension-bubble-menu": 3.31.4
   "@tiptap/extension-floating-menu": 3.31.4
-
-packageExtensions:
-  # comark-properties imports comark-time from onmax/comark-ui#453 on, which its patch brings before it lists it.
-  comark-properties@0.12.2:
-    dependencies:
-      comark-time: https://pkg.pr.new/onmax/comark-ui/comark-time@a410d81
 
 patchedDependencies:
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
@@ -83,10 +77,6 @@ patchedDependencies:
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
   "@better-auth/oauth-provider@1.7.15": patches/@better-auth__oauth-provider@1.7.15.patch
-  # describeTime and relativize, so cached renders read relative dates in the reader's browser (onmax/comark-ui#453).
-  comark-time@0.12.2: patches/comark-time@0.12.2.patch
-  # Date rows in comark-time's markup with its relative-dates script, and `scripts` for the CSP (onmax/comark-ui#453).
-  comark-properties@0.12.2: patches/comark-properties@0.12.2.patch
   # RelativeTime and provideRelativeNow (vite-hub/vitehub#4785).
   "@vite-hub/ui@0.0.0-preview-20ab822": patches/@vite-hub__ui@0.0.0-preview-20ab822.patch
 
