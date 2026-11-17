@@ -21,7 +21,7 @@ export default defineRealtime({
       import("../utils/logs"),
     ])
     const refuse = (refused: string) => {
-      requestLog(event)?.set({ realtime: { room: "latest", refused } })
+      requestLog(event)?.set({ realtime: { reason: refused } })
       return false
     }
     if (mode === "write") return refuse("write")
