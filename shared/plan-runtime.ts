@@ -501,6 +501,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The package's icon is a grey image, so each theme gets one in the page's own background color.
     "drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#fafafa") + ";border-color:var(--foreground);background-color:var(--foreground);color:var(--background);transition:box-shadow .12s}" +
     ":root.dark drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#0a0a0a") + "}" +
+    // A display formula's box is a centered row: a mark at its end keeps its own size, beside the formula.
+    ".cmh-display>drop-bubble,.cmh-display>drop-ins{flex:none;align-self:center}" +
     "drop-bubble.cr-bub:hover,drop-bubble.cr-bub[data-on]{border-color:var(--foreground);color:var(--background);box-shadow:0 0 0 3px color-mix(in oklab,var(--foreground) 18%,transparent)}" +
     // The package's .cr-cm tint and underline, in ViteHub's comment blue (--vh-comment-mark, from MARKS_CSS in
     // pageStyle), as the areas are, not the package's amber.
@@ -530,15 +532,31 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function findRange(selector, quote) {
     for (const root of [query(selector), document.body]) {
       if (!root) continue;
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      // Text that isn't drawn is never in a selection's quote: a <style> a block writes before itself, inside a
+      // paragraph when it's an inline formula, and a formula's TeX in its MathML's <annotation>.
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (node) => (node.parentElement && node.parentElement.closest("style, script, annotation") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
       const nodes = []; let text = "";
       while (walker.nextNode()) { nodes.push([walker.currentNode, text.length]); text += walker.currentNode.data; }
-      const at = text.indexOf(quote);
-      if (at < 0) continue;
+      let at = text.indexOf(quote), stop = at + quote.length;
+      if (at < 0) {
+        // A selection quotes a formula as it's drawn: a line between its symbols, and a letter such as k as the italic
+        // 𝑘. The quote is matched again without whitespace and with each character in its plain form (NFKC), which
+        // keeps where each one came from in the page's text.
+        const plain = (chars) => chars.normalize("NFKC").replace(/\s+/g, "");
+        const bare = plain(quote), starts = [], ends = []; let squeezed = "";
+        for (let i = 0; i < text.length; ) {
+          const char = String.fromCodePoint(text.codePointAt(i)), folded = plain(char);
+          for (let k = 0; k < folded.length; k++) { starts.push(i); ends.push(i + char.length); }
+          squeezed += folded; i += char.length;
+        }
+        const from = bare ? squeezed.indexOf(bare) : -1;
+        if (from < 0) continue;
+        at = starts[from]; stop = ends[from + bare.length - 1];
+      }
       const range = document.createRange();
       // Start snaps forward into the node that begins at the offset; end snaps back into the node that ends there.
       const locate = (offset, end) => { for (let i = nodes.length - 1; i >= 0; i--) if (end ? nodes[i][1] < offset : nodes[i][1] <= offset) return [nodes[i][0], offset - nodes[i][1]]; return [nodes[0][0], 0]; };
-      const [sn, so] = locate(at, false), [en, eo] = locate(at + quote.length, true);
+      const [sn, so] = locate(at, false), [en, eo] = locate(stop, true);
       range.setStart(sn, so); range.setEnd(en, Math.min(eo, en.data.length));
       return range;
     }
@@ -697,14 +715,24 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     inserts = [];
   }
   /** A suggestion's new words, after its quote and before its bubble. A deletion has none. */
+  /**
+   * Where a mark after a quote goes: the quote's end, or, when that's in a formula, right after its <math>, which holds
+   * no HTML. That's still inside the formula's box, so a display formula's mark sits beside it, not on a line below.
+   */
+  function afterQuote(range) {
+    const end = range.cloneRange();
+    end.collapse(false);
+    const node = end.startContainer, el = node.nodeType === 1 ? node : node.parentElement;
+    const math = el && el.closest("math");
+    if (math) { end.setStartAfter(math); end.collapse(true); }
+    return end;
+  }
   function insertSuggestion(m, range) {
     if (!m.suggestion) return;
     const ins = document.createElement("drop-ins");
     ins.className = "cr-sg"; ins.dataset.id = m.id; ins.dataset.text = m.suggestion; ins.title = "Suggested: " + m.suggestion;
     ins.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const r = ins.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top }); };
-    const end = range.cloneRange();
-    end.collapse(false);
-    end.insertNode(ins);
+    afterQuote(range).insertNode(ins);
     inserts.push(ins);
   }
   function insertBubble(m, range) {
@@ -716,9 +744,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     bubble.setAttribute("aria-label", (m.suggestion == null ? "Comment" : "Suggestion") + " by " + (m.author || "someone") + change + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
     // Like the package's: the count only once the thread has more than its first comment.
     if (replies) { const count = document.createElement("b"); count.dataset.n = String(replies + 1); bubble.appendChild(count); }
-    const end = range.cloneRange();
-    end.collapse(false);
-    end.insertNode(bubble);
+    afterQuote(range).insertNode(bubble);
     bubbles.set(m.id, bubble);
   }
   function setRail(want) {
