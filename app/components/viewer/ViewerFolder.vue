@@ -7,6 +7,7 @@
 // page; only admins add folders to it or change what it says. A link item opens its page outside Drop in a new tab,
 // and Copy link copies that page's address. A public skill hub, and each skill's folder in it, offers Install
 // (ViewerInstallSkills).
+import { RelativeTime } from "vite-hub/ui"
 import { breakpointsTailwind } from "@vueuse/core"
 import { dropPath } from "#shared/links"
 import { linkSource } from "#shared/resources"
@@ -277,7 +278,11 @@ async function newBoard() {
     </span>
     <template v-else>
       <span class="hidden w-40 truncate text-xs text-muted sm:block">{{ meta(child) }}</span>
-      <TimeAgo class="w-24 shrink-0 text-right text-xs text-muted tabular-nums" :at="child.updatedAt" />
+      <RelativeTime
+        :style="'short'"
+        class="w-24 shrink-0 text-right text-xs text-muted tabular-nums"
+        :at="child.updatedAt"
+      />
     </template>
   </DefineRowParts>
   <div ref="root" class="relative flex min-h-0 flex-1">

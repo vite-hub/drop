@@ -19,6 +19,8 @@ import { loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
 import { FAVICON_PATH, faviconUrl, linkText } from "#shared/resources"
 import { chipNode } from "comark-chips"
+import { scripts as propertiesScripts } from "comark-properties/html"
+import { describeTime } from "comark-time"
 import type { DropResource } from "#shared/types"
 
 /** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
@@ -73,21 +75,9 @@ export const RENDERER_SCRIPTS = [
   (await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })).match(
     /<script>([\s\S]*)<\/script>/,
   )![1]!,
-  // comark-properties rewrites a frontmatter date in the reader's locale.
-  (
-    await renderHtmlFromDocument(
-      {
-        nodes: [
-          [
-            "properties",
-            {},
-            ["div", {}, ["dt", {}, "Date"], ["dd", {}, ["time", { datetime: "2026-10-23" }, "Oct 23, 2026"]]],
-          ],
-        ],
-      },
-      { components: preset.components },
-    )
-  ).match(/<script>([\s\S]*)<\/script>/)![1]!,
+  // comark-properties writes a box's dates relative to the reader's clock, and comark-time lets Escape close their
+  // tooltips.
+  ...propertiesScripts,
 ]
 
 /**
@@ -405,10 +395,33 @@ export async function renderMarkdownDocument(
 
 type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[]]
 
+/**
+ * A moment in comark-time's markup, as comark-properties writes a front matter date: the server writes the date in UTC,
+ * which reads right in any cached copy, and the box's script turns it into "2 days ago", with the full date and time in
+ * its tooltip, in the reader's browser.
+ */
+function timeNode(at: number): PropertyNode {
+  const time = describeTime(new Date(at).toISOString(), { timeZone: "UTC", threshold: "none" })!
+  const label = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(at)
+  const id = `cfm-${crypto.randomUUID()}`
+  return [
+    "time",
+    { class: "ctm", datetime: time.datetime, "data-mode": "absolute", tabindex: "0", "aria-describedby": id },
+    label,
+    ["span", { class: "ctm-tip", role: "tooltip", id }, ["span", { class: "ctm-pill" }, time.tip]],
+  ]
+}
+
 // comark-properties' box opens with `<dl class="cfm"`, then whatever attributes its release adds, such as 0.10's
 // data-comark-frame.
 const PROPERTIES_BOX = /<dl class="cfm"[^>]*>/
 const CHIP_STYLES = /<style data-comark-chips[^>]*>[\s\S]*?<\/style>/
+const PROPERTIES_STYLES = /<style data-comark-properties[^>]*>[\s\S]*?<\/style>/
 
 /**
  * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
@@ -427,13 +440,6 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   const chips = links.map(
     (resource) => chipNode(resource.url, linkText(resource), faviconUrl(resource.url)) as PropertyNode,
   )
-  const updated = new Date(doc.updatedAt)
-  const shown = updated.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  })
   const rows: PropertyNode[] = [
     ...(links.length
       ? [
@@ -445,12 +451,7 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
           ] satisfies PropertyNode,
         ]
       : []),
-    [
-      "div",
-      { "data-key": "updated", "data-kind": "date" },
-      ["dt", {}, "Updated"],
-      ["dd", {}, ["time", { datetime: updated.toISOString().slice(0, 10) }, shown]],
-    ],
+    ["div", { "data-key": "updated", "data-kind": "date" }, ["dt", {}, "Updated"], ["dd", {}, timeNode(doc.updatedAt)]],
   ]
   const rendered = await renderHtmlFromDocument(
     // SAFETY: the rows are Drop's own nodes, with hrefs resources.ts already checked (https, or http on localhost).
@@ -461,9 +462,22 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   // its box or text has a chip. The page keeps one: the doc's, or the rows' when the doc has none.
   const own = CHIP_STYLES.test(html)
   if (open === -1) return (own ? rendered.replace(CHIP_STYLES, "") : rendered) + html
-  // The page already has the box's styles and date script: only its rows go in, after the front matter's.
+  // The page already has the box's styles: only its rows go in, after the front matter's. A box without a date of its
+  // own has no date script yet, so the Updated row brings comark-time's runtime before the box and the script after it.
   const opening = PROPERTIES_BOX.exec(rendered)!
   const start = opening.index + opening[0].length
-  const added = rendered.slice(start, rendered.lastIndexOf("</dl>"))
-  return html.slice(0, close) + (own ? added.replace(CHIP_STYLES, "") : added) + html.slice(close)
+  const end = rendered.lastIndexOf("</dl>")
+  const added = rendered.slice(start, end)
+  const dated = box.includes("<time")
+  const runtime = dated ? "" : rendered.slice(0, opening.index).replace(PROPERTIES_STYLES, "")
+  const after = dated ? "" : rendered.slice(end + "</dl>".length)
+  return (
+    html.slice(0, open) +
+    runtime +
+    html.slice(open, close) +
+    (own ? added.replace(CHIP_STYLES, "") : added) +
+    "</dl>" +
+    after +
+    html.slice(close + "</dl>".length)
+  )
 }

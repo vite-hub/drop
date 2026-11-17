@@ -2,6 +2,7 @@
 // The drop picked in a folder's list, previewed beside it (Dropbox's and Supabase Storage's pane): images and videos as
 // themselves, Markdown, HTML and spreadsheets in a frame with no scripts, the rest by kind. Its name sits on top with
 // what it is under it, and double-clicking the name renames it (`renames`); who added it, and when, sits by Open.
+import { RelativeTime } from "vite-hub/ui"
 import { planDocument } from "#shared/documents"
 import { videoType } from "#shared/plans"
 import { linkSource } from "#shared/resources"
@@ -20,7 +21,6 @@ const { data: detail } = useApi<DropDetail>(() => `/api/drops/${props.child.id}`
   server: false,
 })
 const link = useShareUrl(() => props.child)
-const { copy, copied } = useCopy()
 const colorMode = useColorMode()
 const dark = computed(() => colorMode.value === "dark")
 const url = computed(() => detail.value?.url)
@@ -115,7 +115,7 @@ const about = computed(() =>
         <AgentIcon class="size-3.5" :kind="child.actorKind" :name="child.actorName" />
         <span class="min-w-0 truncate"
           ><span class="text-default">{{ child.actorName }}</span> {{ child.version > 1 ? "updated it" : "added it" }}
-          <TimeAgo :at="child.updatedAt"
+          <RelativeTime :style="'short'" :at="child.updatedAt"
         /></span>
       </p>
       <div class="flex gap-2">
@@ -130,14 +130,12 @@ const about = computed(() =>
           :to="to"
         />
         <UTooltip text="Copy link">
-          <UButton
+          <DropCopyButton
             aria-label="Copy link"
-            color="neutral"
-            :icon="copied('link') ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-            :ui="{ leadingIcon: copied('link') ? 'animate-icon-in' : undefined }"
+            icon="i-mingcute-link-line"
             size="sm"
+            :value="child.href ?? link"
             variant="outline"
-            @click="copy(child.href ?? link, { key: 'link' })"
           />
         </UTooltip>
         <UTooltip v-if="url && child.kind !== 'folder'" text="Download">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RelativeTime } from "vite-hub/ui"
 import type { TabsItem } from "@nuxt/ui"
 import { PLAN_TEMPLATE } from "#shared/plan-template"
 
@@ -22,7 +23,6 @@ const tabsUi = {
 
 const client = ref<McpClient>("claude")
 const { agents, status, disconnect } = useAgents()
-const { copy, copied } = useCopy()
 </script>
 
 <template>
@@ -37,15 +37,7 @@ const { copy, copied } = useCopy()
         <div class="flex items-center gap-2 rounded-md border border-default bg-muted py-1 pr-1 pl-3">
           <span class="label-mono">Server</span>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-highlighted">{{ server }}</span>
-          <UButton
-            aria-label="Copy server URL"
-            color="neutral"
-            :icon="copied('server') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-            :ui="{ leadingIcon: copied('server') ? 'animate-icon-in' : undefined }"
-            size="xs"
-            variant="ghost"
-            @click="copy(server, { key: 'server' })"
-          />
+          <DropCopyButton aria-label="Copy server URL" size="xs" :value="server" />
         </div>
         <div class="-mx-1 overflow-x-auto px-1">
           <UTabs
@@ -67,15 +59,7 @@ const { copy, copied } = useCopy()
         >
         <!-- A bare "Template" said nothing about what it copies. -->
         <UTooltip text="A starter HTML plan your agent can fill in and drop">
-          <UButton
-            color="neutral"
-            :icon="copied('template') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-            :ui="{ leadingIcon: copied('template') ? 'animate-icon-in' : undefined }"
-            :label="copied('template') ? 'Copied' : 'Copy plan template'"
-            size="sm"
-            variant="ghost"
-            @click="copy(PLAN_TEMPLATE, { key: 'template' })"
-          />
+          <DropCopyButton label="Copy plan template" size="sm" :value="PLAN_TEMPLATE" />
         </UTooltip>
       </div>
       <p class="mt-3 border-t border-default pt-3 text-sm text-muted">
@@ -100,7 +84,7 @@ const { copy, copied } = useCopy()
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium text-highlighted">{{ agent.name }}</p>
             <p v-if="agent.connectedAt" class="truncate text-xs text-muted">
-              Connected <TimeAgo :at="agent.connectedAt" />
+              Connected <RelativeTime :at="agent.connectedAt" />
             </p>
           </div>
           <UButton color="neutral" label="Disconnect" size="sm" variant="ghost" @click="disconnect(agent)" />

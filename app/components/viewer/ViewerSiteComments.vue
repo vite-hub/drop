@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // A site drop's comments as the page's main content: one row each, its screenshot as a thumbnail, newest first. A row
 // opens its thread in the review dock; "Review this page" opens the page it was written on in the frame.
+import { RelativeTime } from "vite-hub/ui"
 import type { DropComment, SiteReviewItem } from "#shared/types"
 
 const props = defineProps<{
@@ -120,7 +121,7 @@ function pageLabel(comment: DropComment) {
             <UAvatar :alt="comment.authorName" :src="comment.authorImage ?? undefined" size="3xs" />
             <span class="truncate text-sm font-medium text-highlighted">{{ comment.authorName }}</span>
             <span class="shrink-0 font-mono text-xs text-muted"
-              >#{{ comment.n }} · <TimeAgo :at="comment.createdAt"
+              >#{{ comment.n }} · <RelativeTime :style="'short'" :at="comment.createdAt"
             /></span>
             <span
               v-if="comment.page"

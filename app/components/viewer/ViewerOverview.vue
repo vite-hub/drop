@@ -4,6 +4,7 @@
 // what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
 // it in place. A Markdown doc shows its file, who dropped it and its views at its top (`factsInDoc`, #shared/doc-header),
 // so here it keeps only what can be changed.
+import { RelativeTime } from "vite-hub/ui"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; showDescription: boolean; factsInDoc?: boolean }>()
@@ -99,7 +100,7 @@ async function save() {
         </li>
         <li class="flex items-center gap-2 text-muted">
           <UIcon name="i-mingcute-time-line" class="size-4 shrink-0" />
-          <span>Updated <TimeAgo class="text-highlighted" :at="drop.updatedAt" /></span>
+          <span>Updated <RelativeTime class="text-highlighted" :at="drop.updatedAt" /></span>
         </li>
         <li v-if="folder" class="flex min-w-0 items-center gap-2 text-muted">
           <UIcon name="i-mingcute-folder-line" class="size-4 shrink-0" />

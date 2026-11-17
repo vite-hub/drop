@@ -2,6 +2,7 @@
 // A drop on the Drops page's list, read like a list of posts: its name, a word on what it is, and when, right-aligned in
 // fixed-width digits. No boxes, no rules between lines; whitespace keeps them apart. Hovering, or focus inside, swaps
 // the time for Copy link and the ⋯ menu. The page decides what a click does (`pick`), as with DropCard.
+import { RelativeTime } from "vite-hub/ui"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropSummary } from "#shared/types"
 
@@ -15,7 +16,7 @@ const {
   inTeam?: boolean
 }>()
 const emit = defineEmits<{ pick: [event: MouseEvent]; delete: [] }>()
-const { shared, status, copyLink, copied, linkChoices, menu } = useDropItem(() => drop, {
+const { shared, status, link, linkChoices, menu } = useDropItem(() => drop, {
   inTeam: () => inTeam,
   trash: () => emit("delete"),
 })
@@ -55,7 +56,7 @@ const about = computed(() => {
         class="ml-auto flex shrink-0 items-center gap-3 text-muted group-focus-within:invisible group-hover:invisible"
       >
         <UIcon v-if="shared" :aria-label="status" class="size-3.5" :name="SHARE_ICONS[drop.share]" role="img" />
-        <TimeAgo class="w-24 text-right tabular-nums" :at="drop.updatedAt" />
+        <RelativeTime :style="'short'" class="w-24 text-right tabular-nums" :at="drop.updatedAt" />
       </span>
     </NuxtLink>
     <div
@@ -64,16 +65,7 @@ const about = computed(() => {
       <DeferredMenu v-if="linkChoices" :items="linkChoices" :content="{ align: 'end' }">
         <UButton aria-label="Copy link" color="neutral" icon="i-mingcute-link-line" size="xs" variant="ghost" />
       </DeferredMenu>
-      <UButton
-        v-else
-        aria-label="Copy link"
-        color="neutral"
-        :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-        size="xs"
-        :ui="{ leadingIcon: copied() ? 'animate-icon-in' : undefined }"
-        variant="ghost"
-        @click="copyLink()"
-      />
+      <DropCopyButton v-else aria-label="Copy link" icon="i-mingcute-link-line" size="xs" :value="link" />
       <DeferredMenu :items="menu" :content="{ align: 'end' }">
         <UButton
           :aria-label="`Actions for ${drop.title}`"

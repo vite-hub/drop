@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import geist from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url"
+import { provideRelativeNow } from "vite-hub/ui"
+
+// Every RelativeTime counts from Drop's one clock (useRelativeNow), which the expiry badges and lists read too.
+provideRelativeNow(useRelativeNow())
 
 // Link previews need an absolute image URL, so it follows whichever host serves Drop.
 const origin = useRequestURL().origin

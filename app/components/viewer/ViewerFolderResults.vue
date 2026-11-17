@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // A folder's search results: drops anywhere below it whose name or text has every word, with the folders between and
 // the words around a match in a doc. Searching needs a signed-in person (/api/drops), so public visitors never see it.
+import { RelativeTime } from "vite-hub/ui"
 import { dropPath } from "#shared/links"
 import type { DropSummary } from "#shared/types"
 
@@ -47,7 +48,7 @@ const meta = (drop: DropSummary) =>
           <span class="min-w-0 flex-1">
             <span class="block truncate font-medium text-highlighted">{{ drop.title }}</span>
             <span class="mt-0.5 block truncate text-xs text-muted"
-              >{{ meta(drop) }} · <TimeAgo :at="drop.updatedAt"
+              >{{ meta(drop) }} · <RelativeTime :style="'short'" :at="drop.updatedAt"
             /></span>
             <span v-if="drop.snippet" class="mt-1 line-clamp-2 block text-sm text-muted">{{ drop.snippet }}</span>
           </span>

@@ -908,8 +908,7 @@ const copyMarkdown = (announce?: string) =>
     $fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }),
     { key: "markdown", announce },
   )
-const copyFeedback = () =>
-  copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
+const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).
 function copyLink(announce?: string) {
@@ -1062,10 +1061,10 @@ function copyCommentLink(comment: DropComment) {
   void copy(url.href, { announce: "Link to the comment copied" })
 }
 /** The drop's link with the diff showing: it opens the same changes, History beside them. */
-function copyChangesLink(version: DropVersion) {
+function changesLink(version: DropVersion) {
   const url = new URL(link.value)
   url.searchParams.set("changes", String(version.version))
-  void copy(url.href, { key: "changes", announce: "Link to the changes copied" })
+  return url.href
 }
 
 /** Select the thread immediately; the frame only scrolls to its anchor. */
@@ -1540,10 +1539,9 @@ watch(
             v-if="shownVersion && !editing"
             :key="shownVersion.version"
             :previous="previousVersion"
-            :copied="copied('changes')"
+            :link="changesLink(shownVersion)"
             :version="shownVersion"
             @close="closeChanges"
-            @copy-link="copyChangesLink(shownVersion)"
           />
         </div>
         <ViewerReviewDock
@@ -1569,15 +1567,7 @@ watch(
             >
               <template #actions>
                 <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
-                  <UButton
-                    aria-label="Copy feedback for your agent"
-                    color="neutral"
-                    :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-                    :ui="{ leadingIcon: copied('feedback') ? 'animate-icon-in' : undefined }"
-                    size="sm"
-                    variant="ghost"
-                    @click="copyFeedback"
-                  />
+                  <DropCopyButton aria-label="Copy feedback for your agent" size="sm" :value="feedback" />
                 </UTooltip>
                 <UButton
                   aria-label="Collapse comments"

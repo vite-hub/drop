@@ -46,11 +46,11 @@ test("a diagram label cannot inject markup through its preserved source", async 
   assert.match(html, /data-source=/)
 })
 
-test("a frontmatter date gets comark-properties' locale script, which the CSP allows", async () => {
+test("a frontmatter date gets comark-properties' relative-dates script, which the CSP allows", async () => {
   const html = await render("---\ndate: 2026-10-23\n---\n\nBody\n")
-  assert.match(html, /<time datetime="2026-10-23">\s*Oct 23, 2026\s*<\/time>/)
+  assert.match(html, /<time class="ctm" datetime="2026-10-23"[^>]*>\s*Oct 23, 2026<span class="ctm-tip"/)
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(([, script]) => script)
-  assert.ok(scripts.some((script) => script.includes("localizeDates")))
+  assert.equal(scripts.length, 2, "the relative dates and comark-time's Escape")
   for (const script of scripts)
     assert.ok(RENDERER_SCRIPTS.includes(script), "every renderer script is allowed by the CSP")
 })
