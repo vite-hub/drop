@@ -51,3 +51,14 @@ test("the rest of /api/review still needs a member", async () => {
     assert.equal(response.status, 401, `${method} ${path}`)
   }
 })
+
+// Like a public link's page, a folder's skills check the folder's share themselves (server/utils/hub-skills.ts).
+test("a members-only Drop lets a folder's skill discovery through, and nothing else below a link", async () => {
+  for (const path of [
+    "/d/abc/skill-hub/.well-known/agent-skills/index.json",
+    "/d/abc/.well-known/skills/release-notes/scripts/check.mjs",
+  ])
+    assert.equal((await request(path)).status, 200, path)
+  for (const path of ["/d/abc/skill-hub/.well-known/other/index.json", "/d/abc/skill-hub/deeper/page"])
+    assert.equal((await request(path)).status, 401, path)
+})

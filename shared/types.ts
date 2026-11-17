@@ -190,6 +190,21 @@ export interface DropDetail extends DropSummary {
    * to its questions, polls, and recall cards, and how everyone answered the questions and polls they did.
    */
   quiz?: DropQuiz
+  /** A folder a stranger opens that is a skill hub, or one of a hub's skills: what `npx skills add` installs from it. */
+  install?: SkillInstall
+}
+
+/**
+ * Where `npx skills add` installs a public folder's skills from (server/utils/hub-skills.ts): the hub's link and slug,
+ * and on a skill's own folder, the skill's name.
+ */
+export interface SkillInstall {
+  link: string
+  slug: string
+  /** A hub's page: how many skills it serves. */
+  skills?: number
+  /** A skill's folder in a hub: the skill, for `--skill`. */
+  skill?: string
 }
 
 /** A reader's latest answer to a block of a Markdown doc (#shared/quiz): the option keys they picked. */
