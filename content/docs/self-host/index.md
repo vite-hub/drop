@@ -119,16 +119,37 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 | --- | --- |
 | `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
 | `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
-| `auth.denied` | Why a sign-in or session was refused: `banned`, `not-member`, or `not-listed`. |
+| `identity.denied` | Why Drop refused a sign-in or session: `banned`, `not-member`, or `not-listed`. |
 | `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
 | `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |
 | `audit` | Admin and account actions, abuse reports, and billing changes from Stripe. |
+| `roomAccess.refused` | Why a live room turned someone away: `not-found`, `no-access`, `old-version`, `not-editable`, or `write`. |
+| `browserError` | An error in someone's browser. See below. |
+
+**ViteHub's fields.** ViteHub adds its own fields to the same event. `auth` says what a sign-in endpoint answered, `rateLimit` names the limit that refused a request, and `realtime` names the room that refused a connection. Drop's `identity.denied` and `roomAccess.refused` give Drop's reason behind an `auth` or `realtime` refusal.
 
 **Kept events.** Every event is kept today. Failures, requests slower than a second, and audits are kept even if you lower the sampling rate.
 
 **Left out.** The health check and static files write no event. Upload URLs and password reset links lose their token, and IP addresses are masked.
 
-**The hourly cleanup** writes one event a run, `schedule: "cleanup"`, with what each step did, how long it took, and the steps that failed.
+**The hourly cleanup** writes two events a run. ViteHub's, `schedule`, has the run's outcome, how long it took, and its error. Drop's, `action: "cleanup"` with the same `runId`, has what each step did, how long it took, and the steps that failed.
+
+### Browser errors {#browser-errors}
+
+**A browser error** is a failure in someone's browser that the server never saw. The page sends it to `POST /api/_vitehub/browser-errors`, and it lands on that request's event at the error level, as `browserError`.
+
+The page sends uncaught errors, chunks that fail to load, and the failures Drop catches and shows, such as a toast. A caught failure carries what Drop was doing in `browserError.action`, and in `browserError.fields` the answer's `status` and `requestId`, the `drop`, the toast's `title`, or the `source` of a frame's script.
+
+Drop leaves out the caught failures in the first three rows. The last applies to every error.
+
+| Not sent | Why |
+| --- | --- |
+| A refusal (any 4xx) | The server gave that answer on purpose. |
+| Drop's own 5xx | The server already logged it. A gateway's 502, 503, 504, or 52x is sent, since Drop may never have seen the request. |
+| An aborted request, an offline browser, a page that's closing | None of these is a failure. |
+| The same message twice, or past ten a page | The page sends each once, and at most ten a page load. |
+
+The page sends its path without the query. On a members-only Drop, only signed-in members' browsers can send them.
 
 ## Database and migrations {#database}
 
