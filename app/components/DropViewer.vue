@@ -785,7 +785,10 @@ watch(
   async (id) => {
     related.value = []
     if (!id) return
-    const found = await $fetch<RelatedDrop[]>(`/api/drops/${id}/related`).catch(() => [])
+    const found = await $fetch<RelatedDrop[]>(`/api/drops/${id}/related`).catch((error: unknown) => {
+      reportClientError("related", error, { drop: id })
+      return []
+    })
     if (relatesTo.value === id) related.value = found
   },
   { immediate: true },
@@ -1085,7 +1088,10 @@ async function focusComment(comment: DropComment) {
     await until(videoRef)
       .toBeTruthy({ timeout: 5000 })
       .catch(() => {})
-    const still = await videoRef.value?.frameAt(comment.at).catch(() => null)
+    const still = await videoRef.value?.frameAt(comment.at).catch((error: unknown) => {
+      reportClientError("video-frame", error, { drop: drop.value.id })
+      return null
+    })
     if (!still || popover.value?.type !== "thread" || popover.value.id !== comment.id) return
     showFrame(still)
     popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
@@ -1096,7 +1102,10 @@ async function focusComment(comment: DropComment) {
     await until(pdfRef)
       .toBeTruthy({ timeout: 5000 })
       .catch(() => {})
-    const still = await pdfRef.value?.pageAt(comment.pdfPage).catch(() => null)
+    const still = await pdfRef.value?.pageAt(comment.pdfPage).catch((error: unknown) => {
+      reportClientError("pdf-page", error, { drop: drop.value.id })
+      return null
+    })
     if (!still || popover.value?.type !== "thread" || popover.value.id !== comment.id) return
     showPage(still)
     popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }

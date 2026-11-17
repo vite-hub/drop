@@ -90,7 +90,10 @@ export function useViewerFrame(options: {
   const { base64: imageData } = useBase64(imageBlob)
   onMounted(async () => {
     if (drop.value.kind !== "image" || !drop.value.url) return
-    imageBlob.value = await $fetch<Blob>(drop.value.url, { responseType: "blob" }).catch(() => undefined)
+    imageBlob.value = await $fetch<Blob>(drop.value.url, { responseType: "blob" }).catch((error: unknown) => {
+      reportClientError("image-load", error, { drop: drop.value.id })
+      return undefined
+    })
   })
 
   const attached = useAttachmentData(drop)
@@ -223,7 +226,7 @@ export function useViewerFrame(options: {
   const unplaced = ref(new Set<string>())
 
   // What the page reports going wrong goes to the server in batches, for the agent's read_drop. Only apps and HTML pages
-  // run their own code; a Markdown doc's errors would be Drop's.
+  // run their own code; any other doc's errors are Drop's, so they go to Drop's logs instead.
   let runtimeReports: RuntimeReport[] = []
   const flushRuntimeReports = useDebounceFn(() => {
     const errors = runtimeReports.splice(0, 20)
@@ -232,7 +235,7 @@ export function useViewerFrame(options: {
       $fetch(`/api/drops/${drop.value.id}/errors`, {
         method: "POST",
         body: { version: drop.value.version, errors },
-      }).catch(() => {})
+      }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: drop.value.id }))
   }, 2000)
 
   /**
@@ -278,6 +281,13 @@ export function useViewerFrame(options: {
         if (drop.value.kind === "markdown") quiz.receive(message)
         return
       case "runtime-error":
+        // Every other kind (Markdown, spreadsheets, images) runs only Drop's code. A file that didn't load is the doc's
+        // own link, though, not Drop's failure.
+        if (!isApp.value && drop.value.kind !== "html" && message.kind !== "load" && message.message)
+          reportClientError(`frame-${message.kind}`, message.message, {
+            drop: drop.value.id,
+            ...(message.source ? { source: message.source } : {}),
+          })
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
           runtimeReports.push({
             kind: message.kind,
