@@ -1,13 +1,18 @@
 import assert from "node:assert/strict"
 import { beforeEach, test, vi } from "vite-plus/test"
-import { log } from "evlog"
+import { initLogger } from "evlog"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 const { getUsage, withDropQuota } = await import("../../server/utils/quotas.ts")
 const { default: cleanup } = await import("../../server/schedules/cleanup.ts")
 
+// The cleanup's run events, one per run.
+const runs = []
+initLogger({ silent: true, drain: ({ event }) => void runs.push(event) })
+
 migrate()
 beforeEach(() => {
   reset()
+  runs.length = 0
   state.quotasEnabled = true
 })
 
@@ -38,7 +43,6 @@ test("usage and publishing recover stale quota capacity without waiting for the 
 })
 
 test("hourly cleanup releases only stale pending reservations and logs each release once", async () => {
-  const warnings = vi.spyOn(log, "warn").mockImplementation(() => {})
   reservation("crashed", cutoff - 1, { target: "app" })
   reservation("other-crash", cutoff - 2, { owner: "other", month: "2026-09" })
   reservation("boundary", cutoff)
@@ -52,14 +56,13 @@ test("hourly cleanup releases only stale pending reservations and logs each rele
       .map((row) => row.id),
     ["boundary", "committed", "fresh"],
   )
-  assert.equal(warnings.mock.calls.length, 2)
-  const events = warnings.mock.calls
-    .map((call) => call[0])
-    .sort((a, b) => a.reservation.id.localeCompare(b.reservation.id))
-  assert.deepEqual(events, [
-    {
-      action: "quota-reservation-release",
-      reservation: {
+  assert.equal(runs.length, 1)
+  const step = runs[0].steps.quotaReservations
+  assert.equal(step.released, 2)
+  assert.deepEqual(
+    step.reservations.sort((a, b) => a.id.localeCompare(b.id)),
+    [
+      {
         id: "crashed",
         ownerId: "owner",
         month: "2026-10",
@@ -69,12 +72,9 @@ test("hourly cleanup releases only stale pending reservations and logs each rele
         bytes: 10,
         writes: 1,
         createdAt: cutoff - 1,
+        ageMs: 15 * 60 * 1000 + 1,
       },
-      ageMs: 15 * 60 * 1000 + 1,
-    },
-    {
-      action: "quota-reservation-release",
-      reservation: {
+      {
         id: "other-crash",
         ownerId: "other",
         month: "2026-09",
@@ -84,17 +84,17 @@ test("hourly cleanup releases only stale pending reservations and logs each rele
         bytes: 10,
         writes: 1,
         createdAt: cutoff - 2,
+        ageMs: 15 * 60 * 1000 + 2,
       },
-      ageMs: 15 * 60 * 1000 + 2,
-    },
-  ])
+    ],
+  )
   await cleanup.handler({ scheduledAt: new Date(now) })
-  assert.equal(warnings.mock.calls.length, 2, "Retries do not log reservations already released")
+  assert.equal(runs[1].steps.quotaReservations.released, 0, "Retries do not log reservations already released")
+  assert.equal(runs[1].steps.quotaReservations.reservations, undefined)
   reservation("replacement", now, { target: "app" })
 })
 
 test("reservation cleanup runs even when subsequent blob cleanup fails", async () => {
-  const warnings = vi.spyOn(log, "warn").mockImplementation(() => {})
   reservation("crashed", cutoff - 1)
   sql
     .prepare("INSERT INTO code_images (blob_key,owner_id,size,expires_at) VALUES ('expired','owner',10,?)")
@@ -102,7 +102,8 @@ test("reservation cleanup runs even when subsequent blob cleanup fails", async (
   state.failDelete = true
   await assert.rejects(cleanup.handler({ scheduledAt: new Date(now) }), /injected blob delete failure/)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM quota_reservations").get().n, 0)
-  assert.equal(warnings.mock.calls.length, 1)
+  assert.equal(runs[0].steps.quotaReservations.released, 1)
+  assert.deepEqual(runs[0].failed, ["codeImages"])
 })
 
 test("each member's limits follow their own tier, and anything else falls back to the Drop's default plan", async () => {

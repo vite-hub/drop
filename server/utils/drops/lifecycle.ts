@@ -1,5 +1,4 @@
 import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { type H3Event } from "h3"
 import { db } from "vite-hub/database"
 import { drops, dropVersions } from "../../databases/default/index"
@@ -11,6 +10,7 @@ import { deleteRetainedDrop } from "../quota-deletion"
 import { commentCleanupFor, drainCommentCleanup } from "../comments"
 import { expiryPolicy } from "../expiry"
 import type { Identity } from "../identity"
+import { logAudit } from "../logs"
 import type { DropRow } from "./types"
 import { listDrops, findDrop } from "./query"
 import { drainBlobCleanup, deleteBlobKeys } from "./write"
@@ -55,6 +55,7 @@ export async function emptyTrash(who: Identity, event?: H3Event) {
     const row = await findDrop(summary.id, event)
     if (row) await deleteDrop(row)
   }
+  logAudit(event, who, "trash.empty", { type: "user", id: who.userId, deleted: trashed.length })
   return trashed.length
 }
 
@@ -66,10 +67,11 @@ export async function emptyTrash(who: Identity, event?: H3Event) {
 export async function deleteExpiredDrops(now: Date, limit = 50) {
   const at = now.getTime()
   const { days } = expiryPolicy()
+  let expired = 0
   if (days) {
     const temporary = Math.min(TEMPORARY_DAYS, days)
     const lastSeen = sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt})`
-    await db
+    const moved = await db
       .update(drops)
       .set({
         trashedAt: sql`${lastSeen} + (CASE ${drops.lifetime} WHEN 'temporary' THEN ${temporary} ELSE ${days} END) * ${DAY_MS}`,
@@ -83,6 +85,8 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
           sql`${lastSeen} <= ${at} - (CASE ${drops.lifetime} WHEN 'temporary' THEN ${temporary} ELSE ${days} END) * ${DAY_MS}`,
         ),
       )
+      .returning({ id: drops.id })
+    expired = moved.length
   }
   const due = await db
     .select()
@@ -96,12 +100,18 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
     .limit(limit)
   await drainBlobCleanup()
   await drainCommentCleanup()
-  for (const row of due) {
-    await deleteDrop(row)
-    log.info({ action: "drop-purged", drop: row.id, owner: row.ownerId, reason: row.trashReason })
+  for (const row of [...due, ...orphans]) await deleteDrop(row)
+  // What the run deleted, for the cleanup's run event: drops whose Trash time ran out, and drops whose parent was gone.
+  return {
+    expired,
+    purged: due.length,
+    orphans: orphans.length,
+    deleted: [...due, ...orphans].map((row) => ({
+      id: row.id,
+      owner: row.ownerId,
+      reason: due.includes(row) ? row.trashReason : "orphan",
+    })),
   }
-  for (const row of orphans) await deleteDrop(row)
-  return due.length + orphans.length
 }
 
 /** The drop's share link, which opens its latest version. */

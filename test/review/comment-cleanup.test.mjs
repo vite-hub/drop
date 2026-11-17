@@ -55,7 +55,7 @@ for (const kind of ["markdown", "site"]) {
     }
     // Reinstall the primitive as at process start; only the database holds pending work.
     installComments(comments, { database: state.db })
-    assert.equal(await deleteExpiredDrops(new Date()), 0)
+    assert.equal((await deleteExpiredDrops(new Date())).purged, 0)
     assert.deepEqual(threads(), [])
     assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_comment_messages").get().n, 0)
     assert.equal(sql.prepare("SELECT count(*) AS n FROM comment_cleanup").get().n, 0)
