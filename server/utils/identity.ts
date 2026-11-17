@@ -5,7 +5,7 @@ import { verifyMcpRequest } from "vite-hub/auth/mcp"
 import { useAuth } from "vite-hub/auth/server"
 import { db } from "vite-hub/database"
 import { user as users } from "../databases/default/index"
-import { isMember } from "./members"
+import { isMember, rethrowMembershipOutage } from "./members"
 import { type TeamRole, teamsOf } from "./teams"
 import { useServerEnv } from "vite-hub/env"
 import { type Role, roleFor } from "#shared/roles"
@@ -100,7 +100,10 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   if (bearerFrom(event.req.headers)) return fromAccessToken(event)
   const session = await authFor(event)
     .api.getSession({ headers: event.req.headers })
-    .catch(() => null)
+    .catch((error: unknown) => {
+      rethrowMembershipOutage(error)
+      return null
+    })
   if (!session?.user || session.user.banned) return null
   return {
     userId: session.user.id,

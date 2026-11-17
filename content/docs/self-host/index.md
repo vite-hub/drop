@@ -24,7 +24,7 @@ Then set these on the deployment:
 ::docs-env
 ::
 
-Drop reads its settings when it runs, so a change needs a restart, not a rebuild. Only the host and database are fixed at build time. Each setting also answers to a `VITEHUB_` name, such as `VITEHUB_DROP_MODE`, which wins when both are set. Booleans take `true`, `false`, `1`, or `0`; an invalid value stops Drop with an error naming the setting.
+Drop reads its settings when it runs, so a change needs a restart, not a rebuild. Only the host and database are fixed at build time. Each setting also answers to a `VITEHUB_` name, such as `VITEHUB_DROP_MODE`, which wins when both are set. `VITEHUB_MEMBERS` is owned by ViteHub Auth and only reads that name; `VITEHUB_DROP_MEMBERS` is unsupported. Booleans take `true`, `false`, `1`, or `0`; an invalid value stops Drop with an error naming the setting.
 
 - **Who signs in.** Anyone with a GitHub account, as a Member. `VITEHUB_MEMBERS` lets in only the people it lists, plus the admins, for publishing and viewing, shared links and MCP included. Each entry is a GitHub account (`github:22072217`), an email a sign-in method verified, an email domain (`@example.com`), or a GitHub organization (`github-org:your-org`), which makes sign-in ask for `read:org`. Matching any entry is enough. Take someone off, and they can't sign in again and lose their session within five minutes. It's [ViteHub Auth's member list](https://vitehub.dev/docs/auth/configure#choose-who-can-sign-in).
 - **Who is Admin.** `DROP_ADMINS` lists admin emails, separated by commas or spaces, in any case. Whoever signs in with one, by a method that verified the email, is Admin. Restart to apply a change. In `nuxt dev` and with `DROP_TEST_SIGNIN`, an unverified email counts too.

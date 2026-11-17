@@ -3,7 +3,7 @@ import { checkGitHubOrgMember } from "vite-hub/auth"
 import { useServerEnv } from "vite-hub/env"
 
 /** The GitHub organization that oauth2-proxy signs people in for: the first `github-org:` entry of `VITEHUB_MEMBERS`. */
-export const proxyOrganization = () =>
+const proxyOrganization = () =>
   useServerEnv()
     .drop.members.unseal()
     .split(",")

@@ -69,7 +69,9 @@ async function open(browser, width) {
   const page = await context.newPage()
   await page.goto("https://drop.test/")
   const frame = page.frames()[1]
-  await frame.waitForFunction(() => document.querySelector("drop-comments")?.shadowRoot.querySelector(".m"))
+  await frame.waitForFunction(() =>
+    document.querySelector("drop-comments")?.shadowRoot.querySelector('[data-slot="comment-mark-pin"]'),
+  )
   await frame.evaluate(() => document.fonts.ready)
   return { context, page, frame }
 }
@@ -89,7 +91,7 @@ const drawn = (frame) =>
         ...box(group.querySelector(".cr-card")).toJSON(),
         display: getComputedStyle(group.querySelector(".cr-card")).display,
       })),
-      pins: [...root.querySelectorAll(".m")].map((pin) => pin.dataset.id),
+      pins: [...root.querySelectorAll('[data-slot="comment-mark-pin"]')].map((pin) => pin.dataset.id),
       // Each bubble in the page's own text: its box, its count, and the box of the character after it.
       bubbles: Object.fromEntries(
         [...document.querySelectorAll("drop-bubble")].map((bubble) => {
@@ -109,7 +111,7 @@ const drawn = (frame) =>
           ]
         }),
       ),
-      outlines: root.querySelectorAll(".marks > .a.t").length,
+      outlines: root.querySelectorAll('.marks > [data-slot="comment-mark-area"].t').length,
       margin: CSS.highlights.get("drop-margin")?.size ?? 0,
     }
   })
@@ -173,7 +175,7 @@ test("open text comments on a wide doc sit beside their text as bubbles and marg
     const hovered = await frame.evaluate(() => ({
       checked: [...document.querySelector("drop-comments").shadowRoot.querySelectorAll(".cr-tg")].map((t) => t.checked),
       bubble: document.querySelector('drop-bubble[data-id="c3"]').hasAttribute("data-on"),
-      active: CSS.highlights.get("drop-active").size,
+      active: CSS.highlights.get("vh-comment-active").size,
     }))
     assert.deepEqual(hovered, { checked: [false, false, true, false, false], bubble: true, active: 1 })
     await card.click()
@@ -229,7 +231,7 @@ test("leaving the frame clears quote hover while keeping the open thread raised"
           (t) => t.checked,
         ),
         bubbles: [...document.querySelectorAll("drop-bubble[data-on]")].map((b) => b.dataset.id),
-        active: CSS.highlights.get("drop-active").size,
+        active: CSS.highlights.get("vh-comment-active").size,
       }))
     const hover = async () => {
       await page.mouse.move(quote.x, quote.y)
@@ -292,7 +294,7 @@ test("a comment being written on a selection keeps its card's place in the margi
     await page.waitForFunction(() => window.posts.some((m) => m.type === "draft-place"))
     const place = await page.evaluate(() => window.posts.findLast((m) => m.type === "draft-place"))
     const line = await frame.evaluate(() => {
-      const r = CSS.highlights.get("drop-draft").values().next().value.getClientRects()
+      const r = CSS.highlights.get("vh-comment-draft").values().next().value.getClientRects()
       return r[r.length - 1].toJSON()
     })
     const cards = (await drawn(frame)).cards
@@ -385,8 +387,8 @@ test("an open thread is written in where it is: over its margin card, else besid
     // With its area: the thread goes beside both, so it never covers what the comment is about.
     const pinBox = await frame.evaluate(() => {
       const root = document.querySelector("drop-comments").shadowRoot
-      const p = root.querySelector('.m[data-id="c8"]').getBoundingClientRect()
-      const a = root.querySelector('.a[data-for="c8"]').getBoundingClientRect()
+      const p = root.querySelector('[data-slot="comment-mark-pin"][data-id="c8"]').getBoundingClientRect()
+      const a = root.querySelector('[data-slot="comment-mark-area"][data-for="c8"]').getBoundingClientRect()
       return {
         left: Math.min(p.left, a.left),
         top: Math.min(p.top, a.top),
@@ -425,16 +427,23 @@ test("a saved area is a soft line of ViteHub's comment blue, full blue while its
           return { border: css.borderTopColor, width: css.borderTopWidth, fill: css.backgroundColor }
         }
         const drawing = document.createElement("div")
-        drawing.className = "a"
+        drawing.dataset.slot = "comment-mark-area"
+        drawing.dataset.draft = "true"
         root.querySelector(".draft").appendChild(drawing)
-        // ViteHub's comment blue (--ring in @vite-hub/ui/theme.css), whole and at half strength.
+        // ViteHub's comment blue (--vh-comment-mark in @vite-hub/ui/comment-marks.css), whole and at half strength.
+        const mark = getComputedStyle(root.host).getPropertyValue("--vh-comment-mark").trim()
         const probe = document.createElement("i")
         document.body.appendChild(probe)
-        probe.style.color = "oklch(0.588 0.158 241.966)"
+        probe.style.color = mark
         const blue = getComputedStyle(probe).color
-        probe.style.color = "color-mix(in oklab, oklch(0.588 0.158 241.966) 50%, transparent)"
+        probe.style.color = `color-mix(in oklab, ${mark} 50%, transparent)`
         const half = getComputedStyle(probe).color
-        const result = { area: style(root.querySelector('.a[data-for="c8"]')), draft: style(drawing), blue, half }
+        const result = {
+          area: style(root.querySelector('[data-slot="comment-mark-area"][data-for="c8"]')),
+          draft: style(drawing),
+          blue,
+          half,
+        }
         probe.remove()
         drawing.remove()
         return result
@@ -451,8 +460,10 @@ test("a saved area is a soft line of ViteHub's comment blue, full blue while its
       document.querySelector("iframe").contentWindow.postMessage({ __drop: true, type: "active", id: "c8" }, "*"),
     )
     await frame.waitForFunction(() => {
-      const area = document.querySelector("drop-comments").shadowRoot.querySelector('.a[data-for="c8"]')
-      return area.classList.contains("on") && !area.getAnimations().length
+      const area = document
+        .querySelector("drop-comments")
+        .shadowRoot.querySelector('[data-slot="comment-mark-area"][data-for="c8"]')
+      return area.dataset.active === "true" && !area.getAnimations().length
     })
     const focused = await look()
     assert.equal(focused.area.border, focused.blue)
@@ -479,8 +490,8 @@ test("with comments hidden, an area Drop still shows draws alone, and pops out w
             .filter((el) => el.checkVisibility())
             .map((el) => el.dataset.id ?? el.dataset.for)
         return {
-          pins: visible(".marks > .m"),
-          areas: visible(".marks > .a"),
+          pins: visible('.marks > [data-slot="comment-mark-pin"]'),
+          areas: visible('.marks > [data-slot="comment-mark-area"]'),
           rail: document.documentElement.getAttribute("data-drop-rail"),
           leaving: root.querySelectorAll(".leave > *").length,
         }

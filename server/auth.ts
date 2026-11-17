@@ -22,6 +22,7 @@ import {
   teamPlans,
   teamsEnabled,
 } from "./utils/teams"
+import { currentRoleAdapter } from "./utils/current-role-adapter"
 import { teamLimitAdapter } from "./utils/team-limit-adapter"
 import { TIERS } from "#shared/quotas"
 
@@ -69,7 +70,9 @@ export default defineAuth(({ env, requestOrigin }) => {
   return {
     appName: "Drop",
     baseURL: requestOrigin,
-    database: teamLimitAdapter(drizzleAdapter(db, { provider: "sqlite", schema })),
+    database: currentRoleAdapter(teamLimitAdapter(drizzleAdapter(db, { provider: "sqlite", schema })), (person) =>
+      roleOf(person, env.drop.admins.unseal()),
+    ),
     // Default retention: 90 days / 100,000 events. ViteHub strips IPs and secrets and isolates write failures.
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),

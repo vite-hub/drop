@@ -7,6 +7,7 @@ import { env } from "vite-hub/env"
 import { CLIENT_IP_HEADERS } from "./shared/client-ip.ts"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
+import { ROBOTS_DISALLOW } from "./shared/robots.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
@@ -176,6 +177,9 @@ export default defineNuxtConfig({
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
+    // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
+    // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
+    seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
     auth: true,
     console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
     env: {
@@ -201,7 +205,8 @@ export default defineNuxtConfig({
           // The only people who may sign in, open shared links, or use MCP: ViteHub Auth's VITEHUB_MEMBERS, such as
           // `github:22072217,ada@example.com,@acme.com,github-org:acme`. Admins always may. Empty lets anyone in. Drop
           // reads it only to know whether it is members-only, and for oauth2-proxy's organization.
-          members: env({ secret: true, source: env.source("VITEHUB_MEMBERS"), default: "" }),
+          // This Auth-owned setting only accepts VITEHUB_MEMBERS, without a VITEHUB_DROP_MEMBERS alias.
+          members: env({ secret: true, source: env.source("VITEHUB_MEMBERS", { canonical: false }), default: "" }),
           // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
           authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
           authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),

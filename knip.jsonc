@@ -14,6 +14,8 @@
         "server/mcp/index.ts",
         // ViteHub Content's definition, found by convention.
         "server/content.ts",
+        // ViteHub's sitemap entries (`seo.sitemap`), found by convention.
+        "server/sitemap.ts",
         // Tags in content/docs/**/*.md (`::roles-table`) render these; knip doesn't read the Markdown.
         "app/components/docs/md/*.vue",
         // Nuxt auto-imports these viewer controls; their references are template/runtime driven.

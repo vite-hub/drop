@@ -169,7 +169,7 @@ test("area selection respects permissions, edit/diff state, lightboxes, and file
   }
 })
 
-test("text and attached images survive plain/area composer replacement, then release on leaving the viewer", async () => {
+test("text, mentions and attached images survive plain/area composer replacement, then release on leaving the viewer", async () => {
   // A minimal Vue host exercises real provide/inject and component cleanup without a browser.
   const node = () => ({ children: [], parent: null })
   const renderer = createRenderer({
@@ -205,13 +205,20 @@ test("text and attached images survive plain/area composer replacement, then rel
   })
   app.mount(node())
   const image = new File(["image"], "feedback.png", { type: "image/png" })
-  draft.body.value = "Keep this feedback"
+  draft.body.value = "Keep this feedback @Ana Ruiz"
+  draft.mentions.value = ["ana"]
+  const lookup = draft.rememberPeople([{ id: "ana", name: "Ana Ruiz" }])
+  await Promise.resolve()
+  assert.deepEqual(draft.people.value, []) // Publication must wait beyond the native input event's microtasks.
+  await lookup
   draft.images.drop({ dataTransfer: { files: [image] }, preventDefault() {} })
   const preview = draft.images.picks.value[0].url
   for (const next of ["area", "plain"]) {
     mode.value = next
     await nextTick()
-    assert.equal(composer.body.value, "Keep this feedback")
+    assert.equal(composer.body.value, "Keep this feedback @Ana Ruiz")
+    assert.deepEqual(composer.mentions.value, ["ana"])
+    assert.deepEqual(composer.people.value, [{ id: "ana", name: "Ana Ruiz" }])
     assert.deepEqual(composer.images.files.value, [image])
     assert.equal((await fetch(preview)).status, 200)
   }
@@ -232,11 +239,14 @@ test("text and attached images survive plain/area composer replacement, then rel
   // Failure retains the draft; a stale completion cannot release a later request.
   const failed = composer.beginSend()
   assert.equal(failed(false), false)
+  assert.deepEqual(composer.mentions.value, ["ana"])
   const accepted = composer.beginSend()
   finish(true)
   assert.equal(composer.sending.value, true)
   assert.equal(accepted(true), true)
   assert.equal(composer.body.value, "")
+  assert.deepEqual(composer.mentions.value, [])
+  assert.deepEqual(composer.people.value, [])
   assert.deepEqual(composer.images.files.value, [])
   await assert.rejects(fetch(preview))
   await assert.rejects(fetch(secondPreview))

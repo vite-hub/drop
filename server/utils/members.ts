@@ -20,3 +20,15 @@ export async function isMember(userId: string, event?: H3Event | Request) {
     })
   return !error
 }
+
+/** Session policy errors cross Better Auth's API boundary before the sessionless check can run. */
+export function rethrowMembershipOutage(error: unknown) {
+  if (!error || typeof error !== "object" || !("body" in error)) return
+  const body = error.body
+  if (body && typeof body === "object" && "code" in body && body.code === "AUTH_GITHUB_UNAVAILABLE")
+    throw new HTTPError({
+      status: 503,
+      statusText: "GitHub membership verification is unavailable. Try again shortly.",
+      data: { code: body.code },
+    })
+}

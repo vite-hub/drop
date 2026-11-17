@@ -1,12 +1,33 @@
+import type { CommentUser } from "vite-hub/comments/client"
+
 // A new comment keeps its text and images when the reviewer adds or removes an area.
 export const [provideReviewDraft, injectReviewDraft] = createInjectionState(() => {
   const body = ref("")
   const images = useImagePicks()
+  const mentions = ref<string[]>([])
+  const people = ref<CommentUser[]>([])
+  async function rememberPeople(found: CommentUser[]) {
+    // Mention lookup starts in input capture. Wait for the target input handler to save the native text
+    // before publishing reactive people (a microtask can still run between those event handlers).
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    people.value = [...new Map([...people.value, ...found].map((person) => [person.id, person])).values()]
+    return found
+  }
+  watch(
+    body,
+    (text) => {
+      if (!text) {
+        mentions.value = []
+        people.value = []
+      }
+    },
+    { flush: "sync" },
+  )
   const sending = ref(false)
   // Waiting for the picture of the area being commented on before it sends (DropViewer's submit).
   const waiting = ref(false)
   let revision = 0
-  watch([body, images.picks], () => revision++, { flush: "sync" })
+  watch([body, images.picks, mentions], () => revision++, { flush: "sync" })
 
   // Ownership lives with the draft, so replacing a composer cannot start a second send.
   function beginSend() {
@@ -25,5 +46,5 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState(() =
     }
   }
 
-  return { body, images, sending, waiting, beginSend }
+  return { body, images, mentions, people, rememberPeople, sending, waiting, beginSend }
 })
