@@ -1,6 +1,5 @@
 import type { AgentMetadata } from "#shared/agent"
 import { and, eq, exists, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { blob, detectContentType } from "vite-hub/blob"
@@ -16,7 +15,7 @@ import { defaultShare, isPublic, type Share } from "#shared/share"
 import { MAX_KEEP_REASON } from "#shared/expiry"
 import { shareReviewFor } from "../trust"
 import type { Identity } from "../identity"
-import { logDrop } from "../logs"
+import { background, logDrop } from "../logs"
 import { requireKeepSlot, withDropQuota } from "../quotas"
 import { expiryPolicy } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
@@ -96,7 +95,7 @@ async function queueBlobCleanup(keys: string[]) {
         .values(chunk.map((blobKey) => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() })))
         .onConflictDoNothing()
   } catch (error) {
-    log.error({ action: "blob-cleanup-queue", error: String(error) })
+    background.error({ action: "blob-cleanup-queue", error: String(error) })
   }
 }
 
@@ -117,13 +116,13 @@ export async function deleteBlobKeys(keys: string[]) {
   try {
     await Promise.all(unique.map(deleteMarkdownCache))
   } catch (error) {
-    log.error({ action: "markdown-cache-cleanup", error: String(error) })
+    background.error({ action: "markdown-cache-cleanup", error: String(error) })
     await queueBlobCleanup(unique)
     return
   }
   const [error] = await blob.delete(unique)
   if (error) {
-    log.error({ action: "blob-cleanup", error: error.message, keys: unique.length })
+    background.error({ action: "blob-cleanup", error: error.message, keys: unique.length })
     await queueBlobCleanup(unique)
     return
   }

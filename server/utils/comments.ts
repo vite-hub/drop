@@ -1,5 +1,4 @@
 import { and, eq, type SQL, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { HTTPError } from "h3"
 import * as v from "valibot"
 import type {
@@ -19,6 +18,7 @@ import { commentCleanup, drops } from "../databases/default/index"
 import { attachmentsUnder, deleteImages, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
 import type { Identity } from "./identity"
+import { background } from "./logs"
 
 /**
  * Drop's comments are ViteHub Comments threads (server/comments.ts). A thread's first message is the comment, the rest
@@ -452,7 +452,7 @@ export async function drainCommentCleanup() {
       await removeQueuedComments(item)
       await db.delete(commentCleanup).where(eq(commentCleanup.dropId, item.dropId))
     } catch (error) {
-      log.error({ action: "comment-cleanup", drop: item.dropId, error: String(error) })
+      background.error({ action: "comment-cleanup", drop: item.dropId, error: String(error) })
     }
   }
 }

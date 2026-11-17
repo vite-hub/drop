@@ -1,14 +1,39 @@
 import { AsyncLocalStorage } from "node:async_hooks"
-import { type AuditActor, type AuditTarget, log, type RequestLogger } from "evlog"
+import { type AuditActor, type AuditTarget, createLogger, log, type RequestLogger } from "evlog"
 import { useLogger } from "evlog/nitro/v3"
 import type { H3Event } from "h3"
 import type { DropRow } from "./drops/types"
 import type { Identity } from "./identity"
 
+declare module "h3" {
+  interface H3EventContext {
+    /** The drop the request's wide event names (logDrop), so later reads don't replace it. */
+    loggedDrop?: string
+    /** The request's wide event is already out (an error page renders after it): nothing more goes on it. */
+    logClosed?: boolean
+    /** A Stripe webhook's audit is set (teams.ts `logSubscription`): a second callback on it doesn't replace it. */
+    billingAudited?: boolean
+  }
+}
+
 /** The request's wide event (evlog). None outside a request: the hourly schedule, and calls made without the event. */
 export function requestLog(event?: H3Event | null): RequestLogger | undefined {
-  if (!event?.req.context?.log) return
+  if (!event?.req.context?.log || event.context.logClosed) return
   return useLogger(event)
+}
+
+// The host, for events outside a request, which no Nitro hook sees (server/plugins/wide-events.ts sets it).
+let host: string | undefined
+export const setDeploymentHost = (name: string) => {
+  host = name
+}
+const deployment = () => (host ? { deployment: { host } } : {})
+
+/** An event of its own, outside a request: a schedule's run, or a failure with no request to put it on. */
+export const background = {
+  logger: (fields: Record<string, unknown>) => createLogger({ ...fields, ...deployment() }),
+  warn: (fields: Record<string, unknown>) => log.warn({ ...fields, ...deployment() }),
+  error: (fields: Record<string, unknown>) => log.error({ ...fields, ...deployment() }),
 }
 
 /**
@@ -19,7 +44,7 @@ export function logError(event: H3Event | undefined, error: unknown, fields: Rec
   const failure = error instanceof Error ? error : new Error(String(error))
   const request = requestLog(event)
   if (request) return request.error(failure, fields)
-  log.error({ ...fields, error: { name: failure.name, message: failure.message, stack: failure.stack } })
+  background.error({ ...fields, error: { name: failure.name, message: failure.message, stack: failure.stack } })
 }
 
 /**
@@ -44,13 +69,6 @@ export function logDenied(event: H3Event | undefined, denied: AuthDenial) {
 }
 
 type LoggedDrop = Pick<DropRow, "id" | "kind" | "version">
-
-declare module "h3" {
-  interface H3EventContext {
-    /** The drop the request's wide event names (logDrop), so later reads don't replace it. */
-    loggedDrop?: string
-  }
-}
 
 /**
  * Names the drop a request is about on its wide event: the first one it reads, so the folders and ancestors read
