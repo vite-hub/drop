@@ -195,19 +195,23 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   });
   document.body.append(host);
 
-  // A compare, or a Mermaid diagram wider than the text, spreads past the text into the room beside it, where the
-  // outline goes. So in a doc with one, the outline keeps a 200px column 4rem right of them, and the text moves left
+  // A compare, or a Mermaid diagram or a table wider than the text, spreads past the text into the room beside it, where
+  // the outline goes. So in a doc with one, the outline keeps a 200px column 4rem right of them, and the text moves left
   // only as far as that needs (like for the viewer's panel). It only shows while they keep at least the text's width.
   // A doc with threads keeps them in the column, since comark-comments' cards take that room (document-shell.css), and
   // so does any doc while review comments sit in the margin (data-drop-rail, ANNOTATOR_SCRIPT).
-  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .cmm[data-wide]")].filter((block) => !block.closest(".cr"));
+  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .cmm[data-wide], .typeset > div[data-width]")].filter((block) => !block.closest(".cr"));
+  // A diagram's own width is its SVG's; a table's is the width comark-ui estimated from its cells, in em.
+  const own = (block) => block.classList.contains("cmm")
+    ? parseFloat(block.style.getPropertyValue("--cmm-svg"))
+    : parseFloat(block.dataset.width) * parseFloat(getComputedStyle(block).fontSize);
   const column = 264;
   const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
     const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
     const text = main.getBoundingClientRect().width - 48;
     const railed = document.documentElement.getAttribute("data-drop-rail") === "open";
-    const wide = railed ? [] : blocks.filter((block) => block.classList.contains("ca-compare") || parseFloat(block.style.getPropertyValue("--cmm-svg")) > text);
+    const wide = railed ? [] : blocks.filter((block) => block.classList.contains("ca-compare") || own(block) > text);
     if (blocks.length && !wide.length) {
       document.body.style.removeProperty("--drop-outline");
       document.body.style.removeProperty("--drop-shift");
@@ -224,7 +228,9 @@ const OUTLINE_SCRIPT = String.raw`(() => {
         }
         return on;
       };
-      const diagrams = () => wide.reduce((sum, block) => sum + (block.classList.contains("ca-compare") ? 0 : block.getBoundingClientRect().width), 0);
+      // A compare fills whatever room it gets, and a table stacks its prose columns when cramped, so only a diagram's
+      // width decides whether the outline keeps its column.
+      const diagrams = () => wide.reduce((sum, block) => sum + (block.classList.contains("cmm") ? block.getBoundingClientRect().width : 0), 0);
       let fits = keep(innerWidth - inset - column - 48 >= main.getBoundingClientRect().width);
       // A diagram's labels matter more than the outline, so the outline goes when its column would shrink a diagram.
       if (fits) {
