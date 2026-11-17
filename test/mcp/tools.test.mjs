@@ -528,6 +528,45 @@ test("a comment on a video's frame keeps its second, and read_drop tells agents 
   )
 })
 
+test("a comment on a PDF's page keeps the page's number, and read_drop tells agents which page", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${id}/comments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init),
+      }),
+    )
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  insertDrop("paper", { kind: "file", filename: "paper.pdf", blob_key: "paper.pdf", content_type: "application/pdf" })
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
+  const area = { kind: "image", selector: "pdf", ox: 300, oy: 120, ow: 400, oh: 180, label: "page 3" }
+  const sent = await commentsPost(route("paper", { ...area, pdfPage: 3, body: "Caption this figure." }))
+  assert.equal(sent.pdfPage, 3)
+  assert.equal(sent.at, null)
+  const plain = await commentsPost(route("paper", { kind: "page", selector: "", ox: 0, oy: 0, body: "Nice." }))
+  assert.equal(plain.pdfPage, null)
+  await assert.rejects(
+    commentsPost(route("paper", { kind: "area", selector: "main", ox: 0, oy: 0, pdfPage: 2, body: "x" })),
+    { statusText: "A PDF's page takes a spot or an area." },
+  )
+  await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 0, body: "x" })))
+  await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 2, at: 4, body: "x" })), {
+    statusText: "A comment is on a frame or a page, not both.",
+  })
+
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const read = await call(readDrop, { id: "paper" })
+  assert.deepEqual(
+    read.structuredContent.comments.map((comment) => comment.pdfPage),
+    [3, undefined],
+  )
+  assert.match(read.content[0].text, /\[the area 30%–70% across, 12%–30% down of page 3\]\n {3}Caption this figure\./)
+})
+
 test("accepting a suggestion, from the page or an agent, publishes its words as the next version and resolves it; undo takes it back", async () => {
   const post = (id, init) => {
     const event = new H3Event(

@@ -73,6 +73,9 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(message.title)} · Drop</title>
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   ${card}
   <style>
     ${theme}
@@ -114,7 +117,7 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
         "X-Robots-Tag": "noindex, nofollow",
         "Cache-Control": "private, no-store",
         "Content-Security-Policy":
-          "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+          "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       },
     },
   )

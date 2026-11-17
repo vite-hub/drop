@@ -433,6 +433,7 @@ export default defineNuxtConfig({
     },
     // Added to Nuxt's own list, which already serves `public/`.
     publicAssets: [
+      { baseURL: "/vendor/pdfjs/wasm", dir: "node_modules/pdfjs-dist/wasm", maxAge: 60 * 60 * 24 * 365 },
       { baseURL: "/vendor/medium-zoom", dir: "node_modules/medium-zoom/dist", maxAge: 60 * 60 * 24 * 365 },
     ],
   },
