@@ -46,7 +46,7 @@ async function pick(next: Share) {
 // Reka focuses the first button, the close X, and rings it. Focus the panel instead: Tab still walks in, Escape still closes.
 function focusPanel(event: Event) {
   event.preventDefault()
-  ;(event.target as HTMLElement).focus({ preventScroll: true })
+  if (event.target instanceof HTMLElement) event.target.focus({ preventScroll: true })
 }
 </script>
 
